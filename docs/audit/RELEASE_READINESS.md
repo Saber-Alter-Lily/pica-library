@@ -1,17 +1,22 @@
 # Release Readiness
 
-`READY_FOR_REVIEW`
+`PRIVATE_V0_1_0_RELEASE_CANDIDATE_READY_FOR_CHATGPT_FINAL_AUDIT`
 
-The candidate passed 64/64 local tests and all push/pull-request GitHub CI jobs on
-Node 22 and Node 24 at tested code SHA
-`ca33dcc3a8409adfd4b330e63ee76c161634ca3a`. It is suitable for private
-human/ChatGPT review but is not approved for release.
+Final code SHA: `718149f85491b1b205911cb804a0d490e5022e0f`.
 
-Remaining release blockers:
+Completed gates:
 
-- `MANUAL_PENDING_AFTER_PRIVATE_MAIN_MERGE`: live provider test with maintainer-owned credentials.
-- `MANUAL_PENDING_AFTER_PRIVATE_MAIN_MERGE`: live manual GitHub Runner download/artifact test.
-- Explicit future authorization for merge, visibility, release, Pages and package publication decisions.
+- Local regression 78/78, type, lint, format, Web syntax, build, CLI smoke.
+- GitHub CI Node 22 and Node 24.
+- Existing private source runner live baseline.
+- Recommendation V2 and bounded provider recall validation.
+- Local incremental download, update check, repair scan, and Bundle validation.
+- Browser Lite static-site load, persistence-state comparison, recommendation
+  rendering, and clear-state behavior.
+- Private companion caller, one comic/one episode/balanced live artifact.
+- Artifact, Bundle, tracked source, and review-package security scans.
+- Temporary source deploy key and private key removed after validation.
 
-No merge, release, tag, npm publication, GitHub Release, Pages deployment or public
-visibility change is part of this candidate.
+The repository remains PRIVATE. No merge to main, public visibility change,
+tag, GitHub Release, production Pages deployment, npm/Docker publication, or
+public announcement is authorized or performed.

@@ -1,8 +1,8 @@
 # Local Live Validation Report
 
-Workspace: `G:\pica-library-live-validation`; validation data remained only in
-its ignored `.live-validation-data` directory. No credentials, titles, or media
-are included in this report.
+Validation data remained only in the ignored workspace data directory. No
+credentials, titles, absolute maintainer paths, or media are included in this
+report.
 
 - Existing authenticated Library: 1770 favorites.
 - Recommendation V2: passed; 30 recommendations returned and 30 contained cover

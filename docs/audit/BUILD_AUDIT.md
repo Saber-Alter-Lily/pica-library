@@ -5,7 +5,7 @@
 - Frozen source SHA: `9a8448a49062f22c367fdea1dc10e3acf53fde1d`
 - Target repository: `Saber-Alter-Lily/pica-library` (private, independent, not a fork)
 - Candidate branch: `codex/independent-v0.1.0-rc1`
-- Tested code SHA: `ca33dcc3a8409adfd4b330e63ee76c161634ca3a`
+- Final tested code SHA: `718149f85491b1b205911cb804a0d490e5022e0f`
 - Version: `0.1.0-rc.1`
 
 The candidate includes separate trusted API and uncredentialed media clients,

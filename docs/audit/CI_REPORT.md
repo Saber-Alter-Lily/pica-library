@@ -1,6 +1,6 @@
 # CI Report
 
-Final RC code SHA: `13a4159a1d01b404b9ee6cf474f0cde61f475e29`.
+Final RC code SHA: `718149f85491b1b205911cb804a0d490e5022e0f`.
 
 - Local regression: 21 files, 78/78 tests passed.
 - TypeScript: passed.
@@ -11,7 +11,7 @@ Final RC code SHA: `13a4159a1d01b404b9ee6cf474f0cde61f475e29`.
 - Built CLI smoke: passed.
 - GitHub Actions Node 22: passed.
 - GitHub Actions Node 24: passed.
-- CI run: <https://github.com/Saber-Alter-Lily/pica-library/actions/runs/31625731327>
+- CI run: <https://github.com/Saber-Alter-Lily/pica-library/actions/runs/31627819130>
 
 No critical test is skipped. Coverage includes database migration, scheduler,
 retry quiescence, pause/resume/cancel, repair, Bundle, Browser Lite,

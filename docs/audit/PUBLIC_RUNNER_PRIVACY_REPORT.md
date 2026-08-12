@@ -15,9 +15,10 @@ only for the corrected RC validation.
 - The engine source is checked out from `job.workflow_repository` at immutable
   `job.workflow_sha`, not from the caller checkout context.
 - Normal public-source callers pass only named `PICA_ACCOUNT` and
-  `PICA_PASSWORD` secrets. A temporary optional `PICA_SOURCE_TOKEN` exists only
-  so maintainers can validate cross-repository checkout before the source is
-  public; it is removed from the companion after validation.
+  `PICA_PASSWORD` secrets. Temporary optional source credentials exist only so
+  maintainers can validate cross-repository checkout before the source is
+  public. A repository-scoped, read-only `PICA_SOURCE_SSH_KEY` deploy key is
+  preferred and is removed after validation.
 - Artifact retention is one day and the artifact belongs to the caller run.
 - The source repository's manual wrapper calls the same guarded engine, so it
   automatically fails closed if the source repository is public.

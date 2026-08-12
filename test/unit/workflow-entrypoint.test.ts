@@ -49,6 +49,9 @@ describe('built CLI entrypoint contract', () => {
         expect(reusable).toContain(
             'token: ${{ secrets.PICA_SOURCE_TOKEN || github.token }}'
         )
+        expect(reusable).toContain(
+            'ssh-key: ${{ secrets.PICA_SOURCE_SSH_KEY }}'
+        )
         expect(reusable).toContain('persist-credentials: false')
         expect(reusable).toContain('retention-days: 1')
     })

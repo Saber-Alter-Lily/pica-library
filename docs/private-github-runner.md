@@ -14,9 +14,10 @@ private caller run.
 5. Open Actions, choose `private-pica-download`, and run a small request first.
 
 While the engine source itself is still private during maintainer RC validation,
-an additional temporary read-only `PICA_SOURCE_TOKEN` may be required for source
-checkout. This is not needed after the engine repository becomes public and is
-not part of the normal user setup.
+an additional temporary read-only `PICA_SOURCE_SSH_KEY` deploy key may be
+required for source checkout. This is not needed after the engine repository
+becomes public and is not part of the normal user setup. A repository-scoped,
+read-only deploy key is preferred over copying a broad personal token.
 
 ```yaml
 name: private-pica-download
@@ -54,7 +55,7 @@ jobs:
       PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
       PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
       # RC maintainers only while the engine source is private:
-      # PICA_SOURCE_TOKEN: ${{ secrets.PICA_SOURCE_TOKEN }}
+      # PICA_SOURCE_SSH_KEY: ${{ secrets.PICA_SOURCE_SSH_KEY }}
 ```
 
 The engine fails before checkout, credential validation, provider login, or

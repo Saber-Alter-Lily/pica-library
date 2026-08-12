@@ -155,4 +155,32 @@ describe('library database', () => {
         expect(database.listAuthors()[0]).toMatchObject({ works: 2 })
         database.close()
     })
+
+    it('re-imports the same snapshot without duplicate entities', () => {
+        const database = createDatabase()
+        const record: FavoriteRecord = {
+            comicId: 'stable',
+            title: 'Stable',
+            author: 'Alice',
+            categories: [],
+            tags: [],
+            finished: false
+        }
+        database.importFavorites([record])
+        database.importFavorites([{ ...record, title: 'Stable Updated' }])
+        expect(database.summary()).toMatchObject({ comics: 1, authors: 1 })
+        expect(database.listComics()[0].title).toBe('Stable Updated')
+        database.close()
+    })
+
+    it('persists pause, resume and cancel transitions', () => {
+        const database = createDatabase()
+        database.importCatalog([{ comicId: 'job-comic', title: 'Job', author: 'Alice', categories: [], tags: [], finished: false }])
+        const job = database.createDownloadJob({ comicId: 'job-comic' })
+        database.transitionDownloadJob(job.id, 'QUEUED')
+        database.transitionDownloadJob(job.id, 'PAUSED')
+        database.transitionDownloadJob(job.id, 'QUEUED')
+        expect(database.transitionDownloadJob(job.id, 'CANCELLED')).toMatchObject({ status: 'CANCELLED', finishedAt: expect.any(String) })
+        database.close()
+    })
 })

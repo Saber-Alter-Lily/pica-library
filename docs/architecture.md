@@ -1,39 +1,42 @@
-# 架构
+# Architecture
 
-Pica Library 是一个模块化单体：同一套领域模型服务 Lite 网页、本地网页与 CLI，避免三套功能逐渐分叉。
+Pica Library is one modular application, not three products.
 
-```mermaid
-flowchart LR
-    L["GitHub Pages Lite"] --> P["CSV / JSON 计划"]
-    P --> W["本地网页"]
-    P --> C["CLI"]
-    W --> A["本地 HTTP API"]
-    C --> S["应用服务"]
-    A --> S
-    S --> D["SQLite 元数据与进度"]
-    S --> O["稳定 ID 对象库"]
-    S --> R["站内 API"]
-    D --> V["按作者 / 社团视图"]
-    O --> V
+```text
+Interfaces     Web                         CLI
+                  \                       /
+Product        Library -> Discover -> Download -> Maintain
+                         | persistent state |
+Runtimes       Browser Lite   Local Engine   GitHub Runner
+Storage        IndexedDB      SQLite         GitHub Artifact
+Provider                       Pica
 ```
 
-## 层次
+Browser Lite reads a versioned portable Bundle and builds plans without credentials.
+The local HTTP server binds to `127.0.0.1` by default and rejects cross-origin
+writes. CLI and Web API call the same `LibraryService`, `LibraryDatabase`, download
+state machine and scheduler. The GitHub workflow is only a manual ephemeral runner
+for that shared CLI.
 
-- `src/sdk.ts`：站内登录、分页、搜索、章节、图片与可靠文件传输。
-- `src/library/author.ts`：无损规范化与可解释的作者候选证据。
-- `src/library/database.ts`：SQLite 数据模型、收藏快照、作者关系和图片状态。
-- `src/library/service.ts`：同步、发现、排序与增量下载用例。
-- `src/library/organizer.ts`：从稳定对象库生成按作者/社团浏览视图。
-- `src/library/server.ts`：只监听本机的 JSON API 和静态网页服务。
-- `src/library-cli.ts`：批处理与自动化入口。
-- `web/`：同一套 Lite/完整版界面；Lite 数据只写入浏览器 IndexedDB。
+## Persistent model
 
-## 数据原则
+SQLite migrations own canonical comics, authors and aliases, relationships,
+episodes, pictures, favorite snapshots, sync runs, download jobs and items, update
+findings, recommendation profiles and results. Stable provider IDs are primary keys.
+Re-import updates metadata without duplicating entities.
 
-漫画、章节和图片以站内稳定 ID 为主键。显示名称可以改变，但不会导致重复对象。收藏同步是完整快照；目录中的旧收藏不会删除，只把 `is_favorite` 改为 false。下载先写 `.part` 文件，再原子改名，并记录字节数与 SHA-256。
+## Download lifecycle
 
-作者归一分两步：确定性规则先生成候选，人工审核再做高风险合并。系统不会因为两个名字“看起来相似”就自动合并，从而避免同名作者被错误归档。
+Jobs transition through `DRAFT`, `QUEUED`, `PREPARING`, `RUNNING`, `PAUSED`,
+`RETRY_WAIT`, `COMPLETED`, `FAILED`, or `CANCELLED`. A shared scheduler enforces
+global job concurrency, priority, request spacing and exponential retry. Picture
+downloads retain upstream checks for `allowDownload`, episode selection, `.part`
+files, atomic rename, SHA-256 and verified incremental skips.
 
-## 扩展点
+## Maintenance
 
-后续版本可以在不改变 CLI/UI 的情况下替换推荐评分、加入外部作者词典、增加下载任务队列，或增加只读的 OPDS/阅读器接口。SQLite 与导出 JSON 都带稳定字段，便于迁移。
+Update scanning compares provider episodes against persisted episode IDs, orders
+and metadata, then creates reviewable findings. Repair scans persisted file state for
+missing, empty or failed pictures. Neither path downloads directly; approved work is
+added to the unified queue. Low-confidence author identities stay in the Maintenance
+inbox until a user approves, separates, researches or merges them.

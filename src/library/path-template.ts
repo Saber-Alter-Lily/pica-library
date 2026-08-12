@@ -10,6 +10,8 @@ export interface PathTemplateValues {
     short_id?: string
     chapter_order: string | number
     chapter: string
+    circle?: string
+    category?: string
 }
 
 const placeholders = new Set<keyof PathTemplateValues>([
@@ -18,7 +20,9 @@ const placeholders = new Set<keyof PathTemplateValues>([
     'comic_id',
     'short_id',
     'chapter_order',
-    'chapter'
+    'chapter',
+    'circle',
+    'category'
 ])
 const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i
 
@@ -58,4 +62,16 @@ export function renderLibraryPath(
     )
         throw new Error('Path template escaped the library root')
     return destination
+}
+
+export function previewLibraryPath(
+    root: string,
+    template: string,
+    values: PathTemplateValues,
+    occupied: ReadonlySet<string> = new Set()
+) {
+    const destination = renderLibraryPath(root, template, values)
+    if (!occupied.has(destination)) return destination
+    const suffix = safePathSegment(values.short_id ?? values.comic_id.slice(0, 8))
+    return `${destination} [${suffix}]`
 }

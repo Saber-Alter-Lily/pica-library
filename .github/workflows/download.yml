@@ -107,9 +107,9 @@ jobs:
               --data-dir .pica-library-action
           fi
 
-      - name: Build readable folders
+      - name: Build review artifact
         run: >-
-          node dist/library-cli.js portable
+          node dist/library-cli.js artifact
           --output pica-download
           --data-dir .pica-library-action
 

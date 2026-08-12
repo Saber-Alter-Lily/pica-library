@@ -109,3 +109,16 @@ describe('local web server', () => {
         expect(await paused.json()).toMatchObject({ status: 'PAUSED' })
     })
 })
+
+describe('server binding security', () => {
+    it('rejects unsafe remote binding unless explicitly enabled', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-bind-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.db'))
+        const service = new LibraryService(database, dir)
+        await expect(
+            startLibraryServer({ database, service, host: '0.0.0.0', port: 0 })
+        ).rejects.toThrow('Remote binding is disabled')
+        database.close()
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+})

@@ -16,6 +16,7 @@ import { parsePositionals } from './library/arguments'
 import { serializeLibraryBundle } from './types/bundle'
 import { queueRepairs, scanRepairIssues } from './maintenance/repair'
 import { queueUpdate } from './maintenance/updates'
+import { buildRunnerArtifact } from './runners/shared/artifact'
 
 loadEnv()
 
@@ -89,6 +90,7 @@ Usage:
   pica-library download-plan <download-plan.json> [--concurrency 5]
   pica-library organize
   pica-library portable --output pica-download
+  pica-library artifact --output pica-download
   pica-library serve [--host 127.0.0.1] [--port 4789]
   pica-library doctor
 
@@ -557,6 +559,16 @@ async function main() {
                     dataDir,
                     database.listComics({ limit: 5000 }),
                     outputDir
+                )
+            )
+            return
+        }
+        if (command === 'artifact') {
+            print(
+                buildRunnerArtifact(
+                    database,
+                    dataDir,
+                    path.resolve(flag('output', 'pica-download')!)
                 )
             )
             return

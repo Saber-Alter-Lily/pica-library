@@ -75,6 +75,9 @@ Usage:
   pica-library prepare-library --output pica-library-export
   pica-library search [KEYWORD] [--tag TAG] [--category NAME] [--sort likes]
   pica-library download <comic-id...> [--episodes 1,3,5-10] [--concurrency 5]
+  pica-library download list
+  pica-library download run
+  pica-library download <pause|resume|retry|cancel> <job-id>
   pica-library download-favorites --page 1 [--episodes all] [--concurrency 5]
   pica-library download-plan <download-plan.json> [--concurrency 5]
   pica-library organize
@@ -358,27 +361,62 @@ async function main() {
         }
         if (command === 'download') {
             const comicIds = positionalsAfter('download')
+            const [action, jobId] = comicIds
+            if (action === 'list') {
+                print(database.listDownloadJobs())
+                return
+            }
+            if (action === 'run') {
+                await service.runDownloadQueue({
+                    runner: 'LOCAL',
+                    concurrency: Number(flag('concurrency', '2'))
+                })
+                print(database.listDownloadJobs())
+                return
+            }
+            const operatorStatus = {
+                pause: 'PAUSED',
+                resume: 'QUEUED',
+                retry: 'QUEUED',
+                cancel: 'CANCELLED'
+            } as const
+            if (action in operatorStatus) {
+                if (!jobId) throw new Error(`A job id is required for ${action}`)
+                print(
+                    database.transitionDownloadJob(
+                        jobId,
+                        operatorStatus[action as keyof typeof operatorStatus]
+                    )
+                )
+                return
+            }
             if (comicIds.length === 0)
                 throw new Error('At least one comic id is required')
-            const results = []
+            const jobs = []
             for (const comicId of comicIds) {
-                results.push(
-                    await service.downloadComic(comicId, {
+                jobs.push(
+                    service.enqueueDownload({
+                        comicId,
                         episodeOrders: parseEpisodeSelection(flag('episodes')),
-                        concurrency: Number(flag('concurrency', '5')),
-                        onProgress: (progress) => {
-                            if (!hasFlag('json')) {
-                                process.stdout.write(
-                                    `\r${progress.comicTitle} / ${progress.episodeTitle}: ${progress.completed}/${progress.total}`
-                                )
-                                if (progress.completed === progress.total)
-                                    process.stdout.write('\n')
-                            }
-                        }
+                        source: 'manual',
+                        runner: 'LOCAL'
                     })
                 )
             }
-            print(results)
+            await service.runDownloadQueue({
+                runner: 'LOCAL',
+                pictureConcurrency: Number(flag('concurrency', '5')),
+                onProgress: (progress) => {
+                    if (!hasFlag('json')) {
+                        process.stdout.write(
+                            `\r${progress.comicTitle} / ${progress.episodeTitle}: ${progress.completed}/${progress.total}`
+                        )
+                        if (progress.completed === progress.total)
+                            process.stdout.write('\n')
+                    }
+                }
+            })
+            print(jobs.map((job) => database.getDownloadJob(job.id)))
             return
         }
         if (command === 'download-favorites') {
@@ -389,29 +427,26 @@ async function main() {
                     `Favorite page ${favoritePage.page}/${favoritePage.pages}: ${favoritePage.comics.length} comics`
                 )
             }
-            const results = []
+            const jobs = []
             for (const comic of favoritePage.comics) {
-                results.push(
-                    await service.downloadComic(comic.comicId, {
+                jobs.push(
+                    service.enqueueDownload({
+                        comicId: comic.comicId,
                         episodeOrders: parseEpisodeSelection(flag('episodes')),
-                        concurrency: Number(flag('concurrency', '5')),
-                        onProgress: (progress) => {
-                            if (!hasFlag('json')) {
-                                process.stdout.write(
-                                    `\r${progress.comicTitle} / ${progress.episodeTitle}: ${progress.completed}/${progress.total}`
-                                )
-                                if (progress.completed === progress.total)
-                                    process.stdout.write('\n')
-                            }
-                        }
+                        source: 'library',
+                        runner: 'LOCAL'
                     })
                 )
             }
+            await service.runDownloadQueue({
+                runner: 'LOCAL',
+                pictureConcurrency: Number(flag('concurrency', '5'))
+            })
             print({
                 page: favoritePage.page,
                 pages: favoritePage.pages,
                 totalFavorites: favoritePage.total,
-                results
+                jobs: jobs.map((job) => database.getDownloadJob(job.id))
             })
             return
         }
@@ -432,16 +467,22 @@ async function main() {
             const episodeOrders = Array.isArray(plan.episodeOrders)
                 ? plan.episodeOrders.map(Number).filter(Number.isInteger)
                 : []
-            const results = []
+            const jobs = []
             for (const comicId of comicIds) {
-                results.push(
-                    await service.downloadComic(comicId, {
+                jobs.push(
+                    service.enqueueDownload({
+                        comicId,
                         episodeOrders,
-                        concurrency: Number(flag('concurrency', '5'))
+                        source: 'manual',
+                        runner: 'LOCAL'
                     })
                 )
             }
-            print(results)
+            await service.runDownloadQueue({
+                runner: 'LOCAL',
+                pictureConcurrency: Number(flag('concurrency', '5'))
+            })
+            print(jobs.map((job) => database.getDownloadJob(job.id)))
             return
         }
         if (command === 'organize') {

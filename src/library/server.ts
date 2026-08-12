@@ -274,16 +274,30 @@ export async function startLibraryServer(options: {
                 const episodeOrders = stringList(input.episodeOrders)
                     .map(Number)
                     .filter((value) => Number.isInteger(value) && value > 0)
-                const results = []
+                const jobs = []
                 for (const comicId of comicIds) {
-                    results.push(
-                        await options.service.downloadComic(comicId, {
+                    jobs.push(
+                        options.service.enqueueDownload({
+                            comicId,
                             episodeOrders,
-                            concurrency: Number(input.concurrency ?? 5)
+                            source: (input.source
+                                ? String(input.source)
+                                : 'manual') as 'manual',
+                            runner: 'LOCAL'
                         })
                     )
                 }
-                return json(response, 200, results)
+                if (input.run !== false) {
+                    await options.service.runDownloadQueue({
+                        runner: 'LOCAL',
+                        pictureConcurrency: Number(input.concurrency ?? 5)
+                    })
+                }
+                return json(
+                    response,
+                    200,
+                    jobs.map((job) => options.database.getDownloadJob(job.id))
+                )
             }
             if (
                 url.pathname === '/api/v1/organize' &&

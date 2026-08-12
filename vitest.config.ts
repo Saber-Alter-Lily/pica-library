@@ -6,7 +6,7 @@ export default defineConfig({
         external: ['node:sqlite']
     },
     test: {
-        include: ['test/unit/**/*.test.ts'],
+        include: ['test/{unit,integration}/**/*.test.ts'],
         testTimeout: 10000
     }
 })

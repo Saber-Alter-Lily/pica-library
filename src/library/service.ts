@@ -8,6 +8,12 @@ import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
 import type { FavoriteRecord, SortMode } from './types'
 import { recommendComics } from './recommendation'
+import { DownloadScheduler } from '../core/downloads/scheduler'
+import type {
+    CreateDownloadJob,
+    DownloadJob,
+    DownloadRunner
+} from '../core/downloads/types'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -216,7 +222,58 @@ export class LibraryService {
         return recommendComics(this.database.listComics({ limit: 5000 }), limit)
     }
 
-    async downloadComic(
+    enqueueDownload(input: CreateDownloadJob): DownloadJob {
+        const job = this.database.createDownloadJob(input)
+        return this.database.transitionDownloadJob(job.id, 'QUEUED')
+    }
+
+    async runDownloadQueue(options: {
+        runner?: DownloadRunner
+        concurrency?: number
+        pictureConcurrency?: number
+        requestIntervalMs?: number
+        maxRetries?: number
+        onProgress?: (progress: DownloadProgress) => void
+    } = {}) {
+        const runner = options.runner ?? 'LOCAL'
+        const store = {
+            nextDownloadJobs: (limit: number) =>
+                this.database.nextDownloadJobs(limit, runner),
+            transitionDownloadJob: this.database.transitionDownloadJob.bind(
+                this.database
+            )
+        }
+        const scheduler = new DownloadScheduler(
+            store,
+            async (job) => {
+                const result = await this.downloadComicNow(job.comicId, {
+                    episodeOrders: job.episodeOrders,
+                    concurrency: options.pictureConcurrency,
+                    onProgress: (progress) => {
+                        this.database.updateDownloadProgress(job.id, {
+                            progressCompleted: progress.completed,
+                            progressTotal: progress.total
+                        })
+                        options.onProgress?.(progress)
+                    }
+                })
+                this.database.updateDownloadProgress(job.id, {
+                    progressCompleted: result.pictures,
+                    progressTotal: result.pictures,
+                    bytes: result.bytes
+                })
+            },
+            {
+                concurrency: options.concurrency,
+                requestIntervalMs: options.requestIntervalMs,
+                maxRetries: options.maxRetries
+            }
+        )
+        await scheduler.drain()
+        return this.database.listDownloadJobs()
+    }
+
+    private async downloadComicNow(
         comicId: string,
         options: {
             episodeOrders?: number[]

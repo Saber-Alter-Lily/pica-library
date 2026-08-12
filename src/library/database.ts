@@ -1,7 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { randomUUID } from 'node:crypto'
 import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite'
+import { assertTransition, isTerminal } from '../core/downloads/state-machine'
+import type {
+    CreateDownloadJob,
+    DownloadJob,
+    DownloadJobPatch,
+    DownloadStatus
+} from '../core/downloads/types'
 import {
     authorIdForKey,
     normalizeAuthorKey,
@@ -15,6 +23,7 @@ import type {
     LibrarySummary,
     StoredComic
 } from './types'
+import { runMigrations } from '../storage/sqlite/migrations'
 
 type SqlRow = Record<string, unknown>
 
@@ -38,6 +47,26 @@ function numberValue(value: unknown): number {
     return Number.isFinite(number) ? number : 0
 }
 
+function downloadJob(row: SqlRow): DownloadJob {
+    return {
+        id: String(row.id),
+        comicId: String(row.comic_id),
+        episodeOrders: jsonArray(row.episode_selection_json).map(Number),
+        source: String(row.source) as DownloadJob['source'],
+        priority: numberValue(row.priority),
+        runner: String(row.runner) as DownloadJob['runner'],
+        status: String(row.status) as DownloadStatus,
+        createdAt: String(row.created_at),
+        startedAt: row.started_at ? String(row.started_at) : null,
+        finishedAt: row.finished_at ? String(row.finished_at) : null,
+        retryCount: numberValue(row.retry_count),
+        progressCompleted: numberValue(row.progress_completed),
+        progressTotal: numberValue(row.progress_total),
+        bytes: numberValue(row.bytes),
+        error: row.error ? String(row.error) : null
+    }
+}
+
 export class LibraryDatabase {
     readonly file: string
     private readonly db: DatabaseSyncType
@@ -55,110 +84,7 @@ export class LibraryDatabase {
     }
 
     private migrate() {
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-                version INTEGER PRIMARY KEY,
-                applied_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS authors (
-                id TEXT PRIMARY KEY,
-                canonical_name TEXT NOT NULL,
-                normalized_key TEXT NOT NULL UNIQUE,
-                confidence REAL NOT NULL DEFAULT 1,
-                evidence TEXT NOT NULL DEFAULT '',
-                review_status TEXT NOT NULL DEFAULT 'approved',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS author_aliases (
-                alias_key TEXT PRIMARY KEY,
-                alias_display TEXT NOT NULL,
-                author_id TEXT NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
-                source TEXT NOT NULL,
-                evidence TEXT NOT NULL DEFAULT '',
-                confidence REAL NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS comics (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                raw_author TEXT NOT NULL DEFAULT '',
-                circle TEXT,
-                author_candidate TEXT,
-                canonical_author_id TEXT REFERENCES authors(id),
-                description TEXT NOT NULL DEFAULT '',
-                chinese_team TEXT NOT NULL DEFAULT '',
-                categories_json TEXT NOT NULL DEFAULT '[]',
-                tags_json TEXT NOT NULL DEFAULT '[]',
-                finished INTEGER NOT NULL DEFAULT 0,
-                created_at_source TEXT,
-                updated_at_source TEXT,
-                total_likes INTEGER NOT NULL DEFAULT 0,
-                total_views INTEGER NOT NULL DEFAULT 0,
-                pages_count INTEGER NOT NULL DEFAULT 0,
-                eps_count INTEGER NOT NULL DEFAULT 0,
-                is_favorite INTEGER NOT NULL DEFAULT 0,
-                first_seen_at TEXT NOT NULL,
-                last_seen_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS comic_authors (
-                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
-                author_id TEXT NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
-                raw_value TEXT NOT NULL,
-                circle TEXT,
-                role TEXT NOT NULL DEFAULT 'creator',
-                is_primary INTEGER NOT NULL DEFAULT 1,
-                confidence REAL NOT NULL DEFAULT 1,
-                needs_review INTEGER NOT NULL DEFAULT 0,
-                evidence TEXT NOT NULL DEFAULT '',
-                PRIMARY KEY (comic_id, author_id, raw_value)
-            );
-
-            CREATE TABLE IF NOT EXISTS episodes (
-                id TEXT PRIMARY KEY,
-                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
-                title TEXT NOT NULL,
-                order_no INTEGER NOT NULL,
-                updated_at_source TEXT,
-                first_seen_at TEXT NOT NULL,
-                last_seen_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS pictures (
-                id TEXT PRIMARY KEY,
-                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
-                episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
-                position INTEGER NOT NULL,
-                original_name TEXT NOT NULL,
-                media_path TEXT NOT NULL,
-                file_server TEXT NOT NULL,
-                local_path TEXT,
-                byte_size INTEGER,
-                sha256 TEXT,
-                status TEXT NOT NULL DEFAULT 'pending',
-                first_seen_at TEXT NOT NULL,
-                last_seen_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS sync_runs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source TEXT NOT NULL,
-                status TEXT NOT NULL,
-                started_at TEXT NOT NULL,
-                finished_at TEXT,
-                item_count INTEGER NOT NULL DEFAULT 0,
-                error TEXT
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_comics_favorite ON comics(is_favorite);
-            CREATE INDEX IF NOT EXISTS idx_comics_author ON comics(canonical_author_id);
-            CREATE INDEX IF NOT EXISTS idx_episodes_comic ON episodes(comic_id, order_no);
-            CREATE INDEX IF NOT EXISTS idx_pictures_episode ON pictures(episode_id, position);
-        `)
+        runMigrations(this.db)
     }
 
     importFavorites(
@@ -760,5 +686,124 @@ export class LibraryDatabase {
                  byte_size = ?, sha256 = ? WHERE id = ?`
             )
             .run(localPath, byteSize, sha256, pictureId)
+    }
+
+    createDownloadJob(input: CreateDownloadJob): DownloadJob {
+        const id = randomUUID()
+        const now = new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO download_jobs(
+                    id, comic_id, episode_selection_json, source, priority,
+                    runner, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'DRAFT', ?)`
+            )
+            .run(
+                id,
+                input.comicId,
+                JSON.stringify(input.episodeOrders ?? []),
+                input.source ?? 'manual',
+                input.priority ?? 0,
+                input.runner ?? 'LOCAL',
+                now
+            )
+        return this.getDownloadJob(id)
+    }
+
+    getDownloadJob(id: string): DownloadJob {
+        const row = this.db
+            .prepare('SELECT * FROM download_jobs WHERE id = ?')
+            .get(id) as SqlRow | undefined
+        if (!row) throw new Error(`Unknown download job: ${id}`)
+        return downloadJob(row)
+    }
+
+    listDownloadJobs(status?: DownloadStatus): DownloadJob[] {
+        const rows = status
+            ? (this.db
+                  .prepare(
+                      `SELECT * FROM download_jobs WHERE status = ?
+                       ORDER BY priority DESC, created_at`
+                  )
+                  .all(status) as SqlRow[])
+            : (this.db
+                  .prepare(
+                      `SELECT * FROM download_jobs
+                       ORDER BY created_at DESC`
+                  )
+                  .all() as SqlRow[])
+        return rows.map(downloadJob)
+    }
+
+    nextDownloadJobs(limit: number, runner?: DownloadJob['runner']) {
+        const rows = runner
+            ? (this.db
+                  .prepare(
+                      `SELECT * FROM download_jobs
+                       WHERE status = 'QUEUED' AND runner = ?
+                       ORDER BY priority DESC, created_at LIMIT ?`
+                  )
+                  .all(runner, Math.max(1, limit)) as SqlRow[])
+            : (this.db
+                  .prepare(
+                      `SELECT * FROM download_jobs WHERE status = 'QUEUED'
+                       ORDER BY priority DESC, created_at LIMIT ?`
+                  )
+                  .all(Math.max(1, limit)) as SqlRow[])
+        return rows.map(downloadJob)
+    }
+
+    transitionDownloadJob(
+        id: string,
+        status: DownloadStatus,
+        patch: DownloadJobPatch = {}
+    ): DownloadJob {
+        const current = this.getDownloadJob(id)
+        assertTransition(current.status, status)
+        const now = new Date().toISOString()
+        const result = this.db
+            .prepare(
+                `UPDATE download_jobs SET
+                    status = ?,
+                    started_at = CASE
+                        WHEN ? = 'RUNNING' THEN COALESCE(started_at, ?)
+                        ELSE started_at END,
+                    finished_at = CASE WHEN ? = 1 THEN ? ELSE NULL END,
+                    retry_count = COALESCE(?, retry_count),
+                    error = CASE WHEN ? = 1 THEN ? ELSE error END
+                 WHERE id = ? AND status = ?`
+            )
+            .run(
+                status,
+                status,
+                now,
+                isTerminal(status) ? 1 : 0,
+                now,
+                patch.retryCount ?? null,
+                Object.prototype.hasOwnProperty.call(patch, 'error') ? 1 : 0,
+                patch.error ?? null,
+                id,
+                current.status
+            )
+        if (result.changes !== 1)
+            throw new Error(`Download job changed concurrently: ${id}`)
+        return this.getDownloadJob(id)
+    }
+
+    updateDownloadProgress(id: string, patch: DownloadJobPatch): DownloadJob {
+        const current = this.getDownloadJob(id)
+        this.db
+            .prepare(
+                `UPDATE download_jobs SET
+                    progress_completed = ?, progress_total = ?, bytes = ?
+                 WHERE id = ?`
+            )
+            .run(
+                patch.progressCompleted ?? current.progressCompleted,
+                patch.progressTotal ?? current.progressTotal,
+                patch.bytes ?? current.bytes,
+                id
+            )
+        return this.getDownloadJob(id)
     }
 }

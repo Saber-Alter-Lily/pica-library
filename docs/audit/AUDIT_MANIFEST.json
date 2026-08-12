@@ -1,0 +1,14 @@
+{
+  "sourceRepo": "Saber-Alter-Lily/pica-cli",
+  "sourceSha": "9a8448a49062f22c367fdea1dc10e3acf53fde1d",
+  "targetRepo": "Saber-Alter-Lily/pica-library",
+  "targetBranch": "codex/independent-v0.1.0-rc1",
+  "targetSha": "a950902be1fda0dbd50146da024f7fbc34216903",
+  "version": "0.1.0-rc.1",
+  "testStatus": "39/39 passed",
+  "releasePerformed": false,
+  "npmPublished": false,
+  "githubReleaseCreated": false,
+  "pagesDeployed": false,
+  "repositoryPublic": false
+}

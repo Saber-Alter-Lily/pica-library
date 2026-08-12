@@ -29,6 +29,9 @@ function store(initial: DownloadJob[]): QueueStore & { jobs: DownloadJob[] } {
         nextDownloadJobs(limit) {
             return this.jobs.filter((item) => item.status === 'QUEUED').slice(0, limit)
         },
+        getDownloadJob(id) {
+            return { ...this.jobs.find((candidate) => candidate.id === id)! }
+        },
         transitionDownloadJob(id, status, patch = {}) {
             const item = this.jobs.find((candidate) => candidate.id === id)!
             assertTransition(item.status, status)
@@ -72,5 +75,18 @@ describe('global download scheduler', () => {
         await scheduler.drain()
         expect(attempts).toBe(2)
         expect(queue.jobs[0]).toMatchObject({ status: 'COMPLETED', retryCount: 1 })
+    })
+
+    it('does not overwrite a pause requested during execution', async () => {
+        const queue = store([job('pause')])
+        const scheduler = new DownloadScheduler(
+            queue,
+            async (running) => {
+                queue.transitionDownloadJob(running.id, 'PAUSED')
+            },
+            { requestIntervalMs: 0 }
+        )
+        await scheduler.drain()
+        expect(queue.jobs[0].status).toBe('PAUSED')
     })
 })

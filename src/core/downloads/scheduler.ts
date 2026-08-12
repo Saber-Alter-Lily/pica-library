@@ -3,6 +3,7 @@ import type { DownloadJob } from './types'
 
 export interface QueueStore {
     nextDownloadJobs(limit: number): DownloadJob[]
+    getDownloadJob(id: string): DownloadJob
     transitionDownloadJob(
         id: string,
         status: DownloadJob['status'],
@@ -52,12 +53,21 @@ export class DownloadScheduler {
         let current = this.store.transitionDownloadJob(job.id, 'PREPARING')
         try {
             if (this.requestIntervalMs) await delay(this.requestIntervalMs)
+            current = this.store.getDownloadJob(job.id)
+            if (current.status === 'PAUSED' || current.status === 'CANCELLED')
+                return
             current = this.store.transitionDownloadJob(job.id, 'RUNNING')
             await this.execute(current)
+            current = this.store.getDownloadJob(job.id)
+            if (current.status === 'PAUSED' || current.status === 'CANCELLED')
+                return
             this.store.transitionDownloadJob(job.id, 'COMPLETED', {
                 error: null
             })
         } catch (error) {
+            current = this.store.getDownloadJob(job.id)
+            if (current.status === 'PAUSED' || current.status === 'CANCELLED')
+                return
             const message = error instanceof Error ? error.message : String(error)
             const retryCount = current.retryCount + 1
             if (retryCount <= this.maxRetries) {

@@ -5,7 +5,6 @@ import commonjs from '@rollup/plugin-commonjs'
 import esbuild from 'rollup-plugin-esbuild'
 import { builtinModules } from 'node:module'
 import { readFileSync } from 'node:fs'
-import { visualizer } from 'rollup-plugin-visualizer'
 
 const pkg = JSON.parse(
     readFileSync(new URL('./package.json', import.meta.url), 'utf8')
@@ -28,7 +27,6 @@ export default defineConfig({
             minify: true
         }),
         nodeResolve(),
-        commonjs(),
-        visualizer()
+        commonjs()
     ]
 })

@@ -270,6 +270,7 @@ export class LibraryService {
         const store = {
             nextDownloadJobs: (limit: number) =>
                 this.database.nextDownloadJobs(limit, runner),
+            getDownloadJob: this.database.getDownloadJob.bind(this.database),
             transitionDownloadJob: this.database.transitionDownloadJob.bind(
                 this.database
             )
@@ -286,6 +287,10 @@ export class LibraryService {
                             progressTotal: progress.total
                         })
                         options.onProgress?.(progress)
+                    },
+                    shouldStop: () => {
+                        const status = this.database.getDownloadJob(job.id).status
+                        return status === 'PAUSED' || status === 'CANCELLED'
                     }
                 })
                 this.database.updateDownloadProgress(job.id, {
@@ -310,6 +315,7 @@ export class LibraryService {
             episodeOrders?: number[]
             concurrency?: number
             onProgress?: (progress: DownloadProgress) => void
+            shouldStop?: () => boolean
         } = {}
     ): Promise<DownloadResult> {
         const pica = await this.connect()
@@ -375,6 +381,7 @@ export class LibraryService {
             await Promise.all(
                 pictures.map((picture, index) =>
                     limit(async () => {
+                        if (options.shouldStop?.()) return
                         const pictureId =
                             picture.id ||
                             String(

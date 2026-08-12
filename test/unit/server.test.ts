@@ -83,4 +83,29 @@ describe('local web server', () => {
         })
         expect(response.status).toBe(403)
     })
+
+    it('exposes durable download queue controls', async () => {
+        const queued = await fetch(`${url}/api/v1/download`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                comicIds: ['c1'],
+                source: 'library',
+                run: false
+            })
+        })
+        expect(queued.status).toBe(200)
+        const [job] = (await queued.json()) as Array<{ id: string }>
+        const jobs = await fetch(`${url}/api/v1/downloads`).then((response) =>
+            response.json()
+        )
+        expect(jobs).toContainEqual(
+            expect.objectContaining({ id: job.id, status: 'QUEUED' })
+        )
+        const paused = await fetch(
+            `${url}/api/v1/downloads/${job.id}/pause`,
+            { method: 'POST' }
+        )
+        expect(await paused.json()).toMatchObject({ status: 'PAUSED' })
+    })
 })

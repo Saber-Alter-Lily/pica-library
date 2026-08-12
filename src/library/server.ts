@@ -6,6 +6,9 @@ import type { FavoriteRecord, SortMode } from './types'
 import { LibraryDatabase } from './database'
 import { LibraryService } from './service'
 import { organizeLibraryViews } from './organizer'
+import { queueRepairs, scanRepairIssues } from '../maintenance/repair'
+import { queueUpdate } from '../maintenance/updates'
+import type { DownloadSource } from '../core/downloads/types'
 
 function json(response: ServerResponse, status: number, value: unknown) {
     response.writeHead(status, {
@@ -119,7 +122,7 @@ export async function startLibraryServer(options: {
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
                 return json(response, 200, {
                     mode: 'connected',
-                    version: '2.0.0-alpha.1',
+                    version: '0.1.0-rc.1',
                     database: options.database.file,
                     summary: options.database.summary()
                 })
@@ -185,13 +188,11 @@ export async function startLibraryServer(options: {
                     options.database.applyAuthorDictionary(authors)
                 )
             }
-            if (
-                url.pathname.startsWith('/api/v1/authors/') &&
-                request.method === 'POST'
-            ) {
-                const authorId = decodeURIComponent(
-                    url.pathname.split('/').at(-1) ?? ''
-                )
+            const authorDecision = url.pathname.match(
+                /^\/api\/v1\/authors\/([^/]+)(?:\/decision)?$/
+            )
+            if (authorDecision && request.method === 'POST') {
+                const authorId = decodeURIComponent(authorDecision[1])
                 const input = await body(request)
                 options.database.setAuthorDecision(
                     authorId,
@@ -282,7 +283,7 @@ export async function startLibraryServer(options: {
                             episodeOrders,
                             source: (input.source
                                 ? String(input.source)
-                                : 'manual') as 'manual',
+                                : 'manual') as DownloadSource,
                             runner: 'LOCAL'
                         })
                     )
@@ -298,6 +299,69 @@ export async function startLibraryServer(options: {
                     200,
                     jobs.map((job) => options.database.getDownloadJob(job.id))
                 )
+            }
+            if (
+                url.pathname === '/api/v1/downloads' &&
+                request.method === 'GET'
+            ) {
+                return json(response, 200, options.database.listDownloadJobs())
+            }
+            if (
+                url.pathname === '/api/v1/downloads/run' &&
+                request.method === 'POST'
+            ) {
+                await options.service.runDownloadQueue({ runner: 'LOCAL' })
+                return json(response, 200, options.database.listDownloadJobs())
+            }
+            const jobAction = url.pathname.match(
+                /^\/api\/v1\/downloads\/([^/]+)\/(pause|resume|retry|cancel)$/
+            )
+            if (jobAction && request.method === 'POST') {
+                const statuses = {
+                    pause: 'PAUSED',
+                    resume: 'QUEUED',
+                    retry: 'QUEUED',
+                    cancel: 'CANCELLED'
+                } as const
+                return json(
+                    response,
+                    200,
+                    options.database.transitionDownloadJob(
+                        decodeURIComponent(jobAction[1]),
+                        statuses[jobAction[2] as keyof typeof statuses]
+                    )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/maintenance/updates' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const findings = await options.service.checkUpdates(
+                    stringList(input.comicIds)
+                )
+                const jobs = input.queue
+                    ? findings
+                          .filter(
+                              (finding) =>
+                                  finding.newEpisodeOrders.length > 0
+                          )
+                          .map((finding) =>
+                              queueUpdate(options.database, finding)
+                          )
+                    : []
+                return json(response, 200, { findings, jobs })
+            }
+            if (
+                url.pathname === '/api/v1/maintenance/repair' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const issues = scanRepairIssues(options.database)
+                const jobs = input.queue
+                    ? queueRepairs(options.database, issues)
+                    : []
+                return json(response, 200, { issues, jobs })
             }
             if (
                 url.pathname === '/api/v1/organize' &&

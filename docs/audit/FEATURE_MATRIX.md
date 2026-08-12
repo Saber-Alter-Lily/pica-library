@@ -8,9 +8,10 @@
 | Versioned SQLite migration and rollback | Yes | 3 integration tests | Implemented |
 | Author review, merge and dictionary import | Yes | Unit/API tests | Implemented |
 | Explainable collection recommendation | Yes | Unit tests | Implemented |
-| Unified persistent download queue | Yes | Unit/API tests | Implemented |
-| Job scheduler plus global media gate | Yes | Multi-job fake transfer tests | Global concurrency and request-start spacing enforced |
-| Cumulative progress and pause/resume | Yes | Multi-episode service tests | Resume continues from validated files |
+| Unified persistent download queue | Yes | Unit/API/CLI tests | Enqueue-only `download add` supports episodes and runner without credentials |
+| Job scheduler plus global media gate | Yes | Controlled-promise retry tests | Attempts settle before retry; retry backoff respects cancellation |
+| Cumulative progress and pause/resume | Yes | Multi-episode service tests | PREPARING pause is legal; resume preserves retry count and cumulative bytes |
+| Manual failed-job retry | Yes | Database/API/Web tests | Retry resets error and automatic retry budget; Resume remains distinct |
 | Performance profiles | Yes | CLI/Web/workflow and profile tests | Balanced default; Custom applies explicit overrides |
 | Local and GitHub runner semantics | Yes | Queue/workflow/artifact tests | GitHub jobs and artifact records use `GITHUB` |
 | Downloaded-only update checking | Yes | Fake-provider service tests | Partial download stores full observed episode baseline |

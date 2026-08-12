@@ -2,8 +2,10 @@
 
 `READY_FOR_REVIEW`
 
-The candidate passed local validation and GitHub CI on Node 22 and Node 24. It is
-suitable for private human/ChatGPT review but is not approved for release.
+The candidate passed 64/64 local tests and all push/pull-request GitHub CI jobs on
+Node 22 and Node 24 at tested code SHA
+`ca33dcc3a8409adfd4b330e63ee76c161634ca3a`. It is suitable for private
+human/ChatGPT review but is not approved for release.
 
 Remaining release blockers:
 

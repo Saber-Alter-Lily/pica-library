@@ -13,6 +13,9 @@ import {
 } from './library/organizer'
 import type { SortMode } from './library/types'
 import { parsePositionals } from './library/arguments'
+import { serializeLibraryBundle } from './types/bundle'
+import { queueRepairs, scanRepairIssues } from './maintenance/repair'
+import { queueUpdate } from './maintenance/updates'
 
 loadEnv()
 
@@ -58,10 +61,14 @@ function positionalsAfter(command: string) {
 }
 
 function help() {
-    console.log(`pica-library 2.0.0-alpha.1
+    console.log(`pica-library 0.1.0-rc.1
 
 Usage:
   pica-library init
+  pica-library library <sync|list|import|export>
+  pica-library discover <search|recommend>
+  pica-library download <add|list|run|pause|resume|retry|cancel>
+  pica-library maintenance <updates|repair|authors|health>
   pica-library import <favorites.csv>
   pica-library export <favorites.csv>
   pica-library import-aliases <author-aliases.json>
@@ -85,6 +92,9 @@ Usage:
   pica-library serve [--host 127.0.0.1] [--port 4789]
   pica-library doctor
 
+Maintenance options:
+  --queue           Create incremental jobs after update/repair review
+
 Global options:
   --data-dir PATH   Data, database and library root (default: .pica-library)
   --json            Machine-readable output
@@ -99,7 +109,25 @@ function print(value: unknown) {
 }
 
 async function main() {
-    const command = argv[0] ?? 'help'
+    const groups: Record<string, Record<string, string>> = {
+        library: {
+            sync: 'sync',
+            list: 'list',
+            import: 'import',
+            export: 'export'
+        },
+        discover: { search: 'search', recommend: 'recommendations' },
+        maintenance: {
+            updates: 'maintenance-updates',
+            repair: 'maintenance-repair',
+            authors: 'authors',
+            health: 'doctor'
+        }
+    }
+    const requested = argv[0] ?? 'help'
+    const groupedCommand = groups[requested]?.[argv[1]]
+    if (groupedCommand) argv.splice(0, 2, groupedCommand)
+    const command = argv[0] ?? requested
     if (['help', '--help', '-h'].includes(command)) {
         help()
         return
@@ -312,18 +340,21 @@ async function main() {
             )
             fs.writeFileSync(
                 path.join(outputDir, 'pica-library-bundle.json'),
-                JSON.stringify(
-                    {
-                        schemaVersion: 2,
-                        kind: 'pica-library-bundle',
-                        generatedAt: new Date().toISOString(),
-                        favorites,
-                        profile: result.profile,
-                        recommendations: result.recommendations
-                    },
-                    null,
-                    2
-                ),
+                serializeLibraryBundle({
+                    schemaVersion: 1,
+                    kind: 'pica-library-bundle',
+                    generatedAt: new Date().toISOString(),
+                    library: { comics: favorites },
+                    authors: database.listAuthors(),
+                    profile: result.profile as unknown as Record<string, unknown>,
+                    recommendations: result.recommendations,
+                    queue: database.listDownloadJobs(),
+                    provenance: {
+                        application: 'pica-library',
+                        version: '0.1.0-rc.1',
+                        source: 'connected-preparation'
+                    }
+                }),
                 'utf8'
             )
             print({
@@ -417,6 +448,31 @@ async function main() {
                 }
             })
             print(jobs.map((job) => database.getDownloadJob(job.id)))
+            return
+        }
+        if (command === 'recommendations') {
+            print(
+                await service.recommendations({
+                    limit: Number(flag('limit', '30'))
+                })
+            )
+            return
+        }
+        if (command === 'maintenance-updates') {
+            const comicIds = positionalsAfter('maintenance-updates')
+            const findings = await service.checkUpdates(comicIds)
+            const jobs = hasFlag('queue')
+                ? findings
+                      .filter((finding) => finding.newEpisodeOrders.length > 0)
+                      .map((finding) => queueUpdate(database, finding))
+                : []
+            print({ findings, jobs })
+            return
+        }
+        if (command === 'maintenance-repair') {
+            const issues = scanRepairIssues(database)
+            const jobs = hasFlag('queue') ? queueRepairs(database, issues) : []
+            print({ issues, jobs })
             return
         }
         if (command === 'download-favorites') {

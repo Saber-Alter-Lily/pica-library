@@ -24,6 +24,7 @@ import type {
     StoredComic
 } from './types'
 import { runMigrations } from '../storage/sqlite/migrations'
+import type { UpdateFinding } from '../maintenance/updates'
 
 type SqlRow = Record<string, unknown>
 
@@ -655,6 +656,67 @@ export class LibraryDatabase {
                 picture.fileServer,
                 now,
                 now
+            )
+    }
+
+    listEpisodes(comicId: string) {
+        return (
+            this.db
+                .prepare(
+                    `SELECT id, title, order_no, updated_at_source
+                     FROM episodes WHERE comic_id = ? ORDER BY order_no`
+                )
+                .all(comicId) as SqlRow[]
+        ).map((row) => ({
+            id: String(row.id),
+            title: String(row.title),
+            order: numberValue(row.order_no),
+            updatedAt: row.updated_at_source
+                ? String(row.updated_at_source)
+                : undefined
+        }))
+    }
+
+    listPictureHealth() {
+        return (
+            this.db
+                .prepare(
+                    `SELECT p.id, p.comic_id, p.episode_id, p.local_path,
+                            p.status, e.order_no
+                     FROM pictures p
+                     JOIN episodes e ON e.id = p.episode_id
+                     ORDER BY p.comic_id, e.order_no, p.position`
+                )
+                .all() as SqlRow[]
+        ).map((row) => ({
+            pictureId: String(row.id),
+            comicId: String(row.comic_id),
+            episodeId: String(row.episode_id),
+            episodeOrder: numberValue(row.order_no),
+            localPath: row.local_path ? String(row.local_path) : null,
+            status: String(row.status)
+        }))
+    }
+
+    saveUpdateFinding(finding: UpdateFinding) {
+        this.db
+            .prepare(
+                `INSERT INTO update_findings(
+                    id, comic_id, old_episode_count, new_episode_count,
+                    new_episode_ids_json, new_episode_orders_json,
+                    metadata_changed, checked_at, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+                finding.id,
+                finding.comicId,
+                finding.oldEpisodeCount,
+                finding.newEpisodeCount,
+                JSON.stringify(finding.newEpisodeIds),
+                JSON.stringify(finding.newEpisodeOrders),
+                finding.metadataChanged ? 1 : 0,
+                finding.checkedAt,
+                finding.status
             )
     }
 

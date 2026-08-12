@@ -9,11 +9,17 @@ import { normalizeAuthorKey } from './author'
 import type { FavoriteRecord, SortMode } from './types'
 import { recommendComics } from './recommendation'
 import { DownloadScheduler } from '../core/downloads/scheduler'
+import {
+    defaultLibraryTemplate,
+    renderLibraryPath,
+    safePathSegment
+} from './path-template'
 import type {
     CreateDownloadJob,
     DownloadJob,
     DownloadRunner
 } from '../core/downloads/types'
+import { checkComicUpdates } from '../maintenance/updates'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -41,17 +47,6 @@ export interface DownloadResult {
     downloaded: number
     skipped: number
     bytes: number
-}
-
-function safeSegment(value: string, fallback: string) {
-    const normalized = value
-        .normalize('NFKC')
-        .trim()
-        // eslint-disable-next-line no-control-regex
-        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
-        .replace(/[. ]+$/g, '')
-        .slice(0, 100)
-    return normalized || fallback
 }
 
 function comicToRecord(comic: Comic): FavoriteRecord {
@@ -222,6 +217,42 @@ export class LibraryService {
         return recommendComics(this.database.listComics({ limit: 5000 }), limit)
     }
 
+    async checkUpdates(comicIds?: string[]) {
+        const pica = await this.connect()
+        const ids = comicIds?.length
+            ? comicIds
+            : this.database
+                  .listComics({ limit: 5000 })
+                  .filter((comic) => comic.isFavorite)
+                  .map((comic) => comic.comicId)
+        const findings = []
+        for (const comicId of ids) {
+            findings.push(
+                await checkComicUpdates(
+                    this.database,
+                    {
+                        episodes: async (id) =>
+                            (await pica.episodesAll(id)).flatMap((episode) => {
+                                const episodeId = episode.id || episode._id
+                                return episodeId
+                                    ? [
+                                          {
+                                              id: episodeId,
+                                              order: episode.order,
+                                              title: episode.title,
+                                              updatedAt: episode.updated_at
+                                          }
+                                      ]
+                                    : []
+                            })
+                    },
+                    comicId
+                )
+            )
+        }
+        return findings
+    }
+
     enqueueDownload(input: CreateDownloadJob): DownloadJob {
         const job = this.database.createDownloadJob(input)
         return this.database.transitionDownloadJob(job.id, 'QUEUED')
@@ -317,15 +348,19 @@ export class LibraryService {
             })
             const pictures = await pica.picturesAll(comicId, episode)
             result.pictures += pictures.length
-            const episodeDir = path.join(
-                this.dataDir,
-                'library',
-                'objects',
-                comicId,
-                `${String(episode.order).padStart(4, '0')}-${safeSegment(
-                    episode.title,
-                    episodeId
-                )}`
+            const stored = this.database
+                .listComics({ limit: 5000 })
+                .find((item) => item.comicId === comicId)
+            const episodeDir = renderLibraryPath(
+                path.join(this.dataDir, 'library'),
+                process.env.PICA_LIBRARY_PATH_TEMPLATE ?? defaultLibraryTemplate,
+                {
+                    author: stored?.canonicalAuthor ?? comic.author ?? 'Unknown author',
+                    title: comic.title,
+                    comic_id: comicId,
+                    chapter_order: String(episode.order).padStart(4, '0'),
+                    chapter: episode.title || episodeId
+                }
             )
             const concurrency = Math.max(
                 1,
@@ -362,7 +397,7 @@ export class LibraryService {
                         })
                         const file = path.join(
                             episodeDir,
-                            safeSegment(picture.name, `${index + 1}.jpg`)
+                            safePathSegment(picture.name, `${index + 1}.jpg`)
                         )
                         const previous =
                             this.database.pictureDownloadState(pictureId)

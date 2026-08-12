@@ -46,7 +46,10 @@ export function resolvePerformanceSettings(
         'globalMediaConcurrency',
         'maxRetries'
     ] as const) {
-        if (!Number.isInteger(value[key]) || value[key] < (key === 'maxRetries' ? 0 : 1))
+        if (
+            !Number.isInteger(value[key]) ||
+            value[key] < (key === 'maxRetries' ? 0 : 1)
+        )
             throw new Error(`Invalid performance setting: ${key}`)
     }
     if (value.requestIntervalMs < 0 || value.retryBaseMs < 0)

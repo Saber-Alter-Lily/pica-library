@@ -12,7 +12,7 @@ coverage/
 pica-library-data/
 pica-library-export/
 pica-download/
-downloads/
+/downloads/
 artifacts/
 *.log
 *.tgz

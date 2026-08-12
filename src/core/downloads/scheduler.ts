@@ -64,7 +64,8 @@ export class DownloadScheduler {
             current = this.store.getDownloadJob(job.id)
             if (current.status === 'PAUSED' || current.status === 'CANCELLED')
                 return
-            const message = error instanceof Error ? error.message : String(error)
+            const message =
+                error instanceof Error ? error.message : String(error)
             const retryCount = current.retryCount + 1
             if (retryCount <= this.maxRetries) {
                 this.store.transitionDownloadJob(job.id, 'RETRY_WAIT', {

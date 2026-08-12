@@ -209,6 +209,77 @@ main {
     border-radius: 7px;
     background: #fff;
 }
+[hidden] {
+    display: none !important;
+}
+.comic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+    gap: 14px;
+}
+.comic-card {
+    min-width: 0;
+    overflow: hidden;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.comic-card-body,
+.result-body {
+    padding: 12px;
+}
+.comic-card h3 {
+    min-height: 2.6em;
+    margin: 6px 0;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 1.3;
+}
+.comic-card p {
+    margin: 5px 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+.comic-select {
+    color: var(--muted);
+    font-size: 12px;
+}
+.cover-shell {
+    position: relative;
+    display: grid;
+    aspect-ratio: 3 / 4;
+    place-items: center;
+    overflow: hidden;
+    color: #87a092;
+    background: linear-gradient(145deg, #e4eee8, #cddcd3);
+}
+.cover-shell img {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.cover-shell span {
+    font-size: clamp(26px, 5vw, 54px);
+    font-weight: 800;
+    opacity: 0.45;
+}
+.cover-missing {
+    background: repeating-linear-gradient(
+        135deg,
+        #e7ede9,
+        #e7ede9 12px,
+        #dae4de 12px,
+        #dae4de 24px
+    );
+}
+.load-more-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 18px;
+}
 table {
     width: 100%;
     border-collapse: collapse;
@@ -240,7 +311,7 @@ th {
     gap: 10px;
 }
 .result {
-    padding: 14px;
+    overflow: hidden;
 }
 .result h3 {
     margin: 0 0 5px;

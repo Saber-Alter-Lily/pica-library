@@ -27,20 +27,43 @@ database, Bundle, artifact, or logs.
 
 The static `web/` directory also works in Browser Lite mode. It can import a
 Pica Library Bundle, browse and filter records, review authors, view prepared
-recommendations, and export a download plan. It never asks for a Pica password.
+recommendations, and export a download plan. Cover references stay lightweight;
+images are loaded lazily and failed images fall back to a local placeholder. It
+never asks for a Pica password.
+
+The connected Library defaults to a cover grid, offers a compact list view, and
+renders large collections 48 items at a time. Discover combines bounded related,
+author, circle, tag, and category recall into personalized, explainable
+recommendations. Scores and recall evidence remain available in data/audit
+outputs while normal cards stay concise.
 
 ## Runners
 
 | Runner | Best for | State | Output |
 | --- | --- | --- | --- |
 | Local Engine | Persistent libraries, resume, updates, repair and organization | SQLite on your machine | Author-first `library/` |
-| GitHub Runner | Short, manual, ephemeral download batches | Repository Secrets + temporary job state | Short-lived GitHub Artifact |
+| GitHub private caller | Short, manual, ephemeral download batches | Secrets and run belong to a private repository | One-day private Artifact |
 
 Both runners call the same `pica-library` CLI and shared download engine. The
-manual GitHub workflow accepts one favorites page or up to 20 comic IDs and
-uploads `library/`, `download-result.json`, `manifest.json`, and `errors.json`
-when failures exist. Only download material you are authorized to access and
-do not redistribute workflow artifacts.
+GitHub engine accepts one favorites page or up to 20 comic IDs and uploads
+`library/`, `download-result.json`, `manifest.json`, and `errors.json` when
+failures exist. The reusable workflow refuses any caller whose repository is
+not private. This keeps credentials, run logs, and downloaded artifacts in a
+user-controlled private repository even if the source repository becomes
+public. See [the private runner guide](docs/private-github-runner.md). Only
+download material you are authorized to access and do not redistribute it.
+
+## Security boundaries
+
+- Provider credentials are environment/Repository Secrets only; they are not
+  persisted in SQLite, Browser Lite, Bundles, or artifacts.
+- API authentication and media transfer use separate HTTP clients. Cover and
+  page requests never inherit API Authorization/signature headers.
+- The local server binds to loopback by default. Its cover route accepts a comic
+  ID, never an arbitrary proxy URL, and caches only bounded `image/*` responses
+  under the selected data directory.
+- Portable Bundles contain metadata, not embedded base64 cover libraries or
+  absolute maintainer paths.
 
 ## CLI
 

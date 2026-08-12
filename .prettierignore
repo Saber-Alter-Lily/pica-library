@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.live-validation-data/
 pnpm-lock.yaml
 yarn.lock
 *.md

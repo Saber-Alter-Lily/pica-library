@@ -9,6 +9,7 @@ coverage/
 .env.*
 !.env.template
 .pica-library/
+.live-validation-data/
 pica-library-data/
 pica-library-export/
 pica-download/

@@ -143,8 +143,8 @@ export class LibraryDatabase {
                 canonical_author_id, description, chinese_team,
                 categories_json, tags_json, finished, created_at_source,
                 updated_at_source, total_likes, total_views, pages_count,
-                eps_count, is_favorite, first_seen_at, last_seen_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                eps_count, cover_url, is_favorite, first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
                 raw_author = excluded.raw_author,
@@ -162,6 +162,7 @@ export class LibraryDatabase {
                 total_views = excluded.total_views,
                 pages_count = excluded.pages_count,
                 eps_count = excluded.eps_count,
+                cover_url = COALESCE(excluded.cover_url, comics.cover_url),
                 is_favorite = CASE
                     WHEN excluded.is_favorite = 1 THEN 1
                     ELSE comics.is_favorite
@@ -238,6 +239,7 @@ export class LibraryDatabase {
                     record.totalViews ?? 0,
                     record.pagesCount ?? 0,
                     record.epsCount ?? 0,
+                    record.coverUrl ?? null,
                     markFavorite ? 1 : 0,
                     now,
                     now
@@ -356,6 +358,7 @@ export class LibraryDatabase {
                     totalViews: numberValue(row.total_views),
                     pagesCount: numberValue(row.pages_count),
                     epsCount: numberValue(row.eps_count),
+                    coverUrl: row.cover_url ? String(row.cover_url) : undefined,
                     canonicalAuthor,
                     circle: row.circle ? String(row.circle) : null,
                     authorId: row.canonical_author_id
@@ -370,6 +373,8 @@ export class LibraryDatabase {
                 }
             })
             .filter((comic) => {
+                if (query.comicId && comic.comicId !== query.comicId)
+                    return false
                 if (
                     query.finished !== undefined &&
                     comic.finished !== query.finished
@@ -435,6 +440,10 @@ export class LibraryDatabase {
         const offset = Math.max(0, query.offset ?? 0)
         const limit = Math.max(1, Math.min(5000, query.limit ?? 100))
         return comics.slice(offset, offset + limit)
+    }
+
+    getComic(comicId: string): StoredComic | undefined {
+        return this.listComics({ comicId, limit: 1 })[0]
     }
 
     listAuthors(): AuthorGroup[] {

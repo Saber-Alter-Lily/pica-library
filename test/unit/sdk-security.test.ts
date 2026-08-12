@@ -8,12 +8,13 @@ import { redactSensitive } from '../../src/utils'
 
 function response(
     config: Parameters<AxiosAdapter>[0],
-    data: unknown
+    data: unknown,
+    responseHeaders: Record<string, string> = {}
 ): AxiosResponse {
     return {
         config,
         data,
-        headers: {},
+        headers: responseHeaders,
         status: 200,
         statusText: 'OK'
     }
@@ -93,5 +94,29 @@ describe('provider client security', () => {
             token: '[REDACTED]',
             nested: { password: '[REDACTED]', safe: 'ok' }
         })
+    })
+
+    it('accepts bounded image responses and rejects non-image cover data', async () => {
+        const mediaAdapter: AxiosAdapter = async (config) =>
+            response(config, Buffer.from('image'), {
+                'content-type': 'image/jpeg; charset=binary'
+            })
+        const pica = new Pica({ mediaAdapter })
+        await expect(
+            pica.fetchImage('https://media.example/cover.jpg', 32)
+        ).resolves.toMatchObject({ contentType: 'image/jpeg' })
+
+        const textClient = new Pica({
+            mediaAdapter: async (config) =>
+                response(config, Buffer.from('no'), {
+                    'content-type': 'text/html'
+                })
+        })
+        await expect(
+            textClient.fetchImage('https://media.example/error', 32)
+        ).rejects.toThrow('not an image')
+        await expect(
+            pica.fetchImage('https://media.example/large.jpg', 2)
+        ).rejects.toThrow('size limit')
     })
 })

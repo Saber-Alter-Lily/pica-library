@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
     addLiteQueueItems,
     importLibraryBundle,
-    restoreLiteState
+    restoreLiteState,
+    selectDisplayTags,
+    visibleLibraryPage
 } from '../../web/lite-state.js'
 
 function bundle() {
@@ -72,5 +74,29 @@ describe('Browser Lite state contract', () => {
             runner: 'LOCAL',
             status: 'PLANNED'
         })
+    })
+
+    it('bounds initial rendering for a 1770-item library', () => {
+        const records = Array.from({ length: 1770 }, (_, comicId) => ({
+            comicId: String(comicId)
+        }))
+        expect(visibleLibraryPage(records)).toHaveLength(48)
+        expect(visibleLibraryPage(records, 2)).toHaveLength(96)
+        expect(visibleLibraryPage(records, 99)).toHaveLength(1770)
+    })
+
+    it('selects deterministic discriminative tags before generic tags', () => {
+        const comic = { tags: ['全彩', 'common', 'rare', 'other'] }
+        const records = [
+            comic,
+            { tags: ['common'] },
+            { tags: ['common'] },
+            { tags: ['other'] }
+        ]
+        expect(selectDisplayTags(comic, records, 3)).toEqual([
+            'rare',
+            'other',
+            'common'
+        ])
     })
 })

@@ -277,3 +277,75 @@ describe('LibraryService downloads and maintenance', () => {
         database.close()
     })
 })
+
+describe('LibraryService recommendation recall bounds', () => {
+    it('caps seed fanout and provider concurrency while preserving route evidence', async () => {
+        const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-recall-'))
+        directories.push(dataDir)
+        const database = new LibraryDatabase(path.join(dataDir, 'library.db'))
+        database.importFavorites(
+            Array.from({ length: 30 }, (_, index) => ({
+                comicId: `favorite-${index}`,
+                title: `Favorite ${index}`,
+                author: `Circle ${index % 5} (Author ${index % 10})`,
+                categories: [`Category ${index % 4}`],
+                tags: [`Tag ${index % 7}`],
+                finished: index % 2 === 0,
+                totalLikes: 30 - index
+            }))
+        )
+        let active = 0
+        let maxActive = 0
+        const calls: string[] = []
+        const load = async (route: string, source: string) => {
+            calls.push(`${route}:${source}`)
+            active += 1
+            maxActive = Math.max(maxActive, active)
+            await new Promise((resolve) => setTimeout(resolve, 5))
+            active -= 1
+            return [
+                {
+                    ...comic(`candidate-${route}-${source}`),
+                    author: route === 'author' ? source : 'Candidate Author',
+                    categories:
+                        route === 'category'
+                            ? [source]
+                            : ['Candidate Category'],
+                    tags: route === 'tag' ? [source] : ['Candidate Tag']
+                }
+            ]
+        }
+        const provider = {
+            Order: { loved: 'ld' },
+            related: (source: string) => load('related', source),
+            comicsPage: async (category: string, tag: string) => ({
+                docs: await load(tag ? 'tag' : 'category', tag || category)
+            }),
+            search: async (source: string) => ({
+                docs: await load('author', source)
+            })
+        }
+        const service = new LibraryService(
+            database,
+            dataDir,
+            provider as unknown as Pica
+        )
+        const result = await service.recommendations({
+            seedCount: 999,
+            limit: 30
+        })
+
+        expect(
+            calls.filter((call) => call.startsWith('related:'))
+        ).toHaveLength(16)
+        expect(calls.length).toBeLessThanOrEqual(24)
+        expect(maxActive).toBeLessThanOrEqual(3)
+        expect(result.audit.seedCount).toBe(16)
+        expect(
+            result.recommendations.every(
+                (item) => item.recallSources.length > 0
+            )
+        ).toBe(true)
+        database.close()
+    })
+})

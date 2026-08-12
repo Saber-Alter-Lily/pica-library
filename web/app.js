@@ -6,8 +6,19 @@ import {
     loadLiteState,
     saveLiteState
 } from './lite-state.js'
+import {
+    LIBRARY_PAGE_SIZE,
+    selectDisplayTags,
+    visibleLibraryPage
+} from './lite-state.js'
 
-const state = { mode: 'lite', visible: [], ...emptyLiteState() }
+const state = {
+    mode: 'lite',
+    visible: [],
+    libraryPage: 1,
+    libraryView: 'grid',
+    ...emptyLiteState()
+}
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
 const escapeHtml = (value) =>
@@ -201,14 +212,50 @@ function renderComics(records = state.records) {
             return String(left.title).localeCompare(right.title)
         return String(right.updatedAt || '').localeCompare(left.updatedAt || '')
     })
-    $('#comic-rows').innerHTML = state.visible
+    const page = visibleLibraryPage(
+        state.visible,
+        state.libraryPage,
+        LIBRARY_PAGE_SIZE
+    )
+    const coverSource = (comic) =>
+        state.mode === 'connected'
+            ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}`
+            : comic.coverUrl || ''
+    const tagsFor = (comic) => selectDisplayTags(comic, state.records)
+    const cover = (comic) => `<div class="cover-shell">
+        ${
+            coverSource(comic)
+                ? `<img src="${escapeHtml(coverSource(comic))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />`
+                : ''
+        }
+        <span aria-hidden="true">P</span>
+    </div>`
+    $('#comic-grid').innerHTML = page
+        .map(
+            (comic) => `<article class="comic-card">
+                ${cover(comic)}
+                <div class="comic-card-body">
+                    <label class="comic-select"><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /> 选择</label>
+                    <h3>${escapeHtml(comic.title)}</h3>
+                    <p>${escapeHtml(comic.canonicalAuthor || comic.author || '未知作者')}</p>
+                    <div>${tagsFor(comic)
+                        .map(
+                            (tag) =>
+                                `<span class="tag">${escapeHtml(tag)}</span>`
+                        )
+                        .join('')}</div>
+                    <p class="comic-meta">爱心 ${Number(comic.totalLikes || 0).toLocaleString()} · ${Number(comic.downloadedPictures || 0)}/${Number(comic.knownPictures || 0)} 已下载</p>
+                </div>
+            </article>`
+        )
+        .join('')
+    $('#comic-rows').innerHTML = page
         .map(
             (comic) => `<tr>
                 <td><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /></td>
                 <td><strong>${escapeHtml(comic.title)}</strong></td>
                 <td>${escapeHtml(comic.canonicalAuthor || comic.author || '未知')}</td>
-                <td>${(comic.tags || [])
-                    .slice(0, 6)
+                <td>${tagsFor(comic)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</td>
                 <td>${Number(comic.totalLikes || 0).toLocaleString()}</td>
@@ -217,6 +264,9 @@ function renderComics(records = state.records) {
             </tr>`
         )
         .join('')
+    $('#library-count').textContent =
+        `已显示 ${page.length} / ${state.visible.length} 部作品`
+    $('#load-more').hidden = page.length >= state.visible.length
 }
 
 function renderAuthors() {
@@ -242,8 +292,15 @@ function renderResultCards(records, target, withReasons = false) {
         .map((item) => {
             const comic = item.comic || item
             return `<article class="result">
-                <h3>${escapeHtml(comic.title)}</h3>
+                <div class="cover-shell">
+                    ${comic.coverUrl ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : comic.coverUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />` : ''}
+                    <span aria-hidden="true">P</span>
+                </div>
+                <div class="result-body"><h3>${escapeHtml(comic.title)}</h3>
                 <p>${escapeHtml(comic.canonicalAuthor || comic.author || '未知作者')}</p>
+                <div>${selectDisplayTags(comic, state.records)
+                    .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
+                    .join('')}</div>
                 ${
                     withReasons
                         ? `<p>${(item.reasons || [])
@@ -256,6 +313,7 @@ function renderResultCards(records, target, withReasons = false) {
                 }
                 <p>爱心 ${Number(comic.totalLikes || 0).toLocaleString()} · 浏览 ${Number(comic.totalViews || 0).toLocaleString()}</p>
                 <button data-result-download="${escapeHtml(comic.comicId)}">加入下载</button>
+                </div>
             </article>`
         })
         .join('')
@@ -373,7 +431,23 @@ $$('.tabs').forEach((tabs) =>
     })
 )
 
-$('#apply-filter').onclick = () => renderComics()
+$('#apply-filter').onclick = () => {
+    state.libraryPage = 1
+    renderComics()
+}
+$('#load-more').onclick = () => {
+    state.libraryPage += 1
+    renderComics()
+}
+function setLibraryView(view) {
+    state.libraryView = view
+    $('#comic-grid').hidden = view !== 'grid'
+    $('#comic-table').hidden = view !== 'list'
+    $('#view-grid').setAttribute('aria-pressed', String(view === 'grid'))
+    $('#view-list').setAttribute('aria-pressed', String(view === 'list'))
+}
+$('#view-grid').onclick = () => setLibraryView('grid')
+$('#view-list').onclick = () => setLibraryView('list')
 $('#pending-only').onchange = renderAuthors
 $('#import-button').onclick = async () => {
     const file = $('#import-file').files[0]

@@ -161,6 +161,22 @@ export async function startLibraryServer(options: {
                     })
                 )
             }
+            const coverRequest = url.pathname.match(
+                /^\/api\/v1\/covers\/([^/]+)$/
+            )
+            if (coverRequest && request.method === 'GET') {
+                const cover = await options.service.cover(
+                    decodeURIComponent(coverRequest[1])
+                )
+                response.writeHead(200, {
+                    'content-type': cover.contentType,
+                    'content-length': String(cover.data.byteLength),
+                    'cache-control': 'private, max-age=86400',
+                    'x-content-type-options': 'nosniff'
+                })
+                response.end(cover.data)
+                return
+            }
             if (
                 url.pathname === '/api/v1/authors' &&
                 request.method === 'GET'

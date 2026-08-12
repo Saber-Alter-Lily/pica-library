@@ -64,7 +64,7 @@ describe('runner artifact', () => {
 
     it('configures the workflow CLI path as a GitHub runner', () => {
         const workflow = fs.readFileSync(
-            path.resolve('.github/workflows/download.yml'),
+            path.resolve('.github/workflows/private-download.yml'),
             'utf8'
         )
         expect(workflow.match(/--runner GITHUB/g)).toHaveLength(2)

@@ -22,6 +22,7 @@ export interface FavoriteRecord {
     totalViews?: number
     pagesCount?: number
     epsCount?: number
+    coverUrl?: string
 }
 
 export interface AuthorIdentity {
@@ -39,6 +40,7 @@ export interface AuthorIdentity {
 }
 
 export interface ComicQuery {
+    comicId?: string
     text?: string
     author?: string
     tags?: string[]
@@ -110,4 +112,33 @@ export interface RecommendationResult {
     comic: StoredComic
     score: number
     reasons: string[]
+    recallSources: string[]
+    matchedSignals: string[]
+    exploration: boolean
+}
+
+export type RecallRoute = 'related' | 'author' | 'tag' | 'category' | 'circle'
+
+export interface RecallEvidence {
+    route: RecallRoute
+    source: string
+    seedComicId?: string
+}
+
+export interface RecommendationCandidate {
+    comic: FavoriteRecord
+    recalls: RecallEvidence[]
+}
+
+export interface RecommendationAudit {
+    favoriteCount: number
+    seedCount: number
+    seedAuthorDiversity: number
+    seedTagDiversity: number
+    candidateCountByRecallRoute: Record<RecallRoute, number>
+    deduplicatedCandidateCount: number
+    alreadyFavoriteExcludedCount: number
+    finalRecommendationCount: number
+    maxSameAuthorInTopN: number
+    explorationCount: number
 }

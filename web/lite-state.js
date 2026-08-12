@@ -1,5 +1,6 @@
 export const LITE_SCHEMA_VERSION = 1
 export const LITE_BUNDLE_KIND = 'pica-library-bundle'
+export const LIBRARY_PAGE_SIZE = 48
 
 const DATABASE_NAME = 'pica-library-lite'
 const DATABASE_VERSION = 1
@@ -105,6 +106,52 @@ export function addLiteQueueItems(state, comicIds, source = 'library') {
         known.add(comicId)
     }
     return next
+}
+
+export function visibleLibraryPage(
+    records,
+    page = 1,
+    pageSize = LIBRARY_PAGE_SIZE
+) {
+    const safePage = Math.max(1, Math.trunc(page) || 1)
+    const safeSize = Math.max(
+        1,
+        Math.min(100, Math.trunc(pageSize) || LIBRARY_PAGE_SIZE)
+    )
+    return records.slice(0, safePage * safeSize)
+}
+
+const GENERIC_TAGS = new Set([
+    '全彩',
+    '短篇',
+    '長篇',
+    '长篇',
+    '連載中',
+    '连载中',
+    '完結',
+    '完结',
+    '漢化',
+    '汉化'
+])
+
+export function selectDisplayTags(comic, records, limit = 3) {
+    const frequencies = new Map()
+    for (const record of records) {
+        for (const tag of new Set(record.tags || [])) {
+            frequencies.set(tag, (frequencies.get(tag) || 0) + 1)
+        }
+    }
+    return [...new Set(comic.tags || [])]
+        .sort((left, right) => {
+            const genericDifference =
+                Number(GENERIC_TAGS.has(left)) - Number(GENERIC_TAGS.has(right))
+            return (
+                genericDifference ||
+                (frequencies.get(left) || 0) - (frequencies.get(right) || 0) ||
+                String(left).localeCompare(String(right))
+            )
+        })
+        .slice(0, Math.max(0, limit))
 }
 
 function openDatabase(indexedDB) {

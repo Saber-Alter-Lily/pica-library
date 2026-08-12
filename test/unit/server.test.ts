@@ -6,6 +6,7 @@ import type { Server } from 'node:http'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
+import { Pica } from '../../src/sdk'
 
 describe('local web server', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-server-'))
@@ -70,6 +71,55 @@ describe('local web server', () => {
             item.json()
         )
         expect(comics).toHaveLength(1)
+    })
+
+    it('serves provider covers by comic id without accepting a caller URL', async () => {
+        let fetches = 0
+        const coverService = new LibraryService(database, dir, {
+            fetchImage: async () => {
+                fetches += 1
+                return {
+                    data: Buffer.from('safe-image'),
+                    contentType: 'image/jpeg'
+                }
+            }
+        } as unknown as Pica)
+        database.importCatalog([
+            {
+                comicId: 'cover-comic',
+                title: 'Cover work',
+                author: 'Alice',
+                categories: [],
+                tags: [],
+                finished: false,
+                coverUrl: 'https://media.example/static/cover.jpg'
+            }
+        ])
+        const isolated = await startLibraryServer({
+            database,
+            service: coverService,
+            host: '127.0.0.1',
+            port: 0
+        })
+        try {
+            const first = await fetch(
+                `${isolated.url}/api/v1/covers/cover-comic?url=https://attacker.example`
+            )
+            const second = await fetch(
+                `${isolated.url}/api/v1/covers/cover-comic`
+            )
+            expect(first.status).toBe(200)
+            expect(first.headers.get('content-type')).toBe('image/jpeg')
+            expect(await first.text()).toBe('safe-image')
+            expect(await second.text()).toBe('safe-image')
+            expect(fetches).toBe(1)
+        } finally {
+            await new Promise<void>((resolve, reject) =>
+                isolated.server.close((error) =>
+                    error ? reject(error) : resolve()
+                )
+            )
+        }
     })
 
     it('rejects cross-origin writes', async () => {

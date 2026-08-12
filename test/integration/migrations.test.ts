@@ -33,7 +33,7 @@ describe('SQLite migrations', () => {
         const versions = database
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>
-        expect(versions.map((row) => row.version)).toEqual([1, 2])
+        expect(versions.map((row) => row.version)).toEqual([1, 2, 3])
         expect(
             database
                 .prepare(
@@ -41,6 +41,16 @@ describe('SQLite migrations', () => {
                 )
                 .get()
         ).toBeTruthy()
+        expect(
+            database
+                .prepare('PRAGMA table_info(comics)')
+                .all()
+                .some((column) =>
+                    Object.values(column as Record<string, unknown>).includes(
+                        'cover_url'
+                    )
+                )
+        ).toBe(true)
         database.close()
     })
 
@@ -66,7 +76,7 @@ describe('SQLite migrations', () => {
             database
                 .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
                 .get()
-        ).toMatchObject({ count: 2 })
+        ).toMatchObject({ count: 3 })
         database.close()
     })
 
@@ -76,12 +86,12 @@ describe('SQLite migrations', () => {
             runMigrations(database, [
                 ...migrations,
                 {
-                    version: 3,
+                    version: 4,
                     name: 'broken',
                     up: 'CREATE TABLE transient(value TEXT); INVALID SQL;'
                 }
             ])
-        ).toThrow(/Migration 3/)
+        ).toThrow(/Migration 4/)
         expect(
             database
                 .prepare(
@@ -92,7 +102,7 @@ describe('SQLite migrations', () => {
         expect(
             database
                 .prepare(
-                    'SELECT version FROM schema_migrations WHERE version = 3'
+                    'SELECT version FROM schema_migrations WHERE version = 4'
                 )
                 .get()
         ).toBeUndefined()

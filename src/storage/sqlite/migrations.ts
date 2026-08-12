@@ -203,6 +203,14 @@ export const migrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_update_findings_comic
                 ON update_findings(comic_id, checked_at DESC);
         `
+    },
+    {
+        version: 3,
+        name: 'comic_cover_reference',
+        up: '',
+        after(database) {
+            ensureColumn(database, 'comics', 'cover_url TEXT')
+        }
     }
 ]
 

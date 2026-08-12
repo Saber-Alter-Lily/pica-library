@@ -78,10 +78,16 @@
                         <option value="title">标题</option>
                     </select>
                     <button id="apply-filter" class="primary">筛选</button>
+                    <button id="view-grid" aria-pressed="true">封面网格</button>
+                    <button id="view-list" aria-pressed="false">
+                        紧凑列表
+                    </button>
                     <button id="queue-selected">加入下载</button>
                     <button id="export-plan">导出计划</button>
                 </div>
-                <div class="table-wrap">
+                <p id="library-count" class="status"></p>
+                <div id="comic-grid" class="comic-grid"></div>
+                <div id="comic-table" class="table-wrap" hidden>
                     <table>
                         <thead>
                             <tr>
@@ -96,6 +102,9 @@
                         </thead>
                         <tbody id="comic-rows"></tbody>
                     </table>
+                </div>
+                <div class="load-more-wrap">
+                    <button id="load-more" hidden>加载更多</button>
                 </div>
             </section>
 

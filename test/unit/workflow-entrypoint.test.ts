@@ -20,7 +20,7 @@ describe('built CLI entrypoint contract', () => {
 
     it('uses the canonical built CLI in runtime automation', () => {
         const runtimeFiles = [
-            '.github/workflows/download.yml',
+            '.github/workflows/private-download.yml',
             '.github/workflows/prepare-library.yml',
             'scripts/setup-windows.ps1'
         ]
@@ -31,7 +31,21 @@ describe('built CLI entrypoint contract', () => {
             expect(content, relativePath).toContain('dist/pica-library.js')
         }
 
-        const downloadWorkflow = read('.github/workflows/download.yml')
+        const downloadWorkflow = read('.github/workflows/private-download.yml')
         expect(downloadWorkflow).toContain('--runner GITHUB')
+    })
+
+    it('fails closed for public callers and checks out the pinned engine', () => {
+        const wrapper = read('.github/workflows/download.yml')
+        const reusable = read('.github/workflows/private-download.yml')
+        expect(wrapper).toContain(
+            'uses: ./.github/workflows/private-download.yml'
+        )
+        expect(reusable).toContain('workflow_call:')
+        expect(reusable).toContain('github.event.repository.private')
+        expect(reusable).toContain("!= 'true'")
+        expect(reusable).toContain('repository: ${{ job.workflow_repository }}')
+        expect(reusable).toContain('ref: ${{ job.workflow_sha }}')
+        expect(reusable).toContain('retention-days: 1')
     })
 })

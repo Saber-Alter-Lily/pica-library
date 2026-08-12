@@ -302,9 +302,32 @@ export class Pica {
         }
     }
 
+    async fetchImage(
+        target: string,
+        maxBytes = 5 * 1024 * 1024
+    ): Promise<{ data: Buffer; contentType: string }> {
+        if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+            throw new Error('Image size limit must be a positive integer')
+        }
+        const response = await this.mediaRequest(target, 0, maxBytes)
+        const data = Buffer.from(response.data)
+        if (data.byteLength > maxBytes) {
+            throw new Error('Provider image exceeds the configured size limit')
+        }
+        const contentType = String(response.headers['content-type'] ?? '')
+            .split(';', 1)[0]
+            .trim()
+            .toLowerCase()
+        if (!contentType.startsWith('image/')) {
+            throw new Error('Provider cover response is not an image')
+        }
+        return { data, contentType }
+    }
+
     private async mediaRequest(
         target: string,
-        redirects = 0
+        redirects = 0,
+        maxBytes?: number
     ): Promise<AxiosResponse<Buffer>> {
         const url = new URL(target)
         const insecureAllowed = process.env.PICA_ALLOW_INSECURE_HTTP === 'true'
@@ -319,6 +342,8 @@ export class Pica {
         if (redirects > 5) throw new Error('Too many media redirects')
         const response = await this.media.get<Buffer>(url.toString(), {
             responseType: 'arraybuffer',
+            maxContentLength: maxBytes,
+            maxBodyLength: maxBytes,
             maxRedirects: 0,
             headers: { Accept: 'image/*,application/octet-stream' },
             validateStatus: (status) =>
@@ -329,7 +354,8 @@ export class Pica {
         if (location) {
             return this.mediaRequest(
                 new URL(location, url).toString(),
-                redirects + 1
+                redirects + 1,
+                maxBytes
             )
         }
         return response

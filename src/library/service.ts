@@ -1,12 +1,22 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import pLimit from 'p-limit'
 import { Pica } from '../sdk'
 import type { Comic, Picture } from '../types'
 import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
-import type { FavoriteRecord, SortMode } from './types'
-import { recommendComics } from './recommendation'
+import type {
+    FavoriteRecord,
+    RecommendationCandidate,
+    RecallRoute,
+    SortMode
+} from './types'
+import {
+    mergeRecallCandidates,
+    recommendComics,
+    selectDiversifiedSeeds
+} from './recommendation'
 import { DownloadScheduler } from '../core/downloads/scheduler'
 import { MediaRequestGate } from '../core/downloads/media-gate'
 import {
@@ -71,7 +81,11 @@ function comicToRecord(comic: Comic): FavoriteRecord {
         totalLikes: comic.totalLikes ?? comic.likesCount ?? 0,
         totalViews: comic.totalViews ?? comic.viewsCount ?? 0,
         pagesCount: comic.pagesCount ?? 0,
-        epsCount: comic.epsCount ?? 0
+        epsCount: comic.epsCount ?? 0,
+        coverUrl:
+            comic.thumb?.fileServer && comic.thumb.path
+                ? `${comic.thumb.fileServer}/static/${comic.thumb.path}`
+                : undefined
     }
 }
 
@@ -108,6 +122,44 @@ export class LibraryService {
         await pica.login(account, password)
         this.pica = pica
         return pica
+    }
+
+    async cover(comicId: string) {
+        const comic = this.database.getComic(comicId)
+        if (!comic?.coverUrl) throw new Error('Comic cover is unavailable')
+
+        const cacheDir = path.join(this.dataDir, 'cover-cache')
+        const cacheKey = createHash('sha256').update(comicId).digest('hex')
+        const imageFile = path.join(cacheDir, `${cacheKey}.bin`)
+        const metadataFile = path.join(cacheDir, `${cacheKey}.json`)
+        try {
+            const metadata = JSON.parse(
+                await fs.promises.readFile(metadataFile, 'utf8')
+            ) as { contentType?: unknown }
+            const contentType = String(metadata.contentType ?? '')
+            if (!contentType.startsWith('image/')) throw new Error('invalid')
+            return {
+                data: await fs.promises.readFile(imageFile),
+                contentType,
+                cached: true
+            }
+        } catch {
+            // A partial or stale cache entry is safely replaced below.
+        }
+
+        const pica = await this.connect()
+        const image = await pica.fetchImage(comic.coverUrl)
+        await fs.promises.mkdir(cacheDir, { recursive: true })
+        const imagePartial = `${imageFile}.part`
+        const metadataPartial = `${metadataFile}.part`
+        await fs.promises.writeFile(imagePartial, image.data)
+        await fs.promises.writeFile(
+            metadataPartial,
+            JSON.stringify({ contentType: image.contentType })
+        )
+        await fs.promises.rename(imagePartial, imageFile)
+        await fs.promises.rename(metadataPartial, metadataFile)
+        return { ...image, cached: false }
     }
 
     async syncFavorites() {
@@ -200,30 +252,103 @@ export class LibraryService {
         if (favorites.length === 0) return recommendComics([], limit)
 
         const pica = await this.connect()
-        const seeds = [...favorites]
-            .sort(
-                (a, b) =>
-                    (b.totalLikes ?? 0) - (a.totalLikes ?? 0) ||
-                    String(b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
-            )
-            .slice(0, Math.max(1, Math.min(options.seedCount ?? 8, 12)))
-        const related = await Promise.all(
-            seeds.map(async (seed) => {
-                try {
-                    return await pica.related(seed.comicId)
-                } catch {
-                    return []
-                }
+        const seedBudget = Math.max(1, Math.min(options.seedCount ?? 12, 16))
+        const seeds = selectDiversifiedSeeds(favorites, seedBudget)
+        const profile = recommendComics(favorites, limit).profile
+        const recallTasks: Array<{
+            route: RecallRoute
+            source: string
+            seedComicId?: string
+            load: () => Promise<Comic[]>
+            accepts?: (comic: Comic) => boolean
+        }> = seeds.map((seed) => ({
+            route: 'related' as const,
+            source: seed.comicId,
+            seedComicId: seed.comicId,
+            load: () => pica.related(seed.comicId)
+        }))
+        for (const item of profile.tags.slice(0, 2))
+            recallTasks.push({
+                route: 'tag',
+                source: item.value,
+                load: async () =>
+                    (await pica.comicsPage('', item.value, pica.Order.loved, 1))
+                        .docs,
+                accepts: (comic) =>
+                    comic.tags.some(
+                        (tag) =>
+                            normalizeAuthorKey(tag) ===
+                            normalizeAuthorKey(item.value)
+                    )
             })
+        for (const item of profile.categories.slice(0, 2))
+            recallTasks.push({
+                route: 'category',
+                source: item.value,
+                load: async () =>
+                    (await pica.comicsPage(item.value, '', pica.Order.loved, 1))
+                        .docs,
+                accepts: (comic) =>
+                    comic.categories.some(
+                        (category) =>
+                            normalizeAuthorKey(category) ===
+                            normalizeAuthorKey(item.value)
+                    )
+            })
+        for (const item of profile.authors.slice(0, 2))
+            recallTasks.push({
+                route: 'author',
+                source: item.value,
+                load: async () =>
+                    (await pica.search(item.value, 1, pica.Order.loved)).docs,
+                accepts: (comic) =>
+                    normalizeAuthorKey(comic.author) ===
+                    normalizeAuthorKey(item.value)
+            })
+        for (const item of profile.circles.slice(0, 2))
+            recallTasks.push({
+                route: 'circle',
+                source: item.value,
+                load: async () =>
+                    (await pica.search(item.value, 1, pica.Order.loved)).docs,
+                accepts: (comic) =>
+                    normalizeAuthorKey(comic.author).includes(
+                        normalizeAuthorKey(item.value)
+                    )
+            })
+        const gate = pLimit(3)
+        const recalled = await Promise.all(
+            recallTasks.map((task) =>
+                gate(async (): Promise<RecommendationCandidate[]> => {
+                    try {
+                        return (await task.load())
+                            .filter((comic) => task.accepts?.(comic) ?? true)
+                            .map((comic) => ({
+                                comic: comicToRecord(comic),
+                                recalls: [
+                                    {
+                                        route: task.route,
+                                        source: task.source,
+                                        seedComicId: task.seedComicId
+                                    }
+                                ]
+                            }))
+                    } catch {
+                        return []
+                    }
+                })
+            )
         )
-        const candidateMap = new Map<string, FavoriteRecord>()
-        for (const comic of related.flat())
-            candidateMap.set(comic._id, comicToRecord(comic))
+        const candidates = mergeRecallCandidates(recalled.flat())
         this.database.importCatalog(
-            [...candidateMap.values()],
+            candidates.map((item) => item.comic),
             'pica:recommendations'
         )
-        return recommendComics(this.database.listComics({ limit: 5000 }), limit)
+        return recommendComics(
+            this.database.listComics({ limit: 5000 }),
+            limit,
+            candidates
+        )
     }
 
     async checkUpdates(comicIds?: string[]) {

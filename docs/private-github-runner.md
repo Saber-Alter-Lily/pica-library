@@ -13,6 +13,11 @@ private caller run.
 4. Replace `ENGINE_SHA` with an immutable reviewed commit SHA from Pica Library.
 5. Open Actions, choose `private-pica-download`, and run a small request first.
 
+While the engine source itself is still private during maintainer RC validation,
+an additional temporary read-only `PICA_SOURCE_TOKEN` may be required for source
+checkout. This is not needed after the engine repository becomes public and is
+not part of the normal user setup.
+
 ```yaml
 name: private-pica-download
 
@@ -48,6 +53,8 @@ jobs:
     secrets:
       PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
       PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
+      # RC maintainers only while the engine source is private:
+      # PICA_SOURCE_TOKEN: ${{ secrets.PICA_SOURCE_TOKEN }}
 ```
 
 The engine fails before checkout, credential validation, provider login, or

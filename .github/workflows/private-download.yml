@@ -25,6 +25,8 @@ on:
         required: true
       PICA_PASSWORD:
         required: true
+      PICA_SOURCE_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -56,6 +58,8 @@ jobs:
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
+          token: ${{ secrets.PICA_SOURCE_TOKEN || github.token }}
+          persist-credentials: false
 
       - name: Validate request
         shell: bash

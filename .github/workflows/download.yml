@@ -45,3 +45,4 @@ jobs:
     secrets:
       PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
       PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
+      PICA_SOURCE_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -46,6 +46,10 @@ describe('built CLI entrypoint contract', () => {
         expect(reusable).toContain("!= 'true'")
         expect(reusable).toContain('repository: ${{ job.workflow_repository }}')
         expect(reusable).toContain('ref: ${{ job.workflow_sha }}')
+        expect(reusable).toContain(
+            'token: ${{ secrets.PICA_SOURCE_TOKEN || github.token }}'
+        )
+        expect(reusable).toContain('persist-credentials: false')
         expect(reusable).toContain('retention-days: 1')
     })
 })

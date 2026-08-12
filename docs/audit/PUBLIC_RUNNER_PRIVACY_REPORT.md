@@ -1,7 +1,9 @@
 # Public Runner Privacy Report
 
-Status: implementation complete; private-caller live validation pending the RC
-commit.
+Status: implementation complete. The first private-source validation reached
+the private caller gate but exposed GitHub's separate source-checkout permission
+boundary before any provider request. A temporary read-only source token is used
+only for the corrected RC validation.
 
 ## Boundary
 
@@ -12,7 +14,10 @@ commit.
   download, or artifact upload.
 - The engine source is checked out from `job.workflow_repository` at immutable
   `job.workflow_sha`, not from the caller checkout context.
-- Only named `PICA_ACCOUNT` and `PICA_PASSWORD` secrets are accepted.
+- Normal public-source callers pass only named `PICA_ACCOUNT` and
+  `PICA_PASSWORD` secrets. A temporary optional `PICA_SOURCE_TOKEN` exists only
+  so maintainers can validate cross-repository checkout before the source is
+  public; it is removed from the companion after validation.
 - Artifact retention is one day and the artifact belongs to the caller run.
 - The source repository's manual wrapper calls the same guarded engine, so it
   automatically fails closed if the source repository is public.

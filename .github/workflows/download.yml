@@ -1,0 +1,139 @@
+name: limited-download
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '下载方式'
+        required: true
+        type: choice
+        default: favorites_page
+        options:
+          - favorites_page
+          - comic_ids
+      favorite_page:
+        description: '收藏夹页码（通常每页约 20 本）'
+        required: false
+        default: '1'
+        type: string
+      comic_ids:
+        description: '漫画 ID，逗号分隔，单次最多 20 本'
+        required: false
+        type: string
+      episodes:
+        description: '章节，例如 all、1,3,5-10'
+        required: true
+        default: 'all'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    env:
+      PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
+      PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
+      PICA_DL_CONCURRENCY: '5'
+      INPUT_MODE: ${{ inputs.mode }}
+      INPUT_FAVORITE_PAGE: ${{ inputs.favorite_page }}
+      INPUT_COMIC_IDS: ${{ inputs.comic_ids }}
+      INPUT_EPISODES: ${{ inputs.episodes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PICA_ACCOUNT" && test -n "$PICA_PASSWORD" || {
+            echo '请先设置 PICA_ACCOUNT 和 PICA_PASSWORD Repository Secrets。'
+            exit 1
+          }
+          if [[ "$INPUT_MODE" == 'favorites_page' ]]; then
+            [[ "$INPUT_FAVORITE_PAGE" =~ ^[1-9][0-9]{0,3}$ ]] || {
+              echo '收藏夹页码必须是正整数。'
+              exit 1
+            }
+          elif [[ "$INPUT_MODE" == 'comic_ids' ]]; then
+            IFS=',' read -ra ids <<< "$INPUT_COMIC_IDS"
+            test -n "$INPUT_COMIC_IDS" && test "${#ids[@]}" -le 20 || {
+              echo 'ID 模式单次允许 1 至 20 本漫画。'
+              exit 1
+            }
+            for id in "${ids[@]}"; do
+              [[ "${id// /}" =~ ^[A-Za-z0-9_-]{8,64}$ ]] || {
+                echo '漫画 ID 格式无效。'
+                exit 1
+              }
+            done
+          else
+            echo '未知下载方式。'
+            exit 1
+          fi
+          [[ "$INPUT_EPISODES" == 'all' || "$INPUT_EPISODES" =~ ^[0-9,-]{1,80}$ ]] || {
+            echo '章节格式无效。'
+            exit 1
+          }
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Download requested comics
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$INPUT_MODE" == 'favorites_page' ]]; then
+            node dist/library-cli.js download-favorites \
+              --page "$INPUT_FAVORITE_PAGE" \
+              --episodes "$INPUT_EPISODES" \
+              --concurrency 5 \
+              --data-dir .pica-library-action
+          else
+            IFS=',' read -ra ids <<< "$INPUT_COMIC_IDS"
+            args=()
+            for id in "${ids[@]}"; do args+=("${id// /}"); done
+            node dist/library-cli.js download "${args[@]}" \
+              --episodes "$INPUT_EPISODES" \
+              --concurrency 5 \
+              --data-dir .pica-library-action
+          fi
+
+      - name: Build readable folders
+        run: >-
+          node dist/library-cli.js portable
+          --output pica-download
+          --data-dir .pica-library-action
+
+      - name: Upload temporary download
+        id: artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-download-${{ github.run_id }}
+          path: pica-download
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        env:
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+        run: |
+          {
+            echo '## 下载任务'
+            echo ''
+            echo '支持一页收藏夹（通常约 20 本）或最多 20 个漫画 ID；图片并发 5。'
+            echo '多个手动任务可以并行运行；成功产物保留 1 天。'
+            echo "[下载本次漫画]($ARTIFACT_URL)"
+            echo '请仅下载你有权访问和保存的内容，不要将产物用于公开再分发。'
+          } >> "$GITHUB_STEP_SUMMARY"

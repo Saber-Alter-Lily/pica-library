@@ -1,0 +1,57 @@
+name: prepare-library
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    env:
+      PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
+      PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check account secrets
+        shell: bash
+        run: |
+          test -n "$PICA_ACCOUNT" && test -n "$PICA_PASSWORD" || {
+            echo '请先设置 PICA_ACCOUNT 和 PICA_PASSWORD Repository Secrets。'
+            exit 1
+          }
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Export favorites and recommendations
+        run: >-
+          node dist/library-cli.js prepare-library
+          --output pica-library-export
+          --limit 100
+          --data-dir .pica-library-action
+      - name: Upload library data
+        id: artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-library-data-${{ github.run_id }}
+          path: pica-library-export
+          retention-days: 3
+      - name: Write summary
+        shell: bash
+        env:
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+        run: |
+          {
+            echo '## 收藏库数据已准备完成'
+            echo ''
+            echo "[下载 favorites.csv 和推荐数据包]($ARTIFACT_URL)"
+            echo ''
+            echo '将 pica-library-bundle.json 导入 Pica Library Lite，即可查看收藏、作者归一和真实推荐。'
+          } >> "$GITHUB_STEP_SUMMARY"

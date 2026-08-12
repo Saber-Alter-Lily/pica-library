@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="light dark" />
+        <title>Pica Library</title>
+        <link rel="stylesheet" href="./styles.css" />
+    </head>
+    <body>
+        <header>
+            <div class="brand">
+                <h1>Pica Library</h1>
+                <p class="subtitle">整理、发现、继续下载你的漫画收藏</p>
+            </div>
+            <div id="mode" class="mode">正在检测运行模式…</div>
+        </header>
+
+        <nav>
+            <button data-view="dashboard" class="active">概览</button>
+            <button data-view="library">收藏库</button>
+            <button data-view="authors">作者归一</button>
+            <button data-view="recommendations">专属推荐</button>
+            <button data-view="discover">站内搜索</button>
+        </nav>
+
+        <main>
+            <section id="dashboard" class="view active">
+                <div class="start-grid">
+                    <button class="start-action primary-action" id="first-use">
+                        <span class="step">01</span>
+                        <strong>第一次使用</strong>
+                        <small>准备收藏数据与专属推荐</small>
+                    </button>
+                    <button class="start-action" data-go="recommendations">
+                        <span class="step">02</span>
+                        <strong>生成专属推荐</strong>
+                        <small>从收藏偏好发现关联作品</small>
+                    </button>
+                    <a
+                        class="start-action"
+                        id="actions-download"
+                        href="https://github.com/Saber-Alter-Lily/pica-cli/actions/workflows/download.yml"
+                    >
+                        <span class="step">03</span>
+                        <strong>在 GitHub 下载</strong>
+                        <small>无需安装，一次下载一页收藏</small>
+                    </a>
+                    <button class="start-action" id="show-setup">
+                        <span class="step">04</span>
+                        <strong>安装本地完整版</strong>
+                        <small>同步、批量增量下载和本地归档</small>
+                    </button>
+                </div>
+                <div id="summary" class="cards"></div>
+                <article class="panel compact-panel">
+                    <div>
+                        <h2>导入收藏库数据</h2>
+                        <p class="muted">
+                            文件只在当前浏览器中处理，不会上传。
+                        </p>
+                    </div>
+                    <div class="row">
+                        <input
+                            id="import-file"
+                            type="file"
+                            accept=".csv,.json"
+                        />
+                        <button id="import-button" class="primary">导入</button>
+                        <button id="sync-button">从站内同步收藏</button>
+                    </div>
+                    <p id="import-result" class="muted"></p>
+                </article>
+                <dialog id="first-use-dialog">
+                    <button
+                        class="first-use-close dialog-close"
+                        aria-label="关闭"
+                    >
+                        ×
+                    </button>
+                    <h2>第一次使用</h2>
+                    <ol class="setup-steps">
+                        <li>Fork 项目到自己的 GitHub 账号。</li>
+                        <li>
+                            在 Fork 的 Actions Secrets 设置
+                            <code>PICA_ACCOUNT</code> 和
+                            <code>PICA_PASSWORD</code>。
+                        </li>
+                        <li>
+                            运行
+                            <code>prepare-library</code>，下载生成的数据包。
+                        </li>
+                        <li>
+                            回到这里导入 <code>pica-library-bundle.json</code>。
+                        </li>
+                    </ol>
+                    <a
+                        class="button-link primary"
+                        href="https://github.com/Saber-Alter-Lily/pica-cli/fork"
+                        >Fork 项目</a
+                    >
+                    <a
+                        class="button-link"
+                        href="https://github.com/Saber-Alter-Lily/pica-cli/actions/workflows/prepare-library.yml"
+                        >打开准备工作流</a
+                    >
+                </dialog>
+                <dialog id="setup-dialog">
+                    <button class="setup-close dialog-close" aria-label="关闭">
+                        ×
+                    </button>
+                    <h2>本地完整版</h2>
+                    <ol class="setup-steps">
+                        <li>下载或克隆项目。</li>
+                        <li>
+                            运行
+                            <code
+                                >powershell -ExecutionPolicy Bypass -File
+                                scripts/setup-windows.ps1</code
+                            >
+                        </li>
+                        <li>
+                            在 <code>.env.local</code> 填写账号，再运行
+                            <code>node dist/library-cli.js serve</code>
+                        </li>
+                    </ol>
+                    <a
+                        class="button-link primary"
+                        href="https://github.com/Saber-Alter-Lily/pica-cli/archive/refs/heads/main.zip"
+                        >下载项目 ZIP</a
+                    >
+                </dialog>
+            </section>
+
+            <section id="recommendations" class="view">
+                <div class="section-heading">
+                    <div>
+                        <h2>专属推荐</h2>
+                        <p class="muted">
+                            综合作者、社团、Tag、分类、完结偏好和站内热度，每条结果都会说明理由。
+                        </p>
+                    </div>
+                    <button id="recommend-button" class="primary">
+                        生成推荐
+                    </button>
+                </div>
+                <div id="profile" class="profile-strip"></div>
+                <p id="recommend-message" class="muted"></p>
+                <div id="recommend-results" class="result-grid"></div>
+            </section>
+
+            <section id="library" class="view">
+                <div class="toolbar">
+                    <input id="filter-text" placeholder="标题或作者" />
+                    <input id="filter-tag" placeholder="Tag（逗号分隔）" />
+                    <select id="sort-mode">
+                        <option value="latest">最近更新</option>
+                        <option value="likes">爱心数</option>
+                        <option value="views">浏览量</option>
+                        <option value="title">标题</option>
+                        <option value="recommended">综合推荐</option>
+                    </select>
+                    <button id="apply-filter" class="primary">筛选</button>
+                    <button id="export-plan">导出下载计划</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>标题</th>
+                                <th>归一作者</th>
+                                <th>Tag</th>
+                                <th>爱心</th>
+                                <th>浏览</th>
+                                <th>更新</th>
+                                <th>本地进度</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comic-rows"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="authors" class="view">
+                <div class="toolbar">
+                    <label
+                        ><input id="pending-only" type="checkbox" />
+                        仅待审核</label
+                    >
+                    <button id="refresh-authors">刷新</button>
+                    <button id="export-aliases">导出作者字典</button>
+                    <input id="alias-file" type="file" accept=".json" />
+                    <button id="import-aliases">导入作者字典</button>
+                </div>
+                <div class="toolbar">
+                    <span>勾选至少两个作者后：</span>
+                    <input
+                        id="merge-name"
+                        placeholder="合并后的规范名称（可选）"
+                    />
+                    <button id="merge-authors" class="primary">
+                        合并所选作者
+                    </button>
+                    <button id="organize-library">重建本地作者目录</button>
+                </div>
+                <div id="author-list" class="author-list"></div>
+            </section>
+
+            <section id="discover" class="view">
+                <article class="panel">
+                    <h2>站内搜索与排序</h2>
+                    <div class="search-grid">
+                        <input
+                            id="search-keyword"
+                            placeholder="关键词（可留空）"
+                        />
+                        <input id="search-tags" placeholder="Tag，逗号分隔" />
+                        <input
+                            id="search-categories"
+                            placeholder="分类，逗号分隔"
+                        />
+                        <select id="search-sort">
+                            <option value="likes">爱心数</option>
+                            <option value="views">浏览量</option>
+                            <option value="latest">最近更新</option>
+                            <option value="recommended">综合推荐</option>
+                        </select>
+                        <button id="search-button" class="primary">搜索</button>
+                    </div>
+                    <p id="search-message" class="muted"></p>
+                </article>
+                <div id="search-results" class="result-grid"></div>
+            </section>
+        </main>
+
+        <template id="author-template">
+            <article class="author-card">
+                <input class="author-select" type="checkbox" />
+                <div>
+                    <p class="author-name"></p>
+                    <p class="author-meta muted"></p>
+                    <p class="author-evidence"></p>
+                </div>
+                <div class="author-actions">
+                    <button data-decision="approved">确认</button>
+                    <button data-decision="keep_separate">保持分离</button>
+                    <button data-decision="needs_research">待研究</button>
+                </div>
+            </article>
+        </template>
+        <script type="module" src="./app.js"></script>
+    </body>
+</html>

@@ -96,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$INPUT_MODE" == 'favorites_page' ]]; then
-            node dist/library-cli.js download-favorites \
+            node dist/pica-library.js download-favorites \
               --page "$INPUT_FAVORITE_PAGE" \
               --episodes "$INPUT_EPISODES" \
               --profile "$INPUT_PROFILE" \
@@ -106,7 +106,7 @@ jobs:
             IFS=',' read -ra ids <<< "$INPUT_COMIC_IDS"
             args=()
             for id in "${ids[@]}"; do args+=("${id// /}"); done
-            node dist/library-cli.js download "${args[@]}" \
+            node dist/pica-library.js download "${args[@]}" \
               --episodes "$INPUT_EPISODES" \
               --profile "$INPUT_PROFILE" \
               --runner GITHUB \
@@ -115,7 +115,7 @@ jobs:
 
       - name: Build review artifact
         run: >-
-          node dist/library-cli.js artifact
+          node dist/pica-library.js artifact
           --output pica-download
           --data-dir .pica-library-action
 

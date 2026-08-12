@@ -17,4 +17,4 @@ pnpm build
 
 Write-Host ''
 Write-Host '配置完成。填写 .env.local 后运行：'
-Write-Host 'node dist/library-cli.js serve'
+Write-Host 'node dist/pica-library.js serve'

@@ -32,6 +32,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm web:check
       - run: pnpm build
+      - name: Smoke test built CLI
+        run: node dist/pica-library.js --help
       - name: Build Browser Lite review artifact
         uses: actions/upload-artifact@v4
         with:

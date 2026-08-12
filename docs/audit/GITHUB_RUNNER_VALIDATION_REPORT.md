@@ -19,11 +19,17 @@ Private-caller architecture validation:
   then passed the private-caller gate but failed at private source checkout
   before request validation or provider login. GitHub's caller token cannot
   clone a separate private source repository.
-- A corrected optional `PICA_SOURCE_TOKEN` path was added for maintainer-only RC
-  validation; normal use after the source is public falls back to
-  `github.token`.
-- Persisting the current broad GitHub CLI token was rejected as unsafe. No token
-  was written. Final private-caller content validation therefore remains
-  pending a fine-grained contents-read token or the later public-source state.
-
-No second provider run was triggered and no private caller artifact exists yet.
+- Persisting the current broad GitHub CLI token was rejected as unsafe and no
+  token was written. A repository-scoped, read-only deploy key was used instead.
+- Corrected run:
+  <https://github.com/Saber-Alter-Lily/pica-library-runner/actions/runs/31627546675>.
+- Private gate, immutable engine checkout, request validation, provider
+  download, artifact build, and artifact upload all passed.
+- Result: `GITHUB`, `COMPLETED`, 30 media files, 12,183,916 bytes, zero retries,
+  zero empty files, zero stale `.part` files, and no artifact error manifest.
+- The one-day artifact belongs to the PRIVATE caller repository run.
+- Artifact text scan found no password/token/Authorization/Cookie/API-key
+  fields or bearer-like values.
+- The temporary deploy key, companion private-key Secret, and local private-key
+  directory were all removed immediately after validation. Only the two Pica
+  credential Secret names remain in the PRIVATE companion.

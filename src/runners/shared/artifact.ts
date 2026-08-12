@@ -19,13 +19,18 @@ export function buildRunnerArtifact(
     const jobs = database.listDownloadJobs()
     const errors = jobs
         .filter((job) => job.status === 'FAILED' || job.error)
-        .map((job) => ({ jobId: job.id, comicId: job.comicId, error: job.error }))
+        .map((job) => ({
+            jobId: job.id,
+            comicId: job.comicId,
+            error: job.error
+        }))
     const result = {
         schemaVersion: 1,
         generatedAt: new Date().toISOString(),
         jobs: jobs.map((job) => ({
             jobId: job.id,
             comicId: job.comicId,
+            runner: job.runner,
             status: job.status,
             bytes: job.bytes,
             completed: job.progressCompleted,
@@ -41,9 +46,18 @@ export function buildRunnerArtifact(
         files: ['library/', 'download-result.json', 'manifest.json'],
         hasErrors: errors.length > 0
     }
-    fs.writeFileSync(path.join(destination, 'download-result.json'), JSON.stringify(result, null, 2))
-    fs.writeFileSync(path.join(destination, 'manifest.json'), JSON.stringify(manifest, null, 2))
+    fs.writeFileSync(
+        path.join(destination, 'download-result.json'),
+        JSON.stringify(result, null, 2)
+    )
+    fs.writeFileSync(
+        path.join(destination, 'manifest.json'),
+        JSON.stringify(manifest, null, 2)
+    )
     if (errors.length)
-        fs.writeFileSync(path.join(destination, 'errors.json'), JSON.stringify(errors, null, 2))
+        fs.writeFileSync(
+            path.join(destination, 'errors.json'),
+            JSON.stringify(errors, null, 2)
+        )
     return { outputDir: destination, jobs: jobs.length, errors: errors.length }
 }

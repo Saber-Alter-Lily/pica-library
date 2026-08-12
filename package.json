@@ -3,7 +3,9 @@
   "version": "0.1.0-rc.1",
   "private": true,
   "author": "Saber-Alter-Lily",
-  "contributors": ["Neo (justorez) - upstream pica-cli author"],
+  "contributors": [
+    "Neo (justorez) - upstream pica-cli author"
+  ],
   "description": "Collection-centric Pica library manager, explainable discovery engine and shared local/GitHub downloader",
   "packageManager": "pnpm@11.16.0",
   "type": "module",
@@ -18,11 +20,11 @@
     "test:integration": "vitest run test/integration",
     "test:watch": "vitest",
     "type:check": "tsc --incremental --noEmit",
-    "lint": "eslint --no-cache --ignore-path .gitignore .",
+    "lint": "eslint --no-cache --max-warnings=0 --ignore-path .gitignore .",
     "lint:fix": "eslint --no-cache --fix --ignore-path .gitignore .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "web:check": "node --check web/app.js",
+    "web:check": "node --check web/app.js && node --check web/lite-state.js",
     "benchmark": "tsx scripts/benchmark/download-harness.ts"
   },
   "engines": {
@@ -36,7 +38,13 @@
   "bugs": {
     "url": "https://github.com/Saber-Alter-Lily/pica-library/issues"
   },
-  "keywords": ["pica", "comic-library", "downloader", "metadata", "recommendation"],
+  "keywords": [
+    "pica",
+    "comic-library",
+    "downloader",
+    "metadata",
+    "recommendation"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@commitlint/cli": "^19.3.0",

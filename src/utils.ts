@@ -8,6 +8,21 @@ import figures from 'figures'
 
 export const debug = Debug('pica')
 
+const sensitiveKey =
+    /^(account|email|password|token|authorization|cookie|secret|api[-_]?key)$/i
+
+export function redactSensitive(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(redactSensitive)
+    if (!value || typeof value !== 'object') return value
+    const output: Record<string, unknown> = {}
+    for (const [key, item] of Object.entries(value)) {
+        output[key] = sensitiveKey.test(key)
+            ? '[REDACTED]'
+            : redactSensitive(item)
+    }
+    return output
+}
+
 /**
  * @param input `all` or `1,3,5-20`
  */

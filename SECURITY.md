@@ -2,21 +2,46 @@
 
 ## Credentials
 
-- 账号和密码只从进程环境或被 Git 忽略的 `.env.local` 读取。
-- 登录日志不打印密码，SQLite 不保存账号、密码或会话令牌。
-- 不要把 `.env.local`、数据库、收藏导出或下载内容提交到 Git。
+- Account and password values are read only from process environment variables,
+  Repository Secrets, or a Git-ignored `.env.local` file.
+- The SDK redacts credential-shaped fields from debug success and error output.
+- SQLite, portable Bundles and artifact metadata do not store account, password,
+  login token, cookie, or other user secrets.
+- Never commit `.env.local`, databases, personal exports, or downloaded content.
+
+Upstream API signing values in `src/data/headers.json` and the SDK are public
+provider protocol compatibility constants. They are not user credentials. Real
+account, password and login-token values remain user secrets and must never enter
+source code, logs, Bundles, or artifact metadata.
+
+## Media requests
+
+Pica API requests and media-host requests use separate clients. Only the trusted
+Pica API client receives signing and login authorization headers. Media requests
+never receive those credentials, including redirects and the explicitly opted-in
+`PICA_ALLOW_INSECURE_HTTP=true` fallback. HTTPS is required by default.
 
 ## Local web service
 
-- 默认只监听 `127.0.0.1`。
-- 非回环地址默认拒绝启动；明确设置 `PICA_LIBRARY_ALLOW_REMOTE=true` 才能覆盖。
-- 带浏览器 `Origin` 的跨域写请求会被拒绝。
-- 若要跨设备使用，请自行增加受信任的反向代理、TLS 和身份验证；当前版本不应直接暴露到公网。
+- The service listens on `127.0.0.1` by default.
+- Non-loopback binding is rejected unless `PICA_LIBRARY_ALLOW_REMOTE=true` is set.
+- Cross-origin browser writes are rejected.
+- Add trusted TLS, authentication and a reverse proxy before any cross-device use;
+  the current server must not be exposed directly to the public internet.
 
 ## Downloaded content
 
-GitHub 仓库、Pages、Releases 和 CI 只用于源码、文档、测试与构建产物。本项目不把漫画内容上传为 Actions artifact，也不提供第三方临时网盘上传。使用者应只保存有权访问的内容，并自行遵守站点规则和适用法律。
+- Downloaded content is never committed to Git, published to Pages, or attached
+  to a GitHub Release automatically.
+- The manual GitHub Runner intentionally uploads user-requested downloads as a
+  private GitHub Actions Artifact. The download workflow currently retains that
+  artifact for one day.
+- The project does not upload downloads to a third-party temporary file host.
+- Users are responsible for having the right to access downloaded content and
+  for complying with provider rules, applicable law, and redistribution limits.
 
 ## Reporting
 
-请通过 GitHub Security Advisory 私下报告凭据泄漏、路径穿越、跨域写入或任意文件覆盖问题。不要在公开 Issue 中附带真实账号、令牌、收藏清单或漫画文件。
+Report credential exposure, path traversal, cross-origin writes, or arbitrary file
+overwrite privately through a GitHub Security Advisory. Do not attach real account
+values, tokens, personal collection exports, or downloaded files to public issues.

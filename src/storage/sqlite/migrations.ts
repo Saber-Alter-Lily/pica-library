@@ -7,9 +7,15 @@ export interface Migration {
     after?: (database: DatabaseSync) => void
 }
 
-function ensureColumn(database: DatabaseSync, table: string, definition: string) {
+function ensureColumn(
+    database: DatabaseSync,
+    table: string,
+    definition: string
+) {
     const column = definition.trim().split(/\s+/, 1)[0]
-    const columns = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+    const columns = database
+        .prepare(`PRAGMA table_info(${table})`)
+        .all() as Array<{
         name: string
     }>
     if (!columns.some((item) => item.name === column))
@@ -209,7 +215,9 @@ export function runMigrations(
         name TEXT NOT NULL DEFAULT '',
         applied_at TEXT NOT NULL
     )`)
-    const columns = database.prepare('PRAGMA table_info(schema_migrations)').all() as Array<{
+    const columns = database
+        .prepare('PRAGMA table_info(schema_migrations)')
+        .all() as Array<{
         name: string
     }>
     if (!columns.some((column) => column.name === 'name'))
@@ -218,12 +226,16 @@ export function runMigrations(
         )
     const applied = new Set(
         (
-            database.prepare('SELECT version FROM schema_migrations').all() as Array<{
+            database
+                .prepare('SELECT version FROM schema_migrations')
+                .all() as Array<{
                 version: number
             }>
         ).map((row) => Number(row.version))
     )
-    for (const migration of [...available].sort((a, b) => a.version - b.version)) {
+    for (const migration of [...available].sort(
+        (a, b) => a.version - b.version
+    )) {
         if (applied.has(migration.version)) continue
         database.exec('BEGIN IMMEDIATE')
         try {
@@ -233,7 +245,11 @@ export function runMigrations(
                 .prepare(
                     'INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)'
                 )
-                .run(migration.version, migration.name, new Date().toISOString())
+                .run(
+                    migration.version,
+                    migration.name,
+                    new Date().toISOString()
+                )
             database.exec('COMMIT')
         } catch (error) {
             database.exec('ROLLBACK')

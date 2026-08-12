@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
-import pLimit from 'p-limit'
 import { Pica } from '../sdk'
 import type { Comic, Picture } from '../types'
 import { LibraryDatabase } from './database'
@@ -9,6 +8,12 @@ import { normalizeAuthorKey } from './author'
 import type { FavoriteRecord, SortMode } from './types'
 import { recommendComics } from './recommendation'
 import { DownloadScheduler } from '../core/downloads/scheduler'
+import { MediaRequestGate } from '../core/downloads/media-gate'
+import {
+    resolvePerformanceSettings,
+    type PerformanceProfile,
+    type PerformanceSettings
+} from '../core/downloads/profiles'
 import {
     defaultLibraryTemplate,
     renderLibraryPath,
@@ -46,6 +51,7 @@ export interface DownloadResult {
     pictures: number
     downloaded: number
     skipped: number
+    completed: number
     bytes: number
 }
 
@@ -81,8 +87,10 @@ export class LibraryService {
 
     constructor(
         readonly database: LibraryDatabase,
-        readonly dataDir: string
+        readonly dataDir: string,
+        provider?: Pica
     ) {
+        this.pica = provider ?? null
         fs.mkdirSync(dataDir, { recursive: true })
     }
 
@@ -223,7 +231,7 @@ export class LibraryService {
             ? comicIds
             : this.database
                   .listComics({ limit: 5000 })
-                  .filter((comic) => comic.isFavorite)
+                  .filter((comic) => comic.downloadedPictures > 0)
                   .map((comic) => comic.comicId)
         const findings = []
         for (const comicId of ids) {
@@ -258,15 +266,23 @@ export class LibraryService {
         return this.database.transitionDownloadJob(job.id, 'QUEUED')
     }
 
-    async runDownloadQueue(options: {
-        runner?: DownloadRunner
-        concurrency?: number
-        pictureConcurrency?: number
-        requestIntervalMs?: number
-        maxRetries?: number
-        onProgress?: (progress: DownloadProgress) => void
-    } = {}) {
+    async runDownloadQueue(
+        options: {
+            runner?: DownloadRunner
+            profile?: PerformanceProfile
+            custom?: Partial<PerformanceSettings>
+            onProgress?: (progress: DownloadProgress) => void
+        } = {}
+    ) {
         const runner = options.runner ?? 'LOCAL'
+        const settings = resolvePerformanceSettings(
+            options.profile ?? 'balanced',
+            options.custom
+        )
+        const mediaGate = new MediaRequestGate(
+            settings.globalMediaConcurrency,
+            settings.requestIntervalMs
+        )
         const store = {
             nextDownloadJobs: (limit: number) =>
                 this.database.nextDownloadJobs(limit, runner),
@@ -280,7 +296,7 @@ export class LibraryService {
             async (job) => {
                 const result = await this.downloadComicNow(job.comicId, {
                     episodeOrders: job.episodeOrders,
-                    concurrency: options.pictureConcurrency,
+                    mediaGate,
                     onProgress: (progress) => {
                         this.database.updateDownloadProgress(job.id, {
                             progressCompleted: progress.completed,
@@ -289,20 +305,22 @@ export class LibraryService {
                         options.onProgress?.(progress)
                     },
                     shouldStop: () => {
-                        const status = this.database.getDownloadJob(job.id).status
+                        const status = this.database.getDownloadJob(
+                            job.id
+                        ).status
                         return status === 'PAUSED' || status === 'CANCELLED'
                     }
                 })
                 this.database.updateDownloadProgress(job.id, {
-                    progressCompleted: result.pictures,
+                    progressCompleted: result.completed,
                     progressTotal: result.pictures,
                     bytes: result.bytes
                 })
             },
             {
-                concurrency: options.concurrency,
-                requestIntervalMs: options.requestIntervalMs,
-                maxRetries: options.maxRetries
+                jobConcurrency: settings.jobConcurrency,
+                maxRetries: settings.maxRetries,
+                retryBaseMs: settings.retryBaseMs
             }
         )
         await scheduler.drain()
@@ -313,10 +331,10 @@ export class LibraryService {
         comicId: string,
         options: {
             episodeOrders?: number[]
-            concurrency?: number
+            mediaGate: MediaRequestGate
             onProgress?: (progress: DownloadProgress) => void
             shouldStop?: () => boolean
-        } = {}
+        }
     ): Promise<DownloadResult> {
         const pica = await this.connect()
         const comic = await pica.comicInfo(comicId)
@@ -326,7 +344,20 @@ export class LibraryService {
             )
         }
         this.database.importCatalog([comicToRecord(comic)], 'pica:download')
-        let episodes = await pica.episodesAll(comicId)
+        const observedEpisodes = await pica.episodesAll(comicId)
+        for (const episode of observedEpisodes) {
+            const episodeId = episode.id || episode._id
+            if (!episodeId)
+                throw new Error('Episode response did not include an id')
+            this.database.upsertEpisode({
+                id: episodeId,
+                comicId,
+                title: episode.title,
+                order: episode.order,
+                updatedAt: episode.updated_at
+            })
+        }
+        let episodes = observedEpisodes
         if (options.episodeOrders?.length) {
             const allowed = new Set(options.episodeOrders)
             episodes = episodes.filter((episode) => allowed.has(episode.order))
@@ -339,19 +370,20 @@ export class LibraryService {
             pictures: 0,
             downloaded: 0,
             skipped: 0,
+            completed: 0,
             bytes: 0
         }
+        const work: Array<{
+            picture: Picture
+            pictureId: string
+            episodeId: string
+            episodeTitle: string
+            file: string
+        }> = []
         for (const episode of episodes) {
             const episodeId = episode.id || episode._id
             if (!episodeId)
                 throw new Error('Episode response did not include an id')
-            this.database.upsertEpisode({
-                id: episodeId,
-                comicId,
-                title: episode.title,
-                order: episode.order,
-                updatedAt: episode.updated_at
-            })
             const pictures = await pica.picturesAll(comicId, episode)
             result.pictures += pictures.length
             const stored = this.database
@@ -359,103 +391,106 @@ export class LibraryService {
                 .find((item) => item.comicId === comicId)
             const episodeDir = renderLibraryPath(
                 path.join(this.dataDir, 'library'),
-                process.env.PICA_LIBRARY_PATH_TEMPLATE ?? defaultLibraryTemplate,
+                process.env.PICA_LIBRARY_PATH_TEMPLATE ??
+                    defaultLibraryTemplate,
                 {
-                    author: stored?.canonicalAuthor ?? comic.author ?? 'Unknown author',
+                    author:
+                        stored?.canonicalAuthor ??
+                        comic.author ??
+                        'Unknown author',
                     title: comic.title,
                     comic_id: comicId,
                     chapter_order: String(episode.order).padStart(4, '0'),
                     chapter: episode.title || episodeId
                 }
             )
-            const concurrency = Math.max(
-                1,
-                Math.min(
-                    options.concurrency ??
-                        Number(process.env.PICA_DL_CONCURRENCY || 5),
-                    20
-                )
-            )
-            const limit = pLimit(concurrency)
-            let completed = 0
-            await Promise.all(
-                pictures.map((picture, index) =>
-                    limit(async () => {
-                        if (options.shouldStop?.()) return
-                        const pictureId =
-                            picture.id ||
-                            String(
-                                (picture as Picture & { _id?: string })._id ??
-                                    ''
-                            )
-                        if (!pictureId) {
-                            throw new Error(
-                                'Picture response did not include an id'
-                            )
-                        }
-                        this.database.upsertPicture({
-                            id: pictureId,
-                            comicId,
-                            episodeId,
-                            position: index + 1,
-                            originalName: picture.media.originalName,
-                            mediaPath: picture.media.path,
-                            fileServer: picture.media.fileServer
-                        })
-                        const file = path.join(
-                            episodeDir,
-                            safePathSegment(picture.name, `${index + 1}.jpg`)
-                        )
-                        const previous =
-                            this.database.pictureDownloadState(pictureId)
-                        const existingFile =
-                            previous?.status === 'completed' &&
-                            previous.localPath &&
-                            fs.existsSync(previous.localPath)
-                                ? previous.localPath
-                                : fs.existsSync(file)
-                                  ? file
-                                  : null
-                        if (
-                            existingFile &&
-                            fs.statSync(existingFile).size > 0
-                        ) {
-                            const data = fs.readFileSync(existingFile)
-                            this.database.markPictureDownloaded(
-                                pictureId,
-                                existingFile,
-                                data.byteLength,
-                                createHash('sha256').update(data).digest('hex')
-                            )
-                            result.skipped += 1
-                        } else {
-                            const downloaded = await pica.downloadToFile(
-                                picture.url,
-                                file
-                            )
-                            this.database.markPictureDownloaded(
-                                pictureId,
-                                file,
-                                downloaded.bytes,
-                                downloaded.sha256
-                            )
-                            result.downloaded += 1
-                            result.bytes += downloaded.bytes
-                        }
-                        completed += 1
-                        options.onProgress?.({
-                            comicId,
-                            comicTitle: comic.title,
-                            episodeId,
-                            episodeTitle: episode.title,
-                            completed,
-                            total: pictures.length,
-                            file
-                        })
-                    })
-                )
-            )
+            pictures.forEach((picture, index) => {
+                const pictureId =
+                    picture.id ||
+                    String((picture as Picture & { _id?: string })._id ?? '')
+                if (!pictureId)
+                    throw new Error('Picture response did not include an id')
+                this.database.upsertPicture({
+                    id: pictureId,
+                    comicId,
+                    episodeId,
+                    position: index + 1,
+                    originalName: picture.media.originalName,
+                    mediaPath: picture.media.path,
+                    fileServer: picture.media.fileServer
+                })
+                work.push({
+                    picture,
+                    pictureId,
+                    episodeId,
+                    episodeTitle: episode.title,
+                    file: path.join(
+                        episodeDir,
+                        safePathSegment(picture.name, `${index + 1}.jpg`)
+                    )
+                })
+            })
         }
+        const validExisting = new Map<string, string>()
+        for (const item of work) {
+            const previous = this.database.pictureDownloadState(item.pictureId)
+            const existing =
+                previous?.status === 'completed' &&
+                previous.localPath &&
+                fs.existsSync(previous.localPath)
+                    ? previous.localPath
+                    : fs.existsSync(item.file)
+                      ? item.file
+                      : null
+            if (existing && fs.statSync(existing).size > 0) {
+                validExisting.set(item.pictureId, existing)
+            }
+        }
+        let completed = validExisting.size
+        result.skipped = completed
+        result.pictures = work.length
+        await Promise.all(
+            work.map(async (item) => {
+                if (options.shouldStop?.()) return
+                const existing = validExisting.get(item.pictureId)
+                if (existing) {
+                    const data = fs.readFileSync(existing)
+                    this.database.markPictureDownloaded(
+                        item.pictureId,
+                        existing,
+                        data.byteLength,
+                        createHash('sha256').update(data).digest('hex')
+                    )
+                    return
+                }
+                await options.mediaGate.run(async () => {
+                    if (options.shouldStop?.()) return
+                    const downloaded = await pica.downloadToFile(
+                        item.picture.url,
+                        item.file
+                    )
+                    this.database.markPictureDownloaded(
+                        item.pictureId,
+                        item.file,
+                        downloaded.bytes,
+                        downloaded.sha256
+                    )
+                    result.downloaded += 1
+                    result.bytes += downloaded.bytes
+                    completed += 1
+                    options.onProgress?.({
+                        comicId,
+                        comicTitle: comic.title,
+                        episodeId: item.episodeId,
+                        episodeTitle: item.episodeTitle,
+                        completed,
+                        total: work.length,
+                        file: item.file
+                    })
+                })
+            })
+        )
+        result.completed = completed
         return result
     }
 }

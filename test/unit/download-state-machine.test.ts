@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { assertTransition, canTransition } from '../../src/core/downloads/state-machine'
+import {
+    assertTransition,
+    canTransition
+} from '../../src/core/downloads/state-machine'
 
 describe('download state machine', () => {
     it('allows the normal lifecycle and operator controls', () => {

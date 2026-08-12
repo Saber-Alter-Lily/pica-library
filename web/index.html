@@ -1,62 +1,277 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pica Library</title>
-    <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-    <header class="app-header">
-        <div><h1>Pica Library</h1><p>收藏整理、个性发现与增量下载</p></div>
-        <span id="mode" class="mode">检测模式中</span>
-    </header>
-    <nav aria-label="主导航">
-        <button data-view="home" class="active">Home</button>
-        <button data-view="library">Library</button>
-        <button data-view="discover">Discover</button>
-        <button data-view="downloads">Downloads</button>
-        <button data-view="maintenance">Maintenance</button>
-    </nav>
-    <main>
-        <section id="home" class="view active">
-            <div class="page-heading"><div><h2>开始使用</h2><p>网页轻量查看，连接本地服务后同步、推荐和下载。</p></div></div>
-            <div class="quick-start">
-                <button data-go="library"><strong>导入收藏</strong><span>CSV 或数据包</span></button>
-                <button data-go="discover"><strong>查看推荐</strong><span>基于收藏偏好</span></button>
-                <button data-go="downloads"><strong>管理下载</strong><span>任务、进度与重试</span></button>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Pica Library</title>
+        <link rel="stylesheet" href="./styles.css" />
+    </head>
+    <body>
+        <header class="app-header">
+            <div>
+                <h1>Pica Library</h1>
+                <p>收藏整理、个性发现与增量下载</p>
             </div>
-            <div id="summary" class="metrics"></div>
-            <article class="notice"><strong>两种模式</strong><p>Lite 模式只在当前浏览器处理数据；连接模式由本地服务访问站点，账号不会写入导出包。</p></article>
-        </section>
+            <span id="mode" class="mode">正在检测模式</span>
+        </header>
+        <nav aria-label="主导航">
+            <button data-view="home" class="active">Home</button>
+            <button data-view="library">Library</button>
+            <button data-view="discover">Discover</button>
+            <button data-view="downloads">Downloads</button>
+            <button data-view="maintenance">Maintenance</button>
+        </nav>
+        <main>
+            <section id="home" class="view active">
+                <div class="page-heading">
+                    <div>
+                        <h2>开始使用</h2>
+                        <p>网页轻量查看，连接本地服务后同步、搜索和下载。</p>
+                    </div>
+                    <button id="clear-lite-state">清空本地数据</button>
+                </div>
+                <div class="quick-start">
+                    <button data-go="library">
+                        <strong>导入收藏</strong><span>CSV 或数据包</span>
+                    </button>
+                    <button data-go="discover">
+                        <strong>查看推荐</strong><span>基于收藏偏好</span>
+                    </button>
+                    <button data-go="downloads">
+                        <strong>管理下载</strong><span>任务、进度与重试</span>
+                    </button>
+                </div>
+                <div id="summary" class="metrics"></div>
+                <article class="notice">
+                    <strong>两种模式</strong>
+                    <p>
+                        Browser Lite
+                        把导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号不会写入导出包。
+                    </p>
+                </article>
+            </section>
 
-        <section id="library" class="view">
-            <div class="page-heading"><div><h2>Library</h2><p>筛选、核对并选择需要下载的作品。</p></div><div class="actions"><input id="import-file" type="file" accept=".csv,.json" /><button id="import-button" class="primary">导入</button><button id="sync-button">同步收藏</button></div></div>
-            <p id="import-result" class="status"></p>
-            <div class="toolbar"><input id="filter-text" placeholder="标题或作者" /><input id="filter-tag" placeholder="标签，逗号分隔" /><select id="sort-mode"><option value="latest">最近更新</option><option value="likes">爱心数量</option><option value="views">浏览数量</option><option value="title">标题</option></select><button id="apply-filter" class="primary">筛选</button><button id="queue-selected">加入下载</button><button id="export-plan">导出计划</button></div>
-            <div class="table-wrap"><table><thead><tr><th></th><th>标题</th><th>归一作者</th><th>标签</th><th>爱心</th><th>更新</th><th>进度</th></tr></thead><tbody id="comic-rows"></tbody></table></div>
-        </section>
+            <section id="library" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Library</h2>
+                        <p>筛选、核对并选择需要下载的作品。</p>
+                    </div>
+                    <div class="actions">
+                        <input
+                            id="import-file"
+                            type="file"
+                            accept=".csv,.json"
+                        />
+                        <button id="import-button" class="primary">导入</button>
+                        <button id="sync-button">同步收藏</button>
+                    </div>
+                </div>
+                <p id="import-result" class="status"></p>
+                <div class="toolbar">
+                    <input id="filter-text" placeholder="标题或作者" />
+                    <input id="filter-tag" placeholder="标签，逗号分隔" />
+                    <select id="sort-mode">
+                        <option value="latest">最近更新</option>
+                        <option value="likes">爱心数量</option>
+                        <option value="views">浏览数量</option>
+                        <option value="title">标题</option>
+                    </select>
+                    <button id="apply-filter" class="primary">筛选</button>
+                    <button id="queue-selected">加入下载</button>
+                    <button id="export-plan">导出计划</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>标题</th>
+                                <th>归一作者</th>
+                                <th>标签</th>
+                                <th>爱心</th>
+                                <th>更新</th>
+                                <th>进度</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comic-rows"></tbody>
+                    </table>
+                </div>
+            </section>
 
-        <section id="discover" class="view">
-            <div class="tabs"><button data-tab="recommend" class="active">专属推荐</button><button data-tab="search">站内搜索</button></div>
-            <div id="recommend" class="tab active"><div class="page-heading"><div><h2>专属推荐</h2><p>结合收藏中的作者、社团、标签和分类，并给出可解释理由。</p></div><button id="recommend-button" class="primary">生成推荐</button></div><div id="profile" class="profile"></div><p id="recommend-message" class="status"></p><div id="recommend-results" class="results"></div></div>
-            <div id="search" class="tab"><div class="page-heading"><div><h2>站内搜索</h2><p>按关键词与标签查找，并按爱心、浏览或更新时间排序。</p></div></div><div class="toolbar"><input id="search-keyword" placeholder="关键词" /><input id="search-tags" placeholder="标签，逗号分隔" /><select id="search-sort"><option value="likes">爱心数量</option><option value="views">浏览数量</option><option value="latest">最近更新</option></select><button id="search-button" class="primary">搜索</button></div><p id="search-message" class="status"></p><div id="search-results" class="results"></div></div>
-        </section>
+            <section id="discover" class="view">
+                <div class="tabs">
+                    <button data-tab="recommend" class="active">
+                        专属推荐
+                    </button>
+                    <button data-tab="search">站内搜索</button>
+                </div>
+                <div id="recommend" class="tab active">
+                    <div class="page-heading">
+                        <div>
+                            <h2>专属推荐</h2>
+                            <p>展示可解释的作者、社团、标签和分类偏好。</p>
+                        </div>
+                        <button id="recommend-button" class="primary">
+                            查看推荐
+                        </button>
+                    </div>
+                    <div id="profile" class="profile"></div>
+                    <p id="recommend-message" class="status"></p>
+                    <div id="recommend-results" class="results"></div>
+                </div>
+                <div id="search" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>站内搜索</h2>
+                            <p>按关键词和标签查找并排序。</p>
+                        </div>
+                    </div>
+                    <div class="toolbar">
+                        <input id="search-keyword" placeholder="关键词" />
+                        <input id="search-tags" placeholder="标签，逗号分隔" />
+                        <select id="search-sort">
+                            <option value="likes">爱心数量</option>
+                            <option value="views">浏览数量</option>
+                            <option value="latest">最近更新</option>
+                        </select>
+                        <button id="search-button" class="primary">搜索</button>
+                    </div>
+                    <p id="search-message" class="status"></p>
+                    <div id="search-results" class="results"></div>
+                </div>
+            </section>
 
-        <section id="downloads" class="view">
-            <div class="page-heading"><div><h2>Downloads</h2><p>所有入口共享同一队列；暂停只停止新工作，已完成文件会保留。</p></div><div class="actions"><button id="refresh-jobs">刷新</button><button id="run-jobs" class="primary">运行队列</button></div></div>
-            <div id="job-list" class="list"></div>
-        </section>
+            <section id="downloads" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Downloads</h2>
+                        <p>本地与 GitHub 任务使用同一套持久化队列语义。</p>
+                    </div>
+                    <div class="actions">
+                        <select id="performance-profile" aria-label="性能配置">
+                            <option value="conservative">Conservative</option>
+                            <option value="balanced" selected>Balanced</option>
+                            <option value="fast">Fast</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <div
+                            id="custom-performance"
+                            class="custom-performance"
+                            hidden
+                        >
+                            <label
+                                >Jobs
+                                <input
+                                    id="custom-jobs"
+                                    type="number"
+                                    min="1"
+                                    value="2"
+                            /></label>
+                            <label
+                                >Media
+                                <input
+                                    id="custom-media"
+                                    type="number"
+                                    min="1"
+                                    value="5"
+                            /></label>
+                            <label
+                                >Interval ms
+                                <input
+                                    id="custom-interval"
+                                    type="number"
+                                    min="0"
+                                    value="250"
+                            /></label>
+                            <label
+                                >Retries
+                                <input
+                                    id="custom-retries"
+                                    type="number"
+                                    min="0"
+                                    value="2"
+                            /></label>
+                        </div>
+                        <button id="refresh-jobs">刷新</button>
+                        <button id="run-jobs" class="primary">运行队列</button>
+                    </div>
+                </div>
+                <div id="job-list" class="list"></div>
+            </section>
 
-        <section id="maintenance" class="view">
-            <div class="tabs"><button data-tab="updates" class="active">更新</button><button data-tab="repair">修复</button><button data-tab="authors">作者归一</button><button data-tab="health">健康检查</button></div>
-            <div id="updates" class="tab active"><div class="page-heading"><div><h2>更新检测</h2><p>比较远端章节，只为新增章节创建任务。</p></div><button id="check-updates" class="primary">检查收藏更新</button></div><pre id="update-result" class="output"></pre></div>
-            <div id="repair" class="tab"><div class="page-heading"><div><h2>文件修复</h2><p>扫描缺失、空文件和失败记录，按章节增量补齐。</p></div><button id="scan-repair" class="primary">扫描问题</button></div><pre id="repair-result" class="output"></pre></div>
-            <div id="authors" class="tab"><div class="page-heading"><div><h2>作者归一</h2><p>自动建议只作为候选，合并决定由用户确认。</p></div><button id="refresh-authors">刷新</button></div><label><input id="pending-only" type="checkbox" /> 仅看待审核</label><div id="author-list" class="list"></div></div>
-            <div id="health" class="tab"><div class="page-heading"><div><h2>健康检查</h2><p>确认模式、数据统计和服务可用性。</p></div><button id="run-health" class="primary">运行检查</button></div><pre id="health-result" class="output"></pre></div>
-        </section>
-    </main>
-    <template id="author-template"><article class="list-item"><input class="author-select" type="checkbox" /><div class="grow"><strong class="author-name"></strong><p class="author-meta"></p><p class="author-evidence"></p></div><div class="actions"><button data-decision="approved">确认</button><button data-decision="keep_separate">保持分离</button><button data-decision="needs_research">待研究</button></div></article></template>
-    <script type="module" src="./app.js"></script>
-</body>
+            <section id="maintenance" class="view">
+                <div class="tabs">
+                    <button data-tab="updates" class="active">更新</button>
+                    <button data-tab="repair">修复</button>
+                    <button data-tab="authors">作者归一</button>
+                    <button data-tab="health">健康检查</button>
+                </div>
+                <div id="updates" class="tab active">
+                    <div class="page-heading">
+                        <div>
+                            <h2>更新检测</h2>
+                            <p>默认只检查已经建立本地下载状态的漫画。</p>
+                        </div>
+                        <button id="check-updates" class="primary">
+                            检查下载内容更新
+                        </button>
+                    </div>
+                    <pre id="update-result" class="output"></pre>
+                </div>
+                <div id="repair" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>文件修复</h2>
+                            <p>扫描缺失、空文件和失败记录。</p>
+                        </div>
+                        <button id="scan-repair" class="primary">
+                            扫描问题
+                        </button>
+                    </div>
+                    <pre id="repair-result" class="output"></pre>
+                </div>
+                <div id="authors" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>作者归一</h2>
+                            <p>自动建议只作为候选，合并决定由用户确认。</p>
+                        </div>
+                    </div>
+                    <label
+                        ><input id="pending-only" type="checkbox" />
+                        仅看待审核</label
+                    >
+                    <div id="author-list" class="list"></div>
+                </div>
+                <div id="health" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>健康检查</h2>
+                            <p>确认模式、数据统计和服务可用性。</p>
+                        </div>
+                        <button id="run-health" class="primary">
+                            运行检查
+                        </button>
+                    </div>
+                    <pre id="health-result" class="output"></pre>
+                </div>
+            </section>
+        </main>
+        <template id="author-template">
+            <article class="list-item">
+                <div class="grow">
+                    <strong class="author-name"></strong>
+                    <p class="author-meta"></p>
+                    <p class="author-evidence"></p>
+                </div>
+                <div class="actions">
+                    <button data-decision="approved">确认</button
+                    ><button data-decision="keep_separate">保持分离</button
+                    ><button data-decision="needs_research">待研究</button>
+                </div>
+            </article>
+        </template>
+        <script type="module" src="./app.js"></script>
+    </body>
 </html>

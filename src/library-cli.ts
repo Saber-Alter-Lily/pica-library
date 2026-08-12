@@ -17,6 +17,11 @@ import { serializeLibraryBundle } from './types/bundle'
 import { queueRepairs, scanRepairIssues } from './maintenance/repair'
 import { queueUpdate } from './maintenance/updates'
 import { buildRunnerArtifact } from './runners/shared/artifact'
+import type {
+    PerformanceProfile,
+    PerformanceSettings
+} from './core/downloads/profiles'
+import type { DownloadRunner } from './core/downloads/types'
 
 loadEnv()
 
@@ -33,6 +38,11 @@ const flagsWithValues = new Set([
     'name',
     'episodes',
     'concurrency',
+    'job-concurrency',
+    'request-interval',
+    'max-retries',
+    'profile',
+    'runner',
     'host',
     'port',
     'page',
@@ -61,6 +71,26 @@ function positionalsAfter(command: string) {
     return parsePositionals(argv, command, flagsWithValues)
 }
 
+function downloadRuntimeOptions() {
+    const profile = flag('profile', 'balanced') as PerformanceProfile
+    if (!['conservative', 'balanced', 'fast', 'custom'].includes(profile))
+        throw new Error(`Unknown performance profile: ${profile}`)
+    const runner = flag('runner', 'LOCAL')?.toUpperCase() as DownloadRunner
+    if (!['LOCAL', 'GITHUB'].includes(runner))
+        throw new Error(`Unknown download runner: ${runner}`)
+    const custom: Partial<PerformanceSettings> = {}
+    if (profile === 'custom') {
+        if (flag('job-concurrency'))
+            custom.jobConcurrency = Number(flag('job-concurrency'))
+        if (flag('concurrency'))
+            custom.globalMediaConcurrency = Number(flag('concurrency'))
+        if (flag('request-interval'))
+            custom.requestIntervalMs = Number(flag('request-interval'))
+        if (flag('max-retries')) custom.maxRetries = Number(flag('max-retries'))
+    }
+    return { profile, runner, custom }
+}
+
 function help() {
     console.log(`pica-library 0.1.0-rc.1
 
@@ -82,7 +112,7 @@ Usage:
   pica-library sync
   pica-library prepare-library --output pica-library-export
   pica-library search [KEYWORD] [--tag TAG] [--category NAME] [--sort likes]
-  pica-library download <comic-id...> [--episodes 1,3,5-10] [--concurrency 5]
+  pica-library download <comic-id...> [--episodes 1,3,5-10] [--profile balanced] [--runner LOCAL]
   pica-library download list
   pica-library download run
   pica-library download <pause|resume|retry|cancel> <job-id>
@@ -100,6 +130,8 @@ Maintenance options:
 Global options:
   --data-dir PATH   Data, database and library root (default: .pica-library)
   --json            Machine-readable output
+  --profile NAME    conservative, balanced, fast or custom
+  --runner NAME     LOCAL or GITHUB
 
 Connected commands use PICA_ACCOUNT and PICA_PASSWORD from the environment or
 .env.local. Credentials and tokens are never written to the library database.`)
@@ -348,7 +380,10 @@ async function main() {
                     generatedAt: new Date().toISOString(),
                     library: { comics: favorites },
                     authors: database.listAuthors(),
-                    profile: result.profile as unknown as Record<string, unknown>,
+                    profile: result.profile as unknown as Record<
+                        string,
+                        unknown
+                    >,
                     recommendations: result.recommendations,
                     queue: database.listDownloadJobs(),
                     provenance: {
@@ -393,6 +428,7 @@ async function main() {
             return
         }
         if (command === 'download') {
+            const runtime = downloadRuntimeOptions()
             const comicIds = positionalsAfter('download')
             const [action, jobId] = comicIds
             if (action === 'list') {
@@ -400,10 +436,7 @@ async function main() {
                 return
             }
             if (action === 'run') {
-                await service.runDownloadQueue({
-                    runner: 'LOCAL',
-                    concurrency: Number(flag('concurrency', '2'))
-                })
+                await service.runDownloadQueue(runtime)
                 print(database.listDownloadJobs())
                 return
             }
@@ -414,7 +447,8 @@ async function main() {
                 cancel: 'CANCELLED'
             } as const
             if (action in operatorStatus) {
-                if (!jobId) throw new Error(`A job id is required for ${action}`)
+                if (!jobId)
+                    throw new Error(`A job id is required for ${action}`)
                 print(
                     database.transitionDownloadJob(
                         jobId,
@@ -432,13 +466,12 @@ async function main() {
                         comicId,
                         episodeOrders: parseEpisodeSelection(flag('episodes')),
                         source: 'manual',
-                        runner: 'LOCAL'
+                        runner: runtime.runner
                     })
                 )
             }
             await service.runDownloadQueue({
-                runner: 'LOCAL',
-                pictureConcurrency: Number(flag('concurrency', '5')),
+                ...runtime,
                 onProgress: (progress) => {
                     if (!hasFlag('json')) {
                         process.stdout.write(
@@ -478,6 +511,7 @@ async function main() {
             return
         }
         if (command === 'download-favorites') {
+            const runtime = downloadRuntimeOptions()
             const page = Number(flag('page', '1'))
             const favoritePage = await service.favoritesPage(page)
             if (!hasFlag('json')) {
@@ -492,14 +526,11 @@ async function main() {
                         comicId: comic.comicId,
                         episodeOrders: parseEpisodeSelection(flag('episodes')),
                         source: 'library',
-                        runner: 'LOCAL'
+                        runner: runtime.runner
                     })
                 )
             }
-            await service.runDownloadQueue({
-                runner: 'LOCAL',
-                pictureConcurrency: Number(flag('concurrency', '5'))
-            })
+            await service.runDownloadQueue(runtime)
             print({
                 page: favoritePage.page,
                 pages: favoritePage.pages,
@@ -509,6 +540,7 @@ async function main() {
             return
         }
         if (command === 'download-plan') {
+            const runtime = downloadRuntimeOptions()
             const file = positionalsAfter('download-plan')[0]
             if (!file) throw new Error('A download plan JSON file is required')
             const plan = JSON.parse(
@@ -532,14 +564,11 @@ async function main() {
                         comicId,
                         episodeOrders,
                         source: 'manual',
-                        runner: 'LOCAL'
+                        runner: runtime.runner
                     })
                 )
             }
-            await service.runDownloadQueue({
-                runner: 'LOCAL',
-                pictureConcurrency: Number(flag('concurrency', '5'))
-            })
+            await service.runDownloadQueue(runtime)
             print(jobs.map((job) => database.getDownloadJob(job.id)))
             return
         }

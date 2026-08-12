@@ -1,37 +1,579 @@
-const state={mode:'lite',records:[],authors:[],visible:[],recommendations:null}
-const $=(s)=>document.querySelector(s),$$=(s)=>[...document.querySelectorAll(s)]
-const esc=(v)=>String(v??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
-const norm=(v)=>String(v??'').normalize('NFKC').trim().toLocaleLowerCase()
-const list=(v)=>String(v??'').split(',').map((x)=>x.trim()).filter(Boolean)
-async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(!response.ok)throw new Error(value.error||`HTTP ${response.status}`);return value}
-const post=(path,value)=>api(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(value)})
+import {
+    addLiteQueueItems,
+    clearLiteState,
+    emptyLiteState,
+    importLibraryBundle,
+    loadLiteState,
+    saveLiteState
+} from './lite-state.js'
 
-function parseCsv(text){const rows=[];let row=[],cell='',quoted=false;text=text.replace(/^\uFEFF/,'');for(let i=0;i<text.length;i++){const c=text[i];if(quoted){if(c==='"'&&text[i+1]==='"'){cell+='"';i++}else if(c==='"')quoted=false;else cell+=c}else if(c==='"')quoted=true;else if(c===','){row.push(cell);cell=''}else if(c==='\n'){row.push(cell.replace(/\r$/,''));if(row.some(Boolean))rows.push(row);row=[];cell=''}else cell+=c}if(cell||row.length){row.push(cell);rows.push(row)}return rows}
-function csvRecords(text){const rows=parseCsv(text),head=rows[0]||[];const at=(row,...names)=>{for(const name of names){const i=head.indexOf(name);if(i>=0)return row[i]||''}return''};return rows.slice(1).flatMap((row)=>{const comicId=at(row,'comic_id','_id','id').trim(),title=at(row,'title').trim();return comicId&&title?[{comicId,title,author:at(row,'author','author_raw'),tags:list(at(row,'tags').replaceAll('|',',')),categories:list(at(row,'categories').replaceAll('|',',')),totalLikes:Number(at(row,'total_likes','totalLikes'))||0,totalViews:Number(at(row,'total_views','totalViews'))||0,updatedAt:at(row,'updated_at'),isFavorite:true}]:[]})}
-function deriveAuthors(){const map=new Map;for(const comic of state.records){const raw=String(comic.canonicalAuthor||comic.author||'未知作者').trim(),match=raw.match(/^(.+?)\s*\(([^()]+)\)$/),name=match?match[2].trim():raw,key=norm(name),item=map.get(key)||{id:`lite_${key}`,canonicalName:name,aliases:new Set,circles:new Set,works:0,confidence:match?.8:1,reviewStatus:match?'pending':'approved',evidence:match?'检测到“社团（作者）”格式，请确认作者实体。':'规范化名称一致。'};item.works++;item.aliases.add(raw);if(match)item.circles.add(match[1].trim());map.set(key,item);comic.canonicalAuthor=name}state.authors=[...map.values()].map((x)=>({...x,aliases:[...x.aliases],circles:[...x.circles]})).sort((a,b)=>b.works-a.works)}
-function summary(value={}){const items=[['漫画',value.comics??state.records.length],['收藏',value.favorites??state.records.length],['作者',value.authors??state.authors.length],['待审核作者',value.authorsPendingReview??state.authors.filter((x)=>x.reviewStatus==='pending').length],['章节',value.episodes||0],['已下载图片',value.downloadedPictures||0]];$('#summary').innerHTML=items.map(([k,v])=>`<div class="metric"><span>${k}</span><strong>${Number(v).toLocaleString()}</strong></div>`).join('')}
-function renderComics(records=state.records){const q=norm($('#filter-text').value),tags=list($('#filter-tag').value).map(norm),sort=$('#sort-mode').value;state.visible=records.filter((c)=>(!q||norm([c.title,c.author,c.canonicalAuthor].join(' ')).includes(q))&&tags.every((t)=>(c.tags||[]).map(norm).includes(t)));state.visible.sort((a,b)=>sort==='likes'?(b.totalLikes||0)-(a.totalLikes||0):sort==='views'?(b.totalViews||0)-(a.totalViews||0):sort==='title'?String(a.title).localeCompare(b.title):String(b.updatedAt||'').localeCompare(a.updatedAt||''));$('#comic-rows').innerHTML=state.visible.map((c)=>`<tr><td><input type="checkbox" data-comic-id="${esc(c.comicId)}"></td><td><strong>${esc(c.title)}</strong></td><td>${esc(c.canonicalAuthor||c.author||'未知')}</td><td>${(c.tags||[]).slice(0,6).map((t)=>`<span class="tag">${esc(t)}</span>`).join('')}</td><td>${Number(c.totalLikes||0).toLocaleString()}</td><td>${esc(c.updatedAt||'')}</td><td>${Number(c.downloadedPictures||0)}/${Number(c.knownPictures||0)}</td></tr>`).join('')}
-function renderAuthors(){const pending=$('#pending-only').checked,items=state.authors.filter((a)=>!pending||a.reviewStatus==='pending');$('#author-list').innerHTML='';for(const author of items){const node=$('#author-template').content.cloneNode(true);node.querySelector('.list-item').dataset.authorId=author.id;node.querySelector('.author-name').textContent=author.canonicalName;node.querySelector('.author-meta').textContent=`${author.works} 部作品 · ${author.aliases.join(' / ')} · 置信度 ${Math.round(author.confidence*100)}%`;node.querySelector('.author-evidence').textContent=author.evidence;$('#author-list').append(node)}}
-function resultCards(records,target,withReasons=false){$(target).innerHTML=(records||[]).map((item)=>{const comic=item.comic||item;return `<article class="result"><h3>${esc(comic.title)}</h3><p>${esc(comic.canonicalAuthor||comic.author||'未知作者')}</p>${withReasons?`<p>${(item.reasons||[]).slice(0,3).map((r)=>esc(r.value||r)).join(' · ')}</p>`:''}<p>爱心 ${Number(comic.totalLikes||0).toLocaleString()} · 浏览 ${Number(comic.totalViews||0).toLocaleString()}</p><button data-result-download="${esc(comic.comicId)}">加入下载</button></article>`}).join('')}
-function downloadJson(name,value){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
-function selectedIds(){return $$('[data-comic-id]:checked').map((x)=>x.dataset.comicId)}
-async function loadJobs(){if(state.mode!=='connected'){ $('#job-list').innerHTML='<article class="notice">连接本地服务后可查看和控制持久化队列。</article>';return}const jobs=await api('/api/v1/downloads');$('#job-list').innerHTML=jobs.map((j)=>{const pct=j.progressTotal?Math.round(j.progressCompleted/j.progressTotal*100):0;return `<article class="list-item"><div class="grow"><strong>${esc(j.comicId)}</strong><p>${j.source} · ${j.runner} · ${j.status} · 重试 ${j.retryCount}</p><div class="progress"><span style="width:${pct}%"></span></div><p>${j.progressCompleted}/${j.progressTotal} · ${Number(j.bytes).toLocaleString()} bytes${j.error?` · ${esc(j.error)}`:''}</p></div><div class="actions">${['QUEUED','PREPARING','RUNNING'].includes(j.status)?`<button data-job-action="pause" data-job-id="${j.id}">暂停</button>`:''}${['PAUSED','FAILED'].includes(j.status)?`<button data-job-action="resume" data-job-id="${j.id}">恢复</button>`:''}${!['COMPLETED','CANCELLED'].includes(j.status)?`<button data-job-action="cancel" data-job-id="${j.id}">取消</button>`:''}</div></article>`}).join('')||'<article class="notice">队列为空。</article>'}
+const state = { mode: 'lite', visible: [], ...emptyLiteState() }
+const $ = (selector) => document.querySelector(selector)
+const $$ = (selector) => [...document.querySelectorAll(selector)]
+const escapeHtml = (value) =>
+    String(value ?? '').replace(
+        /[&<>"']/g,
+        (character) =>
+            ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[character]
+    )
+const normalize = (value) =>
+    String(value ?? '')
+        .normalize('NFKC')
+        .trim()
+        .toLocaleLowerCase()
+const splitList = (value) =>
+    String(value ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
 
-$$('nav [data-view], [data-go]').forEach((b)=>b.addEventListener('click',()=>{const id=b.dataset.view||b.dataset.go;$$('.view').forEach((x)=>x.classList.toggle('active',x.id===id));$$('nav button').forEach((x)=>x.classList.toggle('active',x.dataset.view===id));if(id==='downloads')loadJobs()}))
-$$('.tabs').forEach((tabs)=>tabs.addEventListener('click',(e)=>{const id=e.target.dataset.tab;if(!id)return;tabs.querySelectorAll('button').forEach((x)=>x.classList.toggle('active',x===e.target));const section=tabs.parentElement;section.querySelectorAll(':scope > .tab').forEach((x)=>x.classList.toggle('active',x.id===id));if(id==='authors')renderAuthors()}))
-$('#apply-filter').onclick=()=>renderComics();$('#pending-only').onchange=renderAuthors
-$('#import-button').onclick=async()=>{const file=$('#import-file').files[0];if(!file)return;try{const text=await file.text(),value=file.name.endsWith('.csv')?csvRecords(text):JSON.parse(text),records=Array.isArray(value)?value:value.library?.comics||value.favorites||[];if(state.mode==='connected')await post('/api/v1/import',{records});state.records=records;deriveAuthors();summary();renderComics();renderAuthors();$('#import-result').textContent=`已导入 ${records.length} 条记录。`}catch(e){$('#import-result').textContent=e.message}}
-$('#sync-button').onclick=async()=>{try{if(state.mode!=='connected')throw new Error('同步收藏需要连接本地服务。');await post('/api/v1/sync',{});await detect()}catch(e){$('#import-result').textContent=e.message}}
-$('#export-plan').onclick=()=>downloadJson('download-plan.json',{schemaVersion:1,createdAt:new Date().toISOString(),comicIds:selectedIds().length?selectedIds():state.visible.map((x)=>x.comicId)})
-async function enqueue(ids,source){if(!ids.length)return;if(state.mode!=='connected'){downloadJson('download-plan.json',{schemaVersion:1,createdAt:new Date().toISOString(),comicIds:ids});return}await post('/api/v1/download',{comicIds:ids,source,run:false});await loadJobs()}
-$('#queue-selected').onclick=()=>enqueue(selectedIds(),'library')
-$('#search-button').onclick=async()=>{try{if(state.mode!=='connected')throw new Error('站内搜索需要连接本地服务。');const records=await post('/api/v1/search',{keyword:$('#search-keyword').value,tags:list($('#search-tags').value),sort:$('#search-sort').value,limit:100});resultCards(records,'#search-results');$('#search-message').textContent=`找到 ${records.length} 条结果。`}catch(e){$('#search-message').textContent=e.message}}
-$('#recommend-button').onclick=async()=>{try{let value=state.recommendations;if(state.mode==='connected')value=await post('/api/v1/recommendations',{limit:30,seedCount:8});if(!value)throw new Error('请先导入包含推荐结果的数据包，或连接本地服务。');state.recommendations=value;const prefs=[...(value.profile?.authors||[]),...(value.profile?.tags||[])].slice(0,12);$('#profile').innerHTML=prefs.map((x)=>`<span class="preference">${esc(x.value)} · ${x.count}</span>`).join('');resultCards(value.recommendations,'#recommend-results',true);$('#recommend-message').textContent=`已生成 ${value.recommendations.length} 条推荐。`}catch(e){$('#recommend-message').textContent=e.message}}
-;['#search-results','#recommend-results'].forEach((id)=>$(id).onclick=(e)=>{const comicId=e.target.dataset.resultDownload;if(comicId)enqueue([comicId],id.includes('recommend')?'recommendation':'search')})
-$('#refresh-jobs').onclick=loadJobs;$('#run-jobs').onclick=async()=>{await post('/api/v1/downloads/run',{});await loadJobs()};$('#job-list').onclick=async(e)=>{if(!e.target.dataset.jobAction)return;await post(`/api/v1/downloads/${e.target.dataset.jobId}/${e.target.dataset.jobAction}`,{});await loadJobs()}
-$('#check-updates').onclick=async()=>{try{$('#update-result').textContent=JSON.stringify(await post('/api/v1/maintenance/updates',{}),null,2)}catch(e){$('#update-result').textContent=e.message}}
-$('#scan-repair').onclick=async()=>{try{$('#repair-result').textContent=JSON.stringify(await post('/api/v1/maintenance/repair',{}),null,2)}catch(e){$('#repair-result').textContent=e.message}}
-$('#run-health').onclick=async()=>{$('#health-result').textContent=JSON.stringify(state.mode==='connected'?await api('/api/v1/status'):{mode:'lite',records:state.records.length,storage:'browser only'},null,2)}
-$('#author-list').onclick=async(e)=>{const decision=e.target.dataset.decision;if(!decision)return;const item=e.target.closest('[data-author-id]');if(state.mode==='connected')await post(`/api/v1/authors/${item.dataset.authorId}/decision`,{reviewStatus:decision});else{const author=state.authors.find((x)=>x.id===item.dataset.authorId);if(author)author.reviewStatus=decision}renderAuthors()}
-async function detect(){try{const status=await api('/api/v1/status');state.mode='connected';$('#mode').textContent='Connected';state.records=await api('/api/v1/comics');state.authors=await api('/api/v1/authors');summary(status.summary)}catch{state.mode='lite';$('#mode').textContent='Browser Lite';deriveAuthors();summary()}renderComics();renderAuthors()}
+async function api(path, options) {
+    const response = await fetch(path, options)
+    const value = await response.json()
+    if (!response.ok) throw new Error(value.error || `HTTP ${response.status}`)
+    return value
+}
+
+const post = (path, value) =>
+    api(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(value)
+    })
+
+function replaceLiteState(value) {
+    Object.assign(state, value)
+}
+
+async function persistLiteState() {
+    if (state.mode !== 'lite') return
+    await saveLiteState(state)
+}
+
+function parseCsv(text) {
+    const rows = []
+    let row = []
+    let cell = ''
+    let quoted = false
+    text = text.replace(/^\uFEFF/, '')
+    for (let index = 0; index < text.length; index += 1) {
+        const character = text[index]
+        if (quoted) {
+            if (character === '"' && text[index + 1] === '"') {
+                cell += '"'
+                index += 1
+            } else if (character === '"') quoted = false
+            else cell += character
+        } else if (character === '"') quoted = true
+        else if (character === ',') {
+            row.push(cell)
+            cell = ''
+        } else if (character === '\n') {
+            row.push(cell.replace(/\r$/, ''))
+            if (row.some(Boolean)) rows.push(row)
+            row = []
+            cell = ''
+        } else cell += character
+    }
+    if (cell || row.length) {
+        row.push(cell)
+        rows.push(row)
+    }
+    return rows
+}
+
+function csvRecords(text) {
+    const rows = parseCsv(text)
+    const headers = rows[0] || []
+    const at = (row, ...names) => {
+        for (const name of names) {
+            const index = headers.indexOf(name)
+            if (index >= 0) return row[index] || ''
+        }
+        return ''
+    }
+    return rows.slice(1).flatMap((row) => {
+        const comicId = at(row, 'comic_id', '_id', 'id').trim()
+        const title = at(row, 'title').trim()
+        if (!comicId || !title) return []
+        return [
+            {
+                comicId,
+                title,
+                author: at(row, 'author', 'author_raw'),
+                tags: splitList(at(row, 'tags').replaceAll('|', ',')),
+                categories: splitList(
+                    at(row, 'categories').replaceAll('|', ',')
+                ),
+                totalLikes: Number(at(row, 'total_likes', 'totalLikes')) || 0,
+                totalViews: Number(at(row, 'total_views', 'totalViews')) || 0,
+                updatedAt: at(row, 'updated_at'),
+                isFavorite: true
+            }
+        ]
+    })
+}
+
+function deriveAuthors() {
+    const groups = new Map()
+    for (const comic of state.records) {
+        const raw = String(
+            comic.canonicalAuthor || comic.author || '未知作者'
+        ).trim()
+        const match = raw.match(/^(.+?)\s*\(([^()]+)\)$/)
+        const name = match ? match[2].trim() : raw
+        const key = normalize(name)
+        const group = groups.get(key) || {
+            id: `lite_${key}`,
+            canonicalName: name,
+            aliases: new Set(),
+            circles: new Set(),
+            works: 0,
+            confidence: match ? 0.8 : 1,
+            reviewStatus: match ? 'pending' : 'approved',
+            evidence: match
+                ? '检测到“社团（作者）”格式，请确认作者实体。'
+                : '规范化名称一致。'
+        }
+        group.works += 1
+        group.aliases.add(raw)
+        if (match) group.circles.add(match[1].trim())
+        groups.set(key, group)
+        comic.canonicalAuthor = name
+    }
+    state.authors = [...groups.values()]
+        .map((group) => ({
+            ...group,
+            aliases: [...group.aliases],
+            circles: [...group.circles]
+        }))
+        .sort((left, right) => right.works - left.works)
+}
+
+function renderSummary(value = {}) {
+    const items = [
+        ['漫画', value.comics ?? state.records.length],
+        ['收藏', value.favorites ?? state.records.length],
+        ['作者', value.authors ?? state.authors.length],
+        [
+            '待审核作者',
+            value.authorsPendingReview ??
+                state.authors.filter(
+                    (author) => author.reviewStatus === 'pending'
+                ).length
+        ],
+        ['章节', value.episodes || 0],
+        ['已下载图片', value.downloadedPictures || 0],
+        ['Lite 计划', state.queue.length]
+    ]
+    $('#summary').innerHTML = items
+        .map(
+            ([label, count]) =>
+                `<div class="metric"><span>${label}</span><strong>${Number(count).toLocaleString()}</strong></div>`
+        )
+        .join('')
+}
+
+function renderComics(records = state.records) {
+    const query = normalize($('#filter-text').value)
+    const tags = splitList($('#filter-tag').value).map(normalize)
+    const sort = $('#sort-mode').value
+    state.visible = records.filter(
+        (comic) =>
+            (!query ||
+                normalize(
+                    [comic.title, comic.author, comic.canonicalAuthor].join(' ')
+                ).includes(query)) &&
+            tags.every((tag) => (comic.tags || []).map(normalize).includes(tag))
+    )
+    state.visible.sort((left, right) => {
+        if (sort === 'likes')
+            return (right.totalLikes || 0) - (left.totalLikes || 0)
+        if (sort === 'views')
+            return (right.totalViews || 0) - (left.totalViews || 0)
+        if (sort === 'title')
+            return String(left.title).localeCompare(right.title)
+        return String(right.updatedAt || '').localeCompare(left.updatedAt || '')
+    })
+    $('#comic-rows').innerHTML = state.visible
+        .map(
+            (comic) => `<tr>
+                <td><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /></td>
+                <td><strong>${escapeHtml(comic.title)}</strong></td>
+                <td>${escapeHtml(comic.canonicalAuthor || comic.author || '未知')}</td>
+                <td>${(comic.tags || [])
+                    .slice(0, 6)
+                    .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
+                    .join('')}</td>
+                <td>${Number(comic.totalLikes || 0).toLocaleString()}</td>
+                <td>${escapeHtml(comic.updatedAt || '')}</td>
+                <td>${Number(comic.downloadedPictures || 0)}/${Number(comic.knownPictures || 0)}</td>
+            </tr>`
+        )
+        .join('')
+}
+
+function renderAuthors() {
+    const pendingOnly = $('#pending-only').checked
+    const authors = state.authors.filter(
+        (author) => !pendingOnly || author.reviewStatus === 'pending'
+    )
+    $('#author-list').innerHTML = ''
+    for (const author of authors) {
+        const node = $('#author-template').content.cloneNode(true)
+        const item = node.querySelector('.list-item')
+        item.dataset.authorId = author.id
+        node.querySelector('.author-name').textContent = author.canonicalName
+        node.querySelector('.author-meta').textContent =
+            `${author.works} 部作品 · ${(author.aliases || []).join(' / ')} · 置信度 ${Math.round((author.confidence || 0) * 100)}%`
+        node.querySelector('.author-evidence').textContent = author.evidence
+        $('#author-list').append(node)
+    }
+}
+
+function renderResultCards(records, target, withReasons = false) {
+    $(target).innerHTML = (records || [])
+        .map((item) => {
+            const comic = item.comic || item
+            return `<article class="result">
+                <h3>${escapeHtml(comic.title)}</h3>
+                <p>${escapeHtml(comic.canonicalAuthor || comic.author || '未知作者')}</p>
+                ${
+                    withReasons
+                        ? `<p>${(item.reasons || [])
+                              .slice(0, 3)
+                              .map((reason) =>
+                                  escapeHtml(reason.value || reason)
+                              )
+                              .join(' · ')}</p>`
+                        : ''
+                }
+                <p>爱心 ${Number(comic.totalLikes || 0).toLocaleString()} · 浏览 ${Number(comic.totalViews || 0).toLocaleString()}</p>
+                <button data-result-download="${escapeHtml(comic.comicId)}">加入下载</button>
+            </article>`
+        })
+        .join('')
+}
+
+function renderPreparedRecommendations() {
+    const preferences = [
+        ...(state.profile?.authors || []),
+        ...(state.profile?.tags || [])
+    ].slice(0, 12)
+    $('#profile').innerHTML = preferences
+        .map(
+            (item) =>
+                `<span class="preference">${escapeHtml(item.value)} · ${item.count}</span>`
+        )
+        .join('')
+    renderResultCards(state.recommendations, '#recommend-results', true)
+    $('#recommend-message').textContent =
+        `共 ${state.recommendations.length} 条推荐。`
+}
+
+function downloadJson(name, value) {
+    const anchor = document.createElement('a')
+    anchor.href = URL.createObjectURL(
+        new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' })
+    )
+    anchor.download = name
+    anchor.click()
+    URL.revokeObjectURL(anchor.href)
+}
+
+function selectedIds() {
+    return $$('[data-comic-id]:checked').map((input) => input.dataset.comicId)
+}
+
+function portablePlan() {
+    return {
+        schemaVersion: 1,
+        createdAt: new Date().toISOString(),
+        comicIds: state.queue.map((item) => item.comicId)
+    }
+}
+
+async function loadJobs() {
+    if (state.mode === 'lite') {
+        $('#job-list').innerHTML =
+            state.queue
+                .map(
+                    (job) =>
+                        `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · Browser Lite 计划</p></div></article>`
+                )
+                .join('') || '<article class="notice">下载计划为空。</article>'
+        return
+    }
+    const jobs = await api('/api/v1/downloads')
+    $('#job-list').innerHTML =
+        jobs
+            .map((job) => {
+                const percent = job.progressTotal
+                    ? Math.round(
+                          (job.progressCompleted / job.progressTotal) * 100
+                      )
+                    : 0
+                return `<article class="list-item">
+                    <div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${job.source} · ${job.runner} · ${job.status} · 重试 ${job.retryCount}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${job.progressCompleted}/${job.progressTotal} · ${Number(job.bytes).toLocaleString()} bytes${job.error ? ` · ${escapeHtml(job.error)}` : ''}</p></div>
+                    <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">暂停</button>` : ''}${['PAUSED', 'FAILED'].includes(job.status) ? `<button data-job-action="resume" data-job-id="${job.id}">恢复</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">取消</button>` : ''}</div>
+                </article>`
+            })
+            .join('') || '<article class="notice">队列为空。</article>'
+}
+
+async function enqueue(ids, source) {
+    if (!ids.length) return
+    if (state.mode === 'connected') {
+        await post('/api/v1/download', { comicIds: ids, source, run: false })
+    } else {
+        replaceLiteState(addLiteQueueItems(state, ids, source))
+        await persistLiteState()
+        renderSummary()
+    }
+    await loadJobs()
+}
+
+function renderAll(summary) {
+    renderSummary(summary)
+    renderComics()
+    renderAuthors()
+}
+
+$$('nav [data-view], [data-go]').forEach((button) =>
+    button.addEventListener('click', () => {
+        const id = button.dataset.view || button.dataset.go
+        $$('.view').forEach((view) =>
+            view.classList.toggle('active', view.id === id)
+        )
+        $$('nav button').forEach((item) =>
+            item.classList.toggle('active', item.dataset.view === id)
+        )
+        if (id === 'downloads') loadJobs()
+    })
+)
+
+$$('.tabs').forEach((tabs) =>
+    tabs.addEventListener('click', (event) => {
+        const id = event.target.dataset.tab
+        if (!id) return
+        tabs.querySelectorAll('button').forEach((button) =>
+            button.classList.toggle('active', button === event.target)
+        )
+        const section = tabs.parentElement
+        section
+            .querySelectorAll(':scope > .tab')
+            .forEach((tab) => tab.classList.toggle('active', tab.id === id))
+        if (id === 'authors') renderAuthors()
+    })
+)
+
+$('#apply-filter').onclick = () => renderComics()
+$('#pending-only').onchange = renderAuthors
+$('#import-button').onclick = async () => {
+    const file = $('#import-file').files[0]
+    if (!file) return
+    try {
+        const text = await file.text()
+        if (file.name.toLowerCase().endsWith('.csv')) {
+            state.records = csvRecords(text)
+            state.authors = []
+            state.profile = null
+            state.recommendations = []
+            state.queue = []
+        } else {
+            replaceLiteState(importLibraryBundle(JSON.parse(text)))
+        }
+        if (state.mode === 'connected')
+            await post('/api/v1/import', { records: state.records })
+        if (!state.authors.length) deriveAuthors()
+        await persistLiteState()
+        renderAll()
+        $('#import-result').textContent =
+            `已导入 ${state.records.length} 条记录、${state.recommendations.length} 条推荐和 ${state.queue.length} 个计划。`
+    } catch (error) {
+        $('#import-result').textContent = error.message
+    }
+}
+$('#sync-button').onclick = async () => {
+    try {
+        if (state.mode !== 'connected')
+            throw new Error('同步收藏需要连接本地服务。')
+        await post('/api/v1/sync', {})
+        await detect()
+    } catch (error) {
+        $('#import-result').textContent = error.message
+    }
+}
+$('#clear-lite-state').onclick = async () => {
+    if (state.mode !== 'lite') return
+    await clearLiteState()
+    replaceLiteState(emptyLiteState())
+    renderAll()
+    await loadJobs()
+}
+$('#export-plan').onclick = () => {
+    const ids = selectedIds()
+    const plan = ids.length
+        ? {
+              schemaVersion: 1,
+              createdAt: new Date().toISOString(),
+              comicIds: ids
+          }
+        : portablePlan()
+    downloadJson('download-plan.json', plan)
+}
+$('#queue-selected').onclick = () => enqueue(selectedIds(), 'library')
+$('#search-button').onclick = async () => {
+    try {
+        if (state.mode !== 'connected')
+            throw new Error('站内搜索需要连接本地服务。')
+        const records = await post('/api/v1/search', {
+            keyword: $('#search-keyword').value,
+            tags: splitList($('#search-tags').value),
+            sort: $('#search-sort').value,
+            limit: 100
+        })
+        renderResultCards(records, '#search-results')
+        $('#search-message').textContent = `找到 ${records.length} 条结果。`
+    } catch (error) {
+        $('#search-message').textContent = error.message
+    }
+}
+$('#recommend-button').onclick = async () => {
+    try {
+        if (state.mode === 'connected') {
+            const value = await post('/api/v1/recommendations', {
+                limit: 30,
+                seedCount: 8
+            })
+            state.profile = value.profile
+            state.recommendations = value.recommendations
+        }
+        if (!state.recommendations.length)
+            throw new Error('请先导入包含推荐结果的数据包，或连接本地服务。')
+        renderPreparedRecommendations()
+    } catch (error) {
+        $('#recommend-message').textContent = error.message
+    }
+}
+;['#search-results', '#recommend-results'].forEach((selector) => {
+    $(selector).onclick = (event) => {
+        const comicId = event.target.dataset.resultDownload
+        if (comicId)
+            enqueue(
+                [comicId],
+                selector.includes('recommend') ? 'recommendation' : 'search'
+            )
+    }
+})
+$('#refresh-jobs').onclick = loadJobs
+$('#performance-profile').onchange = () => {
+    $('#custom-performance').hidden =
+        $('#performance-profile').value !== 'custom'
+}
+$('#run-jobs').onclick = async () => {
+    if (state.mode === 'lite') {
+        downloadJson('download-plan.json', portablePlan())
+        return
+    }
+    const profile = $('#performance-profile').value
+    const runtime = { profile }
+    if (profile === 'custom') {
+        Object.assign(runtime, {
+            jobConcurrency: Number($('#custom-jobs').value),
+            globalMediaConcurrency: Number($('#custom-media').value),
+            requestIntervalMs: Number($('#custom-interval').value),
+            maxRetries: Number($('#custom-retries').value)
+        })
+    }
+    await post('/api/v1/downloads/run', runtime)
+    await loadJobs()
+}
+$('#job-list').onclick = async (event) => {
+    if (!event.target.dataset.jobAction || state.mode !== 'connected') return
+    await post(
+        `/api/v1/downloads/${event.target.dataset.jobId}/${event.target.dataset.jobAction}`,
+        {}
+    )
+    await loadJobs()
+}
+$('#check-updates').onclick = async () => {
+    try {
+        $('#update-result').textContent = JSON.stringify(
+            await post('/api/v1/maintenance/updates', {}),
+            null,
+            2
+        )
+    } catch (error) {
+        $('#update-result').textContent = error.message
+    }
+}
+$('#scan-repair').onclick = async () => {
+    try {
+        $('#repair-result').textContent = JSON.stringify(
+            await post('/api/v1/maintenance/repair', {}),
+            null,
+            2
+        )
+    } catch (error) {
+        $('#repair-result').textContent = error.message
+    }
+}
+$('#run-health').onclick = async () => {
+    $('#health-result').textContent = JSON.stringify(
+        state.mode === 'connected'
+            ? await api('/api/v1/status')
+            : {
+                  mode: 'lite',
+                  records: state.records.length,
+                  recommendations: state.recommendations.length,
+                  queue: state.queue.length,
+                  storage: 'IndexedDB'
+              },
+        null,
+        2
+    )
+}
+$('#author-list').onclick = async (event) => {
+    const decision = event.target.dataset.decision
+    if (!decision) return
+    const item = event.target.closest('[data-author-id]')
+    if (state.mode === 'connected') {
+        await post(`/api/v1/authors/${item.dataset.authorId}/decision`, {
+            reviewStatus: decision
+        })
+    } else {
+        const author = state.authors.find(
+            (candidate) => candidate.id === item.dataset.authorId
+        )
+        if (author) author.reviewStatus = decision
+        await persistLiteState()
+    }
+    renderAuthors()
+}
+
+async function detect() {
+    replaceLiteState(await loadLiteState())
+    try {
+        const status = await api('/api/v1/status')
+        state.mode = 'connected'
+        $('#mode').textContent = 'Connected'
+        state.records = await api('/api/v1/comics')
+        state.authors = await api('/api/v1/authors')
+        renderAll(status.summary)
+    } catch {
+        state.mode = 'lite'
+        $('#mode').textContent = 'Browser Lite'
+        if (!state.authors.length && state.records.length) deriveAuthors()
+        renderAll()
+    }
+    if (state.recommendations.length) renderPreparedRecommendations()
+}
+
 detect()

@@ -755,6 +755,15 @@ export class LibraryDatabase {
         const now = new Date().toISOString()
         this.db
             .prepare(
+                `INSERT INTO comics(
+                    id, title, raw_author, categories_json, tags_json,
+                    first_seen_at, last_seen_at
+                ) VALUES (?, ?, '', '[]', '[]', ?, ?)
+                ON CONFLICT(id) DO NOTHING`
+            )
+            .run(input.comicId, `Pending metadata [${input.comicId}]`, now, now)
+        this.db
+            .prepare(
                 `INSERT INTO download_jobs(
                     id, comic_id, episode_selection_json, source, priority,
                     runner, status, created_at

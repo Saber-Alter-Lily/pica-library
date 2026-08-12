@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { DownloadScheduler, type QueueStore } from '../../src/core/downloads/scheduler'
+import {
+    DownloadScheduler,
+    type QueueStore
+} from '../../src/core/downloads/scheduler'
 import { assertTransition } from '../../src/core/downloads/state-machine'
 import type { DownloadJob } from '../../src/core/downloads/types'
 
@@ -27,7 +30,9 @@ function store(initial: DownloadJob[]): QueueStore & { jobs: DownloadJob[] } {
     return {
         jobs: initial,
         nextDownloadJobs(limit) {
-            return this.jobs.filter((item) => item.status === 'QUEUED').slice(0, limit)
+            return this.jobs
+                .filter((item) => item.status === 'QUEUED')
+                .slice(0, limit)
         },
         getDownloadJob(id) {
             return { ...this.jobs.find((candidate) => candidate.id === id)! }
@@ -41,8 +46,8 @@ function store(initial: DownloadJob[]): QueueStore & { jobs: DownloadJob[] } {
     }
 }
 
-describe('global download scheduler', () => {
-    it('never exceeds global concurrency', async () => {
+describe('download job scheduler', () => {
+    it('never exceeds configured job concurrency', async () => {
         const queue = store([job('1'), job('2'), job('3'), job('4')])
         let active = 0
         let peak = 0
@@ -54,11 +59,13 @@ describe('global download scheduler', () => {
                 await new Promise((resolve) => setTimeout(resolve, 5))
                 active -= 1
             },
-            { concurrency: 2, requestIntervalMs: 0 }
+            { jobConcurrency: 2 }
         )
         await scheduler.drain()
         expect(peak).toBe(2)
-        expect(queue.jobs.every((item) => item.status === 'COMPLETED')).toBe(true)
+        expect(queue.jobs.every((item) => item.status === 'COMPLETED')).toBe(
+            true
+        )
     })
 
     it('requeues a transient failure and then completes', async () => {
@@ -70,11 +77,14 @@ describe('global download scheduler', () => {
                 attempts += 1
                 if (attempts === 1) throw new Error('temporary')
             },
-            { requestIntervalMs: 0, retryBaseMs: 0, maxRetries: 1 }
+            { retryBaseMs: 0, maxRetries: 1 }
         )
         await scheduler.drain()
         expect(attempts).toBe(2)
-        expect(queue.jobs[0]).toMatchObject({ status: 'COMPLETED', retryCount: 1 })
+        expect(queue.jobs[0]).toMatchObject({
+            status: 'COMPLETED',
+            retryCount: 1
+        })
     })
 
     it('does not overwrite a pause requested during execution', async () => {
@@ -84,7 +94,7 @@ describe('global download scheduler', () => {
             async (running) => {
                 queue.transitionDownloadJob(running.id, 'PAUSED')
             },
-            { requestIntervalMs: 0 }
+            {}
         )
         await scheduler.drain()
         expect(queue.jobs[0].status).toBe('PAUSED')

@@ -102,11 +102,28 @@ describe('local web server', () => {
         expect(jobs).toContainEqual(
             expect.objectContaining({ id: job.id, status: 'QUEUED' })
         )
-        const paused = await fetch(
-            `${url}/api/v1/downloads/${job.id}/pause`,
-            { method: 'POST' }
-        )
+        const paused = await fetch(`${url}/api/v1/downloads/${job.id}/pause`, {
+            method: 'POST'
+        })
         expect(await paused.json()).toMatchObject({ status: 'PAUSED' })
+    })
+
+    it('validates custom performance settings through the Web API', async () => {
+        const response = await fetch(`${url}/api/v1/downloads/run`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                profile: 'custom',
+                jobConcurrency: 1,
+                globalMediaConcurrency: 0,
+                requestIntervalMs: 0,
+                maxRetries: 0
+            })
+        })
+        expect(response.status).toBe(500)
+        expect(await response.json()).toMatchObject({
+            error: expect.stringContaining('globalMediaConcurrency')
+        })
     })
 })
 

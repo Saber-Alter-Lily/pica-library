@@ -12,16 +12,14 @@ export interface QueueStore {
 }
 
 export interface SchedulerOptions {
-    concurrency?: number
-    requestIntervalMs?: number
+    jobConcurrency?: number
     maxRetries?: number
     retryBaseMs?: number
 }
 
 export class DownloadScheduler {
     private stopped = false
-    private readonly concurrency: number
-    private readonly requestIntervalMs: number
+    private readonly jobConcurrency: number
     private readonly maxRetries: number
     private readonly retryBaseMs: number
 
@@ -30,8 +28,7 @@ export class DownloadScheduler {
         private readonly execute: (job: DownloadJob) => Promise<void>,
         options: SchedulerOptions = {}
     ) {
-        this.concurrency = Math.max(1, options.concurrency ?? 2)
-        this.requestIntervalMs = Math.max(0, options.requestIntervalMs ?? 250)
+        this.jobConcurrency = Math.max(1, options.jobConcurrency ?? 2)
         this.maxRetries = Math.max(0, options.maxRetries ?? 2)
         this.retryBaseMs = Math.max(0, options.retryBaseMs ?? 1000)
     }
@@ -43,7 +40,7 @@ export class DownloadScheduler {
     async drain(): Promise<void> {
         this.stopped = false
         while (!this.stopped) {
-            const jobs = this.store.nextDownloadJobs(this.concurrency)
+            const jobs = this.store.nextDownloadJobs(this.jobConcurrency)
             if (jobs.length === 0) return
             await Promise.all(jobs.map((job) => this.run(job)))
         }
@@ -52,7 +49,6 @@ export class DownloadScheduler {
     private async run(job: DownloadJob) {
         let current = this.store.transitionDownloadJob(job.id, 'PREPARING')
         try {
-            if (this.requestIntervalMs) await delay(this.requestIntervalMs)
             current = this.store.getDownloadJob(job.id)
             if (current.status === 'PAUSED' || current.status === 'CANCELLED')
                 return

@@ -19,9 +19,9 @@ function file() {
 }
 
 afterEach(() => {
-    tempDirs.splice(0).forEach((dir) =>
-        fs.rmSync(dir, { recursive: true, force: true })
-    )
+    tempDirs
+        .splice(0)
+        .forEach((dir) => fs.rmSync(dir, { recursive: true, force: true }))
 })
 
 describe('SQLite migrations', () => {
@@ -56,12 +56,16 @@ describe('SQLite migrations', () => {
             );
         `)
         runMigrations(database)
-        const columns = database.prepare('PRAGMA table_info(pictures)').all() as Array<{
+        const columns = database
+            .prepare('PRAGMA table_info(pictures)')
+            .all() as Array<{
             name: string
         }>
         expect(columns.map((column) => column.name)).toContain('retry_count')
         expect(
-            database.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get()
+            database
+                .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
+                .get()
         ).toMatchObject({ count: 2 })
         database.close()
     })
@@ -80,12 +84,16 @@ describe('SQLite migrations', () => {
         ).toThrow(/Migration 3/)
         expect(
             database
-                .prepare("SELECT name FROM sqlite_master WHERE name='transient'")
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE name='transient'"
+                )
                 .get()
         ).toBeUndefined()
         expect(
             database
-                .prepare('SELECT version FROM schema_migrations WHERE version = 3')
+                .prepare(
+                    'SELECT version FROM schema_migrations WHERE version = 3'
+                )
                 .get()
         ).toBeUndefined()
         database.close()

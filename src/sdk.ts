@@ -1,9 +1,9 @@
-import axios, { AxiosError } from 'axios'
+import axios, { AxiosError, type AxiosAdapter, type AxiosResponse } from 'axios'
 import headers from './data/headers.json'
 import { createHash, createHmac } from 'node:crypto'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { normalizeName, debug } from './utils'
+import { normalizeName, debug, redactSensitive } from './utils'
 import {
     Comic,
     Episode,
@@ -28,11 +28,14 @@ export class Pica {
         point: 'vd' // 最多指名
     }
     api // 分页默认为每页 40 条
+    private readonly media
     token: string | undefined
     maxRetry = 3
     retryMap = new Map<string, number>() // <url, retryCount>
 
-    constructor() {
+    constructor(
+        options: { apiAdapter?: AxiosAdapter; mediaAdapter?: AxiosAdapter } = {}
+    ) {
         const httpProxy = process.env.PICA_PROXY
             ? new URL(process.env.PICA_PROXY as string)
             : false
@@ -45,7 +48,18 @@ export class Pica {
                       host: httpProxy.hostname,
                       port: Number(httpProxy.port)
                   }
-                : false
+                : false,
+            adapter: options.apiAdapter
+        })
+        this.media = axios.create({
+            proxy: httpProxy
+                ? {
+                      protocol: httpProxy.protocol,
+                      host: httpProxy.hostname,
+                      port: Number(httpProxy.port)
+                  }
+                : false,
+            adapter: options.mediaAdapter
         })
         this.api.interceptors.request.use((config) => {
             const method = config.method
@@ -76,7 +90,7 @@ export class Pica {
                     return res
                 }
 
-                debug('\n%s %O', url, result)
+                debug('\n%s %O', url, redactSensitive(result))
 
                 if (result.code != 200) {
                     throw new Error('请求失败')
@@ -101,7 +115,12 @@ export class Pica {
                     this.retryMap.delete(url)
                 }
 
-                debug('\nerror %s %s %O', url, message, response?.data)
+                debug(
+                    '\nerror %s %s %O',
+                    url,
+                    message,
+                    redactSensitive(response?.data)
+                )
                 return Promise.reject(message)
             }
         )
@@ -243,27 +262,7 @@ export class Pica {
     }
 
     async download(url: string, info: DInfo): Promise<void> {
-        // 使用单独的 axios 请求
-        // 哔咔的某些文件服务器安全证书不可用，我真服了！
-        // 把图片 https 全部换成 http
-        const transformUrl = (url: string) => {
-            const u = new URL(url)
-            return `http://${u.host}${u.pathname}`
-        }
-        url = transformUrl(url)
-
-        this.retryMap.set(url, this.maxRetry)
-        const res = await this.api.get<Buffer>(url, {
-            responseType: 'arraybuffer',
-            maxRedirects: 0,
-            validateStatus: (status) => status >= 200 && status < 304
-        })
-
-        // 由于 axio 的自动重定向过程无法修改，只好手动处理
-        if (res.headers['location']) {
-            const nextUrl = transformUrl(res.headers['location'])
-            return this.download(nextUrl, info)
-        }
+        const res = await this.mediaRequest(url)
 
         const dir = path.resolve(
             process.cwd(),
@@ -277,23 +276,15 @@ export class Pica {
     }
 
     async downloadToFile(url: string, file: string) {
-        const request = async (target: string) => {
-            this.retryMap.set(target, this.maxRetry)
-            return this.api.get<Buffer>(target, {
-                responseType: 'arraybuffer',
-                maxRedirects: 5,
-                validateStatus: (status) => status >= 200 && status < 304
-            })
-        }
         let response
         try {
-            response = await request(url)
+            response = await this.mediaRequest(url)
         } catch (error) {
             if (
                 process.env.PICA_ALLOW_INSECURE_HTTP === 'true' &&
                 url.startsWith('https://')
             ) {
-                response = await request(
+                response = await this.mediaRequest(
                     `http://${url.slice('https://'.length)}`
                 )
             } else {
@@ -309,6 +300,39 @@ export class Pica {
             bytes: data.byteLength,
             sha256: createHash('sha256').update(data).digest('hex')
         }
+    }
+
+    private async mediaRequest(
+        target: string,
+        redirects = 0
+    ): Promise<AxiosResponse<Buffer>> {
+        const url = new URL(target)
+        const insecureAllowed = process.env.PICA_ALLOW_INSECURE_HTTP === 'true'
+        if (
+            url.protocol !== 'https:' &&
+            !(insecureAllowed && url.protocol === 'http:')
+        ) {
+            throw new Error(
+                'Media downloads require HTTPS unless PICA_ALLOW_INSECURE_HTTP=true'
+            )
+        }
+        if (redirects > 5) throw new Error('Too many media redirects')
+        const response = await this.media.get<Buffer>(url.toString(), {
+            responseType: 'arraybuffer',
+            maxRedirects: 0,
+            headers: { Accept: 'image/*,application/octet-stream' },
+            validateStatus: (status) =>
+                (status >= 200 && status < 304) ||
+                (status >= 300 && status < 400)
+        })
+        const location = response.headers.location
+        if (location) {
+            return this.mediaRequest(
+                new URL(location, url).toString(),
+                redirects + 1
+            )
+        }
+        return response
     }
 
     async search(
@@ -407,6 +431,10 @@ export class Pica {
         url: string,
         data?: object
     ): Promise<Record<string, T>> {
+        if (/^[a-z][a-z\d+.-]*:\/\//i.test(url))
+            throw new Error(
+                'Pica API requests require a trusted relative endpoint'
+            )
         return this.api.request({
             url,
             method,

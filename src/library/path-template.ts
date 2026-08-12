@@ -49,7 +49,9 @@ export function renderLibraryPath(
         if (!placeholders.has(key as keyof PathTemplateValues))
             throw new Error(`Unknown path placeholder: {${key}}`)
         return safePathSegment(
-            key === 'short_id' ? shortId : values[key as keyof PathTemplateValues]
+            key === 'short_id'
+                ? shortId
+                : values[key as keyof PathTemplateValues]
         )
     })
     const segments = rendered.split(/[\\/]+/).filter(Boolean)
@@ -72,6 +74,8 @@ export function previewLibraryPath(
 ) {
     const destination = renderLibraryPath(root, template, values)
     if (!occupied.has(destination)) return destination
-    const suffix = safePathSegment(values.short_id ?? values.comic_id.slice(0, 8))
+    const suffix = safePathSegment(
+        values.short_id ?? values.comic_id.slice(0, 8)
+    )
     return `${destination} [${suffix}]`
 }

@@ -85,6 +85,19 @@ function stringList(value: unknown): string[] {
         .filter(Boolean)
 }
 
+function performanceOverrides(input: Record<string, unknown>) {
+    const result: Record<string, number> = {}
+    for (const key of [
+        'jobConcurrency',
+        'globalMediaConcurrency',
+        'requestIntervalMs',
+        'maxRetries'
+    ]) {
+        if (input[key] !== undefined) result[key] = Number(input[key])
+    }
+    return result
+}
+
 export async function startLibraryServer(options: {
     database: LibraryDatabase
     service: LibraryService
@@ -291,7 +304,14 @@ export async function startLibraryServer(options: {
                 if (input.run !== false) {
                     await options.service.runDownloadQueue({
                         runner: 'LOCAL',
-                        pictureConcurrency: Number(input.concurrency ?? 5)
+                        profile: (input.profile
+                            ? String(input.profile)
+                            : 'balanced') as
+                            | 'conservative'
+                            | 'balanced'
+                            | 'fast'
+                            | 'custom',
+                        custom: performanceOverrides(input)
                     })
                 }
                 return json(
@@ -310,7 +330,18 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/downloads/run' &&
                 request.method === 'POST'
             ) {
-                await options.service.runDownloadQueue({ runner: 'LOCAL' })
+                const input = await body(request)
+                await options.service.runDownloadQueue({
+                    runner: 'LOCAL',
+                    profile: (input.profile
+                        ? String(input.profile)
+                        : 'balanced') as
+                        | 'conservative'
+                        | 'balanced'
+                        | 'fast'
+                        | 'custom',
+                    custom: performanceOverrides(input)
+                })
                 return json(response, 200, options.database.listDownloadJobs())
             }
             const jobAction = url.pathname.match(
@@ -343,8 +374,7 @@ export async function startLibraryServer(options: {
                 const jobs = input.queue
                     ? findings
                           .filter(
-                              (finding) =>
-                                  finding.newEpisodeOrders.length > 0
+                              (finding) => finding.newEpisodeOrders.length > 0
                           )
                           .map((finding) =>
                               queueUpdate(options.database, finding)

@@ -12,7 +12,9 @@ Storage        IndexedDB      SQLite         GitHub Artifact
 Provider                       Pica
 ```
 
-Browser Lite reads a versioned portable Bundle and builds plans without credentials.
+Browser Lite validates a versioned portable Bundle, restores prepared recommendations
+and portable queue data, and persists records, author decisions, recommendation state
+and plans in IndexedDB without credentials. Users can clear that browser-local state.
 The local HTTP server binds to `127.0.0.1` by default and rejects cross-origin
 writes. CLI and Web API call the same `LibraryService`, `LibraryDatabase`, download
 state machine and scheduler. The GitHub workflow is only a manual ephemeral runner
@@ -28,8 +30,9 @@ Re-import updates metadata without duplicating entities.
 ## Download lifecycle
 
 Jobs transition through `DRAFT`, `QUEUED`, `PREPARING`, `RUNNING`, `PAUSED`,
-`RETRY_WAIT`, `COMPLETED`, `FAILED`, or `CANCELLED`. A shared scheduler enforces
-global job concurrency, priority, request spacing and exponential retry. Picture
+`RETRY_WAIT`, `COMPLETED`, `FAILED`, or `CANCELLED`. A job scheduler enforces job
+concurrency, priority and exponential retry. One shared media gate across all active
+jobs enforces global transfer concurrency and request-start spacing. Picture
 downloads retain upstream checks for `allowDownload`, episode selection, `.part`
 files, atomic rename, SHA-256 and verified incremental skips.
 

@@ -2,23 +2,29 @@
 
 Status: PASS for private review candidate.
 
-- Credentials: empty `.env.template` only; `.env*` ignored except template; account
-  and password read from environment or Repository Secrets.
-- Logs: no code prints credential values. Workflow validation prints only missing-secret guidance.
-- Bundle: recursive validation rejects password/token/cookie/secret/API-key fields
-  and absolute POSIX/Windows paths.
-- Database and user data: `*.db`, WAL/SHM, `.pica-library/`, exports, downloads and artifacts are ignored.
-- GitHub Secrets: manual workflows reference `secrets.PICA_ACCOUNT` and
-  `secrets.PICA_PASSWORD`; artifacts are short lived and contain no database.
-- Server: defaults to `127.0.0.1`, rejects remote binding without an explicit opt-in,
-  rejects cross-origin writes and caps request bodies.
-- Paths: invalid/control characters and Windows reserved names are sanitized,
-  segments are length-limited, unknown placeholders fail, resolved destinations
-  cannot escape the library root.
-- Artifacts: GitHub output is limited to `library/`, structured result/manifest and
-  conditional errors; third-party file upload code was removed.
-- Publishing: no Pages deployment, release, package publish or registry workflow exists.
+- API/media boundary: the signed API Axios client accepts trusted relative Pica API
+  paths only. A separate media client follows media redirects without Authorization,
+  signature, nonce, API key, cookie, account or password headers.
+- Transport: media requires HTTPS by default. `PICA_ALLOW_INSECURE_HTTP=true` is an
+  explicit compatibility fallback and does not change the credential-free media path.
+- Logs: recursive redaction covers account, email, password, token, authorization,
+  cookie, secret and API-key variants in both success and error debug output.
+- User secrets: account/password come from environment variables or GitHub Secrets;
+  SQLite, Bundles, IndexedDB state and artifact metadata do not store them.
+- Provider constants: `src/data/headers.json` and the SDK signing constant are public
+  upstream compatibility protocol constants, not user secrets. Account, password and
+  login token values remain user secrets.
+- Bundle/Lite: recursive validation rejects secret-shaped fields; Bundle validation
+  also rejects absolute POSIX/Windows paths.
+- Server/paths: loopback is the default, remote bind needs explicit opt-in,
+  cross-origin writes and oversized bodies are rejected, and output paths cannot
+  escape the library root.
+- GitHub Artifact: user-requested GitHub Runner downloads are intentionally uploaded
+  to a private Actions Artifact retained for one day. Content is not committed,
+  published to Pages, attached to Releases or sent to a third-party temporary host.
+- Publishing: no Pages deployment, Release, tag, npm publication or registry workflow
+  was performed.
 
-The tracked files and Git history were scanned for common GitHub/AWS/private-key and
-non-empty credential assignment patterns. No secrets were detected. Literal field
-names and GitHub Secret references are expected safe matches.
+Tracked files and Git history were scanned for GitHub/AWS/private-key signatures and
+non-empty account/password assignments. No user secret was detected. Literal field
+names, GitHub Secret references and public provider protocol constants are expected.

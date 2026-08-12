@@ -1,21 +1,24 @@
 # Feature Matrix
 
-| Capability | Implemented | Tested | Status / note |
+| Capability | Implemented | Evidence | Status / note |
 | --- | --- | --- | --- |
-| Independent private non-fork repository | Yes | GitHub metadata check | Implemented |
+| Independent private non-fork repository | Yes | GitHub metadata | Implemented |
+| API/media client isolation and debug redaction | Yes | SDK security tests | HTTPS by default; opt-in HTTP remains credential-free |
+| Fresh DB raw-ID enqueue | Yes | Database unit tests | LOCAL and GITHUB jobs avoid FK failure |
 | Versioned SQLite migration and rollback | Yes | 3 integration tests | Implemented |
-| Canonical comics, authors, episodes, pictures | Yes | Unit/integration | Implemented |
-| Author review, merge and dictionary import | Yes | Unit/API | Implemented |
-| Explainable collection recommendation | Yes | Unit | Implemented |
-| Unified persistent download queue | Yes | Unit/API | Implemented |
-| Explicit state machine and global scheduler | Yes | Unit | Implemented |
-| Pause, resume, retry and cancel | Yes | Unit/database | Cooperative pause |
-| Local and GitHub runners | Yes | Build/artifact unit | GitHub run pending PR |
-| Update detection and queue conversion | Yes | Fake provider unit | Implemented |
-| Repair missing/empty/failed files | Yes | Filesystem unit | Implemented |
-| Safe folder template and preview | Yes | Unit | Implemented |
-| Portable Bundle validation/redaction | Yes | Round-trip unit | Implemented |
-| Five-area Web IA | Yes | Desktop/mobile browser QA | Implemented |
-| Popular and complete Related views | No | No | Deferred until stable provider contract |
-| Real Pica speed benchmark | No | No | NOT YET BENCHMARKED |
-| Public release, Pages, npm package | No | Policy check | Intentionally prohibited |
+| Author review, merge and dictionary import | Yes | Unit/API tests | Implemented |
+| Explainable collection recommendation | Yes | Unit tests | Implemented |
+| Unified persistent download queue | Yes | Unit/API tests | Implemented |
+| Job scheduler plus global media gate | Yes | Multi-job fake transfer tests | Global concurrency and request-start spacing enforced |
+| Cumulative progress and pause/resume | Yes | Multi-episode service tests | Resume continues from validated files |
+| Performance profiles | Yes | CLI/Web/workflow and profile tests | Balanced default; Custom applies explicit overrides |
+| Local and GitHub runner semantics | Yes | Queue/workflow/artifact tests | GitHub jobs and artifact records use `GITHUB` |
+| Downloaded-only update checking | Yes | Fake-provider service tests | Partial download stores full observed episode baseline |
+| Repair missing/empty/failed files | Yes | Filesystem unit tests | Implemented |
+| Portable Bundle validation | Yes | Bundle and Browser Lite tests | Schema/kind/secrets checked |
+| Browser Lite prepared recommendations | Yes | Browser state contract tests | Available without local service |
+| Browser Lite IndexedDB persistence | Yes | Pure state round-trip plus browser load QA | Records, authors, recommendations/profile and plans persist |
+| Five-area Web IA | Yes | Browser load QA and syntax checks | Browser Lite first screen verified |
+| Popular and complete Related views | No | None | Deferred until stable provider contract |
+| Real Pica speed benchmark | No | None | NOT YET BENCHMARKED |
+| Public release, Pages, npm package | No | Policy and repository checks | Intentionally prohibited |

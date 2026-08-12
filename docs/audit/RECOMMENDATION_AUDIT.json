@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "source": "sanitized private local validation",
+  "favoriteCount": 1770,
+  "profileAuthorCount": 20,
+  "profileTagCount": 20,
+  "seedCount": 12,
+  "seedAuthorDiversity": 12,
+  "seedTagDiversity": 89,
+  "candidateCountByRecallRoute": {
+    "related": 120,
+    "author": 26,
+    "tag": 30,
+    "category": 40,
+    "circle": 40
+  },
+  "deduplicatedCandidateCount": 240,
+  "alreadyFavoriteExcludedCount": 52,
+  "finalRecommendationCount": 30,
+  "maxSameAuthorInTopN": 2,
+  "explorationCount": 0,
+  "recommendationsWithCoverMetadata": 30,
+  "titlesIncluded": false
+}

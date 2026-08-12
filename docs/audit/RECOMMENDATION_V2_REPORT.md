@@ -19,3 +19,10 @@ audit metrics remain available for review rather than cluttering the card.
 Deterministic unit coverage includes profile bounds/normalization, diverse seed
 selection, deduplication/provenance, favorite exclusion, popularity resistance,
 author concentration, exploration bounds, and stable ordering.
+
+Sanitized live validation on the existing 1770-item Library returned 30 results
+from 240 deduplicated candidates. Twelve seeds represented twelve normalized
+authors and 89 seed tags. Fifty-two recalled favorites were excluded, every
+result carried cover metadata, and no author appeared more than twice in the
+top 30. Exploration was zero for this run; the algorithm's maximum remains 15%.
+These metrics demonstrate bounds and diversity, not subjective user preference.

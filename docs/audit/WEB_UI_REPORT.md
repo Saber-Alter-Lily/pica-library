@@ -14,3 +14,11 @@ Connected covers use `/api/v1/covers/:comicId`; Browser Lite uses an optional
 safe cover reference from imported metadata. The local endpoint is not a
 general URL proxy and caches bounded image responses only under the configured
 data directory.
+
+Actual Browser Lite desktop QA at 1280×720 inspected Home, Library Grid,
+Discover, Downloads, and Maintenance. Document width matched viewport width on
+all five views. Fixed-ratio fallback covers and long-title cards remained
+usable. The in-app browser did not expose a reliable viewport resize control;
+narrow-screen status is therefore based on the checked responsive CSS and is
+left for final human verification rather than reported as an automated mobile
+screenshot pass.

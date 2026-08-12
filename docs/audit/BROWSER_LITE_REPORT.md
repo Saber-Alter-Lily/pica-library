@@ -10,3 +10,8 @@ normal Bundle. Imported collections use the same 48-record incremental render
 contract as connected mode. Automated tests cover import, invalid/sensitive
 bundle rejection, persistence round trip, queue deduplication, 1770-record page
 bounds, and discriminative tag selection.
+
+Manual static-server QA confirmed Browser Lite mode without a Local Engine,
+state restoration across reload (same comic/queue counts), prepared
+recommendation rendering, and clear-state behavior. The final clear action
+returned the library and plan counts to zero.

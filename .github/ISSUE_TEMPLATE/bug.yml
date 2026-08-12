@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a reproducible Pica Library problem
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Environment
+      description: Pica Library version, Node version, OS and runner. Never include credentials.

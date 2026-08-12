@@ -1,0 +1,145 @@
+name: limited-download
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Download source'
+        required: true
+        type: choice
+        default: favorites_page
+        options: [favorites_page, comic_ids]
+      favorite_page:
+        description: 'Favorites page (normally about 20 comics)'
+        required: false
+        default: '1'
+        type: string
+      comic_ids:
+        description: 'Comma-separated comic IDs (maximum 20)'
+        required: false
+        type: string
+      episodes:
+        description: 'Episodes, for example all or 1,3,5-10'
+        required: true
+        default: 'all'
+        type: string
+      profile:
+        description: 'Performance preset; fast is aggressive, not a benchmark claim'
+        required: true
+        default: balanced
+        type: choice
+        options: [conservative, balanced, fast]
+
+permissions:
+  contents: read
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    env:
+      PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
+      PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
+      INPUT_MODE: ${{ inputs.mode }}
+      INPUT_FAVORITE_PAGE: ${{ inputs.favorite_page }}
+      INPUT_COMIC_IDS: ${{ inputs.comic_ids }}
+      INPUT_EPISODES: ${{ inputs.episodes }}
+      INPUT_PROFILE: ${{ inputs.profile }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PICA_ACCOUNT" && test -n "$PICA_PASSWORD" || {
+            echo 'Configure PICA_ACCOUNT and PICA_PASSWORD Repository Secrets first.'
+            exit 1
+          }
+          if [[ "$INPUT_MODE" == 'favorites_page' ]]; then
+            [[ "$INPUT_FAVORITE_PAGE" =~ ^[1-9][0-9]{0,3}$ ]] || {
+              echo 'Favorite page must be a positive integer.'
+              exit 1
+            }
+          elif [[ "$INPUT_MODE" == 'comic_ids' ]]; then
+            IFS=',' read -ra ids <<< "$INPUT_COMIC_IDS"
+            test -n "$INPUT_COMIC_IDS" && test "${#ids[@]}" -le 20 || {
+              echo 'ID mode accepts between 1 and 20 comics.'
+              exit 1
+            }
+            for id in "${ids[@]}"; do
+              [[ "${id// /}" =~ ^[A-Za-z0-9_-]{8,64}$ ]] || {
+                echo 'A comic ID has an invalid format.'
+                exit 1
+              }
+            done
+          else
+            echo 'Unknown download mode.'
+            exit 1
+          fi
+          [[ "$INPUT_EPISODES" == 'all' || "$INPUT_EPISODES" =~ ^[0-9,-]{1,80}$ ]] || {
+            echo 'Episodes have an invalid format.'
+            exit 1
+          }
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Download requested comics
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$INPUT_MODE" == 'favorites_page' ]]; then
+            node dist/library-cli.js download-favorites \
+              --page "$INPUT_FAVORITE_PAGE" \
+              --episodes "$INPUT_EPISODES" \
+              --profile "$INPUT_PROFILE" \
+              --runner GITHUB \
+              --data-dir .pica-library-action
+          else
+            IFS=',' read -ra ids <<< "$INPUT_COMIC_IDS"
+            args=()
+            for id in "${ids[@]}"; do args+=("${id// /}"); done
+            node dist/library-cli.js download "${args[@]}" \
+              --episodes "$INPUT_EPISODES" \
+              --profile "$INPUT_PROFILE" \
+              --runner GITHUB \
+              --data-dir .pica-library-action
+          fi
+
+      - name: Build review artifact
+        run: >-
+          node dist/library-cli.js artifact
+          --output pica-download
+          --data-dir .pica-library-action
+
+      - name: Upload temporary download
+        id: artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-download-${{ github.run_id }}
+          path: pica-download
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+      - name: Write summary
+        if: always()
+        shell: bash
+        env:
+          ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+        run: |
+          {
+            echo '## Download job'
+            echo ''
+            echo 'One favorites page or up to 20 comic IDs; global media concurrency is controlled by the selected profile.'
+            echo 'The private artifact is retained for one day.'
+            echo "[Download this run]($ARTIFACT_URL)"
+            echo 'Download only content you may access and do not redistribute the artifact.'
+          } >> "$GITHUB_STEP_SUMMARY"

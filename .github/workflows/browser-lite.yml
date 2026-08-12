@@ -1,0 +1,19 @@
+name: browser-lite-review
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload static Browser Lite review build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-library-browser-lite-${{ github.run_id }}
+          path: web
+          retention-days: 3

@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: ['main', 'codex/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm type:check
+      - run: pnpm test:unit
+      - run: pnpm test:integration
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm web:check
+      - run: pnpm build
+      - name: Build Browser Lite review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-lite-node-${{ matrix.node }}
+          path: web
+          retention-days: 3

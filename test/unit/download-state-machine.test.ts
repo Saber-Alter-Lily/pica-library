@@ -7,6 +7,7 @@ import {
 describe('download state machine', () => {
     it('allows the normal lifecycle and operator controls', () => {
         expect(canTransition('DRAFT', 'QUEUED')).toBe(true)
+        expect(canTransition('PREPARING', 'PAUSED')).toBe(true)
         expect(canTransition('RUNNING', 'PAUSED')).toBe(true)
         expect(canTransition('PAUSED', 'QUEUED')).toBe(true)
         expect(canTransition('FAILED', 'QUEUED')).toBe(true)

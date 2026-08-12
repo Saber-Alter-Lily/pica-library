@@ -113,11 +113,13 @@ Usage:
   pica-library prepare-library --output pica-library-export
   pica-library search [KEYWORD] [--tag TAG] [--category NAME] [--sort likes]
   pica-library download <comic-id...> [--episodes 1,3,5-10] [--profile balanced] [--runner LOCAL]
+  pica-library download add <comic-id...> [--episodes 1,3,5-10] [--runner LOCAL]
   pica-library download list
-  pica-library download run
+  pica-library download run [--profile conservative|balanced|fast]
+  pica-library download run --profile custom [--job-concurrency N] [--concurrency N] [--request-interval MS] [--max-retries N]
   pica-library download <pause|resume|retry|cancel> <job-id>
-  pica-library download-favorites --page 1 [--episodes all] [--concurrency 5]
-  pica-library download-plan <download-plan.json> [--concurrency 5]
+  pica-library download-favorites --page 1 [--episodes all] [--profile balanced]
+  pica-library download-plan <download-plan.json> [--profile balanced]
   pica-library organize
   pica-library portable --output pica-download
   pica-library artifact --output pica-download
@@ -440,10 +442,32 @@ async function main() {
                 print(database.listDownloadJobs())
                 return
             }
+            if (action === 'add') {
+                const addIds = comicIds.slice(1)
+                if (addIds.length === 0)
+                    throw new Error('At least one comic id is required')
+                print(
+                    addIds.map((comicId) =>
+                        service.enqueueDownload({
+                            comicId,
+                            episodeOrders: parseEpisodeSelection(
+                                flag('episodes')
+                            ),
+                            source: 'manual',
+                            runner: runtime.runner
+                        })
+                    )
+                )
+                return
+            }
+            if (action === 'retry') {
+                if (!jobId) throw new Error('A job id is required for retry')
+                print(database.retryDownloadJob(jobId))
+                return
+            }
             const operatorStatus = {
                 pause: 'PAUSED',
                 resume: 'QUEUED',
-                retry: 'QUEUED',
                 cancel: 'CANCELLED'
             } as const
             if (action in operatorStatus) {

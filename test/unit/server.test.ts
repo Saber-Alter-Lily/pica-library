@@ -108,6 +108,38 @@ describe('local web server', () => {
         expect(await paused.json()).toMatchObject({ status: 'PAUSED' })
     })
 
+    it('pauses a preparing job without returning HTTP 500', async () => {
+        const job = database.createDownloadJob({ comicId: 'preparing-job' })
+        database.transitionDownloadJob(job.id, 'QUEUED')
+        database.transitionDownloadJob(job.id, 'PREPARING')
+        const response = await fetch(
+            `${url}/api/v1/downloads/${job.id}/pause`,
+            { method: 'POST' }
+        )
+        expect(response.status).toBe(200)
+        expect(await response.json()).toMatchObject({ status: 'PAUSED' })
+    })
+
+    it('resets retry state through the retry API', async () => {
+        const job = database.createDownloadJob({ comicId: 'failed-job' })
+        database.transitionDownloadJob(job.id, 'QUEUED')
+        database.transitionDownloadJob(job.id, 'PREPARING')
+        database.transitionDownloadJob(job.id, 'FAILED', {
+            retryCount: 3,
+            error: 'failed'
+        })
+        const response = await fetch(
+            `${url}/api/v1/downloads/${job.id}/retry`,
+            { method: 'POST' }
+        )
+        expect(response.status).toBe(200)
+        expect(await response.json()).toMatchObject({
+            status: 'QUEUED',
+            retryCount: 0,
+            error: null
+        })
+    })
+
     it('validates custom performance settings through the Web API', async () => {
         const response = await fetch(`${url}/api/v1/downloads/run`, {
             method: 'POST',

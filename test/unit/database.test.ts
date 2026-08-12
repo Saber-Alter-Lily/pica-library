@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
+import { DownloadScheduler } from '../../src/core/downloads/scheduler'
 import type { FavoriteRecord } from '../../src/library/types'
 
 const tempDirs: string[] = []
@@ -205,6 +206,57 @@ describe('library database', () => {
         expect(first.comicId).toBe('raw-1')
         expect(github).toMatchObject({ comicId: 'raw-2', runner: 'GITHUB' })
         expect(database.summary().comics).toBe(2)
+        database.close()
+    })
+
+    it('preserves retries on resume and resets the budget for manual retry', async () => {
+        const database = createDatabase()
+        const paused = database.createDownloadJob({ comicId: 'paused-retry' })
+        database.transitionDownloadJob(paused.id, 'QUEUED')
+        database.transitionDownloadJob(paused.id, 'PREPARING')
+        database.transitionDownloadJob(paused.id, 'RUNNING')
+        database.transitionDownloadJob(paused.id, 'PAUSED', { retryCount: 2 })
+        expect(
+            database.transitionDownloadJob(paused.id, 'QUEUED').retryCount
+        ).toBe(2)
+
+        const exhausted = database.createDownloadJob({
+            comicId: 'manual-retry'
+        })
+        database.transitionDownloadJob(exhausted.id, 'QUEUED')
+        await new DownloadScheduler(
+            database,
+            async () => {
+                throw new Error('exhausted')
+            },
+            { maxRetries: 0, retryBaseMs: 0 }
+        ).drain()
+        expect(database.getDownloadJob(exhausted.id)).toMatchObject({
+            status: 'FAILED',
+            retryCount: 1,
+            error: 'exhausted'
+        })
+
+        expect(database.retryDownloadJob(exhausted.id)).toMatchObject({
+            status: 'QUEUED',
+            retryCount: 0,
+            error: null
+        })
+        let attempts = 0
+        await new DownloadScheduler(
+            database,
+            async (job) => {
+                if (job.id !== exhausted.id) return
+                attempts += 1
+                if (attempts === 1) throw new Error('new transient failure')
+            },
+            { maxRetries: 1, retryBaseMs: 0 }
+        ).drain()
+        expect(database.getDownloadJob(exhausted.id)).toMatchObject({
+            status: 'COMPLETED',
+            retryCount: 1,
+            error: null
+        })
         database.close()
     })
 })

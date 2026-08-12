@@ -321,7 +321,7 @@ async function loadJobs() {
                     : 0
                 return `<article class="list-item">
                     <div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${job.source} · ${job.runner} · ${job.status} · 重试 ${job.retryCount}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${job.progressCompleted}/${job.progressTotal} · ${Number(job.bytes).toLocaleString()} bytes${job.error ? ` · ${escapeHtml(job.error)}` : ''}</p></div>
-                    <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">暂停</button>` : ''}${['PAUSED', 'FAILED'].includes(job.status) ? `<button data-job-action="resume" data-job-id="${job.id}">恢复</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">取消</button>` : ''}</div>
+                    <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">暂停</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">恢复</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">重试</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">取消</button>` : ''}</div>
                 </article>`
             })
             .join('') || '<article class="notice">队列为空。</article>'

@@ -3,7 +3,7 @@ import type { DownloadStatus } from './types'
 const transitions: Record<DownloadStatus, readonly DownloadStatus[]> = {
     DRAFT: ['QUEUED', 'CANCELLED'],
     QUEUED: ['PREPARING', 'PAUSED', 'CANCELLED'],
-    PREPARING: ['RUNNING', 'RETRY_WAIT', 'FAILED', 'CANCELLED'],
+    PREPARING: ['RUNNING', 'PAUSED', 'RETRY_WAIT', 'FAILED', 'CANCELLED'],
     RUNNING: ['PAUSED', 'RETRY_WAIT', 'COMPLETED', 'FAILED', 'CANCELLED'],
     PAUSED: ['QUEUED', 'CANCELLED'],
     RETRY_WAIT: ['QUEUED', 'FAILED', 'CANCELLED'],

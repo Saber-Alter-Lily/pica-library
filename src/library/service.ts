@@ -41,6 +41,7 @@ export interface DownloadProgress {
     episodeTitle: string
     completed: number
     total: number
+    bytes: number
     file?: string
 }
 
@@ -300,7 +301,8 @@ export class LibraryService {
                     onProgress: (progress) => {
                         this.database.updateDownloadProgress(job.id, {
                             progressCompleted: progress.completed,
-                            progressTotal: progress.total
+                            progressTotal: progress.total,
+                            bytes: progress.bytes
                         })
                         options.onProgress?.(progress)
                     },
@@ -447,9 +449,17 @@ export class LibraryService {
             }
         }
         let completed = validExisting.size
+        const completedPictureIds = new Set(validExisting.keys())
+        let cumulativeBytes = [...validExisting.keys()].reduce(
+            (total, pictureId) =>
+                total +
+                (this.database.pictureDownloadState(pictureId)?.byteSize ?? 0),
+            0
+        )
         result.skipped = completed
         result.pictures = work.length
-        await Promise.all(
+        let attemptFailed = false
+        const settled = await Promise.allSettled(
             work.map(async (item) => {
                 if (options.shouldStop?.()) return
                 const existing = validExisting.get(item.pictureId)
@@ -464,33 +474,50 @@ export class LibraryService {
                     return
                 }
                 await options.mediaGate.run(async () => {
-                    if (options.shouldStop?.()) return
-                    const downloaded = await pica.downloadToFile(
-                        item.picture.url,
-                        item.file
-                    )
-                    this.database.markPictureDownloaded(
-                        item.pictureId,
-                        item.file,
-                        downloaded.bytes,
-                        downloaded.sha256
-                    )
-                    result.downloaded += 1
-                    result.bytes += downloaded.bytes
-                    completed += 1
-                    options.onProgress?.({
-                        comicId,
-                        comicTitle: comic.title,
-                        episodeId: item.episodeId,
-                        episodeTitle: item.episodeTitle,
-                        completed,
-                        total: work.length,
-                        file: item.file
-                    })
+                    if (attemptFailed || options.shouldStop?.()) return
+                    try {
+                        const downloaded = await pica.downloadToFile(
+                            item.picture.url,
+                            item.file
+                        )
+                        this.database.markPictureDownloaded(
+                            item.pictureId,
+                            item.file,
+                            downloaded.bytes,
+                            downloaded.sha256
+                        )
+                        result.downloaded += 1
+                        completedPictureIds.add(item.pictureId)
+                        cumulativeBytes += downloaded.bytes
+                        completed += 1
+                        options.onProgress?.({
+                            comicId,
+                            comicTitle: comic.title,
+                            episodeId: item.episodeId,
+                            episodeTitle: item.episodeTitle,
+                            completed,
+                            total: work.length,
+                            bytes: cumulativeBytes,
+                            file: item.file
+                        })
+                    } catch (error) {
+                        attemptFailed = true
+                        throw error
+                    }
                 })
             })
         )
-        result.completed = completed
+        result.completed = completedPictureIds.size
+        result.bytes = [...completedPictureIds].reduce(
+            (total, pictureId) =>
+                total +
+                (this.database.pictureDownloadState(pictureId)?.byteSize ?? 0),
+            0
+        )
+        const failure = settled.find(
+            (item): item is PromiseRejectedResult => item.status === 'rejected'
+        )
+        if (failure) throw failure.reason
         return result
     }
 }

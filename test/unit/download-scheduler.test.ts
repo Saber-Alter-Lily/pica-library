@@ -99,4 +99,42 @@ describe('download job scheduler', () => {
         await scheduler.drain()
         expect(queue.jobs[0].status).toBe('PAUSED')
     })
+
+    it('does not requeue after cancellation during retry backoff', async () => {
+        const queue = store([job('cancel-backoff')])
+        let enterBackoff!: () => void
+        let leaveBackoff!: () => void
+        const enteredBackoff = new Promise<void>((resolve) => {
+            enterBackoff = resolve
+        })
+        const backoffReleased = new Promise<void>((resolve) => {
+            leaveBackoff = resolve
+        })
+        const scheduler = new DownloadScheduler(
+            queue,
+            async () => {
+                throw new Error('temporary')
+            },
+            {
+                maxRetries: 1,
+                retryBaseMs: 1,
+                retryDelay: async () => {
+                    enterBackoff()
+                    await backoffReleased
+                }
+            }
+        )
+
+        const drain = scheduler.drain()
+        await enteredBackoff
+        expect(queue.jobs[0].status).toBe('RETRY_WAIT')
+        queue.transitionDownloadJob('cancel-backoff', 'CANCELLED')
+        leaveBackoff()
+        await drain
+
+        expect(queue.jobs[0]).toMatchObject({
+            status: 'CANCELLED',
+            retryCount: 1
+        })
+    })
 })

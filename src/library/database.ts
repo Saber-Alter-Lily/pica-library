@@ -861,6 +861,16 @@ export class LibraryDatabase {
         return this.getDownloadJob(id)
     }
 
+    retryDownloadJob(id: string): DownloadJob {
+        const current = this.getDownloadJob(id)
+        if (current.status !== 'FAILED')
+            throw new Error(`Only failed jobs can be retried: ${id}`)
+        return this.transitionDownloadJob(id, 'QUEUED', {
+            retryCount: 0,
+            error: null
+        })
+    }
+
     updateDownloadProgress(id: string, patch: DownloadJobPatch): DownloadJob {
         const current = this.getDownloadJob(id)
         this.db

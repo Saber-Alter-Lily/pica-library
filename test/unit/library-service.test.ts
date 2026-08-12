@@ -132,7 +132,8 @@ describe('LibraryService downloads and maintenance', () => {
         expect(database.getDownloadJob(job.id)).toMatchObject({
             status: 'PAUSED',
             progressCompleted: 2,
-            progressTotal: 6
+            progressTotal: 6,
+            bytes: 2
         })
 
         database.transitionDownloadJob(job.id, 'QUEUED')
@@ -151,7 +152,81 @@ describe('LibraryService downloads and maintenance', () => {
         expect(database.getDownloadJob(job.id)).toMatchObject({
             status: 'COMPLETED',
             progressCompleted: 6,
-            progressTotal: 6
+            progressTotal: 6,
+            bytes: 6
+        })
+        await service.runDownloadQueue({ profile: 'balanced' })
+        expect(database.getDownloadJob(job.id).bytes).toBe(6)
+        database.close()
+    })
+
+    it('settles an entire media attempt before retrying and reuses successful files', async () => {
+        const { database, provider, service } = setup([3])
+        const events: string[] = []
+        const calls = new Map<string, number>()
+        let attempt = 0
+        let secondStarted!: () => void
+        let firstFailed!: () => void
+        let releaseSecond!: () => void
+        const secondStart = new Promise<void>((resolve) => {
+            secondStarted = resolve
+        })
+        const failureObserved = new Promise<void>((resolve) => {
+            firstFailed = resolve
+        })
+        const secondRelease = new Promise<void>((resolve) => {
+            releaseSecond = resolve
+        })
+        provider.comicInfo = async (comicId: string) => {
+            attempt += 1
+            return comic(comicId)
+        }
+        provider.downloadToFile = async (url: string, file: string) => {
+            const picture = path.basename(url)
+            calls.set(picture, (calls.get(picture) ?? 0) + 1)
+            events.push(`attempt-${attempt}:start-${picture}`)
+            if (attempt === 1 && picture === '1.jpg') {
+                await secondStart
+                events.push('attempt-1:fail-1.jpg')
+                firstFailed()
+                throw new Error('early media failure')
+            }
+            if (attempt === 1 && picture === '2.jpg') {
+                secondStarted()
+                await secondRelease
+            }
+            fs.mkdirSync(path.dirname(file), { recursive: true })
+            fs.writeFileSync(file, 'x')
+            events.push(`attempt-${attempt}:finish-${picture}`)
+            return { bytes: 1, sha256: 'test-sha256' }
+        }
+        const job = service.enqueueDownload({ comicId: 'comic-quiescence' })
+
+        const draining = service.runDownloadQueue({
+            profile: 'custom',
+            custom: {
+                jobConcurrency: 1,
+                globalMediaConcurrency: 2,
+                requestIntervalMs: 0,
+                maxRetries: 1
+            }
+        })
+        await failureObserved
+        expect(attempt).toBe(1)
+        expect(events).not.toContain('attempt-2:start-1.jpg')
+        releaseSecond()
+        await draining
+
+        expect(events.indexOf('attempt-1:finish-2.jpg')).toBeLessThan(
+            events.indexOf('attempt-2:start-1.jpg')
+        )
+        expect(calls.get('2.jpg')).toBe(1)
+        expect(database.getDownloadJob(job.id)).toMatchObject({
+            status: 'COMPLETED',
+            progressCompleted: 3,
+            progressTotal: 3,
+            bytes: 3,
+            retryCount: 1
         })
         database.close()
     })

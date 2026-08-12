@@ -15,6 +15,7 @@ export interface SchedulerOptions {
     jobConcurrency?: number
     maxRetries?: number
     retryBaseMs?: number
+    retryDelay?: (milliseconds: number) => Promise<void>
 }
 
 export class DownloadScheduler {
@@ -22,6 +23,7 @@ export class DownloadScheduler {
     private readonly jobConcurrency: number
     private readonly maxRetries: number
     private readonly retryBaseMs: number
+    private readonly retryDelay: (milliseconds: number) => Promise<void>
 
     constructor(
         private readonly store: QueueStore,
@@ -31,6 +33,7 @@ export class DownloadScheduler {
         this.jobConcurrency = Math.max(1, options.jobConcurrency ?? 2)
         this.maxRetries = Math.max(0, options.maxRetries ?? 2)
         this.retryBaseMs = Math.max(0, options.retryBaseMs ?? 1000)
+        this.retryDelay = options.retryDelay ?? delay
     }
 
     stop() {
@@ -73,7 +76,16 @@ export class DownloadScheduler {
                     retryCount
                 })
                 if (this.retryBaseMs)
-                    await delay(this.retryBaseMs * 2 ** (retryCount - 1))
+                    await this.retryDelay(
+                        this.retryBaseMs * 2 ** (retryCount - 1)
+                    )
+                current = this.store.getDownloadJob(job.id)
+                if (
+                    current.status === 'CANCELLED' ||
+                    current.status === 'PAUSED'
+                )
+                    return
+                if (current.status !== 'RETRY_WAIT') return
                 this.store.transitionDownloadJob(job.id, 'QUEUED')
             } else {
                 this.store.transitionDownloadJob(job.id, 'FAILED', {

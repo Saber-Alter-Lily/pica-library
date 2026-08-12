@@ -348,17 +348,23 @@ export async function startLibraryServer(options: {
                 /^\/api\/v1\/downloads\/([^/]+)\/(pause|resume|retry|cancel)$/
             )
             if (jobAction && request.method === 'POST') {
+                const jobId = decodeURIComponent(jobAction[1])
+                if (jobAction[2] === 'retry')
+                    return json(
+                        response,
+                        200,
+                        options.database.retryDownloadJob(jobId)
+                    )
                 const statuses = {
                     pause: 'PAUSED',
                     resume: 'QUEUED',
-                    retry: 'QUEUED',
                     cancel: 'CANCELLED'
                 } as const
                 return json(
                     response,
                     200,
                     options.database.transitionDownloadJob(
-                        decodeURIComponent(jobAction[1]),
+                        jobId,
                         statuses[jobAction[2] as keyof typeof statuses]
                     )
                 )

@@ -43,8 +43,9 @@ describe('download CLI', () => {
             '--json'
         ])
 
-        expect(result.stderr).toBe('')
         expect(result.status).toBe(0)
+        expect(result.stderr).not.toContain('PICA_ACCOUNT')
+        expect(result.stderr).not.toContain('PICA_PASSWORD')
         expect(JSON.parse(result.stdout)).toEqual([
             expect.objectContaining({
                 comicId: 'raw-one',

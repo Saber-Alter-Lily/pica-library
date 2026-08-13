@@ -105,6 +105,20 @@
                                 Save and Continue
                             </button>
                         </div>
+                        <div id="setup-next-step" class="wide notice" hidden>
+                            <strong>连接成功</strong>
+                            <p>下一步：同步你的 Pica 收藏，建立本地漫画库。</p>
+                            <button
+                                id="setup-sync"
+                                type="button"
+                                class="primary"
+                            >
+                                同步收藏
+                            </button>
+                            <button id="setup-sync-later" type="button">
+                                稍后同步
+                            </button>
+                        </div>
                     </form>
                 </div>
             </section>
@@ -117,6 +131,10 @@
                     <button id="clear-lite-state">清空本地数据</button>
                 </div>
                 <div class="quick-start">
+                    <button id="home-sync">
+                        <strong>同步收藏</strong
+                        ><span>建立或更新本地漫画库</span>
+                    </button>
                     <button data-go="library">
                         <strong>导入收藏</strong><span>CSV 或数据包</span>
                     </button>
@@ -208,6 +226,7 @@
                     <button id="queue-selected">加入下载</button>
                     <button id="export-plan">导出计划</button>
                 </div>
+                <p id="last-sync" class="status"></p>
                 <p id="library-count" class="status"></p>
                 <div id="comic-grid" class="comic-grid"></div>
                 <div id="comic-table" class="table-wrap" hidden>
@@ -250,6 +269,22 @@
                     </div>
                     <div id="profile" class="profile"></div>
                     <p id="recommend-message" class="status"></p>
+                    <div class="toolbar recommendation-toolbar">
+                        <button id="recommend-grid" aria-pressed="true">
+                            网格
+                        </button>
+                        <button id="recommend-list" aria-pressed="false">
+                            列表
+                        </button>
+                        <label
+                            ><input
+                                id="recommend-cover-toggle"
+                                type="checkbox"
+                                checked
+                            />
+                            加载封面</label
+                        >
+                    </div>
                     <button id="recommend-next-batch">Next batch</button>
                     <div id="recommend-results" class="results"></div>
                 </div>
@@ -282,6 +317,13 @@
                         <p>本地与 GitHub 任务使用同一套持久化队列语义。</p>
                     </div>
                     <div class="actions">
+                        <button
+                            id="sync-export-browser-lite"
+                            class="primary"
+                            type="button"
+                        >
+                            同步并导出 Browser Lite 数据包
+                        </button>
                         <select id="performance-profile" aria-label="性能配置">
                             <option value="conservative">Conservative</option>
                             <option value="balanced" selected>Balanced</option>
@@ -437,6 +479,10 @@
                                 placeholder="Disabled"
                         /></label>
                     </details>
+                    <button id="settings-detect-proxy" type="button">
+                        自动检测代理
+                    </button>
+                    <p id="browser-lite-timestamps" class="status"></p>
                     <p
                         id="settings-message"
                         class="status wide"

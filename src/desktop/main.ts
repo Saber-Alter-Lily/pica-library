@@ -60,6 +60,7 @@ let service: LibraryService | null = null
 let stopping = false
 let currentUrl = ''
 let lastBrowserLiteExportDirectory: string | null = null
+let lastBrowserLiteExportAt: string | null = null
 
 function showStartupError() {
     if (process.platform !== 'win32') return
@@ -169,11 +170,14 @@ function friendlyConnectionError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     log.write(`Connection test failed: ${message}`)
     if (/401|unauthor|credential|account|password|sign-in/i.test(message))
-        return 'The account or password was rejected.'
-    if (/proxy/i.test(message)) return 'The proxy could not connect.'
-    if (/timeout|network|socket|connect|dns|tls/i.test(message))
-        return 'The provider could not be reached. Check your network or proxy.'
-    return 'The provider returned an unexpected error.'
+        return 'AUTH_FAILED: The account or password was rejected.'
+    if (/proxy/i.test(message))
+        return 'PROXY_FAILED: The proxy could not connect.'
+    if (/timeout|timed out/i.test(message))
+        return 'TIMEOUT: The connection timed out.'
+    if (/network|socket|connect|dns|tls/i.test(message))
+        return 'NETWORK_FAILED: The provider could not be reached. Check your network or proxy.'
+    return 'PROVIDER_UNEXPECTED: The provider returned an unexpected error.'
 }
 
 async function testConnection(input: Record<string, unknown>) {
@@ -199,7 +203,7 @@ async function testConnection(input: Record<string, unknown>) {
     }
 }
 
-async function detectProxy() {
+async function detectProxy(input: Record<string, unknown>) {
     const listeningPorts: number[] = []
     for (const port of knownProxyPorts())
         if (await isLoopbackListening(port)) listeningPorts.push(port)
@@ -215,11 +219,12 @@ async function detectProxy() {
             ],
             { encoding: 'utf8', windowsHide: true, env: sanitizedChildEnv() }
         )
+        const enabled = /ProxyEnable\s+REG_DWORD\s+0x1/i.test(registry.stdout)
         const match =
             registry.status === 0
                 ? registry.stdout.match(/ProxyServer\s+REG_SZ\s+([^\r\n]+)/i)
                 : null
-        if (match)
+        if (enabled && match)
             windowsProxy = /^https?:\/\//i.test(match[1].trim())
                 ? match[1].trim()
                 : `http://${match[1].trim()}`
@@ -229,12 +234,23 @@ async function detectProxy() {
         windows: windowsProxy,
         listeningPorts
     })
-    return {
-        candidates: candidates.map((candidate) => ({
+    const validated = []
+    for (const candidate of candidates) {
+        let usable = false
+        try {
+            await testConnection({ ...input, proxyUrl: candidate.url })
+            usable = true
+        } catch {
+            // Candidate remains selectable even when provider validation fails.
+        }
+        validated.push({
             ...candidate,
-            url: redactProxyUrl(candidate.url)
-        }))
+            url: redactProxyUrl(candidate.url),
+            usable
+        })
+        if (usable) break
     }
+    return { candidates: validated }
 }
 
 async function chooseFolder() {
@@ -341,7 +357,9 @@ async function startEngine(preferredPort: number) {
             proxyEnabled: Boolean(config?.proxyUrl),
             proxyUrl: config?.proxyUrl,
             openBrowser: config?.openBrowser ?? true,
-            logsDirectory: paths.logs
+            logsDirectory: paths.logs,
+            lastSync: database?.lastCompletedSync() ?? null,
+            lastExportAt: lastBrowserLiteExportAt
         }),
         save: async (input) => {
             const wasConfigured = Boolean(config && credentials)
@@ -398,15 +416,48 @@ async function startEngine(preferredPort: number) {
         chooseFolder,
         exportBrowserLitePackage: async () => {
             if (!database) throw new Error('Library is not ready')
-            const content = serializeBrowserLiteDataPackage(database)
+            const lastSync = database.lastCompletedSync()
+            const content = serializeBrowserLiteDataPackage(database, {
+                sourceSyncedAt: lastSync?.finishedAt
+            })
             const file = await chooseBrowserLitePackagePath()
             if (!file) return { success: false, cancelled: true }
             fs.writeFileSync(file, content, 'utf8')
             lastBrowserLiteExportDirectory = path.dirname(file)
+            lastBrowserLiteExportAt = new Date().toISOString()
             return {
                 success: true,
-                fileName: 'pica-library-bundle.json'
+                fileName: 'pica-library-bundle.json',
+                generatedAt: lastBrowserLiteExportAt,
+                sourceSyncedAt: lastSync?.finishedAt ?? null
             }
+        },
+        syncAndExportBrowserLitePackage: async () => {
+            if (!database || !service) throw new Error('Library is not ready')
+            await service.syncFavorites()
+            const recommendation = await service.recommendations({ limit: 60 })
+            const lastSync = database.lastCompletedSync()
+            const generatedAt = new Date().toISOString()
+            const content = serializeBrowserLiteDataPackage(database, {
+                generatedAt,
+                sourceSyncedAt: lastSync?.finishedAt,
+                profile: recommendation.profile,
+                recommendations: recommendation.recommendations
+            })
+            const file = await chooseBrowserLitePackagePath()
+            if (!file) return { success: false, cancelled: true }
+            fs.writeFileSync(file, content, 'utf8')
+            lastBrowserLiteExportDirectory = path.dirname(file)
+            lastBrowserLiteExportAt = generatedAt
+            return {
+                success: true,
+                fileName: 'pica-library-bundle.json',
+                generatedAt,
+                sourceSyncedAt: lastSync?.finishedAt ?? null
+            }
+        },
+        openBrowserLite: async () => {
+            browser(`${currentUrl}/?mode=browser-lite`)
         },
         openDirectory,
         shutdown: () => {

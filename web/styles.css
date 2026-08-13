@@ -366,6 +366,35 @@ th {
     color: var(--muted);
     font-size: 13px;
 }
+.results.list-mode {
+    display: block;
+}
+.results.list-mode .result {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    margin-bottom: 6px;
+}
+.results.list-mode .cover-shell {
+    width: 72px;
+}
+.results.list-mode .result-body {
+    min-width: 0;
+}
+.browser-lite-forced .app-header,
+.browser-lite-forced nav,
+.browser-lite-forced #home > .page-heading,
+.browser-lite-forced #home > .quick-start,
+.browser-lite-forced #home > .metrics,
+.browser-lite-forced #home > .notice {
+    display: none;
+}
+.browser-lite-forced main {
+    padding-top: 16px;
+}
+.browser-lite-forced #browser-lite-onboarding {
+    max-width: 760px;
+    margin: 0 auto;
+}
 .profile {
     display: flex;
     gap: 6px;

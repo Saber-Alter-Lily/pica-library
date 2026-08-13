@@ -27,7 +27,7 @@ const state = {
     mode: 'lite',
     visible: [],
     libraryPage: 1,
-    libraryView: 'grid',
+    libraryView: localStorage.getItem('pica-library-view') || 'grid',
     recommendationView:
         localStorage.getItem('pica-recommendation-view') || 'grid',
     coversEnabled: localStorage.getItem('pica-covers-enabled') !== 'false',
@@ -137,6 +137,7 @@ async function loadDesktop() {
         $('#settings-profile').value = desktop.profile || 'balanced'
         $('#settings-proxy').value = desktop.proxyUrl || ''
         $('#setup-directory').value = desktop.libraryDirectory || ''
+        renderTimestamps()
         if (!desktop.configured) {
             document.body.classList.add('onboarding')
             document.querySelector('nav').hidden = true
@@ -145,6 +146,20 @@ async function loadDesktop() {
     } catch {
         desktop = null
     }
+}
+
+function displayDate(value) {
+    if (!value) return '尚无记录'
+    const date = new Date(value)
+    return Number.isNaN(date.valueOf()) ? '尚无记录' : date.toLocaleString()
+}
+
+function renderTimestamps() {
+    const syncedAt = desktop?.lastSync?.finishedAt ?? state.sourceSyncedAt
+    const exportedAt = desktop?.lastExportAt ?? state.generatedAt
+    $('#last-sync').textContent = `上次同步：${displayDate(syncedAt)}`
+    $('#browser-lite-timestamps').textContent =
+        `最近同步：${displayDate(syncedAt)} / 最近导出：${displayDate(exportedAt)}`
 }
 
 async function waitForDesktopHealth(timeoutMs = 30000) {
@@ -171,6 +186,7 @@ async function testDesktop(prefix) {
     try {
         await desktopPost('/api/v1/desktop/test-connection', setupValue(prefix))
         message.textContent = t('message.connectionSuccess')
+        if (prefix === 'setup') $('#setup-next-step').hidden = false
     } catch (error) {
         message.textContent = localizeError(language, error)
     }
@@ -187,7 +203,9 @@ $('#setup-form').onsubmit = async (event) => {
         await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
         message.textContent = t('message.savedOpening')
         await waitForDesktopHealth()
-        location.assign('/')
+        await loadDesktop()
+        $('#setup-next-step').hidden = false
+        message.textContent = '设置已应用。下一步请同步收藏。'
     } catch (error) {
         message.textContent = localizeError(language, error)
     }
@@ -223,6 +241,8 @@ $('#export-browser-lite').onclick = async () => {
         }
         message.textContent = t('message.browserLiteExported')
         $('#open-browser-lite-export').hidden = false
+        desktop.lastExportAt = result.generatedAt
+        renderTimestamps()
     } catch (error) {
         message.textContent = String(error?.message || error).includes(
             'There is no library data to export yet'
@@ -231,22 +251,64 @@ $('#export-browser-lite').onclick = async () => {
             : t('message.browserLiteExportFailed')
     }
 }
+$('#sync-export-browser-lite').onclick = async () => {
+    const message = $('#browser-lite-export-message')
+    message.textContent = '正在同步收藏并生成 Browser Lite 数据包…'
+    try {
+        const result = await desktopPost(
+            '/api/v1/desktop/sync-export-browser-lite'
+        )
+        if (result.cancelled) {
+            message.textContent = '已取消导出。'
+            return
+        }
+        message.textContent = '收藏同步完成，Browser Lite 数据包已导出。'
+        $('#open-browser-lite-export').hidden = false
+        desktop.lastSync = { finishedAt: result.sourceSyncedAt }
+        desktop.lastExportAt = result.generatedAt
+        renderTimestamps()
+    } catch (error) {
+        message.textContent = localizeError(language, error)
+    }
+}
 $('#open-browser-lite-export').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', {
         kind: 'browser-lite-export'
     })
 $('#open-browser-lite').onclick = () =>
-    window.open(`${location.origin}/?mode=browser-lite`, '_blank', 'noopener')
+    desktopPost('/api/v1/desktop/open-browser-lite')
 $('#detect-proxy').onclick = async () => {
     try {
-        const result = await desktopPost('/api/v1/desktop/detect-proxy')
+        const result = await desktopPost(
+            '/api/v1/desktop/detect-proxy',
+            setupValue('setup')
+        )
         $('#setup-message').textContent = result.candidates?.length
             ? `Detected ${result.candidates.map((item) => item.url).join(', ')}`
             : 'No local proxy detected.'
-        if (result.candidates?.[0])
+        if (result.candidates?.[0] && !result.candidates[0].url.includes('***'))
             $('#setup-proxy').value = result.candidates[0].url
     } catch (error) {
         $('#setup-message').textContent = localizeError(language, error)
+    }
+}
+$('#settings-detect-proxy').onclick = async () => {
+    const message = $('#settings-message')
+    try {
+        const value = setupValue('settings')
+        if (!value.account) delete value.account
+        if (!value.password) delete value.password
+        const result = await desktopPost('/api/v1/desktop/detect-proxy', value)
+        const usable = result.candidates?.find((item) => item.usable)
+        message.textContent = usable
+            ? `已检测到可用代理：${usable.url}`
+            : result.candidates?.length
+              ? '检测到本地代理服务，但尚未找到可用于连接 Pica 的代理。'
+              : '未检测到可用的本地代理。'
+        if (usable && !usable.url.includes('***'))
+            $('#settings-proxy').value = usable.url
+    } catch (error) {
+        message.textContent = localizeError(language, error)
     }
 }
 $('#exit-app').onclick = async () => {
@@ -499,6 +561,19 @@ function renderPreparedRecommendations() {
     $('#recommend-message').textContent = t('message.recommendationCount', {
         count: state.recommendations.length
     })
+    $('#recommend-results').classList.toggle(
+        'list-mode',
+        state.recommendationView === 'list'
+    )
+    $('#recommend-grid').setAttribute(
+        'aria-pressed',
+        String(state.recommendationView === 'grid')
+    )
+    $('#recommend-list').setAttribute(
+        'aria-pressed',
+        String(state.recommendationView === 'list')
+    )
+    $('#recommend-next-batch').hidden = state.recommendations.length <= 12
 }
 
 function downloadJson(name, value) {
@@ -572,6 +647,10 @@ function renderAll(summary) {
     renderComics()
     renderAuthors()
     renderPreparedRecommendations()
+    setLibraryView(state.libraryView)
+    $('#cover-toggle').checked = state.coversEnabled
+    $('#recommend-cover-toggle').checked = state.coversEnabled
+    renderTimestamps()
 }
 
 $$('nav [data-view], [data-go]').forEach((button) =>
@@ -632,6 +711,18 @@ $('#recommend-next-batch').onclick = () => {
             : state.recommendationBatch + 1
     renderPreparedRecommendations()
 }
+function setRecommendationView(view) {
+    state.recommendationView = view
+    localStorage.setItem('pica-recommendation-view', view)
+    renderPreparedRecommendations()
+}
+$('#recommend-grid').onclick = () => setRecommendationView('grid')
+$('#recommend-list').onclick = () => setRecommendationView('list')
+$('#recommend-cover-toggle').onchange = (event) => {
+    state.coversEnabled = event.target.checked
+    localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
+    renderAll()
+}
 $('#pending-only').onchange = renderAuthors
 async function importSelectedFile() {
     const file = $('#import-file').files[0]
@@ -664,16 +755,28 @@ async function importSelectedFile() {
 $('#import-button').onclick = importSelectedFile
 $('#import-file').onchange = importSelectedFile
 $('#onboarding-import').onclick = () => $('#import-file').click()
-$('#sync-button').onclick = async () => {
+async function syncFavorites(message = $('#import-result')) {
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.syncNeedsEngine'))
-        await post('/api/v1/sync', {})
+        message.textContent = '正在同步收藏…'
+        const result = await post('/api/v1/sync', {})
+        desktop.lastSync = result.lastSync
+        message.textContent = `收藏同步完成，已同步 ${result.imported} 部漫画。`
         await detect()
     } catch (error) {
-        $('#import-result').textContent = localizeError(language, error)
+        message.textContent = localizeError(language, error)
     }
 }
+$('#sync-button').onclick = () => syncFavorites()
+$('#home-sync').onclick = () => syncFavorites($('#import-result'))
+$('#setup-sync').onclick = async () => {
+    await syncFavorites($('#setup-message'))
+    document.body.classList.remove('onboarding')
+    document.querySelector('nav').hidden = false
+    activateView('library')
+}
+$('#setup-sync-later').onclick = () => location.assign('/')
 $('#clear-lite-state').onclick = async () => {
     if (state.mode !== 'lite') return
     await clearLiteState()
@@ -825,6 +928,7 @@ $('#author-list').onclick = async (event) => {
 
 async function detect() {
     if (new URLSearchParams(location.search).get('mode') === 'browser-lite') {
+        document.body.classList.add('browser-lite-forced')
         state.mode = 'lite'
         $('#mode').textContent = t('mode.lite')
         replaceLiteState(await loadLiteState())

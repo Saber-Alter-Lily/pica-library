@@ -19,9 +19,13 @@ export interface DesktopServerController {
     testConnection: (
         input: Record<string, unknown>
     ) => Promise<Record<string, unknown>>
-    detectProxy?: () => Promise<Record<string, unknown>>
+    detectProxy?: (
+        input: Record<string, unknown>
+    ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
+    syncAndExportBrowserLitePackage?: () => Promise<Record<string, unknown>>
+    openBrowserLite?: () => Promise<void>
     openDirectory: (kind: string) => Promise<void>
     shutdown: () => void
 }
@@ -209,7 +213,11 @@ export async function startLibraryServer(options: {
             ) {
                 if (!options.desktop?.detectProxy)
                     throw new Error('Proxy detection is unavailable')
-                return json(response, 200, await options.desktop.detectProxy())
+                return json(
+                    response,
+                    200,
+                    await options.desktop.detectProxy(await body(request))
+                )
             }
             if (
                 url.pathname === '/api/v1/desktop/choose-folder' &&
@@ -230,6 +238,27 @@ export async function startLibraryServer(options: {
                     200,
                     await options.desktop.exportBrowserLitePackage()
                 )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/sync-export-browser-lite' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.syncAndExportBrowserLitePackage)
+                    throw new Error('Sync and export is unavailable')
+                return json(
+                    response,
+                    200,
+                    await options.desktop.syncAndExportBrowserLitePackage()
+                )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/open-browser-lite' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.openBrowserLite)
+                    throw new Error('Browser Lite is unavailable')
+                await options.desktop.openBrowserLite()
+                return json(response, 200, { success: true })
             }
             if (
                 url.pathname === '/api/v1/desktop/open-directory' &&
@@ -371,11 +400,11 @@ export async function startLibraryServer(options: {
                 )
             }
             if (url.pathname === '/api/v1/sync' && request.method === 'POST') {
-                return json(
-                    response,
-                    200,
-                    await options.service.syncFavorites()
-                )
+                const result = await options.service.syncFavorites()
+                return json(response, 200, {
+                    ...result,
+                    lastSync: options.database.lastCompletedSync()
+                })
             }
             if (
                 url.pathname === '/api/v1/search' &&

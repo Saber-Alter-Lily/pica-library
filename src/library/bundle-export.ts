@@ -1,11 +1,12 @@
 import { PRODUCT_VERSION } from '../version'
 import { serializeLibraryBundle } from '../types/bundle'
 import type { LibraryDatabase } from './database'
-import type { StoredComic } from './types'
+import type { RecommendationProfile, StoredComic } from './types'
 
 export interface BrowserLiteBundleOptions {
     generatedAt?: string
-    profile?: Record<string, unknown> | null
+    sourceSyncedAt?: string
+    profile?: RecommendationProfile | Record<string, unknown> | null
     recommendations?: unknown[]
     source?: string
     comics?: StoredComic[]
@@ -30,6 +31,9 @@ export function serializeBrowserLiteDataPackage(
         schemaVersion: 1,
         kind: 'pica-library-bundle',
         generatedAt: options.generatedAt ?? new Date().toISOString(),
+        ...(options.sourceSyncedAt
+            ? { sourceSyncedAt: options.sourceSyncedAt }
+            : {}),
         library: { comics },
         authors: database.listAuthors(),
         profile: options.profile ?? null,

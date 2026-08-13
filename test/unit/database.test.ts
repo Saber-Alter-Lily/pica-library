@@ -48,7 +48,11 @@ describe('library database', () => {
             }
         ]
 
-        const result = database.importFavorites(records)
+        const result = database.importFavorites(records, 'pica:favorites')
+        expect(database.lastCompletedSync()).toMatchObject({
+            itemCount: 2,
+            finishedAt: expect.any(String)
+        })
         expect(result).toMatchObject({
             imported: 2,
             inserted: 2,

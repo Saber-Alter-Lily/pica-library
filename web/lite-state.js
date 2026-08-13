@@ -77,7 +77,9 @@ export function emptyLiteState() {
         authors: [],
         profile: null,
         recommendations: [],
-        queue: []
+        queue: [],
+        generatedAt: null,
+        sourceSyncedAt: null
     }
 }
 
@@ -111,7 +113,13 @@ export function importLibraryBundle(value) {
         recommendations: sanitizeRecommendations(
             requireArray(value.recommendations, 'Bundle recommendations')
         ),
-        queue: structuredClone(requireArray(value.queue, 'Bundle queue'))
+        queue: structuredClone(requireArray(value.queue, 'Bundle queue')),
+        generatedAt:
+            typeof value.generatedAt === 'string' ? value.generatedAt : null,
+        sourceSyncedAt:
+            typeof value.sourceSyncedAt === 'string'
+                ? value.sourceSyncedAt
+                : null
     }
 }
 
@@ -133,7 +141,13 @@ export function restoreLiteState(value) {
         recommendations: Array.isArray(value.recommendations)
             ? sanitizeRecommendations(value.recommendations)
             : [],
-        queue: Array.isArray(value.queue) ? structuredClone(value.queue) : []
+        queue: Array.isArray(value.queue) ? structuredClone(value.queue) : [],
+        generatedAt:
+            typeof value.generatedAt === 'string' ? value.generatedAt : null,
+        sourceSyncedAt:
+            typeof value.sourceSyncedAt === 'string'
+                ? value.sourceSyncedAt
+                : null
     }
 }
 

@@ -1,4 +1,5 @@
 import type { AuthorGroup, StoredComic } from '../library/types'
+import type { RecommendationProfile } from '../library/types'
 import type { DownloadJob } from '../core/downloads/types'
 
 export const bundleSchemaVersion = 1
@@ -7,11 +8,12 @@ export interface LibraryBundle {
     schemaVersion: 1
     kind: 'pica-library-bundle'
     generatedAt: string
+    sourceSyncedAt?: string
     library: {
         comics: StoredComic[]
     }
     authors: AuthorGroup[]
-    profile: Record<string, unknown> | null
+    profile: RecommendationProfile | Record<string, unknown> | null
     recommendations: unknown[]
     queue: DownloadJob[]
     provenance: {
@@ -22,8 +24,10 @@ export interface LibraryBundle {
 }
 
 const sensitiveKey =
-    /(account|password|passwd|token|cookie|secret|api[_-]?key)/i
+    /(account|password|passwd|token|authorization|cookie|secret|api[_-]?key)/i
 const absoluteWindowsPath = /^[a-z]:[\\/]/i
+const sensitiveValue =
+    /\b(?:Bearer\s+[A-Za-z0-9._~+/-]+|PICA_(?:ACCOUNT|PASSWORD)\s*=)/i
 
 function auditPortable(value: unknown, location = '$'): void {
     if (Array.isArray(value)) {
@@ -33,11 +37,16 @@ function auditPortable(value: unknown, location = '$'): void {
         return
     }
     if (!value || typeof value !== 'object') {
-        if (
-            typeof value === 'string' &&
-            (absoluteWindowsPath.test(value) || value.startsWith('/'))
-        )
-            throw new Error(`Bundle contains an absolute path at ${location}`)
+        if (typeof value === 'string') {
+            if (absoluteWindowsPath.test(value) || value.startsWith('/'))
+                throw new Error(
+                    `Bundle contains an absolute path at ${location}`
+                )
+            if (sensitiveValue.test(value))
+                throw new Error(
+                    `Bundle contains a sensitive value at ${location}`
+                )
+        }
         return
     }
     for (const [key, item] of Object.entries(value)) {

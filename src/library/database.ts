@@ -311,6 +311,22 @@ export class LibraryDatabase {
         }
     }
 
+    lastCompletedSync() {
+        const row = this.db
+            .prepare(
+                `SELECT finished_at, item_count FROM sync_runs
+                 WHERE status = 'completed' AND source LIKE 'pica:favorites%'
+                 ORDER BY finished_at DESC LIMIT 1`
+            )
+            .get() as SqlRow | undefined
+        return row
+            ? {
+                  finishedAt: String(row.finished_at),
+                  itemCount: numberValue(row.item_count)
+              }
+            : null
+    }
+
     listComics(query: ComicQuery = {}): StoredComic[] {
         const rows = this.db
             .prepare(

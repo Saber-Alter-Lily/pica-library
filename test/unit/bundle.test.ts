@@ -29,9 +29,27 @@ describe('library bundle', () => {
         expect(validateLibraryBundle(JSON.parse(encoded))).toEqual(bundle())
     })
 
+    it('preserves optional snapshot timestamps for Browser Lite', () => {
+        const value = {
+            ...bundle(),
+            sourceSyncedAt: '2026-08-13T01:02:03.000Z'
+        }
+        expect(
+            validateLibraryBundle(JSON.parse(serializeLibraryBundle(value)))
+        ).toMatchObject({
+            sourceSyncedAt: value.sourceSyncedAt
+        })
+    })
+
     it('rejects secrets and absolute paths at any depth', () => {
         expect(() =>
             validateLibraryBundle({ ...bundle(), token: 'value' })
+        ).toThrow('sensitive field')
+        expect(() =>
+            validateLibraryBundle({
+                ...bundle(),
+                profile: { nested: { Authorization: 'Bearer secret' } }
+            })
         ).toThrow('sensitive field')
         expect(() =>
             validateLibraryBundle({

@@ -54,7 +54,7 @@ try {
     if ($status.application -ne 'Pica Library' -or $status.version -ne '0.1.2' -or $status.configured) { throw 'Unexpected packaged status' }
     $setup = Invoke-WebRequest -UseBasicParsing -Uri ($instance.url + '/setup') -TimeoutSec 10
     if ($setup.StatusCode -ne 200 -or $setup.Content -notmatch 'Welcome to Pica Library') { throw 'Setup page is unavailable' }
-    if ($setup.Content -notmatch 'id="language-select"' -or $setup.Content -notmatch '简体中文') { throw 'Language controls are unavailable' }
+    if ($setup.Content -notmatch 'id="language-select"' -or $setup.Content -notmatch 'option value="zh-CN"') { throw 'Language controls are unavailable' }
 
     $initialCsrfToken = $status.csrfToken
     $credentialEncrypted = $null

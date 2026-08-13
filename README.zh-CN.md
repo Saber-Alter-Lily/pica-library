@@ -2,7 +2,7 @@
 
 # Pica Library
 
-> 当前稳定版本仍为 `v0.1.2`；`v0.1.3` Browser Lite 引导更新正在审核中。
+> 当前稳定版本为 `v0.1.3`，已补全 Browser Lite 数据包导出与首次使用引导。
 
 ## Browser Lite
 
@@ -19,10 +19,10 @@ Browser Lite 可直接在浏览器中查看已导出的漫画库数据，无需�
 
 ## Windows 一键使用
 
-当前稳定版本为 `v0.1.2`，包含完整简体中文界面和双语首次启动向导。
+当前稳定版本为 `v0.1.3`，包含完整简体中文界面、双语首次启动向导和 Browser Lite 数据包导出流程。
 
 1. 打开 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases)。
-2. 下载 `Pica-Library-v0.1.2-windows-x64.zip`。
+2. 下载 `Pica-Library-v0.1.3-windows-x64.zip`。
 3. 完整解压 ZIP，不要直接在压缩软件中运行。
 4. 双击 `Pica Library.exe`。
 5. 按首次启动向导完成设置。

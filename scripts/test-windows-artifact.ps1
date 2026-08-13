@@ -35,7 +35,11 @@ $env:LOCALAPPDATA = $local
 try {
     if ($PortCollision) {
         $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,4789)
-        $listener.Start()
+        try { $listener.Start() }
+        catch [Net.Sockets.SocketException] {
+            if ($_.Exception.SocketErrorCode -ne [Net.Sockets.SocketError]::AddressAlreadyInUse) { throw }
+            $listener = $null
+        }
     }
     $watch = [Diagnostics.Stopwatch]::StartNew()
     Start-Process -FilePath $launcher -ArgumentList '--no-open' -WorkingDirectory $rootPath -WindowStyle Hidden

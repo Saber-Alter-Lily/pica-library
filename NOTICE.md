@@ -7,5 +7,6 @@ Pica and PicACG names and services belong to their respective owners. This
 repository is an unofficial interoperability tool and is not affiliated with
 the service provider.
 
-This repository is a private review candidate. No release, package publication,
-GitHub Pages deployment, or public announcement has been performed.
+Redistributed third-party components retain their respective copyrights and
+licenses. Windows package license details are provided in its `licenses`
+directory.

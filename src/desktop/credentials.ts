@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { StoredCredentials } from './types'
+import { sanitizedChildEnv } from './child-process'
 
 export interface CredentialStore {
     load(): StoredCredentials | null
@@ -46,6 +47,7 @@ function powershell(script: string, stdin: string) {
             input: stdin,
             encoding: 'utf8',
             windowsHide: true,
+            env: sanitizedChildEnv(),
             maxBuffer: 1024 * 1024
         }
     )

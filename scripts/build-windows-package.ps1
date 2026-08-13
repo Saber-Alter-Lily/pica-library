@@ -21,7 +21,7 @@ if ($version -ne '0.1.1') { throw 'Windows package must report version 0.1.1' }
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve source commit SHA' }
 if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
 if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }
-New-Item -ItemType Directory -Force -Path (Join-Path $stage 'app'),(Join-Path $stage 'runtime'),(Split-Path $runtimeCache -Parent) | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $stage 'app'),(Join-Path $stage 'runtime'),(Join-Path $stage 'licenses'),(Split-Path $runtimeCache -Parent) | Out-Null
 
 Push-Location $root
 try { pnpm build } finally { Pop-Location }
@@ -39,11 +39,19 @@ $runtimeExtract = Join-Path $buildRoot 'runtime-extract'
 if (Test-Path -LiteralPath $runtimeExtract) { Remove-Item -Recurse -Force -LiteralPath $runtimeExtract }
 Expand-Archive -LiteralPath $runtimeCache -DestinationPath $runtimeExtract
 Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\node.exe") -Destination (Join-Path $stage 'runtime\node.exe')
+Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\LICENSE") -Destination (Join-Path $stage 'licenses\Node.js-LICENSE.txt')
 
-Copy-Item -Path (Join-Path $root 'dist\*') -Destination (Join-Path $stage 'app') -Recurse
+Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $stage 'app')
+Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $stage 'licenses\THIRD_PARTY_LICENSES.txt')
 Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
 foreach ($notice in @('NOTICE.md','UPSTREAM.md')) { Copy-Item -LiteralPath (Join-Path $root $notice) -Destination $stage }
+foreach ($requiredLicense in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICENSES.txt')) {
+    $licensePath = Join-Path $stage $requiredLicense
+    if (-not (Test-Path -LiteralPath $licensePath) -or (Get-Item -LiteralPath $licensePath).Length -eq 0) {
+        throw "Required redistributed license material is missing: $requiredLicense"
+    }
+}
 
 $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework compiler is unavailable' }

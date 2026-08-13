@@ -101,6 +101,9 @@ function sortCode(pica: Pica, sort: SortMode | undefined) {
 
 export class LibraryService {
     private pica: Pica | null = null
+    private acceptingLocalDownloads = true
+    private readonly activeLocalRuns = new Set<Promise<void>>()
+    private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
 
     constructor(
         readonly database: LibraryDatabase,
@@ -390,6 +393,11 @@ export class LibraryService {
     }
 
     enqueueDownload(input: CreateDownloadJob): DownloadJob {
+        if (
+            (input.runner ?? 'LOCAL') === 'LOCAL' &&
+            !this.acceptingLocalDownloads
+        )
+            throw new Error('The local download engine is shutting down')
         const job = this.database.createDownloadJob(input)
         return this.database.transitionDownloadJob(job.id, 'QUEUED')
     }
@@ -403,6 +411,8 @@ export class LibraryService {
         } = {}
     ) {
         const runner = options.runner ?? 'LOCAL'
+        if (runner === 'LOCAL' && !this.acceptingLocalDownloads)
+            throw new Error('The local download engine is shutting down')
         const settings = resolvePerformanceSettings(
             options.profile ?? 'balanced',
             options.custom
@@ -452,8 +462,64 @@ export class LibraryService {
                 retryBaseMs: settings.retryBaseMs
             }
         )
-        await scheduler.drain()
+        const draining = scheduler.drain()
+        if (runner === 'LOCAL') {
+            this.activeLocalRuns.add(draining)
+            this.activeLocalSchedulers.add(scheduler)
+        }
+        try {
+            await draining
+        } finally {
+            if (runner === 'LOCAL') {
+                this.activeLocalRuns.delete(draining)
+                this.activeLocalSchedulers.delete(scheduler)
+            }
+        }
         return this.database.listDownloadJobs()
+    }
+
+    hasActiveLocalDownloads() {
+        const active = new Set(['QUEUED', 'PREPARING', 'RUNNING', 'RETRY_WAIT'])
+        return this.database
+            .listDownloadJobs()
+            .some((job) => job.runner === 'LOCAL' && active.has(job.status))
+    }
+
+    async quiesceLocalDownloads(timeoutMs = 30_000) {
+        this.acceptingLocalDownloads = false
+        for (const scheduler of this.activeLocalSchedulers) scheduler.stop()
+        const pausable = new Set([
+            'QUEUED',
+            'PREPARING',
+            'RUNNING',
+            'RETRY_WAIT'
+        ])
+        for (const job of this.database.listDownloadJobs()) {
+            if (job.runner === 'LOCAL' && pausable.has(job.status))
+                this.database.transitionDownloadJob(job.id, 'PAUSED')
+        }
+        const settled = Promise.allSettled([...this.activeLocalRuns]).then(
+            () => undefined
+        )
+        let timeout: NodeJS.Timeout | undefined
+        try {
+            await Promise.race([
+                settled,
+                new Promise<never>((_, reject) => {
+                    timeout = setTimeout(
+                        () =>
+                            reject(
+                                new Error(
+                                    'Timed out waiting for active downloads to pause'
+                                )
+                            ),
+                        timeoutMs
+                    )
+                })
+            ])
+        } finally {
+            if (timeout) clearTimeout(timeout)
+        }
     }
 
     private async downloadComicNow(

@@ -20,6 +20,10 @@ export interface SchedulerOptions {
 
 export class DownloadScheduler {
     private stopped = false
+    private stopWaiter: (() => void) | null = null
+    private stopSignal = new Promise<void>((resolve) => {
+        this.stopWaiter = resolve
+    })
     private readonly jobConcurrency: number
     private readonly maxRetries: number
     private readonly retryBaseMs: number
@@ -38,10 +42,14 @@ export class DownloadScheduler {
 
     stop() {
         this.stopped = true
+        this.stopWaiter?.()
     }
 
     async drain(): Promise<void> {
         this.stopped = false
+        this.stopSignal = new Promise<void>((resolve) => {
+            this.stopWaiter = resolve
+        })
         while (!this.stopped) {
             const jobs = this.store.nextDownloadJobs(this.jobConcurrency)
             if (jobs.length === 0) return
@@ -76,9 +84,13 @@ export class DownloadScheduler {
                     retryCount
                 })
                 if (this.retryBaseMs)
-                    await this.retryDelay(
-                        this.retryBaseMs * 2 ** (retryCount - 1)
-                    )
+                    await Promise.race([
+                        this.retryDelay(
+                            this.retryBaseMs * 2 ** (retryCount - 1)
+                        ),
+                        this.stopSignal
+                    ])
+                if (this.stopped) return
                 current = this.store.getDownloadJob(job.id)
                 if (
                     current.status === 'CANCELLED' ||

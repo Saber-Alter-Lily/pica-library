@@ -23,6 +23,14 @@ import { InstanceLock } from './instance'
 import { DesktopLog } from './logging'
 import { desktopPaths } from './paths'
 import type { DesktopConfig, SetupInput, StoredCredentials } from './types'
+import {
+    launchBrowser,
+    sanitizedChildEnv,
+    showBrowserFallback,
+    windowsExecutable
+} from './child-process'
+import { connectionCredentials } from './connection'
+import { assertLibraryChangeAllowed } from './lifecycle'
 
 const args = new Set(process.argv.slice(2))
 const paths = desktopPaths()
@@ -41,12 +49,9 @@ let config = loadConfig(paths.config)
 let credentials: StoredCredentials | null = null
 let server: Server | null = null
 let database: LibraryDatabase | null = null
+let service: LibraryService | null = null
 let stopping = false
 let currentUrl = ''
-
-function windowsExecutable(...parts: string[]) {
-    return path.join(process.env.SystemRoot ?? 'C:\\Windows', ...parts)
-}
 
 function showStartupError() {
     if (process.platform !== 'win32') return
@@ -69,30 +74,18 @@ function showStartupError() {
         {
             input: `Pica Library could not start.\n\nSee the diagnostic log and try again:\n${log.file}`,
             encoding: 'utf8',
-            windowsHide: true
+            windowsHide: true,
+            env: sanitizedChildEnv()
         }
     )
 }
 
 function browser(url: string) {
     if (args.has('--no-open')) return true
-    try {
-        const child = spawn(
-            windowsExecutable('System32', 'cmd.exe'),
-            ['/d', '/s', '/c', 'start', '', url],
-            {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true
-            }
-        )
-        child.unref()
-        return true
-    } catch (error) {
+    return launchBrowser(url, (error) => {
         log.write(`Browser opening failed: ${String(error)}`)
-        console.error(`Pica Library is running at ${url}`)
-        return false
-    }
+        showBrowserFallback(url)
+    })
 }
 
 async function identifiedHealth(url: string) {
@@ -108,6 +101,7 @@ async function identifiedHealth(url: string) {
 }
 
 async function closeEngine() {
+    await service?.quiesceLocalDownloads()
     if (server) {
         const closing = server
         closing.closeIdleConnections()
@@ -128,6 +122,7 @@ async function closeEngine() {
     server = null
     database?.close()
     database = null
+    service = null
 }
 
 async function stop(exitCode = 0) {
@@ -165,8 +160,7 @@ function friendlyConnectionError(error: unknown) {
 }
 
 async function testConnection(input: Record<string, unknown>) {
-    const account = String(input.account ?? credentials?.account ?? '').trim()
-    const password = String(input.password ?? credentials?.password ?? '')
+    const { account, password } = connectionCredentials(input, credentials)
     if (!account || !password)
         throw new Error('Enter account and password first')
     const previous = process.env.PICA_PROXY
@@ -208,7 +202,7 @@ async function chooseFolder() {
                 '-Command',
                 script
             ],
-            { windowsHide: true }
+            { windowsHide: true, env: sanitizedChildEnv() }
         )
         let output = ''
         child.stdout.on('data', (chunk) => {
@@ -234,7 +228,8 @@ function openDirectory(kind: string) {
     const child = spawn(windowsExecutable('explorer.exe'), [directory], {
         detached: true,
         stdio: 'ignore',
-        windowsHide: true
+        windowsHide: true,
+        env: sanitizedChildEnv()
     })
     child.unref()
     return Promise.resolve()
@@ -244,7 +239,7 @@ async function startEngine(preferredPort: number) {
     const dataDir = config?.libraryDirectory ?? paths.data
     fs.mkdirSync(dataDir, { recursive: true })
     database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-    const service = new LibraryService(database, dataDir)
+    service = new LibraryService(database, dataDir)
     const csrfToken = randomBytes(32).toString('base64url')
     const desktop: DesktopServerController = {
         csrfToken,
@@ -279,6 +274,14 @@ async function startEngine(preferredPort: number) {
                         : String(input.proxyUrl)
             }
             const built = buildConfig(setup)
+            const dataChanged =
+                config?.libraryDirectory !== built.config.libraryDirectory
+            if (service)
+                assertLibraryChangeAllowed(
+                    service,
+                    config?.libraryDirectory,
+                    built.config.libraryDirectory
+                )
             if (
                 built.config.proxyUrl === config?.proxyUrl &&
                 !built.credentials.proxyUsername &&
@@ -291,8 +294,6 @@ async function startEngine(preferredPort: number) {
             }
             credentialsStore.save(built.credentials)
             saveConfig(paths.config, built.config)
-            const dataChanged =
-                config?.libraryDirectory !== built.config.libraryDirectory
             config = built.config
             credentials = built.credentials
             applyCredentials(credentials, config)
@@ -322,10 +323,10 @@ async function startEngine(preferredPort: number) {
         if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
         database.close()
         database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-        const fallbackService = new LibraryService(database, dataDir)
+        service = new LibraryService(database, dataDir)
         const started = await startLibraryServer({
             database,
-            service: fallbackService,
+            service,
             host: '127.0.0.1',
             port: 0,
             desktop

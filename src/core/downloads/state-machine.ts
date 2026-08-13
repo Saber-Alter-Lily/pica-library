@@ -6,7 +6,7 @@ const transitions: Record<DownloadStatus, readonly DownloadStatus[]> = {
     PREPARING: ['RUNNING', 'PAUSED', 'RETRY_WAIT', 'FAILED', 'CANCELLED'],
     RUNNING: ['PAUSED', 'RETRY_WAIT', 'COMPLETED', 'FAILED', 'CANCELLED'],
     PAUSED: ['QUEUED', 'CANCELLED'],
-    RETRY_WAIT: ['QUEUED', 'FAILED', 'CANCELLED'],
+    RETRY_WAIT: ['QUEUED', 'PAUSED', 'FAILED', 'CANCELLED'],
     COMPLETED: [],
     FAILED: ['QUEUED', 'CANCELLED'],
     CANCELLED: []

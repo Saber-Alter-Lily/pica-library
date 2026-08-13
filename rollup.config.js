@@ -4,22 +4,20 @@ import { nodeResolve } from '@rollup/plugin-node-resolve'
 import commonjs from '@rollup/plugin-commonjs'
 import esbuild from 'rollup-plugin-esbuild'
 import { builtinModules } from 'node:module'
-import { readFileSync } from 'node:fs'
-
-const pkg = JSON.parse(
-    readFileSync(new URL('./package.json', import.meta.url), 'utf8')
-)
 
 export default defineConfig({
     input: {
-        'pica-library': 'src/library-cli.ts'
+        'pica-library': 'src/library-cli.ts',
+        desktop: 'src/desktop/main.ts'
     },
     output: {
         dir: 'dist',
         entryFileNames: '[name].js',
         format: 'es'
     },
-    external: [...Object.keys(pkg.dependencies), ...builtinModules, /node:/],
+    // Windows distribution carries no node_modules. Bundle all JavaScript
+    // dependencies and leave only the official Node runtime built-ins external.
+    external: [...builtinModules, /node:/],
     plugins: [
         json(),
         esbuild({

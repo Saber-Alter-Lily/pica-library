@@ -12,7 +12,24 @@ It keeps stable library state instead of treating every download as a new job:
 
 ## Try it
 
-Current stable release: `v0.1.0`. For local use:
+Current stable release: `v0.1.0`. The next candidate adds a Windows 10/11
+x64 package for ordinary users:
+
+1. Download `Pica-Library-v0.1.1-windows-x64.zip` from the release.
+2. Extract the entire ZIP.
+3. Double-click `Pica Library.exe` and complete setup in the browser.
+
+The package carries its own official Node.js runtime. It does not require a
+terminal, Node.js, npm, pnpm, Git, administrator access, or `.env.local`.
+Credentials are protected for the current Windows user with DPAPI and are never
+stored in the normal configuration file. The unsigned open-source executable
+may initially show a Windows SmartScreen reputation warning.
+
+Application data lives under `%LOCALAPPDATA%\Pica Library` by default, separate
+from the extracted application. Replacing a future application folder will not
+remove the library database, cover cache, configuration, or downloads.
+
+For source development and advanced local use:
 
 ```powershell
 pnpm install --frozen-lockfile

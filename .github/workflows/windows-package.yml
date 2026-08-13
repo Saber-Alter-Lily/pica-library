@@ -1,0 +1,46 @@
+name: windows-package
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm type:check
+      - run: pnpm test:unit
+      - run: pnpm test:integration
+      - run: pnpm build:windows
+      - name: Artifact-only clean Windows smoke
+        shell: powershell
+        run: |
+          $zip = (Get-ChildItem artifacts\Pica-Library-v0.1.1-windows-x64.zip).FullName
+          .\scripts\test-windows-artifact.ps1 -Zip $zip
+          .\scripts\test-windows-artifact.ps1 -Zip $zip -SetupPersistence
+          .\scripts\test-windows-artifact.ps1 -Zip $zip -PortCollision
+      - name: Validate candidate contents
+        shell: powershell
+        run: |
+          $zip = Get-ChildItem artifacts\Pica-Library-v0.1.1-windows-x64.zip
+          if (-not $zip) { throw 'Candidate ZIP missing' }
+          if ((Get-Content artifacts\SHA256SUMS.txt) -notmatch (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()) { throw 'Checksum mismatch' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pica-library-v0.1.1-windows-x64-candidate
+          path: |
+            artifacts/Pica-Library-v0.1.1-windows-x64.zip
+            artifacts/SHA256SUMS.txt
+          retention-days: 1

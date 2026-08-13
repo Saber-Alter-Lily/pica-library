@@ -21,6 +21,7 @@ const state = {
     libraryView: 'grid',
     ...emptyLiteState()
 }
+let desktop = null
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
 const escapeHtml = (value) =>
@@ -59,6 +60,111 @@ const post = (path, value) =>
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(value)
     })
+
+const desktopPost = (path, value = {}) =>
+    api(path, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-pica-csrf': desktop?.csrfToken || ''
+        },
+        body: JSON.stringify(value)
+    })
+
+function setupValue(prefix) {
+    return {
+        account: $(`#${prefix}-account`).value,
+        password: $(`#${prefix}-password`).value,
+        libraryDirectory: $(`#${prefix}-directory`).value,
+        profile: $(`#${prefix}-profile`).value,
+        proxyUrl: $(`#${prefix}-proxy`).value
+    }
+}
+
+function activateView(id) {
+    $$('.view').forEach((view) =>
+        view.classList.toggle('active', view.id === id)
+    )
+    $$('nav button').forEach((item) =>
+        item.classList.toggle('active', item.dataset.view === id)
+    )
+}
+
+async function chooseFolder(prefix) {
+    const value = await desktopPost('/api/v1/desktop/choose-folder')
+    if (value.path) $(`#${prefix}-directory`).value = value.path
+}
+
+async function loadDesktop() {
+    try {
+        desktop = await api('/api/v1/desktop/status')
+        $('#settings-nav').hidden = false
+        $('#settings-version').textContent = `Pica Library ${desktop.version}`
+        $('#settings-directory').value = desktop.libraryDirectory || ''
+        $('#settings-profile').value = desktop.profile || 'balanced'
+        $('#settings-proxy').value = desktop.proxyUrl || ''
+        $('#setup-directory').value = desktop.libraryDirectory || ''
+        if (!desktop.configured) {
+            document.body.classList.add('onboarding')
+            document.querySelector('nav').hidden = true
+            activateView('setup')
+        }
+    } catch {
+        desktop = null
+    }
+}
+
+async function testDesktop(prefix) {
+    const message = $(`#${prefix}-message`)
+    message.textContent = 'Testing connection...'
+    try {
+        await desktopPost('/api/v1/desktop/test-connection', setupValue(prefix))
+        message.textContent = 'Connection successful.'
+    } catch (error) {
+        message.textContent = error.message
+    }
+}
+
+$('#setup-folder').onclick = () => chooseFolder('setup')
+$('#settings-folder').onclick = () => chooseFolder('settings')
+$('#setup-test').onclick = () => testDesktop('setup')
+$('#settings-test').onclick = () => testDesktop('settings')
+$('#setup-form').onsubmit = async (event) => {
+    event.preventDefault()
+    const message = $('#setup-message')
+    try {
+        await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
+        message.textContent = 'Saved. Opening your library...'
+        setTimeout(() => location.assign('/'), 500)
+    } catch (error) {
+        message.textContent = error.message
+    }
+}
+$('#settings-form').onsubmit = async (event) => {
+    event.preventDefault()
+    const message = $('#settings-message')
+    try {
+        const value = setupValue('settings')
+        if (!value.account) delete value.account
+        if (!value.password) delete value.password
+        const result = await desktopPost('/api/v1/desktop/settings', value)
+        message.textContent = result.restarting
+            ? 'Saved. Restarting local engine...'
+            : 'Settings saved.'
+        $('#settings-password').value = ''
+    } catch (error) {
+        message.textContent = error.message
+    }
+}
+$('#open-data').onclick = () =>
+    desktopPost('/api/v1/desktop/open-directory', { kind: 'data' })
+$('#open-logs').onclick = () =>
+    desktopPost('/api/v1/desktop/open-directory', { kind: 'logs' })
+$('#exit-app').onclick = async () => {
+    await desktopPost('/api/v1/desktop/shutdown')
+    document.body.innerHTML =
+        '<main><article class="notice"><strong>Pica Library has stopped.</strong><p>You can close this tab.</p></article></main>'
+}
 
 function replaceLiteState(value) {
     Object.assign(state, value)
@@ -618,6 +724,8 @@ $('#author-list').onclick = async (event) => {
 }
 
 async function detect() {
+    await loadDesktop()
+    if (desktop && !desktop.configured) return
     replaceLiteState(await loadLiteState())
     try {
         const status = await api('/api/v1/status')

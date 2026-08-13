@@ -20,8 +20,78 @@
             <button data-view="discover">Discover</button>
             <button data-view="downloads">Downloads</button>
             <button data-view="maintenance">Maintenance</button>
+            <button data-view="settings" id="settings-nav" hidden>
+                Settings
+            </button>
         </nav>
         <main>
+            <section id="setup" class="view setup-view">
+                <div class="setup-shell">
+                    <div class="setup-heading">
+                        <span class="setup-mark">P</span>
+                        <div>
+                            <h2>Set up Pica Library</h2>
+                            <p>Your library stays on this computer.</p>
+                        </div>
+                    </div>
+                    <form id="setup-form" class="settings-form">
+                        <label
+                            >Account<input
+                                id="setup-account"
+                                autocomplete="username"
+                                required
+                        /></label>
+                        <label
+                            >Password<input
+                                id="setup-password"
+                                type="password"
+                                autocomplete="current-password"
+                                required
+                        /></label>
+                        <label class="wide"
+                            >Library and download folder<span class="folder-row"
+                                ><input id="setup-directory" required /><button
+                                    id="setup-folder"
+                                    type="button"
+                                >
+                                    Choose Folder...
+                                </button></span
+                            ></label
+                        >
+                        <label
+                            >Download profile<select id="setup-profile">
+                                <option value="conservative">
+                                    Conservative
+                                </option>
+                                <option value="balanced" selected>
+                                    Balanced
+                                </option>
+                                <option value="fast">Fast</option>
+                            </select></label
+                        >
+                        <details class="wide">
+                            <summary>Advanced</summary>
+                            <label
+                                >HTTP/HTTPS proxy (optional)<input
+                                    id="setup-proxy"
+                                    placeholder="http://127.0.0.1:7890"
+                            /></label>
+                        </details>
+                        <p
+                            id="setup-message"
+                            class="status wide"
+                            role="status"
+                        ></p>
+                        <div class="actions wide">
+                            <button id="setup-test" type="button">
+                                Test Connection</button
+                            ><button class="primary" type="submit">
+                                Save and Continue
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
             <section id="home" class="view active">
                 <div class="page-heading">
                     <div>
@@ -265,6 +335,76 @@
                     </div>
                     <pre id="health-result" class="output"></pre>
                 </div>
+            </section>
+            <section id="settings" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Settings</h2>
+                        <p>Manage this Windows installation.</p>
+                    </div>
+                    <span id="settings-version" class="mode"></span>
+                </div>
+                <form id="settings-form" class="settings-form panel">
+                    <label
+                        >Account<input
+                            id="settings-account"
+                            autocomplete="username"
+                            placeholder="Keep current account"
+                    /></label>
+                    <label
+                        >Change password<input
+                            id="settings-password"
+                            type="password"
+                            autocomplete="new-password"
+                            placeholder="Leave blank to keep current password"
+                    /></label>
+                    <label class="wide"
+                        >Library and download folder<span class="folder-row"
+                            ><input id="settings-directory" required /><button
+                                id="settings-folder"
+                                type="button"
+                            >
+                                Choose Folder...
+                            </button></span
+                        ></label
+                    >
+                    <label
+                        >Download profile<select id="settings-profile">
+                            <option value="conservative">Conservative</option>
+                            <option value="balanced">Balanced</option>
+                            <option value="fast">Fast</option>
+                        </select></label
+                    >
+                    <details class="wide">
+                        <summary>Advanced proxy</summary>
+                        <label
+                            >HTTP/HTTPS proxy<input
+                                id="settings-proxy"
+                                placeholder="Disabled"
+                        /></label>
+                    </details>
+                    <p
+                        id="settings-message"
+                        class="status wide"
+                        role="status"
+                    ></p>
+                    <div class="actions wide">
+                        <button id="settings-test" type="button">
+                            Test Connection</button
+                        ><button class="primary" type="submit">
+                            Save Settings</button
+                        ><button id="open-data" type="button">
+                            Open Library Folder</button
+                        ><button id="open-logs" type="button">Open Logs</button
+                        ><button
+                            id="exit-app"
+                            type="button"
+                            class="danger-action"
+                        >
+                            Exit Pica Library
+                        </button>
+                    </div>
+                </form>
             </section>
         </main>
         <template id="author-template">

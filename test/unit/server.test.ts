@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Server } from 'node:http'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
@@ -44,7 +44,7 @@ describe('local web server', () => {
         )
         expect(status).toMatchObject({
             mode: 'connected',
-            version: '0.1.0',
+            version: '0.1.1',
             summary: { comics: 0 }
         })
     })
@@ -220,5 +220,93 @@ describe('server binding security', () => {
         ).rejects.toThrow('Remote binding is disabled')
         database.close()
         fs.rmSync(dir, { recursive: true, force: true })
+    })
+})
+
+describe('desktop mutation security', () => {
+    it('requires a local host, same origin and the current CSRF nonce', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-desktop-api-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.db'))
+        const service = new LibraryService(database, dir)
+        const save = vi.fn(async () => ({ success: true }))
+        const started = await startLibraryServer({
+            database,
+            service,
+            host: '127.0.0.1',
+            port: 0,
+            desktop: {
+                csrfToken: 'current-nonce',
+                configured: () => true,
+                status: () => ({ profile: 'balanced' }),
+                save,
+                testConnection: async () => ({ success: true }),
+                chooseFolder: async () => null,
+                openDirectory: async () => undefined,
+                shutdown: () => undefined
+            }
+        })
+        const payload = JSON.stringify({ password: 'not-returned' })
+        try {
+            const status = await fetch(
+                `${started.url}/api/v1/desktop/status`
+            ).then((response) => response.json())
+            expect(status).toMatchObject({
+                application: 'Pica Library',
+                configured: true,
+                csrfToken: 'current-nonce'
+            })
+            expect(JSON.stringify(status)).not.toContain('password')
+
+            for (const headers of [
+                { origin: started.url },
+                {
+                    origin: started.url,
+                    'x-pica-csrf': 'stale-nonce'
+                },
+                {
+                    origin: 'https://attacker.example',
+                    'x-pica-csrf': 'current-nonce'
+                }
+            ]) {
+                const requestHeaders = new Headers({
+                    'content-type': 'application/json'
+                })
+                for (const [key, value] of Object.entries(headers))
+                    if (value) requestHeaders.set(key, value)
+                const response = await fetch(
+                    `${started.url}/api/v1/desktop/settings`,
+                    {
+                        method: 'POST',
+                        headers: requestHeaders,
+                        body: payload
+                    }
+                )
+                expect(response.status).toBe(403)
+            }
+            expect(save).not.toHaveBeenCalled()
+
+            const accepted = await fetch(
+                `${started.url}/api/v1/desktop/settings`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        origin: started.url,
+                        'x-pica-csrf': 'current-nonce'
+                    },
+                    body: payload
+                }
+            )
+            expect(accepted.status).toBe(200)
+            expect(save).toHaveBeenCalledTimes(1)
+        } finally {
+            await new Promise<void>((resolve, reject) =>
+                started.server.close((error) =>
+                    error ? reject(error) : resolve()
+                )
+            )
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
     })
 })

@@ -26,7 +26,7 @@ describe('built CLI entrypoint contract', () => {
         const cli = read('src/library-cli.ts')
         const server = read('src/library/server.ts')
 
-        expect(packageJson.version).toBe('0.1.0')
+        expect(packageJson.version).toBe('0.1.1')
         expect(version).toContain("from '../package.json'")
         expect(version).toContain('export const PRODUCT_VERSION')
         expect(cli).toContain('pica-library ${PRODUCT_VERSION}')
@@ -97,9 +97,16 @@ describe('built CLI entrypoint contract', () => {
             )
             if (content.includes('upload-artifact@')) {
                 expect(content, name).toContain('retention-days: 1')
-                expect(content, name).toContain(
-                    'github.event.repository.private'
-                )
+                if (name === 'windows-package.yml') {
+                    expect(content, name).not.toMatch(
+                        /secrets\.PICA_(ACCOUNT|PASSWORD)/
+                    )
+                    expect(content, name).toContain('-SetupPersistence')
+                } else {
+                    expect(content, name).toContain(
+                        'github.event.repository.private'
+                    )
+                }
             }
         }
         const prepared = read('.github/workflows/prepare-library.yml')

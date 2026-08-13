@@ -11,6 +11,19 @@ import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
 
+export interface DesktopServerController {
+    csrfToken: string
+    configured: () => boolean
+    status: () => Record<string, unknown>
+    save: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
+    testConnection: (
+        input: Record<string, unknown>
+    ) => Promise<Record<string, unknown>>
+    chooseFolder: () => Promise<string | null>
+    openDirectory: (kind: string) => Promise<void>
+    shutdown: () => void
+}
+
 function json(response: ServerResponse, status: number, value: unknown) {
     response.writeHead(status, {
         'content-type': 'application/json; charset=utf-8',
@@ -104,6 +117,7 @@ export async function startLibraryServer(options: {
     service: LibraryService
     host?: string
     port?: number
+    desktop?: DesktopServerController
 }) {
     const root = webRoot()
     const host = options.host ?? '127.0.0.1'
@@ -120,6 +134,13 @@ export async function startLibraryServer(options: {
     const server = http.createServer(async (request, response) => {
         const url = new URL(request.url ?? '/', `http://${host}:${port}`)
         try {
+            const requestHost = request.headers.host ?? ''
+            if (
+                !requestHost.startsWith(`${host}:`) &&
+                !requestHost.startsWith('localhost:')
+            ) {
+                return json(response, 403, { error: 'Invalid local host' })
+            }
             const origin = request.headers.origin
             const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(
                 request.method ?? 'GET'
@@ -132,6 +153,80 @@ export async function startLibraryServer(options: {
                 return json(response, 403, {
                     error: 'Cross-origin writes are forbidden'
                 })
+            }
+            const desktopMutation =
+                options.desktop &&
+                isMutation &&
+                url.pathname.startsWith('/api/v1/desktop/')
+            if (
+                desktopMutation &&
+                request.headers['x-pica-csrf'] !== options.desktop?.csrfToken
+            ) {
+                return json(response, 403, {
+                    error: 'This local request could not be verified'
+                })
+            }
+            if (
+                url.pathname === '/api/v1/desktop/status' &&
+                request.method === 'GET' &&
+                options.desktop
+            ) {
+                return json(response, 200, {
+                    application: 'Pica Library',
+                    version: PRODUCT_VERSION,
+                    configured: options.desktop.configured(),
+                    csrfToken: options.desktop.csrfToken,
+                    ...options.desktop.status()
+                })
+            }
+            if (
+                url.pathname === '/api/v1/desktop/settings' &&
+                request.method === 'POST' &&
+                options.desktop
+            ) {
+                return json(
+                    response,
+                    200,
+                    await options.desktop.save(await body(request))
+                )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/test-connection' &&
+                request.method === 'POST' &&
+                options.desktop
+            ) {
+                return json(
+                    response,
+                    200,
+                    await options.desktop.testConnection(await body(request))
+                )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/choose-folder' &&
+                request.method === 'POST' &&
+                options.desktop
+            ) {
+                return json(response, 200, {
+                    path: await options.desktop.chooseFolder()
+                })
+            }
+            if (
+                url.pathname === '/api/v1/desktop/open-directory' &&
+                request.method === 'POST' &&
+                options.desktop
+            ) {
+                const input = await body(request)
+                await options.desktop.openDirectory(String(input.kind ?? ''))
+                return json(response, 200, { success: true })
+            }
+            if (
+                url.pathname === '/api/v1/desktop/shutdown' &&
+                request.method === 'POST' &&
+                options.desktop
+            ) {
+                json(response, 200, { success: true })
+                setTimeout(() => options.desktop?.shutdown(), 50)
+                return
             }
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
                 return json(response, 200, {
@@ -432,7 +527,9 @@ export async function startLibraryServer(options: {
             if (url.pathname.startsWith('/api/')) {
                 return json(response, 404, { error: 'API route not found' })
             }
-            serveAsset(response, root, url.pathname)
+            if (url.pathname === '/setup')
+                serveAsset(response, root, '/index.html')
+            else serveAsset(response, root, url.pathname)
         } catch (error) {
             json(response, 500, {
                 error: error instanceof Error ? error.message : String(error)

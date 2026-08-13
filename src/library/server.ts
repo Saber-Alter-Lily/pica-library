@@ -9,6 +9,7 @@ import { organizeLibraryViews } from './organizer'
 import { queueRepairs, scanRepairIssues } from '../maintenance/repair'
 import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
+import { PRODUCT_VERSION } from '../version'
 
 function json(response: ServerResponse, status: number, value: unknown) {
     response.writeHead(status, {
@@ -135,7 +136,7 @@ export async function startLibraryServer(options: {
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
                 return json(response, 200, {
                     mode: 'connected',
-                    version: '0.1.0-rc.2',
+                    version: PRODUCT_VERSION,
                     database: options.database.file,
                     summary: options.database.summary()
                 })
@@ -291,7 +292,7 @@ export async function startLibraryServer(options: {
                     200,
                     await options.service.recommendations({
                         limit: Number(input.limit ?? 30),
-                        seedCount: Number(input.seedCount ?? 8)
+                        seedCount: Number(input.seedCount ?? 12)
                     })
                 )
             }

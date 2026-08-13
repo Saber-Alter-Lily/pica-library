@@ -18,6 +18,36 @@ describe('built CLI entrypoint contract', () => {
         expect(rollup).toContain("entryFileNames: '[name].js'")
     })
 
+    it('keeps stable product version surfaces bound to package metadata', () => {
+        const packageJson = JSON.parse(read('package.json')) as {
+            version: string
+        }
+        const version = read('src/version.ts')
+        const cli = read('src/library-cli.ts')
+        const server = read('src/library/server.ts')
+
+        expect(packageJson.version).toBe('0.1.0')
+        expect(version).toContain("from '../package.json'")
+        expect(version).toContain('export const PRODUCT_VERSION')
+        expect(cli).toContain('pica-library ${PRODUCT_VERSION}')
+        expect(cli).toContain('version: PRODUCT_VERSION')
+        expect(server).toContain('version: PRODUCT_VERSION')
+    })
+
+    it('lets Web recommendations use the audited backend seed default', () => {
+        const app = read('web/app.js')
+        const request = app.slice(
+            app.indexOf("post('/api/v1/recommendations'"),
+            app.indexOf('state.profile = value.profile')
+        )
+        expect(request).toContain('limit: 30')
+        expect(request).not.toContain('seedCount: 8')
+        expect(request).not.toContain('seedCount:')
+        expect(read('src/library/server.ts')).toContain(
+            'seedCount: Number(input.seedCount ?? 12)'
+        )
+    })
+
     it('uses the canonical built CLI in runtime automation', () => {
         const runtimeFiles = [
             '.github/workflows/private-download.yml',

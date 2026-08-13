@@ -44,6 +44,7 @@ describe('local web server', () => {
         )
         expect(status).toMatchObject({
             mode: 'connected',
+            version: '0.1.0',
             summary: { comics: 0 }
         })
     })

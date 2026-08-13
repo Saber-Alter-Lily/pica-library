@@ -6,7 +6,7 @@
 - Target repository: `Saber-Alter-Lily/pica-library` (private, independent, not a fork)
 - Candidate branch: `codex/final-audit-remediation`
 - Exact tested code SHA: bound by the final review package after the one-commit freeze
-- Version: `0.1.0-rc.2`
+- Version: `0.1.0`
 
 The candidate includes separate trusted API and uncredentialed media clients,
 versioned SQLite storage, canonical author state, explainable recommendations, a

@@ -22,6 +22,7 @@ import type {
     PerformanceSettings
 } from './core/downloads/profiles'
 import type { DownloadRunner } from './core/downloads/types'
+import { PRODUCT_VERSION } from './version'
 
 loadEnv()
 
@@ -92,7 +93,7 @@ function downloadRuntimeOptions() {
 }
 
 function help() {
-    console.log(`pica-library 0.1.0-rc.2
+    console.log(`pica-library ${PRODUCT_VERSION}
 
 Usage:
   pica-library init
@@ -390,7 +391,7 @@ async function main() {
                     queue: database.listDownloadJobs(),
                     provenance: {
                         application: 'pica-library',
-                        version: '0.1.0-rc.2',
+                        version: PRODUCT_VERSION,
                         source: 'connected-preparation'
                     }
                 }),

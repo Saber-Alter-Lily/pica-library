@@ -509,8 +509,7 @@ $('#recommend-button').onclick = async () => {
     try {
         if (state.mode === 'connected') {
             const value = await post('/api/v1/recommendations', {
-                limit: 30,
-                seedCount: 8
+                limit: 30
             })
             state.profile = value.profile
             state.recommendations = value.recommendations

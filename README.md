@@ -12,7 +12,8 @@ It keeps stable library state instead of treating every download as a new job:
 
 ## Try it
 
-This is a private `0.1.0-rc.2` review candidate, not a release. For local review:
+This is the private `0.1.0` stable release candidate. It remains unpublished
+until explicit release authorization. For local review:
 
 ```powershell
 pnpm install --frozen-lockfile

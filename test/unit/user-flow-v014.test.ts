@@ -114,6 +114,8 @@ describe('v0.1.4 local user flow', () => {
         expect(setup).not.toContain('<summary>Advanced</summary>')
         expect(html).toContain('id="open-browser-lite"')
         expect(html).toContain('id="recommend-next-batch"')
+        expect(html).toContain('id="cover-toggle-label"')
+        expect(html).toContain('id="recommend-cover-toggle-label"')
         expect(html).toContain('id="settings-detect-proxy"')
         expect(html).toContain('id="home-sync"')
         expect(html).toContain('id="setup-sync"')

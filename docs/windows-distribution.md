@@ -47,7 +47,7 @@ Application files and mutable data are separate. A future application ZIP can
 be extracted to a new directory without deleting the existing database,
 configuration, cache, or downloads.
 
-The v0.1.1 candidate is unsigned. Windows may display a SmartScreen or
+The v0.1.1 Windows release is unsigned. Windows may display a SmartScreen or
 reputation warning for a new unsigned open-source executable. No self-signed
 certificate is presented as production signing.
 

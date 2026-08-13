@@ -12,7 +12,7 @@ It keeps stable library state instead of treating every download as a new job:
 
 ## Try it
 
-Current stable release: `v0.1.0`. The next candidate adds a Windows 10/11
+Current stable release: `v0.1.1`. This release adds a Windows 10/11
 x64 package for ordinary users:
 
 1. Download `Pica-Library-v0.1.1-windows-x64.zip` from the release.

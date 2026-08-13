@@ -184,6 +184,8 @@ describe('recommendation v2', () => {
             values.map((item) => candidate(item))
         )
         expect(result.audit.explorationCount).toBeLessThanOrEqual(2)
+        expect(result.audit.explorationCount).toBeGreaterThan(0)
+        expect(result.audit.explorationCount / 10).toBeLessThanOrEqual(0.15)
         expect(
             result.recommendations
                 .filter((item) => item.exploration)

@@ -4,9 +4,9 @@
 - Frozen source branch: `codex/pica-library-v2`
 - Frozen source SHA: `9a8448a49062f22c367fdea1dc10e3acf53fde1d`
 - Target repository: `Saber-Alter-Lily/pica-library` (private, independent, not a fork)
-- Candidate branch: `codex/independent-v0.1.0-rc1`
-- Final tested code SHA: `718149f85491b1b205911cb804a0d490e5022e0f`
-- Version: `0.1.0-rc.1`
+- Candidate branch: `codex/final-audit-remediation`
+- Exact tested code SHA: bound by the final review package after the one-commit freeze
+- Version: `0.1.0-rc.2`
 
 The candidate includes separate trusted API and uncredentialed media clients,
 versioned SQLite storage, canonical author state, explainable recommendations, a

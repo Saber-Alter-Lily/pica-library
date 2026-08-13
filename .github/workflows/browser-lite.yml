@@ -12,8 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Upload static Browser Lite review build
+        if: github.event.repository.private == true
         uses: actions/upload-artifact@v4
         with:
           name: pica-library-browser-lite-${{ github.run_id }}
           path: web
-          retention-days: 3
+          retention-days: 1

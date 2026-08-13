@@ -9,13 +9,14 @@ import { redactSensitive } from '../../src/utils'
 function response(
     config: Parameters<AxiosAdapter>[0],
     data: unknown,
-    responseHeaders: Record<string, string> = {}
+    responseHeaders: Record<string, string> = {},
+    status = 200
 ): AxiosResponse {
     return {
         config,
         data,
         headers: responseHeaders,
-        status: 200,
+        status,
         statusText: 'OK'
     }
 }
@@ -114,9 +115,53 @@ describe('provider client security', () => {
         })
         await expect(
             textClient.fetchImage('https://media.example/error', 32)
-        ).rejects.toThrow('not an image')
+        ).rejects.toThrow('safe raster image')
         await expect(
             pica.fetchImage('https://media.example/large.jpg', 2)
         ).rejects.toThrow('size limit')
+    })
+
+    it('rejects private cover targets and revalidates every redirect hop', async () => {
+        let requestCount = 0
+        const redirecting = new Pica({
+            mediaAdapter: async (config) => {
+                requestCount += 1
+                return response(
+                    config,
+                    Buffer.alloc(0),
+                    {
+                        location: 'https://127.0.0.1/internal.png'
+                    },
+                    302
+                )
+            }
+        })
+        for (const target of [
+            'http://media.example/cover.jpg',
+            'https://localhost/cover.jpg',
+            'https://127.0.0.1/cover.jpg',
+            'https://[::1]/cover.jpg',
+            'https://user:password@media.example/cover.jpg'
+        ])
+            await expect(redirecting.fetchImage(target)).rejects.toThrow(
+                'not trusted'
+            )
+        expect(requestCount).toBe(0)
+        await expect(
+            redirecting.fetchImage('https://media.example/cover.jpg')
+        ).rejects.toThrow('not trusted')
+        expect(requestCount).toBe(1)
+    })
+
+    it('allows only safe raster cover MIME types', async () => {
+        const svg = new Pica({
+            mediaAdapter: async (config) =>
+                response(config, Buffer.from('<svg/>'), {
+                    'content-type': 'image/svg+xml'
+                })
+        })
+        await expect(
+            svg.fetchImage('https://media.example/cover.svg')
+        ).rejects.toThrow('safe raster')
     })
 })

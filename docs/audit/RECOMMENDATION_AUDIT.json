@@ -6,7 +6,7 @@
   "profileTagCount": 20,
   "seedCount": 12,
   "seedAuthorDiversity": 12,
-  "seedTagDiversity": 89,
+  "seedTagDiversity": 94,
   "candidateCountByRecallRoute": {
     "related": 120,
     "author": 26,
@@ -14,11 +14,11 @@
     "category": 40,
     "circle": 40
   },
-  "deduplicatedCandidateCount": 240,
-  "alreadyFavoriteExcludedCount": 52,
+  "deduplicatedCandidateCount": 236,
+  "alreadyFavoriteExcludedCount": 53,
   "finalRecommendationCount": 30,
   "maxSameAuthorInTopN": 2,
-  "explorationCount": 0,
+  "explorationCount": 4,
   "recommendationsWithCoverMetadata": 30,
   "titlesIncluded": false
 }

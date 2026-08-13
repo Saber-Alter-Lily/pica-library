@@ -1,14 +1,14 @@
 # Test Report
 
 Environment: Windows local validation and GitHub-hosted Ubuntu runners, pnpm
-`11.16.0`, 2026-08-13. Final tested code SHA:
-`718149f85491b1b205911cb804a0d490e5022e0f`.
+`11.16.0`, 2026-08-13. The exact RC2 SHA is bound after the one-commit freeze
+by the final review package; this report is included in that commit.
 
 | Gate | Result |
 | --- | --- |
 | frozen install | PASS |
 | TypeScript | PASS |
-| full Vitest suite | PASS, 21 files, 78 tests |
+| full Vitest suite | PASS, 21 files, 84 tests |
 | unit tests | PASS |
 | integration/migration tests | PASS |
 | ESLint | PASS, zero warnings |
@@ -18,8 +18,8 @@ Environment: Windows local validation and GitHub-hosted Ubuntu runners, pnpm
 | built CLI smoke | PASS |
 | `git diff --check` | PASS |
 | tracked source credential-pattern scan | PASS |
-| Node 22 GitHub CI | PASS |
-| Node 24 GitHub CI | PASS |
+| Node 22 GitHub CI | Pending exact-SHA freeze |
+| Node 24 GitHub CI | Pending exact-SHA freeze |
 
 Coverage includes download scheduling and state transitions, retry quiescence,
 cumulative byte accounting, pause/resume/cancel, maintenance/repair, SQLite

@@ -135,7 +135,7 @@ export async function startLibraryServer(options: {
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
                 return json(response, 200, {
                     mode: 'connected',
-                    version: '0.1.0-rc.1',
+                    version: '0.1.0-rc.2',
                     database: options.database.file,
                     summary: options.database.summary()
                 })

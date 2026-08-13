@@ -289,30 +289,48 @@ export function recommendComics(
     const output: RecommendationResult[] = []
     const authorCounts = new Map<string, number>()
     const circleCounts = new Map<string, number>()
-    const explorationTarget = Math.min(
-        Math.ceil(limit * 0.15),
-        Math.max(0, scored.length - Math.floor(limit * 0.8))
-    )
-    const exploration = scored
+    const explorationCandidates = scored
         .filter((item) => item.score > 0 && item.score < 0.45)
-        .slice(0, explorationTarget)
+        .sort(
+            (a, b) =>
+                a.score - b.score ||
+                a.comic.comicId.localeCompare(b.comic.comicId)
+        )
+    const explorationTarget = Math.min(
+        explorationCandidates.length,
+        limit >= 7 ? Math.max(1, Math.floor(limit * 0.15)) : 0
+    )
+    const exploration = explorationCandidates.slice(0, explorationTarget)
     const explorationIds = new Set(
         exploration.map((item) => item.comic.comicId)
     )
-    for (const item of [
-        ...scored.filter((item) => !explorationIds.has(item.comic.comicId)),
-        ...exploration
-    ]) {
-        if (output.length >= limit) break
+    const addItem = (item: RecommendationResult) => {
         const author = key(item.comic.canonicalAuthor ?? item.comic.author)
         const circle = key(item.comic.circle)
-        if ((authorCounts.get(author) ?? 0) >= 2) continue
-        if (circle && (circleCounts.get(circle) ?? 0) >= 3) continue
+        if ((authorCounts.get(author) ?? 0) >= 2) return false
+        if (circle && (circleCounts.get(circle) ?? 0) >= 3) return false
         item.exploration = explorationIds.has(item.comic.comicId)
         output.push(item)
         authorCounts.set(author, (authorCounts.get(author) ?? 0) + 1)
         if (circle)
             circleCounts.set(circle, (circleCounts.get(circle) ?? 0) + 1)
+        return true
+    }
+    const exploitation = scored.filter(
+        (item) => !explorationIds.has(item.comic.comicId)
+    )
+    const exploitationBudget = Math.max(0, limit - explorationTarget)
+    for (const item of exploitation) {
+        if (output.length >= exploitationBudget) break
+        addItem(item)
+    }
+    for (const item of exploration) {
+        if (output.length >= limit) break
+        addItem(item)
+    }
+    for (const item of exploitation) {
+        if (output.length >= limit) break
+        if (!output.includes(item)) addItem(item)
     }
 
     const routeCounts = Object.fromEntries(

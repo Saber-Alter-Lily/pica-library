@@ -5,6 +5,10 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { normalizeName, debug, redactSensitive } from './utils'
 import {
+    requireTrustedCoverUrl,
+    safeRasterContentType
+} from './library/cover-url'
+import {
     Comic,
     Episode,
     DInfo,
@@ -309,27 +313,30 @@ export class Pica {
         if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
             throw new Error('Image size limit must be a positive integer')
         }
-        const response = await this.mediaRequest(target, 0, maxBytes)
+        const response = await this.mediaRequest(target, 0, maxBytes, true)
         const data = Buffer.from(response.data)
         if (data.byteLength > maxBytes) {
             throw new Error('Provider image exceeds the configured size limit')
         }
-        const contentType = String(response.headers['content-type'] ?? '')
-            .split(';', 1)[0]
-            .trim()
-            .toLowerCase()
-        if (!contentType.startsWith('image/')) {
-            throw new Error('Provider cover response is not an image')
-        }
+        const contentType = safeRasterContentType(
+            response.headers['content-type']
+        )
+        if (!contentType)
+            throw new Error(
+                'Provider cover response is not a safe raster image'
+            )
         return { data, contentType }
     }
 
     private async mediaRequest(
         target: string,
         redirects = 0,
-        maxBytes?: number
+        maxBytes?: number,
+        trustedCover = false
     ): Promise<AxiosResponse<Buffer>> {
-        const url = new URL(target)
+        const url = new URL(
+            trustedCover ? requireTrustedCoverUrl(target) : target
+        )
         const insecureAllowed = process.env.PICA_ALLOW_INSECURE_HTTP === 'true'
         if (
             url.protocol !== 'https:' &&
@@ -353,9 +360,12 @@ export class Pica {
         const location = response.headers.location
         if (location) {
             return this.mediaRequest(
-                new URL(location, url).toString(),
+                trustedCover
+                    ? requireTrustedCoverUrl(new URL(location, url).toString())
+                    : new URL(location, url).toString(),
                 redirects + 1,
-                maxBytes
+                maxBytes,
+                trustedCover
             )
         }
         return response

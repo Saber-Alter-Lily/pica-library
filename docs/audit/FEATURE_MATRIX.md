@@ -17,7 +17,7 @@
 | Downloaded-only update checking | Yes | Fake-provider service tests | Partial download stores full observed episode baseline |
 | Repair missing/empty/failed files | Yes | Filesystem unit tests | Implemented |
 | Portable Bundle validation | Yes | Bundle and Browser Lite tests | Schema/kind/secrets checked |
-| Browser Lite prepared recommendations | Yes | Browser state contract tests | Available without local service |
+| Browser Lite prepared recommendations | Yes | Browser state and 1280x720/390x844 QA | Default cards omit diagnostics and popularity |
 | Browser Lite IndexedDB persistence | Yes | Pure state round-trip plus browser load QA | Records, authors, recommendations/profile and plans persist |
 | Five-area Web IA | Yes | Browser load QA and syntax checks | Browser Lite first screen verified |
 | Popular and complete Related views | No | None | Deferred until stable provider contract |

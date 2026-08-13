@@ -1,12 +1,13 @@
 # Release Readiness
 
-`PRIVATE_V0_1_0_RELEASE_CANDIDATE_READY_FOR_CHATGPT_FINAL_AUDIT`
+`PRIVATE_V0_1_0_RC2_PENDING_EXACT_SHA_CI`
 
-Final code SHA: `718149f85491b1b205911cb804a0d490e5022e0f`.
+The generated final review package binds the exact one-commit RC2 SHA after
+CI and private-caller validation complete.
 
 Completed gates:
 
-- Local regression 78/78, type, lint, format, Web syntax, build, CLI smoke.
+- Local regression 84/84, type, lint, format, Web syntax, build, CLI smoke.
 - GitHub CI Node 22 and Node 24.
 - Existing private source runner live baseline.
 - Recommendation V2 and bounded provider recall validation.

@@ -37,8 +37,6 @@ jobs:
   download:
     runs-on: ubuntu-latest
     env:
-      PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
-      PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
       INPUT_MODE: ${{ inputs.mode }}
       INPUT_FAVORITE_PAGE: ${{ inputs.favorite_page }}
       INPUT_COMIC_IDS: ${{ inputs.comic_ids }}
@@ -66,9 +64,12 @@ jobs:
 
       - name: Validate request
         shell: bash
+        env:
+          PICA_ACCOUNT_PRESENT: ${{ secrets.PICA_ACCOUNT != '' }}
+          PICA_PASSWORD_PRESENT: ${{ secrets.PICA_PASSWORD != '' }}
         run: |
           set -euo pipefail
-          test -n "$PICA_ACCOUNT" && test -n "$PICA_PASSWORD" || {
+          [[ "$PICA_ACCOUNT_PRESENT" == 'true' && "$PICA_PASSWORD_PRESENT" == 'true' ]] || {
             echo 'Configure PICA_ACCOUNT and PICA_PASSWORD Repository Secrets first.'
             exit 1
           }
@@ -114,6 +115,9 @@ jobs:
 
       - name: Download requested comics
         shell: bash
+        env:
+          PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
+          PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
         run: |
           set -euo pipefail
           if [[ "$INPUT_MODE" == 'favorites_page' ]]; then

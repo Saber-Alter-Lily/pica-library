@@ -5,13 +5,15 @@ imports schema-versioned Portable Bundles, rejects sensitive fields, persists
 state and author decisions in IndexedDB, clears state on request, and exports a
 deduplicated portable download plan.
 
-Cover URLs are optional metadata. No base64 image library is embedded in the
-normal Bundle. Imported collections use the same 48-record incremental render
-contract as connected mode. Automated tests cover import, invalid/sensitive
-bundle rejection, persistence round trip, queue deduplication, 1770-record page
-bounds, and discriminative tag selection.
+Cover URLs are optional untrusted metadata. Imports and restored state drop
+unsafe references before rendering; invalid covers use the local fallback.
+Automated tests cover invalid/sensitive bundles, unsafe cover fallback,
+persistence round trip, queue deduplication, 1770-record page bounds, a
+precomputed tag-frequency index, and discriminative tag selection.
 
-Manual static-server QA confirmed Browser Lite mode without a Local Engine,
-state restoration across reload (same comic/queue counts), prepared
-recommendation rendering, and clear-state behavior. The final clear action
-returned the library and plan counts to zero.
+Actual responsive QA used only synthetic data at 1280x720 and 390x844. Home,
+Library Grid/List, Discover, Downloads and Maintenance had no document-level
+horizontal overflow. The compact list intentionally scrolls inside its wrapper.
+Long titles/tags remained contained, navigation and visible buttons were
+reachable, unsafe `data:`/localhost covers fell back locally, reload restored
+state, and clear removed both state and rendered recommendation cards.

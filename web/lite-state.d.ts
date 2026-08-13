@@ -7,6 +7,10 @@ export interface LiteState {
 }
 
 export const LIBRARY_PAGE_SIZE: number
+export function trustedBrowserCoverUrl(raw: unknown): string
+export function buildTagFrequencyIndex(
+    records: Array<{ tags?: string[] }>
+): Map<string, number>
 
 export function emptyLiteState(): LiteState
 export function importLibraryBundle(value: unknown): LiteState
@@ -23,7 +27,7 @@ export function visibleLibraryPage<T>(
 ): T[]
 export function selectDisplayTags(
     comic: { tags?: string[] },
-    records: Array<{ tags?: string[] }>,
+    frequencies: Map<string, number>,
     limit?: number
 ): string[]
 export function loadLiteState(indexedDB?: IDBFactory): Promise<LiteState>

@@ -5,8 +5,12 @@ Status: PASS for private review candidate.
 - API/media boundary: the signed API Axios client accepts trusted relative Pica API
   paths only. A separate media client follows media redirects without Authorization,
   signature, nonce, API key, cookie, account or password headers.
-- Transport: media requires HTTPS by default. `PICA_ALLOW_INSECURE_HTTP=true` is an
-  explicit compatibility fallback and does not change the credential-free media path.
+- Cover trust: imported cover references are sanitized, server-side cover fetches
+  require public HTTPS URLs without credentials, every redirect is revalidated,
+  and only bounded JPEG/PNG/WebP/GIF/AVIF raster responses are served. SVG and
+  local/private literal targets are rejected.
+- Transport: covers always require HTTPS. The legacy explicit HTTP compatibility
+  fallback applies only to ordinary credential-free manga media downloads.
 - Logs: recursive redaction covers account, email, password, token, authorization,
   cookie, secret and API-key variants in both success and error debug output.
 - User secrets: account/password come from environment variables or GitHub Secrets;

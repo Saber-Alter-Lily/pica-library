@@ -2,6 +2,51 @@ export const LITE_SCHEMA_VERSION = 1
 export const LITE_BUNDLE_KIND = 'pica-library-bundle'
 export const LIBRARY_PAGE_SIZE = 48
 
+export function trustedBrowserCoverUrl(raw) {
+    if (typeof raw !== 'string' || !raw.trim()) return ''
+    try {
+        const url = new URL(raw)
+        if (url.protocol !== 'https:' || url.username || url.password) return ''
+        const hostname = url.hostname.toLowerCase()
+        if (
+            !hostname ||
+            hostname === 'localhost' ||
+            hostname.endsWith('.localhost') ||
+            /^(127\.|10\.|192\.168\.|169\.254\.)/.test(hostname) ||
+            /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+            hostname === '[::1]' ||
+            hostname === '::1' ||
+            /^\[?(fc|fd|fe[89ab]|ff)/.test(hostname) ||
+            /^\[?::ffff:/i.test(hostname)
+        )
+            return ''
+        return url.toString()
+    } catch {
+        return ''
+    }
+}
+
+function sanitizeComic(comic) {
+    if (!comic || typeof comic !== 'object' || Array.isArray(comic))
+        return comic
+    const copy = structuredClone(comic)
+    if ('coverUrl' in copy) {
+        const safe = trustedBrowserCoverUrl(copy.coverUrl)
+        if (safe) copy.coverUrl = safe
+        else delete copy.coverUrl
+    }
+    return copy
+}
+
+function sanitizeRecommendations(items) {
+    return items.map((item) => {
+        const copy = structuredClone(item)
+        if (copy?.comic) copy.comic = sanitizeComic(copy.comic)
+        else return sanitizeComic(copy)
+        return copy
+    })
+}
+
 const DATABASE_NAME = 'pica-library-lite'
 const DATABASE_VERSION = 1
 const STORE_NAME = 'state'
@@ -54,15 +99,16 @@ export function importLibraryBundle(value) {
     rejectSensitiveFields(value)
 
     return {
-        records: structuredClone(
-            requireArray(value.library.comics, 'Bundle library.comics')
-        ),
+        records: requireArray(
+            value.library.comics,
+            'Bundle library.comics'
+        ).map(sanitizeComic),
         authors: structuredClone(requireArray(value.authors, 'Bundle authors')),
         profile:
             value.profile && typeof value.profile === 'object'
                 ? structuredClone(value.profile)
                 : null,
-        recommendations: structuredClone(
+        recommendations: sanitizeRecommendations(
             requireArray(value.recommendations, 'Bundle recommendations')
         ),
         queue: structuredClone(requireArray(value.queue, 'Bundle queue'))
@@ -75,7 +121,7 @@ export function restoreLiteState(value) {
     rejectSensitiveFields(value)
     return {
         records: Array.isArray(value.records)
-            ? structuredClone(value.records)
+            ? value.records.map(sanitizeComic)
             : [],
         authors: Array.isArray(value.authors)
             ? structuredClone(value.authors)
@@ -85,7 +131,7 @@ export function restoreLiteState(value) {
                 ? structuredClone(value.profile)
                 : null,
         recommendations: Array.isArray(value.recommendations)
-            ? structuredClone(value.recommendations)
+            ? sanitizeRecommendations(value.recommendations)
             : [],
         queue: Array.isArray(value.queue) ? structuredClone(value.queue) : []
     }
@@ -134,13 +180,17 @@ const GENERIC_TAGS = new Set([
     '汉化'
 ])
 
-export function selectDisplayTags(comic, records, limit = 3) {
+export function buildTagFrequencyIndex(records) {
     const frequencies = new Map()
     for (const record of records) {
         for (const tag of new Set(record.tags || [])) {
             frequencies.set(tag, (frequencies.get(tag) || 0) + 1)
         }
     }
+    return frequencies
+}
+
+export function selectDisplayTags(comic, frequencies, limit = 3) {
     return [...new Set(comic.tags || [])]
         .sort((left, right) => {
             const genericDifference =

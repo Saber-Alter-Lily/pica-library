@@ -6,6 +6,7 @@ import { Pica } from '../sdk'
 import type { Comic, Picture } from '../types'
 import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
+import { safeRasterContentType, trustedCoverUrl } from './cover-url'
 import type {
     FavoriteRecord,
     RecommendationCandidate,
@@ -82,10 +83,11 @@ function comicToRecord(comic: Comic): FavoriteRecord {
         totalViews: comic.totalViews ?? comic.viewsCount ?? 0,
         pagesCount: comic.pagesCount ?? 0,
         epsCount: comic.epsCount ?? 0,
-        coverUrl:
+        coverUrl: trustedCoverUrl(
             comic.thumb?.fileServer && comic.thumb.path
                 ? `${comic.thumb.fileServer}/static/${comic.thumb.path}`
                 : undefined
+        )
     }
 }
 
@@ -136,8 +138,8 @@ export class LibraryService {
             const metadata = JSON.parse(
                 await fs.promises.readFile(metadataFile, 'utf8')
             ) as { contentType?: unknown }
-            const contentType = String(metadata.contentType ?? '')
-            if (!contentType.startsWith('image/')) throw new Error('invalid')
+            const contentType = safeRasterContentType(metadata.contentType)
+            if (!contentType) throw new Error('invalid')
             return {
                 data: await fs.promises.readFile(imageFile),
                 contentType,

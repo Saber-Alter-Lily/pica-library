@@ -55,4 +55,42 @@ describe('built CLI entrypoint contract', () => {
         expect(reusable).toContain('persist-credentials: false')
         expect(reusable).toContain('retention-days: 1')
     })
+
+    it('scopes provider secrets to provider steps and protects all artifacts', () => {
+        const workflows = fs
+            .readdirSync(path.join(root, '.github/workflows'))
+            .filter((name) => /\.ya?ml$/.test(name))
+        for (const name of workflows) {
+            const content = read(`.github/workflows/${name}`)
+            expect(content, name).not.toMatch(
+                /jobs:\s*[\s\S]*?runs-on:[^\n]*\n\s+env:\s*\n\s+PICA_(ACCOUNT|PASSWORD):/
+            )
+            if (content.includes('upload-artifact@')) {
+                expect(content, name).toContain('retention-days: 1')
+                expect(content, name).toContain(
+                    'github.event.repository.private'
+                )
+            }
+        }
+        const prepared = read('.github/workflows/prepare-library.yml')
+        const reusable = read('.github/workflows/private-download.yml')
+        expect(prepared).toContain("== 'true' ]] ||")
+        expect(prepared).toContain('PICA_ACCOUNT_PRESENT')
+        expect(reusable).toContain('PICA_ACCOUNT_PRESENT')
+    })
+
+    it('keeps recommendation diagnostics out of the default UI', () => {
+        const app = read('web/app.js')
+        const renderer = app.slice(
+            app.indexOf('function renderResultCards'),
+            app.indexOf('function downloadJson')
+        )
+        expect(renderer).not.toContain('item.reasons')
+        expect(renderer).not.toContain('item.score')
+        expect(renderer).not.toContain('matchedSignals')
+        expect(renderer).not.toContain('state.profile?.')
+        expect(app).toMatch(
+            /function renderAll[\s\S]*renderPreparedRecommendations\(\)/
+        )
+    })
 })

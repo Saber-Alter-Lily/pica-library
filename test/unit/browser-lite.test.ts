@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
     addLiteQueueItems,
+    buildTagFrequencyIndex,
     importLibraryBundle,
     restoreLiteState,
     selectDisplayTags,
+    trustedBrowserCoverUrl,
     visibleLibraryPage
 } from '../../web/lite-state.js'
 
@@ -93,10 +95,36 @@ describe('Browser Lite state contract', () => {
             { tags: ['common'] },
             { tags: ['other'] }
         ]
-        expect(selectDisplayTags(comic, records, 3)).toEqual([
+        const index = buildTagFrequencyIndex(records)
+        expect(selectDisplayTags(comic, index, 3)).toEqual([
             'rare',
             'other',
             'common'
         ])
+    })
+
+    it('builds the tag frequency index once for repeated render selection', () => {
+        const records = [{ tags: ['a', 'b'] }, { tags: ['a'] }]
+        const index = buildTagFrequencyIndex(records)
+        expect(index.get('a')).toBe(2)
+        expect(selectDisplayTags(records[0], index, 1)).toEqual(['b'])
+    })
+
+    it('drops untrusted cover URLs from imported and restored Lite state', () => {
+        const value = bundle() as ReturnType<typeof bundle> & {
+            library: { comics: Array<{ coverUrl?: string }> }
+            recommendations: Array<{ comic: { coverUrl?: string } }>
+        }
+        value.library.comics[0].coverUrl = 'http://127.0.0.1/private.svg'
+        value.recommendations[0].comic.coverUrl =
+            'https://user:password@example.test/cover.jpg'
+        const imported = importLibraryBundle(value)
+        expect(imported.records[0]).not.toHaveProperty('coverUrl')
+        expect(imported.recommendations[0].comic).not.toHaveProperty('coverUrl')
+        expect(trustedBrowserCoverUrl('https://media.example/cover.jpg')).toBe(
+            'https://media.example/cover.jpg'
+        )
+        expect(trustedBrowserCoverUrl('https://localhost/cover.jpg')).toBe('')
+        expect(trustedBrowserCoverUrl('https://[fd00::1]/cover.jpg')).toBe('')
     })
 })

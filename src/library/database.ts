@@ -25,6 +25,7 @@ import type {
 } from './types'
 import { runMigrations } from '../storage/sqlite/migrations'
 import type { UpdateFinding } from '../maintenance/updates'
+import { trustedCoverUrl } from './cover-url'
 
 type SqlRow = Record<string, unknown>
 
@@ -239,7 +240,7 @@ export class LibraryDatabase {
                     record.totalViews ?? 0,
                     record.pagesCount ?? 0,
                     record.epsCount ?? 0,
-                    record.coverUrl ?? null,
+                    trustedCoverUrl(record.coverUrl) ?? null,
                     markFavorite ? 1 : 0,
                     now,
                     now

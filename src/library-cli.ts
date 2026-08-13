@@ -92,7 +92,7 @@ function downloadRuntimeOptions() {
 }
 
 function help() {
-    console.log(`pica-library 0.1.0-rc.1
+    console.log(`pica-library 0.1.0-rc.2
 
 Usage:
   pica-library init
@@ -390,7 +390,7 @@ async function main() {
                     queue: database.listDownloadJobs(),
                     provenance: {
                         application: 'pica-library',
-                        version: '0.1.0-rc.1',
+                        version: '0.1.0-rc.2',
                         source: 'connected-preparation'
                     }
                 }),

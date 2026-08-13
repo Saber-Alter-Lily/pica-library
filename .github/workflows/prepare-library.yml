@@ -9,15 +9,24 @@ permissions:
 jobs:
   prepare:
     runs-on: ubuntu-latest
-    env:
-      PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
-      PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
     steps:
+      - name: Require a private source repository
+        shell: bash
+        env:
+          SOURCE_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          [[ "$SOURCE_REPOSITORY_PRIVATE" == 'true' ]] || {
+            echo 'Library exports are disabled unless the source repository is private.'
+            exit 1
+          }
       - uses: actions/checkout@v4
       - name: Check account secrets
         shell: bash
+        env:
+          PICA_ACCOUNT_PRESENT: ${{ secrets.PICA_ACCOUNT != '' }}
+          PICA_PASSWORD_PRESENT: ${{ secrets.PICA_PASSWORD != '' }}
         run: |
-          test -n "$PICA_ACCOUNT" && test -n "$PICA_PASSWORD" || {
+          [[ "$PICA_ACCOUNT_PRESENT" == 'true' && "$PICA_PASSWORD_PRESENT" == 'true' ]] || {
             echo '请先设置 PICA_ACCOUNT 和 PICA_PASSWORD Repository Secrets。'
             exit 1
           }
@@ -31,6 +40,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Export favorites and recommendations
+        env:
+          PICA_ACCOUNT: ${{ secrets.PICA_ACCOUNT }}
+          PICA_PASSWORD: ${{ secrets.PICA_PASSWORD }}
         run: >-
           node dist/pica-library.js prepare-library
           --output pica-library-export
@@ -42,7 +54,7 @@ jobs:
         with:
           name: pica-library-data-${{ github.run_id }}
           path: pica-library-export
-          retention-days: 3
+          retention-days: 1
       - name: Write summary
         shell: bash
         env:

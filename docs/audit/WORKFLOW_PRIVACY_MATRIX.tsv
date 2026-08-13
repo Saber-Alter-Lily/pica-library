@@ -1,0 +1,6 @@
+workflow	trigger	provider_credentials_used	credential_scope	produces_sensitive_artifact	public_fail_closed	retention_days
+browser-lite.yml	workflow_dispatch	no	none	no (static review only)	yes	1
+ci.yml	push; pull_request	no	none	no (static review only)	yes	1
+download.yml	workflow_dispatch	yes	workflow-call secret mapping only	yes	yes via reusable gate	1 via reusable
+prepare-library.yml	workflow_dispatch	yes	export provider step only	yes	yes	1
+private-download.yml	workflow_call	yes	download provider step only	yes	yes	1

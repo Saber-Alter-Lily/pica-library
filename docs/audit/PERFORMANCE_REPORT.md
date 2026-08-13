@@ -9,6 +9,8 @@
 - Provider recall concurrency: 3.
 - Candidate requests: first page only; no recommendation `searchAll` or
   `comicsAll` fanout.
+- Tag frequencies: one `Map<tag, count>` is built per Library/result render and
+  reused across all grid/list cards; per-card full-library scans were removed.
 
 These are implementation bounds, not throughput claims. Final browser visual QA
 and full regression results are recorded separately during RC validation.

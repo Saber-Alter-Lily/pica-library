@@ -8,7 +8,9 @@ import {
 } from './lite-state.js'
 import {
     LIBRARY_PAGE_SIZE,
+    buildTagFrequencyIndex,
     selectDisplayTags,
+    trustedBrowserCoverUrl,
     visibleLibraryPage
 } from './lite-state.js'
 
@@ -217,11 +219,12 @@ function renderComics(records = state.records) {
         state.libraryPage,
         LIBRARY_PAGE_SIZE
     )
+    const tagFrequencies = buildTagFrequencyIndex(state.records)
     const coverSource = (comic) =>
         state.mode === 'connected'
             ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}`
-            : comic.coverUrl || ''
-    const tagsFor = (comic) => selectDisplayTags(comic, state.records)
+            : trustedBrowserCoverUrl(comic.coverUrl)
+    const tagsFor = (comic) => selectDisplayTags(comic, tagFrequencies)
     const cover = (comic) => `<div class="cover-shell">
         ${
             coverSource(comic)
@@ -287,31 +290,22 @@ function renderAuthors() {
     }
 }
 
-function renderResultCards(records, target, withReasons = false) {
+function renderResultCards(records, target, recommendation = false) {
+    const tagFrequencies = buildTagFrequencyIndex(state.records)
     $(target).innerHTML = (records || [])
         .map((item) => {
             const comic = item.comic || item
             return `<article class="result">
                 <div class="cover-shell">
-                    ${comic.coverUrl ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : comic.coverUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />` : ''}
+                    ${state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />` : ''}
                     <span aria-hidden="true">P</span>
                 </div>
                 <div class="result-body"><h3>${escapeHtml(comic.title)}</h3>
                 <p>${escapeHtml(comic.canonicalAuthor || comic.author || '未知作者')}</p>
-                <div>${selectDisplayTags(comic, state.records)
+                <div>${selectDisplayTags(comic, tagFrequencies)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</div>
-                ${
-                    withReasons
-                        ? `<p>${(item.reasons || [])
-                              .slice(0, 3)
-                              .map((reason) =>
-                                  escapeHtml(reason.value || reason)
-                              )
-                              .join(' · ')}</p>`
-                        : ''
-                }
-                <p>爱心 ${Number(comic.totalLikes || 0).toLocaleString()} · 浏览 ${Number(comic.totalViews || 0).toLocaleString()}</p>
+                ${recommendation ? '' : `<p>爱心 ${Number(comic.totalLikes || 0).toLocaleString()} · 浏览 ${Number(comic.totalViews || 0).toLocaleString()}</p>`}
                 <button data-result-download="${escapeHtml(comic.comicId)}">加入下载</button>
                 </div>
             </article>`
@@ -320,16 +314,7 @@ function renderResultCards(records, target, withReasons = false) {
 }
 
 function renderPreparedRecommendations() {
-    const preferences = [
-        ...(state.profile?.authors || []),
-        ...(state.profile?.tags || [])
-    ].slice(0, 12)
-    $('#profile').innerHTML = preferences
-        .map(
-            (item) =>
-                `<span class="preference">${escapeHtml(item.value)} · ${item.count}</span>`
-        )
-        .join('')
+    $('#profile').innerHTML = ''
     renderResultCards(state.recommendations, '#recommend-results', true)
     $('#recommend-message').textContent =
         `共 ${state.recommendations.length} 条推荐。`
@@ -401,6 +386,7 @@ function renderAll(summary) {
     renderSummary(summary)
     renderComics()
     renderAuthors()
+    renderPreparedRecommendations()
 }
 
 $$('nav [data-view], [data-go]').forEach((button) =>

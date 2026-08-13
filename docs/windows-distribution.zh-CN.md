@@ -2,6 +2,10 @@
 
 # Windows 一键版使用指南
 
+## 导出 Browser Lite 数据包
+
+准备好漫画库后，打开“设置 → Browser Lite”，点击“导出 Browser Lite 数据包”。保留默认文件名 `pica-library-bundle.json`，然后在 Browser Lite 网页中选择这个文件。网页无需也不会要求填写 Pica 账号或密码。
+
 ## 下载与启动
 
 1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases) 下载 `Pica-Library-v0.1.2-windows-x64.zip`。

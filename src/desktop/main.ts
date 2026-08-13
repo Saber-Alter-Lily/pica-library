@@ -9,6 +9,7 @@ import {
     type DesktopServerController
 } from '../library/server'
 import { LibraryService } from '../library/service'
+import { serializeBrowserLiteDataPackage } from '../library/bundle-export'
 import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import {
@@ -52,6 +53,7 @@ let database: LibraryDatabase | null = null
 let service: LibraryService | null = null
 let stopping = false
 let currentUrl = ''
+let lastBrowserLiteExportDirectory: string | null = null
 
 function showStartupError() {
     if (process.platform !== 'win32') return
@@ -217,10 +219,46 @@ async function chooseFolder() {
     })
 }
 
+async function chooseBrowserLitePackagePath() {
+    if (process.platform !== 'win32') return null
+    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='pica-library-bundle.json';$d.Filter='JSON files (*.json)|*.json';$d.DefaultExt='json';$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
+    const powershell = windowsExecutable(
+        'System32',
+        'WindowsPowerShell',
+        'v1.0',
+        'powershell.exe'
+    )
+    return await new Promise<string | null>((resolve, reject) => {
+        const child = spawn(
+            powershell,
+            [
+                '-NoLogo',
+                '-NoProfile',
+                '-NonInteractive',
+                '-STA',
+                '-Command',
+                script
+            ],
+            { windowsHide: true, env: sanitizedChildEnv() }
+        )
+        let output = ''
+        child.stdout.on('data', (chunk) => (output += String(chunk)))
+        child.once('error', reject)
+        child.once('exit', (code) =>
+            code === 0
+                ? resolve(output.trim() || null)
+                : reject(new Error('File picker failed'))
+        )
+    })
+}
+
 function openDirectory(kind: string) {
     const allowed: Record<string, string> = {
         data: config?.libraryDirectory ?? paths.data,
-        logs: paths.logs
+        logs: paths.logs,
+        ...(lastBrowserLiteExportDirectory
+            ? { 'browser-lite-export': lastBrowserLiteExportDirectory }
+            : {})
     }
     const directory = allowed[kind]
     if (!directory) throw new Error('Unknown directory')
@@ -304,6 +342,18 @@ async function startEngine(preferredPort: number) {
         },
         testConnection,
         chooseFolder,
+        exportBrowserLitePackage: async () => {
+            if (!database) throw new Error('Library is not ready')
+            const content = serializeBrowserLiteDataPackage(database)
+            const file = await chooseBrowserLitePackagePath()
+            if (!file) return { success: false, cancelled: true }
+            fs.writeFileSync(file, content, 'utf8')
+            lastBrowserLiteExportDirectory = path.dirname(file)
+            return {
+                success: true,
+                fileName: 'pica-library-bundle.json'
+            }
+        },
         openDirectory,
         shutdown: () => {
             void stop()

@@ -13,7 +13,7 @@ import {
 } from './library/organizer'
 import type { SortMode } from './library/types'
 import { parsePositionals } from './library/arguments'
-import { serializeLibraryBundle } from './types/bundle'
+import { serializeBrowserLiteDataPackage } from './library/bundle-export'
 import { queueRepairs, scanRepairIssues } from './maintenance/repair'
 import { queueUpdate } from './maintenance/updates'
 import { buildRunnerArtifact } from './runners/shared/artifact'
@@ -377,23 +377,14 @@ async function main() {
             )
             fs.writeFileSync(
                 path.join(outputDir, 'pica-library-bundle.json'),
-                serializeLibraryBundle({
-                    schemaVersion: 1,
-                    kind: 'pica-library-bundle',
-                    generatedAt: new Date().toISOString(),
-                    library: { comics: favorites },
-                    authors: database.listAuthors(),
+                serializeBrowserLiteDataPackage(database, {
                     profile: result.profile as unknown as Record<
                         string,
                         unknown
                     >,
                     recommendations: result.recommendations,
-                    queue: database.listDownloadJobs(),
-                    provenance: {
-                        application: 'pica-library',
-                        version: PRODUCT_VERSION,
-                        source: 'connected-preparation'
-                    }
+                    source: 'connected-preparation',
+                    comics: favorites
                 }),
                 'utf8'
             )

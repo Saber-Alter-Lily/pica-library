@@ -199,6 +199,50 @@ main {
 .notice {
     padding: 14px;
 }
+.onboarding-card,
+.export-panel {
+    margin-bottom: 18px;
+    padding: 20px;
+    border: 1px solid #b8d3c3;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f7fcf9, #fff);
+}
+.onboarding-card h3,
+.export-panel h3 {
+    margin: 0 0 8px;
+}
+.onboarding-card ol {
+    margin: 14px 0;
+    padding-left: 24px;
+    line-height: 1.7;
+}
+.onboarding-card p,
+.export-panel p {
+    color: var(--muted);
+}
+.eyebrow {
+    margin: 0 0 5px;
+    color: var(--green) !important;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.button-link {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--ink);
+    text-decoration: none;
+    background: #fff;
+}
+.compatibility-note {
+    margin-bottom: 0;
+    font-size: 13px;
+}
 .notice p {
     margin: 4px 0 0;
     color: var(--muted);

@@ -23,6 +23,22 @@ x64 package for ordinary users:
 
 v0.1.2 includes full Simplified Chinese localization and bilingual onboarding.
 
+The `v0.1.3` Browser Lite onboarding update is currently a release candidate
+under review; `v0.1.2` remains the stable release.
+
+### Browser Lite
+
+Browser Lite displays an exported library in the browser and never asks for a
+Pica account or password. To prepare its recommended data package:
+
+1. Download and open the [Pica Library Windows release](https://github.com/Saber-Alter-Lily/pica-library/releases).
+2. Complete setup and prepare the library.
+3. Open **Settings → Browser Lite → Export Browser Lite Data Package**.
+4. Open Browser Lite and import `pica-library-bundle.json`.
+
+The complete package can carry prepared library, author and recommendation
+data. Existing compatible CSV and JSON imports remain available.
+
 The package carries its own official Node.js runtime. It does not require a
 terminal, Node.js, npm, pnpm, Git, administrator access, or `.env.local`.
 Credentials are protected for the current Windows user with DPAPI and are never

@@ -2,6 +2,13 @@
 
 # Windows One-Click Distribution
 
+## Export a Browser Lite Data Package
+
+After preparing the library, open **Settings → Browser Lite** and choose
+**Export Browser Lite Data Package**. Save the default
+`pica-library-bundle.json`, then select that file on the Browser Lite page.
+The web page does not need or request the Pica account or password.
+
 Pica Library v0.1.2 targets Windows 10/11 x64 as its ordinary-user
 package. Download the ZIP, extract the entire directory, and double-click
 `Pica Library.exe`. Do not run the executable from inside an archive viewer.

@@ -17,7 +17,7 @@ function Get-Sha256([string]$file) {
     finally { $algorithm.Dispose() }
 }
 
-if ($version -ne '0.1.2') { throw 'Windows package must report version 0.1.2' }
+if ($version -ne '0.1.3') { throw 'Windows package must report version 0.1.3' }
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve source commit SHA' }
 if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
 if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }
@@ -64,12 +64,13 @@ Pica Library v$version for Windows 10/11 x64
 1. Extract the entire ZIP.
 2. Double-click Pica Library.exe.
 3. Complete setup in the browser.
+4. To use Browser Lite, open Settings > Browser Lite and export the data package.
 
 No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
-$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('UGljYSBMaWJyYXJ5IHYwLjEuMiBXaW5kb3dzIDEwLzExIHg2NAoK5L2/55So5pa55rOV77yaCgoxLiDlrozmlbTop6PljosgWklQ44CCCjIuIOWPjOWHuyBQaWNhIExpYnJhcnkuZXhl44CCCjMuIOa1j+iniOWZqOS8muiHquWKqOaJk+W8gO+8jOaMiemmluasoeWQr+WKqOWQkeWvvOWujOaIkOmFjee9ruOAggoK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTjgIIK5peg6ZyA5L2/55So5ZG95Luk6KGM77yM5Lmf5peg6ZyA566h55CG5ZGY5p2D6ZmQ44CCCgrlvZPliY3lj6/miafooYzmlofku7bmnKrov5vooYzku6PnoIHnrb7lkI3vvIzlm6DmraQgV2luZG93cyBTbWFydFNjcmVlbgrpppbmrKHov5DooYzml7blj6/og73mmL7npLrkv6Hoqonmj5DnpLrjgILor7fnoa7orqTmlofku7bmnaXoh6rmnKzpobnnm67lrpjmlrkKR2l0SHViIFJlbGVhc2XvvIzlubblj6/kvb/nlKggU0hBLTI1NiDmoKHpqozmlofku7blrozmlbTmgKfjgII='))
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('UGljYSBMaWJyYXJ5IHYwLjEuMyBXaW5kb3dzIDEwLzExIHg2NAoK5L2/55So5pa55rOV77yaCgoxLiDlrozmlbTop6PljosgWklQ44CCCjIuIOWPjOWHuyBQaWNhIExpYnJhcnkuZXhl44CCCjMuIOa1j+iniOWZqOS8muiHquWKqOaJk+W8gO+8jOaMiemmluasoeWQr+WKqOWQkeWvvOWujOaIkOmFjee9ruOAggo0LiDlpoLpnIDkvb/nlKggQnJvd3NlciBMaXRl77yM6K+35Zyo4oCc6K6+572uIOKGkiBCcm93c2VyIExpdGXigJ3kuK3lr7zlh7rmlbDmja7ljIXjgIIKCuaXoOmcgOWuieijhSBOb2RlLmpz44CBbnBt44CBcG5wbSDmiJYgR2l044CCCuaXoOmcgOS9v+eUqOWRveS7pOihjO+8jOS5n+aXoOmcgOeuoeeQhuWRmOadg+mZkOOAggoK5b2T5YmN5Y+v5omn6KGM5paH5Lu25pyq6L+b6KGM5Luj56CB562+5ZCN77yM5Zug5q2kIFdpbmRvd3MgU21hcnRTY3JlZW4K6aaW5qyh6L+Q6KGM5pe25Y+v6IO95pi+56S65L+h6KqJ5o+Q56S644CC6K+356Gu6K6k5paH5Lu25p2l6Ieq5pys6aG555uu5a6Y5pa5CkdpdEh1YiBSZWxlYXNl77yM5bm25Y+v5L2/55SoIFNIQS0yNTYg5qCh6aqM5paH5Lu25a6M5pW05oCn44CC'))
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 

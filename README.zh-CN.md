@@ -2,6 +2,19 @@
 
 # Pica Library
 
+> 当前稳定版本仍为 `v0.1.2`；`v0.1.3` Browser Lite 引导更新正在审核中。
+
+## Browser Lite
+
+Browser Lite 可直接在浏览器中查看已导出的漫画库数据，无需在网页中输入 Pica 账号或密码。
+
+1. 从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases) 下载并打开 Pica Library Windows 版。
+2. 完成首次设置并准备好漫画库。
+3. 打开“设置 → Browser Lite → 导出 Browser Lite 数据包”。
+4. 在 Browser Lite 中导入 `pica-library-bundle.json`。
+
+完整数据包可包含已准备好的漫画库、作者信息和推荐结果；仍兼容现有 CSV / JSON 文件。
+
 一个面向大量 Pica 收藏的本地漫画库管理、发现与下载工具。
 
 ## Windows 一键使用

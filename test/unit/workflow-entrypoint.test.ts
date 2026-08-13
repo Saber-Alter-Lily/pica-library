@@ -26,11 +26,13 @@ describe('built CLI entrypoint contract', () => {
         const cli = read('src/library-cli.ts')
         const server = read('src/library/server.ts')
 
-        expect(packageJson.version).toBe('0.1.2')
+        expect(packageJson.version).toBe('0.1.3')
         expect(version).toContain("from '../package.json'")
         expect(version).toContain('export const PRODUCT_VERSION')
         expect(cli).toContain('pica-library ${PRODUCT_VERSION}')
-        expect(cli).toContain('version: PRODUCT_VERSION')
+        expect(read('src/library/bundle-export.ts')).toContain(
+            'version: PRODUCT_VERSION'
+        )
         expect(server).toContain('version: PRODUCT_VERSION')
     })
 

@@ -27,14 +27,14 @@ jobs:
       - name: Artifact-only clean Windows smoke
         shell: powershell
         run: |
-          $zip = (Get-ChildItem artifacts\Pica-Library-v0.1.2-windows-x64.zip).FullName
+          $zip = (Get-ChildItem artifacts\Pica-Library-v0.1.3-windows-x64.zip).FullName
           .\scripts\test-windows-artifact.ps1 -Zip $zip
           .\scripts\test-windows-artifact.ps1 -Zip $zip -SetupPersistence
           .\scripts\test-windows-artifact.ps1 -Zip $zip -PortCollision
       - name: Validate candidate contents
         shell: powershell
         run: |
-          $zip = Get-ChildItem artifacts\Pica-Library-v0.1.2-windows-x64.zip
+          $zip = Get-ChildItem artifacts\Pica-Library-v0.1.3-windows-x64.zip
           if (-not $zip) { throw 'Candidate ZIP missing' }
           $sha = [Security.Cryptography.SHA256]::Create()
           try { $actual = ([BitConverter]::ToString($sha.ComputeHash([IO.File]::OpenRead($zip.FullName)))).Replace('-','').ToLowerInvariant() }
@@ -42,8 +42,8 @@ jobs:
           if ((Get-Content artifacts\SHA256SUMS.txt) -notmatch $actual) { throw 'Checksum mismatch' }
       - uses: actions/upload-artifact@v4
         with:
-          name: pica-library-v0.1.2-windows-x64-candidate
+          name: pica-library-v0.1.3-windows-x64-candidate
           path: |
-            artifacts/Pica-Library-v0.1.2-windows-x64.zip
+            artifacts/Pica-Library-v0.1.3-windows-x64.zip
             artifacts/SHA256SUMS.txt
           retention-days: 1

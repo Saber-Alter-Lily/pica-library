@@ -189,6 +189,29 @@ $('#open-data').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', { kind: 'data' })
 $('#open-logs').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', { kind: 'logs' })
+$('#export-browser-lite').onclick = async () => {
+    const message = $('#browser-lite-export-message')
+    message.textContent = t('message.browserLiteExporting')
+    try {
+        const result = await desktopPost('/api/v1/desktop/export-browser-lite')
+        if (result.cancelled) {
+            message.textContent = t('message.browserLiteExportCancelled')
+            return
+        }
+        message.textContent = t('message.browserLiteExported')
+        $('#open-browser-lite-export').hidden = false
+    } catch (error) {
+        message.textContent = String(error?.message || error).includes(
+            'There is no library data to export yet'
+        )
+            ? t('message.browserLiteExportEmpty')
+            : t('message.browserLiteExportFailed')
+    }
+}
+$('#open-browser-lite-export').onclick = () =>
+    desktopPost('/api/v1/desktop/open-directory', {
+        kind: 'browser-lite-export'
+    })
 $('#exit-app').onclick = async () => {
     await desktopPost('/api/v1/desktop/shutdown')
     document.body.innerHTML = `<main><article class="notice"><strong>${t('message.stopped')}</strong><p>${t('message.closeTab')}</p></article></main>`
@@ -499,6 +522,8 @@ async function enqueue(ids, source) {
 }
 
 function renderAll(summary) {
+    $('#browser-lite-onboarding').hidden =
+        state.mode !== 'lite' || state.records.length > 0
     renderSummary(summary)
     renderComics()
     renderAuthors()
@@ -551,7 +576,7 @@ function setLibraryView(view) {
 $('#view-grid').onclick = () => setLibraryView('grid')
 $('#view-list').onclick = () => setLibraryView('list')
 $('#pending-only').onchange = renderAuthors
-$('#import-button').onclick = async () => {
+async function importSelectedFile() {
     const file = $('#import-file').files[0]
     if (!file) return
     try {
@@ -579,6 +604,9 @@ $('#import-button').onclick = async () => {
         $('#import-result').textContent = localizeError(language, error)
     }
 }
+$('#import-button').onclick = importSelectedFile
+$('#import-file').onchange = importSelectedFile
+$('#onboarding-import').onclick = () => $('#import-file').click()
 $('#sync-button').onclick = async () => {
     try {
         if (state.mode !== 'connected')

@@ -46,6 +46,21 @@ export const translations = {
         'home.modes': 'Two modes',
         'home.modesText':
             'Browser Lite stores imported data in this browser. Connected mode uses the local service to access the provider; account credentials are not written to exported Bundles.',
+        'browserLite.title': 'Get started with Browser Lite',
+        'browserLite.intro':
+            'Browser Lite uses a data package exported by Pica Library. You do not need to enter your Pica account or password on this page.',
+        'browserLite.step1': 'Download and open Pica Library for Windows',
+        'browserLite.step2': 'Complete setup and prepare your library',
+        'browserLite.step3':
+            'In Settings → Browser Lite, export a Browser Lite Data Package',
+        'browserLite.step4':
+            'Import the generated pica-library-bundle.json here',
+        'browserLite.detail':
+            'A complete data package can include your prepared library, author information and recommendation results.',
+        'browserLite.select': 'Choose Browser Lite Data Package',
+        'browserLite.download': 'Download Windows version',
+        'browserLite.compatibility':
+            'Existing compatible CSV / JSON files are also supported.',
         'library.title': 'Library',
         'library.subtitle': 'Filter, review and select comics to download.',
         'library.import': 'Import Bundle',
@@ -116,6 +131,11 @@ export const translations = {
         'settings.openData': 'Open data folder',
         'settings.openLogs': 'Open log folder',
         'settings.exit': 'Exit Pica Library',
+        'settings.browserLiteTitle': 'Browser Lite',
+        'settings.browserLiteText':
+            'Export your current library as a Browser Lite data package for use in the standalone Browser Lite page.',
+        'settings.browserLiteExport': 'Export Browser Lite Data Package',
+        'settings.browserLiteOpenFolder': 'Open containing folder',
         'author.approve': 'Confirm',
         'author.separate': 'Keep separate',
         'author.research': 'Needs research',
@@ -150,6 +170,14 @@ export const translations = {
         'message.savedOpening': 'Saved. Opening your library...',
         'message.savedRestarting': 'Saved. Restarting the local engine...',
         'message.settingsSaved': 'Settings saved.',
+        'message.browserLiteExporting': 'Preparing the data package...',
+        'message.browserLiteExported':
+            'The Browser Lite Data Package has been exported.',
+        'message.browserLiteExportCancelled': 'Export cancelled.',
+        'message.browserLiteExportFailed':
+            'Data package export failed. Please try again later.',
+        'message.browserLiteExportEmpty':
+            'There is no library data to export yet. Sync your favorites or import library data first.',
         'message.stopped': 'Pica Library has stopped.',
         'message.closeTab': 'You can close this tab.',
         'message.libraryCount': 'Showing {shown} of {total} comics',
@@ -236,6 +264,19 @@ export const translations = {
         'home.modes': '两种模式',
         'home.modesText':
             'Browser Lite 将导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号凭据不会写入导出数据包。',
+        'browserLite.title': '开始使用 Browser Lite',
+        'browserLite.intro':
+            'Browser Lite 使用从 Pica Library 导出的数据包，无需在网页中填写 Pica 账号或密码。',
+        'browserLite.step1': '下载并打开 Pica Library Windows 版',
+        'browserLite.step2': '完成首次设置并准备好漫画库',
+        'browserLite.step3':
+            '在“设置 → Browser Lite”中导出 Browser Lite 数据包',
+        'browserLite.step4': '将生成的 pica-library-bundle.json 导入这里',
+        'browserLite.detail':
+            '完整数据包可包含已准备好的漫画库、作者信息和推荐结果。',
+        'browserLite.select': '选择 Browser Lite 数据包',
+        'browserLite.download': '下载 Windows 版',
+        'browserLite.compatibility': '也支持现有兼容的 CSV / JSON 文件。',
         'library.title': '漫画库',
         'library.subtitle': '筛选、核对并选择需要下载的作品。',
         'library.import': '导入数据包',
@@ -300,6 +341,11 @@ export const translations = {
         'settings.openData': '打开数据目录',
         'settings.openLogs': '打开日志目录',
         'settings.exit': '退出 Pica Library',
+        'settings.browserLiteTitle': 'Browser Lite',
+        'settings.browserLiteText':
+            '将当前漫画库导出为 Browser Lite 数据包，之后可在独立的 Browser Lite 网页中导入使用。',
+        'settings.browserLiteExport': '导出 Browser Lite 数据包',
+        'settings.browserLiteOpenFolder': '打开所在文件夹',
         'author.approve': '确认',
         'author.separate': '保持分离',
         'author.research': '待研究',
@@ -334,6 +380,12 @@ export const translations = {
         'message.savedOpening': '已保存，正在打开漫画库…',
         'message.savedRestarting': '已保存，正在重启本地服务…',
         'message.settingsSaved': '设置已保存。',
+        'message.browserLiteExporting': '正在准备数据包…',
+        'message.browserLiteExported': 'Browser Lite 数据包已导出。',
+        'message.browserLiteExportCancelled': '已取消导出。',
+        'message.browserLiteExportFailed': '数据包导出失败，请稍后重试。',
+        'message.browserLiteExportEmpty':
+            '当前还没有可导出的漫画库数据。请先同步收藏或导入漫画库数据后再导出。',
         'message.stopped': 'Pica Library 已退出。',
         'message.closeTab': '现在可以关闭此页面。',
         'message.libraryCount': '已显示 {shown} / {total} 部作品',
@@ -497,6 +549,19 @@ export const domTranslations = [
     ['[data-go="downloads"] span', 'home.downloadsHint'],
     ['#home .notice strong', 'home.modes'],
     ['#home .notice p', 'home.modesText'],
+    ['#browser-lite-onboarding h3', 'browserLite.title'],
+    ['#browser-lite-onboarding .onboarding-intro', 'browserLite.intro'],
+    ['#browser-lite-onboarding li:nth-child(1)', 'browserLite.step1'],
+    ['#browser-lite-onboarding li:nth-child(2)', 'browserLite.step2'],
+    ['#browser-lite-onboarding li:nth-child(3)', 'browserLite.step3'],
+    ['#browser-lite-onboarding li:nth-child(4)', 'browserLite.step4'],
+    ['#browser-lite-onboarding .onboarding-detail', 'browserLite.detail'],
+    ['#onboarding-import', 'browserLite.select'],
+    ['#onboarding-download', 'browserLite.download'],
+    [
+        '#browser-lite-onboarding .compatibility-note',
+        'browserLite.compatibility'
+    ],
     ['#library h2', 'library.title'],
     ['#library .page-heading p', 'library.subtitle'],
     ['#import-button', 'library.import'],
@@ -580,6 +645,10 @@ export const domTranslations = [
     ['#open-data', 'settings.openData'],
     ['#open-logs', 'settings.openLogs'],
     ['#exit-app', 'settings.exit'],
+    ['#settings-browser-lite h3', 'settings.browserLiteTitle'],
+    ['#settings-browser-lite > p:first-of-type', 'settings.browserLiteText'],
+    ['#export-browser-lite', 'settings.browserLiteExport'],
+    ['#open-browser-lite-export', 'settings.browserLiteOpenFolder'],
     ['[data-decision="approved"]', 'author.approve'],
     ['[data-decision="keep_separate"]', 'author.separate'],
     ['[data-decision="needs_research"]', 'author.research']

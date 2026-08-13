@@ -20,6 +20,7 @@ export interface DesktopServerController {
         input: Record<string, unknown>
     ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
+    exportBrowserLitePackage: () => Promise<Record<string, unknown>>
     openDirectory: (kind: string) => Promise<void>
     shutdown: () => void
 }
@@ -209,6 +210,17 @@ export async function startLibraryServer(options: {
                 return json(response, 200, {
                     path: await options.desktop.chooseFolder()
                 })
+            }
+            if (
+                url.pathname === '/api/v1/desktop/export-browser-lite' &&
+                request.method === 'POST' &&
+                options.desktop
+            ) {
+                return json(
+                    response,
+                    200,
+                    await options.desktop.exportBrowserLitePackage()
+                )
             }
             if (
                 url.pathname === '/api/v1/desktop/open-directory' &&

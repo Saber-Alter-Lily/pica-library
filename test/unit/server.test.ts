@@ -44,7 +44,7 @@ describe('local web server', () => {
         )
         expect(status).toMatchObject({
             mode: 'connected',
-            version: '0.1.2',
+            version: '0.1.3',
             summary: { comics: 0 }
         })
     })
@@ -241,6 +241,7 @@ describe('desktop mutation security', () => {
                 save,
                 testConnection: async () => ({ success: true }),
                 chooseFolder: async () => null,
+                exportBrowserLitePackage: async () => ({ success: true }),
                 openDirectory: async () => undefined,
                 shutdown: () => undefined
             }

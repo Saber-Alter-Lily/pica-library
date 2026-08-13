@@ -125,6 +125,39 @@
                     </button>
                 </div>
                 <div id="summary" class="metrics"></div>
+                <article id="browser-lite-onboarding" class="onboarding-card">
+                    <p class="eyebrow">Browser Lite</p>
+                    <h3>开始使用 Browser Lite</h3>
+                    <p class="onboarding-intro">
+                        Browser Lite 使用从 Pica Library
+                        导出的数据包，无需在网页中填写 Pica 账号或密码。
+                    </p>
+                    <ol>
+                        <li>下载并打开 Pica Library Windows 版</li>
+                        <li>完成首次设置并准备好漫画库</li>
+                        <li>
+                            在“设置 → Browser Lite”中导出 Browser Lite 数据包
+                        </li>
+                        <li>将生成的 pica-library-bundle.json 导入这里</li>
+                    </ol>
+                    <p class="onboarding-detail">
+                        完整数据包可包含已准备好的漫画库、作者信息和推荐结果。
+                    </p>
+                    <div class="actions">
+                        <button id="onboarding-import" class="primary">
+                            选择 Browser Lite 数据包
+                        </button>
+                        <a
+                            id="onboarding-download"
+                            class="button-link"
+                            href="https://github.com/Saber-Alter-Lily/pica-library/releases"
+                            >下载 Windows 版</a
+                        >
+                    </div>
+                    <p class="compatibility-note">
+                        也支持现有兼容的 CSV / JSON 文件。
+                    </p>
+                </article>
                 <article class="notice">
                     <strong>两种模式</strong>
                     <p>
@@ -418,6 +451,34 @@
                         </button>
                     </div>
                 </form>
+                <article id="settings-browser-lite" class="panel export-panel">
+                    <h3>Browser Lite</h3>
+                    <p>
+                        将当前漫画库导出为 Browser Lite 数据包，之后可在独立的
+                        Browser Lite 网页中导入使用。
+                    </p>
+                    <div class="actions">
+                        <button
+                            id="export-browser-lite"
+                            class="primary"
+                            type="button"
+                        >
+                            导出 Browser Lite 数据包
+                        </button>
+                        <button
+                            id="open-browser-lite-export"
+                            type="button"
+                            hidden
+                        >
+                            打开所在文件夹
+                        </button>
+                    </div>
+                    <p
+                        id="browser-lite-export-message"
+                        class="status"
+                        role="status"
+                    ></p>
+                </article>
             </section>
         </main>
         <template id="author-template">

@@ -2,7 +2,7 @@
 
 # Windows One-Click Distribution
 
-Pica Library v0.1.1 targets Windows 10/11 x64 as its first ordinary-user
+Pica Library v0.1.2 targets Windows 10/11 x64 as its ordinary-user
 package. Download the ZIP, extract the entire directory, and double-click
 `Pica Library.exe`. Do not run the executable from inside an archive viewer.
 
@@ -49,7 +49,7 @@ Application files and mutable data are separate. A future application ZIP can
 be extracted to a new directory without deleting the existing database,
 configuration, cache, or downloads.
 
-The v0.1.1 Windows release is unsigned. Windows may display a SmartScreen or
+The v0.1.2 Windows release is unsigned. Windows may display a SmartScreen or
 reputation warning for a new unsigned open-source executable. No self-signed
 certificate is presented as production signing.
 
@@ -61,5 +61,5 @@ workflow documented in the main README.
 ## Verify SHA-256
 
 Download `SHA256SUMS.txt` from the same official GitHub Release. In PowerShell,
-run `Get-FileHash .\Pica-Library-v0.1.1-windows-x64.zip -Algorithm SHA256`
+run `Get-FileHash .\Pica-Library-v0.1.2-windows-x64.zip -Algorithm SHA256`
 and compare the complete value with the published checksum before extracting.

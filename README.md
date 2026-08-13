@@ -14,15 +14,14 @@ It keeps stable library state instead of treating every download as a new job:
 
 ## Try it
 
-Current stable release: `v0.1.1`. This release adds a Windows 10/11
+Current stable release: `v0.1.2`. This release adds a Windows 10/11
 x64 package for ordinary users:
 
-1. Download `Pica-Library-v0.1.1-windows-x64.zip` from the release.
+1. Download `Pica-Library-v0.1.2-windows-x64.zip` from the release.
 2. Extract the entire ZIP.
 3. Double-click `Pica Library.exe` and complete setup in the browser.
 
-The current development candidate is `v0.1.2`, focused on Simplified Chinese
-localization and onboarding. It is not yet a public stable release.
+v0.1.2 includes full Simplified Chinese localization and bilingual onboarding.
 
 The package carries its own official Node.js runtime. It does not require a
 terminal, Node.js, npm, pnpm, Git, administrator access, or `.env.local`.

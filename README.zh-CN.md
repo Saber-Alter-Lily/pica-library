@@ -6,10 +6,10 @@
 
 ## Windows 一键使用
 
-当前稳定版本为 `v0.1.1`。`v0.1.2` 是正在审核的中文本地化开发候选版，尚未正式发布。
+当前稳定版本为 `v0.1.2`，包含完整简体中文界面和双语首次启动向导。
 
 1. 打开 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases)。
-2. 下载 `Pica-Library-v0.1.1-windows-x64.zip`。
+2. 下载 `Pica-Library-v0.1.2-windows-x64.zip`。
 3. 完整解压 ZIP，不要直接在压缩软件中运行。
 4. 双击 `Pica Library.exe`。
 5. 按首次启动向导完成设置。

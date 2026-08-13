@@ -4,7 +4,7 @@
 
 ## 下载与启动
 
-1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases) 下载 `Pica-Library-v0.1.1-windows-x64.zip`。
+1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases) 下载 `Pica-Library-v0.1.2-windows-x64.zip`。
 2. 完整解压到一个新文件夹，不要直接在压缩软件中运行。
 3. 双击 `Pica Library.exe`。
 4. 浏览器将自动打开首次启动向导；填写 Pica 账号和密码，选择漫画保存目录与下载模式，可按需填写 HTTP/HTTPS 代理。
@@ -44,7 +44,7 @@
 从同一官方 Release 下载 `SHA256SUMS.txt`，然后在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash .\Pica-Library-v0.1.1-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\Pica-Library-v0.1.2-windows-x64.zip -Algorithm SHA256
 ```
 
 将完整校验值与发布页提供的值逐字比较，一致后再解压运行。

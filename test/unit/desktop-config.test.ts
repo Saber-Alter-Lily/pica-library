@@ -87,7 +87,7 @@ describe('desktop configuration security', () => {
             buildConfig({
                 account: 'a',
                 password: 'b',
-                libraryDirectory: 'C:\\Library',
+                libraryDirectory: path.resolve('library'),
                 profile: 'balanced',
                 proxyUrl: 'socks5://127.0.0.1:1080'
             })

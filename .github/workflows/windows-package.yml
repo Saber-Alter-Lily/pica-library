@@ -36,7 +36,10 @@ jobs:
         run: |
           $zip = Get-ChildItem artifacts\Pica-Library-v0.1.1-windows-x64.zip
           if (-not $zip) { throw 'Candidate ZIP missing' }
-          if ((Get-Content artifacts\SHA256SUMS.txt) -notmatch (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()) { throw 'Checksum mismatch' }
+          $sha = [Security.Cryptography.SHA256]::Create()
+          try { $actual = ([BitConverter]::ToString($sha.ComputeHash([IO.File]::OpenRead($zip.FullName)))).Replace('-','').ToLowerInvariant() }
+          finally { $sha.Dispose() }
+          if ((Get-Content artifacts\SHA256SUMS.txt) -notmatch $actual) { throw 'Checksum mismatch' }
       - uses: actions/upload-artifact@v4
         with:
           name: pica-library-v0.1.1-windows-x64-candidate

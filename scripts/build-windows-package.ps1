@@ -11,6 +11,12 @@ $runtimeCache = Join-Path $root "artifacts\cache\node-v$nodeVersion-win-x64.zip"
 $runtimeFile = "node-v$nodeVersion-win-x64.zip"
 $sourceSha = (git -C $root rev-parse HEAD).Trim()
 
+function Get-Sha256([string]$file) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($algorithm.ComputeHash([IO.File]::OpenRead($file)))).Replace('-','').ToLowerInvariant() }
+    finally { $algorithm.Dispose() }
+}
+
 if ($version -ne '0.1.1') { throw 'Windows package must report version 0.1.1' }
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve source commit SHA' }
 if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
@@ -27,7 +33,7 @@ $checksums = (Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v
 $expectedLine = @($checksums -split "`n" | Where-Object { $_ -match "\s$([regex]::Escape($runtimeFile))\s*$" })[0]
 if (-not $expectedLine) { throw 'Official Node.js runtime checksum was not found' }
 $expectedHash = ($expectedLine -split '\s+')[0].ToLowerInvariant()
-$actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeCache).Hash.ToLowerInvariant()
+$actualHash = Get-Sha256 $runtimeCache
 if ($actualHash -ne $expectedHash) { throw 'Official Node.js runtime checksum mismatch' }
 $runtimeExtract = Join-Path $buildRoot 'runtime-extract'
 if (Test-Path -LiteralPath $runtimeExtract) { Remove-Item -Recurse -Force -LiteralPath $runtimeExtract }
@@ -74,6 +80,6 @@ foreach ($file in $textFiles) {
     }
 }
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
-$hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+$hash = Get-Sha256 $zip
 [IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
 [ordered]@{ path=$zip; sha256=$hash; size_bytes=(Get-Item $zip).Length; uncompressed_bytes=(Get-ChildItem $stage -File -Recurse | Measure-Object Length -Sum).Sum; file_count=@(Get-ChildItem $stage -File -Recurse).Count; node_version=$nodeVersion; product_version=$version; source_sha=$sourceSha } | ConvertTo-Json

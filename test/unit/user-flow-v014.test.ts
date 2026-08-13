@@ -42,6 +42,8 @@ describe('v0.1.4 local user flow', () => {
         expect(app).toContain("localStorage.setItem('pica-covers-enabled'")
         expect(app).toContain("localStorage.setItem('pica-recommendation-view'")
         expect(app).toContain('/api/v1/desktop/sync-export-browser-lite')
+        expect(app).toContain('limit: 60')
+        expect(app).toContain("$('#lite-reimport').onclick")
     })
 
     it('keeps proxy onboarding visible above the first-run fold', () => {
@@ -58,6 +60,8 @@ describe('v0.1.4 local user flow', () => {
         expect(html).toContain('id="settings-detect-proxy"')
         expect(html).toContain('id="home-sync"')
         expect(html).toContain('id="setup-sync"')
+        expect(html).toContain('id="lite-snapshot-time"')
+        expect(html).toContain('id="lite-reimport"')
     })
 
     it('creates Windows-readable UTF-8 logs with a BOM', () => {

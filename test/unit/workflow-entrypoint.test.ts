@@ -42,7 +42,7 @@ describe('built CLI entrypoint contract', () => {
             app.indexOf("post('/api/v1/recommendations'"),
             app.indexOf('state.profile = value.profile')
         )
-        expect(request).toContain('limit: 30')
+        expect(request).toContain('limit: 60')
         expect(request).not.toContain('seedCount: 8')
         expect(request).not.toContain('seedCount:')
         expect(read('src/library/server.ts')).toContain(

@@ -205,6 +205,12 @@
                     </div>
                 </div>
                 <p id="import-result" class="status"></p>
+                <div id="lite-snapshot-bar" class="notice" hidden>
+                    <span id="lite-snapshot-time"></span>
+                    <button id="lite-reimport" type="button">
+                        重新导入数据包
+                    </button>
+                </div>
                 <div class="toolbar">
                     <label
                         ><input id="cover-toggle" type="checkbox" checked />
@@ -471,14 +477,14 @@
                             <option value="fast">Fast</option>
                         </select></label
                     >
-                    <details class="wide">
-                        <summary>Advanced proxy</summary>
+                    <div class="wide setup-proxy-section">
+                        <h3>网络代理</h3>
                         <label
                             >HTTP/HTTPS proxy<input
                                 id="settings-proxy"
                                 placeholder="Disabled"
                         /></label>
-                    </details>
+                    </div>
                     <button id="settings-detect-proxy" type="button">
                         自动检测代理
                     </button>

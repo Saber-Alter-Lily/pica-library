@@ -160,6 +160,10 @@ function renderTimestamps() {
     $('#last-sync').textContent = `上次同步：${displayDate(syncedAt)}`
     $('#browser-lite-timestamps').textContent =
         `最近同步：${displayDate(syncedAt)} / 最近导出：${displayDate(exportedAt)}`
+    $('#lite-snapshot-bar').hidden =
+        state.mode !== 'lite' || state.records.length === 0
+    $('#lite-snapshot-time').textContent =
+        `当前数据包生成时间：${displayDate(state.generatedAt)}`
 }
 
 async function waitForDesktopHealth(timeoutMs = 30000) {
@@ -755,6 +759,7 @@ async function importSelectedFile() {
 $('#import-button').onclick = importSelectedFile
 $('#import-file').onchange = importSelectedFile
 $('#onboarding-import').onclick = () => $('#import-file').click()
+$('#lite-reimport').onclick = () => $('#import-file').click()
 async function syncFavorites(message = $('#import-result')) {
     try {
         if (state.mode !== 'connected')
@@ -818,7 +823,7 @@ $('#recommend-button').onclick = async () => {
     try {
         if (state.mode === 'connected') {
             const value = await post('/api/v1/recommendations', {
-                limit: 30
+                limit: 60
             })
             state.profile = value.profile
             state.recommendations = value.recommendations

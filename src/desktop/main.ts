@@ -213,9 +213,7 @@ async function detectProxy(input: Record<string, unknown>) {
             windowsExecutable('System32', 'reg.exe'),
             [
                 'query',
-                'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings',
-                '/v',
-                'ProxyServer'
+                'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings'
             ],
             { encoding: 'utf8', windowsHide: true, env: sanitizedChildEnv() }
         )
@@ -498,13 +496,16 @@ async function startEngine(preferredPort: number) {
 
 async function restartEngine() {
     if (stopping) return
+    const previousUrl = currentUrl
     await closeEngine()
     if (stopping) return
     const port = currentUrl
         ? Number(new URL(currentUrl).port)
         : config?.preferredPort ?? 4789
     await startEngine(port || config?.preferredPort || 4789)
-    await waitForHealth(currentUrl)
+    if (await waitForHealth(currentUrl)) {
+        if (currentUrl !== previousUrl) browser(currentUrl)
+    }
 }
 
 async function main() {

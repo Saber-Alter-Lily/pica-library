@@ -11,6 +11,7 @@ export interface DesktopPaths {
     runtimeState: string
     lock: string
     instance: string
+    exportState: string
 }
 
 export function desktopPaths(rootOverride?: string): DesktopPaths {
@@ -31,6 +32,11 @@ export function desktopPaths(rootOverride?: string): DesktopPaths {
         logs: path.join(local, 'logs'),
         runtimeState: path.join(local, 'runtime-state'),
         lock: path.join(local, 'runtime-state', 'instance.lock'),
-        instance: path.join(local, 'runtime-state', 'instance.json')
+        instance: path.join(local, 'runtime-state', 'instance.json'),
+        exportState: path.join(
+            local,
+            'runtime-state',
+            'browser-lite-export.json'
+        )
     }
 }

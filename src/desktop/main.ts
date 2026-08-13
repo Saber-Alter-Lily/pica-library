@@ -60,7 +60,28 @@ let service: LibraryService | null = null
 let stopping = false
 let currentUrl = ''
 let lastBrowserLiteExportDirectory: string | null = null
-let lastBrowserLiteExportAt: string | null = null
+let lastBrowserLiteExportAt: string | null = (() => {
+    try {
+        const value = JSON.parse(
+            fs.readFileSync(paths.exportState, 'utf8')
+        ) as {
+            generatedAt?: unknown
+        }
+        return typeof value.generatedAt === 'string' ? value.generatedAt : null
+    } catch {
+        return null
+    }
+})()
+
+function saveExportState(generatedAt: string) {
+    const temporary = `${paths.exportState}.tmp`
+    fs.writeFileSync(temporary, JSON.stringify({ generatedAt }), {
+        encoding: 'utf8',
+        mode: 0o600
+    })
+    fs.renameSync(temporary, paths.exportState)
+    lastBrowserLiteExportAt = generatedAt
+}
 
 function showStartupError() {
     if (process.platform !== 'win32') return
@@ -422,7 +443,7 @@ async function startEngine(preferredPort: number) {
             if (!file) return { success: false, cancelled: true }
             fs.writeFileSync(file, content, 'utf8')
             lastBrowserLiteExportDirectory = path.dirname(file)
-            lastBrowserLiteExportAt = new Date().toISOString()
+            saveExportState(new Date().toISOString())
             return {
                 success: true,
                 fileName: 'pica-library-bundle.json',
@@ -446,7 +467,7 @@ async function startEngine(preferredPort: number) {
             if (!file) return { success: false, cancelled: true }
             fs.writeFileSync(file, content, 'utf8')
             lastBrowserLiteExportDirectory = path.dirname(file)
-            lastBrowserLiteExportAt = generatedAt
+            saveExportState(generatedAt)
             return {
                 success: true,
                 fileName: 'pica-library-bundle.json',

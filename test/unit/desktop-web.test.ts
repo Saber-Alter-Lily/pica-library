@@ -32,6 +32,14 @@ describe('desktop setup and settings UI contract', () => {
         expect(app).toContain("$('#settings-password').value = ''")
     })
 
+    it('persists only the non-sensitive Browser Lite export timestamp', () => {
+        const main = read('src/desktop/main.ts')
+        const paths = read('src/desktop/paths.ts')
+        expect(paths).toContain('browser-lite-export.json')
+        expect(main).toContain('saveExportState(generatedAt)')
+        expect(main).toContain('JSON.stringify({ generatedAt })')
+    })
+
     it('packages one launcher with an official bundled runtime', () => {
         const build = read('scripts/build-windows-package.ps1')
         expect(build).toContain('Pica Library.exe')

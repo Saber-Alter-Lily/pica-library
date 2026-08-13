@@ -1,3 +1,5 @@
+[简体中文](README.zh-CN.md) | English
+
 # Pica Library
 
 Pica Library is a collection-centric manager, explainable discovery engine,
@@ -18,6 +20,9 @@ x64 package for ordinary users:
 1. Download `Pica-Library-v0.1.1-windows-x64.zip` from the release.
 2. Extract the entire ZIP.
 3. Double-click `Pica Library.exe` and complete setup in the browser.
+
+The current development candidate is `v0.1.2`, focused on Simplified Chinese
+localization and onboarding. It is not yet a public stable release.
 
 The package carries its own official Node.js runtime. It does not require a
 terminal, Node.js, npm, pnpm, Git, administrator access, or `.env.local`.
@@ -106,3 +111,6 @@ architecture. See [UPSTREAM.md](UPSTREAM.md), [NOTICE.md](NOTICE.md), and
 
 Architecture and review records are in [docs/architecture.md](docs/architecture.md)
 and [docs/audit](docs/audit).
+
+See the [Windows distribution guide](docs/windows-distribution.md) for setup,
+upgrades, SmartScreen guidance and SHA-256 verification.

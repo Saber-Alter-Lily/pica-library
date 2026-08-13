@@ -12,7 +12,16 @@
                 <h1>Pica Library</h1>
                 <p>收藏整理、个性发现与增量下载</p>
             </div>
-            <span id="mode" class="mode">正在检测模式</span>
+            <div class="header-controls">
+                <label class="language-control"
+                    ><span>界面语言</span>
+                    <select id="language-select">
+                        <option value="zh-CN">简体中文</option>
+                        <option value="en">English</option>
+                    </select>
+                </label>
+                <span id="mode" class="mode">正在检测模式</span>
+            </div>
         </header>
         <nav aria-label="主导航">
             <button data-view="home" class="active">Home</button>
@@ -77,6 +86,10 @@
                                     placeholder="http://127.0.0.1:7890"
                             /></label>
                         </details>
+                        <p id="setup-security" class="setup-help wide">
+                            账号和密码仅用于连接 Pica 服务。Windows 版本使用当前
+                            Windows 用户的 DPAPI 加密保存凭据。
+                        </p>
                         <p
                             id="setup-message"
                             class="status wide"

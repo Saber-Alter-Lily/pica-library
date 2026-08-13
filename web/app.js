@@ -7,6 +7,13 @@ import {
     saveLiteState
 } from './lite-state.js'
 import {
+    applyTranslations,
+    localizeError,
+    resolveLanguage,
+    saveLanguage,
+    translate
+} from './i18n.js'
+import {
     LIBRARY_PAGE_SIZE,
     buildTagFrequencyIndex,
     selectDisplayTags,
@@ -22,6 +29,11 @@ const state = {
     ...emptyLiteState()
 }
 let desktop = null
+let language = resolveLanguage(
+    localStorage,
+    navigator.languages || [navigator.language]
+)
+const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
 const escapeHtml = (value) =>
@@ -46,6 +58,21 @@ const splitList = (value) =>
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean)
+
+function applyLanguage(nextLanguage, persist = false) {
+    language = nextLanguage
+    if (persist) language = saveLanguage(localStorage, language)
+    $('#language-select').value = language
+    applyTranslations(language)
+    if (persist) {
+        renderAll()
+        void loadJobs()
+    }
+}
+
+$('#language-select').onchange = (event) =>
+    applyLanguage(event.target.value, true)
+applyLanguage(language)
 
 async function api(path, options) {
     const response = await fetch(path, options)
@@ -116,12 +143,12 @@ async function loadDesktop() {
 
 async function testDesktop(prefix) {
     const message = $(`#${prefix}-message`)
-    message.textContent = 'Testing connection...'
+    message.textContent = t('message.testing')
     try {
         await desktopPost('/api/v1/desktop/test-connection', setupValue(prefix))
-        message.textContent = 'Connection successful.'
+        message.textContent = t('message.connectionSuccess')
     } catch (error) {
-        message.textContent = error.message
+        message.textContent = localizeError(language, error)
     }
 }
 
@@ -134,10 +161,10 @@ $('#setup-form').onsubmit = async (event) => {
     const message = $('#setup-message')
     try {
         await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
-        message.textContent = 'Saved. Opening your library...'
+        message.textContent = t('message.savedOpening')
         setTimeout(() => location.assign('/'), 500)
     } catch (error) {
-        message.textContent = error.message
+        message.textContent = localizeError(language, error)
     }
 }
 $('#settings-form').onsubmit = async (event) => {
@@ -149,11 +176,11 @@ $('#settings-form').onsubmit = async (event) => {
         if (!value.password) delete value.password
         const result = await desktopPost('/api/v1/desktop/settings', value)
         message.textContent = result.restarting
-            ? 'Saved. Restarting local engine...'
-            : 'Settings saved.'
+            ? t('message.savedRestarting')
+            : t('message.settingsSaved')
         $('#settings-password').value = ''
     } catch (error) {
-        message.textContent = error.message
+        message.textContent = localizeError(language, error)
     }
 }
 $('#open-data').onclick = () =>
@@ -162,8 +189,7 @@ $('#open-logs').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', { kind: 'logs' })
 $('#exit-app').onclick = async () => {
     await desktopPost('/api/v1/desktop/shutdown')
-    document.body.innerHTML =
-        '<main><article class="notice"><strong>Pica Library has stopped.</strong><p>You can close this tab.</p></article></main>'
+    document.body.innerHTML = `<main><article class="notice"><strong>${t('message.stopped')}</strong><p>${t('message.closeTab')}</p></article></main>`
 }
 
 function replaceLiteState(value) {
@@ -277,19 +303,19 @@ function deriveAuthors() {
 
 function renderSummary(value = {}) {
     const items = [
-        ['漫画', value.comics ?? state.records.length],
-        ['收藏', value.favorites ?? state.records.length],
-        ['作者', value.authors ?? state.authors.length],
+        [t('common.comics'), value.comics ?? state.records.length],
+        [t('common.favorites'), value.favorites ?? state.records.length],
+        [t('common.authors'), value.authors ?? state.authors.length],
         [
-            '待审核作者',
+            t('common.pendingAuthors'),
             value.authorsPendingReview ??
                 state.authors.filter(
                     (author) => author.reviewStatus === 'pending'
                 ).length
         ],
-        ['章节', value.episodes || 0],
-        ['已下载图片', value.downloadedPictures || 0],
-        ['Lite 计划', state.queue.length]
+        [t('common.episodes'), value.episodes || 0],
+        [t('common.downloadedPictures'), value.downloadedPictures || 0],
+        [t('common.litePlans'), state.queue.length]
     ]
     $('#summary').innerHTML = items
         .map(
@@ -344,16 +370,16 @@ function renderComics(records = state.records) {
             (comic) => `<article class="comic-card">
                 ${cover(comic)}
                 <div class="comic-card-body">
-                    <label class="comic-select"><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /> 选择</label>
+                    <label class="comic-select"><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /> ${t('action.select')}</label>
                     <h3>${escapeHtml(comic.title)}</h3>
-                    <p>${escapeHtml(comic.canonicalAuthor || comic.author || '未知作者')}</p>
+                    <p>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</p>
                     <div>${tagsFor(comic)
                         .map(
                             (tag) =>
                                 `<span class="tag">${escapeHtml(tag)}</span>`
                         )
                         .join('')}</div>
-                    <p class="comic-meta">爱心 ${Number(comic.totalLikes || 0).toLocaleString()} · ${Number(comic.downloadedPictures || 0)}/${Number(comic.knownPictures || 0)} 已下载</p>
+                    <p class="comic-meta">${t('message.comicProgress', { likes: Number(comic.totalLikes || 0).toLocaleString(), downloaded: Number(comic.downloadedPictures || 0), total: Number(comic.knownPictures || 0) })}</p>
                 </div>
             </article>`
         )
@@ -363,7 +389,7 @@ function renderComics(records = state.records) {
             (comic) => `<tr>
                 <td><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /></td>
                 <td><strong>${escapeHtml(comic.title)}</strong></td>
-                <td>${escapeHtml(comic.canonicalAuthor || comic.author || '未知')}</td>
+                <td>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknown'))}</td>
                 <td>${tagsFor(comic)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</td>
@@ -373,8 +399,10 @@ function renderComics(records = state.records) {
             </tr>`
         )
         .join('')
-    $('#library-count').textContent =
-        `已显示 ${page.length} / ${state.visible.length} 部作品`
+    $('#library-count').textContent = t('message.libraryCount', {
+        shown: page.length,
+        total: state.visible.length
+    })
     $('#load-more').hidden = page.length >= state.visible.length
 }
 
@@ -389,8 +417,14 @@ function renderAuthors() {
         const item = node.querySelector('.list-item')
         item.dataset.authorId = author.id
         node.querySelector('.author-name').textContent = author.canonicalName
-        node.querySelector('.author-meta').textContent =
-            `${author.works} 部作品 · ${(author.aliases || []).join(' / ')} · 置信度 ${Math.round((author.confidence || 0) * 100)}%`
+        node.querySelector('.author-meta').textContent = t(
+            'message.authorMeta',
+            {
+                works: author.works,
+                aliases: (author.aliases || []).join(' / '),
+                confidence: Math.round((author.confidence || 0) * 100)
+            }
+        )
         node.querySelector('.author-evidence').textContent = author.evidence
         $('#author-list').append(node)
     }
@@ -407,12 +441,12 @@ function renderResultCards(records, target, recommendation = false) {
                     <span aria-hidden="true">P</span>
                 </div>
                 <div class="result-body"><h3>${escapeHtml(comic.title)}</h3>
-                <p>${escapeHtml(comic.canonicalAuthor || comic.author || '未知作者')}</p>
+                <p>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</p>
                 <div>${selectDisplayTags(comic, tagFrequencies)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</div>
-                ${recommendation ? '' : `<p>爱心 ${Number(comic.totalLikes || 0).toLocaleString()} · 浏览 ${Number(comic.totalViews || 0).toLocaleString()}</p>`}
-                <button data-result-download="${escapeHtml(comic.comicId)}">加入下载</button>
+                ${recommendation ? '' : `<p>${t('message.popularity', { likes: Number(comic.totalLikes || 0).toLocaleString(), views: Number(comic.totalViews || 0).toLocaleString() })}</p>`}
+                <button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>
                 </div>
             </article>`
         })
@@ -422,8 +456,9 @@ function renderResultCards(records, target, recommendation = false) {
 function renderPreparedRecommendations() {
     $('#profile').innerHTML = ''
     renderResultCards(state.recommendations, '#recommend-results', true)
-    $('#recommend-message').textContent =
-        `共 ${state.recommendations.length} 条推荐。`
+    $('#recommend-message').textContent = t('message.recommendationCount', {
+        count: state.recommendations.length
+    })
 }
 
 function downloadJson(name, value) {
@@ -454,9 +489,10 @@ async function loadJobs() {
             state.queue
                 .map(
                     (job) =>
-                        `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · Browser Lite 计划</p></div></article>`
+                        `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · ${t('message.litePlan')}</p></div></article>`
                 )
-                .join('') || '<article class="notice">下载计划为空。</article>'
+                .join('') ||
+            `<article class="notice">${t('message.emptyPlan')}</article>`
         return
     }
     const jobs = await api('/api/v1/downloads')
@@ -469,11 +505,12 @@ async function loadJobs() {
                       )
                     : 0
                 return `<article class="list-item">
-                    <div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${job.source} · ${job.runner} · ${job.status} · 重试 ${job.retryCount}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${job.progressCompleted}/${job.progressTotal} · ${Number(job.bytes).toLocaleString()} bytes${job.error ? ` · ${escapeHtml(job.error)}` : ''}</p></div>
-                    <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">暂停</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">恢复</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">重试</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">取消</button>` : ''}</div>
+                    <div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source)} · ${escapeHtml(job.runner)} · ${t(`status.${job.status}`)} · ${t('message.retryCount', { count: job.retryCount })}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${job.progressCompleted}/${job.progressTotal} · ${t('message.bytes', { count: Number(job.bytes).toLocaleString() })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
+                    <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">${t('action.pause')}</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">${t('action.resume')}</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">${t('action.retry')}</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">${t('action.cancel')}</button>` : ''}</div>
                 </article>`
             })
-            .join('') || '<article class="notice">队列为空。</article>'
+            .join('') ||
+        `<article class="notice">${t('message.emptyQueue')}</article>`
 }
 
 async function enqueue(ids, source) {
@@ -560,20 +597,23 @@ $('#import-button').onclick = async () => {
         if (!state.authors.length) deriveAuthors()
         await persistLiteState()
         renderAll()
-        $('#import-result').textContent =
-            `已导入 ${state.records.length} 条记录、${state.recommendations.length} 条推荐和 ${state.queue.length} 个计划。`
+        $('#import-result').textContent = t('message.imported', {
+            records: state.records.length,
+            recommendations: state.recommendations.length,
+            plans: state.queue.length
+        })
     } catch (error) {
-        $('#import-result').textContent = error.message
+        $('#import-result').textContent = localizeError(language, error)
     }
 }
 $('#sync-button').onclick = async () => {
     try {
         if (state.mode !== 'connected')
-            throw new Error('同步收藏需要连接本地服务。')
+            throw new Error(t('message.syncNeedsEngine'))
         await post('/api/v1/sync', {})
         await detect()
     } catch (error) {
-        $('#import-result').textContent = error.message
+        $('#import-result').textContent = localizeError(language, error)
     }
 }
 $('#clear-lite-state').onclick = async () => {
@@ -598,7 +638,7 @@ $('#queue-selected').onclick = () => enqueue(selectedIds(), 'library')
 $('#search-button').onclick = async () => {
     try {
         if (state.mode !== 'connected')
-            throw new Error('站内搜索需要连接本地服务。')
+            throw new Error(t('message.searchNeedsEngine'))
         const records = await post('/api/v1/search', {
             keyword: $('#search-keyword').value,
             tags: splitList($('#search-tags').value),
@@ -606,9 +646,11 @@ $('#search-button').onclick = async () => {
             limit: 100
         })
         renderResultCards(records, '#search-results')
-        $('#search-message').textContent = `找到 ${records.length} 条结果。`
+        $('#search-message').textContent = t('message.searchCount', {
+            count: records.length
+        })
     } catch (error) {
-        $('#search-message').textContent = error.message
+        $('#search-message').textContent = localizeError(language, error)
     }
 }
 $('#recommend-button').onclick = async () => {
@@ -621,10 +663,10 @@ $('#recommend-button').onclick = async () => {
             state.recommendations = value.recommendations
         }
         if (!state.recommendations.length)
-            throw new Error('请先导入包含推荐结果的数据包，或连接本地服务。')
+            throw new Error(t('message.recommendNeedsData'))
         renderPreparedRecommendations()
     } catch (error) {
-        $('#recommend-message').textContent = error.message
+        $('#recommend-message').textContent = localizeError(language, error)
     }
 }
 ;['#search-results', '#recommend-results'].forEach((selector) => {
@@ -676,7 +718,7 @@ $('#check-updates').onclick = async () => {
             2
         )
     } catch (error) {
-        $('#update-result').textContent = error.message
+        $('#update-result').textContent = localizeError(language, error)
     }
 }
 $('#scan-repair').onclick = async () => {
@@ -687,7 +729,7 @@ $('#scan-repair').onclick = async () => {
             2
         )
     } catch (error) {
-        $('#repair-result').textContent = error.message
+        $('#repair-result').textContent = localizeError(language, error)
     }
 }
 $('#run-health').onclick = async () => {
@@ -730,13 +772,13 @@ async function detect() {
     try {
         const status = await api('/api/v1/status')
         state.mode = 'connected'
-        $('#mode').textContent = 'Connected'
+        $('#mode').textContent = t('mode.connected')
         state.records = await api('/api/v1/comics')
         state.authors = await api('/api/v1/authors')
         renderAll(status.summary)
     } catch {
         state.mode = 'lite'
-        $('#mode').textContent = 'Browser Lite'
+        $('#mode').textContent = t('mode.lite')
         if (!state.authors.length && state.records.length) deriveAuthors()
         renderAll()
     }

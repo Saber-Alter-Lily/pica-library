@@ -17,7 +17,7 @@ function Get-Sha256([string]$file) {
     finally { $algorithm.Dispose() }
 }
 
-if ($version -ne '0.1.1') { throw 'Windows package must report version 0.1.1' }
+if ($version -ne '0.1.2') { throw 'Windows package must report version 0.1.2' }
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve source commit SHA' }
 if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
 if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }

@@ -455,6 +455,24 @@ th {
     color: #8d2d21;
     border-color: #d7aaa4;
 }
+.header-controls,
+.language-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.language-control {
+    color: var(--muted);
+    font-size: 13px;
+}
+.language-control select {
+    min-width: 112px;
+}
+.setup-help {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.6;
+}
 @media (max-width: 760px) {
     .app-header,
     .page-heading {
@@ -471,6 +489,10 @@ th {
     }
     .app-header {
         align-items: flex-start;
+    }
+    .header-controls {
+        width: 100%;
+        justify-content: space-between;
     }
     .settings-form {
         grid-template-columns: 1fr;

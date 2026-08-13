@@ -1,3 +1,5 @@
+[简体中文](windows-distribution.zh-CN.md) | English
+
 # Windows One-Click Distribution
 
 Pica Library v0.1.1 targets Windows 10/11 x64 as its first ordinary-user
@@ -55,3 +57,9 @@ The package includes an official Node.js Windows x64 runtime, but users do not
 need a system Node.js, npm, pnpm, Git, terminal, or administrator privileges.
 Advanced users may continue to use the source CLI and environment-variable
 workflow documented in the main README.
+
+## Verify SHA-256
+
+Download `SHA256SUMS.txt` from the same official GitHub Release. In PowerShell,
+run `Get-FileHash .\Pica-Library-v0.1.1-windows-x64.zip -Algorithm SHA256`
+and compare the complete value with the published checksum before extracting.

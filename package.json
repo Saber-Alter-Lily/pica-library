@@ -1,6 +1,6 @@
 {
   "name": "pica-library",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "author": "Saber-Alter-Lily",
   "contributors": [
@@ -25,7 +25,7 @@
     "lint:fix": "eslint --no-cache --fix --ignore-path .gitignore .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "web:check": "node --check web/app.js && node --check web/lite-state.js",
+    "web:check": "node --check web/app.js && node --check web/i18n.js && node --check web/lite-state.js",
     "benchmark": "tsx scripts/benchmark/download-harness.ts"
   },
   "engines": {

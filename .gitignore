@@ -15,6 +15,13 @@ pica-library-export/
 pica-download/
 /downloads/
 artifacts/
+/tmp/
+/temp/
+/cache/
+/screenshots/
+*.sqlite*
+/pica-library-live-validation*/
+/*_REVIEW_PACKAGE.zip
 *.log
 *.tgz
 .eslintcache

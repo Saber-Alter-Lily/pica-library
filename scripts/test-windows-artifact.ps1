@@ -19,6 +19,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $rootPath 'Pica Library.exe'))) {
 }
 $launcher = Join-Path $rootPath 'Pica Library.exe'
 if (-not (Test-Path -LiteralPath $launcher)) { throw 'Pica Library.exe is missing' }
+foreach ($guide in @('README-WINDOWS.txt','README-WINDOWS.zh-CN.txt')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $rootPath $guide))) { throw "Windows guide is missing: $guide" }
+}
 $sourceSha = [IO.File]::ReadAllText((Join-Path $rootPath 'SOURCE_SHA.txt')).Trim()
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Packaged source SHA is invalid' }
 foreach ($license in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICENSES.txt')) {

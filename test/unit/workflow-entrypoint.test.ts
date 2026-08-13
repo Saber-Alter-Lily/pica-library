@@ -130,4 +130,17 @@ describe('built CLI entrypoint contract', () => {
             /function renderAll[\s\S]*renderPreparedRecommendations\(\)/
         )
     })
+
+    it('stores semantic Browser Lite author evidence for live language switching', () => {
+        const app = read('web/app.js')
+        const authorState = read('web/author-state.js')
+        expect(app).toContain('deriveLiteAuthors(state.records, normalize)')
+        expect(authorState).toContain('evidenceKey: match')
+        expect(authorState).toContain("'author.evidence.circlePattern'")
+        expect(authorState).toContain("'author.evidence.normalized'")
+        expect(app).toContain('localizeAuthorEvidence(language, author)')
+        expect(app).not.toContain('检测到“社团（作者）”格式，请确认作者实体。')
+        expect(app).not.toContain('规范化名称一致。')
+        expect(app).not.toContain("|| '未知作者'")
+    })
 })

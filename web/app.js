@@ -6,8 +6,10 @@ import {
     loadLiteState,
     saveLiteState
 } from './lite-state.js'
+import { deriveLiteAuthors } from './author-state.js'
 import {
     applyTranslations,
+    localizeAuthorEvidence,
     localizeError,
     resolveLanguage,
     saveLanguage,
@@ -266,39 +268,7 @@ function csvRecords(text) {
 }
 
 function deriveAuthors() {
-    const groups = new Map()
-    for (const comic of state.records) {
-        const raw = String(
-            comic.canonicalAuthor || comic.author || '未知作者'
-        ).trim()
-        const match = raw.match(/^(.+?)\s*\(([^()]+)\)$/)
-        const name = match ? match[2].trim() : raw
-        const key = normalize(name)
-        const group = groups.get(key) || {
-            id: `lite_${key}`,
-            canonicalName: name,
-            aliases: new Set(),
-            circles: new Set(),
-            works: 0,
-            confidence: match ? 0.8 : 1,
-            reviewStatus: match ? 'pending' : 'approved',
-            evidence: match
-                ? '检测到“社团（作者）”格式，请确认作者实体。'
-                : '规范化名称一致。'
-        }
-        group.works += 1
-        group.aliases.add(raw)
-        if (match) group.circles.add(match[1].trim())
-        groups.set(key, group)
-        comic.canonicalAuthor = name
-    }
-    state.authors = [...groups.values()]
-        .map((group) => ({
-            ...group,
-            aliases: [...group.aliases],
-            circles: [...group.circles]
-        }))
-        .sort((left, right) => right.works - left.works)
+    state.authors = deriveLiteAuthors(state.records, normalize)
 }
 
 function renderSummary(value = {}) {
@@ -416,7 +386,9 @@ function renderAuthors() {
         const node = $('#author-template').content.cloneNode(true)
         const item = node.querySelector('.list-item')
         item.dataset.authorId = author.id
-        node.querySelector('.author-name').textContent = author.canonicalName
+        node.querySelector('.author-name').textContent = author.canonicalNameKey
+            ? t(author.canonicalNameKey)
+            : author.canonicalName || t('common.unknownAuthor')
         node.querySelector('.author-meta').textContent = t(
             'message.authorMeta',
             {
@@ -425,7 +397,8 @@ function renderAuthors() {
                 confidence: Math.round((author.confidence || 0) * 100)
             }
         )
-        node.querySelector('.author-evidence').textContent = author.evidence
+        node.querySelector('.author-evidence').textContent =
+            localizeAuthorEvidence(language, author)
         $('#author-list').append(node)
     }
 }

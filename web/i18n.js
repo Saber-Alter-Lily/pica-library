@@ -119,6 +119,9 @@ export const translations = {
         'author.approve': 'Confirm',
         'author.separate': 'Keep separate',
         'author.research': 'Needs research',
+        'author.evidence.circlePattern':
+            'Detected a "circle (author)" pattern. Confirm the author identity.',
+        'author.evidence.normalized': 'The normalized name is consistent.',
         'status.QUEUED': 'Queued',
         'status.PREPARING': 'Preparing',
         'status.RUNNING': 'Downloading',
@@ -300,6 +303,9 @@ export const translations = {
         'author.approve': '确认',
         'author.separate': '保持分离',
         'author.research': '待研究',
+        'author.evidence.circlePattern':
+            '检测到“社团（作者）”格式，请确认作者实体。',
+        'author.evidence.normalized': '规范化名称一致。',
         'status.QUEUED': '等待中',
         'status.PREPARING': '准备中',
         'status.RUNNING': '下载中',
@@ -409,13 +415,13 @@ export function missingTranslationKeys(language) {
 
 export function localizeError(language, error) {
     const message = error instanceof Error ? error.message : String(error || '')
+    if (/credential protection|securely store|dpapi/i.test(message))
+        return translate(language, 'error.credential')
     if (/account|password|credential|401|unauthor|rejected/i.test(message))
         return translate(language, 'error.auth')
     if (/proxy/i.test(message)) return translate(language, 'error.proxy')
     if (/pause or finish active downloads/i.test(message))
         return translate(language, 'error.librarySwitch')
-    if (/credential protection|securely store|dpapi/i.test(message))
-        return translate(language, 'error.credential')
     if (/create.*data directory|data directory.*writ/i.test(message))
         return translate(language, 'error.dataDirectory')
     if (/database.*open|open.*database|sqlite.*open/i.test(message))
@@ -433,6 +439,26 @@ export function localizeError(language, error) {
     )
         return translate(language, 'error.network')
     return message || translate(language, 'error.generic')
+}
+
+const legacyAuthorEvidence = new Map([
+    [
+        '检测到“社团（作者）”格式，请确认作者实体。',
+        'author.evidence.circlePattern'
+    ],
+    ['规范化名称一致。', 'author.evidence.normalized'],
+    [
+        'Detected a "circle (author)" pattern. Confirm the author identity.',
+        'author.evidence.circlePattern'
+    ],
+    ['The normalized name is consistent.', 'author.evidence.normalized']
+])
+
+export function localizeAuthorEvidence(language, author) {
+    const key =
+        author?.evidenceKey ||
+        legacyAuthorEvidence.get(String(author?.evidence || ''))
+    return key ? translate(language, key) : String(author?.evidence || '')
 }
 
 export const domTranslations = [

@@ -21,7 +21,7 @@ export function showBrowserFallback(url: string) {
         "[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');" +
         '$u=[Console]::In.ReadToEnd();' +
         '[Windows.Forms.Clipboard]::SetText($u);' +
-        '[Windows.Forms.MessageBox]::Show("Pica Library is running at:"+[Environment]::NewLine+[Environment]::NewLine+$u+[Environment]::NewLine+[Environment]::NewLine+"The address has been copied to the clipboard.","Open Pica Library",[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Information) | Out-Null'
+        '[Windows.Forms.MessageBox]::Show("Pica Library 已启动 / is running at:"+[Environment]::NewLine+[Environment]::NewLine+$u+[Environment]::NewLine+[Environment]::NewLine+"地址已复制到剪贴板。"+[Environment]::NewLine+"The address has been copied to the clipboard.","打开 / Open Pica Library",[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Information) | Out-Null'
     spawnSync(
         windowsExecutable(
             'System32',

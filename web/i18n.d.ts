@@ -19,4 +19,8 @@ export function translate(
 ): string
 export function missingTranslationKeys(language: string): string[]
 export function localizeError(language: string, error: unknown): string
+export function localizeAuthorEvidence(
+    language: string,
+    author: { evidenceKey?: string; evidence?: string }
+): string
 export function applyTranslations(language: string, root?: Document): void

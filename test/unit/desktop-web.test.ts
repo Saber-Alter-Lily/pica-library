@@ -43,5 +43,30 @@ describe('desktop setup and settings UI contract', () => {
         expect(rollup).toContain('THIRD_PARTY_LICENSES.txt')
         expect(build).not.toContain('npm publish')
         expect(build).not.toContain('gh release')
+        expect(build).toContain('README-WINDOWS.txt')
+        expect(build).toContain('README-WINDOWS.zh-CN.txt')
+        expect(build).toContain('[Convert]::FromBase64String')
+        expect(read('scripts/test-windows-artifact.ps1')).toContain(
+            "@('README-WINDOWS.txt','README-WINDOWS.zh-CN.txt')"
+        )
+    })
+
+    it('keeps native Windows recovery paths bilingual and secret-free', () => {
+        const main = read('src/desktop/main.ts')
+        const child = read('src/desktop/child-process.ts')
+        expect(main).toContain('Pica Library 无法启动 / could not start.')
+        expect(main).toContain(
+            '请查看诊断日志后重试 / See the diagnostic log and try again:'
+        )
+        expect(main).toContain('选择 Pica Library 漫画保存目录')
+        expect(main).toContain('Choose the Pica Library folder')
+        expect(child).toContain('Pica Library 已启动 / is running at:')
+        expect(child).toContain('地址已复制到剪贴板。')
+        expect(child).toContain('The address has been copied to the clipboard.')
+        for (const source of [main, child]) {
+            expect(source).not.toMatch(/PICA_ACCOUNT实际|PICA_PASSWORD实际/)
+            expect(source).not.toContain('${credentials.account}')
+            expect(source).not.toContain('${credentials.password}')
+        }
     })
 })

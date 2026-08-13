@@ -69,6 +69,8 @@ No separate Node.js, npm, pnpm, Git, terminal, or administrator access is requir
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('UGljYSBMaWJyYXJ5IHYwLjEuMiBXaW5kb3dzIDEwLzExIHg2NAoK5L2/55So5pa55rOV77yaCgoxLiDlrozmlbTop6PljosgWklQ44CCCjIuIOWPjOWHuyBQaWNhIExpYnJhcnkuZXhl44CCCjMuIOa1j+iniOWZqOS8muiHquWKqOaJk+W8gO+8jOaMiemmluasoeWQr+WKqOWQkeWvvOWujOaIkOmFjee9ruOAggoK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTjgIIK5peg6ZyA5L2/55So5ZG95Luk6KGM77yM5Lmf5peg6ZyA566h55CG5ZGY5p2D6ZmQ44CCCgrlvZPliY3lj6/miafooYzmlofku7bmnKrov5vooYzku6PnoIHnrb7lkI3vvIzlm6DmraQgV2luZG93cyBTbWFydFNjcmVlbgrpppbmrKHov5DooYzml7blj6/og73mmL7npLrkv6Hoqonmj5DnpLrjgILor7fnoa7orqTmlofku7bmnaXoh6rmnKzpobnnm67lrpjmlrkKR2l0SHViIFJlbGVhc2XvvIzlubblj6/kvb/nlKggU0hBLTI1NiDmoKHpqozmlofku7blrozmlbTmgKfjgII='))
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 
 $forbidden = Get-ChildItem -LiteralPath $stage -Recurse -Force | Where-Object {

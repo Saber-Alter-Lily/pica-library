@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { deriveLiteAuthors } from '../../web/author-state.js'
 import {
     detectLanguage,
     languageStorageKey,
+    localizeAuthorEvidence,
+    localizeError,
     missingTranslationKeys,
     resolveLanguage,
     saveLanguage,
@@ -56,4 +59,61 @@ describe('Web localization', () => {
         expect(translate('zh-CN', 'missing.raw.key')).toBe('')
         delete translations.en[key]
     })
+
+    it('switches Browser Lite author evidence without persisting localized text', () => {
+        const records = [
+            { comicId: 'one', author: 'Circle (Alice)' },
+            { comicId: 'two', author: 'Bob' }
+        ]
+        const authors = deriveLiteAuthors(records, (value) =>
+            String(value).toLocaleLowerCase()
+        )
+        const circle = authors.find(
+            (author) => author.canonicalName === 'Alice'
+        )!
+        const normalized = authors.find(
+            (author) => author.canonicalName === 'Bob'
+        )!
+        expect(circle.evidenceKey).toBe('author.evidence.circlePattern')
+        expect(normalized.evidenceKey).toBe('author.evidence.normalized')
+        expect(circle).not.toHaveProperty('evidence')
+        expect(localizeAuthorEvidence('zh-CN', circle)).toBe(
+            '检测到“社团（作者）”格式，请确认作者实体。'
+        )
+        expect(localizeAuthorEvidence('en', circle)).toBe(
+            'Detected a "circle (author)" pattern. Confirm the author identity.'
+        )
+        expect(localizeAuthorEvidence('zh-CN', circle)).toBe(
+            '检测到“社团（作者）”格式，请确认作者实体。'
+        )
+        expect(localizeAuthorEvidence('en', normalized)).toBe(
+            'The normalized name is consistent.'
+        )
+        expect(
+            localizeAuthorEvidence('en', {
+                evidence: '规范化名称一致。'
+            })
+        ).toBe('The normalized name is consistent.')
+    })
+
+    it.each(['zh-CN', 'en'])(
+        'classifies secure credential storage before authentication in %s',
+        (language) => {
+            expect(
+                localizeError(
+                    language,
+                    'Windows credential protection is unavailable'
+                )
+            ).toBe(translations[language]['error.credential'])
+            expect(
+                localizeError(
+                    language,
+                    'Secure credential persistence requires Windows DPAPI'
+                )
+            ).toBe(translations[language]['error.credential'])
+            expect(localizeError(language, 'HTTP 401 rejected account')).toBe(
+                translations[language]['error.auth']
+            )
+        }
+    )
 })

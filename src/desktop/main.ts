@@ -72,7 +72,7 @@ function showStartupError() {
             script
         ],
         {
-            input: `Pica Library could not start.\n\nSee the diagnostic log and try again:\n${log.file}`,
+            input: `Pica Library 无法启动 / could not start.\n\n请查看诊断日志后重试 / See the diagnostic log and try again:\n${log.file}`,
             encoding: 'utf8',
             windowsHide: true,
             env: sanitizedChildEnv()
@@ -184,7 +184,7 @@ async function testConnection(input: Record<string, unknown>) {
 
 async function chooseFolder() {
     if (process.platform !== 'win32') return null
-    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.FolderBrowserDialog;$d.Description='Choose your Pica Library folder';if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.SelectedPath)}`
+    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.FolderBrowserDialog;$d.Description='选择 Pica Library 漫画保存目录'+[Environment]::NewLine+'Choose the Pica Library folder';if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.SelectedPath)}`
     const powershell = windowsExecutable(
         'System32',
         'WindowsPowerShell',

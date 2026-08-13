@@ -19,6 +19,7 @@ export interface DesktopServerController {
     testConnection: (
         input: Record<string, unknown>
     ) => Promise<Record<string, unknown>>
+    detectProxy?: () => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
     openDirectory: (kind: string) => Promise<void>
@@ -201,6 +202,14 @@ export async function startLibraryServer(options: {
                     200,
                     await options.desktop.testConnection(await body(request))
                 )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/detect-proxy' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.detectProxy)
+                    throw new Error('Proxy detection is unavailable')
+                return json(response, 200, await options.desktop.detectProxy())
             }
             if (
                 url.pathname === '/api/v1/desktop/choose-folder' &&

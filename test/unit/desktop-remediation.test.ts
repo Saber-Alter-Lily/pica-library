@@ -40,7 +40,7 @@ describe('desktop remediation boundaries', () => {
             ),
             'utf8'
         )
-        expect(mainSource.match(/env: sanitizedChildEnv\(\)/g)).toHaveLength(4)
+        expect(mainSource.match(/env: sanitizedChildEnv\(\)/g)).toHaveLength(5)
         expect(
             credentialSource.match(/env: sanitizedChildEnv\(\)/g)
         ).toHaveLength(1)

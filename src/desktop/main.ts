@@ -32,6 +32,12 @@ import {
 } from './child-process'
 import { connectionCredentials } from './connection'
 import { assertLibraryChangeAllowed } from './lifecycle'
+import {
+    isLoopbackListening,
+    knownProxyPorts,
+    proxyCandidates,
+    redactProxyUrl
+} from './proxy-detection'
 
 const args = new Set(process.argv.slice(2))
 const paths = desktopPaths()
@@ -100,6 +106,15 @@ async function identifiedHealth(url: string) {
     } catch {
         return false
     }
+}
+
+async function waitForHealth(url: string, timeoutMs = 30_000) {
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+        if (await identifiedHealth(url)) return true
+        await new Promise((resolve) => setTimeout(resolve, 150))
+    }
+    return false
 }
 
 async function closeEngine() {
@@ -181,6 +196,44 @@ async function testConnection(input: Record<string, unknown>) {
     } finally {
         if (previous) process.env.PICA_PROXY = previous
         else delete process.env.PICA_PROXY
+    }
+}
+
+async function detectProxy() {
+    const listeningPorts: number[] = []
+    for (const port of knownProxyPorts())
+        if (await isLoopbackListening(port)) listeningPorts.push(port)
+    let windowsProxy: string | undefined
+    if (process.platform === 'win32') {
+        const registry = spawnSync(
+            windowsExecutable('System32', 'reg.exe'),
+            [
+                'query',
+                'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings',
+                '/v',
+                'ProxyServer'
+            ],
+            { encoding: 'utf8', windowsHide: true, env: sanitizedChildEnv() }
+        )
+        const match =
+            registry.status === 0
+                ? registry.stdout.match(/ProxyServer\s+REG_SZ\s+([^\r\n]+)/i)
+                : null
+        if (match)
+            windowsProxy = /^https?:\/\//i.test(match[1].trim())
+                ? match[1].trim()
+                : `http://${match[1].trim()}`
+    }
+    const candidates = proxyCandidates({
+        saved: config?.proxyUrl,
+        windows: windowsProxy,
+        listeningPorts
+    })
+    return {
+        candidates: candidates.map((candidate) => ({
+            ...candidate,
+            url: redactProxyUrl(candidate.url)
+        }))
     }
 }
 
@@ -337,10 +390,11 @@ async function startEngine(preferredPort: number) {
             applyCredentials(credentials, config)
             if (!wasConfigured)
                 desktop.csrfToken = randomBytes(32).toString('base64url')
-            if (dataChanged) setTimeout(() => restartEngine(), 150)
+            if (dataChanged) void restartEngine()
             return { success: true, restarting: dataChanged }
         },
         testConnection,
+        detectProxy,
         chooseFolder,
         exportBrowserLitePackage: async () => {
             if (!database) throw new Error('Library is not ready')
@@ -395,7 +449,11 @@ async function restartEngine() {
     if (stopping) return
     await closeEngine()
     if (stopping) return
-    await startEngine(config?.preferredPort ?? 4789)
+    const port = currentUrl
+        ? Number(new URL(currentUrl).port)
+        : config?.preferredPort ?? 4789
+    await startEngine(port || config?.preferredPort || 4789)
+    await waitForHealth(currentUrl)
 }
 
 async function main() {

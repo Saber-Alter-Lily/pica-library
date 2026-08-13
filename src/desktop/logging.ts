@@ -15,6 +15,8 @@ export class DesktopLog {
     constructor(directory: string) {
         fs.mkdirSync(directory, { recursive: true })
         this.file = path.join(directory, 'pica-library.log')
+        if (!fs.existsSync(this.file))
+            fs.writeFileSync(this.file, '\uFEFF', 'utf8')
     }
     write(message: string) {
         fs.appendFileSync(

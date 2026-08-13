@@ -28,6 +28,10 @@ const state = {
     visible: [],
     libraryPage: 1,
     libraryView: 'grid',
+    recommendationView:
+        localStorage.getItem('pica-recommendation-view') || 'grid',
+    coversEnabled: localStorage.getItem('pica-covers-enabled') !== 'false',
+    recommendationBatch: 0,
     ...emptyLiteState()
 }
 let desktop = null
@@ -143,6 +147,24 @@ async function loadDesktop() {
     }
 }
 
+async function waitForDesktopHealth(timeoutMs = 30000) {
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+        try {
+            const status = await api('/api/v1/status')
+            if (
+                status?.application === 'Pica Library' ||
+                status?.status === 'Connected'
+            )
+                return status
+        } catch {
+            // The engine is expected to be briefly unavailable during restart.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+    throw new Error('The local engine did not become healthy in time.')
+}
+
 async function testDesktop(prefix) {
     const message = $(`#${prefix}-message`)
     message.textContent = t('message.testing')
@@ -164,7 +186,8 @@ $('#setup-form').onsubmit = async (event) => {
     try {
         await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
         message.textContent = t('message.savedOpening')
-        setTimeout(() => location.assign('/'), 500)
+        await waitForDesktopHealth()
+        location.assign('/')
     } catch (error) {
         message.textContent = localizeError(language, error)
     }
@@ -212,6 +235,20 @@ $('#open-browser-lite-export').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', {
         kind: 'browser-lite-export'
     })
+$('#open-browser-lite').onclick = () =>
+    window.open(`${location.origin}/?mode=browser-lite`, '_blank', 'noopener')
+$('#detect-proxy').onclick = async () => {
+    try {
+        const result = await desktopPost('/api/v1/desktop/detect-proxy')
+        $('#setup-message').textContent = result.candidates?.length
+            ? `Detected ${result.candidates.map((item) => item.url).join(', ')}`
+            : 'No local proxy detected.'
+        if (result.candidates?.[0])
+            $('#setup-proxy').value = result.candidates[0].url
+    } catch (error) {
+        $('#setup-message').textContent = localizeError(language, error)
+    }
+}
 $('#exit-app').onclick = async () => {
     await desktopPost('/api/v1/desktop/shutdown')
     document.body.innerHTML = `<main><article class="notice"><strong>${t('message.stopped')}</strong><p>${t('message.closeTab')}</p></article></main>`
@@ -345,10 +382,12 @@ function renderComics(records = state.records) {
         LIBRARY_PAGE_SIZE
     )
     const tagFrequencies = buildTagFrequencyIndex(state.records)
-    const coverSource = (comic) =>
-        state.mode === 'connected'
+    const coverSource = (comic) => {
+        if (!state.coversEnabled) return ''
+        return state.mode === 'connected'
             ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}`
             : trustedBrowserCoverUrl(comic.coverUrl)
+    }
     const tagsFor = (comic) => selectDisplayTags(comic, tagFrequencies)
     const cover = (comic) => `<div class="cover-shell">
         ${
@@ -433,7 +472,7 @@ function renderResultCards(records, target, recommendation = false) {
             const comic = item.comic || item
             return `<article class="result">
                 <div class="cover-shell">
-                    ${state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />` : ''}
+                    ${state.coversEnabled && (state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl)) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />` : ''}
                     <span aria-hidden="true">P</span>
                 </div>
                 <div class="result-body"><h3>${escapeHtml(comic.title)}</h3>
@@ -451,7 +490,12 @@ function renderResultCards(records, target, recommendation = false) {
 
 function renderPreparedRecommendations() {
     $('#profile').innerHTML = ''
-    renderResultCards(state.recommendations, '#recommend-results', true)
+    const start = state.recommendationBatch * 12
+    renderResultCards(
+        state.recommendations.slice(start, start + 12),
+        '#recommend-results',
+        true
+    )
     $('#recommend-message').textContent = t('message.recommendationCount', {
         count: state.recommendations.length
     })
@@ -572,9 +616,22 @@ function setLibraryView(view) {
     $('#comic-table').hidden = view !== 'list'
     $('#view-grid').setAttribute('aria-pressed', String(view === 'grid'))
     $('#view-list').setAttribute('aria-pressed', String(view === 'list'))
+    localStorage.setItem('pica-library-view', view)
 }
 $('#view-grid').onclick = () => setLibraryView('grid')
 $('#view-list').onclick = () => setLibraryView('list')
+$('#cover-toggle').onchange = (event) => {
+    state.coversEnabled = event.target.checked
+    localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
+    renderAll()
+}
+$('#recommend-next-batch').onclick = () => {
+    state.recommendationBatch =
+        (state.recommendationBatch + 1) * 12 >= state.recommendations.length
+            ? 0
+            : state.recommendationBatch + 1
+    renderPreparedRecommendations()
+}
 $('#pending-only').onchange = renderAuthors
 async function importSelectedFile() {
     const file = $('#import-file').files[0]
@@ -767,6 +824,13 @@ $('#author-list').onclick = async (event) => {
 }
 
 async function detect() {
+    if (new URLSearchParams(location.search).get('mode') === 'browser-lite') {
+        state.mode = 'lite'
+        $('#mode').textContent = t('mode.lite')
+        replaceLiteState(await loadLiteState())
+        renderAll()
+        return
+    }
     await loadDesktop()
     if (desktop && !desktop.configured) return
     replaceLiteState(await loadLiteState())

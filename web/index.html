@@ -78,14 +78,17 @@
                                 <option value="fast">Fast</option>
                             </select></label
                         >
-                        <details class="wide">
-                            <summary>Advanced</summary>
+                        <div class="wide setup-proxy-section">
+                            <h3>Network Proxy</h3>
+                            <button id="detect-proxy" type="button">
+                                Auto-detect proxy
+                            </button>
                             <label
                                 >HTTP/HTTPS proxy (optional)<input
                                     id="setup-proxy"
                                     placeholder="http://127.0.0.1:7890"
                             /></label>
-                        </details>
+                        </div>
                         <p id="setup-security" class="setup-help wide">
                             账号和密码仅用于连接 Pica 服务。Windows 版本使用当前
                             Windows 用户的 DPAPI 加密保存凭据。
@@ -185,6 +188,10 @@
                 </div>
                 <p id="import-result" class="status"></p>
                 <div class="toolbar">
+                    <label
+                        ><input id="cover-toggle" type="checkbox" checked />
+                        Load covers</label
+                    >
                     <input id="filter-text" placeholder="标题或作者" />
                     <input id="filter-tag" placeholder="标签，逗号分隔" />
                     <select id="sort-mode">
@@ -243,6 +250,7 @@
                     </div>
                     <div id="profile" class="profile"></div>
                     <p id="recommend-message" class="status"></p>
+                    <button id="recommend-next-batch">Next batch</button>
                     <div id="recommend-results" class="results"></div>
                 </div>
                 <div id="search" class="tab">
@@ -471,6 +479,9 @@
                             hidden
                         >
                             打开所在文件夹
+                        </button>
+                        <button id="open-browser-lite" type="button">
+                            Open Browser Lite
                         </button>
                     </div>
                     <p

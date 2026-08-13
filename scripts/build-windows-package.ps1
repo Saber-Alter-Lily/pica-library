@@ -3,7 +3,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $package = Get-Content -Raw -LiteralPath (Join-Path $root 'package.json') | ConvertFrom-Json
 $version = [string]$package.version
 $nodeVersion = '24.15.0'
-$name = "Pica-Library-v$version-windows-x64"
+$name = 'Pica-Library-v0.1.4-local-test-windows-x64'
 $buildRoot = Join-Path $root 'artifacts\windows-package'
 $stage = Join-Path $buildRoot $name
 $zip = Join-Path $root "artifacts\$name.zip"
@@ -17,7 +17,7 @@ function Get-Sha256([string]$file) {
     finally { $algorithm.Dispose() }
 }
 
-if ($version -ne '0.1.3') { throw 'Windows package must report version 0.1.3' }
+if ($version -ne '0.1.4-dev.1') { throw 'Local Windows package must report version 0.1.4-dev.1' }
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve source commit SHA' }
 if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
 if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }

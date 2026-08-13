@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import {
     knownProxyPorts,
     proxyCandidates,
-    redactProxyUrl
+    redactProxyUrl,
+    validateProxyCandidates
 } from '../../src/desktop/proxy-detection'
 
 const root = path.resolve(import.meta.dirname, '../..')
@@ -31,6 +32,62 @@ describe('v0.1.4 local user flow', () => {
         expect(redactProxyUrl('http://user:secret@127.0.0.1:7890')).toBe(
             'http://***:***@127.0.0.1:7890'
         )
+    })
+
+    it('stops proxy auto-detection after the first provider-validated candidate', async () => {
+        const attempted: string[] = []
+        const candidates = proxyCandidates({
+            saved: 'http://127.0.0.1:7890',
+            windows: 'http://127.0.0.1:7891',
+            environment: { HTTPS_PROXY: 'http://127.0.0.1:7897' }
+        })
+        const result = await validateProxyCandidates(
+            candidates,
+            async (url) => {
+                attempted.push(url)
+                if (url.endsWith(':7890'))
+                    throw new Error('provider unavailable')
+            }
+        )
+
+        expect(attempted).toEqual([
+            'http://127.0.0.1:7890',
+            'http://127.0.0.1:7891'
+        ])
+        expect(result.map(({ usable }) => usable)).toEqual([false, true])
+    })
+
+    it('reports no usable proxy when every candidate fails validation', async () => {
+        const candidates = proxyCandidates({ listeningPorts: [7890, 7891] })
+        const result = await validateProxyCandidates(candidates, async () => {
+            throw new Error('provider rejected request')
+        })
+
+        expect(result).toHaveLength(2)
+        expect(result.every(({ usable }) => !usable)).toBe(true)
+    })
+
+    it('redacts credentials from provider-failed auto-detection results', async () => {
+        const result = await validateProxyCandidates(
+            [
+                {
+                    url: 'http://proxy-user:proxy-secret@127.0.0.1:7890',
+                    source: 'saved'
+                }
+            ],
+            async () => {
+                throw new Error('provider validation failed')
+            }
+        )
+
+        expect(result).toEqual([
+            {
+                url: 'http://***:***@127.0.0.1:7890',
+                source: 'saved',
+                usable: false
+            }
+        ])
+        expect(JSON.stringify(result)).not.toContain('proxy-secret')
     })
 
     it('contains health polling, forced Browser Lite, and recommendation batching', () => {

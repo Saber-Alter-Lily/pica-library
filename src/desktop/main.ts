@@ -36,7 +36,7 @@ import {
     isLoopbackListening,
     knownProxyPorts,
     proxyCandidates,
-    redactProxyUrl
+    validateProxyCandidates
 } from './proxy-detection'
 
 const args = new Set(process.argv.slice(2))
@@ -253,22 +253,9 @@ async function detectProxy(input: Record<string, unknown>) {
         windows: windowsProxy,
         listeningPorts
     })
-    const validated = []
-    for (const candidate of candidates) {
-        let usable = false
-        try {
-            await testConnection({ ...input, proxyUrl: candidate.url })
-            usable = true
-        } catch {
-            // Candidate remains selectable even when provider validation fails.
-        }
-        validated.push({
-            ...candidate,
-            url: redactProxyUrl(candidate.url),
-            usable
-        })
-        if (usable) break
-    }
+    const validated = await validateProxyCandidates(candidates, async (url) => {
+        await testConnection({ ...input, proxyUrl: url })
+    })
     return { candidates: validated }
 }
 

@@ -1,16 +1,33 @@
-# Pica Library v0.1.4 Local User Test
+# Pica Library v0.1.4 本地验收指南
 
-This is a local acceptance build, not a public release. Extract it to a new folder and close any older Pica Library process before testing.
+这是本地测试版，不是公开发布版。关闭旧版程序，将 ZIP 解压到新文件夹后再开始。
 
-1. Double-click `Pica Library.exe`. Confirm one working local page opens and saved credentials are never displayed.
-2. In first-run setup or Settings, use **Auto-detect proxy**, then **Test Connection**. Confirm proxy credentials are never shown.
-3. Save settings. Confirm the page waits for the engine and does not redirect to a dead address.
-4. Use **Sync Favorites** or **Update Favorites**. Confirm the Library receives records.
-5. In Library, switch grid/list and turn cover loading off/on. OFF must show placeholders without new cover requests.
-6. Open recommendations, note the first 12, then choose **Next batch**. Confirm recommendations do not repeat before the pool is exhausted.
-7. In Settings > Browser Lite, export `pica-library-bundle.json`, then choose **Open Browser Lite**.
-8. Confirm the import action is visible, import the package, and verify Library and Recommendations work offline.
-9. Export a newer snapshot and reimport it to confirm updated content appears.
-10. Close Pica Library and confirm its local port is released.
+## TEST A - 现有安装升级行为
 
-Do not reuse real data for development tests. Report any stale page, exposed secret, unexpected cover request, or process that remains after shutdown.
+双击 `Pica Library.exe`，确认只打开一个可用的 localhost 页面；保存的账号和密码不会显示。测试连接和代理自动检测，保存后页面应等待引擎恢复，不得停留在失效地址。
+
+## TEST B - 代理引导
+
+进入“设置”，点击“自动检测代理”，确认当前可用代理能被识别且认证信息不会显示，然后运行“测试连接”。
+
+## TEST C - 收藏
+
+点击“同步收藏”或“更新收藏”，确认本地漫画库获得记录，并显示最近同步时间。
+
+## TEST D - 漫画库
+
+依次切换“网格 → 列表 → 网格”。关闭封面加载时应显示占位图且不产生新封面请求；重新开启后封面应按可见区域懒加载。
+
+## TEST E - 推荐
+
+记录第一批 12 条推荐，点击“换一批”，确认出现下一批且在候选池耗尽前不重复。切换网格/列表并测试封面开关。
+
+## TEST F - Browser Lite
+
+在“设置 → Browser Lite”点击“同步并导出 Browser Lite 数据包”，保存 `pica-library-bundle.json`，再点击“打开 Browser Lite”。导入按钮应无需滚动即可看到。导入后确认漫画库、推荐、换一批、数据包时间和“重新导入数据包”均可用。
+
+## TEST G - 更新快照
+
+更新收藏并导出新数据包，在 Browser Lite 中重新导入，确认快照生成时间与内容已更新。
+
+完成后关闭 Pica Library，确认没有残留窗口、进程或被占用的本地端口。若发现失效页面、凭据泄露、封面关闭后仍请求网络或程序无法退出，请记录复现步骤。

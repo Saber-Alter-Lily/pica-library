@@ -5,6 +5,10 @@ export type ProxyCandidate = {
     source: 'saved' | 'windows' | 'environment' | 'loopback'
 }
 
+export type ValidatedProxyCandidate = ProxyCandidate & {
+    usable: boolean
+}
+
 const KNOWN_PORTS = [7890, 7891, 7897, 10809, 1080, 8080, 8888]
 
 export function redactProxyUrl(input: string) {
@@ -55,6 +59,29 @@ export function proxyCandidates(
 
 export function knownProxyPorts() {
     return [...KNOWN_PORTS]
+}
+
+export async function validateProxyCandidates(
+    candidates: ProxyCandidate[],
+    validate: (url: string) => Promise<void>
+): Promise<ValidatedProxyCandidate[]> {
+    const result: ValidatedProxyCandidate[] = []
+    for (const candidate of candidates) {
+        let usable = false
+        try {
+            await validate(candidate.url)
+            usable = true
+        } catch {
+            // Failed candidates remain selectable for manual correction.
+        }
+        result.push({
+            ...candidate,
+            url: redactProxyUrl(candidate.url),
+            usable
+        })
+        if (usable) break
+    }
+    return result
 }
 
 export async function isLoopbackListening(port: number, timeoutMs = 200) {

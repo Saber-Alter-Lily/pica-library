@@ -2,9 +2,9 @@
 
 # Pica Library
 
-> 当前稳定版本为 `v0.1.3`；下一个正式发布候选版为 `v0.2.0`。
+> 当前稳定版本为 `v0.2.0`。
 
-## v0.2.0 发布候选版
+## v0.2.0 稳定版
 
 v0.2.0 新增快速收藏同步、书架、作者/标签分面与高级筛选、可恢复的推荐会话与后台预生成、推荐预览、真实的加入/取消 Pica 收藏、下载与已下载管理、内置 Web Reader、阅读进度、ZIP/CBZ 导出和增量更新框架。
 
@@ -27,10 +27,10 @@ Browser Lite 可直接在浏览器中查看已导出的漫画库数据，无需�
 
 ## Windows 一键使用
 
-当前稳定版本为 `v0.1.3`，包含完整简体中文界面、双语首次启动向导和 Browser Lite 数据包导出流程。
+当前稳定版本为 `v0.2.0`，包含完整简体中文界面、双语首次启动向导和 Browser Lite 数据包导出流程。
 
 1. 打开 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases)。
-2. 下载 `Pica-Library-v0.1.3-windows-x64.zip`。
+2. 下载 `Pica-Library-v0.2.0-windows-x64.zip`。
 3. 完整解压 ZIP，不要直接在压缩软件中运行。
 4. 双击 `Pica Library.exe`。
 5. 按首次启动向导完成设置。

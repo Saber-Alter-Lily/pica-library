@@ -14,17 +14,17 @@ It keeps stable library state instead of treating every download as a new job:
 
 ## Try it
 
-Current stable release: `v0.1.3`. This release provides a Windows 10/11
+Current stable release: `v0.2.0`. This release provides a Windows 10/11
 x64 package for ordinary users:
 
-1. Download `Pica-Library-v0.1.3-windows-x64.zip` from the release.
+1. Download `Pica-Library-v0.2.0-windows-x64.zip` from the release.
 2. Extract the entire ZIP.
 3. Double-click `Pica Library.exe` and complete setup in the browser.
 
-v0.1.3 includes full Simplified Chinese localization, bilingual onboarding,
+v0.2.0 includes full Simplified Chinese localization, bilingual onboarding,
 and the Browser Lite data-package export flow.
 
-Next release candidate: `v0.2.0`. It adds quick favorites synchronization,
+The stable v0.2.0 release adds quick favorites synchronization,
 shelves, author/tag facets and advanced filtering, persistent recommendation
 sessions with background pre-generation and previews, real add/remove Pica
 favorite actions, richer download and downloaded-library management, an

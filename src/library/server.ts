@@ -10,6 +10,7 @@ import { queueRepairs, scanRepairIssues } from '../maintenance/repair'
 import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
+import { appCapabilities } from '../app-capabilities'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -27,6 +28,12 @@ export interface DesktopServerController {
     syncAndExportBrowserLitePackage?: () => Promise<Record<string, unknown>>
     openBrowserLite?: () => Promise<void>
     openDirectory: (kind: string) => Promise<void>
+    stageUpdate?: (
+        name: string,
+        value: Buffer
+    ) => Promise<Record<string, unknown>>
+    applyUpdate?: (id: string) => Promise<Record<string, unknown>>
+    updateProgress?: () => unknown
     shutdown: () => void
 }
 
@@ -53,6 +60,18 @@ async function body(request: IncomingMessage) {
         string,
         unknown
     >
+}
+
+async function binaryBody(request: IncomingMessage, limit = 128 * 1024 * 1024) {
+    const chunks: Buffer[] = []
+    let size = 0
+    for await (const chunk of request) {
+        const buffer = Buffer.from(chunk)
+        size += buffer.byteLength
+        if (size > limit) throw new Error('Update package is too large')
+        chunks.push(buffer)
+    }
+    return Buffer.concat(chunks)
 }
 
 function webRoot() {
@@ -184,6 +203,62 @@ export async function startLibraryServer(options: {
                     csrfToken: options.desktop.csrfToken,
                     ...options.desktop.status()
                 })
+            }
+            if (
+                url.pathname === '/api/v1/capabilities' &&
+                request.method === 'GET'
+            ) {
+                return json(response, 200, appCapabilities(false))
+            }
+            if (
+                url.pathname === '/api/v1/update/progress' &&
+                request.method === 'GET' &&
+                options.desktop?.updateProgress
+            ) {
+                return json(response, 200, options.desktop.updateProgress())
+            }
+            if (
+                url.pathname === '/api/v1/update/stage' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.stageUpdate)
+                    throw new Error('Updates are unavailable in this mode')
+                if (
+                    request.headers['x-pica-csrf'] !== options.desktop.csrfToken
+                )
+                    return json(response, 403, {
+                        error: 'This local request could not be verified'
+                    })
+                const filename = path.basename(
+                    String(request.headers['x-update-filename'] ?? 'update.zip')
+                )
+                return json(
+                    response,
+                    200,
+                    await options.desktop.stageUpdate(
+                        filename,
+                        await binaryBody(request)
+                    )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/update/apply' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.applyUpdate)
+                    throw new Error('Updates are unavailable in this mode')
+                if (
+                    request.headers['x-pica-csrf'] !== options.desktop.csrfToken
+                )
+                    return json(response, 403, {
+                        error: 'This local request could not be verified'
+                    })
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    await options.desktop.applyUpdate(String(input.id ?? ''))
+                )
             }
             if (
                 url.pathname === '/api/v1/desktop/settings' &&

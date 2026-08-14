@@ -12,6 +12,7 @@ import { LibraryService } from '../library/service'
 import { serializeBrowserLiteDataPackage } from '../library/bundle-export'
 import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
+import { UpdateManager } from '../update/manager'
 import {
     buildConfig,
     connectionProxy,
@@ -41,6 +42,30 @@ import {
 
 const args = new Set(process.argv.slice(2))
 const paths = desktopPaths()
+const applicationRoot = path.resolve(path.dirname(process.argv[1]), '..')
+const packagedSourceFile = path.join(applicationRoot, 'SOURCE_SHA.txt')
+const currentSourceSha = (() => {
+    try {
+        const value = fs.readFileSync(packagedSourceFile, 'utf8').trim()
+        return /^[0-9a-f]{40}$/.test(value) ? value : undefined
+    } catch {
+        return undefined
+    }
+})()
+const updateManager = new UpdateManager({
+    currentVersion: PRODUCT_VERSION,
+    currentSourceSha,
+    applicationRoot,
+    stateRoot: path.join(paths.runtimeState, 'updates'),
+    launcherPath: path.join(applicationRoot, 'Pica Library.exe'),
+    runtimePath: fs.existsSync(
+        path.join(applicationRoot, 'runtime', 'node.exe')
+    )
+        ? path.join(applicationRoot, 'runtime', 'node.exe')
+        : process.execPath,
+    desktopEntryPath: process.argv[1],
+    instanceFile: paths.instance
+})
 for (const directory of [
     paths.root,
     paths.data,
@@ -515,6 +540,13 @@ async function startEngine(preferredPort: number) {
             browser(`${currentUrl}/?mode=browser-lite`)
         },
         openDirectory,
+        stageUpdate: async (name, value) => updateManager.stage(name, value),
+        applyUpdate: async (id) => {
+            const result = updateManager.apply(id)
+            setTimeout(() => void stop(), 150)
+            return result
+        },
+        updateProgress: () => updateManager.progress(),
         shutdown: () => {
             void stop()
         }

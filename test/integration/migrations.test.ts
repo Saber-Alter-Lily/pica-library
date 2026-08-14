@@ -33,7 +33,7 @@ describe('SQLite migrations', () => {
         const versions = database
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>
-        expect(versions.map((row) => row.version)).toEqual([1, 2, 3, 4])
+        expect(versions.map((row) => row.version)).toEqual([1, 2, 3, 4, 5])
         expect(
             database
                 .prepare(
@@ -76,7 +76,7 @@ describe('SQLite migrations', () => {
             database
                 .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
                 .get()
-        ).toMatchObject({ count: 4 })
+        ).toMatchObject({ count: 5 })
         database.close()
     })
 
@@ -86,12 +86,12 @@ describe('SQLite migrations', () => {
             runMigrations(database, [
                 ...migrations,
                 {
-                    version: 5,
+                    version: 6,
                     name: 'broken',
                     up: 'CREATE TABLE transient(value TEXT); INVALID SQL;'
                 }
             ])
-        ).toThrow(/Migration 5/)
+        ).toThrow(/Migration 6/)
         expect(
             database
                 .prepare(
@@ -102,10 +102,42 @@ describe('SQLite migrations', () => {
         expect(
             database
                 .prepare(
-                    'SELECT version FROM schema_migrations WHERE version = 5'
+                    'SELECT version FROM schema_migrations WHERE version = 6'
                 )
                 .get()
         ).toBeUndefined()
         database.close()
+    })
+
+    it('backs up an older database before applying a newer schema', () => {
+        const databaseFile = file()
+        const legacy = new DatabaseSync(databaseFile)
+        runMigrations(
+            legacy,
+            migrations.filter((item) => item.version <= 4)
+        )
+        legacy.close()
+
+        const library = new LibraryDatabase(databaseFile)
+        library.close()
+
+        const backup = `${databaseFile}.pre-migration-v5.bak`
+        expect(fs.existsSync(backup)).toBe(true)
+        const backedUp = new DatabaseSync(backup)
+        expect(
+            backedUp
+                .prepare(
+                    'SELECT MAX(version) AS version FROM schema_migrations'
+                )
+                .get()
+        ).toMatchObject({ version: 4 })
+        expect(
+            backedUp
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='shelves'"
+                )
+                .get()
+        ).toBeUndefined()
+        backedUp.close()
     })
 })

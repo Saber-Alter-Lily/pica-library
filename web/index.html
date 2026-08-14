@@ -680,6 +680,56 @@
                         role="status"
                     ></p>
                 </article>
+                <article id="settings-update" class="panel update-panel">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">本地更新</p>
+                            <h3>更新</h3>
+                        </div>
+                        <span id="update-current-version" class="mode"></span>
+                    </div>
+                    <p>下载官方更新包后，可直接在这里校验、暂存并更新。</p>
+                    <label
+                        id="update-dropzone"
+                        class="update-dropzone"
+                        tabindex="0"
+                    >
+                        <strong>将 Pica Library 更新包拖到这里</strong>
+                        <span>或选择 Pica-Library-vX.Y.Z-update.zip</span>
+                        <input
+                            id="update-file"
+                            type="file"
+                            accept=".zip,application/zip"
+                        />
+                    </label>
+                    <div
+                        id="update-summary"
+                        class="update-summary"
+                        hidden
+                    ></div>
+                    <div id="update-progress" class="operation-progress" hidden>
+                        <span id="update-progress-phase"></span>
+                        <progress id="update-progress-bar" max="1"></progress>
+                    </div>
+                    <p
+                        id="update-message"
+                        class="status"
+                        aria-live="polite"
+                    ></p>
+                    <div class="actions">
+                        <button id="update-check" type="button">
+                            检查更新
+                        </button>
+                        <button
+                            id="update-apply"
+                            class="primary"
+                            type="button"
+                            hidden
+                        >
+                            更新并重启
+                        </button>
+                    </div>
+                </article>
             </section>
         </main>
         <template id="author-template">

@@ -244,8 +244,64 @@ export const migrations: Migration[] = [
                 FROM comics
             `)
         }
+    },
+    {
+        version: 5,
+        name: 'v020_local_product_state',
+        up: `
+            CREATE TABLE IF NOT EXISTS shelves (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                normalized_name TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS shelf_items (
+                shelf_id TEXT NOT NULL REFERENCES shelves(id) ON DELETE CASCADE,
+                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
+                added_at TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (shelf_id, comic_id)
+            );
+            CREATE TABLE IF NOT EXISTS reading_progress (
+                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
+                episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+                page_index INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (comic_id, episode_id)
+            );
+            CREATE TABLE IF NOT EXISTS recommendation_sessions (
+                id TEXT PRIMARY KEY,
+                cycle_id TEXT NOT NULL,
+                session_no INTEGER NOT NULL,
+                generated_at TEXT NOT NULL,
+                result_ids_json TEXT NOT NULL DEFAULT '[]',
+                exhausted INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (cycle_id, session_no)
+            );
+            CREATE TABLE IF NOT EXISTS recommendation_seen (
+                cycle_id TEXT NOT NULL,
+                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
+                first_seen_at TEXT NOT NULL,
+                PRIMARY KEY (cycle_id, comic_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_shelf_items_comic
+                ON shelf_items(comic_id, shelf_id);
+            CREATE INDEX IF NOT EXISTS idx_shelf_items_order
+                ON shelf_items(shelf_id, position, added_at);
+            CREATE INDEX IF NOT EXISTS idx_reading_progress_updated
+                ON reading_progress(updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_recommendation_seen_cycle
+                ON recommendation_seen(cycle_id, first_seen_at);
+        `
     }
 ]
+
+export const latestMigrationVersion = Math.max(
+    0,
+    ...migrations.map((migration) => migration.version)
+)
 
 export function runMigrations(
     database: DatabaseSync,

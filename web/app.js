@@ -40,6 +40,7 @@ const state = {
         localStorage.getItem('pica-downloaded-covers-enabled') !== 'false',
     coversEnabled: localStorage.getItem('pica-covers-enabled') !== 'false',
     recommendationBatch: 0,
+    stagedUpdate: null,
     ...emptyLiteState()
 }
 let desktop = null
@@ -145,6 +146,7 @@ async function loadDesktop() {
         desktop = await api('/api/v1/desktop/status')
         $('#settings-nav').hidden = false
         $('#settings-version').textContent = `Pica Library ${desktop.version}`
+        $('#update-current-version').textContent = `v${desktop.version}`
         $('#settings-directory').value = desktop.libraryDirectory || ''
         $('#settings-profile').value = desktop.profile || 'balanced'
         $('#settings-proxy').value = desktop.proxyUrl || ''
@@ -157,6 +159,125 @@ async function loadDesktop() {
         }
     } catch {
         desktop = null
+    }
+}
+
+const updatePhaseText = {
+    validating: '校验更新包',
+    extracting: '解压到临时目录',
+    staged: '已完成校验与暂存',
+    'preparing-backup': '准备备份',
+    'waiting-for-exit': '等待应用退出',
+    'replacing-files': '替换文件',
+    starting: '启动新版本',
+    'health-check': '检查运行状态',
+    complete: '完成',
+    rollback: '更新失败，正在回滚',
+    failed: '更新失败'
+}
+
+function renderUpdateProgress(progress) {
+    const panel = $('#update-progress')
+    if (!progress || progress.phase === 'idle') {
+        panel.hidden = true
+        return
+    }
+    panel.hidden = false
+    $('#update-progress-phase').textContent =
+        updatePhaseText[progress.phase] || progress.phase
+    const bar = $('#update-progress-bar')
+    if (progress.total > 0) {
+        bar.max = progress.total
+        bar.value = progress.current || 0
+    } else {
+        bar.removeAttribute('value')
+    }
+}
+
+async function stageUpdateFile(file) {
+    if (!desktop) throw new Error('更新仅在本地 Windows 版中可用')
+    if (!file || !file.name.toLowerCase().endsWith('.zip'))
+        throw new Error('请选择 ZIP 更新包')
+    const message = $('#update-message')
+    message.textContent = '正在校验更新包…'
+    renderUpdateProgress({ phase: 'validating' })
+    const response = await fetch('/api/v1/update/stage', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/zip',
+            'x-pica-csrf': desktop.csrfToken,
+            'x-update-filename': encodeURIComponent(file.name)
+        },
+        body: file
+    })
+    const value = await response.json()
+    if (!response.ok) throw new Error(value.error || '更新包校验失败')
+    state.stagedUpdate = value
+    const summary = $('#update-summary')
+    summary.hidden = false
+    summary.innerHTML = `<strong>${escapeHtml(value.targetVersion)}</strong><br>${Number(value.fileCount)} 个变更文件 · ${Number(value.deletionCount)} 个删除项<br>数据库架构 v${Number(value.databaseSchemaVersion)}${value.requiresFullInstall ? '<br><strong>此更新需要完整安装包。</strong>' : ''}`
+    $('#update-apply').hidden = Boolean(value.requiresFullInstall)
+    message.textContent = value.requiresFullInstall
+        ? '此更新需要完整安装包。请打开 GitHub Release。'
+        : '更新包已验证并暂存。确认后可更新并重启。'
+    renderUpdateProgress({
+        phase: 'staged',
+        current: value.fileCount,
+        total: value.fileCount
+    })
+}
+
+const updateDropzone = $('#update-dropzone')
+;['dragenter', 'dragover'].forEach((name) =>
+    updateDropzone.addEventListener(name, (event) => {
+        event.preventDefault()
+        updateDropzone.classList.add('dragover')
+    })
+)
+;['dragleave', 'drop'].forEach((name) =>
+    updateDropzone.addEventListener(name, (event) => {
+        event.preventDefault()
+        updateDropzone.classList.remove('dragover')
+    })
+)
+updateDropzone.addEventListener('drop', (event) => {
+    const file = event.dataTransfer?.files?.[0]
+    if (file)
+        void stageUpdateFile(file).catch((error) => {
+            $('#update-message').textContent = localizeError(language, error)
+            renderUpdateProgress({ phase: 'failed' })
+        })
+})
+$('#update-file').onchange = (event) => {
+    const file = event.target.files?.[0]
+    if (file)
+        void stageUpdateFile(file).catch((error) => {
+            $('#update-message').textContent = localizeError(language, error)
+            renderUpdateProgress({ phase: 'failed' })
+        })
+}
+$('#update-check').onclick = () => {
+    window.open(
+        'https://github.com/Saber-Alter-Lily/pica-library/releases',
+        '_blank',
+        'noopener,noreferrer'
+    )
+}
+$('#update-apply').onclick = async () => {
+    if (!state.stagedUpdate) return
+    if (
+        !window.confirm(
+            `确认更新到 ${state.stagedUpdate.targetVersion} 并重启？`
+        )
+    )
+        return
+    try {
+        await desktopPost('/api/v1/update/apply', { id: state.stagedUpdate.id })
+        $('#update-message').textContent = '应用即将退出并完成更新，请稍候…'
+        renderUpdateProgress({ phase: 'waiting-for-exit' })
+    } catch (error) {
+        $('#update-message').textContent = localizeError(language, error)
+        renderUpdateProgress({ phase: 'failed' })
     }
 }
 

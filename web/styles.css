@@ -664,3 +664,39 @@ th {
         flex-direction: column;
     }
 }
+.update-dropzone {
+    display: grid;
+    gap: 0.45rem;
+    place-items: center;
+    min-height: 9rem;
+    padding: 1.25rem;
+    border: 2px dashed var(--border);
+    border-radius: 1rem;
+    text-align: center;
+    cursor: pointer;
+}
+
+.update-dropzone.dragover,
+.update-dropzone:focus-within {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.update-dropzone input {
+    max-width: 100%;
+}
+
+.update-summary {
+    margin-top: 1rem;
+    padding: 0.85rem;
+    border-radius: 0.75rem;
+    background: var(--surface-muted, rgba(127, 127, 127, 0.08));
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+    .update-dropzone {
+        min-height: 7rem;
+        padding: 0.85rem;
+    }
+}

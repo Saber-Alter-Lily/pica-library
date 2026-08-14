@@ -44,8 +44,20 @@ describe('local web server', () => {
         )
         expect(status).toMatchObject({
             mode: 'connected',
-            version: '0.1.4-dev.2',
+            version: '0.2.0-dev.0',
             summary: { comics: 0 }
+        })
+    })
+
+    it('exposes explicit application capabilities', async () => {
+        const capabilities = await fetch(`${url}/api/v1/capabilities`).then(
+            (response) => response.json()
+        )
+        expect(capabilities).toMatchObject({
+            appVersion: '0.2.0-dev.0',
+            appApiVersion: 2,
+            databaseSchemaVersion: 5,
+            updateManifestVersion: 1
         })
     })
 

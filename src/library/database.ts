@@ -25,7 +25,10 @@ import type {
     LibrarySummary,
     StoredComic
 } from './types'
-import { runMigrations } from '../storage/sqlite/migrations'
+import {
+    latestMigrationVersion,
+    runMigrations
+} from '../storage/sqlite/migrations'
 import type { UpdateFinding } from '../maintenance/updates'
 import { trustedCoverUrl } from './cover-url'
 
@@ -132,6 +135,7 @@ export class LibraryDatabase {
         fs.mkdirSync(path.dirname(this.file), { recursive: true })
         this.db = new DatabaseSync(this.file)
         this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
+        this.backupBeforeMigration()
         this.migrate()
     }
 
@@ -141,6 +145,31 @@ export class LibraryDatabase {
 
     private migrate() {
         runMigrations(this.db)
+    }
+
+    private backupBeforeMigration() {
+        if (!fs.existsSync(this.file) || fs.statSync(this.file).size === 0)
+            return
+        const table = this.db
+            .prepare(
+                "SELECT 1 AS found FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
+            )
+            .get() as SqlRow | undefined
+        const current = table
+            ? numberValue(
+                  (
+                      this.db
+                          .prepare(
+                              'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations'
+                          )
+                          .get() as SqlRow
+                  ).version
+              )
+            : 0
+        if (current >= latestMigrationVersion) return
+        this.db.exec('PRAGMA wal_checkpoint(FULL)')
+        const backup = `${this.file}.pre-migration-v${latestMigrationVersion}.bak`
+        fs.copyFileSync(this.file, backup)
     }
 
     importFavorites(

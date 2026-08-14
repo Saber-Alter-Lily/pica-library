@@ -68,7 +68,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 # The legacy compiler embeds a timestamp and a random module ID. When launcher
 # source is unchanged, each incremental target reuses the previous package's
 # launcher bytes so a file-diff update does not report a false replacement.
-# update does not report a false launcher replacement.
 if ($version -in @('0.2.0-dev.1','0.2.0-dev.2')) {
     $baseZip = if ($version -eq '0.2.0-dev.1') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
@@ -106,8 +105,16 @@ No separate Node.js, npm, pnpm, Git, terminal, or administrator access is requir
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
-$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHYwLjEuNC1kZXYuMiBXaW5kb3dzIDEwLzExIHg2NAoKMS4g6Kej5Y6L5a6M5pW0IFpJUOOAggoyLiDlj4zlh7sgUGljYSBMaWJyYXJ5LmV4ZeOAggozLiDlnKjmtY/op4jlmajkuK3lrozmiJDpppbmrKHorr7nva7jgIIKNC4g5Y+v5Zyo6K6+572u5Lit5L2/55So5ZCM5q2l44CB5LiL6L295ZKM5bey5LiL6L295ryr55S76KeG5Zu+44CCCgrov5nmmK/mnKzlnLDpqozmlLbmnoTlu7rvvIzkuI3pnIDopoHljZXni6zlronoo4UgTm9kZS5qc+OAgW5wbeOAgXBucG3jgIFHaXQg5oiW566h55CG5ZGY5p2D6ZmQ44CC'
-$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64))
+$readmeZh = @"
+Pica Library v$version Windows 10/11 x64
+
+1. 解压完整 ZIP。
+2. 双击 Pica Library.exe。
+3. 在浏览器中完成首次设置。
+4. 可在设置中使用同步、下载和已下载漫画视图。
+
+这是本地验收构建，不需要单独安装 Node.js、npm、pnpm、Git 或管理员权限。
+"@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 

@@ -63,7 +63,7 @@ describe('dev.2 connected Web lifecycle contracts', () => {
             '.querySelector(`[data-reader-page="${resumePage}"]`)'
         )
         expect(app).toContain("?.scrollIntoView({ block: 'center' })")
-        expect(app).toContain('继续阅读：第 ${state.reader.pageIndex + 1} 页')
+        expect(app).toContain("t('reader.resume'")
     })
 
     it.each([

@@ -199,9 +199,16 @@
                     <div class="actions">
                         <input
                             id="import-file"
+                            class="file-picker-input"
                             type="file"
                             accept=".csv,.json"
                         />
+                        <label
+                            id="import-file-label"
+                            class="button-control"
+                            for="import-file"
+                            >选择数据文件</label
+                        >
                         <button id="import-button" class="primary">导入</button>
                         <button id="sync-button">更新收藏</button>
                         <button id="full-sync-button">完整校验收藏</button>
@@ -363,7 +370,9 @@
                             type="checkbox"
                             checked
                         />
-                        加载封面</label
+                        <span id="shelf-cover-toggle-label"
+                            >加载封面</span
+                        ></label
                     >
                 </div>
                 <div class="shelf-layout">

@@ -1,6 +1,9 @@
 export const supportedLanguages: readonly ['zh-CN', 'en']
 export const languageStorageKey: string
 export const translations: Record<string, Record<string, string>>
+export const domTranslations: ReadonlyArray<
+    readonly [selector: string, key: string, attribute?: string]
+>
 
 export function normalizeLanguage(value: unknown): 'zh-CN' | 'en'
 export function detectLanguage(languages?: string[] | string): 'zh-CN' | 'en'

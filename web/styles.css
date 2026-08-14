@@ -67,6 +67,33 @@ button {
 button:hover {
     border-color: var(--green);
 }
+.button-control {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.button-control:hover,
+.button-control:focus-visible {
+    border-color: var(--green);
+}
+.file-picker-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
 button.primary,
 nav button.active,
 .tabs button.active {

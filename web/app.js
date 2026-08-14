@@ -60,6 +60,7 @@ const state = {
     searchResults: [],
     recommendationSessionNo: 1,
     recommendationExhausted: false,
+    updateProgress: null,
     reader: {
         comicId: null,
         episodeId: null,
@@ -111,6 +112,18 @@ function applyLanguage(nextLanguage, persist = false) {
     if (persist) {
         renderAll()
         void loadJobs()
+        if (activeView === 'shelves') {
+            void loadShelves().then(() => {
+                if (state.activeShelfId) void openShelf(state.activeShelfId)
+            })
+        }
+        if (activeView === 'downloaded') void loadDownloaded()
+        if (activeView === 'settings') void loadPreviewCacheStats()
+        if (activeView === 'reader') {
+            renderReaderChapterHeading()
+            renderReaderPages()
+        }
+        if (state.updateProgress) renderUpdateProgress(state.updateProgress)
     }
 }
 
@@ -202,28 +215,30 @@ async function loadDesktop() {
 }
 
 const updatePhaseText = {
-    validating: '校验更新包',
-    extracting: '解压到临时目录',
-    staged: '已完成校验与暂存',
-    'preparing-backup': '准备备份',
-    'waiting-for-exit': '等待应用退出',
-    'replacing-files': '替换文件',
-    starting: '启动新版本',
-    'health-check': '检查运行状态',
-    complete: '完成',
-    rollback: '更新失败，正在回滚',
-    failed: '更新失败'
+    validating: 'update.phase.validating',
+    extracting: 'update.phase.extracting',
+    staged: 'update.phase.staged',
+    'preparing-backup': 'update.phase.preparingBackup',
+    'waiting-for-exit': 'update.phase.waitingExit',
+    'replacing-files': 'update.phase.replacing',
+    starting: 'update.phase.starting',
+    'health-check': 'update.phase.health',
+    complete: 'update.phase.complete',
+    rollback: 'update.phase.rollback',
+    failed: 'update.phase.failed'
 }
 
 function renderUpdateProgress(progress) {
+    state.updateProgress = progress
     const panel = $('#update-progress')
     if (!progress || progress.phase === 'idle') {
         panel.hidden = true
         return
     }
     panel.hidden = false
-    $('#update-progress-phase').textContent =
-        updatePhaseText[progress.phase] || progress.phase
+    $('#update-progress-phase').textContent = updatePhaseText[progress.phase]
+        ? t(updatePhaseText[progress.phase])
+        : progress.phase
     const bar = $('#update-progress-bar')
     if (progress.total > 0) {
         bar.max = progress.total
@@ -234,11 +249,11 @@ function renderUpdateProgress(progress) {
 }
 
 async function stageUpdateFile(file) {
-    if (!desktop) throw new Error('更新仅在本地 Windows 版中可用')
+    if (!desktop) throw new Error(t('update.localOnly'))
     if (!file || !file.name.toLowerCase().endsWith('.zip'))
-        throw new Error('请选择 ZIP 更新包')
+        throw new Error(t('update.chooseZip'))
     const message = $('#update-message')
-    message.textContent = '正在校验更新包…'
+    message.textContent = t('update.validating')
     renderUpdateProgress({ phase: 'validating' })
     const response = await fetch('/api/v1/update/stage', {
         method: 'POST',
@@ -250,15 +265,26 @@ async function stageUpdateFile(file) {
         body: file
     })
     const value = await response.json()
-    if (!response.ok) throw new Error(value.error || '更新包校验失败')
+    if (!response.ok)
+        throw new Error(value.error || t('update.validationFailed'))
     state.stagedUpdate = value
     const summary = $('#update-summary')
     summary.hidden = false
-    summary.innerHTML = `<strong>${escapeHtml(value.targetVersion)}</strong><br>${Number(value.fileCount)} 个变更文件 · ${Number(value.deletionCount)} 个删除项<br>数据库架构 v${Number(value.databaseSchemaVersion)}${value.requiresFullInstall ? '<br><strong>此更新需要完整安装包。</strong>' : ''}`
+    summary.innerHTML = `<strong>${escapeHtml(value.targetVersion)}</strong><br>${t(
+        'update.summary',
+        {
+            files: Number(value.fileCount),
+            deletions: Number(value.deletionCount),
+            schema: Number(value.databaseSchemaVersion),
+            full: value.requiresFullInstall
+                ? t('update.fullRequiredInline')
+                : ''
+        }
+    )}`
     $('#update-apply').hidden = Boolean(value.requiresFullInstall)
     message.textContent = value.requiresFullInstall
-        ? '此更新需要完整安装包。请打开 GitHub Release。'
-        : '更新包已验证并暂存。确认后可更新并重启。'
+        ? t('update.fullRequired')
+        : t('update.staged')
     renderUpdateProgress({
         phase: 'staged',
         current: value.fileCount,
@@ -297,19 +323,25 @@ $('#update-file').onchange = (event) => {
 }
 $('#update-check').onclick = async () => {
     const message = $('#update-message')
-    message.textContent = '正在检查官方稳定版本…'
+    message.textContent = t('update.checking')
     try {
         const value = await api('/api/v1/update/check')
         if (value.status === 'current') {
-            message.textContent = '当前已是最新版本。'
+            message.textContent = t('update.current')
             return
         }
         const releaseUrl = escapeHtml(value.releaseUrl)
         if (value.status === 'full-install') {
-            message.innerHTML = `发现 v${escapeHtml(value.version)}。此更新需要完整安装包。<a href="${releaseUrl}" target="_blank" rel="noopener noreferrer">打开官方 GitHub Release</a>`
+            message.innerHTML = t('update.fullFound', {
+                version: escapeHtml(value.version),
+                url: releaseUrl
+            })
             return
         }
-        message.innerHTML = `发现 v${escapeHtml(value.version)} 兼容增量更新。<a href="${releaseUrl}" target="_blank" rel="noopener noreferrer">下载官方更新包</a>，然后在上方选择或拖入 ZIP。`
+        message.innerHTML = t('update.incrementalFound', {
+            version: escapeHtml(value.version),
+            url: releaseUrl
+        })
     } catch (error) {
         message.textContent = localizeError(language, error)
     }
@@ -318,13 +350,15 @@ $('#update-apply').onclick = async () => {
     if (!state.stagedUpdate) return
     if (
         !window.confirm(
-            `确认更新到 ${state.stagedUpdate.targetVersion} 并重启？`
+            t('update.confirm', {
+                version: state.stagedUpdate.targetVersion
+            })
         )
     )
         return
     try {
         await desktopPost('/api/v1/update/apply', { id: state.stagedUpdate.id })
-        $('#update-message').textContent = '应用即将退出并完成更新，请稍候…'
+        $('#update-message').textContent = t('update.applying')
         renderUpdateProgress({ phase: 'waiting-for-exit' })
     } catch (error) {
         $('#update-message').textContent = localizeError(language, error)
@@ -333,21 +367,28 @@ $('#update-apply').onclick = async () => {
 }
 
 function displayDate(value) {
-    if (!value) return '尚无记录'
+    if (!value) return t('time.none')
     const date = new Date(value)
-    return Number.isNaN(date.valueOf()) ? '尚无记录' : date.toLocaleString()
+    return Number.isNaN(date.valueOf())
+        ? t('time.none')
+        : date.toLocaleString(language)
 }
 
 function renderTimestamps() {
     const syncedAt = desktop?.lastSync?.finishedAt ?? state.sourceSyncedAt
     const exportedAt = desktop?.lastExportAt ?? state.generatedAt
-    $('#last-sync').textContent = `上次同步：${displayDate(syncedAt)}`
-    $('#browser-lite-timestamps').textContent =
-        `最近同步：${displayDate(syncedAt)} / 最近导出：${displayDate(exportedAt)}`
+    $('#last-sync').textContent = t('time.lastSync', {
+        time: displayDate(syncedAt)
+    })
+    $('#browser-lite-timestamps').textContent = t('time.syncExport', {
+        sync: displayDate(syncedAt),
+        export: displayDate(exportedAt)
+    })
     $('#lite-snapshot-bar').hidden =
         state.mode !== 'lite' || state.records.length === 0
-    $('#lite-snapshot-time').textContent =
-        `当前数据包生成时间：${displayDate(state.generatedAt)}`
+    $('#lite-snapshot-time').textContent = t('time.snapshot', {
+        time: displayDate(state.generatedAt)
+    })
 }
 
 function setProgress(element, phase, current, total) {
@@ -413,7 +454,7 @@ $('#setup-form').onsubmit = async (event) => {
         await waitForDesktopHealth()
         await loadDesktop()
         $('#setup-next-step').hidden = false
-        message.textContent = '设置已应用。下一步请同步收藏。'
+        message.textContent = t('settings.appliedSync')
     } catch (error) {
         message.textContent = localizeError(language, error)
     }
@@ -461,15 +502,15 @@ $('#export-browser-lite').onclick = async () => {
 }
 $('#sync-export-browser-lite').onclick = async () => {
     const message = $('#browser-lite-export-message')
-    message.textContent = '正在同步收藏并生成 Browser Lite 数据包…'
+    message.textContent = t('bundle.syncExporting')
     const phases = {
-        'sync-favorites': '同步收藏',
-        'update-library': '更新漫画库',
-        'prepare-recommendations': '准备推荐',
-        'generate-bundle': '生成数据包',
-        'choose-save-location': '等待选择保存位置',
-        'write-file': '写入文件',
-        complete: '完成'
+        'sync-favorites': 'bundle.phase.sync',
+        'update-library': 'bundle.phase.library',
+        'prepare-recommendations': 'bundle.phase.recommendations',
+        'generate-bundle': 'bundle.phase.generate',
+        'choose-save-location': 'bundle.phase.choose',
+        'write-file': 'bundle.phase.write',
+        complete: 'bundle.phase.complete'
     }
     const progressTimer = setInterval(async () => {
         try {
@@ -477,7 +518,7 @@ $('#sync-export-browser-lite').onclick = async () => {
             const phase = status.browserLiteExportProgress?.phase
             setProgress(
                 $('#download-operation'),
-                phases[phase] || '正在准备…',
+                phases[phase] ? t(phases[phase]) : t('bundle.preparing'),
                 0,
                 0
             )
@@ -490,10 +531,10 @@ $('#sync-export-browser-lite').onclick = async () => {
             '/api/v1/desktop/sync-export-browser-lite'
         )
         if (result.cancelled) {
-            message.textContent = '已取消导出。'
+            message.textContent = t('bundle.cancelled')
             return
         }
-        message.textContent = '收藏同步完成，Browser Lite 数据包已导出。'
+        message.textContent = t('bundle.complete')
         $('#open-browser-lite-export').hidden = false
         desktop.lastSync = { finishedAt: result.sourceSyncedAt }
         desktop.lastExportAt = result.generatedAt
@@ -535,10 +576,10 @@ $('#settings-detect-proxy').onclick = async () => {
         const result = await desktopPost('/api/v1/desktop/detect-proxy', value)
         const usable = result.candidates?.find((item) => item.usable)
         message.textContent = usable
-            ? `已检测到可用代理：${usable.url}`
+            ? t('proxy.detected', { url: usable.url })
             : result.candidates?.length
-              ? '检测到本地代理服务，但尚未找到可用于连接 Pica 的代理。'
-              : '未检测到可用的本地代理。'
+              ? t('proxy.localUnavailable')
+              : t('proxy.none')
         if (usable && !usable.url.includes('***'))
             $('#settings-proxy').value = usable.url
     } catch (error) {
@@ -815,13 +856,13 @@ function renderResultCards(records, target, recommendation = false) {
                     <span aria-hidden="true">P</span>
                 </div>
                 <div class="result-body"><h3>${escapeHtml(comic.title)}</h3>
-                <label class="result-select"><input type="checkbox" data-selection-context="${context}" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections[context].has(comic.comicId) ? 'checked' : ''} /> 选择</label>
+                <label class="result-select"><input type="checkbox" data-selection-context="${context}" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections[context].has(comic.comicId) ? 'checked' : ''} /> ${t('action.select')}</label>
                 <p>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</p>
                 <div>${selectDisplayTags(comic, tagFrequencies)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</div>
                 ${recommendation ? '' : `<p>${t('message.popularity', { likes: Number(comic.totalLikes || 0).toLocaleString(), views: Number(comic.totalViews || 0).toLocaleString() })}</p>`}
-                <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">详情 / 预览</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">加入 Pica 收藏</button>` : ''}</div>
+                <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">${t('result.details')}</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">${t('result.favorite')}</button>` : ''}</div>
                 </div>
             </article>`
         })
@@ -855,16 +896,22 @@ function renderPreparedRecommendations() {
     const batchCount = Math.max(1, Math.ceil(state.recommendations.length / 12))
     $('#recommend-batch').textContent =
         state.recommendations.length > 0
-            ? `推荐第 ${state.recommendationSessionNo} 轮 · ${t(
-                  'message.recommendationBatch',
-                  {
+            ? t('recommend.round', {
+                  session: state.recommendationSessionNo,
+                  batch: t('message.recommendationBatch', {
                       current: state.recommendationBatch + 1,
                       total: batchCount
-                  }
-              )}${state.recommendationNextReady ? ' · 下一轮已准备好' : state.recommendationBatch > 0 ? ' · 正在准备下一轮…' : ''}`
+                  }),
+                  next: state.recommendationNextReady
+                      ? t('recommend.nextReady')
+                      : state.recommendationBatch > 0
+                        ? t('recommend.preparingNext')
+                        : ''
+              })
             : ''
-    $('#recommend-selection-status').textContent =
-        `已选择 ${state.selections.recommendation.size} 部`
+    $('#recommend-selection-status').textContent = t('library.selected', {
+        count: state.selections.recommendation.size
+    })
     setGridSize('recommendation', state.recommendationGridSize)
 }
 
@@ -890,7 +937,9 @@ function updateSelectionStatus(context) {
     }
     const target = $(selectors[context])
     if (target)
-        target.textContent = `已选择 ${state.selections[context].size} 部`
+        target.textContent = t('library.selected', {
+            count: state.selections[context].size
+        })
 }
 
 document.querySelector('main').addEventListener('change', (event) => {
@@ -957,22 +1006,32 @@ function renderFilterFacets() {
             key: 'scope',
             label:
                 {
-                    library: '漫画库',
-                    favorites: 'Pica 收藏',
-                    downloaded: '已下载',
-                    catalog: '全部缓存记录',
-                    all: '全部缓存记录'
+                    library: t('library.scope.library'),
+                    favorites: t('library.scope.favorites'),
+                    downloaded: t('library.scope.downloaded'),
+                    catalog: t('library.scope.catalog'),
+                    all: t('library.scope.catalog')
                 }[query.scope] || query.scope
         })
-    if (query.text) chips.push({ key: 'text', label: `搜索：${query.text}` })
+    if (query.text)
+        chips.push({
+            key: 'text',
+            label: t('library.filterSearch', { value: query.text })
+        })
     for (const authorId of query.authorIds || []) {
         const label =
             result.facets.authors.find((item) => item.value === authorId)
                 ?.label || authorId
-        chips.push({ key: 'author', label: `作者：${label}` })
+        chips.push({
+            key: 'author',
+            label: t('library.filterAuthor', { value: label })
+        })
     }
     for (const tag of query.tags || [])
-        chips.push({ key: `tag:${tag}`, label: `标签：${tag}` })
+        chips.push({
+            key: `tag:${tag}`,
+            label: t('library.filterTag', { value: tag })
+        })
     $('#filter-chips').innerHTML = chips
         .map(
             (chip) =>
@@ -982,7 +1041,7 @@ function renderFilterFacets() {
     if (chips.length)
         $('#filter-chips').insertAdjacentHTML(
             'beforeend',
-            '<button class="filter-chip" data-filter-remove="all">清除全部</button>'
+            `<button class="filter-chip" data-filter-remove="all">${t('library.clearFilters')}</button>`
         )
 }
 
@@ -1022,7 +1081,7 @@ $('#filter-chips').onclick = (event) => {
 async function loadShelves() {
     if (state.mode !== 'connected') {
         $('#shelf-list').innerHTML =
-            '<article class="notice">书架需要本地 Windows 引擎。</article>'
+            `<article class="notice">${t('shelf.engineRequired')}</article>`
         return
     }
     state.shelves = await api('/api/v1/shelves')
@@ -1030,13 +1089,13 @@ async function loadShelves() {
         state.shelves
             .map(
                 (shelf) =>
-                    `<button class="shelf-card" data-shelf-open="${escapeHtml(shelf.id)}"><strong>${escapeHtml(shelf.name)}</strong><span>${Number(shelf.count)} 部</span></button>`
+                    `<button class="shelf-card" data-shelf-open="${escapeHtml(shelf.id)}"><strong>${escapeHtml(shelf.name)}</strong><span>${t('shelf.count', { count: Number(shelf.count) })}</span></button>`
             )
-            .join('') || '<article class="notice">还没有书架。</article>'
+            .join('') || `<article class="notice">${t('shelf.empty')}</article>`
     $('#shelf-dialog-select').innerHTML = state.shelves
         .map(
             (shelf) =>
-                `<option value="${escapeHtml(shelf.id)}">${escapeHtml(shelf.name)} · ${Number(shelf.count)} 部</option>`
+                `<option value="${escapeHtml(shelf.id)}">${escapeHtml(shelf.name)} · ${t('shelf.count', { count: Number(shelf.count) })}</option>`
         )
         .join('')
 }
@@ -1045,12 +1104,12 @@ async function openShelf(shelfId) {
     const value = await api(`/api/v1/shelves/${encodeURIComponent(shelfId)}`)
     state.activeShelfId = shelfId
     const shelf = value.shelf
-    if (!shelf) throw new Error('书架不存在')
+    if (!shelf) throw new Error(t('shelf.notFound'))
     $('#shelf-detail').innerHTML =
-        `<div class="page-heading"><div><h3>${escapeHtml(shelf.name)}</h3><p>${Number(value.items.length)} 部漫画</p></div><div class="actions"><button data-shelf-rename="${escapeHtml(shelf.id)}">重命名</button><button data-shelf-delete="${escapeHtml(shelf.id)}">删除书架</button></div></div><div id="shelf-items" class="comic-grid ${state.shelfView === 'list' ? 'shelf-list-mode' : ''}">${value.items
+        `<div class="page-heading"><div><h3>${escapeHtml(shelf.name)}</h3><p>${t('shelf.count', { count: Number(value.items.length) })}</p></div><div class="actions"><button data-shelf-rename="${escapeHtml(shelf.id)}">${t('shelf.rename')}</button><button data-shelf-delete="${escapeHtml(shelf.id)}">${t('shelf.delete')}</button></div></div><div id="shelf-items" class="comic-grid ${state.shelfView === 'list' ? 'shelf-list-mode' : ''}">${value.items
             .map(
                 (comic) =>
-                    `<article class="comic-card">${state.shelfCoversEnabled ? `<div class="cover-shell"><img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" onerror="this.remove();this.parentElement.classList.add('cover-missing')"/><span aria-hidden="true">P</span></div>` : '<div class="cover-shell"><span aria-hidden="true">P</span></div>'}<div class="comic-card-body"><label><input type="checkbox" data-selection-context="shelf" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.shelf.has(comic.comicId) ? 'checked' : ''}/> 选择</label><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><div>${(
+                    `<article class="comic-card">${state.shelfCoversEnabled ? `<div class="cover-shell"><img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" onerror="this.remove();this.parentElement.classList.add('cover-missing')"/><span aria-hidden="true">P</span></div>` : '<div class="cover-shell"><span aria-hidden="true">P</span></div>'}<div class="comic-card-body"><label><input type="checkbox" data-selection-context="shelf" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.shelf.has(comic.comicId) ? 'checked' : ''}/> ${t('action.select')}</label><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><div>${(
                         comic.tags || []
                     )
                         .slice(0, 3)
@@ -1060,11 +1119,11 @@ async function openShelf(shelfId) {
                         )
                         .join(
                             ''
-                        )}</div><p>${comic.downloadedPictures > 0 ? `已下载 ${comic.downloadedPictures} 张` : '尚未下载'}</p><div class="actions">${comic.downloadedPictures > 0 ? `<button data-shelf-read="${escapeHtml(comic.comicId)}">阅读</button>` : `<button data-shelf-download="${escapeHtml(comic.comicId)}">下载</button>`}</div></div></article>`
+                        )}</div><p>${comic.downloadedPictures > 0 ? t('shelf.downloadedPictures', { count: comic.downloadedPictures }) : t('shelf.notDownloaded')}</p><div class="actions">${comic.downloadedPictures > 0 ? `<button data-shelf-read="${escapeHtml(comic.comicId)}">${t('downloaded.read')}</button>` : `<button data-shelf-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>`}</div></div></article>`
             )
             .join(
                 ''
-            )}</div><div class="actions"><button data-shelf-remove-selected="${escapeHtml(shelf.id)}">移出所选漫画</button></div>`
+            )}</div><div class="actions"><button data-shelf-remove-selected="${escapeHtml(shelf.id)}">${t('shelf.removeSelected')}</button></div>`
     setGridSize('shelf', state.shelfGridSize)
 }
 
@@ -1072,13 +1131,13 @@ let pendingShelfAction = null
 async function chooseShelf(count, action) {
     await loadShelves()
     if (!state.shelves.length) {
-        const name = window.prompt('先创建一个书架：')
+        const name = window.prompt(t('shelf.createPrompt'))
         if (!name) return
         await post('/api/v1/shelves', { name })
         await loadShelves()
     }
     pendingShelfAction = action
-    $('#shelf-dialog-count').textContent = `将 ${count} 部漫画加入所选书架。`
+    $('#shelf-dialog-count').textContent = t('shelf.addCount', { count })
     $('#shelf-dialog').showModal()
 }
 
@@ -1209,8 +1268,11 @@ async function loadPreviewCacheStats() {
     if (state.mode !== 'connected') return
     try {
         const value = await api('/api/v1/previews/cache')
-        $('#preview-cache-stats').textContent =
-            `当前占用：${formatBytes(value.bytes)} · 最大缓存：${formatBytes(value.maxBytes)} · 自动保留约 ${Math.round(value.ttlMs / 86400000)} 天`
+        $('#preview-cache-stats').textContent = t('preview.cacheStats', {
+            current: formatBytes(value.bytes),
+            maximum: formatBytes(value.maxBytes),
+            days: Math.round(value.ttlMs / 86400000)
+        })
     } catch (error) {
         $('#preview-cache-stats').textContent = localizeError(language, error)
     }
@@ -1244,7 +1306,7 @@ function openRecommendationDetail(comicId, context = 'recommendation') {
     $('#recommend-preview').innerHTML = ''
     $('#recommend-preview-message').textContent = ''
     $('#recommend-detail-content').innerHTML =
-        `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? '完结' : '连载或状态未知'} · 爱心 ${Number(comic.totalLikes || 0).toLocaleString()}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">预览前几页</button><button data-detail-shelf="true">加入书架</button>${state.capabilities?.features?.providerFavoriteMutation ? '<button data-detail-favorite="true">加入 Pica 收藏</button>' : ''}<button data-detail-download="true">下载</button></div>`
+        `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${state.capabilities?.features?.providerFavoriteMutation ? `<button data-detail-favorite="true">${t('result.favorite')}</button>` : ''}<button data-detail-download="true">${t('action.download')}</button></div>`
     dialog.showModal()
 }
 
@@ -1252,7 +1314,7 @@ async function loadRecommendationPreview(offset = 0) {
     const dialog = $('#recommend-detail-dialog')
     const comicId = dialog.dataset.comicId
     const message = $('#recommend-preview-message')
-    message.textContent = '正在准备预览…'
+    message.textContent = t('preview.preparing')
     try {
         const value = await post('/api/v1/previews/prepare', {
             comicId,
@@ -1260,7 +1322,7 @@ async function loadRecommendationPreview(offset = 0) {
             count: 3
         })
         if (!value.pages.length) {
-            message.textContent = '此漫画当前没有可用预览页。'
+            message.textContent = t('preview.empty')
             return
         }
         dialog.dataset.previewOffset = String(offset + value.pages.length)
@@ -1269,11 +1331,19 @@ async function loadRecommendationPreview(offset = 0) {
             value.pages
                 .map(
                     (page) =>
-                        `<img src="${escapeHtml(page.url)}" alt="预览第 ${page.index + 1} 页" loading="lazy" />`
+                        `<img src="${escapeHtml(page.url)}" alt="${t('preview.pageAlt', { page: page.index + 1 })}" loading="lazy" />`
                 )
                 .join('')
         )
-        message.innerHTML = `正在预览：${escapeHtml(value.episodeTitle || '首个可读章节')} · 已加载 ${offset + value.pages.length} 页${value.hasMore ? ' <button data-detail-preview-more="true">再加载 3 页</button>' : ''}`
+        message.innerHTML = t('preview.status', {
+            episode: escapeHtml(
+                value.episodeTitle || t('preview.firstEpisode')
+            ),
+            count: offset + value.pages.length,
+            more: value.hasMore
+                ? ` <button data-detail-preview-more="true">${t('preview.more')}</button>`
+                : ''
+        })
         await loadPreviewCacheStats()
     } catch (error) {
         message.textContent = localizeError(language, error)
@@ -1303,7 +1373,7 @@ $('#recommend-detail-dialog').onclick = async (event) => {
                 `/api/v1/provider/favorites/${encodeURIComponent(comicId)}`,
                 'PUT'
             )
-            event.target.textContent = '★ 已收藏'
+            event.target.textContent = t('result.favorited')
             event.target.disabled = true
         } catch (error) {
             $('#recommend-preview-message').textContent = localizeError(
@@ -1334,7 +1404,7 @@ function renderReaderPages() {
     target.innerHTML = pages
         .map(
             (page, index) =>
-                `<img src="${escapeHtml(page.url)}" data-reader-page="${mode === 'vertical' ? index : reader.pageIndex + index}" alt="第 ${(mode === 'vertical' ? index : reader.pageIndex + index) + 1} 页" />`
+                `<img src="${escapeHtml(page.url)}" data-reader-page="${mode === 'vertical' ? index : reader.pageIndex + index}" alt="${t('reader.pageAlt', { page: (mode === 'vertical' ? index : reader.pageIndex + index) + 1 })}" />`
         )
         .join('')
     if (readerScrollHandler)
@@ -1426,12 +1496,21 @@ async function openReaderChapter(episodeId) {
     )
     state.reader.progressSaved = null
     state.reader.dirty = false
-    $('#reader-chapter-title').textContent =
-        `${chapter.episode.title} · ${chapter.pages.length} 页` +
-        (chapter.progress
-            ? ` · 继续阅读：第 ${state.reader.pageIndex + 1} 页`
-            : '')
+    renderReaderChapterHeading()
     renderReaderPages()
+}
+
+function renderReaderChapterHeading() {
+    const chapter = state.reader.chapter
+    if (!chapter) return
+    $('#reader-chapter-title').textContent =
+        t('reader.chapter', {
+            title: chapter.episode.title,
+            pages: chapter.pages.length
+        }) +
+        (chapter.progress
+            ? t('reader.resume', { page: state.reader.pageIndex + 1 })
+            : '')
 }
 
 async function openReaderComic(comicId) {
@@ -1443,7 +1522,7 @@ async function openReaderComic(comicId) {
             api('/api/v1/reader/progress')
         ])
         const readable = chapters.filter((item) => item.downloadedPictures > 0)
-        if (!readable.length) throw new Error('该漫画尚无已下载章节。')
+        if (!readable.length) throw new Error(t('reader.noChapters'))
         const resume = recentProgress.find(
             (item) =>
                 item.comicId === comicId &&
@@ -1459,7 +1538,7 @@ async function openReaderComic(comicId) {
             dirty: false
         }
         const comic = state.records.find((item) => item.comicId === comicId)
-        $('#reader-title').textContent = comic?.title || '阅读'
+        $('#reader-title').textContent = comic?.title || t('reader.title')
         $('#reader-chapters').innerHTML = chapters
             .map(
                 (chapter) =>
@@ -1510,11 +1589,16 @@ async function exportReaderArchive(format) {
             episodeId: state.reader.episodeId
         })
         const name = value.path.split(/[\\/]/).pop()
-        $('#reader-message').textContent =
-            `已导出 ${name} · ${value.pages} 页 · ${formatBytes(value.bytes)}`
+        $('#reader-message').textContent = t('reader.exported', {
+            name,
+            pages: value.pages,
+            bytes: formatBytes(value.bytes)
+        })
         if (
             window.confirm(
-                `${format.toUpperCase()} 已导出。用系统默认阅读器打开？`
+                t('reader.openExport', {
+                    format: format.toUpperCase()
+                })
             )
         )
             await post('/api/v1/reader/open-default', { path: value.path })
@@ -1554,14 +1638,14 @@ async function loadDownloaded() {
         records
             .map(
                 (comic) =>
-                    `<article class="comic-card"><div class="cover-shell">${coverSource(comic) ? `<img src="${coverSource(comic)}" loading="lazy" alt="" />` : ''}<span aria-hidden="true">P</span></div><div class="comic-card-body"><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><p>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</p><p>${t('downloaded.chapters', { downloaded: comic.downloadedChapters, known: comic.knownChapters || '—' })} · ${t('message.pictures', { count: comic.downloadedPictures })} · ${formatBytes(comic.localBytes)}</p><button data-read-comic="${escapeHtml(comic.comicId)}">阅读</button></div></article>`
+                    `<article class="comic-card"><div class="cover-shell">${coverSource(comic) ? `<img src="${coverSource(comic)}" loading="lazy" alt="" />` : ''}<span aria-hidden="true">P</span></div><div class="comic-card-body"><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><p>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</p><p>${t('downloaded.chapters', { downloaded: comic.downloadedChapters, known: comic.knownChapters || '—' })} · ${t('message.pictures', { count: comic.downloadedPictures })} · ${formatBytes(comic.localBytes)}</p><button data-read-comic="${escapeHtml(comic.comicId)}">${t('downloaded.read')}</button></div></article>`
             )
             .join('') ||
         `<article class="notice">${t('downloaded.empty')}</article>`
     $('#downloaded-rows').innerHTML = records
         .map(
             (comic) =>
-                `<tr><td>${escapeHtml(comic.title)}<br><button data-read-comic="${escapeHtml(comic.comicId)}">阅读</button></td><td>${escapeHtml(comic.canonicalAuthor || comic.author)}</td><td>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</td><td>${comic.downloadedChapters}/${comic.knownChapters || '—'}</td><td>${comic.downloadedPictures}</td><td>${formatBytes(comic.localBytes)}</td><td>${escapeHtml(comic.lastDownloadedAt || '—')}</td></tr>`
+                `<tr><td>${escapeHtml(comic.title)}<br><button data-read-comic="${escapeHtml(comic.comicId)}">${t('downloaded.read')}</button></td><td>${escapeHtml(comic.canonicalAuthor || comic.author)}</td><td>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</td><td>${comic.downloadedChapters}/${comic.knownChapters || '—'}</td><td>${comic.downloadedPictures}</td><td>${formatBytes(comic.localBytes)}</td><td>${escapeHtml(comic.lastDownloadedAt || '—')}</td></tr>`
         )
         .join('')
     setGridSize('downloaded', state.downloadedGridSize)
@@ -1588,6 +1672,7 @@ function renderAll(summary) {
     $('#browser-lite-onboarding').hidden =
         state.mode !== 'lite' || state.records.length > 0
     renderSummary(summary)
+    renderFilterFacets()
     renderComics()
     renderAuthors()
     renderPreparedRecommendations()
@@ -1736,8 +1821,7 @@ $('#recommend-next-batch').onclick = async () => {
             renderPreparedRecommendations()
             return
         }
-        $('#recommend-message').textContent =
-            '当前离线数据中的推荐已经看完。重新同步并导出 Browser Lite 数据包可获得新的推荐。'
+        $('#recommend-message').textContent = t('recommend.exhausted')
         return
     }
     try {
@@ -1752,7 +1836,8 @@ $('#recommend-next-batch').onclick = async () => {
         state.recommendationBatch = 0
         clearSelection('recommendation')
         renderPreparedRecommendations()
-        if (value.exhausted) $('#recommend-message').textContent = value.message
+        if (value.exhausted)
+            $('#recommend-message').textContent = t('recommend.exhausted')
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
     }
@@ -1835,15 +1920,20 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
         if (state.mode !== 'connected')
             throw new Error(t('message.syncNeedsEngine'))
         message.textContent =
-            mode === 'full' ? '正在完整校验收藏…' : '正在检查收藏更新…'
+            mode === 'full' ? t('sync.fullStarting') : t('sync.quickStarting')
         setProgress($('#library-operation'), message.textContent, 0, 0)
         let progressTimer = setInterval(async () => {
             try {
                 const progress = await api('/api/v1/sync/progress')
                 if (progress.phase === 'reading') {
                     const text = progress.fallbackReason
-                        ? `检测到收藏结构变化，正在执行完整校验…已检查第 ${progress.page || 0} 页`
-                        : `已检查第 ${progress.page || 0} 页 · 发现新增 ${progress.found || 0} 部`
+                        ? t('sync.fullFallback', {
+                              page: progress.page || 0
+                          })
+                        : t('sync.quickProgress', {
+                              page: progress.page || 0,
+                              found: progress.found || 0
+                          })
                     setProgress(
                         $('#library-operation'),
                         text,
@@ -1870,7 +1960,7 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
             progressTimer = null
         }
         if (desktop) desktop.lastSync = result.lastSync
-        message.textContent = `${result.syncMode === 'quick' ? `快速更新完成：检查 ${result.pagesChecked} 页。` : `完整校验完成：检查 ${result.pagesChecked} 页。`} ${t(
+        message.textContent = `${result.syncMode === 'quick' ? t('sync.quickComplete', { pages: result.pagesChecked }) : t('sync.fullComplete', { pages: result.pagesChecked })} ${t(
             'message.syncSummary',
             {
                 favorites: result.favoriteCount,
@@ -1936,7 +2026,10 @@ $('#library-add-filtered-shelf').onclick = () => {
         const shelf = state.shelves.find((item) => item.id === shelfId)
         if (
             !window.confirm(
-                `将 ${total} 部漫画加入书架“${shelf?.name || ''}”？`
+                t('shelf.addFilteredConfirm', {
+                    count: total,
+                    name: shelf?.name || ''
+                })
             )
         )
             return
@@ -1973,7 +2066,7 @@ $('#search-add-shelf').onclick = () => {
     )
 }
 $('#shelf-create').onclick = async () => {
-    const name = window.prompt('书架名称：')
+    const name = window.prompt(t('shelf.namePrompt'))
     if (!name) return
     try {
         await post('/api/v1/shelves', { name })
@@ -1993,7 +2086,7 @@ $('#shelf-detail').onclick = async (event) => {
     const read = event.target.dataset.shelfRead
     const download = event.target.dataset.shelfDownload
     if (rename) {
-        const name = window.prompt('新的书架名称：')
+        const name = window.prompt(t('shelf.renamePrompt'))
         if (name) {
             await mutate(
                 `/api/v1/shelves/${encodeURIComponent(rename)}`,
@@ -2006,15 +2099,14 @@ $('#shelf-detail').onclick = async (event) => {
             await openShelf(rename)
         }
     } else if (removeShelf) {
-        if (!window.confirm('删除书架？漫画、下载和 Pica 收藏不会被删除。'))
-            return
+        if (!window.confirm(t('shelf.deleteConfirm'))) return
         await mutate(
             `/api/v1/shelves/${encodeURIComponent(removeShelf)}`,
             'DELETE'
         )
         state.activeShelfId = null
         $('#shelf-detail').innerHTML =
-            '<article class="notice">书架已删除；漫画和下载仍然保留。</article>'
+            `<article class="notice">${t('shelf.deleted')}</article>`
         await loadShelves()
     } else if (removeSelected) {
         await post(
@@ -2070,7 +2162,7 @@ $('#recommend-button').onclick = async () => {
     }
 }
 $('#recommend-restart').onclick = async () => {
-    if (!window.confirm('清除本轮已看记录并重新开始推荐？')) return
+    if (!window.confirm(t('recommend.restartConfirm'))) return
     try {
         const value = await post('/api/v1/recommendation-sessions', {
             action: 'restart'
@@ -2107,7 +2199,7 @@ $('#recommend-restart').onclick = async () => {
                     `/api/v1/provider/favorites/${encodeURIComponent(favoriteId)}`,
                     'PUT'
                 )
-                event.target.textContent = '★ 已收藏'
+                event.target.textContent = t('result.favorited')
                 event.target.disabled = true
             } catch (error) {
                 $('#recommend-message').textContent = localizeError(
@@ -2257,7 +2349,7 @@ async function detect() {
             state.recommendationNextReady = recommendation.nextSessionReady
             renderPreparedRecommendations()
         } else if (recommendation.preparing) {
-            $('#recommend-message').textContent = '正在准备推荐…'
+            $('#recommend-message').textContent = t('recommend.preparing')
         }
     } catch {
         state.mode = 'lite'

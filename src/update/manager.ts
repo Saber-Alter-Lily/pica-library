@@ -223,6 +223,8 @@ export class UpdateManager {
             throw new Error('Official GitHub Release was not found')
         const release = (await response.json()) as {
             tag_name?: string
+            draft?: boolean
+            prerelease?: boolean
             assets?: Array<{
                 name?: string
                 digest?: string | null
@@ -231,6 +233,10 @@ export class UpdateManager {
         }
         if (release.tag_name !== tag)
             throw new Error('Official release tag mismatch')
+        if (release.draft || release.prerelease)
+            throw new Error(
+                'Official release must be a published stable release'
+            )
         const asset = release.assets?.find((item) => item.name === archiveName)
         if (!asset)
             throw new Error('Update asset is not in the official release')
@@ -352,6 +358,17 @@ export class UpdateManager {
                     'Stable builds reject local-test update packages'
                 )
         } else {
+            if (
+                stableVersionParts(this.options.currentVersion) &&
+                (!stableVersionParts(manifest.targetVersion) ||
+                    !isNewerStable(
+                        manifest.targetVersion,
+                        this.options.currentVersion
+                    ))
+            )
+                throw new Error(
+                    'Stable builds require a strictly newer stable target version'
+                )
             try {
                 await this.verifyOfficialRelease(
                     manifest,

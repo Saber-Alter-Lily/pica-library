@@ -9,6 +9,7 @@ describe('v0.2.0 product UI and documentation contracts', () => {
     const app = read('web/app.js')
     const html = read('web/index.html')
     const css = read('web/styles.css')
+    const i18n = read('web/i18n.js')
 
     it('exposes author/tag facets, explicit tag semantics, chips and backend bulk action', () => {
         for (const id of [
@@ -41,7 +42,8 @@ describe('v0.2.0 product UI and documentation contracts', () => {
         expect(app).toContain('state.recommendationSessionNo = value.sessionNo')
         expect(app).toContain('state.recommendationExhausted = value.exhausted')
         expect(app).toContain("action: 'restart'")
-        expect(app).toContain('当前离线数据中的推荐已经看完。')
+        expect(app).toContain("t('recommend.exhausted')")
+        expect(i18n).toContain("'recommend.exhausted'")
     })
 
     it('keeps recommendation previews user-triggered and bounded to three pages', () => {
@@ -78,18 +80,18 @@ describe('v0.2.0 product UI and documentation contracts', () => {
         expect(app).toContain("'/api/v1/update/stage'")
         expect(app).toContain("'/api/v1/update/apply'")
         expect(app).toContain("'/api/v1/update/check'")
-        expect(app).toContain('当前已是最新版本。')
-        expect(app).toContain('此更新需要完整安装包。')
-        expect(app).toContain('兼容增量更新')
+        expect(app).toContain("t('update.current')")
+        expect(app).toContain("t('update.fullRequired')")
+        expect(app).toContain("t('update.incrementalFound'")
         for (const phase of [
-            '校验更新包',
-            '解压到临时目录',
-            '准备备份',
-            '等待应用退出',
-            '替换文件',
-            '启动新版本',
-            '检查运行状态',
-            '完成'
+            'update.phase.validating',
+            'update.phase.extracting',
+            'update.phase.preparingBackup',
+            'update.phase.waitingExit',
+            'update.phase.replacing',
+            'update.phase.starting',
+            'update.phase.health',
+            'update.phase.complete'
         ])
             expect(app).toContain(phase)
     })
@@ -103,7 +105,7 @@ describe('v0.2.0 product UI and documentation contracts', () => {
         expect(css).not.toContain('min-width: 1200px')
     })
 
-    it('ships every required v0.2.0 contract document', () => {
+    it('ships architecture contracts without local acceptance guides', () => {
         for (const name of [
             'V0_2_0_ARCHITECTURE.md',
             'UPDATE_PACKAGE_SPEC_V1.md',
@@ -112,11 +114,17 @@ describe('v0.2.0 product UI and documentation contracts', () => {
             'READER_V1.md',
             'LIBRARY_QUERY_AND_FACETS_V1.md',
             'PICA_FAVORITE_MUTATION_CAPABILITY.md',
-            'EXTERNAL_READER_CANDIDATE_REPORT.md',
-            'PICA_LIBRARY_V0_2_0_DEV1_USER_TEST_GUIDE.md'
+            'EXTERNAL_READER_CANDIDATE_REPORT.md'
         ])
             expect(fs.existsSync(path.join(root, 'docs', name)), name).toBe(
                 true
             )
+        for (const name of [
+            'PICA_LIBRARY_V0_1_4_DEV2_USER_TEST_GUIDE.md',
+            'PICA_LIBRARY_V0_1_4_LOCAL_USER_TEST_GUIDE.md',
+            'docs/PICA_LIBRARY_V0_2_0_DEV1_USER_TEST_GUIDE.md',
+            'docs/PICA_LIBRARY_V0_2_0_DEV2_USER_TEST_GUIDE.md'
+        ])
+            expect(fs.existsSync(path.join(root, name)), name).toBe(false)
     })
 })

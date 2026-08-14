@@ -76,6 +76,38 @@ function manager(version = '0.2.0-dev.0', fetchImplementation?: typeof fetch) {
     })
 }
 
+function stableUpdate(targetVersion = '0.2.1') {
+    return packageBuffer({
+        packageType: 'incremental',
+        sourceVersionRange: '=0.2.0',
+        targetVersion
+    })
+}
+
+function officialRelease(
+    update: ReturnType<typeof packageBuffer>,
+    overrides: Record<string, unknown> = {}
+) {
+    return vi.fn(
+        async () =>
+            new Response(
+                JSON.stringify({
+                    tag_name: `v${update.manifest.targetVersion}`,
+                    draft: false,
+                    prerelease: false,
+                    assets: [
+                        {
+                            name: `Pica-Library-v${update.manifest.targetVersion}-update.zip`,
+                            digest: `sha256:${hash(update.buffer)}`
+                        }
+                    ],
+                    ...overrides
+                }),
+                { status: 200 }
+            )
+    ) as unknown as typeof fetch
+}
+
 afterEach(() => {
     vi.restoreAllMocks()
     for (const directory of tempDirs.splice(0))
@@ -249,6 +281,72 @@ describe('UpdateManager', () => {
             )
         ).resolves.toMatchObject({ targetVersion: '0.2.1' })
         expect(fetchImplementation).toHaveBeenCalledOnce()
+    })
+
+    it('rejects a prerelease target when staging from a stable build', async () => {
+        const update = stableUpdate('0.2.1-rc.1')
+        const fetchImplementation = officialRelease(update)
+        await expect(
+            manager('0.2.0', fetchImplementation).stage(
+                'Pica-Library-v0.2.1-rc.1-update.zip',
+                update.buffer
+            )
+        ).rejects.toThrow(/strictly newer stable target/)
+        expect(fetchImplementation).not.toHaveBeenCalled()
+    })
+
+    it('rejects an official release marked as prerelease', async () => {
+        const update = stableUpdate()
+        await expect(
+            manager(
+                '0.2.0',
+                officialRelease(update, { prerelease: true })
+            ).stage('Pica-Library-v0.2.1-update.zip', update.buffer)
+        ).rejects.toThrow(/无法验证更新包来自官方/)
+    })
+
+    it('rejects an official release marked as draft', async () => {
+        const update = stableUpdate()
+        await expect(
+            manager('0.2.0', officialRelease(update, { draft: true })).stage(
+                'Pica-Library-v0.2.1-update.zip',
+                update.buffer
+            )
+        ).rejects.toThrow(/无法验证更新包来自官方/)
+    })
+
+    it('rejects a same-version stable update', async () => {
+        const update = stableUpdate('0.2.0')
+        const fetchImplementation = officialRelease(update)
+        await expect(
+            manager('0.2.0', fetchImplementation).stage(
+                'Pica-Library-v0.2.0-update.zip',
+                update.buffer
+            )
+        ).rejects.toThrow(/strictly newer stable target/)
+        expect(fetchImplementation).not.toHaveBeenCalled()
+    })
+
+    it('rejects a stable downgrade', async () => {
+        const update = stableUpdate('0.1.9')
+        const fetchImplementation = officialRelease(update)
+        await expect(
+            manager('0.2.0', fetchImplementation).stage(
+                'Pica-Library-v0.1.9-update.zip',
+                update.buffer
+            )
+        ).rejects.toThrow(/strictly newer stable target/)
+        expect(fetchImplementation).not.toHaveBeenCalled()
+    })
+
+    it('accepts a strictly newer stable official update', async () => {
+        const update = stableUpdate('0.3.0')
+        await expect(
+            manager('0.2.0', officialRelease(update)).stage(
+                'Pica-Library-v0.3.0-update.zip',
+                update.buffer
+            )
+        ).resolves.toMatchObject({ targetVersion: '0.3.0' })
     })
 
     it('fails closed when official stable verification is unavailable', async () => {

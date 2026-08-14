@@ -212,7 +212,7 @@ describe('Round 2 progress and download observability contracts', () => {
     const desktop = source('src/desktop/main.ts')
 
     it('sync_progress_indeterminate', () => {
-        expect(app).toContain('正在检查收藏更新…')
+        expect(app).toContain("t('sync.quickStarting')")
         expect(app).toContain(
             "setProgress($('#library-operation'), message.textContent, 0, 0)"
         )

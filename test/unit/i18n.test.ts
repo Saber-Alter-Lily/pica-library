@@ -134,6 +134,20 @@ describe('Web localization', () => {
         expect(app.match(/[\u3400-\u9fff]/g) ?? []).toEqual([])
     })
 
+    it('does not expose OS-localized native file picker text', () => {
+        const html = fs.readFileSync(
+            new URL('../../web/index.html', import.meta.url),
+            'utf8'
+        )
+        for (const id of ['import-file', 'update-file']) {
+            expect(html).toMatch(
+                new RegExp(
+                    `id=["']${id}["'][\\s\\S]*?class=["'][^"']*file-picker-input`
+                )
+            )
+        }
+    })
+
     it('falls back to English and never exposes a raw key', () => {
         const key = 'test.englishOnly'
         translations.en[key] = 'English fallback'

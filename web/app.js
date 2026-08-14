@@ -295,12 +295,24 @@ $('#update-file').onchange = (event) => {
             renderUpdateProgress({ phase: 'failed' })
         })
 }
-$('#update-check').onclick = () => {
-    window.open(
-        'https://github.com/Saber-Alter-Lily/pica-library/releases',
-        '_blank',
-        'noopener,noreferrer'
-    )
+$('#update-check').onclick = async () => {
+    const message = $('#update-message')
+    message.textContent = '正在检查官方稳定版本…'
+    try {
+        const value = await api('/api/v1/update/check')
+        if (value.status === 'current') {
+            message.textContent = '当前已是最新版本。'
+            return
+        }
+        const releaseUrl = escapeHtml(value.releaseUrl)
+        if (value.status === 'full-install') {
+            message.innerHTML = `发现 v${escapeHtml(value.version)}。此更新需要完整安装包。<a href="${releaseUrl}" target="_blank" rel="noopener noreferrer">打开官方 GitHub Release</a>`
+            return
+        }
+        message.innerHTML = `发现 v${escapeHtml(value.version)} 兼容增量更新。<a href="${releaseUrl}" target="_blank" rel="noopener noreferrer">下载官方更新包</a>，然后在上方选择或拖入 ZIP。`
+    } catch (error) {
+        message.textContent = localizeError(language, error)
+    }
 }
 $('#update-apply').onclick = async () => {
     if (!state.stagedUpdate) return

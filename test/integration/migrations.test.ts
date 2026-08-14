@@ -185,4 +185,166 @@ describe('SQLite migrations', () => {
         })
         migrated.close()
     })
+
+    it('upgrades public v0.1.3-style state to v0.2.0 without data loss', () => {
+        const databaseFile = file()
+        const legacy = new DatabaseSync(databaseFile)
+        runMigrations(
+            legacy,
+            migrations.filter((item) => item.version <= 3)
+        )
+        const now = '2026-08-13T00:00:00.000Z'
+        legacy
+            .prepare(
+                `INSERT INTO authors(
+                    id, canonical_name, normalized_key, confidence, evidence,
+                    review_status, created_at, updated_at
+                ) VALUES (?, ?, ?, 1, ?, 'approved', ?, ?)`
+            )
+            .run(
+                'author-v013',
+                'Legacy Author',
+                'legacy author',
+                'verified',
+                now,
+                now
+            )
+        legacy
+            .prepare(
+                `INSERT INTO comics(
+                    id, title, raw_author, canonical_author_id, description,
+                    categories_json, tags_json, is_favorite,
+                    first_seen_at, last_seen_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
+            )
+            .run(
+                'comic-v013',
+                'Legacy Comic',
+                'Legacy Author',
+                'author-v013',
+                'preserve me',
+                '["legacy-category"]',
+                '["legacy-tag"]',
+                now,
+                now
+            )
+        legacy
+            .prepare(
+                `INSERT INTO episodes(
+                    id, comic_id, title, order_no, first_seen_at, last_seen_at
+                ) VALUES (?, ?, ?, 1, ?, ?)`
+            )
+            .run('episode-v013', 'comic-v013', 'Chapter 1', now, now)
+        legacy
+            .prepare(
+                `INSERT INTO pictures(
+                    id, comic_id, episode_id, position, original_name,
+                    media_path, file_server, local_path, byte_size, status,
+                    first_seen_at, last_seen_at
+                ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, 321, 'completed', ?, ?)`
+            )
+            .run(
+                'picture-v013',
+                'comic-v013',
+                'episode-v013',
+                '001.jpg',
+                '/media/001.jpg',
+                'https://example.invalid',
+                'Legacy Author/Legacy Comic/Chapter 1/001.jpg',
+                now,
+                now
+            )
+        legacy
+            .prepare(
+                `INSERT INTO download_jobs(
+                    id, comic_id, episode_selection_json, source, priority,
+                    runner, status, created_at, finished_at,
+                    progress_completed, progress_total, bytes
+                ) VALUES (?, ?, ?, ?, 0, 'LOCAL', 'COMPLETED', ?, ?, 1, 1, 321)`
+            )
+            .run(
+                'job-v013',
+                'comic-v013',
+                '["episode-v013"]',
+                'v0.1.3',
+                now,
+                now
+            )
+        legacy.close()
+
+        const upgraded = new LibraryDatabase(databaseFile)
+        expect(upgraded.getComic('comic-v013')).toMatchObject({
+            comicId: 'comic-v013',
+            title: 'Legacy Comic',
+            author: 'Legacy Author',
+            isFavorite: true,
+            inLibrary: true
+        })
+        upgraded.close()
+
+        const verified = new DatabaseSync(databaseFile)
+        expect(
+            verified
+                .prepare('SELECT canonical_name FROM authors WHERE id = ?')
+                .get('author-v013')
+        ).toMatchObject({ canonical_name: 'Legacy Author' })
+        expect(
+            verified
+                .prepare(
+                    'SELECT local_path, byte_size, status FROM pictures WHERE id = ?'
+                )
+                .get('picture-v013')
+        ).toMatchObject({
+            local_path: 'Legacy Author/Legacy Comic/Chapter 1/001.jpg',
+            byte_size: 321,
+            status: 'completed'
+        })
+        expect(
+            verified
+                .prepare(
+                    'SELECT status, progress_completed, progress_total, bytes FROM download_jobs WHERE id = ?'
+                )
+                .get('job-v013')
+        ).toMatchObject({
+            status: 'COMPLETED',
+            progress_completed: 1,
+            progress_total: 1,
+            bytes: 321
+        })
+        for (const table of [
+            'shelves',
+            'reading_progress',
+            'recommendation_sessions',
+            'app_state',
+            'library_membership',
+            'favorites_sync_state'
+        ])
+            expect(
+                verified
+                    .prepare(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name = ?"
+                    )
+                    .get(table)
+            ).toBeTruthy()
+        expect(
+            verified
+                .prepare(
+                    'SELECT reason FROM library_membership WHERE comic_id = ?'
+                )
+                .all('comic-v013')
+        ).toEqual(
+            expect.arrayContaining([
+                { reason: 'pica-favorite' },
+                { reason: 'download' }
+            ])
+        )
+        expect(
+            verified
+                .prepare(
+                    'SELECT MAX(version) AS version FROM schema_migrations'
+                )
+                .get()
+        ).toMatchObject({ version: 7 })
+        verified.close()
+    })
 })

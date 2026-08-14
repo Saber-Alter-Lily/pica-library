@@ -267,4 +267,84 @@ describe('UpdateManager', () => {
             )
         ).rejects.toThrow(/无法验证更新包来自官方/)
     })
+
+    it('reports the current version when no newer stable release exists', async () => {
+        const fetchImplementation = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        tag_name: 'v0.2.0',
+                        html_url:
+                            'https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.2.0',
+                        draft: false,
+                        prerelease: false,
+                        assets: []
+                    }),
+                    { status: 200 }
+                )
+        ) as unknown as typeof fetch
+        await expect(
+            manager('0.2.0', fetchImplementation).checkForUpdate()
+        ).resolves.toEqual({ status: 'current', currentVersion: '0.2.0' })
+    })
+
+    it('requires a full install when a newer stable release has no update ZIP', async () => {
+        const releaseUrl =
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.0'
+        const fetchImplementation = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        tag_name: 'v0.3.0',
+                        html_url: releaseUrl,
+                        draft: false,
+                        prerelease: false,
+                        assets: [
+                            { name: 'Pica-Library-v0.3.0-windows-x64.zip' }
+                        ]
+                    }),
+                    { status: 200 }
+                )
+        ) as unknown as typeof fetch
+        await expect(
+            manager('0.2.0', fetchImplementation).checkForUpdate()
+        ).resolves.toEqual({
+            status: 'full-install',
+            version: '0.3.0',
+            releaseUrl
+        })
+    })
+
+    it('offers only a stable official incremental update asset', async () => {
+        const releaseUrl =
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.2.1'
+        const assetUrl = `${releaseUrl}/download/Pica-Library-v0.2.1-update.zip`
+        const fetchImplementation = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        tag_name: 'v0.2.1',
+                        html_url: releaseUrl,
+                        draft: false,
+                        prerelease: false,
+                        assets: [
+                            {
+                                name: 'Pica-Library-v0.2.1-update.zip',
+                                browser_download_url: assetUrl
+                            }
+                        ]
+                    }),
+                    { status: 200 }
+                )
+        ) as unknown as typeof fetch
+        await expect(
+            manager('0.2.0', fetchImplementation).checkForUpdate()
+        ).resolves.toEqual({
+            status: 'incremental',
+            version: '0.2.1',
+            releaseUrl,
+            assetName: 'Pica-Library-v0.2.1-update.zip',
+            assetUrl
+        })
+    })
 })

@@ -77,6 +77,10 @@ describe('v0.2.0 product UI and documentation contracts', () => {
         expect(html).toContain('将 Pica Library 更新包拖到这里')
         expect(app).toContain("'/api/v1/update/stage'")
         expect(app).toContain("'/api/v1/update/apply'")
+        expect(app).toContain("'/api/v1/update/check'")
+        expect(app).toContain('当前已是最新版本。')
+        expect(app).toContain('此更新需要完整安装包。')
+        expect(app).toContain('兼容增量更新')
         for (const phase of [
             '校验更新包',
             '解压到临时目录',

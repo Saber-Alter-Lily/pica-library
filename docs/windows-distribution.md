@@ -13,6 +13,10 @@ Pica Library v0.1.3 targets Windows 10/11 x64 as its ordinary-user
 package. Download the ZIP, extract the entire directory, and double-click
 `Pica Library.exe`. Do not run the executable from inside an archive viewer.
 
+For the v0.1.3 to v0.2.0 upgrade, download and extract the complete v0.2.0
+Windows ZIP. v0.1.3 cannot consume the new incremental update format. v0.2.0
+establishes the updater baseline for future compatible releases.
+
 The first launch opens a setup page on `127.0.0.1`. Enter the Pica account and
 password, choose a library folder and performance profile, and optionally add
 an HTTP or HTTPS proxy. The folder picker is native to Windows; a path can also

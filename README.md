@@ -24,6 +24,19 @@ x64 package for ordinary users:
 v0.1.3 includes full Simplified Chinese localization, bilingual onboarding,
 and the Browser Lite data-package export flow.
 
+Next release candidate: `v0.2.0`. It adds quick favorites synchronization,
+shelves, author/tag facets and advanced filtering, persistent recommendation
+sessions with background pre-generation and previews, real add/remove Pica
+favorite actions, richer download and downloaded-library management, an
+internal Web Reader with reading progress, ZIP/CBZ export, and the incremental
+update framework.
+
+Important upgrade note: users of v0.1.3 must download and extract the full
+`Pica-Library-v0.2.0-windows-x64.zip` package. v0.1.3 does not contain the new
+UpdateManager and cannot consume a v0.2.0 incremental package. v0.2.0
+establishes the baseline from which future compatible releases may use the
+built-in incremental Update ZIP flow.
+
 ### Browser Lite
 
 Browser Lite displays an exported library in the browser and never asks for a
@@ -36,6 +49,10 @@ Pica account or password. To prepare its recommended data package:
 
 The complete package can carry prepared library, author and recommendation
 data. Existing compatible CSV and JSON imports remain available.
+
+v0.2.0 provides an internal Web Reader and ZIP/CBZ export. It also exposes an
+external-reader integration interface, but does not bundle a third-party
+reader or import arbitrary local CBZ/ZIP files.
 
 The package carries its own official Node.js runtime. It does not require a
 terminal, Node.js, npm, pnpm, Git, administrator access, or `.env.local`.

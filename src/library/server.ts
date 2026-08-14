@@ -35,6 +35,7 @@ export interface DesktopServerController {
     syncAndExportBrowserLitePackage?: () => Promise<Record<string, unknown>>
     openBrowserLite?: () => Promise<void>
     openDirectory: (kind: string) => Promise<void>
+    checkForUpdate?: () => Promise<Record<string, unknown>>
     stageUpdate?: (
         name: string,
         value: Buffer
@@ -248,6 +249,17 @@ export async function startLibraryServer(options: {
                     appCapabilities(
                         providerService.capabilities.favoriteMutation
                     )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/update/check' &&
+                request.method === 'GET' &&
+                options.desktop?.checkForUpdate
+            ) {
+                return json(
+                    response,
+                    200,
+                    await options.desktop.checkForUpdate()
                 )
             }
             if (

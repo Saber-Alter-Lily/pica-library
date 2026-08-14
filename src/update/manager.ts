@@ -30,6 +30,21 @@ function prerelease(version: string) {
     return /(?:^|[-.])(dev|alpha|beta|rc)(?:[.-]|\d|$)/i.test(version)
 }
 
+function stableVersionParts(version: string) {
+    const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
+    return match ? match.slice(1).map(Number) : null
+}
+
+function isNewerStable(candidate: string, current: string) {
+    const left = stableVersionParts(candidate)
+    const right = stableVersionParts(current)
+    if (!left || !right) return false
+    for (let index = 0; index < 3; index++) {
+        if (left[index] !== right[index]) return left[index] > right[index]
+    }
+    return false
+}
+
 function exactSourceMatches(range: string, version: string) {
     const trimmed = range.trim()
     if (trimmed === version || trimmed === `=${version}`) return true
@@ -240,6 +255,65 @@ export class UpdateManager {
             )
     }
 
+    async checkForUpdate() {
+        const request = this.options.fetchImplementation ?? fetch
+        const response = await request(
+            `https://api.github.com/repos/${officialRepository}/releases/latest`,
+            {
+                headers: {
+                    accept: 'application/vnd.github+json',
+                    'user-agent': 'Pica-Library-UpdateManager'
+                },
+                signal: AbortSignal.timeout(15_000)
+            }
+        )
+        if (!response.ok)
+            throw new Error('无法读取官方 GitHub Release。请稍后重试。')
+        const release = (await response.json()) as {
+            tag_name?: string
+            html_url?: string
+            draft?: boolean
+            prerelease?: boolean
+            assets?: Array<{
+                name?: string
+                browser_download_url?: string
+            }>
+        }
+        const tag = String(release.tag_name ?? '')
+        const version = tag.startsWith('v') ? tag.slice(1) : ''
+        if (
+            release.draft ||
+            release.prerelease ||
+            !stableVersionParts(version) ||
+            !isNewerStable(version, this.options.currentVersion)
+        )
+            return {
+                status: 'current' as const,
+                currentVersion: this.options.currentVersion
+            }
+        const releaseUrl =
+            release.html_url ??
+            `https://github.com/${officialRepository}/releases/tag/${encodeURIComponent(tag)}`
+        const updateAsset = release.assets?.find((item) =>
+            /^Pica-Library-v\d+\.\d+\.\d+-update\.zip$/.test(
+                String(item.name ?? '')
+            )
+        )
+        if (!updateAsset?.name || !updateAsset.browser_download_url)
+            return {
+                status: 'full-install' as const,
+                version,
+                releaseUrl
+            }
+        return {
+            status: 'incremental' as const,
+            version,
+            releaseUrl,
+            assetName: updateAsset.name,
+            assetUrl: updateAsset.browser_download_url
+        }
+    }
+
     async stage(archiveName: string, buffer: Buffer) {
         this.writeProgress({ phase: 'validating' })
         const archiveHash = sha256(buffer)
@@ -405,6 +479,8 @@ export const updateInternals = {
     compatibilityRequiresFullInstall,
     exactSourceMatches,
     prerelease,
+    stableVersionParts,
+    isNewerStable,
     readManifest,
     validateFileList,
     sha256

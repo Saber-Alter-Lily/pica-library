@@ -58,7 +58,7 @@ try {
     $publishedMs = $watch.ElapsedMilliseconds
     if ($PortCollision -and $instance.url -eq 'http://127.0.0.1:4789') { throw 'Packaged app attached to unrelated port occupant' }
     $status = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/status') -TimeoutSec 10
-    if ($status.application -ne 'Pica Library' -or $status.version -notmatch '^0\.2\.0-dev\.[01]$' -or $status.configured) { throw 'Unexpected packaged status' }
+    if ($status.application -ne 'Pica Library' -or $status.version -ne '0.2.0' -or $status.configured) { throw 'Unexpected packaged status' }
     $setup = Invoke-WebRequest -UseBasicParsing -Uri ($instance.url + '/setup') -TimeoutSec 10
     if ($setup.StatusCode -ne 200 -or $setup.Content -notmatch 'Set up Pica Library') { throw 'Setup page is unavailable' }
     if ($setup.Content -notmatch 'id="language-select"' -or $setup.Content -notmatch 'option value="zh-CN"') { throw 'Language controls are unavailable' }

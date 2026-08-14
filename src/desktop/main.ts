@@ -547,6 +547,7 @@ async function startEngine(preferredPort: number) {
             browser(`${currentUrl}/?mode=browser-lite`)
         },
         openDirectory,
+        checkForUpdate: async () => updateManager.checkForUpdate(),
         stageUpdate: async (name, value) => updateManager.stage(name, value),
         applyUpdate: async (id) => {
             const result = updateManager.apply(id)

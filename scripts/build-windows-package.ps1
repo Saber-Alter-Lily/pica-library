@@ -3,14 +3,16 @@ $root = Split-Path -Parent $PSScriptRoot
 $package = Get-Content -Raw -LiteralPath (Join-Path $root 'package.json') | ConvertFrom-Json
 $version = [string]$package.version
 $nodeVersion = '24.15.0'
-$name = if ($version -eq '0.2.0-dev.0') {
+$name = if ($version -eq '0.2.0') {
+    'Pica-Library-v0.2.0-windows-x64'
+} elseif ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {
     'Pica-Library-v0.2.0-dev.1-local-test-windows-x64'
 } elseif ($version -eq '0.2.0-dev.2') {
     'Pica-Library-v0.2.0-dev.2-local-test-windows-x64'
 } else {
-    throw "Unsupported local acceptance package version: $version"
+    throw "Unsupported Windows package version: $version"
 }
 $buildRoot = Join-Path $root 'artifacts\windows-package'
 $stage = Join-Path $buildRoot $name
@@ -101,12 +103,14 @@ Pica Library v$version for Windows 10/11 x64
 3. Complete setup in the browser.
 4. To use Browser Lite, open Settings > Browser Lite and export the data package.
 
+Users upgrading from v0.1.3 must use this complete v0.2.0 Windows ZIP.
+From v0.2.0 onward, future compatible releases may use the built-in incremental update flow.
 No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
-$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHYwLjEuNC1kZXYuMiBXaW5kb3dzIDEwLzExIHg2NAoKMS4g6Kej5Y6L5a6M5pW0IFpJUOOAggoyLiDlj4zlh7sgUGljYSBMaWJyYXJ5LmV4ZeOAggozLiDlnKjmtY/op4jlmajkuK3lrozmiJDpppbmrKHorr7nva7jgIIKNC4g5Y+v5Zyo6K6+572u5Lit5L2/55So5ZCM5q2l44CB5LiL6L295ZKM5bey5LiL6L295ryr55S76KeG5Zu+44CCCgrov5nmmK/mnKzlnLDpqozmlLbmnoTlu7rvvIzkuI3pnIDopoHljZXni6zlronoo4UgTm9kZS5qc+OAgW5wbeOAgXBucG3jgIFHaXQg5oiW566h55CG5ZGY5p2D6ZmQ44CC'
-$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('v0.1.4-dev.2',"v$version")
+$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHYwLjIuMCBXaW5kb3dzIDEwLzExIHg2NAoKMS4g6Kej5Y6L5a6M5pW0IFpJUOOAggoyLiDlj4zlh7sgUGljYSBMaWJyYXJ5LmV4ZeOAggozLiDlnKjmtY/op4jlmajkuK3lrozmiJDpppbmrKHorr7nva7jgIIKNC4g5Y+v5Zyo6K6+572u5Lit5L2/55So5ZCM5q2l44CB5LiL6L2944CB5bey5LiL6L295ryr55S744CB6ZiF6K+75Zmo5LiO5pu05paw5Yqf6IO944CCCgrku44gdjAuMS4zIOWNh+e6p+W/hemhu+S4i+i9veW5tuino+WOi+WujOaVtOeahCB2MC4yLjAgV2luZG93cyBaSVDjgIIK5LuOIHYwLjIuMCDotbfvvIzlkI7nu63lhbzlrrnniYjmnKzlj6/kvb/nlKjlhoXnva7lop7ph4/mm7TmlrDmtYHnqIvjgIIK5peg6ZyA5Y2V54us5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBt44CBR2l0IOaIlueuoeeQhuWRmOadg+mZkOOAgg=='
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64))
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 

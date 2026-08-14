@@ -35,6 +35,11 @@ export interface DownloadJob {
     progressCompleted: number
     progressTotal: number
     bytes: number
+    expectedBytes?: number | null
+    comicTitle?: string | null
+    chapterTitle?: string | null
+    progressUpdatedAt?: string | null
+    bytesPerSecond?: number | null
     error: string | null
 }
 
@@ -50,6 +55,8 @@ export interface DownloadJobPatch {
     progressCompleted?: number
     progressTotal?: number
     bytes?: number
+    expectedBytes?: number | null
+    chapterTitle?: string | null
     retryCount?: number
     error?: string | null
 }

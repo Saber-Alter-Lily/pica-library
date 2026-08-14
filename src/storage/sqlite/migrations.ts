@@ -211,6 +211,39 @@ export const migrations: Migration[] = [
         after(database) {
             ensureColumn(database, 'comics', 'cover_url TEXT')
         }
+    },
+    {
+        version: 4,
+        name: 'library_provenance_and_download_observability',
+        up: `
+            CREATE TABLE IF NOT EXISTS comic_provenance (
+                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
+                source TEXT NOT NULL,
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                PRIMARY KEY (comic_id, source)
+            );
+            CREATE INDEX IF NOT EXISTS idx_comic_provenance_source
+                ON comic_provenance(source, comic_id);
+            CREATE INDEX IF NOT EXISTS idx_pictures_downloaded
+                ON pictures(status, comic_id);
+        `,
+        after(database) {
+            ensureColumn(database, 'download_jobs', 'expected_bytes INTEGER')
+            ensureColumn(
+                database,
+                'download_jobs',
+                'current_episode_title TEXT'
+            )
+            ensureColumn(database, 'download_jobs', 'progress_updated_at TEXT')
+            database.exec(`
+                INSERT OR IGNORE INTO comic_provenance(
+                    comic_id, source, first_seen_at, last_seen_at
+                )
+                SELECT id, 'legacy/unknown', first_seen_at, last_seen_at
+                FROM comics
+            `)
+        }
     }
 ]
 

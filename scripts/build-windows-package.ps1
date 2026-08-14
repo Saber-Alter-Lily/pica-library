@@ -3,7 +3,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $package = Get-Content -Raw -LiteralPath (Join-Path $root 'package.json') | ConvertFrom-Json
 $version = [string]$package.version
 $nodeVersion = '24.15.0'
-$name = 'Pica-Library-v0.1.4-local-test-windows-x64'
+$name = 'Pica-Library-v0.1.4-dev.2-local-test-windows-x64'
 $buildRoot = Join-Path $root 'artifacts\windows-package'
 $stage = Join-Path $buildRoot $name
 $zip = Join-Path $root "artifacts\$name.zip"
@@ -17,7 +17,7 @@ function Get-Sha256([string]$file) {
     finally { $algorithm.Dispose() }
 }
 
-if ($version -ne '0.1.4-dev.1') { throw 'Local Windows package must report version 0.1.4-dev.1' }
+if ($version -ne '0.1.4-dev.2') { throw 'Local Windows package must report version 0.1.4-dev.2' }
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve source commit SHA' }
 if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
 if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }
@@ -70,7 +70,16 @@ No separate Node.js, npm, pnpm, Git, terminal, or administrator access is requir
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
-$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('UGljYSBMaWJyYXJ5IHYwLjEuMyBXaW5kb3dzIDEwLzExIHg2NAoK5L2/55So5pa55rOV77yaCgoxLiDlrozmlbTop6PljosgWklQ44CCCjIuIOWPjOWHuyBQaWNhIExpYnJhcnkuZXhl44CCCjMuIOa1j+iniOWZqOS8muiHquWKqOaJk+W8gO+8jOaMiemmluasoeWQr+WKqOWQkeWvvOWujOaIkOmFjee9ruOAggo0LiDlpoLpnIDkvb/nlKggQnJvd3NlciBMaXRl77yM6K+35Zyo4oCc6K6+572uIOKGkiBCcm93c2VyIExpdGXigJ3kuK3lr7zlh7rmlbDmja7ljIXjgIIKCuaXoOmcgOWuieijhSBOb2RlLmpz44CBbnBt44CBcG5wbSDmiJYgR2l044CCCuaXoOmcgOS9v+eUqOWRveS7pOihjO+8jOS5n+aXoOmcgOeuoeeQhuWRmOadg+mZkOOAggoK5b2T5YmN5Y+v5omn6KGM5paH5Lu25pyq6L+b6KGM5Luj56CB562+5ZCN77yM5Zug5q2kIFdpbmRvd3MgU21hcnRTY3JlZW4K6aaW5qyh6L+Q6KGM5pe25Y+v6IO95pi+56S65L+h6KqJ5o+Q56S644CC6K+356Gu6K6k5paH5Lu25p2l6Ieq5pys6aG555uu5a6Y5pa5CkdpdEh1YiBSZWxlYXNl77yM5bm25Y+v5L2/55SoIFNIQS0yNTYg5qCh6aqM5paH5Lu25a6M5pW05oCn44CC'))
+$readmeZh = @"
+Pica Library v$version Windows 10/11 x64
+
+1. 解压完整 ZIP。
+2. 双击 Pica Library.exe。
+3. 在浏览器中完成首次设置。
+4. 可在设置中使用同步、下载和已下载漫画视图。
+
+这是本地验收构建，不需要单独安装 Node.js、npm、pnpm、Git 或管理员权限。
+"@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 

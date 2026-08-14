@@ -28,8 +28,16 @@ const state = {
     visible: [],
     libraryPage: 1,
     libraryView: localStorage.getItem('pica-library-view') || 'grid',
+    libraryGridSize: localStorage.getItem('pica-library-grid-size') || 'large',
     recommendationView:
         localStorage.getItem('pica-recommendation-view') || 'grid',
+    recommendationGridSize:
+        localStorage.getItem('pica-recommendation-grid-size') || 'large',
+    downloadedView: localStorage.getItem('pica-downloaded-view') || 'grid',
+    downloadedGridSize:
+        localStorage.getItem('pica-downloaded-grid-size') || 'large',
+    downloadedCoversEnabled:
+        localStorage.getItem('pica-downloaded-covers-enabled') !== 'false',
     coversEnabled: localStorage.getItem('pica-covers-enabled') !== 'false',
     recommendationBatch: 0,
     ...emptyLiteState()
@@ -39,6 +47,9 @@ let language = resolveLanguage(
     localStorage,
     navigator.languages || [navigator.language]
 )
+let downloadPoll = null
+let downloadPollBusy = false
+let activeView = 'home'
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
@@ -115,6 +126,7 @@ function setupValue(prefix) {
 }
 
 function activateView(id) {
+    activeView = id
     $$('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
     )
@@ -164,6 +176,26 @@ function renderTimestamps() {
         state.mode !== 'lite' || state.records.length === 0
     $('#lite-snapshot-time').textContent =
         `当前数据包生成时间：${displayDate(state.generatedAt)}`
+}
+
+function setProgress(element, phase, current, total) {
+    if (!element) return
+    element.hidden = false
+    element
+        .querySelector('span')
+        ?.replaceChildren(document.createTextNode(phase))
+    const progress = element.querySelector('progress')
+    if (progress) {
+        progress.hidden = !(total > 0)
+        if (total > 0) {
+            progress.max = total
+            progress.value = Math.min(total, Math.max(0, current || 0))
+        }
+    }
+}
+
+function clearProgress(element) {
+    if (element) element.hidden = true
 }
 
 async function waitForDesktopHealth(timeoutMs = 30000) {
@@ -258,6 +290,29 @@ $('#export-browser-lite').onclick = async () => {
 $('#sync-export-browser-lite').onclick = async () => {
     const message = $('#browser-lite-export-message')
     message.textContent = '正在同步收藏并生成 Browser Lite 数据包…'
+    const phases = {
+        'sync-favorites': '同步收藏',
+        'update-library': '更新漫画库',
+        'prepare-recommendations': '准备推荐',
+        'generate-bundle': '生成数据包',
+        'choose-save-location': '等待选择保存位置',
+        'write-file': '写入文件',
+        complete: '完成'
+    }
+    const progressTimer = setInterval(async () => {
+        try {
+            const status = await api('/api/v1/desktop/status')
+            const phase = status.browserLiteExportProgress?.phase
+            setProgress(
+                $('#download-operation'),
+                phases[phase] || '正在准备…',
+                0,
+                0
+            )
+        } catch {
+            // The export request owns error reporting.
+        }
+    }, 600)
     try {
         const result = await desktopPost(
             '/api/v1/desktop/sync-export-browser-lite'
@@ -273,6 +328,9 @@ $('#sync-export-browser-lite').onclick = async () => {
         renderTimestamps()
     } catch (error) {
         message.textContent = localizeError(language, error)
+    } finally {
+        clearInterval(progressTimer)
+        clearProgress($('#download-operation'))
     }
 }
 $('#open-browser-lite-export').onclick = () =>
@@ -410,6 +468,7 @@ function renderSummary(value = {}) {
                 ).length
         ],
         [t('common.episodes'), value.episodes || 0],
+        [t('common.downloadedComics'), value.downloadedComics || 0],
         [t('common.downloadedPictures'), value.downloadedPictures || 0],
         [t('common.litePlans'), state.queue.length]
     ]
@@ -419,6 +478,35 @@ function renderSummary(value = {}) {
                 `<div class="metric"><span>${label}</span><strong>${Number(count).toLocaleString()}</strong></div>`
         )
         .join('')
+}
+
+function setGridSize(scope, size) {
+    const key = `${scope}GridSize`
+    state[key] = size
+    localStorage.setItem(`pica-${scope}-grid-size`, size)
+    const target =
+        scope === 'library'
+            ? $('#comic-grid')
+            : scope === 'recommendation'
+              ? $('#recommend-results')
+              : $('#downloaded-grid-items')
+    if (target) {
+        target.classList.remove(
+            'grid-size-small',
+            'grid-size-medium',
+            'grid-size-large',
+            'view-grid-size-small',
+            'view-grid-size-medium',
+            'view-grid-size-large'
+        )
+        target.classList.add(`grid-size-${size}`)
+    }
+    $$(`[data-size-scope="${scope}"]`).forEach((button) =>
+        button.setAttribute(
+            'aria-pressed',
+            String(button.dataset.gridSize === size)
+        )
+    )
 }
 
 function renderComics(records = state.records) {
@@ -502,6 +590,7 @@ function renderComics(records = state.records) {
         total: state.visible.length
     })
     $('#load-more').hidden = page.length >= state.visible.length
+    setGridSize('library', state.libraryGridSize)
 }
 
 function renderAuthors() {
@@ -578,6 +667,15 @@ function renderPreparedRecommendations() {
         String(state.recommendationView === 'list')
     )
     $('#recommend-next-batch').hidden = state.recommendations.length <= 12
+    const batchCount = Math.max(1, Math.ceil(state.recommendations.length / 12))
+    $('#recommend-batch').textContent =
+        state.recommendations.length > 0
+            ? t('message.recommendationBatch', {
+                  current: state.recommendationBatch + 1,
+                  total: batchCount
+              })
+            : ''
+    setGridSize('recommendation', state.recommendationGridSize)
 }
 
 function downloadJson(name, value) {
@@ -603,33 +701,133 @@ function portablePlan() {
 }
 
 async function loadJobs() {
-    if (state.mode === 'lite') {
+    if (downloadPollBusy) return
+    downloadPollBusy = true
+    try {
+        if (state.mode === 'lite') {
+            $('#job-list').innerHTML =
+                state.queue
+                    .map(
+                        (job) =>
+                            `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · ${t('message.litePlan')}</p></div></article>`
+                    )
+                    .join('') ||
+                `<article class="notice">${t('message.emptyPlan')}</article>`
+            return
+        }
+        const jobs = await api('/api/v1/downloads')
+        const counts = {
+            RUNNING: 0,
+            PREPARING: 0,
+            QUEUED: 0,
+            RETRY_WAIT: 0,
+            PAUSED: 0,
+            FAILED: 0,
+            COMPLETED: 0
+        }
+        jobs.forEach((job) => {
+            if (counts[job.status] !== undefined) counts[job.status] += 1
+        })
+        $('#download-summary').innerHTML = [
+            [t('downloads.inProgress'), counts.RUNNING + counts.PREPARING],
+            [t('downloads.waiting'), counts.QUEUED + counts.RETRY_WAIT],
+            [t('downloads.paused'), counts.PAUSED],
+            [t('downloads.failed'), counts.FAILED],
+            [t('downloads.completed'), counts.COMPLETED]
+        ]
+            .map(
+                ([label, count]) =>
+                    `<div class="metric"><span>${label}</span><strong>${count}</strong></div>`
+            )
+            .join('')
         $('#job-list').innerHTML =
-            state.queue
-                .map(
-                    (job) =>
-                        `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · ${t('message.litePlan')}</p></div></article>`
-                )
-                .join('') ||
-            `<article class="notice">${t('message.emptyPlan')}</article>`
-        return
-    }
-    const jobs = await api('/api/v1/downloads')
-    $('#job-list').innerHTML =
-        jobs
-            .map((job) => {
-                const percent = job.progressTotal
-                    ? Math.round(
-                          (job.progressCompleted / job.progressTotal) * 100
-                      )
-                    : 0
-                return `<article class="list-item">
-                    <div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source)} · ${escapeHtml(job.runner)} · ${t(`status.${job.status}`)} · ${t('message.retryCount', { count: job.retryCount })}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${job.progressCompleted}/${job.progressTotal} · ${t('message.bytes', { count: Number(job.bytes).toLocaleString() })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
+            jobs
+                .map((job) => {
+                    const percent = job.progressTotal
+                        ? Math.round(
+                              (job.progressCompleted / job.progressTotal) * 100
+                          )
+                        : 0
+                    const title =
+                        job.comicTitle || t('downloads.placeholderTitle')
+                    const chapter =
+                        job.chapterTitle || t('downloads.placeholderChapter')
+                    const speed = job.bytesPerSecond
+                        ? `${formatBytes(job.bytesPerSecond)}/s`
+                        : '—'
+                    const eta =
+                        job.bytesPerSecond && job.expectedBytes > job.bytes
+                            ? `${Math.ceil((job.expectedBytes - job.bytes) / job.bytesPerSecond)}s`
+                            : '—'
+                    return `<article class="list-item download-job-card" data-job-status="${job.status}">
+                    <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ETA ${eta} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
                     <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">${t('action.pause')}</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">${t('action.resume')}</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">${t('action.retry')}</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">${t('action.cancel')}</button>` : ''}</div>
                 </article>`
-            })
+                })
+                .join('') ||
+            `<article class="notice">${t('message.emptyQueue')}</article>`
+        if (
+            jobs.some((job) =>
+                ['QUEUED', 'PREPARING', 'RUNNING', 'RETRY_WAIT'].includes(
+                    job.status
+                )
+            )
+        ) {
+            if (!downloadPoll && activeView === 'downloads')
+                downloadPoll = setInterval(() => void loadJobs(), 1000)
+        } else if (downloadPoll) {
+            clearInterval(downloadPoll)
+            downloadPoll = null
+        }
+    } finally {
+        downloadPollBusy = false
+    }
+}
+
+function formatBytes(bytes) {
+    const value = Number(bytes || 0)
+    if (value < 1024) return `${value} B`
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+    if (value < 1024 * 1024 * 1024)
+        return `${(value / 1024 / 1024).toFixed(1)} MB`
+    return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
+function formatElapsed(startedAt) {
+    const started = new Date(startedAt || '').getTime()
+    if (!Number.isFinite(started)) return '—'
+    const seconds = Math.max(0, Math.floor((Date.now() - started) / 1000))
+    const minutes = Math.floor(seconds / 60)
+    const remainder = seconds % 60
+    return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`
+}
+
+async function loadDownloaded() {
+    if (state.mode === 'lite') return
+    const records = await api('/api/v1/downloaded')
+    $('#downloaded-count').textContent = t('downloaded.count', {
+        shown: records.length,
+        total: records.length
+    })
+    const coverSource = (comic) =>
+        state.downloadedCoversEnabled
+            ? `/api/v1/downloaded/${encodeURIComponent(comic.comicId)}/cover`
+            : ''
+    $('#downloaded-grid-items').innerHTML =
+        records
+            .map(
+                (comic) =>
+                    `<article class="comic-card"><div class="cover-shell">${coverSource(comic) ? `<img src="${coverSource(comic)}" loading="lazy" alt="" />` : ''}<span aria-hidden="true">P</span></div><div class="comic-card-body"><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><p>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</p><p>${t('downloaded.chapters', { downloaded: comic.downloadedChapters, known: comic.knownChapters || '—' })} · ${t('message.pictures', { count: comic.downloadedPictures })} · ${formatBytes(comic.localBytes)}</p></div></article>`
+            )
             .join('') ||
-        `<article class="notice">${t('message.emptyQueue')}</article>`
+        `<article class="notice">${t('downloaded.empty')}</article>`
+    $('#downloaded-rows').innerHTML = records
+        .map(
+            (comic) =>
+                `<tr><td>${escapeHtml(comic.title)}</td><td>${escapeHtml(comic.canonicalAuthor || comic.author)}</td><td>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</td><td>${comic.downloadedChapters}/${comic.knownChapters || '—'}</td><td>${comic.downloadedPictures}</td><td>${formatBytes(comic.localBytes)}</td><td>${escapeHtml(comic.lastDownloadedAt || '—')}</td></tr>`
+        )
+        .join('')
+    setGridSize('downloaded', state.downloadedGridSize)
 }
 
 async function enqueue(ids, source) {
@@ -654,12 +852,25 @@ function renderAll(summary) {
     setLibraryView(state.libraryView)
     $('#cover-toggle').checked = state.coversEnabled
     $('#recommend-cover-toggle').checked = state.coversEnabled
+    $('#downloaded-cover-toggle').checked = state.downloadedCoversEnabled
+    $('#downloaded-grid-items').hidden = state.downloadedView !== 'grid'
+    $('#downloaded-table').hidden = state.downloadedView !== 'list'
+    $('#downloaded-grid').setAttribute(
+        'aria-pressed',
+        String(state.downloadedView === 'grid')
+    )
+    $('#downloaded-list').setAttribute(
+        'aria-pressed',
+        String(state.downloadedView === 'list')
+    )
+    setGridSize('downloaded', state.downloadedGridSize)
     renderTimestamps()
 }
 
 $$('nav [data-view], [data-go]').forEach((button) =>
     button.addEventListener('click', () => {
         const id = button.dataset.view || button.dataset.go
+        activeView = id
         $$('.view').forEach((view) =>
             view.classList.toggle('active', view.id === id)
         )
@@ -667,6 +878,11 @@ $$('nav [data-view], [data-go]').forEach((button) =>
             item.classList.toggle('active', item.dataset.view === id)
         )
         if (id === 'downloads') loadJobs()
+        else if (downloadPoll) {
+            clearInterval(downloadPoll)
+            downloadPoll = null
+        }
+        if (id === 'downloaded') void loadDownloaded()
     })
 )
 
@@ -703,6 +919,22 @@ function setLibraryView(view) {
 }
 $('#view-grid').onclick = () => setLibraryView('grid')
 $('#view-list').onclick = () => setLibraryView('list')
+$$('[data-grid-size]').forEach((button) => {
+    button.onclick = () =>
+        setGridSize(button.dataset.sizeScope, button.dataset.gridSize)
+})
+$('#downloaded-grid').onclick = () => {
+    state.downloadedView = 'grid'
+    localStorage.setItem('pica-downloaded-view', 'grid')
+    $('#downloaded-grid-items').hidden = false
+    $('#downloaded-table').hidden = true
+}
+$('#downloaded-list').onclick = () => {
+    state.downloadedView = 'list'
+    localStorage.setItem('pica-downloaded-view', 'list')
+    $('#downloaded-grid-items').hidden = true
+    $('#downloaded-table').hidden = false
+}
 $('#cover-toggle').onchange = (event) => {
     state.coversEnabled = event.target.checked
     localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
@@ -727,12 +959,22 @@ $('#recommend-cover-toggle').onchange = (event) => {
     localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
     renderAll()
 }
+$('#downloaded-cover-toggle').onchange = (event) => {
+    state.downloadedCoversEnabled = event.target.checked
+    localStorage.setItem(
+        'pica-downloaded-covers-enabled',
+        String(state.downloadedCoversEnabled)
+    )
+    void loadDownloaded()
+}
 $('#pending-only').onchange = renderAuthors
 async function importSelectedFile() {
     const file = $('#import-file').files[0]
     if (!file) return
     try {
+        setProgress($('#library-operation'), t('message.importRead'), 0, 0)
         const text = await file.text()
+        setProgress($('#library-operation'), t('message.importParse'), 0, 0)
         if (file.name.toLowerCase().endsWith('.csv')) {
             state.records = csvRecords(text)
             state.authors = []
@@ -742,17 +984,35 @@ async function importSelectedFile() {
         } else {
             replaceLiteState(importLibraryBundle(JSON.parse(text)))
         }
-        if (state.mode === 'connected')
-            await post('/api/v1/import', { records: state.records })
+        setProgress(
+            $('#library-operation'),
+            t('message.importWrite'),
+            0,
+            state.records.length
+        )
+        const backendResult =
+            state.mode === 'connected'
+                ? await post('/api/v1/import', { records: state.records })
+                : null
+        setProgress(
+            $('#library-operation'),
+            t('message.importAuthors'),
+            state.records.length,
+            state.records.length
+        )
         if (!state.authors.length) deriveAuthors()
         await persistLiteState()
         renderAll()
-        $('#import-result').textContent = t('message.imported', {
-            records: state.records.length,
-            recommendations: state.recommendations.length,
-            plans: state.queue.length
-        })
+        $('#import-result').textContent = backendResult
+            ? t('message.importSummary', backendResult)
+            : t('message.imported', {
+                  records: state.records.length,
+                  recommendations: state.recommendations.length,
+                  plans: state.queue.length
+              })
+        clearProgress($('#library-operation'))
     } catch (error) {
+        clearProgress($('#library-operation'))
         $('#import-result').textContent = localizeError(language, error)
     }
 }
@@ -764,12 +1024,59 @@ async function syncFavorites(message = $('#import-result')) {
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.syncNeedsEngine'))
-        message.textContent = '正在同步收藏…'
-        const result = await post('/api/v1/sync', {})
+        message.textContent = t('message.syncReading')
+        setProgress($('#library-operation'), t('message.syncReading'), 0, 0)
+        let progressTimer = setInterval(async () => {
+            try {
+                const progress = await api('/api/v1/sync/progress')
+                if (progress.phase === 'reading') {
+                    const text = progress.page
+                        ? t('message.syncReadingPage', {
+                              page: progress.page,
+                              pages: progress.pages,
+                              fetched: progress.fetched,
+                              totalText: progress.total
+                                  ? ` / ${progress.total}`
+                                  : ''
+                          })
+                        : t('message.syncReading')
+                    setProgress(
+                        $('#library-operation'),
+                        text,
+                        progress.fetched,
+                        progress.total
+                    )
+                } else if (progress.phase === 'processing') {
+                    setProgress(
+                        $('#library-operation'),
+                        t('message.syncProcessing', progress),
+                        progress.processed,
+                        progress.total
+                    )
+                }
+            } catch {
+                // The main sync request owns error reporting.
+            }
+        }, 700)
+        let result
+        try {
+            result = await post('/api/v1/sync', {})
+        } finally {
+            clearInterval(progressTimer)
+            progressTimer = null
+        }
         desktop.lastSync = result.lastSync
-        message.textContent = `收藏同步完成，已同步 ${result.imported} 部漫画。`
+        message.textContent = `${t('message.syncSummary', {
+            favorites: result.favoriteCount,
+            added: result.addedFavorites,
+            removed: result.removedFavorites,
+            inserted: result.libraryInserted,
+            updated: result.libraryUpdated
+        })} ${t('message.syncOtherRecords')}`
+        clearProgress($('#library-operation'))
         await detect()
     } catch (error) {
+        clearProgress($('#library-operation'))
         message.textContent = localizeError(language, error)
     }
 }
@@ -870,6 +1177,21 @@ $('#run-jobs').onclick = async () => {
 }
 $('#job-list').onclick = async (event) => {
     if (!event.target.dataset.jobAction || state.mode !== 'connected') return
+    if (event.target.dataset.jobAction === 'cancel') {
+        const job = await api('/api/v1/downloads').then((jobs) =>
+            jobs.find((item) => item.id === event.target.dataset.jobId)
+        )
+        if (
+            job &&
+            !window.confirm(
+                t('downloads.cancelConfirm', {
+                    completed: job.progressCompleted,
+                    total: job.progressTotal || '—'
+                })
+            )
+        )
+            return
+    }
     await post(
         `/api/v1/downloads/${event.target.dataset.jobId}/${event.target.dataset.jobAction}`,
         {}
@@ -947,7 +1269,7 @@ async function detect() {
         const status = await api('/api/v1/status')
         state.mode = 'connected'
         $('#mode').textContent = t('mode.connected')
-        state.records = await api('/api/v1/comics')
+        state.records = await api('/api/v1/comics?limit=5000')
         state.authors = await api('/api/v1/authors')
         renderAll(status.summary)
     } catch {

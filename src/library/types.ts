@@ -66,6 +66,7 @@ export interface StoredComic extends FavoriteRecord {
 export interface LibrarySummary {
     comics: number
     favorites: number
+    downloadedComics: number
     authors: number
     authorsPendingReview: number
     episodes: number
@@ -79,6 +80,41 @@ export interface ImportResult {
     updated: number
     authorGroups: number
     authorsPendingReview: number
+    favoriteCount: number
+    addedFavorites: number
+    removedFavorites: number
+    libraryInserted: number
+    libraryUpdated: number
+}
+
+export interface LibraryReconciliation {
+    totalComicRecords: number
+    favoriteRecords: number
+    nonFavoriteRecords: number
+    distinctCanonicalComicIds: number
+    distinctProviderRawIds: number
+    duplicateCanonicalIds: number
+    duplicateProviderRawIds: number
+    provenanceGroups: Record<string, number>
+    favoriteIdsMissingComics: number
+    comicsWithoutKnownProvenance: number
+    sameMangaMultipleIds: number
+    metadataHydrationOnly: number
+}
+
+export interface DownloadedComic {
+    comicId: string
+    title: string
+    author: string
+    canonicalAuthor: string | null
+    coverUrl?: string
+    status: 'complete' | 'partial'
+    downloadedChapters: number
+    knownChapters: number
+    downloadedPictures: number
+    knownPictures: number
+    localBytes: number
+    lastDownloadedAt: string | null
 }
 
 export interface AuthorGroup {

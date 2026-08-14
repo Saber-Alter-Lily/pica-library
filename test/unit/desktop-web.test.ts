@@ -53,7 +53,8 @@ describe('desktop setup and settings UI contract', () => {
         expect(build).not.toContain('gh release')
         expect(build).toContain('README-WINDOWS.txt')
         expect(build).toContain('README-WINDOWS.zh-CN.txt')
-        expect(build).toContain('[Convert]::FromBase64String')
+        expect(build).toContain('Text.UTF8Encoding($false)')
+        expect(build).toContain('这是本地验收构建')
         expect(read('scripts/test-windows-artifact.ps1')).toContain(
             "@('README-WINDOWS.txt','README-WINDOWS.zh-CN.txt')"
         )

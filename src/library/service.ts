@@ -67,6 +67,16 @@ export interface DownloadResult {
     bytes: number
 }
 
+export interface FavoritesSyncProgress {
+    phase: 'idle' | 'reading' | 'processing' | 'complete' | 'failed'
+    page?: number
+    pages?: number
+    fetched?: number
+    total?: number
+    processed?: number
+    error?: string
+}
+
 function comicToRecord(comic: Comic): FavoriteRecord {
     return {
         comicId: comic._id,
@@ -104,6 +114,7 @@ export class LibraryService {
     private acceptingLocalDownloads = true
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
+    private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
 
     constructor(
         readonly database: LibraryDatabase,
@@ -167,14 +178,62 @@ export class LibraryService {
         return { ...image, cached: false }
     }
 
+    async downloadedCover(comicId: string) {
+        const file = this.database.downloadedCoverPath(comicId)
+        if (!file) throw new Error('Downloaded cover is unavailable')
+        const contentTypes: Record<string, string> = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.webp': 'image/webp',
+            '.gif': 'image/gif'
+        }
+        const contentType = safeRasterContentType(
+            contentTypes[path.extname(file).toLowerCase()]
+        )
+        if (!contentType) throw new Error('Downloaded cover type is unsafe')
+        return { data: await fs.promises.readFile(file), contentType }
+    }
+
+    favoritesSyncProgress() {
+        return { ...this.favoritesProgress }
+    }
+
     async syncFavorites() {
         const pica = await this.connect()
-        const { comics } = await pica.favoritesAll()
-        return this.database.importFavorites(
-            comics.map(comicToRecord),
-            'pica:favorites',
-            true
-        )
+        this.favoritesProgress = { phase: 'reading' }
+        try {
+            const { comics } = await pica.favoritesAll('all', (progress) => {
+                this.favoritesProgress = {
+                    phase: 'reading',
+                    ...progress
+                }
+            })
+            this.favoritesProgress = {
+                phase: 'processing',
+                fetched: comics.length,
+                total: comics.length,
+                processed: 0
+            }
+            const result = this.database.importFavorites(
+                comics.map(comicToRecord),
+                'pica:favorites',
+                true
+            )
+            this.favoritesProgress = {
+                phase: 'complete',
+                fetched: comics.length,
+                total: comics.length,
+                processed: comics.length
+            }
+            return result
+        } catch (error) {
+            this.favoritesProgress = {
+                phase: 'failed',
+                error: error instanceof Error ? error.message : String(error)
+            }
+            throw error
+        }
     }
 
     async favoritesPage(page: number) {
@@ -439,7 +498,8 @@ export class LibraryService {
                         this.database.updateDownloadProgress(job.id, {
                             progressCompleted: progress.completed,
                             progressTotal: progress.total,
-                            bytes: progress.bytes
+                            bytes: progress.bytes,
+                            chapterTitle: progress.episodeTitle
                         })
                         options.onProgress?.(progress)
                     },
@@ -538,7 +598,10 @@ export class LibraryService {
                 'The site reports that this comic is not downloadable'
             )
         }
-        this.database.importCatalog([comicToRecord(comic)], 'pica:download')
+        this.database.importCatalog(
+            [comicToRecord(comic)],
+            'pica:download:metadata'
+        )
         const observedEpisodes = await pica.episodesAll(comicId)
         for (const episode of observedEpisodes) {
             const episodeId = episode.id || episode._id

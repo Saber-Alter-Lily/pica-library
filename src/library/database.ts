@@ -18,8 +18,10 @@ import {
 import type {
     AuthorGroup,
     ComicQuery,
+    DownloadedComic,
     FavoriteRecord,
     ImportResult,
+    LibraryReconciliation,
     LibrarySummary,
     StoredComic
 } from './types'
@@ -49,7 +51,37 @@ function numberValue(value: unknown): number {
     return Number.isFinite(number) ? number : 0
 }
 
+function provenanceGroup(source: string) {
+    if (source.startsWith('pica:favorites')) return 'favorites sync'
+    if (source === 'pica:discover') return 'search'
+    if (source === 'pica:recommendations') return 'recommendation'
+    if (source.startsWith('download:enqueue')) return 'download enqueue'
+    if (source === 'download:completion') return 'download completion'
+    if (source.startsWith('pica:download')) return 'metadata hydration'
+    if (source.includes('csv')) return 'CSV import'
+    if (source.includes('bundle')) return 'Bundle import'
+    if (source.includes('import')) return 'manual import'
+    if (source === 'legacy/unknown') return 'legacy/migration'
+    return 'unknown'
+}
+
 function downloadJob(row: SqlRow): DownloadJob {
+    const startedAt = row.started_at ? String(row.started_at) : null
+    const progressUpdatedAt = row.progress_updated_at
+        ? String(row.progress_updated_at)
+        : null
+    const bytes = numberValue(row.bytes)
+    const elapsedSeconds = startedAt
+        ? Math.max(
+              0,
+              (new Date(
+                  progressUpdatedAt ?? new Date().toISOString()
+              ).getTime() -
+                  new Date(startedAt).getTime()) /
+                  1000
+          )
+        : 0
+    const rawTitle = row.comic_title ? String(row.comic_title) : ''
     return {
         id: String(row.id),
         comicId: String(row.comic_id),
@@ -59,15 +91,37 @@ function downloadJob(row: SqlRow): DownloadJob {
         runner: String(row.runner) as DownloadJob['runner'],
         status: String(row.status) as DownloadStatus,
         createdAt: String(row.created_at),
-        startedAt: row.started_at ? String(row.started_at) : null,
+        startedAt,
         finishedAt: row.finished_at ? String(row.finished_at) : null,
         retryCount: numberValue(row.retry_count),
         progressCompleted: numberValue(row.progress_completed),
         progressTotal: numberValue(row.progress_total),
-        bytes: numberValue(row.bytes),
+        bytes,
+        expectedBytes:
+            row.expected_bytes === null || row.expected_bytes === undefined
+                ? null
+                : numberValue(row.expected_bytes),
+        comicTitle:
+            rawTitle && !rawTitle.startsWith('Pending metadata [')
+                ? rawTitle
+                : null,
+        chapterTitle: row.current_episode_title
+            ? String(row.current_episode_title)
+            : null,
+        progressUpdatedAt,
+        bytesPerSecond:
+            elapsedSeconds > 0 && bytes > 0
+                ? Math.round(bytes / elapsedSeconds)
+                : null,
         error: row.error ? String(row.error) : null
     }
 }
+
+const downloadJobSelect = `
+    SELECT j.*, c.title AS comic_title
+    FROM download_jobs j
+    JOIN comics c ON c.id = j.comic_id
+`
 
 export class LibraryDatabase {
     readonly file: string
@@ -96,6 +150,20 @@ export class LibraryDatabase {
         markFavorite = true
     ): ImportResult {
         const now = new Date().toISOString()
+        const uniqueRecords = [
+            ...new Map(
+                records
+                    .filter((record) => record.comicId?.trim())
+                    .map((record) => [record.comicId.trim(), record])
+            ).values()
+        ]
+        const previousFavoriteIds = new Set(
+            (
+                this.db
+                    .prepare('SELECT id FROM comics WHERE is_favorite = 1')
+                    .all() as SqlRow[]
+            ).map((row) => String(row.id))
+        )
         const run = this.db
             .prepare(
                 `INSERT INTO sync_runs(source, status, started_at)
@@ -181,6 +249,17 @@ export class LibraryDatabase {
                 needs_review = excluded.needs_review,
                 evidence = excluded.evidence
         `)
+        const provenanceUpsert = this.db.prepare(`
+            INSERT INTO comic_provenance(
+                comic_id, source, first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?)
+            ON CONFLICT(comic_id, source) DO UPDATE SET
+                last_seen_at = excluded.last_seen_at
+        `)
+        const clearUnknownProvenance = this.db.prepare(`
+            DELETE FROM comic_provenance
+            WHERE comic_id = ? AND source = 'legacy/unknown'
+        `)
 
         let inserted = 0
         let updated = 0
@@ -189,7 +268,7 @@ export class LibraryDatabase {
             if (completeSnapshot && markFavorite) {
                 this.db.exec('UPDATE comics SET is_favorite = 0')
             }
-            for (const record of records) {
+            for (const record of uniqueRecords) {
                 const existed = Boolean(
                     existsStatement.get(record.comicId) as SqlRow | undefined
                 )
@@ -256,6 +335,9 @@ export class LibraryDatabase {
                         identity.evidence
                     )
                 }
+                provenanceUpsert.run(record.comicId, source, now, now)
+                if (source !== 'legacy/unknown')
+                    clearUnknownProvenance.run(record.comicId)
                 if (existed) updated += 1
                 else inserted += 1
             }
@@ -264,7 +346,7 @@ export class LibraryDatabase {
                     `UPDATE sync_runs SET status = 'completed', finished_at = ?,
                      item_count = ? WHERE id = ?`
                 )
-                .run(new Date().toISOString(), records.length, runId)
+                .run(new Date().toISOString(), uniqueRecords.length, runId)
             this.db.exec('COMMIT')
         } catch (error) {
             this.db.exec('ROLLBACK')
@@ -278,12 +360,31 @@ export class LibraryDatabase {
         }
 
         const summary = this.summary()
+        const currentFavoriteIds = new Set(
+            (
+                this.db
+                    .prepare('SELECT id FROM comics WHERE is_favorite = 1')
+                    .all() as SqlRow[]
+            ).map((row) => String(row.id))
+        )
         return {
-            imported: records.length,
+            imported: uniqueRecords.length,
             inserted,
             updated,
             authorGroups: summary.authors,
-            authorsPendingReview: summary.authorsPendingReview
+            authorsPendingReview: summary.authorsPendingReview,
+            favoriteCount: summary.favorites,
+            addedFavorites: [...currentFavoriteIds].filter(
+                (id) => !previousFavoriteIds.has(id)
+            ).length,
+            removedFavorites:
+                completeSnapshot && markFavorite
+                    ? [...previousFavoriteIds].filter(
+                          (id) => !currentFavoriteIds.has(id)
+                      ).length
+                    : 0,
+            libraryInserted: inserted,
+            libraryUpdated: updated
         }
     }
 
@@ -299,6 +400,7 @@ export class LibraryDatabase {
             favorites: count(
                 'SELECT COUNT(*) AS count FROM comics WHERE is_favorite = 1'
             ),
+            downloadedComics: this.listDownloadedComics().length,
             authors: count('SELECT COUNT(*) AS count FROM authors'),
             authorsPendingReview: count(
                 `SELECT COUNT(*) AS count FROM authors WHERE review_status = 'pending'`
@@ -309,6 +411,159 @@ export class LibraryDatabase {
                 `SELECT COUNT(*) AS count FROM pictures WHERE status = 'completed'`
             )
         }
+    }
+
+    reconcileLibraryCounts(): LibraryReconciliation {
+        const count = (sql: string) =>
+            numberValue((this.db.prepare(sql).get() as SqlRow).count)
+        const provenanceGroups: Record<string, number> = {}
+        const provenanceRows = this.db
+            .prepare(
+                `SELECT source, COUNT(DISTINCT comic_id) AS count
+                 FROM comic_provenance GROUP BY source`
+            )
+            .all() as SqlRow[]
+        for (const row of provenanceRows) {
+            const group = provenanceGroup(String(row.source))
+            provenanceGroups[group] =
+                (provenanceGroups[group] ?? 0) + numberValue(row.count)
+        }
+        return {
+            totalComicRecords: count('SELECT COUNT(*) AS count FROM comics'),
+            favoriteRecords: count(
+                'SELECT COUNT(*) AS count FROM comics WHERE is_favorite = 1'
+            ),
+            nonFavoriteRecords: count(
+                'SELECT COUNT(*) AS count FROM comics WHERE is_favorite = 0'
+            ),
+            distinctCanonicalComicIds: count(
+                'SELECT COUNT(DISTINCT id) AS count FROM comics'
+            ),
+            distinctProviderRawIds: count(
+                'SELECT COUNT(DISTINCT id) AS count FROM comics'
+            ),
+            duplicateCanonicalIds: count(
+                `SELECT COUNT(*) AS count FROM (
+                    SELECT id FROM comics GROUP BY id HAVING COUNT(*) > 1
+                )`
+            ),
+            duplicateProviderRawIds: count(
+                `SELECT COUNT(*) AS count FROM (
+                    SELECT id FROM comics GROUP BY id HAVING COUNT(*) > 1
+                )`
+            ),
+            provenanceGroups,
+            favoriteIdsMissingComics: 0,
+            comicsWithoutKnownProvenance: count(
+                `SELECT COUNT(*) AS count FROM comics c
+                 WHERE NOT EXISTS (
+                    SELECT 1 FROM comic_provenance p
+                    WHERE p.comic_id = c.id AND p.source <> 'legacy/unknown'
+                 )`
+            ),
+            sameMangaMultipleIds: count(
+                `SELECT COUNT(*) AS count FROM (
+                    SELECT lower(trim(title)), lower(trim(raw_author))
+                    FROM comics
+                    GROUP BY lower(trim(title)), lower(trim(raw_author))
+                    HAVING COUNT(DISTINCT id) > 1
+                )`
+            ),
+            metadataHydrationOnly: count(
+                `SELECT COUNT(*) AS count FROM comics c
+                 WHERE EXISTS (
+                    SELECT 1 FROM comic_provenance p
+                    WHERE p.comic_id = c.id
+                      AND p.source IN ('pica:download', 'pica:download:metadata')
+                 ) AND NOT EXISTS (
+                    SELECT 1 FROM comic_provenance p
+                    WHERE p.comic_id = c.id
+                      AND p.source NOT IN ('pica:download', 'pica:download:metadata')
+                 )`
+            )
+        }
+    }
+
+    listDownloadedComics(): DownloadedComic[] {
+        const rows = this.db
+            .prepare(
+                `SELECT c.id, c.title, c.raw_author, c.cover_url,
+                        a.canonical_name, p.episode_id, p.local_path,
+                        p.last_seen_at,
+                        (SELECT COUNT(*) FROM episodes e
+                         WHERE e.comic_id = c.id) AS known_chapters,
+                        (SELECT COUNT(*) FROM pictures k
+                         WHERE k.comic_id = c.id) AS known_pictures
+                 FROM comics c
+                 JOIN pictures p ON p.comic_id = c.id
+                 LEFT JOIN authors a ON a.id = c.canonical_author_id
+                 WHERE p.status = 'completed' AND p.local_path IS NOT NULL
+                 ORDER BY c.title, p.last_seen_at DESC`
+            )
+            .all() as SqlRow[]
+        const grouped = new Map<
+            string,
+            DownloadedComic & { episodeIds: Set<string> }
+        >()
+        for (const row of rows) {
+            const localPath = String(row.local_path)
+            if (!fs.existsSync(localPath)) continue
+            const stat = fs.statSync(localPath)
+            if (!stat.isFile() || stat.size <= 0) continue
+            const comicId = String(row.id)
+            let item = grouped.get(comicId)
+            if (!item) {
+                item = {
+                    comicId,
+                    title: String(row.title),
+                    author: String(row.raw_author),
+                    canonicalAuthor: row.canonical_name
+                        ? String(row.canonical_name)
+                        : null,
+                    coverUrl: row.cover_url ? String(row.cover_url) : undefined,
+                    status: 'partial',
+                    downloadedChapters: 0,
+                    knownChapters: numberValue(row.known_chapters),
+                    downloadedPictures: 0,
+                    knownPictures: numberValue(row.known_pictures),
+                    localBytes: 0,
+                    lastDownloadedAt: null,
+                    episodeIds: new Set<string>()
+                }
+                grouped.set(comicId, item)
+            }
+            item.episodeIds.add(String(row.episode_id))
+            item.downloadedPictures += 1
+            item.localBytes += stat.size
+            const observedAt = String(row.last_seen_at)
+            if (!item.lastDownloadedAt || observedAt > item.lastDownloadedAt)
+                item.lastDownloadedAt = observedAt
+        }
+        return [...grouped.values()].map(({ episodeIds, ...item }) => ({
+            ...item,
+            downloadedChapters: episodeIds.size,
+            status:
+                item.knownPictures > 0 &&
+                item.downloadedPictures >= item.knownPictures
+                    ? 'complete'
+                    : 'partial'
+        }))
+    }
+
+    downloadedCoverPath(comicId: string) {
+        const rows = this.db
+            .prepare(
+                `SELECT local_path FROM pictures
+                 WHERE comic_id = ? AND status = 'completed'
+                   AND local_path IS NOT NULL
+                 ORDER BY position LIMIT 20`
+            )
+            .all(comicId) as SqlRow[]
+        for (const row of rows) {
+            const file = String(row.local_path)
+            if (fs.existsSync(file) && fs.statSync(file).size > 0) return file
+        }
+        return null
     }
 
     lastCompletedSync() {
@@ -768,12 +1023,27 @@ export class LibraryDatabase {
         byteSize: number,
         sha256: string
     ) {
+        const picture = this.db
+            .prepare('SELECT comic_id FROM pictures WHERE id = ?')
+            .get(pictureId) as SqlRow | undefined
+        const observedAt = new Date().toISOString()
         this.db
             .prepare(
                 `UPDATE pictures SET status = 'completed', local_path = ?,
-                 byte_size = ?, sha256 = ? WHERE id = ?`
+                 byte_size = ?, sha256 = ?, last_seen_at = ? WHERE id = ?`
             )
-            .run(localPath, byteSize, sha256, pictureId)
+            .run(localPath, byteSize, sha256, observedAt, pictureId)
+        if (picture) {
+            this.db
+                .prepare(
+                    `INSERT INTO comic_provenance(
+                        comic_id, source, first_seen_at, last_seen_at
+                    ) VALUES (?, 'download:completion', ?, ?)
+                    ON CONFLICT(comic_id, source) DO UPDATE SET
+                        last_seen_at = excluded.last_seen_at`
+                )
+                .run(String(picture.comic_id), observedAt, observedAt)
+        }
     }
 
     createDownloadJob(input: CreateDownloadJob): DownloadJob {
@@ -804,12 +1074,26 @@ export class LibraryDatabase {
                 input.runner ?? 'LOCAL',
                 now
             )
+        this.db
+            .prepare(
+                `INSERT INTO comic_provenance(
+                    comic_id, source, first_seen_at, last_seen_at
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(comic_id, source) DO UPDATE SET
+                    last_seen_at = excluded.last_seen_at`
+            )
+            .run(
+                input.comicId,
+                `download:enqueue:${input.source ?? 'manual'}`,
+                now,
+                now
+            )
         return this.getDownloadJob(id)
     }
 
     getDownloadJob(id: string): DownloadJob {
         const row = this.db
-            .prepare('SELECT * FROM download_jobs WHERE id = ?')
+            .prepare(`${downloadJobSelect} WHERE j.id = ?`)
             .get(id) as SqlRow | undefined
         if (!row) throw new Error(`Unknown download job: ${id}`)
         return downloadJob(row)
@@ -819,14 +1103,14 @@ export class LibraryDatabase {
         const rows = status
             ? (this.db
                   .prepare(
-                      `SELECT * FROM download_jobs WHERE status = ?
-                       ORDER BY priority DESC, created_at`
+                      `${downloadJobSelect} WHERE j.status = ?
+                       ORDER BY j.priority DESC, j.created_at`
                   )
                   .all(status) as SqlRow[])
             : (this.db
                   .prepare(
-                      `SELECT * FROM download_jobs
-                       ORDER BY created_at DESC`
+                      `${downloadJobSelect}
+                       ORDER BY j.created_at DESC`
                   )
                   .all() as SqlRow[])
         return rows.map(downloadJob)
@@ -836,15 +1120,16 @@ export class LibraryDatabase {
         const rows = runner
             ? (this.db
                   .prepare(
-                      `SELECT * FROM download_jobs
-                       WHERE status = 'QUEUED' AND runner = ?
-                       ORDER BY priority DESC, created_at LIMIT ?`
+                      `${downloadJobSelect}
+                       WHERE j.status = 'QUEUED' AND j.runner = ?
+                       ORDER BY j.priority DESC, j.created_at LIMIT ?`
                   )
                   .all(runner, Math.max(1, limit)) as SqlRow[])
             : (this.db
                   .prepare(
-                      `SELECT * FROM download_jobs WHERE status = 'QUEUED'
-                       ORDER BY priority DESC, created_at LIMIT ?`
+                      `${downloadJobSelect}
+                       WHERE j.status = 'QUEUED'
+                       ORDER BY j.priority DESC, j.created_at LIMIT ?`
                   )
                   .all(Math.max(1, limit)) as SqlRow[])
         return rows.map(downloadJob)
@@ -902,13 +1187,18 @@ export class LibraryDatabase {
         this.db
             .prepare(
                 `UPDATE download_jobs SET
-                    progress_completed = ?, progress_total = ?, bytes = ?
+                    progress_completed = ?, progress_total = ?, bytes = ?,
+                    expected_bytes = ?, current_episode_title = ?,
+                    progress_updated_at = ?
                  WHERE id = ?`
             )
             .run(
                 patch.progressCompleted ?? current.progressCompleted,
                 patch.progressTotal ?? current.progressTotal,
                 patch.bytes ?? current.bytes,
+                patch.expectedBytes ?? current.expectedBytes ?? null,
+                patch.chapterTitle ?? current.chapterTitle ?? null,
+                new Date().toISOString(),
                 id
             )
         return this.getDownloadJob(id)

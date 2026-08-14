@@ -283,8 +283,31 @@ export async function startLibraryServer(options: {
                     mode: 'connected',
                     version: PRODUCT_VERSION,
                     database: options.database.file,
-                    summary: options.database.summary()
+                    summary: options.database.summary(),
+                    reconciliation: options.database.reconcileLibraryCounts(),
+                    favoritesSyncProgress:
+                        options.service.favoritesSyncProgress()
                 })
+            }
+            if (
+                url.pathname === '/api/v1/sync/progress' &&
+                request.method === 'GET'
+            ) {
+                return json(
+                    response,
+                    200,
+                    options.service.favoritesSyncProgress()
+                )
+            }
+            if (
+                url.pathname === '/api/v1/downloaded' &&
+                request.method === 'GET'
+            ) {
+                return json(
+                    response,
+                    200,
+                    options.database.listDownloadedComics()
+                )
             }
             if (url.pathname === '/api/v1/comics' && request.method === 'GET') {
                 return json(
@@ -313,6 +336,22 @@ export async function startLibraryServer(options: {
             if (coverRequest && request.method === 'GET') {
                 const cover = await options.service.cover(
                     decodeURIComponent(coverRequest[1])
+                )
+                response.writeHead(200, {
+                    'content-type': cover.contentType,
+                    'content-length': String(cover.data.byteLength),
+                    'cache-control': 'private, max-age=86400',
+                    'x-content-type-options': 'nosniff'
+                })
+                response.end(cover.data)
+                return
+            }
+            const downloadedCoverRequest = url.pathname.match(
+                /^\/api\/v1\/downloaded\/([^/]+)\/cover$/
+            )
+            if (downloadedCoverRequest && request.method === 'GET') {
+                const cover = await options.service.downloadedCover(
+                    decodeURIComponent(downloadedCoverRequest[1])
                 )
                 response.writeHead(200, {
                     'content-type': cover.contentType,
@@ -403,7 +442,8 @@ export async function startLibraryServer(options: {
                 const result = await options.service.syncFavorites()
                 return json(response, 200, {
                     ...result,
-                    lastSync: options.database.lastCompletedSync()
+                    lastSync: options.database.lastCompletedSync(),
+                    reconciliation: options.database.reconcileLibraryCounts()
                 })
             }
             if (

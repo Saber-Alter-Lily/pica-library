@@ -60,6 +60,10 @@ let service: LibraryService | null = null
 let stopping = false
 let currentUrl = ''
 let lastBrowserLiteExportDirectory: string | null = null
+let browserLiteExportProgress: {
+    phase: string
+    state: 'idle' | 'running' | 'complete' | 'failed'
+} = { phase: 'idle', state: 'idle' }
 let lastBrowserLiteExportAt: string | null = (() => {
     try {
         const value = JSON.parse(
@@ -365,7 +369,8 @@ async function startEngine(preferredPort: number) {
             openBrowser: config?.openBrowser ?? true,
             logsDirectory: paths.logs,
             lastSync: database?.lastCompletedSync() ?? null,
-            lastExportAt: lastBrowserLiteExportAt
+            lastExportAt: lastBrowserLiteExportAt,
+            browserLiteExportProgress
         }),
         save: async (input) => {
             const wasConfigured = Boolean(config && credentials)
@@ -440,26 +445,70 @@ async function startEngine(preferredPort: number) {
         },
         syncAndExportBrowserLitePackage: async () => {
             if (!database || !service) throw new Error('Library is not ready')
-            await service.syncFavorites()
-            const recommendation = await service.recommendations({ limit: 60 })
-            const lastSync = database.lastCompletedSync()
-            const generatedAt = new Date().toISOString()
-            const content = serializeBrowserLiteDataPackage(database, {
-                generatedAt,
-                sourceSyncedAt: lastSync?.finishedAt,
-                profile: recommendation.profile,
-                recommendations: recommendation.recommendations
-            })
-            const file = await chooseBrowserLitePackagePath()
-            if (!file) return { success: false, cancelled: true }
-            fs.writeFileSync(file, content, 'utf8')
-            lastBrowserLiteExportDirectory = path.dirname(file)
-            saveExportState(generatedAt)
-            return {
-                success: true,
-                fileName: 'pica-library-bundle.json',
-                generatedAt,
-                sourceSyncedAt: lastSync?.finishedAt ?? null
+            try {
+                browserLiteExportProgress = {
+                    phase: 'sync-favorites',
+                    state: 'running'
+                }
+                await service.syncFavorites()
+                browserLiteExportProgress = {
+                    phase: 'update-library',
+                    state: 'running'
+                }
+                const lastSync = database.lastCompletedSync()
+                browserLiteExportProgress = {
+                    phase: 'prepare-recommendations',
+                    state: 'running'
+                }
+                const recommendation = await service.recommendations({
+                    limit: 60
+                })
+                browserLiteExportProgress = {
+                    phase: 'generate-bundle',
+                    state: 'running'
+                }
+                const generatedAt = new Date().toISOString()
+                const content = serializeBrowserLiteDataPackage(database, {
+                    generatedAt,
+                    sourceSyncedAt: lastSync?.finishedAt,
+                    profile: recommendation.profile,
+                    recommendations: recommendation.recommendations
+                })
+                browserLiteExportProgress = {
+                    phase: 'choose-save-location',
+                    state: 'running'
+                }
+                const file = await chooseBrowserLitePackagePath()
+                if (!file) {
+                    browserLiteExportProgress = {
+                        phase: 'cancelled',
+                        state: 'idle'
+                    }
+                    return { success: false, cancelled: true }
+                }
+                browserLiteExportProgress = {
+                    phase: 'write-file',
+                    state: 'running'
+                }
+                fs.writeFileSync(file, content, 'utf8')
+                lastBrowserLiteExportDirectory = path.dirname(file)
+                saveExportState(generatedAt)
+                browserLiteExportProgress = {
+                    phase: 'complete',
+                    state: 'complete'
+                }
+                return {
+                    success: true,
+                    fileName: 'pica-library-bundle.json',
+                    generatedAt,
+                    sourceSyncedAt: lastSync?.finishedAt ?? null
+                }
+            } catch (error) {
+                browserLiteExportProgress = {
+                    phase: 'failed',
+                    state: 'failed'
+                }
+                throw error
             }
         },
         openBrowserLite: async () => {

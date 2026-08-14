@@ -28,6 +28,7 @@
             <button data-view="library">Library</button>
             <button data-view="discover">Discover</button>
             <button data-view="downloads">Downloads</button>
+            <button data-view="downloaded">Downloaded</button>
             <button data-view="maintenance">Maintenance</button>
             <button data-view="settings" id="settings-nav" hidden>
                 Settings
@@ -205,13 +206,49 @@
                     </div>
                 </div>
                 <p id="import-result" class="status"></p>
+                <div id="library-operation" class="operation-progress" hidden>
+                    <span id="library-operation-phase"></span>
+                    <progress id="library-operation-bar" max="1"></progress>
+                </div>
                 <div id="lite-snapshot-bar" class="notice" hidden>
                     <span id="lite-snapshot-time"></span>
                     <button id="lite-reimport" type="button">
                         重新导入数据包
                     </button>
                 </div>
-                <div class="toolbar">
+                <div
+                    class="toolbar responsive-toolbar"
+                    data-control-scope="library"
+                >
+                    <div class="control-group">
+                        <button id="view-grid" aria-pressed="true">
+                            封面网格
+                        </button>
+                        <button id="view-list" aria-pressed="false">
+                            紧凑列表
+                        </button>
+                    </div>
+                    <div class="control-group grid-size-controls">
+                        <button
+                            data-grid-size="small"
+                            data-size-scope="library"
+                        >
+                            小
+                        </button>
+                        <button
+                            data-grid-size="medium"
+                            data-size-scope="library"
+                        >
+                            中
+                        </button>
+                        <button
+                            data-grid-size="large"
+                            data-size-scope="library"
+                            aria-pressed="true"
+                        >
+                            大
+                        </button>
+                    </div>
                     <label
                         ><input id="cover-toggle" type="checkbox" checked />
                         <span id="cover-toggle-label">Load covers</span></label
@@ -225,10 +262,6 @@
                         <option value="title">标题</option>
                     </select>
                     <button id="apply-filter" class="primary">筛选</button>
-                    <button id="view-grid" aria-pressed="true">封面网格</button>
-                    <button id="view-list" aria-pressed="false">
-                        紧凑列表
-                    </button>
                     <button id="queue-selected">加入下载</button>
                     <button id="export-plan">导出计划</button>
                 </div>
@@ -292,7 +325,29 @@
                                 >Load covers</span
                             ></label
                         >
+                        <div class="control-group grid-size-controls">
+                            <button
+                                data-grid-size="small"
+                                data-size-scope="recommendation"
+                            >
+                                小
+                            </button>
+                            <button
+                                data-grid-size="medium"
+                                data-size-scope="recommendation"
+                            >
+                                中
+                            </button>
+                            <button
+                                data-grid-size="large"
+                                data-size-scope="recommendation"
+                                aria-pressed="true"
+                            >
+                                大
+                            </button>
+                        </div>
                     </div>
+                    <p id="recommend-batch" class="status"></p>
                     <button id="recommend-next-batch">Next batch</button>
                     <div id="recommend-results" class="results"></div>
                 </div>
@@ -380,7 +435,88 @@
                         <button id="run-jobs" class="primary">运行队列</button>
                     </div>
                 </div>
+                <div
+                    id="download-summary"
+                    class="metrics download-summary"
+                ></div>
+                <div id="download-operation" class="operation-progress" hidden>
+                    <span id="download-operation-phase"></span>
+                </div>
                 <div id="job-list" class="list"></div>
+            </section>
+
+            <section id="downloaded" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Downloaded</h2>
+                        <p>包含至少一个真实存在的本地下载文件。</p>
+                    </div>
+                    <div
+                        class="view-controls responsive-toolbar"
+                        data-control-scope="downloaded"
+                    >
+                        <div class="control-group">
+                            <button id="downloaded-grid" aria-pressed="true">
+                                网格
+                            </button>
+                            <button id="downloaded-list" aria-pressed="false">
+                                列表
+                            </button>
+                        </div>
+                        <div class="control-group grid-size-controls">
+                            <button
+                                data-grid-size="small"
+                                data-size-scope="downloaded"
+                            >
+                                小
+                            </button>
+                            <button
+                                data-grid-size="medium"
+                                data-size-scope="downloaded"
+                            >
+                                中
+                            </button>
+                            <button
+                                data-grid-size="large"
+                                data-size-scope="downloaded"
+                                aria-pressed="true"
+                            >
+                                大
+                            </button>
+                        </div>
+                        <label
+                            ><input
+                                id="downloaded-cover-toggle"
+                                type="checkbox"
+                                checked
+                            />
+                            <span id="downloaded-cover-toggle-label"
+                                >加载封面</span
+                            ></label
+                        >
+                    </div>
+                </div>
+                <p id="downloaded-count" class="status"></p>
+                <div
+                    id="downloaded-grid-items"
+                    class="comic-grid view-grid-size-large"
+                ></div>
+                <div id="downloaded-table" class="table-wrap" hidden>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>标题</th>
+                                <th>作者</th>
+                                <th>状态</th>
+                                <th>章节</th>
+                                <th>图片</th>
+                                <th>本地大小</th>
+                                <th>最近下载</th>
+                            </tr>
+                        </thead>
+                        <tbody id="downloaded-rows"></tbody>
+                    </table>
+                </div>
             </section>
 
             <section id="maintenance" class="view">

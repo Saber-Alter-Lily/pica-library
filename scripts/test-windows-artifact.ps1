@@ -58,10 +58,36 @@ try {
     $publishedMs = $watch.ElapsedMilliseconds
     if ($PortCollision -and $instance.url -eq 'http://127.0.0.1:4789') { throw 'Packaged app attached to unrelated port occupant' }
     $status = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/status') -TimeoutSec 10
-    if ($status.application -ne 'Pica Library' -or $status.version -ne '0.1.4-dev.1' -or $status.configured) { throw 'Unexpected packaged status' }
+    if ($status.application -ne 'Pica Library' -or $status.version -ne '0.1.4-dev.2' -or $status.configured) { throw 'Unexpected packaged status' }
     $setup = Invoke-WebRequest -UseBasicParsing -Uri ($instance.url + '/setup') -TimeoutSec 10
     if ($setup.StatusCode -ne 200 -or $setup.Content -notmatch 'Set up Pica Library') { throw 'Setup page is unavailable' }
     if ($setup.Content -notmatch 'id="language-select"' -or $setup.Content -notmatch 'option value="zh-CN"') { throw 'Language controls are unavailable' }
+    $ui = Invoke-WebRequest -UseBasicParsing -Uri ($instance.url + '/') -TimeoutSec 10
+    foreach ($marker in @(
+        'id="home"',
+        'id="library"',
+        'id="discover"',
+        'id="downloads"',
+        'id="downloaded"',
+        'id="settings"',
+        'id="download-summary"',
+        'id="downloaded-grid-items"',
+        'id="downloaded-table"',
+        'id="downloaded-cover-toggle"',
+        'data-grid-size="small"',
+        'data-grid-size="medium"',
+        'data-grid-size="large"'
+    )) {
+        if ($ui.Content -notmatch [regex]::Escape($marker)) { throw "Packaged UI marker is missing: $marker" }
+    }
+    $styles = (Invoke-WebRequest -UseBasicParsing -Uri ($instance.url + '/styles.css') -TimeoutSec 10).Content
+    foreach ($rule in @('@media (max-width: 980px)','@media (max-width: 760px)','minmax(250px, 1fr)','minmax(175px, 1fr)','minmax(120px, 1fr)')) {
+        if (-not $styles.Contains($rule)) { throw "Packaged responsive/grid rule is missing: $rule" }
+    }
+    $appScript = (Invoke-WebRequest -UseBasicParsing -Uri ($instance.url + '/app.js') -TimeoutSec 10).Content
+    foreach ($contract in @('setInterval(() => void loadJobs(), 1000)','job.comicTitle','job.chapterTitle','job.expectedBytes','state.downloadedCoversEnabled')) {
+        if (-not $appScript.Contains($contract)) { throw "Packaged download UI contract is missing: $contract" }
+    }
 
     $initialCsrfToken = $status.csrfToken
     $credentialEncrypted = $null
@@ -112,7 +138,7 @@ try {
         if (Get-Process -Id $second.pid -ErrorAction SilentlyContinue) { throw 'Relaunched packaged process did not stop' }
         $relaunch='PASS'
     }
-    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; setup_available=$true; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
+    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
 } finally {
     if ($listener) { $listener.Stop() }
     $env:PATH = $originalPath

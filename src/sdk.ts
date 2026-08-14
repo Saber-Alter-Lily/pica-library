@@ -436,10 +436,24 @@ export class Pica {
         return res.comics
     }
 
-    async favoritesAll(page: ExpectedPage = 'all') {
+    async favoritesAll(
+        page: ExpectedPage = 'all',
+        onPage?: (progress: {
+            page: number
+            pages: number
+            fetched: number
+            total?: number
+        }) => void
+    ) {
         const pageNum = Number(page)
         if (page && Number.isInteger(pageNum)) {
             const res = await this.favorites(pageNum)
+            onPage?.({
+                page: res.page,
+                pages: res.pages,
+                fetched: res.docs.length,
+                total: res.total
+            })
             return { comics: res.docs, pages: res.pages }
         }
 
@@ -447,9 +461,21 @@ export class Pica {
         const first = await this.favorites()
         const pages = first.pages
         comics.push(...first.docs)
+        onPage?.({
+            page: first.page,
+            pages,
+            fetched: comics.length,
+            total: first.total
+        })
         for (let page = 2; page <= pages; page++) {
             const res = await this.favorites(page)
             comics.push(...res.docs)
+            onPage?.({
+                page: res.page,
+                pages,
+                fetched: comics.length,
+                total: res.total
+            })
         }
         return { comics, pages }
     }

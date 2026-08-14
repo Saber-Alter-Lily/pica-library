@@ -33,7 +33,7 @@ describe('SQLite migrations', () => {
         const versions = database
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>
-        expect(versions.map((row) => row.version)).toEqual([1, 2, 3])
+        expect(versions.map((row) => row.version)).toEqual([1, 2, 3, 4])
         expect(
             database
                 .prepare(
@@ -76,7 +76,7 @@ describe('SQLite migrations', () => {
             database
                 .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
                 .get()
-        ).toMatchObject({ count: 3 })
+        ).toMatchObject({ count: 4 })
         database.close()
     })
 
@@ -86,12 +86,12 @@ describe('SQLite migrations', () => {
             runMigrations(database, [
                 ...migrations,
                 {
-                    version: 4,
+                    version: 5,
                     name: 'broken',
                     up: 'CREATE TABLE transient(value TEXT); INVALID SQL;'
                 }
             ])
-        ).toThrow(/Migration 4/)
+        ).toThrow(/Migration 5/)
         expect(
             database
                 .prepare(
@@ -102,7 +102,7 @@ describe('SQLite migrations', () => {
         expect(
             database
                 .prepare(
-                    'SELECT version FROM schema_migrations WHERE version = 4'
+                    'SELECT version FROM schema_migrations WHERE version = 5'
                 )
                 .get()
         ).toBeUndefined()

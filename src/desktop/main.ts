@@ -486,7 +486,7 @@ async function startEngine(preferredPort: number) {
                     state: 'running'
                 }
                 const recommendation = await service.recommendations({
-                    limit: 60
+                    limit: 100
                 })
                 browserLiteExportProgress = {
                     phase: 'generate-bundle',
@@ -497,7 +497,14 @@ async function startEngine(preferredPort: number) {
                     generatedAt,
                     sourceSyncedAt: lastSync?.finishedAt,
                     profile: recommendation.profile,
-                    recommendations: recommendation.recommendations
+                    recommendations: recommendation.recommendations.slice(
+                        0,
+                        60
+                    ),
+                    recommendationSessions: [
+                        recommendation.recommendations.slice(0, 60),
+                        recommendation.recommendations.slice(60, 100)
+                    ].filter((session) => session.length > 0)
                 })
                 browserLiteExportProgress = {
                     phase: 'choose-save-location',
@@ -557,7 +564,8 @@ async function startEngine(preferredPort: number) {
             service,
             host: '127.0.0.1',
             port: preferredPort,
-            desktop
+            desktop,
+            cacheDir: paths.cache
         })
         server = started.server
         currentUrl = started.url
@@ -571,7 +579,8 @@ async function startEngine(preferredPort: number) {
             service,
             host: '127.0.0.1',
             port: 0,
-            desktop
+            desktop,
+            cacheDir: paths.cache
         })
         server = started.server
         currentUrl = started.url

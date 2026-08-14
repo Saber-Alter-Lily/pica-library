@@ -1,6 +1,6 @@
 {
   "name": "pica-library",
-  "version": "0.2.0-dev.0",
+  "version": "0.2.0-dev.1",
   "private": true,
   "author": "Saber-Alter-Lily",
   "contributors": [
@@ -16,6 +16,7 @@
     "dev": "tsx src/library-cli.ts",
     "build": "rimraf dist && rollup --config rollup.config.js",
     "build:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-package.ps1",
+    "build:local-update": "tsx scripts/build-local-update-package.ts",
     "test": "vitest run",
     "test:unit": "vitest run test/unit",
     "test:integration": "vitest run test/integration",

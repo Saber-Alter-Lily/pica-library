@@ -77,6 +77,7 @@ export function emptyLiteState() {
         authors: [],
         profile: null,
         recommendations: [],
+        recommendationSessions: [],
         queue: [],
         generatedAt: null,
         sourceSyncedAt: null
@@ -113,6 +114,13 @@ export function importLibraryBundle(value) {
         recommendations: sanitizeRecommendations(
             requireArray(value.recommendations, 'Bundle recommendations')
         ),
+        recommendationSessions: Array.isArray(value.recommendationSessions)
+            ? value.recommendationSessions.map((session) =>
+                  sanitizeRecommendations(
+                      requireArray(session, 'Bundle recommendation session')
+                  )
+              )
+            : [],
         queue: structuredClone(requireArray(value.queue, 'Bundle queue')),
         generatedAt:
             typeof value.generatedAt === 'string' ? value.generatedAt : null,
@@ -140,6 +148,11 @@ export function restoreLiteState(value) {
                 : null,
         recommendations: Array.isArray(value.recommendations)
             ? sanitizeRecommendations(value.recommendations)
+            : [],
+        recommendationSessions: Array.isArray(value.recommendationSessions)
+            ? value.recommendationSessions.map((session) =>
+                  sanitizeRecommendations(Array.isArray(session) ? session : [])
+              )
             : [],
         queue: Array.isArray(value.queue) ? structuredClone(value.queue) : [],
         generatedAt:

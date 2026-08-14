@@ -22,6 +22,20 @@ function bundle() {
                 reasons: ['Same author']
             }
         ],
+        recommendationSessions: [
+            [
+                {
+                    comic: { comicId: 'comic-2', title: 'Recommendation' },
+                    reasons: ['Same author']
+                }
+            ],
+            [
+                {
+                    comic: { comicId: 'comic-4', title: 'New session' },
+                    reasons: ['New session']
+                }
+            ]
+        ],
         queue: [{ comicId: 'comic-3', status: 'QUEUED' }]
     }
 }
@@ -34,6 +48,9 @@ describe('Browser Lite state contract', () => {
         expect(state.profile).toEqual(bundle().profile)
         expect(state.recommendations[0]).toMatchObject({
             comic: { comicId: 'comic-2' }
+        })
+        expect(state.recommendationSessions[1][0]).toMatchObject({
+            comic: { comicId: 'comic-4' }
         })
         expect(state.queue).toEqual(bundle().queue)
     })

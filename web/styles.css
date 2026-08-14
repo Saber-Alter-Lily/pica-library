@@ -700,3 +700,217 @@ th {
         padding: 0.85rem;
     }
 }
+
+.facet-control {
+    display: grid;
+    gap: 0.2rem;
+    min-width: min(15rem, 100%);
+}
+
+.filter-chips,
+.selection-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin: 0.75rem 0;
+}
+
+.filter-chip {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.65rem;
+    background: var(--surface, #fff);
+}
+
+.result-select {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.shelf-layout {
+    display: grid;
+    grid-template-columns: minmax(13rem, 20rem) minmax(0, 1fr);
+    gap: 1rem;
+}
+
+.shelf-list,
+.shelf-detail {
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+}
+
+.shelf-card {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    padding: 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 0.8rem;
+}
+
+.app-dialog {
+    width: min(42rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    color: inherit;
+    background: var(--surface, #fff);
+}
+
+.app-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.dialog-close {
+    float: right;
+}
+
+.detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.preview-pages {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.preview-pages img {
+    width: 100%;
+    max-height: 75vh;
+    object-fit: contain;
+    background: #111;
+}
+
+.reader-view.active {
+    max-width: none;
+    padding: 0;
+}
+
+body.reader-active .app-header,
+body.reader-active > nav {
+    display: none;
+}
+
+.reader-header {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--surface, #fff);
+    border-bottom: 1px solid var(--border);
+}
+
+.reader-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.reader-shell {
+    display: grid;
+    grid-template-columns: 13rem minmax(0, 1fr);
+    min-height: calc(100vh - 5rem);
+    background: #151515;
+}
+
+.reader-chapters {
+    padding: 0.75rem;
+    background: var(--surface, #fff);
+    overflow: auto;
+}
+
+.reader-chapters button {
+    width: 100%;
+    margin-bottom: 0.4rem;
+    text-align: left;
+}
+
+.reader-pages {
+    min-width: 0;
+    padding: 1rem;
+    align-content: start;
+    justify-items: center;
+}
+
+.reader-pages img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(100vh - 7rem);
+    object-fit: contain;
+}
+
+.reader-pages.reader-vertical {
+    display: grid;
+    gap: 0;
+}
+
+.reader-pages.reader-single,
+.reader-pages.reader-double {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.reader-pages.reader-double img {
+    max-width: calc(50% - 0.25rem);
+}
+
+.reader-pages.fit-width img {
+    width: 100%;
+    height: auto;
+}
+
+.reader-pages.fit-height img {
+    width: auto;
+    height: calc(100vh - 7rem);
+}
+
+.reader-pages.direction-rtl {
+    direction: rtl;
+}
+
+@media (max-width: 700px) {
+    .shelf-layout,
+    .reader-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .reader-header {
+        position: static;
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .reader-chapters {
+        display: flex;
+        overflow-x: auto;
+    }
+
+    .reader-chapters button {
+        width: auto;
+        min-width: 9rem;
+        margin: 0 0.4rem 0 0;
+    }
+
+    .reader-pages.reader-double {
+        display: grid;
+    }
+
+    .reader-pages.reader-double img {
+        max-width: 100%;
+    }
+}

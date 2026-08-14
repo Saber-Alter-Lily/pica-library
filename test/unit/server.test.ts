@@ -44,7 +44,7 @@ describe('local web server', () => {
         )
         expect(status).toMatchObject({
             mode: 'connected',
-            version: '0.2.0-dev.0',
+            version: '0.2.0-dev.1',
             summary: { comics: 0 }
         })
     })
@@ -54,9 +54,9 @@ describe('local web server', () => {
             (response) => response.json()
         )
         expect(capabilities).toMatchObject({
-            appVersion: '0.2.0-dev.0',
+            appVersion: '0.2.0-dev.1',
             appApiVersion: 2,
-            databaseSchemaVersion: 5,
+            databaseSchemaVersion: 6,
             updateManifestVersion: 1
         })
     })
@@ -84,6 +84,120 @@ describe('local web server', () => {
             item.json()
         )
         expect(comics).toHaveLength(1)
+    })
+
+    it('uses the faceted query contract for complete filtered shelf actions', async () => {
+        database.importFavorites([
+            {
+                comicId: 'facet-1',
+                title: 'Facet Romance',
+                author: 'Circle A (Alice)',
+                categories: ['Drama'],
+                tags: ['Romance', 'Color'],
+                finished: true
+            },
+            {
+                comicId: 'facet-2',
+                title: 'Facet School',
+                author: 'Bob',
+                categories: ['Comedy'],
+                tags: ['School'],
+                finished: false
+            }
+        ])
+        const query = {
+            scope: 'favorites',
+            text: 'alice',
+            tags: ['Romance', 'Color'],
+            tagMode: 'all',
+            limit: 1
+        }
+        const filtered = await fetch(`${url}/api/v1/library/query`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(query)
+        }).then((response) => response.json())
+        expect(filtered).toMatchObject({ total: 1 })
+        expect(filtered.facets.authors[0]).toMatchObject({
+            label: 'Alice',
+            count: 1
+        })
+        expect(filtered.facets.tags).toContainEqual(
+            expect.objectContaining({ label: 'Romance', count: 1 })
+        )
+
+        const shelf = await fetch(`${url}/api/v1/shelves`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: 'API Shelf' })
+        }).then((response) => response.json())
+        const added = await fetch(
+            `${url}/api/v1/shelves/${encodeURIComponent(shelf.id)}/add-filtered`,
+            {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ query })
+            }
+        ).then((response) => response.json())
+        expect(added).toMatchObject({ matched: 1, added: 1 })
+        const contents = await fetch(
+            `${url}/api/v1/shelves/${encodeURIComponent(shelf.id)}`
+        ).then((response) => response.json())
+        expect(
+            contents.items.map((item: { comicId: string }) => item.comicId)
+        ).toEqual(['facet-1'])
+    })
+
+    it('serves only registered downloaded reader pages and persists progress', async () => {
+        const file = path.join(dir, 'downloads', 'reader-page.jpg')
+        fs.mkdirSync(path.dirname(file), { recursive: true })
+        fs.writeFileSync(file, 'reader-image')
+        database.upsertEpisode({
+            id: 'reader-api-episode',
+            comicId: 'facet-1',
+            title: 'Reader API chapter',
+            order: 1
+        })
+        database.upsertPicture({
+            id: 'reader-api-picture',
+            comicId: 'facet-1',
+            episodeId: 'reader-api-episode',
+            position: 1,
+            originalName: 'reader-page.jpg',
+            mediaPath: 'reader-page.jpg',
+            fileServer: 'https://media.example'
+        })
+        database.markPictureDownloaded(
+            'reader-api-picture',
+            file,
+            fs.statSync(file).size,
+            'hash'
+        )
+        const chapter = await fetch(
+            `${url}/api/v1/reader/comics/facet-1/chapters/reader-api-episode`
+        ).then((response) => response.json())
+        expect(chapter.pages).toEqual([
+            expect.objectContaining({
+                id: 'reader-api-picture',
+                url: '/api/v1/reader/pictures/reader-api-picture'
+            })
+        ])
+        expect(JSON.stringify(chapter)).not.toContain(file)
+        const image = await fetch(
+            `${url}/api/v1/reader/pictures/reader-api-picture`
+        )
+        expect(image.headers.get('content-type')).toBe('image/jpeg')
+        expect(await image.text()).toBe('reader-image')
+        const progress = await fetch(`${url}/api/v1/reader/progress`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                comicId: 'facet-1',
+                episodeId: 'reader-api-episode',
+                pageIndex: 0
+            })
+        }).then((response) => response.json())
+        expect(progress).toMatchObject({ pageIndex: 0 })
     })
 
     it('serves provider covers by comic id without accepting a caller URL', async () => {

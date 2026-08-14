@@ -1,7 +1,7 @@
 import { PRODUCT_VERSION } from './version'
 
 export const APP_API_VERSION = 2
-export const DATABASE_SCHEMA_VERSION = 5
+export const DATABASE_SCHEMA_VERSION = 6
 export const BUNDLE_FORMAT_VERSION = 1
 export const UPDATE_MANIFEST_VERSION = 1
 export const READER_API_VERSION = 1

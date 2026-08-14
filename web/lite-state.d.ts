@@ -3,7 +3,10 @@ export interface LiteState {
     authors: Array<Record<string, unknown>>
     profile: Record<string, unknown> | null
     recommendations: Array<Record<string, unknown>>
+    recommendationSessions: Array<Array<Record<string, unknown>>>
     queue: Array<Record<string, unknown>>
+    generatedAt: string | null
+    sourceSyncedAt: string | null
 }
 
 export const LIBRARY_PAGE_SIZE: number

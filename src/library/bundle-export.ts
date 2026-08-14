@@ -8,6 +8,7 @@ export interface BrowserLiteBundleOptions {
     sourceSyncedAt?: string
     profile?: RecommendationProfile | Record<string, unknown> | null
     recommendations?: unknown[]
+    recommendationSessions?: unknown[][]
     source?: string
     comics?: StoredComic[]
 }
@@ -38,6 +39,9 @@ export function serializeBrowserLiteDataPackage(
         authors: database.listAuthors(),
         profile: options.profile ?? null,
         recommendations: options.recommendations ?? [],
+        ...(options.recommendationSessions
+            ? { recommendationSessions: options.recommendationSessions }
+            : {}),
         queue: database.listDownloadJobs(),
         provenance: {
             application: 'pica-library',

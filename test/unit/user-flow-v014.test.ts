@@ -99,7 +99,7 @@ describe('v0.1.4 local user flow', () => {
         expect(app).toContain("localStorage.setItem('pica-covers-enabled'")
         expect(app).toContain("localStorage.setItem('pica-recommendation-view'")
         expect(app).toContain('/api/v1/desktop/sync-export-browser-lite')
-        expect(app).toContain('limit: 60')
+        expect(app).toContain("post('/api/v1/recommendation-sessions', {})")
         expect(app).toContain("$('#lite-reimport').onclick")
     })
 

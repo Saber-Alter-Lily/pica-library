@@ -15,6 +15,7 @@ export interface LibraryBundle {
     authors: AuthorGroup[]
     profile: RecommendationProfile | Record<string, unknown> | null
     recommendations: unknown[]
+    recommendationSessions?: unknown[][]
     queue: DownloadJob[]
     provenance: {
         application: 'pica-library'
@@ -75,6 +76,14 @@ export function validateLibraryBundle(value: unknown): LibraryBundle {
         !Array.isArray(bundle.recommendations)
     )
         throw new Error('Bundle authors and recommendations must be arrays')
+    if (
+        bundle.recommendationSessions !== undefined &&
+        (!Array.isArray(bundle.recommendationSessions) ||
+            bundle.recommendationSessions.some(
+                (session) => !Array.isArray(session)
+            ))
+    )
+        throw new Error('Bundle recommendationSessions must contain arrays')
     if (!Array.isArray(bundle.queue))
         throw new Error('Bundle queue must be an array')
     if (!bundle.provenance || bundle.provenance.application !== 'pica-library')

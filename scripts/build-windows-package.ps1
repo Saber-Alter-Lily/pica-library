@@ -63,6 +63,30 @@ if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework comp
 & $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll "/out:$stage\Pica Library.exe" (Join-Path $root 'packaging\windows\Launcher.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 
+# The legacy compiler embeds a timestamp and a random module ID. When launcher
+# source is unchanged, dev.1 must reuse the frozen dev.0 bytes so a file-diff
+# update does not report a false launcher replacement.
+if ($version -eq '0.2.0-dev.1') {
+    $baseZip = Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
+    if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The frozen dev.0 update-base package is required to reuse its unchanged launcher' }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [IO.Compression.ZipFile]::OpenRead($baseZip)
+    try {
+        $baseSourceEntry = $archive.GetEntry('SOURCE_SHA.txt')
+        $baseLauncherEntry = $archive.GetEntry('Pica Library.exe')
+        if (-not $baseSourceEntry -or -not $baseLauncherEntry) { throw 'The dev.0 package is missing launcher provenance' }
+        $reader = New-Object IO.StreamReader($baseSourceEntry.Open())
+        try { $baseSourceSha = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
+        & git -C $root diff --quiet "$baseSourceSha..$sourceSha" -- 'packaging/windows/Launcher.cs'
+        if ($LASTEXITCODE -ne 0) { throw 'Launcher source changed; a full install is required' }
+        $destination = [IO.File]::Open((Join-Path $stage 'Pica Library.exe'),[IO.FileMode]::Create,[IO.FileAccess]::Write)
+        try {
+            $source = $baseLauncherEntry.Open()
+            try { $source.CopyTo($destination) } finally { $source.Dispose() }
+        } finally { $destination.Dispose() }
+    } finally { $archive.Dispose() }
+}
+
 $readme = @"
 Pica Library v$version for Windows 10/11 x64
 

@@ -36,15 +36,12 @@ describe('built CLI entrypoint contract', () => {
         expect(server).toContain('version: PRODUCT_VERSION')
     })
 
-    it('lets Web recommendations use the audited backend seed default', () => {
+    it('lets recommendation sessions own the audited bounded session size', () => {
         const app = read('web/app.js')
-        const request = app.slice(
-            app.indexOf("post('/api/v1/recommendations'"),
-            app.indexOf('state.profile = value.profile')
-        )
-        expect(request).toContain('limit: 60')
-        expect(request).not.toContain('seedCount: 8')
-        expect(request).not.toContain('seedCount:')
+        expect(app).toContain("post('/api/v1/recommendation-sessions', {})")
+        const service = read('src/services/recommendation-service.ts')
+        expect(service).toContain('static readonly sessionSize = 60')
+        expect(service).toContain('static readonly batchSize = 12')
         expect(read('src/library/server.ts')).toContain(
             'seedCount: Number(input.seedCount ?? 12)'
         )

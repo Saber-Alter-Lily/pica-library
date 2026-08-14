@@ -26,6 +26,7 @@
         <nav aria-label="主导航">
             <button data-view="home" class="active">Home</button>
             <button data-view="library">Library</button>
+            <button data-view="shelves">书架</button>
             <button data-view="discover">Discover</button>
             <button data-view="downloads">Downloads</button>
             <button data-view="downloaded">Downloaded</button>
@@ -254,7 +255,31 @@
                         <span id="cover-toggle-label">Load covers</span></label
                     >
                     <input id="filter-text" placeholder="标题或作者" />
-                    <input id="filter-tag" placeholder="标签，逗号分隔" />
+                    <select id="filter-scope">
+                        <option value="all">全部本地漫画</option>
+                        <option value="favorites">Pica 收藏</option>
+                        <option value="downloaded">已下载</option>
+                    </select>
+                    <label class="facet-control"
+                        >作者<input
+                            id="filter-author-input"
+                            list="filter-author-options"
+                            placeholder="输入或选择作者" /><datalist
+                            id="filter-author-options"
+                        ></datalist
+                    ></label>
+                    <label class="facet-control"
+                        >标签<input
+                            id="filter-tag"
+                            list="filter-tag-options"
+                            placeholder="输入标签，回车添加" /><datalist
+                            id="filter-tag-options"
+                        ></datalist
+                    ></label>
+                    <select id="filter-tag-mode" aria-label="标签匹配">
+                        <option value="all">标签：全部匹配</option>
+                        <option value="any">标签：任一匹配</option>
+                    </select>
                     <select id="sort-mode">
                         <option value="latest">最近更新</option>
                         <option value="likes">爱心数量</option>
@@ -263,8 +288,15 @@
                     </select>
                     <button id="apply-filter" class="primary">筛选</button>
                     <button id="queue-selected">加入下载</button>
+                    <button id="library-add-shelf">加入书架</button>
+                    <button id="library-add-filtered-shelf">
+                        将全部筛选结果加入书架
+                    </button>
+                    <button id="library-clear-selection">取消选择</button>
                     <button id="export-plan">导出计划</button>
                 </div>
+                <div id="filter-chips" class="filter-chips"></div>
+                <p id="library-selection-status" class="status"></p>
                 <p id="last-sync" class="status"></p>
                 <p id="library-count" class="status"></p>
                 <div id="comic-grid" class="comic-grid"></div>
@@ -289,6 +321,25 @@
                 </div>
             </section>
 
+            <section id="shelves" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>书架</h2>
+                        <p>本地整理空间；不会改变 Pica 收藏或删除下载文件。</p>
+                    </div>
+                    <button id="shelf-create" class="primary">
+                        + 新建书架
+                    </button>
+                </div>
+                <p id="shelf-message" class="status"></p>
+                <div class="shelf-layout">
+                    <div id="shelf-list" class="shelf-list"></div>
+                    <div id="shelf-detail" class="shelf-detail">
+                        <article class="notice">选择一个书架查看内容。</article>
+                    </div>
+                </div>
+            </section>
+
             <section id="discover" class="view">
                 <div class="tabs">
                     <button data-tab="recommend" class="active">
@@ -305,6 +356,7 @@
                         <button id="recommend-button" class="primary">
                             查看推荐
                         </button>
+                        <button id="recommend-restart">重新开始推荐</button>
                     </div>
                     <div id="profile" class="profile"></div>
                     <p id="recommend-message" class="status"></p>
@@ -349,6 +401,9 @@
                     </div>
                     <p id="recommend-batch" class="status"></p>
                     <button id="recommend-next-batch">Next batch</button>
+                    <button id="recommend-add-shelf">将所选加入书架</button>
+                    <button id="recommend-clear-selection">取消选择</button>
+                    <span id="recommend-selection-status" class="status"></span>
                     <div id="recommend-results" class="results"></div>
                 </div>
                 <div id="search" class="tab">
@@ -369,8 +424,51 @@
                         <button id="search-button" class="primary">搜索</button>
                     </div>
                     <p id="search-message" class="status"></p>
+                    <div class="selection-toolbar">
+                        <button id="search-add-shelf">将所选加入书架</button>
+                        <button id="search-clear-selection">取消选择</button>
+                        <span
+                            id="search-selection-status"
+                            class="status"
+                        ></span>
+                    </div>
                     <div id="search-results" class="results"></div>
                 </div>
+            </section>
+
+            <section id="reader" class="view reader-view">
+                <div class="reader-header">
+                    <div>
+                        <p class="eyebrow">本地阅读器</p>
+                        <h2 id="reader-title">阅读</h2>
+                        <p id="reader-chapter-title" class="status"></p>
+                    </div>
+                    <div class="reader-controls">
+                        <select id="reader-mode">
+                            <option value="vertical">连续纵向</option>
+                            <option value="single">单页</option>
+                            <option value="double">双页</option>
+                        </select>
+                        <select id="reader-direction">
+                            <option value="ltr">从左到右</option>
+                            <option value="rtl">从右到左</option>
+                        </select>
+                        <select id="reader-fit">
+                            <option value="width">适应宽度</option>
+                            <option value="height">适应高度</option>
+                        </select>
+                        <button id="reader-fullscreen">全屏</button>
+                        <button id="reader-export-cbz">导出为 CBZ</button>
+                    </div>
+                </div>
+                <div class="reader-shell">
+                    <aside id="reader-chapters" class="reader-chapters"></aside>
+                    <div
+                        id="reader-pages"
+                        class="reader-pages reader-vertical"
+                    ></div>
+                </div>
+                <p id="reader-message" class="status"></p>
             </section>
 
             <section id="downloads" class="view">
@@ -680,6 +778,13 @@
                         role="status"
                     ></p>
                 </article>
+                <article class="panel preview-cache-panel">
+                    <h3>预览缓存</h3>
+                    <p id="preview-cache-stats">正在读取缓存占用…</p>
+                    <button id="preview-cache-clear" type="button">
+                        清理预览缓存
+                    </button>
+                </article>
                 <article id="settings-update" class="panel update-panel">
                     <div class="section-heading">
                         <div>
@@ -732,6 +837,33 @@
                 </article>
             </section>
         </main>
+        <dialog id="shelf-dialog" class="app-dialog">
+            <form method="dialog">
+                <h3 id="shelf-dialog-title">加入书架</h3>
+                <label
+                    >选择书架<select id="shelf-dialog-select"></select
+                ></label>
+                <p id="shelf-dialog-count" class="status"></p>
+                <div class="actions">
+                    <button value="cancel">取消</button>
+                    <button
+                        id="shelf-dialog-confirm"
+                        value="default"
+                        class="primary"
+                    >
+                        确认
+                    </button>
+                </div>
+            </form>
+        </dialog>
+        <dialog id="recommend-detail-dialog" class="app-dialog detail-dialog">
+            <button id="recommend-detail-close" class="dialog-close">
+                关闭
+            </button>
+            <div id="recommend-detail-content"></div>
+            <div id="recommend-preview" class="preview-pages"></div>
+            <p id="recommend-preview-message" class="status"></p>
+        </dialog>
         <template id="author-template">
             <article class="list-item">
                 <div class="grow">

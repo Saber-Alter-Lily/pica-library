@@ -23,6 +23,10 @@ import type {
     ImportResult,
     LibraryReconciliation,
     LibrarySummary,
+    ReaderEpisode,
+    ReaderPicture,
+    ReadingProgress,
+    Shelf,
     StoredComic
 } from './types'
 import {
@@ -745,6 +749,370 @@ export class LibraryDatabase {
 
     getComic(comicId: string): StoredComic | undefined {
         return this.listComics({ comicId, limit: 1 })[0]
+    }
+
+    setFavoriteState(comicId: string, isFavorite: boolean) {
+        const result = this.db
+            .prepare(
+                'UPDATE comics SET is_favorite = ?, last_seen_at = ? WHERE id = ?'
+            )
+            .run(isFavorite ? 1 : 0, new Date().toISOString(), comicId)
+        if (result.changes !== 1) throw new Error(`Comic not found: ${comicId}`)
+        return this.getComic(comicId)
+    }
+
+    listShelves(): Shelf[] {
+        return (
+            this.db
+                .prepare(
+                    `SELECT s.*, COUNT(si.comic_id) AS item_count
+                     FROM shelves s
+                     LEFT JOIN shelf_items si ON si.shelf_id = s.id
+                     GROUP BY s.id
+                     ORDER BY s.sort_order, s.created_at, s.name`
+                )
+                .all() as SqlRow[]
+        ).map((row) => ({
+            id: String(row.id),
+            name: String(row.name),
+            createdAt: String(row.created_at),
+            updatedAt: String(row.updated_at),
+            sortOrder: numberValue(row.sort_order),
+            count: numberValue(row.item_count)
+        }))
+    }
+
+    createShelf(name: string): Shelf {
+        const display = name.trim()
+        if (!display) throw new Error('书架名称不能为空')
+        const normalized = normalizeAuthorKey(display)
+        const now = new Date().toISOString()
+        const id = randomUUID()
+        try {
+            this.db
+                .prepare(
+                    `INSERT INTO shelves(
+                        id, name, normalized_name, created_at, updated_at, sort_order
+                    ) VALUES (?, ?, ?, ?, ?, ?)`
+                )
+                .run(
+                    id,
+                    display,
+                    normalized,
+                    now,
+                    now,
+                    this.listShelves().length
+                )
+        } catch (error) {
+            if (/unique/i.test(String(error))) throw new Error('已存在同名书架')
+            throw error
+        }
+        return this.listShelves().find((shelf) => shelf.id === id)!
+    }
+
+    renameShelf(id: string, name: string): Shelf {
+        const display = name.trim()
+        if (!display) throw new Error('书架名称不能为空')
+        try {
+            const result = this.db
+                .prepare(
+                    `UPDATE shelves SET name = ?, normalized_name = ?, updated_at = ?
+                     WHERE id = ?`
+                )
+                .run(
+                    display,
+                    normalizeAuthorKey(display),
+                    new Date().toISOString(),
+                    id
+                )
+            if (result.changes !== 1) throw new Error('书架不存在')
+        } catch (error) {
+            if (/unique/i.test(String(error))) throw new Error('已存在同名书架')
+            throw error
+        }
+        return this.listShelves().find((shelf) => shelf.id === id)!
+    }
+
+    deleteShelf(id: string) {
+        const result = this.db
+            .prepare('DELETE FROM shelves WHERE id = ?')
+            .run(id)
+        if (result.changes !== 1) throw new Error('书架不存在')
+        return { deleted: true, id }
+    }
+
+    addShelfItems(shelfId: string, comicIds: string[]) {
+        if (!this.listShelves().some((shelf) => shelf.id === shelfId))
+            throw new Error('书架不存在')
+        const unique = [
+            ...new Set(comicIds.map((id) => id.trim()).filter(Boolean))
+        ]
+        const now = new Date().toISOString()
+        const exists = this.db.prepare(
+            'SELECT 1 AS found FROM comics WHERE id = ?'
+        )
+        const maximum = this.db
+            .prepare(
+                'SELECT COALESCE(MAX(position), -1) AS position FROM shelf_items WHERE shelf_id = ?'
+            )
+            .get(shelfId) as SqlRow
+        let position = numberValue(maximum.position) + 1
+        let added = 0
+        const insert = this.db.prepare(
+            `INSERT OR IGNORE INTO shelf_items(
+                shelf_id, comic_id, added_at, position
+            ) VALUES (?, ?, ?, ?)`
+        )
+        this.db.exec('BEGIN IMMEDIATE')
+        try {
+            for (const comicId of unique) {
+                if (!exists.get(comicId)) continue
+                const result = insert.run(shelfId, comicId, now, position++)
+                added += Number(result.changes)
+            }
+            this.db
+                .prepare('UPDATE shelves SET updated_at = ? WHERE id = ?')
+                .run(now, shelfId)
+            this.db.exec('COMMIT')
+        } catch (error) {
+            this.db.exec('ROLLBACK')
+            throw error
+        }
+        return {
+            shelfId,
+            matched: unique.length,
+            added,
+            total: this.listShelfComics(shelfId).length
+        }
+    }
+
+    removeShelfItems(shelfId: string, comicIds: string[]) {
+        const remove = this.db.prepare(
+            'DELETE FROM shelf_items WHERE shelf_id = ? AND comic_id = ?'
+        )
+        let removed = 0
+        for (const comicId of [...new Set(comicIds)])
+            removed += Number(remove.run(shelfId, comicId).changes)
+        return { shelfId, removed, total: this.listShelfComics(shelfId).length }
+    }
+
+    listShelfComics(shelfId: string): StoredComic[] {
+        const ids = (
+            this.db
+                .prepare(
+                    `SELECT comic_id FROM shelf_items
+                     WHERE shelf_id = ? ORDER BY position, added_at`
+                )
+                .all(shelfId) as SqlRow[]
+        ).map((row) => String(row.comic_id))
+        const comics = new Map(
+            this.listComics({ limit: 5000 }).map((comic) => [
+                comic.comicId,
+                comic
+            ])
+        )
+        return ids.flatMap((id) => {
+            const comic = comics.get(id)
+            return comic ? [comic] : []
+        })
+    }
+
+    listReaderEpisodes(comicId: string): ReaderEpisode[] {
+        return (
+            this.db
+                .prepare(
+                    `SELECT e.id, e.comic_id, e.title, e.order_no,
+                            COUNT(p.id) AS known_pictures,
+                            SUM(CASE WHEN p.status = 'completed' AND p.local_path IS NOT NULL
+                                THEN 1 ELSE 0 END) AS downloaded_pictures
+                     FROM episodes e
+                     LEFT JOIN pictures p ON p.episode_id = e.id
+                     WHERE e.comic_id = ?
+                     GROUP BY e.id ORDER BY e.order_no`
+                )
+                .all(comicId) as SqlRow[]
+        ).map((row) => ({
+            id: String(row.id),
+            comicId: String(row.comic_id),
+            title: String(row.title),
+            order: numberValue(row.order_no),
+            downloadedPictures: numberValue(row.downloaded_pictures),
+            knownPictures: numberValue(row.known_pictures)
+        }))
+    }
+
+    listDownloadedPictures(episodeId: string): ReaderPicture[] {
+        return (
+            this.db
+                .prepare(
+                    `SELECT id, comic_id, episode_id, position, original_name, local_path
+                     FROM pictures
+                     WHERE episode_id = ? AND status = 'completed' AND local_path IS NOT NULL
+                     ORDER BY position`
+                )
+                .all(episodeId) as SqlRow[]
+        ).map((row) => ({
+            id: String(row.id),
+            comicId: String(row.comic_id),
+            episodeId: String(row.episode_id),
+            position: numberValue(row.position),
+            originalName: String(row.original_name),
+            localPath: String(row.local_path)
+        }))
+    }
+
+    getDownloadedPicture(pictureId: string): ReaderPicture | undefined {
+        const row = this.db
+            .prepare(
+                `SELECT id, comic_id, episode_id, position, original_name, local_path
+                 FROM pictures WHERE id = ? AND status = 'completed' AND local_path IS NOT NULL`
+            )
+            .get(pictureId) as SqlRow | undefined
+        return row
+            ? {
+                  id: String(row.id),
+                  comicId: String(row.comic_id),
+                  episodeId: String(row.episode_id),
+                  position: numberValue(row.position),
+                  originalName: String(row.original_name),
+                  localPath: String(row.local_path)
+              }
+            : undefined
+    }
+
+    saveReadingProgress(comicId: string, episodeId: string, pageIndex: number) {
+        if (!Number.isInteger(pageIndex) || pageIndex < 0)
+            throw new Error('阅读页码无效')
+        const now = new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO reading_progress(comic_id, episode_id, page_index, updated_at)
+                 VALUES (?, ?, ?, ?)
+                 ON CONFLICT(comic_id, episode_id) DO UPDATE SET
+                    page_index = excluded.page_index,
+                    updated_at = excluded.updated_at`
+            )
+            .run(comicId, episodeId, pageIndex, now)
+        return {
+            comicId,
+            episodeId,
+            pageIndex,
+            updatedAt: now
+        } as ReadingProgress
+    }
+
+    readingProgress(comicId?: string): ReadingProgress[] {
+        const rows = comicId
+            ? (this.db
+                  .prepare(
+                      `SELECT comic_id, episode_id, page_index, updated_at
+                       FROM reading_progress WHERE comic_id = ? ORDER BY updated_at DESC`
+                  )
+                  .all(comicId) as SqlRow[])
+            : (this.db
+                  .prepare(
+                      `SELECT comic_id, episode_id, page_index, updated_at
+                       FROM reading_progress ORDER BY updated_at DESC`
+                  )
+                  .all() as SqlRow[])
+        return rows.map((row) => ({
+            comicId: String(row.comic_id),
+            episodeId: String(row.episode_id),
+            pageIndex: numberValue(row.page_index),
+            updatedAt: String(row.updated_at)
+        }))
+    }
+
+    recommendationSeen(cycleId: string) {
+        return (
+            this.db
+                .prepare(
+                    'SELECT comic_id FROM recommendation_seen WHERE cycle_id = ? ORDER BY first_seen_at'
+                )
+                .all(cycleId) as SqlRow[]
+        ).map((row) => String(row.comic_id))
+    }
+
+    latestRecommendationSession(cycleId: string) {
+        const row = this.db
+            .prepare(
+                `SELECT id, session_no, generated_at, result_ids_json, exhausted
+                 FROM recommendation_sessions WHERE cycle_id = ?
+                 ORDER BY session_no DESC LIMIT 1`
+            )
+            .get(cycleId) as SqlRow | undefined
+        return row
+            ? {
+                  id: String(row.id),
+                  sessionNo: numberValue(row.session_no),
+                  generatedAt: String(row.generated_at),
+                  comicIds: jsonArray(row.result_ids_json),
+                  exhausted: Boolean(row.exhausted)
+              }
+            : null
+    }
+
+    saveRecommendationSession(
+        cycleId: string,
+        sessionNo: number,
+        comicIds: string[],
+        exhausted: boolean
+    ) {
+        const now = new Date().toISOString()
+        const id = randomUUID()
+        this.db.exec('BEGIN IMMEDIATE')
+        try {
+            this.db
+                .prepare(
+                    `INSERT INTO recommendation_sessions(
+                        id, cycle_id, session_no, generated_at, result_ids_json, exhausted
+                    ) VALUES (?, ?, ?, ?, ?, ?)`
+                )
+                .run(
+                    id,
+                    cycleId,
+                    sessionNo,
+                    now,
+                    JSON.stringify(comicIds),
+                    exhausted ? 1 : 0
+                )
+            const seen = this.db.prepare(
+                `INSERT OR IGNORE INTO recommendation_seen(
+                    cycle_id, comic_id, first_seen_at
+                ) VALUES (?, ?, ?)`
+            )
+            for (const comicId of comicIds) seen.run(cycleId, comicId, now)
+            this.db.exec('COMMIT')
+        } catch (error) {
+            this.db.exec('ROLLBACK')
+            throw error
+        }
+        return { id, cycleId, sessionNo, generatedAt: now, comicIds, exhausted }
+    }
+
+    getAppState<T>(key: string): T | undefined {
+        const row = this.db
+            .prepare('SELECT value_json FROM app_state WHERE key = ?')
+            .get(key) as SqlRow | undefined
+        if (!row) return undefined
+        try {
+            return JSON.parse(String(row.value_json)) as T
+        } catch {
+            return undefined
+        }
+    }
+
+    setAppState(key: string, value: unknown) {
+        const now = new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO app_state(key, value_json, updated_at) VALUES (?, ?, ?)
+                 ON CONFLICT(key) DO UPDATE SET
+                    value_json = excluded.value_json,
+                    updated_at = excluded.updated_at`
+            )
+            .run(key, JSON.stringify(value), now)
+        return { key, updatedAt: now }
     }
 
     listAuthors(): AuthorGroup[] {

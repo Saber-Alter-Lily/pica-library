@@ -41,7 +41,22 @@ const state = {
     coversEnabled: localStorage.getItem('pica-covers-enabled') !== 'false',
     recommendationBatch: 0,
     stagedUpdate: null,
-    ...emptyLiteState()
+    ...emptyLiteState(),
+    capabilities: null,
+    libraryQueryResult: null,
+    libraryQuery: { scope: 'all', tags: [], tagMode: 'all' },
+    selections: {
+        library: new Set(),
+        recommendation: new Set(),
+        search: new Set(),
+        shelf: new Set()
+    },
+    shelves: [],
+    activeShelfId: null,
+    searchResults: [],
+    recommendationSessionNo: 1,
+    recommendationExhausted: false,
+    reader: { comicId: null, episodeId: null, pageIndex: 0, chapters: [] }
 }
 let desktop = null
 let language = resolveLanguage(
@@ -106,6 +121,16 @@ const post = (path, value) =>
         body: JSON.stringify(value)
     })
 
+const mutate = (path, method, value = {}) =>
+    api(path, {
+        method,
+        headers: {
+            'content-type': 'application/json',
+            ...(desktop?.csrfToken ? { 'x-pica-csrf': desktop.csrfToken } : {})
+        },
+        body: JSON.stringify(value)
+    })
+
 const desktopPost = (path, value = {}) =>
     api(path, {
         method: 'POST',
@@ -144,6 +169,7 @@ async function chooseFolder(prefix) {
 async function loadDesktop() {
     try {
         desktop = await api('/api/v1/desktop/status')
+        state.capabilities = await api('/api/v1/capabilities')
         $('#settings-nav').hidden = false
         $('#settings-version').textContent = `Pica Library ${desktop.version}`
         $('#update-current-version').textContent = `v${desktop.version}`
@@ -634,14 +660,23 @@ function renderComics(records = state.records) {
     const query = normalize($('#filter-text').value)
     const tags = splitList($('#filter-tag').value).map(normalize)
     const sort = $('#sort-mode').value
-    state.visible = records.filter(
-        (comic) =>
-            (!query ||
-                normalize(
-                    [comic.title, comic.author, comic.canonicalAuthor].join(' ')
-                ).includes(query)) &&
-            tags.every((tag) => (comic.tags || []).map(normalize).includes(tag))
-    )
+    state.visible =
+        state.mode === 'connected' && state.libraryQueryResult
+            ? [...state.libraryQueryResult.items]
+            : records.filter(
+                  (comic) =>
+                      (!query ||
+                          normalize(
+                              [
+                                  comic.title,
+                                  comic.author,
+                                  comic.canonicalAuthor
+                              ].join(' ')
+                          ).includes(query)) &&
+                      tags.every((tag) =>
+                          (comic.tags || []).map(normalize).includes(tag)
+                      )
+              )
     state.visible.sort((left, right) => {
         if (sort === 'likes')
             return (right.totalLikes || 0) - (left.totalLikes || 0)
@@ -677,7 +712,7 @@ function renderComics(records = state.records) {
             (comic) => `<article class="comic-card">
                 ${cover(comic)}
                 <div class="comic-card-body">
-                    <label class="comic-select"><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /> ${t('action.select')}</label>
+                    <label class="comic-select"><input type="checkbox" data-selection-context="library" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.library.has(comic.comicId) ? 'checked' : ''} /> ${t('action.select')}</label>
                     <h3>${escapeHtml(comic.title)}</h3>
                     <p>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</p>
                     <div>${tagsFor(comic)
@@ -694,7 +729,7 @@ function renderComics(records = state.records) {
     $('#comic-rows').innerHTML = page
         .map(
             (comic) => `<tr>
-                <td><input type="checkbox" data-comic-id="${escapeHtml(comic.comicId)}" /></td>
+                <td><input type="checkbox" data-selection-context="library" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.library.has(comic.comicId) ? 'checked' : ''} /></td>
                 <td><strong>${escapeHtml(comic.title)}</strong></td>
                 <td>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknown'))}</td>
                 <td>${tagsFor(comic)
@@ -708,7 +743,7 @@ function renderComics(records = state.records) {
         .join('')
     $('#library-count').textContent = t('message.libraryCount', {
         shown: page.length,
-        total: state.visible.length
+        total: state.libraryQueryResult?.total ?? state.visible.length
     })
     $('#load-more').hidden = page.length >= state.visible.length
     setGridSize('library', state.libraryGridSize)
@@ -743,6 +778,7 @@ function renderAuthors() {
 
 function renderResultCards(records, target, recommendation = false) {
     const tagFrequencies = buildTagFrequencyIndex(state.records)
+    const context = recommendation ? 'recommendation' : 'search'
     $(target).innerHTML = (records || [])
         .map((item) => {
             const comic = item.comic || item
@@ -752,12 +788,13 @@ function renderResultCards(records, target, recommendation = false) {
                     <span aria-hidden="true">P</span>
                 </div>
                 <div class="result-body"><h3>${escapeHtml(comic.title)}</h3>
+                <label class="result-select"><input type="checkbox" data-selection-context="${context}" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections[context].has(comic.comicId) ? 'checked' : ''} /> 选择</label>
                 <p>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</p>
                 <div>${selectDisplayTags(comic, tagFrequencies)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</div>
                 ${recommendation ? '' : `<p>${t('message.popularity', { likes: Number(comic.totalLikes || 0).toLocaleString(), views: Number(comic.totalViews || 0).toLocaleString() })}</p>`}
-                <button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>
+                <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">详情 / 预览</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">加入 Pica 收藏</button>` : ''}</div>
                 </div>
             </article>`
         })
@@ -791,11 +828,16 @@ function renderPreparedRecommendations() {
     const batchCount = Math.max(1, Math.ceil(state.recommendations.length / 12))
     $('#recommend-batch').textContent =
         state.recommendations.length > 0
-            ? t('message.recommendationBatch', {
-                  current: state.recommendationBatch + 1,
-                  total: batchCount
-              })
+            ? `推荐会话 ${state.recommendationSessionNo} · ${t(
+                  'message.recommendationBatch',
+                  {
+                      current: state.recommendationBatch + 1,
+                      total: batchCount
+                  }
+              )}`
             : ''
+    $('#recommend-selection-status').textContent =
+        `已选择 ${state.selections.recommendation.size} 部`
     setGridSize('recommendation', state.recommendationGridSize)
 }
 
@@ -809,8 +851,203 @@ function downloadJson(name, value) {
     URL.revokeObjectURL(anchor.href)
 }
 
-function selectedIds() {
-    return $$('[data-comic-id]:checked').map((input) => input.dataset.comicId)
+function selectedIds(context = 'library') {
+    return [...state.selections[context]]
+}
+
+function updateSelectionStatus(context) {
+    const selectors = {
+        library: '#library-selection-status',
+        recommendation: '#recommend-selection-status',
+        search: '#search-selection-status'
+    }
+    const target = $(selectors[context])
+    if (target)
+        target.textContent = `已选择 ${state.selections[context].size} 部`
+}
+
+document.querySelector('main').addEventListener('change', (event) => {
+    const input = event.target.closest(
+        '[data-selection-context][data-comic-id]'
+    )
+    if (!input) return
+    const selection = state.selections[input.dataset.selectionContext]
+    if (!selection) return
+    if (input.checked) selection.add(input.dataset.comicId)
+    else selection.delete(input.dataset.comicId)
+    updateSelectionStatus(input.dataset.selectionContext)
+})
+
+function clearSelection(context) {
+    state.selections[context].clear()
+    $$(`[data-selection-context="${context}"]`).forEach(
+        (input) => (input.checked = false)
+    )
+    updateSelectionStatus(context)
+}
+
+function libraryQueryFromControls() {
+    const authorInput = normalize($('#filter-author-input').value)
+    const author = state.libraryQueryResult?.facets?.authors?.find(
+        (item) =>
+            normalize(item.label) === authorInput ||
+            normalize(item.value) === authorInput
+    )
+    const typedTags = splitList($('#filter-tag').value)
+    return {
+        scope: $('#filter-scope').value,
+        text: $('#filter-text').value.trim(),
+        authorIds: author ? [author.value] : [],
+        tags: typedTags,
+        tagMode: $('#filter-tag-mode').value,
+        sort: $('#sort-mode').value,
+        limit: 5000,
+        offset: 0
+    }
+}
+
+function renderFilterFacets() {
+    const result = state.libraryQueryResult
+    if (!result) return
+    $('#filter-author-options').innerHTML = result.facets.authors
+        .slice(0, 250)
+        .map(
+            (item) =>
+                `<option value="${escapeHtml(item.label)}">${Number(item.count).toLocaleString()}</option>`
+        )
+        .join('')
+    $('#filter-tag-options').innerHTML = result.facets.tags
+        .slice(0, 500)
+        .map(
+            (item) =>
+                `<option value="${escapeHtml(item.label)}">${Number(item.count).toLocaleString()}</option>`
+        )
+        .join('')
+    const query = result.query
+    const chips = []
+    if (query.scope && query.scope !== 'all')
+        chips.push({
+            key: 'scope',
+            label: query.scope === 'favorites' ? 'Pica 收藏' : '已下载'
+        })
+    if (query.text) chips.push({ key: 'text', label: `搜索：${query.text}` })
+    for (const authorId of query.authorIds || []) {
+        const label =
+            result.facets.authors.find((item) => item.value === authorId)
+                ?.label || authorId
+        chips.push({ key: 'author', label: `作者：${label}` })
+    }
+    for (const tag of query.tags || [])
+        chips.push({ key: `tag:${tag}`, label: `标签：${tag}` })
+    $('#filter-chips').innerHTML = chips
+        .map(
+            (chip) =>
+                `<button class="filter-chip" data-filter-remove="${escapeHtml(chip.key)}">${escapeHtml(chip.label)} ×</button>`
+        )
+        .join('')
+    if (chips.length)
+        $('#filter-chips').insertAdjacentHTML(
+            'beforeend',
+            '<button class="filter-chip" data-filter-remove="all">清除全部</button>'
+        )
+}
+
+async function loadLibraryQuery(query = libraryQueryFromControls()) {
+    if (state.mode !== 'connected') {
+        state.libraryQueryResult = null
+        renderComics()
+        return
+    }
+    state.libraryQueryResult = await post('/api/v1/library/query', query)
+    state.libraryQuery = state.libraryQueryResult.query
+    state.libraryPage = 1
+    renderFilterFacets()
+    renderComics()
+}
+
+$('#filter-chips').onclick = (event) => {
+    const key = event.target.dataset.filterRemove
+    if (!key) return
+    if (key === 'all') {
+        $('#filter-scope').value = 'all'
+        $('#filter-text').value = ''
+        $('#filter-author-input').value = ''
+        $('#filter-tag').value = ''
+    } else if (key === 'scope') $('#filter-scope').value = 'all'
+    else if (key === 'text') $('#filter-text').value = ''
+    else if (key === 'author') $('#filter-author-input').value = ''
+    else if (key.startsWith('tag:')) {
+        const remove = normalize(key.slice(4))
+        $('#filter-tag').value = splitList($('#filter-tag').value)
+            .filter((tag) => normalize(tag) !== remove)
+            .join(', ')
+    }
+    void loadLibraryQuery()
+}
+
+async function loadShelves() {
+    if (state.mode !== 'connected') {
+        $('#shelf-list').innerHTML =
+            '<article class="notice">书架需要本地 Windows 引擎。</article>'
+        return
+    }
+    state.shelves = await api('/api/v1/shelves')
+    $('#shelf-list').innerHTML =
+        state.shelves
+            .map(
+                (shelf) =>
+                    `<button class="shelf-card" data-shelf-open="${escapeHtml(shelf.id)}"><strong>${escapeHtml(shelf.name)}</strong><span>${Number(shelf.count)} 部</span></button>`
+            )
+            .join('') || '<article class="notice">还没有书架。</article>'
+    $('#shelf-dialog-select').innerHTML = state.shelves
+        .map(
+            (shelf) =>
+                `<option value="${escapeHtml(shelf.id)}">${escapeHtml(shelf.name)} · ${Number(shelf.count)} 部</option>`
+        )
+        .join('')
+}
+
+async function openShelf(shelfId) {
+    const value = await api(`/api/v1/shelves/${encodeURIComponent(shelfId)}`)
+    state.activeShelfId = shelfId
+    const shelf = value.shelf
+    if (!shelf) throw new Error('书架不存在')
+    $('#shelf-detail').innerHTML =
+        `<div class="page-heading"><div><h3>${escapeHtml(shelf.name)}</h3><p>${Number(value.items.length)} 部漫画</p></div><div class="actions"><button data-shelf-rename="${escapeHtml(shelf.id)}">重命名</button><button data-shelf-delete="${escapeHtml(shelf.id)}">删除书架</button></div></div><div class="comic-grid">${value.items
+            .map(
+                (comic) =>
+                    `<article class="comic-card"><div class="comic-card-body"><label><input type="checkbox" data-selection-context="shelf" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.shelf.has(comic.comicId) ? 'checked' : ''}/> 选择</label><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><div class="actions">${comic.downloadedPictures > 0 ? `<button data-shelf-read="${escapeHtml(comic.comicId)}">阅读</button>` : `<button data-shelf-download="${escapeHtml(comic.comicId)}">下载</button>`}</div></div></article>`
+            )
+            .join(
+                ''
+            )}</div><div class="actions"><button data-shelf-remove-selected="${escapeHtml(shelf.id)}">移出所选漫画</button></div>`
+}
+
+let pendingShelfAction = null
+async function chooseShelf(count, action) {
+    await loadShelves()
+    if (!state.shelves.length) {
+        const name = window.prompt('先创建一个书架：')
+        if (!name) return
+        await post('/api/v1/shelves', { name })
+        await loadShelves()
+    }
+    pendingShelfAction = action
+    $('#shelf-dialog-count').textContent = `将 ${count} 部漫画加入所选书架。`
+    $('#shelf-dialog').showModal()
+}
+
+$('#shelf-dialog-confirm').onclick = async (event) => {
+    event.preventDefault()
+    if (!pendingShelfAction) return
+    try {
+        await pendingShelfAction($('#shelf-dialog-select').value)
+        $('#shelf-dialog').close()
+        pendingShelfAction = null
+        await loadShelves()
+    } catch (error) {
+        $('#shelf-dialog-count').textContent = localizeError(language, error)
+    }
 }
 
 function portablePlan() {
@@ -923,6 +1160,280 @@ function formatElapsed(startedAt) {
     return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`
 }
 
+async function loadPreviewCacheStats() {
+    if (state.mode !== 'connected') return
+    try {
+        const value = await api('/api/v1/previews/cache')
+        $('#preview-cache-stats').textContent =
+            `当前占用：${formatBytes(value.bytes)} · 最大缓存：${formatBytes(value.maxBytes)} · 自动保留约 ${Math.round(value.ttlMs / 86400000)} 天`
+    } catch (error) {
+        $('#preview-cache-stats').textContent = localizeError(language, error)
+    }
+}
+
+$('#preview-cache-clear').onclick = async () => {
+    try {
+        await post('/api/v1/previews/cache/clear', {})
+        await loadPreviewCacheStats()
+    } catch (error) {
+        $('#preview-cache-stats').textContent = localizeError(language, error)
+    }
+}
+
+function recommendationRecord(comicId, context) {
+    const source =
+        context === 'search' ? state.searchResults : state.recommendations
+    const item = source.find(
+        (candidate) => (candidate.comic || candidate).comicId === comicId
+    )
+    return item?.comic || item
+}
+
+function openRecommendationDetail(comicId, context = 'recommendation') {
+    const comic = recommendationRecord(comicId, context)
+    if (!comic) return
+    const dialog = $('#recommend-detail-dialog')
+    dialog.dataset.comicId = comicId
+    dialog.dataset.context = context
+    dialog.dataset.previewOffset = '0'
+    $('#recommend-preview').innerHTML = ''
+    $('#recommend-preview-message').textContent = ''
+    $('#recommend-detail-content').innerHTML =
+        `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? '完结' : '连载或状态未知'} · 爱心 ${Number(comic.totalLikes || 0).toLocaleString()}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">预览前几页</button><button data-detail-shelf="true">加入书架</button>${state.capabilities?.features?.providerFavoriteMutation ? '<button data-detail-favorite="true">加入 Pica 收藏</button>' : ''}<button data-detail-download="true">下载</button></div>`
+    dialog.showModal()
+}
+
+async function loadRecommendationPreview(offset = 0) {
+    const dialog = $('#recommend-detail-dialog')
+    const comicId = dialog.dataset.comicId
+    const message = $('#recommend-preview-message')
+    message.textContent = '正在准备预览…'
+    try {
+        const value = await post('/api/v1/previews/prepare', {
+            comicId,
+            offset,
+            count: 3
+        })
+        if (!value.pages.length) {
+            message.textContent = '此漫画当前没有可用预览页。'
+            return
+        }
+        dialog.dataset.previewOffset = String(offset + value.pages.length)
+        $('#recommend-preview').insertAdjacentHTML(
+            'beforeend',
+            value.pages
+                .map(
+                    (page) =>
+                        `<img src="${escapeHtml(page.url)}" alt="预览第 ${page.index + 1} 页" loading="lazy" />`
+                )
+                .join('')
+        )
+        message.innerHTML = `正在预览：${escapeHtml(value.episodeTitle || '首个可读章节')} · 已加载 ${offset + value.pages.length} 页${value.hasMore ? ' <button data-detail-preview-more="true">再加载 3 页</button>' : ''}`
+        await loadPreviewCacheStats()
+    } catch (error) {
+        message.textContent = localizeError(language, error)
+    }
+}
+
+$('#recommend-detail-close').onclick = () =>
+    $('#recommend-detail-dialog').close()
+$('#recommend-detail-dialog').onclick = async (event) => {
+    const dialog = $('#recommend-detail-dialog')
+    const comicId = dialog.dataset.comicId
+    if (event.target.dataset.detailPreview) await loadRecommendationPreview(0)
+    else if (event.target.dataset.detailPreviewMore)
+        await loadRecommendationPreview(
+            Number(dialog.dataset.previewOffset || 0)
+        )
+    else if (event.target.dataset.detailShelf)
+        await chooseShelf(1, (shelfId) =>
+            post(`/api/v1/shelves/${encodeURIComponent(shelfId)}/items`, {
+                comicIds: [comicId],
+                records: [recommendationRecord(comicId, dialog.dataset.context)]
+            })
+        )
+    else if (event.target.dataset.detailFavorite) {
+        try {
+            await mutate(
+                `/api/v1/provider/favorites/${encodeURIComponent(comicId)}`,
+                'PUT'
+            )
+            event.target.textContent = '★ 已收藏'
+            event.target.disabled = true
+        } catch (error) {
+            $('#recommend-preview-message').textContent = localizeError(
+                language,
+                error
+            )
+        }
+    } else if (event.target.dataset.detailDownload)
+        await enqueue([comicId], dialog.dataset.context)
+}
+
+let readerObserver = null
+function renderReaderPages() {
+    const reader = state.reader
+    if (!reader.chapter) return
+    const mode = $('#reader-mode').value
+    const direction = $('#reader-direction').value
+    const fit = $('#reader-fit').value
+    const target = $('#reader-pages')
+    const allPages = reader.chapter.pages
+    const pageCount = mode === 'double' ? 2 : 1
+    const pages =
+        mode === 'vertical'
+            ? allPages
+            : allPages.slice(reader.pageIndex, reader.pageIndex + pageCount)
+    target.className = `reader-pages reader-${mode} direction-${direction} fit-${fit}`
+    target.innerHTML = pages
+        .map(
+            (page, index) =>
+                `<img src="${escapeHtml(page.url)}" data-reader-page="${mode === 'vertical' ? index : reader.pageIndex + index}" alt="第 ${(mode === 'vertical' ? index : reader.pageIndex + index) + 1} 页" />`
+        )
+        .join('')
+    if (readerObserver) readerObserver.disconnect()
+    if (mode === 'vertical') {
+        readerObserver = new IntersectionObserver(
+            (entries) => {
+                const visible = entries
+                    .filter((entry) => entry.isIntersecting)
+                    .sort(
+                        (a, b) => b.intersectionRatio - a.intersectionRatio
+                    )[0]
+                if (visible)
+                    void saveReaderProgress(
+                        Number(visible.target.dataset.readerPage)
+                    )
+            },
+            { threshold: [0.6] }
+        )
+        $$('[data-reader-page]').forEach((image) =>
+            readerObserver.observe(image)
+        )
+    } else void saveReaderProgress(reader.pageIndex)
+}
+
+async function saveReaderProgress(pageIndex) {
+    if (
+        pageIndex === state.reader.pageIndex &&
+        state.reader.progressSaved === pageIndex
+    )
+        return
+    state.reader.pageIndex = pageIndex
+    state.reader.progressSaved = pageIndex
+    try {
+        await post('/api/v1/reader/progress', {
+            comicId: state.reader.comicId,
+            episodeId: state.reader.episodeId,
+            pageIndex
+        })
+    } catch {
+        // Reader remains usable if progress persistence briefly fails.
+    }
+}
+
+async function openReaderChapter(episodeId) {
+    const chapter = await api(
+        `/api/v1/reader/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`
+    )
+    state.reader.episodeId = episodeId
+    state.reader.chapter = chapter
+    state.reader.pageIndex = Math.min(
+        chapter.progress?.pageIndex || 0,
+        Math.max(0, chapter.pages.length - 1)
+    )
+    state.reader.progressSaved = null
+    $('#reader-chapter-title').textContent =
+        `${chapter.episode.title} · ${chapter.pages.length} 页`
+    renderReaderPages()
+}
+
+async function openReaderComic(comicId) {
+    try {
+        const [chapters, recentProgress] = await Promise.all([
+            api(
+                `/api/v1/reader/comics/${encodeURIComponent(comicId)}/chapters`
+            ),
+            api('/api/v1/reader/progress')
+        ])
+        const readable = chapters.filter((item) => item.downloadedPictures > 0)
+        if (!readable.length) throw new Error('该漫画尚无已下载章节。')
+        const resume = recentProgress.find(
+            (item) =>
+                item.comicId === comicId &&
+                readable.some((chapter) => chapter.id === item.episodeId)
+        )
+        state.reader = {
+            comicId,
+            episodeId: null,
+            pageIndex: 0,
+            chapters,
+            chapter: null
+        }
+        const comic = state.records.find((item) => item.comicId === comicId)
+        $('#reader-title').textContent = comic?.title || '阅读'
+        $('#reader-chapters').innerHTML = chapters
+            .map(
+                (chapter) =>
+                    `<button data-reader-episode="${escapeHtml(chapter.id)}" ${chapter.downloadedPictures ? '' : 'disabled'}>${escapeHtml(chapter.title)} · ${chapter.downloadedPictures}/${chapter.knownPictures}</button>`
+            )
+            .join('')
+        activateView('reader')
+        document.body.classList.add('reader-active')
+        await openReaderChapter(resume?.episodeId || readable[0].id)
+    } catch (error) {
+        $('#reader-message').textContent = localizeError(language, error)
+    }
+}
+
+function moveReader(delta) {
+    const total = state.reader.chapter?.pages?.length || 0
+    if (!total || $('#reader-mode').value === 'vertical') return
+    const step = $('#reader-mode').value === 'double' ? 2 : 1
+    const direction = $('#reader-direction').value === 'rtl' ? -1 : 1
+    state.reader.pageIndex = Math.max(
+        0,
+        Math.min(total - 1, state.reader.pageIndex + delta * step * direction)
+    )
+    renderReaderPages()
+}
+
+$('#reader-chapters').onclick = (event) => {
+    const episodeId = event.target.dataset.readerEpisode
+    if (episodeId) void openReaderChapter(episodeId)
+}
+$('#reader-mode').onchange = renderReaderPages
+$('#reader-direction').onchange = renderReaderPages
+$('#reader-fit').onchange = renderReaderPages
+$('#reader-fullscreen').onclick = () =>
+    document.fullscreenElement
+        ? document.exitFullscreen()
+        : $('#reader').requestFullscreen()
+$('#reader-export-cbz').onclick = async () => {
+    try {
+        const value = await post('/api/v1/reader/export-cbz', {
+            comicId: state.reader.comicId,
+            episodeId: state.reader.episodeId
+        })
+        const name = value.path.split(/[\\/]/).pop()
+        $('#reader-message').textContent =
+            `已导出 ${name} · ${value.pages} 页 · ${formatBytes(value.bytes)}`
+        if (window.confirm('CBZ 已导出。用系统默认阅读器打开？'))
+            await post('/api/v1/reader/open-default', { path: value.path })
+    } catch (error) {
+        $('#reader-message').textContent = localizeError(language, error)
+    }
+}
+document.addEventListener('keydown', (event) => {
+    if (activeView !== 'reader') return
+    if (event.key === 'ArrowLeft' || event.key === 'PageUp') moveReader(-1)
+    if (event.key === 'ArrowRight' || event.key === 'PageDown') moveReader(1)
+    if (event.key === 'Escape' && !document.fullscreenElement) {
+        document.body.classList.remove('reader-active')
+        activateView('downloaded')
+    }
+})
+
 async function loadDownloaded() {
     if (state.mode === 'lite') return
     const records = await api('/api/v1/downloaded')
@@ -938,17 +1449,22 @@ async function loadDownloaded() {
         records
             .map(
                 (comic) =>
-                    `<article class="comic-card"><div class="cover-shell">${coverSource(comic) ? `<img src="${coverSource(comic)}" loading="lazy" alt="" />` : ''}<span aria-hidden="true">P</span></div><div class="comic-card-body"><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><p>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</p><p>${t('downloaded.chapters', { downloaded: comic.downloadedChapters, known: comic.knownChapters || '—' })} · ${t('message.pictures', { count: comic.downloadedPictures })} · ${formatBytes(comic.localBytes)}</p></div></article>`
+                    `<article class="comic-card"><div class="cover-shell">${coverSource(comic) ? `<img src="${coverSource(comic)}" loading="lazy" alt="" />` : ''}<span aria-hidden="true">P</span></div><div class="comic-card-body"><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><p>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</p><p>${t('downloaded.chapters', { downloaded: comic.downloadedChapters, known: comic.knownChapters || '—' })} · ${t('message.pictures', { count: comic.downloadedPictures })} · ${formatBytes(comic.localBytes)}</p><button data-read-comic="${escapeHtml(comic.comicId)}">阅读</button></div></article>`
             )
             .join('') ||
         `<article class="notice">${t('downloaded.empty')}</article>`
     $('#downloaded-rows').innerHTML = records
         .map(
             (comic) =>
-                `<tr><td>${escapeHtml(comic.title)}</td><td>${escapeHtml(comic.canonicalAuthor || comic.author)}</td><td>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</td><td>${comic.downloadedChapters}/${comic.knownChapters || '—'}</td><td>${comic.downloadedPictures}</td><td>${formatBytes(comic.localBytes)}</td><td>${escapeHtml(comic.lastDownloadedAt || '—')}</td></tr>`
+                `<tr><td>${escapeHtml(comic.title)}<br><button data-read-comic="${escapeHtml(comic.comicId)}">阅读</button></td><td>${escapeHtml(comic.canonicalAuthor || comic.author)}</td><td>${comic.status === 'complete' ? t('downloaded.complete') : t('downloaded.partial')}</td><td>${comic.downloadedChapters}/${comic.knownChapters || '—'}</td><td>${comic.downloadedPictures}</td><td>${formatBytes(comic.localBytes)}</td><td>${escapeHtml(comic.lastDownloadedAt || '—')}</td></tr>`
         )
         .join('')
     setGridSize('downloaded', state.downloadedGridSize)
+}
+
+$('#downloaded').onclick = (event) => {
+    const comicId = event.target.dataset.readComic
+    if (comicId) void openReaderComic(comicId)
 }
 
 async function enqueue(ids, source) {
@@ -986,6 +1502,9 @@ function renderAll(summary) {
     )
     setGridSize('downloaded', state.downloadedGridSize)
     renderTimestamps()
+    updateSelectionStatus('library')
+    updateSelectionStatus('recommendation')
+    updateSelectionStatus('search')
 }
 
 $$('nav [data-view], [data-go]').forEach((button) =>
@@ -1004,6 +1523,9 @@ $$('nav [data-view], [data-go]').forEach((button) =>
             downloadPoll = null
         }
         if (id === 'downloaded') void loadDownloaded()
+        if (id === 'shelves') void loadShelves()
+        if (id === 'settings') void loadPreviewCacheStats()
+        document.body.classList.toggle('reader-active', id === 'reader')
     })
 )
 
@@ -1022,10 +1544,7 @@ $$('.tabs').forEach((tabs) =>
     })
 )
 
-$('#apply-filter').onclick = () => {
-    state.libraryPage = 1
-    renderComics()
-}
+$('#apply-filter').onclick = () => void loadLibraryQuery()
 $('#load-more').onclick = () => {
     state.libraryPage += 1
     renderComics()
@@ -1061,12 +1580,40 @@ $('#cover-toggle').onchange = (event) => {
     localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
     renderAll()
 }
-$('#recommend-next-batch').onclick = () => {
-    state.recommendationBatch =
-        (state.recommendationBatch + 1) * 12 >= state.recommendations.length
-            ? 0
-            : state.recommendationBatch + 1
-    renderPreparedRecommendations()
+$('#recommend-next-batch').onclick = async () => {
+    if ((state.recommendationBatch + 1) * 12 < state.recommendations.length) {
+        state.recommendationBatch += 1
+        renderPreparedRecommendations()
+        return
+    }
+    if (state.mode !== 'connected') {
+        const nextSession =
+            state.recommendationSessions?.[state.recommendationSessionNo]
+        if (nextSession?.length) {
+            state.recommendations = nextSession
+            state.recommendationSessionNo += 1
+            state.recommendationBatch = 0
+            clearSelection('recommendation')
+            renderPreparedRecommendations()
+            return
+        }
+        $('#recommend-message').textContent =
+            '当前离线数据中的推荐已经看完。重新同步并导出 Browser Lite 数据包可获得新的推荐。'
+        return
+    }
+    try {
+        const value = await post('/api/v1/recommendation-sessions', {})
+        state.profile = value.profile
+        state.recommendations = value.recommendations
+        state.recommendationSessionNo = value.sessionNo
+        state.recommendationExhausted = value.exhausted
+        state.recommendationBatch = 0
+        clearSelection('recommendation')
+        renderPreparedRecommendations()
+        if (value.exhausted) $('#recommend-message').textContent = value.message
+    } catch (error) {
+        $('#recommend-message').textContent = localizeError(language, error)
+    }
 }
 function setRecommendationView(view) {
     state.recommendationView = view
@@ -1229,6 +1776,116 @@ $('#export-plan').onclick = () => {
     downloadJson('download-plan.json', plan)
 }
 $('#queue-selected').onclick = () => enqueue(selectedIds(), 'library')
+$('#library-clear-selection').onclick = () => clearSelection('library')
+$('#recommend-clear-selection').onclick = () => clearSelection('recommendation')
+$('#search-clear-selection').onclick = () => clearSelection('search')
+$('#library-add-shelf').onclick = () => {
+    const ids = selectedIds('library')
+    if (!ids.length) return
+    void chooseShelf(ids.length, (shelfId) =>
+        post(`/api/v1/shelves/${encodeURIComponent(shelfId)}/items`, {
+            comicIds: ids
+        })
+    )
+}
+$('#library-add-filtered-shelf').onclick = () => {
+    const total = state.libraryQueryResult?.total ?? state.visible.length
+    if (!total) return
+    void chooseShelf(total, async (shelfId) => {
+        const shelf = state.shelves.find((item) => item.id === shelfId)
+        if (
+            !window.confirm(
+                `将 ${total} 部漫画加入书架“${shelf?.name || ''}”？`
+            )
+        )
+            return
+        return post(
+            `/api/v1/shelves/${encodeURIComponent(shelfId)}/add-filtered`,
+            {
+                query:
+                    state.libraryQueryResult?.query ??
+                    libraryQueryFromControls()
+            }
+        )
+    })
+}
+$('#recommend-add-shelf').onclick = () => {
+    const ids = selectedIds('recommendation')
+    if (!ids.length) return
+    void chooseShelf(ids.length, (shelfId) =>
+        post(`/api/v1/shelves/${encodeURIComponent(shelfId)}/items`, {
+            comicIds: ids
+        })
+    )
+}
+$('#search-add-shelf').onclick = () => {
+    const ids = selectedIds('search')
+    if (!ids.length) return
+    const records = state.searchResults.filter((item) =>
+        ids.includes(item.comicId)
+    )
+    void chooseShelf(ids.length, (shelfId) =>
+        post(`/api/v1/shelves/${encodeURIComponent(shelfId)}/items`, {
+            comicIds: ids,
+            records
+        })
+    )
+}
+$('#shelf-create').onclick = async () => {
+    const name = window.prompt('书架名称：')
+    if (!name) return
+    try {
+        await post('/api/v1/shelves', { name })
+        await loadShelves()
+    } catch (error) {
+        $('#shelf-message').textContent = localizeError(language, error)
+    }
+}
+$('#shelf-list').onclick = (event) => {
+    const id = event.target.closest('[data-shelf-open]')?.dataset.shelfOpen
+    if (id) void openShelf(id)
+}
+$('#shelf-detail').onclick = async (event) => {
+    const rename = event.target.dataset.shelfRename
+    const removeShelf = event.target.dataset.shelfDelete
+    const removeSelected = event.target.dataset.shelfRemoveSelected
+    const read = event.target.dataset.shelfRead
+    const download = event.target.dataset.shelfDownload
+    if (rename) {
+        const name = window.prompt('新的书架名称：')
+        if (name) {
+            await mutate(
+                `/api/v1/shelves/${encodeURIComponent(rename)}`,
+                'PATCH',
+                {
+                    name
+                }
+            )
+            await loadShelves()
+            await openShelf(rename)
+        }
+    } else if (removeShelf) {
+        if (!window.confirm('删除书架？漫画、下载和 Pica 收藏不会被删除。'))
+            return
+        await mutate(
+            `/api/v1/shelves/${encodeURIComponent(removeShelf)}`,
+            'DELETE'
+        )
+        state.activeShelfId = null
+        $('#shelf-detail').innerHTML =
+            '<article class="notice">书架已删除；漫画和下载仍然保留。</article>'
+        await loadShelves()
+    } else if (removeSelected) {
+        await post(
+            `/api/v1/shelves/${encodeURIComponent(removeSelected)}/remove`,
+            { comicIds: selectedIds('shelf') }
+        )
+        clearSelection('shelf')
+        await openShelf(removeSelected)
+        await loadShelves()
+    } else if (read) void openReaderComic(read)
+    else if (download) await enqueue([download], 'shelf')
+}
 $('#search-button').onclick = async () => {
     try {
         if (state.mode !== 'connected')
@@ -1239,6 +1896,8 @@ $('#search-button').onclick = async () => {
             sort: $('#search-sort').value,
             limit: 100
         })
+        state.searchResults = records
+        clearSelection('search')
         renderResultCards(records, '#search-results')
         $('#search-message').textContent = t('message.searchCount', {
             count: records.length
@@ -1250,11 +1909,17 @@ $('#search-button').onclick = async () => {
 $('#recommend-button').onclick = async () => {
     try {
         if (state.mode === 'connected') {
-            const value = await post('/api/v1/recommendations', {
-                limit: 60
-            })
+            const value = await post('/api/v1/recommendation-sessions', {})
             state.profile = value.profile
             state.recommendations = value.recommendations
+            state.recommendationSessionNo = value.sessionNo
+            state.recommendationExhausted = value.exhausted
+            state.recommendationBatch = 0
+            clearSelection('recommendation')
+        } else if (state.recommendationSessions?.length) {
+            state.recommendations = state.recommendationSessions[0]
+            state.recommendationSessionNo = 1
+            state.recommendationBatch = 0
         }
         if (!state.recommendations.length)
             throw new Error(t('message.recommendNeedsData'))
@@ -1263,14 +1928,53 @@ $('#recommend-button').onclick = async () => {
         $('#recommend-message').textContent = localizeError(language, error)
     }
 }
+$('#recommend-restart').onclick = async () => {
+    if (!window.confirm('清除本轮已看记录并重新开始推荐？')) return
+    try {
+        const value = await post('/api/v1/recommendation-sessions', {
+            action: 'restart'
+        })
+        state.profile = value.profile
+        state.recommendations = value.recommendations
+        state.recommendationSessionNo = value.sessionNo
+        state.recommendationExhausted = value.exhausted
+        state.recommendationBatch = 0
+        clearSelection('recommendation')
+        renderPreparedRecommendations()
+    } catch (error) {
+        $('#recommend-message').textContent = localizeError(language, error)
+    }
+}
 ;['#search-results', '#recommend-results'].forEach((selector) => {
-    $(selector).onclick = (event) => {
+    $(selector).onclick = async (event) => {
         const comicId = event.target.dataset.resultDownload
         if (comicId)
-            enqueue(
+            await enqueue(
                 [comicId],
                 selector.includes('recommend') ? 'recommendation' : 'search'
             )
+        const detailId = event.target.dataset.resultDetail
+        if (detailId)
+            openRecommendationDetail(
+                detailId,
+                event.target.dataset.resultContext
+            )
+        const favoriteId = event.target.dataset.resultFavorite
+        if (favoriteId) {
+            try {
+                await mutate(
+                    `/api/v1/provider/favorites/${encodeURIComponent(favoriteId)}`,
+                    'PUT'
+                )
+                event.target.textContent = '★ 已收藏'
+                event.target.disabled = true
+            } catch (error) {
+                $('#recommend-message').textContent = localizeError(
+                    language,
+                    error
+                )
+            }
+        }
     }
 })
 $('#refresh-jobs').onclick = loadJobs
@@ -1392,6 +2096,14 @@ async function detect() {
         $('#mode').textContent = t('mode.connected')
         state.records = await api('/api/v1/comics?limit=5000')
         state.authors = await api('/api/v1/authors')
+        await loadLibraryQuery({
+            scope: 'all',
+            tags: [],
+            tagMode: 'all',
+            sort: $('#sort-mode').value,
+            limit: 5000,
+            offset: 0
+        })
         renderAll(status.summary)
     } catch {
         state.mode = 'lite'

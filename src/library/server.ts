@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import http, { type IncomingMessage, type ServerResponse } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { FavoriteRecord, SortMode } from './types'
+import type { FavoriteRecord, LibraryFacetQuery, SortMode } from './types'
 import { LibraryDatabase } from './database'
 import { LibraryService } from './service'
 import { organizeLibraryViews } from './organizer'
@@ -11,6 +11,13 @@ import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
 import { appCapabilities } from '../app-capabilities'
+import { ProviderService } from '../services/provider-service'
+import { LibraryQueryService } from '../services/library-query-service'
+import { ShelfService } from '../services/shelf-service'
+import { RecommendationService } from '../services/recommendation-service'
+import { PreviewCacheManager } from '../services/preview-cache-manager'
+import { PreviewService } from '../services/preview-service'
+import { ReaderService } from '../services/reader-service'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -143,10 +150,33 @@ export async function startLibraryServer(options: {
     host?: string
     port?: number
     desktop?: DesktopServerController
+    cacheDir?: string
 }) {
     const root = webRoot()
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
+    const providerService = new ProviderService(
+        () => options.service.connect(),
+        options.database
+    )
+    const libraryQueries = new LibraryQueryService(options.database)
+    const shelfService = new ShelfService(options.database, libraryQueries)
+    const recommendationService = new RecommendationService(
+        options.database,
+        (limit) => options.service.recommendations({ limit })
+    )
+    const previewCache = new PreviewCacheManager(
+        path.join(options.cacheDir ?? options.service.dataDir, 'previews')
+    )
+    const previewService = new PreviewService(
+        options.database,
+        providerService,
+        previewCache
+    )
+    const readerService = new ReaderService(
+        options.database,
+        options.service.dataDir
+    )
     const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1'])
     if (
         !loopbackHosts.has(host) &&
@@ -208,7 +238,13 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/capabilities' &&
                 request.method === 'GET'
             ) {
-                return json(response, 200, appCapabilities(false))
+                return json(
+                    response,
+                    200,
+                    appCapabilities(
+                        providerService.capabilities.favoriteMutation
+                    )
+                )
             }
             if (
                 url.pathname === '/api/v1/update/progress' &&
@@ -382,6 +418,261 @@ export async function startLibraryServer(options: {
                     response,
                     200,
                     options.database.listDownloadedComics()
+                )
+            }
+            if (
+                url.pathname === '/api/v1/library/query' &&
+                request.method === 'POST'
+            ) {
+                return json(
+                    response,
+                    200,
+                    libraryQueries.query(
+                        (await body(request)) as LibraryFacetQuery
+                    )
+                )
+            }
+            if (url.pathname === '/api/v1/shelves' && request.method === 'GET')
+                return json(response, 200, shelfService.list())
+            if (
+                url.pathname === '/api/v1/shelves' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    shelfService.create(String(input.name ?? ''))
+                )
+            }
+            const shelfRoute = url.pathname.match(
+                /^\/api\/v1\/shelves\/([^/]+)$/
+            )
+            if (shelfRoute && request.method === 'GET') {
+                const shelfId = decodeURIComponent(shelfRoute[1])
+                return json(response, 200, {
+                    shelf: shelfService
+                        .list()
+                        .find((item) => item.id === shelfId),
+                    items: shelfService.contents(shelfId)
+                })
+            }
+            if (shelfRoute && request.method === 'PATCH') {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    shelfService.rename(
+                        decodeURIComponent(shelfRoute[1]),
+                        String(input.name ?? '')
+                    )
+                )
+            }
+            if (shelfRoute && request.method === 'DELETE')
+                return json(
+                    response,
+                    200,
+                    shelfService.delete(decodeURIComponent(shelfRoute[1]))
+                )
+            const shelfItemsRoute = url.pathname.match(
+                /^\/api\/v1\/shelves\/([^/]+)\/(items|remove|add-filtered)$/
+            )
+            if (shelfItemsRoute && request.method === 'POST') {
+                const shelfId = decodeURIComponent(shelfItemsRoute[1])
+                const input = await body(request)
+                if (shelfItemsRoute[2] === 'add-filtered')
+                    return json(
+                        response,
+                        200,
+                        shelfService.addFiltered(
+                            shelfId,
+                            (input.query ?? {}) as LibraryFacetQuery
+                        )
+                    )
+                if (shelfItemsRoute[2] === 'remove')
+                    return json(
+                        response,
+                        200,
+                        shelfService.remove(shelfId, stringList(input.comicIds))
+                    )
+                return json(
+                    response,
+                    200,
+                    shelfService.add(
+                        shelfId,
+                        stringList(input.comicIds),
+                        Array.isArray(input.records)
+                            ? (input.records as FavoriteRecord[])
+                            : []
+                    )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/recommendation-sessions' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    input.action === 'restart'
+                        ? await recommendationService.restartCycle()
+                        : await recommendationService.nextSession()
+                )
+            }
+            if (
+                url.pathname === '/api/v1/recommendation-sessions/status' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, recommendationService.currentState())
+            const favoriteRoute = url.pathname.match(
+                /^\/api\/v1\/provider\/favorites\/([^/]+)$/
+            )
+            if (
+                favoriteRoute &&
+                ['PUT', 'DELETE'].includes(request.method ?? '')
+            ) {
+                if (
+                    options.desktop &&
+                    request.headers['x-pica-csrf'] !== options.desktop.csrfToken
+                )
+                    return json(response, 403, {
+                        error: 'This local request could not be verified'
+                    })
+                const comicId = decodeURIComponent(favoriteRoute[1])
+                return json(
+                    response,
+                    200,
+                    request.method === 'PUT'
+                        ? await providerService.addFavorite(comicId)
+                        : await providerService.removeFavorite(comicId)
+                )
+            }
+            if (
+                url.pathname === '/api/v1/previews/prepare' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    await previewService.prepare(
+                        String(input.comicId ?? ''),
+                        Number(input.offset ?? 0),
+                        Number(input.count ?? 3)
+                    )
+                )
+            }
+            const previewPage = url.pathname.match(
+                /^\/api\/v1\/previews\/([^/]+)\/([^/]+)\/(\d+)$/
+            )
+            if (previewPage && request.method === 'GET') {
+                const image = previewService.page(
+                    decodeURIComponent(previewPage[1]),
+                    decodeURIComponent(previewPage[2]),
+                    Number(previewPage[3])
+                )
+                response.writeHead(200, {
+                    'content-type': image.contentType,
+                    'content-length': String(image.data.byteLength),
+                    'cache-control': 'private, max-age=3600',
+                    'x-content-type-options': 'nosniff'
+                })
+                response.end(image.data)
+                return
+            }
+            if (
+                url.pathname === '/api/v1/previews/cache' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, previewService.stats())
+            if (
+                url.pathname === '/api/v1/previews/cache/clear' &&
+                request.method === 'POST'
+            )
+                return json(response, 200, previewService.clear())
+            const readerChapters = url.pathname.match(
+                /^\/api\/v1\/reader\/comics\/([^/]+)\/chapters$/
+            )
+            if (readerChapters && request.method === 'GET')
+                return json(
+                    response,
+                    200,
+                    readerService.chapters(
+                        decodeURIComponent(readerChapters[1])
+                    )
+                )
+            const readerChapter = url.pathname.match(
+                /^\/api\/v1\/reader\/comics\/([^/]+)\/chapters\/([^/]+)$/
+            )
+            if (readerChapter && request.method === 'GET')
+                return json(
+                    response,
+                    200,
+                    readerService.chapter(
+                        decodeURIComponent(readerChapter[1]),
+                        decodeURIComponent(readerChapter[2])
+                    )
+                )
+            const readerPicture = url.pathname.match(
+                /^\/api\/v1\/reader\/pictures\/([^/]+)$/
+            )
+            if (readerPicture && request.method === 'GET') {
+                const image = readerService.picture(
+                    decodeURIComponent(readerPicture[1])
+                )
+                response.writeHead(200, {
+                    'content-type': image.contentType,
+                    'content-length': String(image.data.byteLength),
+                    'cache-control': 'private, max-age=3600',
+                    'x-content-type-options': 'nosniff'
+                })
+                response.end(image.data)
+                return
+            }
+            if (
+                url.pathname === '/api/v1/reader/progress' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, readerService.recentProgress())
+            if (
+                url.pathname === '/api/v1/reader/progress' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    readerService.saveProgress(
+                        String(input.comicId ?? ''),
+                        String(input.episodeId ?? ''),
+                        Number(input.pageIndex ?? 0)
+                    )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/reader/export-cbz' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    readerService.exportCbz(
+                        String(input.comicId ?? ''),
+                        String(input.episodeId ?? '')
+                    )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/reader/open-default' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    readerService.openDefault(String(input.path ?? ''))
                 )
             }
             if (url.pathname === '/api/v1/comics' && request.method === 'GET') {

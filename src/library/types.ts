@@ -51,6 +51,43 @@ export interface ComicQuery {
     offset?: number
 }
 
+export type LibraryScope = 'all' | 'favorites' | 'downloaded'
+export type TagMatchMode = 'all' | 'any'
+export type DownloadFacet =
+    | 'downloaded'
+    | 'not-downloaded'
+    | 'partial'
+    | 'complete'
+
+export interface LibraryFacetQuery {
+    scope?: LibraryScope
+    text?: string
+    authorIds?: string[]
+    tags?: string[]
+    tagMode?: TagMatchMode
+    finished?: boolean
+    download?: DownloadFacet
+    sort?: SortMode
+    limit?: number
+    offset?: number
+}
+
+export interface FacetOption {
+    value: string
+    label: string
+    count: number
+}
+
+export interface LibraryQueryResult {
+    items: StoredComic[]
+    total: number
+    facets: {
+        authors: FacetOption[]
+        tags: FacetOption[]
+    }
+    query: LibraryFacetQuery
+}
+
 export interface StoredComic extends FavoriteRecord {
     canonicalAuthor: string | null
     circle: string | null
@@ -115,6 +152,40 @@ export interface DownloadedComic {
     knownPictures: number
     localBytes: number
     lastDownloadedAt: string | null
+}
+
+export interface Shelf {
+    id: string
+    name: string
+    createdAt: string
+    updatedAt: string
+    sortOrder: number
+    count: number
+}
+
+export interface ReaderEpisode {
+    id: string
+    comicId: string
+    title: string
+    order: number
+    downloadedPictures: number
+    knownPictures: number
+}
+
+export interface ReaderPicture {
+    id: string
+    comicId: string
+    episodeId: string
+    position: number
+    originalName: string
+    localPath: string
+}
+
+export interface ReadingProgress {
+    comicId: string
+    episodeId: string
+    pageIndex: number
+    updatedAt: string
 }
 
 export interface AuthorGroup {

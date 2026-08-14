@@ -295,6 +295,17 @@ export const migrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_recommendation_seen_cycle
                 ON recommendation_seen(cycle_id, first_seen_at);
         `
+    },
+    {
+        version: 6,
+        name: 'v020_application_state',
+        up: `
+            CREATE TABLE IF NOT EXISTS app_state (
+                key TEXT PRIMARY KEY,
+                value_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+        `
     }
 ]
 

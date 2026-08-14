@@ -33,7 +33,7 @@ describe('SQLite migrations', () => {
         const versions = database
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>
-        expect(versions.map((row) => row.version)).toEqual([1, 2, 3, 4, 5])
+        expect(versions.map((row) => row.version)).toEqual([1, 2, 3, 4, 5, 6])
         expect(
             database
                 .prepare(
@@ -76,7 +76,7 @@ describe('SQLite migrations', () => {
             database
                 .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
                 .get()
-        ).toMatchObject({ count: 5 })
+        ).toMatchObject({ count: 6 })
         database.close()
     })
 
@@ -86,12 +86,12 @@ describe('SQLite migrations', () => {
             runMigrations(database, [
                 ...migrations,
                 {
-                    version: 6,
+                    version: 7,
                     name: 'broken',
                     up: 'CREATE TABLE transient(value TEXT); INVALID SQL;'
                 }
             ])
-        ).toThrow(/Migration 6/)
+        ).toThrow(/Migration 7/)
         expect(
             database
                 .prepare(
@@ -102,7 +102,7 @@ describe('SQLite migrations', () => {
         expect(
             database
                 .prepare(
-                    'SELECT version FROM schema_migrations WHERE version = 6'
+                    'SELECT version FROM schema_migrations WHERE version = 7'
                 )
                 .get()
         ).toBeUndefined()
@@ -121,7 +121,7 @@ describe('SQLite migrations', () => {
         const library = new LibraryDatabase(databaseFile)
         library.close()
 
-        const backup = `${databaseFile}.pre-migration-v5.bak`
+        const backup = `${databaseFile}.pre-migration-v6.bak`
         expect(fs.existsSync(backup)).toBe(true)
         const backedUp = new DatabaseSync(backup)
         expect(

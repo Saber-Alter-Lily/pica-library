@@ -22,7 +22,7 @@ export class LibraryQueryService {
 
     query(input: LibraryFacetQuery = {}): LibraryQueryResult {
         const query: LibraryFacetQuery = {
-            scope: input.scope ?? 'all',
+            scope: input.scope ?? 'library',
             text: input.text?.trim() || undefined,
             authorIds: [...new Set(input.authorIds ?? [])],
             tags: [
@@ -43,6 +43,7 @@ export class LibraryQueryService {
         const items = this.database
             .listComics({ limit: 5000 })
             .filter((comic) => {
+                if (query.scope === 'library' && !comic.inLibrary) return false
                 if (query.scope === 'favorites' && !comic.isFavorite)
                     return false
                 if (
@@ -50,6 +51,8 @@ export class LibraryQueryService {
                     comic.downloadedPictures === 0
                 )
                     return false
+                // `catalog` is the explicit advanced scope. `all` remains a
+                // compatibility alias for older Browser/CLI callers.
                 if (
                     query.finished !== undefined &&
                     comic.finished !== query.finished

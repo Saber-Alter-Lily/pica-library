@@ -185,7 +185,7 @@ describe('v0.1.4 Round 2 bounded rendering contracts', () => {
         expect(source).toContain('setInterval(() => void loadJobs(), 1000)')
     })
 
-    it('defines shared grid sizes and responsive controls for all three views', () => {
+    it('defines shared grid sizes and responsive controls for all four views', () => {
         const html = fs.readFileSync(
             path.resolve(import.meta.dirname, '../../web/index.html'),
             'utf8'
@@ -194,9 +194,9 @@ describe('v0.1.4 Round 2 bounded rendering contracts', () => {
             path.resolve(import.meta.dirname, '../../web/styles.css'),
             'utf8'
         )
-        expect(html.match(/data-grid-size="small"/g)?.length).toBe(3)
-        expect(html.match(/data-grid-size="medium"/g)?.length).toBe(3)
-        expect(html.match(/data-grid-size="large"/g)?.length).toBe(3)
+        expect(html.match(/data-grid-size="small"/g)?.length).toBe(4)
+        expect(html.match(/data-grid-size="medium"/g)?.length).toBe(4)
+        expect(html.match(/data-grid-size="large"/g)?.length).toBe(4)
         expect(css).toContain('.responsive-toolbar')
         expect(css).toContain('minmax(120px, 1fr)')
         expect(css).toContain('@media (max-width: 980px)')

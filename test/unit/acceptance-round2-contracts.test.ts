@@ -36,7 +36,11 @@ describe('Round 2 count and sync contracts', () => {
         const value = db()
         value.importFavorites([comic('favorite')], 'pica:favorites')
         value.importCatalog([comic('search-only')], 'pica:discover')
-        expect(value.summary()).toMatchObject({ comics: 2, favorites: 1 })
+        expect(value.summary()).toMatchObject({
+            comics: 1,
+            catalogComics: 2,
+            favorites: 1
+        })
         value.close()
     })
 
@@ -204,13 +208,19 @@ describe('Round 2 shared view and responsive contracts', () => {
 describe('Round 2 progress and download observability contracts', () => {
     const app = source('web/app.js')
     const service = source('src/library/service.ts')
+    const provider = source('src/services/provider-service.ts')
     const desktop = source('src/desktop/main.ts')
 
-    it('sync_progress_indeterminate', () =>
-        expect(app).toContain("t('message.syncReading'), 0, 0"))
+    it('sync_progress_indeterminate', () => {
+        expect(app).toContain('正在检查收藏更新…')
+        expect(app).toContain(
+            "setProgress($('#library-operation'), message.textContent, 0, 0)"
+        )
+    })
     it('sync_progress_determinate', () => {
-        expect(service).toContain("phase: 'processing'")
-        expect(app).toContain('progress.processed')
+        expect(provider).toContain("phase: 'processing'")
+        expect(app).toContain('progress.found')
+        expect(service).toContain('found: result.addedFavorites')
     })
     it('import_progress', () => {
         expect(app).toContain("t('message.importRead')")

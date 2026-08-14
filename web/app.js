@@ -38,13 +38,17 @@ const state = {
         localStorage.getItem('pica-downloaded-grid-size') || 'large',
     downloadedCoversEnabled:
         localStorage.getItem('pica-downloaded-covers-enabled') !== 'false',
+    shelfView: localStorage.getItem('pica-shelf-view') || 'grid',
+    shelfGridSize: localStorage.getItem('pica-shelf-grid-size') || 'large',
+    shelfCoversEnabled:
+        localStorage.getItem('pica-shelf-covers-enabled') !== 'false',
     coversEnabled: localStorage.getItem('pica-covers-enabled') !== 'false',
     recommendationBatch: 0,
     stagedUpdate: null,
     ...emptyLiteState(),
     capabilities: null,
     libraryQueryResult: null,
-    libraryQuery: { scope: 'all', tags: [], tagMode: 'all' },
+    libraryQuery: { scope: 'library', tags: [], tagMode: 'all' },
     selections: {
         library: new Set(),
         recommendation: new Set(),
@@ -56,7 +60,14 @@ const state = {
     searchResults: [],
     recommendationSessionNo: 1,
     recommendationExhausted: false,
-    reader: { comicId: null, episodeId: null, pageIndex: 0, chapters: [] }
+    reader: {
+        comicId: null,
+        episodeId: null,
+        pageIndex: 0,
+        chapters: [],
+        originView: 'downloaded',
+        dirty: false
+    }
 }
 let desktop = null
 let language = resolveLanguage(
@@ -152,6 +163,8 @@ function setupValue(prefix) {
 }
 
 function activateView(id) {
+    if (id === 'reader' && activeView !== 'reader')
+        state.reader.originView = activeView
     activeView = id
     $$('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
@@ -636,7 +649,9 @@ function setGridSize(scope, size) {
             ? $('#comic-grid')
             : scope === 'recommendation'
               ? $('#recommend-results')
-              : $('#downloaded-grid-items')
+              : scope === 'downloaded'
+                ? $('#downloaded-grid-items')
+                : $('#shelf-items')
     if (target) {
         target.classList.remove(
             'grid-size-small',
@@ -828,13 +843,13 @@ function renderPreparedRecommendations() {
     const batchCount = Math.max(1, Math.ceil(state.recommendations.length / 12))
     $('#recommend-batch').textContent =
         state.recommendations.length > 0
-            ? `推荐会话 ${state.recommendationSessionNo} · ${t(
+            ? `推荐第 ${state.recommendationSessionNo} 轮 · ${t(
                   'message.recommendationBatch',
                   {
                       current: state.recommendationBatch + 1,
                       total: batchCount
                   }
-              )}`
+              )}${state.recommendationNextReady ? ' · 下一轮已准备好' : state.recommendationBatch > 0 ? ' · 正在准备下一轮…' : ''}`
             : ''
     $('#recommend-selection-status').textContent =
         `已选择 ${state.selections.recommendation.size} 部`
@@ -925,10 +940,17 @@ function renderFilterFacets() {
         .join('')
     const query = result.query
     const chips = []
-    if (query.scope && query.scope !== 'all')
+    if (query.scope)
         chips.push({
             key: 'scope',
-            label: query.scope === 'favorites' ? 'Pica 收藏' : '已下载'
+            label:
+                {
+                    library: '漫画库',
+                    favorites: 'Pica 收藏',
+                    downloaded: '已下载',
+                    catalog: '全部缓存记录',
+                    all: '全部缓存记录'
+                }[query.scope] || query.scope
         })
     if (query.text) chips.push({ key: 'text', label: `搜索：${query.text}` })
     for (const authorId of query.authorIds || []) {
@@ -969,11 +991,11 @@ $('#filter-chips').onclick = (event) => {
     const key = event.target.dataset.filterRemove
     if (!key) return
     if (key === 'all') {
-        $('#filter-scope').value = 'all'
+        $('#filter-scope').value = 'library'
         $('#filter-text').value = ''
         $('#filter-author-input').value = ''
         $('#filter-tag').value = ''
-    } else if (key === 'scope') $('#filter-scope').value = 'all'
+    } else if (key === 'scope') $('#filter-scope').value = 'library'
     else if (key === 'text') $('#filter-text').value = ''
     else if (key === 'author') $('#filter-author-input').value = ''
     else if (key.startsWith('tag:')) {
@@ -1013,14 +1035,25 @@ async function openShelf(shelfId) {
     const shelf = value.shelf
     if (!shelf) throw new Error('书架不存在')
     $('#shelf-detail').innerHTML =
-        `<div class="page-heading"><div><h3>${escapeHtml(shelf.name)}</h3><p>${Number(value.items.length)} 部漫画</p></div><div class="actions"><button data-shelf-rename="${escapeHtml(shelf.id)}">重命名</button><button data-shelf-delete="${escapeHtml(shelf.id)}">删除书架</button></div></div><div class="comic-grid">${value.items
+        `<div class="page-heading"><div><h3>${escapeHtml(shelf.name)}</h3><p>${Number(value.items.length)} 部漫画</p></div><div class="actions"><button data-shelf-rename="${escapeHtml(shelf.id)}">重命名</button><button data-shelf-delete="${escapeHtml(shelf.id)}">删除书架</button></div></div><div id="shelf-items" class="comic-grid ${state.shelfView === 'list' ? 'shelf-list-mode' : ''}">${value.items
             .map(
                 (comic) =>
-                    `<article class="comic-card"><div class="comic-card-body"><label><input type="checkbox" data-selection-context="shelf" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.shelf.has(comic.comicId) ? 'checked' : ''}/> 选择</label><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><div class="actions">${comic.downloadedPictures > 0 ? `<button data-shelf-read="${escapeHtml(comic.comicId)}">阅读</button>` : `<button data-shelf-download="${escapeHtml(comic.comicId)}">下载</button>`}</div></div></article>`
+                    `<article class="comic-card">${state.shelfCoversEnabled ? `<div class="cover-shell"><img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" onerror="this.remove();this.parentElement.classList.add('cover-missing')"/><span aria-hidden="true">P</span></div>` : '<div class="cover-shell"><span aria-hidden="true">P</span></div>'}<div class="comic-card-body"><label><input type="checkbox" data-selection-context="shelf" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.shelf.has(comic.comicId) ? 'checked' : ''}/> 选择</label><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><div>${(
+                        comic.tags || []
+                    )
+                        .slice(0, 3)
+                        .map(
+                            (tag) =>
+                                `<span class="tag">${escapeHtml(tag)}</span>`
+                        )
+                        .join(
+                            ''
+                        )}</div><p>${comic.downloadedPictures > 0 ? `已下载 ${comic.downloadedPictures} 张` : '尚未下载'}</p><div class="actions">${comic.downloadedPictures > 0 ? `<button data-shelf-read="${escapeHtml(comic.comicId)}">阅读</button>` : `<button data-shelf-download="${escapeHtml(comic.comicId)}">下载</button>`}</div></div></article>`
             )
             .join(
                 ''
             )}</div><div class="actions"><button data-shelf-remove-selected="${escapeHtml(shelf.id)}">移出所选漫画</button></div>`
+    setGridSize('shelf', state.shelfGridSize)
 }
 
 let pendingShelfAction = null
@@ -1270,7 +1303,8 @@ $('#recommend-detail-dialog').onclick = async (event) => {
         await enqueue([comicId], dialog.dataset.context)
 }
 
-let readerObserver = null
+let readerProgressTimer = null
+let readerScrollHandler = null
 function renderReaderPages() {
     const reader = state.reader
     if (!reader.chapter) return
@@ -1291,48 +1325,84 @@ function renderReaderPages() {
                 `<img src="${escapeHtml(page.url)}" data-reader-page="${mode === 'vertical' ? index : reader.pageIndex + index}" alt="第 ${(mode === 'vertical' ? index : reader.pageIndex + index) + 1} 页" />`
         )
         .join('')
-    if (readerObserver) readerObserver.disconnect()
+    if (readerScrollHandler)
+        window.removeEventListener('scroll', readerScrollHandler)
+    readerScrollHandler = null
     if (mode === 'vertical') {
-        readerObserver = new IntersectionObserver(
-            (entries) => {
-                const visible = entries
-                    .filter((entry) => entry.isIntersecting)
-                    .sort(
-                        (a, b) => b.intersectionRatio - a.intersectionRatio
-                    )[0]
-                if (visible)
-                    void saveReaderProgress(
-                        Number(visible.target.dataset.readerPage)
+        const resumePage = reader.pageIndex
+        let queued = false
+        readerScrollHandler = () => {
+            if (queued) return
+            queued = true
+            requestAnimationFrame(() => {
+                queued = false
+                const center = window.innerHeight / 2
+                const nearest = $$('[data-reader-page]')
+                    .map((image) => ({
+                        image,
+                        distance: Math.abs(
+                            image.getBoundingClientRect().top +
+                                image.getBoundingClientRect().height / 2 -
+                                center
+                        )
+                    }))
+                    .sort((a, b) => a.distance - b.distance)[0]
+                if (nearest)
+                    queueReaderProgress(
+                        Number(nearest.image.dataset.readerPage)
                     )
-            },
-            { threshold: [0.6] }
-        )
-        $$('[data-reader-page]').forEach((image) =>
-            readerObserver.observe(image)
-        )
-    } else void saveReaderProgress(reader.pageIndex)
+            })
+        }
+        window.addEventListener('scroll', readerScrollHandler, {
+            passive: true
+        })
+        requestAnimationFrame(() => {
+            target
+                .querySelector(`[data-reader-page="${resumePage}"]`)
+                ?.scrollIntoView({ block: 'center' })
+            requestAnimationFrame(() => readerScrollHandler?.())
+        })
+    } else queueReaderProgress(reader.pageIndex)
 }
 
-async function saveReaderProgress(pageIndex) {
-    if (
-        pageIndex === state.reader.pageIndex &&
-        state.reader.progressSaved === pageIndex
-    )
-        return
+function queueReaderProgress(pageIndex) {
     state.reader.pageIndex = pageIndex
-    state.reader.progressSaved = pageIndex
+    state.reader.dirty = state.reader.progressSaved !== pageIndex
+    clearTimeout(readerProgressTimer)
+    readerProgressTimer = setTimeout(() => void flushReaderProgress(), 400)
+}
+
+async function flushReaderProgress(keepalive = false) {
+    clearTimeout(readerProgressTimer)
+    readerProgressTimer = null
+    if (!state.reader.dirty || !state.reader.comicId || !state.reader.episodeId)
+        return true
+    const payload = {
+        comicId: state.reader.comicId,
+        episodeId: state.reader.episodeId,
+        pageIndex: state.reader.pageIndex
+    }
     try {
-        await post('/api/v1/reader/progress', {
-            comicId: state.reader.comicId,
-            episodeId: state.reader.episodeId,
-            pageIndex
-        })
+        if (keepalive)
+            await fetch('/api/v1/reader/progress', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(payload),
+                keepalive: true
+            })
+        else await post('/api/v1/reader/progress', payload)
+        state.reader.progressSaved = payload.pageIndex
+        state.reader.dirty = false
+        return true
     } catch {
         // Reader remains usable if progress persistence briefly fails.
+        return false
     }
 }
 
 async function openReaderChapter(episodeId) {
+    if (state.reader.episodeId && state.reader.episodeId !== episodeId)
+        await flushReaderProgress()
     const chapter = await api(
         `/api/v1/reader/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`
     )
@@ -1343,8 +1413,12 @@ async function openReaderChapter(episodeId) {
         Math.max(0, chapter.pages.length - 1)
     )
     state.reader.progressSaved = null
+    state.reader.dirty = false
     $('#reader-chapter-title').textContent =
-        `${chapter.episode.title} · ${chapter.pages.length} 页`
+        `${chapter.episode.title} · ${chapter.pages.length} 页` +
+        (chapter.progress
+            ? ` · 继续阅读：第 ${state.reader.pageIndex + 1} 页`
+            : '')
     renderReaderPages()
 }
 
@@ -1368,7 +1442,9 @@ async function openReaderComic(comicId) {
             episodeId: null,
             pageIndex: 0,
             chapters,
-            chapter: null
+            chapter: null,
+            originView: state.reader.originView || 'downloaded',
+            dirty: false
         }
         const comic = state.records.find((item) => item.comicId === comicId)
         $('#reader-title').textContent = comic?.title || '阅读'
@@ -1409,28 +1485,45 @@ $('#reader-fullscreen').onclick = () =>
     document.fullscreenElement
         ? document.exitFullscreen()
         : $('#reader').requestFullscreen()
-$('#reader-export-cbz').onclick = async () => {
+async function exitReader() {
+    await flushReaderProgress()
+    document.body.classList.remove('reader-active')
+    activateView(state.reader.originView || 'downloaded')
+}
+$('#reader-exit').onclick = () => void exitReader()
+async function exportReaderArchive(format) {
     try {
-        const value = await post('/api/v1/reader/export-cbz', {
+        const value = await post(`/api/v1/reader/export-${format}`, {
             comicId: state.reader.comicId,
             episodeId: state.reader.episodeId
         })
         const name = value.path.split(/[\\/]/).pop()
         $('#reader-message').textContent =
             `已导出 ${name} · ${value.pages} 页 · ${formatBytes(value.bytes)}`
-        if (window.confirm('CBZ 已导出。用系统默认阅读器打开？'))
+        if (
+            window.confirm(
+                `${format.toUpperCase()} 已导出。用系统默认阅读器打开？`
+            )
+        )
             await post('/api/v1/reader/open-default', { path: value.path })
     } catch (error) {
         $('#reader-message').textContent = localizeError(language, error)
     }
 }
+$('#reader-export-zip').onclick = () => void exportReaderArchive('zip')
+$('#reader-export-cbz').onclick = async () => {
+    await exportReaderArchive('cbz')
+}
+window.addEventListener('pagehide', () => void flushReaderProgress(true))
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void flushReaderProgress(true)
+})
 document.addEventListener('keydown', (event) => {
     if (activeView !== 'reader') return
     if (event.key === 'ArrowLeft' || event.key === 'PageUp') moveReader(-1)
     if (event.key === 'ArrowRight' || event.key === 'PageDown') moveReader(1)
     if (event.key === 'Escape' && !document.fullscreenElement) {
-        document.body.classList.remove('reader-active')
-        activateView('downloaded')
+        void exitReader()
     }
 })
 
@@ -1575,6 +1668,32 @@ $('#downloaded-list').onclick = () => {
     $('#downloaded-grid-items').hidden = true
     $('#downloaded-table').hidden = false
 }
+function setShelfView(view) {
+    state.shelfView = view
+    localStorage.setItem('pica-shelf-view', view)
+    $('#shelf-grid').setAttribute('aria-pressed', String(view === 'grid'))
+    $('#shelf-list-view').setAttribute('aria-pressed', String(view === 'list'))
+    if (state.activeShelfId) void openShelf(state.activeShelfId)
+}
+$('#shelf-grid').onclick = () => setShelfView('grid')
+$('#shelf-list-view').onclick = () => setShelfView('list')
+$('#shelf-cover-toggle').onchange = (event) => {
+    state.shelfCoversEnabled = event.target.checked
+    localStorage.setItem(
+        'pica-shelf-covers-enabled',
+        String(state.shelfCoversEnabled)
+    )
+    if (state.activeShelfId) void openShelf(state.activeShelfId)
+}
+$('#shelf-cover-toggle').checked = state.shelfCoversEnabled
+$('#shelf-grid').setAttribute(
+    'aria-pressed',
+    String(state.shelfView === 'grid')
+)
+$('#shelf-list-view').setAttribute(
+    'aria-pressed',
+    String(state.shelfView === 'list')
+)
 $('#cover-toggle').onchange = (event) => {
     state.coversEnabled = event.target.checked
     localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
@@ -1584,6 +1703,14 @@ $('#recommend-next-batch').onclick = async () => {
     if ((state.recommendationBatch + 1) * 12 < state.recommendations.length) {
         state.recommendationBatch += 1
         renderPreparedRecommendations()
+        if (state.mode === 'connected') {
+            const status = await post('/api/v1/recommendation-sessions', {
+                action: 'batch',
+                batchIndex: state.recommendationBatch
+            })
+            state.recommendationNextReady = status.nextSessionReady
+            renderPreparedRecommendations()
+        }
         return
     }
     if (state.mode !== 'connected') {
@@ -1602,11 +1729,14 @@ $('#recommend-next-batch').onclick = async () => {
         return
     }
     try {
-        const value = await post('/api/v1/recommendation-sessions', {})
+        const value = await post('/api/v1/recommendation-sessions', {
+            action: 'next'
+        })
         state.profile = value.profile
         state.recommendations = value.recommendations
         state.recommendationSessionNo = value.sessionNo
         state.recommendationExhausted = value.exhausted
+        state.recommendationNextReady = value.nextSessionReady
         state.recommendationBatch = 0
         clearSelection('recommendation')
         renderPreparedRecommendations()
@@ -1688,26 +1818,20 @@ $('#import-button').onclick = importSelectedFile
 $('#import-file').onchange = importSelectedFile
 $('#onboarding-import').onclick = () => $('#import-file').click()
 $('#lite-reimport').onclick = () => $('#import-file').click()
-async function syncFavorites(message = $('#import-result')) {
+async function syncFavorites(message = $('#import-result'), mode = 'quick') {
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.syncNeedsEngine'))
-        message.textContent = t('message.syncReading')
-        setProgress($('#library-operation'), t('message.syncReading'), 0, 0)
+        message.textContent =
+            mode === 'full' ? '正在完整校验收藏…' : '正在检查收藏更新…'
+        setProgress($('#library-operation'), message.textContent, 0, 0)
         let progressTimer = setInterval(async () => {
             try {
                 const progress = await api('/api/v1/sync/progress')
                 if (progress.phase === 'reading') {
-                    const text = progress.page
-                        ? t('message.syncReadingPage', {
-                              page: progress.page,
-                              pages: progress.pages,
-                              fetched: progress.fetched,
-                              totalText: progress.total
-                                  ? ` / ${progress.total}`
-                                  : ''
-                          })
-                        : t('message.syncReading')
+                    const text = progress.fallbackReason
+                        ? `检测到收藏结构变化，正在执行完整校验…已检查第 ${progress.page || 0} 页`
+                        : `已检查第 ${progress.page || 0} 页 · 发现新增 ${progress.found || 0} 部`
                     setProgress(
                         $('#library-operation'),
                         text,
@@ -1728,19 +1852,22 @@ async function syncFavorites(message = $('#import-result')) {
         }, 700)
         let result
         try {
-            result = await post('/api/v1/sync', {})
+            result = await post('/api/v1/sync', { mode })
         } finally {
             clearInterval(progressTimer)
             progressTimer = null
         }
-        desktop.lastSync = result.lastSync
-        message.textContent = `${t('message.syncSummary', {
-            favorites: result.favoriteCount,
-            added: result.addedFavorites,
-            removed: result.removedFavorites,
-            inserted: result.libraryInserted,
-            updated: result.libraryUpdated
-        })} ${t('message.syncOtherRecords')}`
+        if (desktop) desktop.lastSync = result.lastSync
+        message.textContent = `${result.syncMode === 'quick' ? `快速更新完成：检查 ${result.pagesChecked} 页。` : `完整校验完成：检查 ${result.pagesChecked} 页。`} ${t(
+            'message.syncSummary',
+            {
+                favorites: result.favoriteCount,
+                added: result.addedFavorites,
+                removed: result.removedFavorites,
+                inserted: result.libraryInserted,
+                updated: result.libraryUpdated
+            }
+        )} ${t('message.syncOtherRecords')}`
         clearProgress($('#library-operation'))
         await detect()
     } catch (error) {
@@ -1749,6 +1876,8 @@ async function syncFavorites(message = $('#import-result')) {
     }
 }
 $('#sync-button').onclick = () => syncFavorites()
+$('#full-sync-button').onclick = () =>
+    syncFavorites($('#import-result'), 'full')
 $('#home-sync').onclick = () => syncFavorites($('#import-result'))
 $('#setup-sync').onclick = async () => {
     await syncFavorites($('#setup-message'))
@@ -2097,7 +2226,7 @@ async function detect() {
         state.records = await api('/api/v1/comics?limit=5000')
         state.authors = await api('/api/v1/authors')
         await loadLibraryQuery({
-            scope: 'all',
+            scope: 'library',
             tags: [],
             tagMode: 'all',
             sort: $('#sort-mode').value,
@@ -2105,6 +2234,19 @@ async function detect() {
             offset: 0
         })
         renderAll(status.summary)
+        const recommendation = await api(
+            '/api/v1/recommendation-sessions/status'
+        )
+        if (recommendation.recommendations?.length) {
+            state.recommendations = recommendation.recommendations
+            state.recommendationSessionNo = recommendation.sessionNo
+            state.recommendationBatch = recommendation.currentBatchIndex || 0
+            state.recommendationExhausted = recommendation.exhausted
+            state.recommendationNextReady = recommendation.nextSessionReady
+            renderPreparedRecommendations()
+        } else if (recommendation.preparing) {
+            $('#recommend-message').textContent = '正在准备推荐…'
+        }
     } catch {
         state.mode = 'lite'
         $('#mode').textContent = t('mode.lite')

@@ -36,6 +36,10 @@ import type {
     DownloadRunner
 } from '../core/downloads/types'
 import { checkComicUpdates } from '../maintenance/updates'
+import {
+    ProviderService,
+    type FavoritesSyncMode
+} from '../services/provider-service'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -69,12 +73,15 @@ export interface DownloadResult {
 
 export interface FavoritesSyncProgress {
     phase: 'idle' | 'reading' | 'processing' | 'complete' | 'failed'
+    mode?: FavoritesSyncMode
     page?: number
     pages?: number
     fetched?: number
     total?: number
     processed?: number
     error?: string
+    found?: number
+    fallbackReason?: string
 }
 
 function comicToRecord(comic: Comic): FavoriteRecord {
@@ -199,32 +206,27 @@ export class LibraryService {
         return { ...this.favoritesProgress }
     }
 
-    async syncFavorites() {
-        const pica = await this.connect()
+    async syncFavorites(mode: FavoritesSyncMode = 'quick') {
         this.favoritesProgress = { phase: 'reading' }
         try {
-            const { comics } = await pica.favoritesAll('all', (progress) => {
+            const provider = new ProviderService(
+                () => this.connect(),
+                this.database
+            )
+            const result = await provider.syncFavorites(mode, (progress) => {
                 this.favoritesProgress = {
-                    phase: 'reading',
                     ...progress
                 }
             })
             this.favoritesProgress = {
-                phase: 'processing',
-                fetched: comics.length,
-                total: comics.length,
-                processed: 0
-            }
-            const result = this.database.importFavorites(
-                comics.map(comicToRecord),
-                'pica:favorites',
-                true
-            )
-            this.favoritesProgress = {
                 phase: 'complete',
-                fetched: comics.length,
-                total: comics.length,
-                processed: comics.length
+                mode: result.syncMode,
+                page: result.pagesChecked,
+                fetched: result.imported,
+                total: result.favoriteCount,
+                processed: result.imported,
+                found: result.addedFavorites,
+                fallbackReason: result.fallbackReason
             }
             return result
         } catch (error) {
@@ -309,7 +311,7 @@ export class LibraryService {
     async recommendations(
         options: { limit?: number; seedCount?: number } = {}
     ) {
-        const limit = Math.max(1, Math.min(options.limit ?? 30, 100))
+        const limit = Math.max(1, Math.min(options.limit ?? 30, 500))
         const favorites = this.database
             .listComics({ limit: 5000 })
             .filter((comic) => comic.isFavorite)

@@ -306,6 +306,74 @@ export const migrations: Migration[] = [
                 updated_at TEXT NOT NULL
             );
         `
+    },
+    {
+        version: 7,
+        name: 'v020_fast_sync_and_library_membership',
+        up: `
+            CREATE TABLE IF NOT EXISTS library_membership (
+                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
+                reason TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (comic_id, reason)
+            );
+            CREATE INDEX IF NOT EXISTS idx_library_membership_reason
+                ON library_membership(reason, comic_id);
+            CREATE TABLE IF NOT EXISTS favorites_sync_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                last_full_sync_at TEXT,
+                last_quick_sync_at TEXT,
+                previous_remote_count INTEGER NOT NULL DEFAULT 0,
+                last_head_ids_json TEXT NOT NULL DEFAULT '[]',
+                last_head_fingerprint TEXT NOT NULL DEFAULT '',
+                last_known_page_size INTEGER NOT NULL DEFAULT 0,
+                last_full_reconcile_count INTEGER NOT NULL DEFAULT 0
+            );
+            INSERT OR IGNORE INTO favorites_sync_state(id) VALUES (1);
+            UPDATE favorites_sync_state SET
+                last_full_sync_at = COALESCE(
+                    (SELECT finished_at FROM sync_runs
+                     WHERE status = 'completed' AND source LIKE 'pica:favorites%'
+                     ORDER BY finished_at DESC LIMIT 1),
+                    last_full_sync_at
+                ),
+                previous_remote_count = (
+                    SELECT COUNT(*) FROM comics WHERE is_favorite = 1
+                ),
+                last_full_reconcile_count = (
+                    SELECT COUNT(*) FROM comics WHERE is_favorite = 1
+                );
+
+            INSERT OR IGNORE INTO library_membership(
+                comic_id, reason, created_at, updated_at
+            )
+            SELECT id, 'pica-favorite', first_seen_at, last_seen_at
+            FROM comics WHERE is_favorite = 1;
+
+            INSERT OR IGNORE INTO library_membership(
+                comic_id, reason, created_at, updated_at
+            )
+            SELECT DISTINCT comic_id, 'shelf', added_at, added_at
+            FROM shelf_items;
+
+            INSERT OR IGNORE INTO library_membership(
+                comic_id, reason, created_at, updated_at
+            )
+            SELECT DISTINCT comic_id, 'download', first_seen_at, last_seen_at
+            FROM pictures
+            WHERE status = 'completed' AND local_path IS NOT NULL;
+
+            INSERT OR IGNORE INTO library_membership(
+                comic_id, reason, created_at, updated_at
+            )
+            SELECT DISTINCT comic_id, 'explicit-import', first_seen_at, last_seen_at
+            FROM comic_provenance
+            WHERE source LIKE '%import%'
+               OR source LIKE '%csv%'
+               OR source LIKE '%bundle%'
+               OR source = 'legacy/unknown';
+        `
     }
 ]
 

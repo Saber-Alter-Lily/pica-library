@@ -109,8 +109,8 @@ describe('ReaderService', () => {
         expect(result).toMatchObject({ pages: 12 })
         const zip = new AdmZip(result.path)
         const names = zip.getEntries().map((entry) => entry.entryName)
-        expect(names[0]).toBe('01.jpg')
-        expect(names.at(-1)).toBe('12.jpg')
+        expect(names[0]).toBe('001.jpg')
+        expect(names.at(-1)).toBe('012.jpg')
         const combined = Buffer.concat(
             zip.getEntries().map((entry) => entry.getData())
         )
@@ -119,6 +119,41 @@ describe('ReaderService', () => {
         expect(combined).not.toMatch(
             /authorization|bearer|cookie|pica_password/
         )
+        database.close()
+    })
+
+    it('exports ZIP by default semantics with the same safe ordered page set as CBZ', () => {
+        const { database, reader } = fixture(12)
+        const zipResult = reader.exportZip('reader-comic', 'episode-1')
+        const cbzResult = reader.exportCbz('reader-comic', 'episode-1')
+        expect(zipResult.path).toMatch(/\.zip$/)
+        expect(cbzResult.path).toMatch(/\.cbz$/)
+        const names = (file: string) =>
+            new AdmZip(file).getEntries().map((entry) => entry.entryName)
+        expect(names(zipResult.path)).toEqual(names(cbzResult.path))
+        expect(names(zipResult.path)).toEqual(
+            Array.from(
+                { length: 12 },
+                (_, index) => `${String(index + 1).padStart(3, '0')}.jpg`
+            )
+        )
+        const all = Buffer.concat(
+            new AdmZip(zipResult.path)
+                .getEntries()
+                .map((entry) => entry.getData())
+        ).toString('utf8')
+        expect(all).not.toMatch(/PICA_PASSWORD|Authorization|Bearer|Cookie/i)
+        database.close()
+    })
+
+    it('clamps resume progress when downloaded pages were removed', () => {
+        const { database, reader } = fixture(3)
+        reader.saveProgress('reader-comic', 'episode-1', 2)
+        const picture = database.getDownloadedPicture('picture-2')
+        fs.rmSync(picture!.localPath)
+        expect(
+            reader.chapter('reader-comic', 'episode-1').progress?.pageIndex
+        ).toBe(1)
         database.close()
     })
 

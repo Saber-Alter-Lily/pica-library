@@ -7,6 +7,8 @@ $name = if ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {
     'Pica-Library-v0.2.0-dev.1-local-test-windows-x64'
+} elseif ($version -eq '0.2.0-dev.2') {
+    'Pica-Library-v0.2.0-dev.2-local-test-windows-x64'
 } else {
     throw "Unsupported local acceptance package version: $version"
 }
@@ -64,11 +66,16 @@ if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework comp
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 
 # The legacy compiler embeds a timestamp and a random module ID. When launcher
-# source is unchanged, dev.1 must reuse the frozen dev.0 bytes so a file-diff
+# source is unchanged, each incremental target reuses the previous package's
+# launcher bytes so a file-diff update does not report a false replacement.
 # update does not report a false launcher replacement.
-if ($version -eq '0.2.0-dev.1') {
-    $baseZip = Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
-    if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The frozen dev.0 update-base package is required to reuse its unchanged launcher' }
+if ($version -in @('0.2.0-dev.1','0.2.0-dev.2')) {
+    $baseZip = if ($version -eq '0.2.0-dev.1') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
+    } else {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'
+    }
+    if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [IO.Compression.ZipFile]::OpenRead($baseZip)
     try {

@@ -20,6 +20,7 @@ import type {
     ComicQuery,
     DownloadedComic,
     FavoriteRecord,
+    FavoritesSyncState,
     ImportResult,
     LibraryReconciliation,
     LibrarySummary,
@@ -293,6 +294,15 @@ export class LibraryDatabase {
             DELETE FROM comic_provenance
             WHERE comic_id = ? AND source = 'legacy/unknown'
         `)
+        const membershipUpsert = this.db.prepare(`
+            INSERT INTO library_membership(comic_id, reason, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(comic_id, reason) DO UPDATE SET updated_at = excluded.updated_at
+        `)
+        const explicitImport =
+            source.includes('import') ||
+            source.toLocaleLowerCase('und').includes('csv') ||
+            source.toLocaleLowerCase('und').includes('bundle')
 
         let inserted = 0
         let updated = 0
@@ -300,6 +310,9 @@ export class LibraryDatabase {
             this.db.exec('BEGIN IMMEDIATE')
             if (completeSnapshot && markFavorite) {
                 this.db.exec('UPDATE comics SET is_favorite = 0')
+                this.db.exec(
+                    "DELETE FROM library_membership WHERE reason = 'pica-favorite'"
+                )
             }
             for (const record of uniqueRecords) {
                 const existed = Boolean(
@@ -371,6 +384,20 @@ export class LibraryDatabase {
                 provenanceUpsert.run(record.comicId, source, now, now)
                 if (source !== 'legacy/unknown')
                     clearUnknownProvenance.run(record.comicId)
+                if (markFavorite)
+                    membershipUpsert.run(
+                        record.comicId,
+                        'pica-favorite',
+                        now,
+                        now
+                    )
+                if (explicitImport)
+                    membershipUpsert.run(
+                        record.comicId,
+                        'explicit-import',
+                        now,
+                        now
+                    )
                 if (existed) updated += 1
                 else inserted += 1
             }
@@ -429,7 +456,10 @@ export class LibraryDatabase {
         const count = (sql: string) =>
             numberValue((this.db.prepare(sql).get() as SqlRow).count)
         return {
-            comics: count('SELECT COUNT(*) AS count FROM comics'),
+            comics: count(
+                'SELECT COUNT(DISTINCT comic_id) AS count FROM library_membership'
+            ),
+            catalogComics: count('SELECT COUNT(*) AS count FROM comics'),
             favorites: count(
                 'SELECT COUNT(*) AS count FROM comics WHERE is_favorite = 1'
             ),
@@ -619,6 +649,8 @@ export class LibraryDatabase {
         const rows = this.db
             .prepare(
                 `SELECT c.*, a.canonical_name,
+                        EXISTS(SELECT 1 FROM library_membership lm
+                               WHERE lm.comic_id = c.id) AS in_library,
                         (SELECT COUNT(*) FROM episodes e WHERE e.comic_id = c.id)
                             AS known_episodes,
                         (SELECT COUNT(*) FROM pictures p WHERE p.comic_id = c.id)
@@ -674,7 +706,8 @@ export class LibraryDatabase {
                     lastSeenAt: String(row.last_seen_at),
                     knownEpisodes: numberValue(row.known_episodes),
                     knownPictures: numberValue(row.known_pictures),
-                    downloadedPictures: numberValue(row.downloaded_pictures)
+                    downloadedPictures: numberValue(row.downloaded_pictures),
+                    inLibrary: Boolean(row.in_library)
                 }
             })
             .filter((comic) => {
@@ -758,7 +791,72 @@ export class LibraryDatabase {
             )
             .run(isFavorite ? 1 : 0, new Date().toISOString(), comicId)
         if (result.changes !== 1) throw new Error(`Comic not found: ${comicId}`)
+        const now = new Date().toISOString()
+        if (isFavorite)
+            this.db
+                .prepare(
+                    `INSERT INTO library_membership(comic_id, reason, created_at, updated_at)
+                     VALUES (?, 'pica-favorite', ?, ?)
+                     ON CONFLICT(comic_id, reason) DO UPDATE SET updated_at = excluded.updated_at`
+                )
+                .run(comicId, now, now)
+        else
+            this.db
+                .prepare(
+                    "DELETE FROM library_membership WHERE comic_id = ? AND reason = 'pica-favorite'"
+                )
+                .run(comicId)
         return this.getComic(comicId)
+    }
+
+    favoriteIds() {
+        return (
+            this.db
+                .prepare(
+                    'SELECT id FROM comics WHERE is_favorite = 1 ORDER BY id'
+                )
+                .all() as SqlRow[]
+        ).map((row) => String(row.id))
+    }
+
+    favoritesSyncState(): FavoritesSyncState {
+        const row = this.db
+            .prepare('SELECT * FROM favorites_sync_state WHERE id = 1')
+            .get() as SqlRow
+        return {
+            lastFullSyncAt: row.last_full_sync_at
+                ? String(row.last_full_sync_at)
+                : null,
+            lastQuickSyncAt: row.last_quick_sync_at
+                ? String(row.last_quick_sync_at)
+                : null,
+            previousRemoteCount: numberValue(row.previous_remote_count),
+            lastHeadIds: jsonArray(row.last_head_ids_json),
+            lastHeadFingerprint: String(row.last_head_fingerprint ?? ''),
+            lastKnownPageSize: numberValue(row.last_known_page_size),
+            lastFullReconcileCount: numberValue(row.last_full_reconcile_count)
+        }
+    }
+
+    saveFavoritesSyncState(state: FavoritesSyncState) {
+        this.db
+            .prepare(
+                `UPDATE favorites_sync_state SET
+                    last_full_sync_at = ?, last_quick_sync_at = ?,
+                    previous_remote_count = ?, last_head_ids_json = ?,
+                    last_head_fingerprint = ?, last_known_page_size = ?,
+                    last_full_reconcile_count = ? WHERE id = 1`
+            )
+            .run(
+                state.lastFullSyncAt,
+                state.lastQuickSyncAt,
+                state.previousRemoteCount,
+                JSON.stringify(state.lastHeadIds),
+                state.lastHeadFingerprint,
+                state.lastKnownPageSize,
+                state.lastFullReconcileCount
+            )
+        return state
     }
 
     listShelves(): Shelf[] {
@@ -838,6 +936,14 @@ export class LibraryDatabase {
             .prepare('DELETE FROM shelves WHERE id = ?')
             .run(id)
         if (result.changes !== 1) throw new Error('书架不存在')
+        this.db.exec(`
+            DELETE FROM library_membership
+            WHERE reason = 'shelf'
+              AND NOT EXISTS (
+                SELECT 1 FROM shelf_items si
+                WHERE si.comic_id = library_membership.comic_id
+              )
+        `)
         return { deleted: true, id }
     }
 
@@ -863,12 +969,18 @@ export class LibraryDatabase {
                 shelf_id, comic_id, added_at, position
             ) VALUES (?, ?, ?, ?)`
         )
+        const membership = this.db.prepare(
+            `INSERT INTO library_membership(comic_id, reason, created_at, updated_at)
+             VALUES (?, 'shelf', ?, ?)
+             ON CONFLICT(comic_id, reason) DO UPDATE SET updated_at = excluded.updated_at`
+        )
         this.db.exec('BEGIN IMMEDIATE')
         try {
             for (const comicId of unique) {
                 if (!exists.get(comicId)) continue
                 const result = insert.run(shelfId, comicId, now, position++)
                 added += Number(result.changes)
+                membership.run(comicId, now, now)
             }
             this.db
                 .prepare('UPDATE shelves SET updated_at = ? WHERE id = ?')
@@ -893,6 +1005,14 @@ export class LibraryDatabase {
         let removed = 0
         for (const comicId of [...new Set(comicIds)])
             removed += Number(remove.run(shelfId, comicId).changes)
+        this.db.exec(`
+            DELETE FROM library_membership
+            WHERE reason = 'shelf'
+              AND NOT EXISTS (
+                SELECT 1 FROM shelf_items si
+                WHERE si.comic_id = library_membership.comic_id
+              )
+        `)
         return { shelfId, removed, total: this.listShelfComics(shelfId).length }
     }
 
@@ -1050,6 +1170,49 @@ export class LibraryDatabase {
                   exhausted: Boolean(row.exhausted)
               }
             : null
+    }
+
+    recommendationSession(cycleId: string, sessionNo: number) {
+        const row = this.db
+            .prepare(
+                `SELECT id, session_no, generated_at, result_ids_json, exhausted
+                 FROM recommendation_sessions
+                 WHERE cycle_id = ? AND session_no = ?`
+            )
+            .get(cycleId, sessionNo) as SqlRow | undefined
+        return row
+            ? {
+                  id: String(row.id),
+                  sessionNo: numberValue(row.session_no),
+                  generatedAt: String(row.generated_at),
+                  comicIds: jsonArray(row.result_ids_json),
+                  exhausted: Boolean(row.exhausted)
+              }
+            : null
+    }
+
+    recommendationRecords(comicIds: string[]) {
+        const byId = new Map(
+            this.listComics({ limit: 5000 }).map((comic) => [
+                comic.comicId,
+                comic
+            ])
+        )
+        return comicIds.flatMap((id) => {
+            const comic = byId.get(id)
+            return comic
+                ? [
+                      {
+                          comic,
+                          score: 0,
+                          reasons: [] as string[],
+                          recallSources: [] as string[],
+                          matchedSignals: [] as string[],
+                          exploration: false
+                      }
+                  ]
+                : []
+        })
     }
 
     saveRecommendationSession(
@@ -1438,6 +1601,15 @@ export class LibraryDatabase {
                     ) VALUES (?, 'download:completion', ?, ?)
                     ON CONFLICT(comic_id, source) DO UPDATE SET
                         last_seen_at = excluded.last_seen_at`
+                )
+                .run(String(picture.comic_id), observedAt, observedAt)
+            this.db
+                .prepare(
+                    `INSERT INTO library_membership(
+                        comic_id, reason, created_at, updated_at
+                    ) VALUES (?, 'download', ?, ?)
+                    ON CONFLICT(comic_id, reason) DO UPDATE SET
+                        updated_at = excluded.updated_at`
                 )
                 .run(String(picture.comic_id), observedAt, observedAt)
         }

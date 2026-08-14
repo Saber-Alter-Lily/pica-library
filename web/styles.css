@@ -324,6 +324,28 @@ main {
     color: var(--muted);
     font-size: 13px;
 }
+.shelf-list-mode {
+    display: block;
+}
+.shelf-list-mode .comic-card {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    margin-bottom: 8px;
+}
+.shelf-list-mode .cover-shell {
+    width: 84px;
+    min-height: 112px;
+}
+.reader-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+#reader-exit {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+}
 .comic-select {
     color: var(--muted);
     font-size: 12px;

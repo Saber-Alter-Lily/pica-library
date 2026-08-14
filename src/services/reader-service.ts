@@ -33,8 +33,20 @@ export class ReaderService {
             .listReaderEpisodes(comicId)
             .find((item) => item.id === episodeId)
         if (!episode) throw new Error('章节不存在')
-        const pictures = this.database.listDownloadedPictures(episodeId)
+        const pictures = this.database
+            .listDownloadedPictures(episodeId)
+            .filter((picture) => {
+                try {
+                    this.safeLocalFile(picture.localPath)
+                    return true
+                } catch {
+                    return false
+                }
+            })
         if (!pictures.length) throw new Error('该章节尚未下载。')
+        const progress = this.database
+            .readingProgress(comicId)
+            .find((item) => item.episodeId === episodeId)
         return {
             episode,
             pages: pictures.map((picture) => ({
@@ -42,9 +54,15 @@ export class ReaderService {
                 position: picture.position,
                 url: `/api/v1/reader/pictures/${encodeURIComponent(picture.id)}`
             })),
-            progress: this.database
-                .readingProgress(comicId)
-                .find((item) => item.episodeId === episodeId)
+            progress: progress
+                ? {
+                      ...progress,
+                      pageIndex: Math.min(
+                          progress.pageIndex,
+                          Math.max(0, pictures.length - 1)
+                      )
+                  }
+                : undefined
         }
     }
 
@@ -88,7 +106,11 @@ export class ReaderService {
         return this.database.readingProgress().slice(0, 20)
     }
 
-    exportCbz(comicId: string, episodeId: string) {
+    exportArchive(
+        comicId: string,
+        episodeId: string,
+        format: 'zip' | 'cbz' = 'zip'
+    ) {
         const comic = this.database.getComic(comicId)
         const episode = this.database
             .listReaderEpisodes(comicId)
@@ -96,14 +118,14 @@ export class ReaderService {
         if (!comic || !episode) throw new Error('漫画或章节不存在')
         const pictures = this.database.listDownloadedPictures(episodeId)
         if (!pictures.length) throw new Error('该章节尚未下载。')
-        const outputDirectory = path.join(this.root, 'exports', 'cbz')
+        const outputDirectory = path.join(this.root, 'exports', 'archives')
         fs.mkdirSync(outputDirectory, { recursive: true })
         const output = path.join(
             outputDirectory,
-            `${safePathSegment(comic.canonicalAuthor ?? comic.author, '未知作者')} - ${safePathSegment(comic.title, comicId)} - ${safePathSegment(episode.title, episodeId)}.cbz`
+            `${safePathSegment(comic.canonicalAuthor ?? comic.author, '未知作者')} - ${safePathSegment(comic.title, comicId)} - ${safePathSegment(episode.title, episodeId)}.${format}`
         )
         const zip = new AdmZip()
-        const width = String(pictures.length).length
+        const width = Math.max(3, String(pictures.length).length)
         for (let index = 0; index < pictures.length; index++) {
             const file = this.safeLocalFile(pictures[index].localPath)
             const extension = path.extname(file).toLowerCase()
@@ -117,9 +139,18 @@ export class ReaderService {
         zip.writeZip(output)
         return {
             path: output,
+            format,
             pages: pictures.length,
             bytes: fs.statSync(output).size
         }
+    }
+
+    exportZip(comicId: string, episodeId: string) {
+        return this.exportArchive(comicId, episodeId, 'zip')
+    }
+
+    exportCbz(comicId: string, episodeId: string) {
+        return this.exportArchive(comicId, episodeId, 'cbz')
     }
 
     openDefault(file: string) {

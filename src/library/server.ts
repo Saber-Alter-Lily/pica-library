@@ -165,6 +165,10 @@ export async function startLibraryServer(options: {
         options.database,
         (limit) => options.service.recommendations({ limit })
     )
+    void recommendationService.ensureInitialPrepared().catch(() => {
+        // Connected startup must remain available while provider preparation
+        // waits for credentials/network. The status endpoint exposes preparing.
+    })
     const previewCache = new PreviewCacheManager(
         path.join(options.cacheDir ?? options.service.dataDir, 'previews')
     )
@@ -517,7 +521,13 @@ export async function startLibraryServer(options: {
                     200,
                     input.action === 'restart'
                         ? await recommendationService.restartCycle()
-                        : await recommendationService.nextSession()
+                        : input.action === 'next'
+                          ? await recommendationService.advanceSession()
+                          : input.action === 'batch'
+                            ? recommendationService.recordBatch(
+                                  Number(input.batchIndex ?? 0)
+                              )
+                            : await recommendationService.ensureInitialPrepared()
                 )
             }
             if (
@@ -647,6 +657,20 @@ export async function startLibraryServer(options: {
                         String(input.comicId ?? ''),
                         String(input.episodeId ?? ''),
                         Number(input.pageIndex ?? 0)
+                    )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/reader/export-zip' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    readerService.exportZip(
+                        String(input.comicId ?? ''),
+                        String(input.episodeId ?? '')
                     )
                 )
             }
@@ -800,12 +824,16 @@ export async function startLibraryServer(options: {
                     options.database.importFavorites(
                         records,
                         'web:import',
-                        true
+                        false,
+                        false
                     )
                 )
             }
             if (url.pathname === '/api/v1/sync' && request.method === 'POST') {
-                const result = await options.service.syncFavorites()
+                const input = await body(request)
+                const result = await options.service.syncFavorites(
+                    input.mode === 'full' ? 'full' : 'quick'
+                )
                 return json(response, 200, {
                     ...result,
                     lastSync: options.database.lastCompletedSync(),

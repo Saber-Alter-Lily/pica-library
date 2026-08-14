@@ -51,7 +51,12 @@ export interface ComicQuery {
     offset?: number
 }
 
-export type LibraryScope = 'all' | 'favorites' | 'downloaded'
+export type LibraryScope =
+    | 'library'
+    | 'favorites'
+    | 'downloaded'
+    | 'catalog'
+    | 'all'
 export type TagMatchMode = 'all' | 'any'
 export type DownloadFacet =
     | 'downloaded'
@@ -98,10 +103,12 @@ export interface StoredComic extends FavoriteRecord {
     knownEpisodes: number
     knownPictures: number
     downloadedPictures: number
+    inLibrary?: boolean
 }
 
 export interface LibrarySummary {
     comics: number
+    catalogComics: number
     favorites: number
     downloadedComics: number
     authors: number
@@ -109,6 +116,16 @@ export interface LibrarySummary {
     episodes: number
     pictures: number
     downloadedPictures: number
+}
+
+export interface FavoritesSyncState {
+    lastFullSyncAt: string | null
+    lastQuickSyncAt: string | null
+    previousRemoteCount: number
+    lastHeadIds: string[]
+    lastHeadFingerprint: string
+    lastKnownPageSize: number
+    lastFullReconcileCount: number
 }
 
 export interface ImportResult {

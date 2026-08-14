@@ -33,7 +33,9 @@ describe('SQLite migrations', () => {
         const versions = database
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>
-        expect(versions.map((row) => row.version)).toEqual([1, 2, 3, 4, 5, 6])
+        expect(versions.map((row) => row.version)).toEqual([
+            1, 2, 3, 4, 5, 6, 7
+        ])
         expect(
             database
                 .prepare(
@@ -76,7 +78,7 @@ describe('SQLite migrations', () => {
             database
                 .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
                 .get()
-        ).toMatchObject({ count: 6 })
+        ).toMatchObject({ count: 7 })
         database.close()
     })
 
@@ -86,12 +88,12 @@ describe('SQLite migrations', () => {
             runMigrations(database, [
                 ...migrations,
                 {
-                    version: 7,
+                    version: 8,
                     name: 'broken',
                     up: 'CREATE TABLE transient(value TEXT); INVALID SQL;'
                 }
             ])
-        ).toThrow(/Migration 7/)
+        ).toThrow(/Migration 8/)
         expect(
             database
                 .prepare(
@@ -102,7 +104,7 @@ describe('SQLite migrations', () => {
         expect(
             database
                 .prepare(
-                    'SELECT version FROM schema_migrations WHERE version = 7'
+                    'SELECT version FROM schema_migrations WHERE version = 8'
                 )
                 .get()
         ).toBeUndefined()
@@ -121,7 +123,7 @@ describe('SQLite migrations', () => {
         const library = new LibraryDatabase(databaseFile)
         library.close()
 
-        const backup = `${databaseFile}.pre-migration-v6.bak`
+        const backup = `${databaseFile}.pre-migration-v7.bak`
         expect(fs.existsSync(backup)).toBe(true)
         const backedUp = new DatabaseSync(backup)
         expect(
@@ -139,5 +141,48 @@ describe('SQLite migrations', () => {
                 .get()
         ).toBeUndefined()
         backedUp.close()
+    })
+
+    it('migrates a dev.1 catalog without deleting cache and derives durable membership', () => {
+        const databaseFile = file()
+        const dev1 = new DatabaseSync(databaseFile)
+        runMigrations(
+            dev1,
+            migrations.filter((item) => item.version <= 6)
+        )
+        const insert = dev1.prepare(`
+            INSERT INTO comics(
+                id, title, raw_author, categories_json, tags_json,
+                is_favorite, first_seen_at, last_seen_at
+            ) VALUES (?, ?, 'Author', '[]', '[]', ?, ?, ?)
+        `)
+        const provenance = dev1.prepare(`
+            INSERT INTO comic_provenance(
+                comic_id, source, first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?)
+        `)
+        const now = new Date().toISOString()
+        for (let index = 0; index < 1773; index++) {
+            const id = `favorite-${index}`
+            insert.run(id, id, 1, now, now)
+            provenance.run(id, 'pica:favorites', now, now)
+        }
+        for (let index = 0; index < 187; index++) {
+            const id = `cache-${index}`
+            insert.run(id, id, 0, now, now)
+            provenance.run(id, 'pica:recommendations', now, now)
+        }
+        dev1.close()
+
+        const migrated = new LibraryDatabase(databaseFile)
+        expect(migrated.summary()).toMatchObject({
+            comics: 1773,
+            favorites: 1773,
+            catalogComics: 1960
+        })
+        expect(migrated.getComic('cache-0')).toMatchObject({
+            inLibrary: false
+        })
+        migrated.close()
     })
 })

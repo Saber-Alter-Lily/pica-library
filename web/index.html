@@ -203,7 +203,8 @@
                             accept=".csv,.json"
                         />
                         <button id="import-button" class="primary">导入</button>
-                        <button id="sync-button">同步收藏</button>
+                        <button id="sync-button">更新收藏</button>
+                        <button id="full-sync-button">完整校验收藏</button>
                     </div>
                 </div>
                 <p id="import-result" class="status"></p>
@@ -256,9 +257,10 @@
                     >
                     <input id="filter-text" placeholder="标题或作者" />
                     <select id="filter-scope">
-                        <option value="all">全部本地漫画</option>
+                        <option value="library" selected>漫画库</option>
                         <option value="favorites">Pica 收藏</option>
                         <option value="downloaded">已下载</option>
+                        <option value="catalog">全部缓存记录</option>
                     </select>
                     <label class="facet-control"
                         >作者<input
@@ -332,6 +334,38 @@
                     </button>
                 </div>
                 <p id="shelf-message" class="status"></p>
+                <div
+                    class="toolbar responsive-toolbar"
+                    id="shelf-view-controls"
+                >
+                    <button id="shelf-grid" aria-pressed="true">网格</button>
+                    <button id="shelf-list-view" aria-pressed="false">
+                        列表
+                    </button>
+                    <div class="control-group grid-size-controls">
+                        <button data-grid-size="small" data-size-scope="shelf">
+                            小
+                        </button>
+                        <button data-grid-size="medium" data-size-scope="shelf">
+                            中
+                        </button>
+                        <button
+                            data-grid-size="large"
+                            data-size-scope="shelf"
+                            aria-pressed="true"
+                        >
+                            大
+                        </button>
+                    </div>
+                    <label
+                        ><input
+                            id="shelf-cover-toggle"
+                            type="checkbox"
+                            checked
+                        />
+                        加载封面</label
+                    >
+                </div>
                 <div class="shelf-layout">
                     <div id="shelf-list" class="shelf-list"></div>
                     <div id="shelf-detail" class="shelf-detail">
@@ -444,6 +478,9 @@
                         <p id="reader-chapter-title" class="status"></p>
                     </div>
                     <div class="reader-controls">
+                        <button id="reader-exit" class="primary">
+                            ← 退出阅读
+                        </button>
                         <select id="reader-mode">
                             <option value="vertical">连续纵向</option>
                             <option value="single">单页</option>
@@ -458,7 +495,8 @@
                             <option value="height">适应高度</option>
                         </select>
                         <button id="reader-fullscreen">全屏</button>
-                        <button id="reader-export-cbz">导出为 CBZ</button>
+                        <button id="reader-export-zip">导出 ZIP</button>
+                        <button id="reader-export-cbz">导出 CBZ</button>
                     </div>
                 </div>
                 <div class="reader-shell">

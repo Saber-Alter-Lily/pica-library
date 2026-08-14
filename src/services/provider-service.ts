@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { Pica } from '../sdk'
 import type { Comic, Episode, Picture } from '../types'
 import { trustedCoverUrl } from '../library/cover-url'
@@ -6,6 +7,27 @@ import type { LibraryDatabase } from '../library/database'
 
 export interface ProviderCapabilities {
     favoriteMutation: boolean
+}
+
+export type FavoritesSyncMode = 'quick' | 'full'
+
+export interface ProviderFavoritesProgress {
+    phase: 'reading' | 'processing'
+    mode: FavoritesSyncMode
+    page?: number
+    pages?: number
+    fetched?: number
+    total?: number
+    found?: number
+    fallbackReason?: string
+}
+
+const FULL_RECONCILE_INTERVAL_MS = 24 * 60 * 60 * 1000
+const STABLE_OVERLAP_IDS = 8
+const MAX_QUICK_PAGES = 5
+
+function fingerprint(ids: string[]) {
+    return createHash('sha256').update(ids.join('\n')).digest('hex')
 }
 
 export function providerComicRecord(comic: Comic): FavoriteRecord {
@@ -44,14 +66,148 @@ export class ProviderService {
         return this.connectProvider()
     }
 
-    async syncFavorites() {
+    async syncFavorites(
+        mode: FavoritesSyncMode = 'quick',
+        onProgress?: (progress: ProviderFavoritesProgress) => void
+    ) {
         const provider = await this.connect()
-        const { comics } = await provider.favoritesAll('all')
-        return this.database.importFavorites(
-            comics.map(providerComicRecord),
-            'pica:favorites',
+        const previous = this.database.favoritesSyncState()
+        const known = new Set(this.database.favoriteIds())
+        const now = new Date()
+        const fullDue =
+            !previous.lastFullSyncAt ||
+            now.getTime() - new Date(previous.lastFullSyncAt).getTime() >=
+                FULL_RECONCILE_INTERVAL_MS
+
+        const full = async (fallbackReason?: string) => {
+            let headIds: string[] = []
+            let pagesChecked = 0
+            const { comics, pages } = await provider.favoritesAll(
+                'all',
+                (page) => {
+                    pagesChecked = page.page
+                    onProgress?.({
+                        phase: 'reading',
+                        mode: 'full',
+                        ...page,
+                        fallbackReason
+                    })
+                }
+            )
+            headIds = comics.slice(0, 20).map((comic) => comic._id)
+            onProgress?.({
+                phase: 'processing',
+                mode: 'full',
+                fetched: comics.length,
+                total: comics.length,
+                found: comics.filter((comic) => !known.has(comic._id)).length,
+                fallbackReason
+            })
+            const result = this.database.importFavorites(
+                comics.map(providerComicRecord),
+                'pica:favorites:full',
+                true
+            )
+            const timestamp = now.toISOString()
+            this.database.saveFavoritesSyncState({
+                lastFullSyncAt: timestamp,
+                lastQuickSyncAt: previous.lastQuickSyncAt,
+                previousRemoteCount: comics.length,
+                lastHeadIds: headIds,
+                lastHeadFingerprint: fingerprint(headIds),
+                lastKnownPageSize: comics.length
+                    ? Math.ceil(comics.length / Math.max(1, pages))
+                    : 0,
+                lastFullReconcileCount: comics.length
+            })
+            return {
+                ...result,
+                syncMode: 'full' as const,
+                pagesChecked,
+                fallbackReason
+            }
+        }
+
+        if (mode === 'full') return full()
+        if (fullDue) return full('periodic-or-initial-reconciliation')
+
+        const collected = [] as Comic[]
+        const unseen = new Set<string>()
+        let page = 1
+        let remoteTotal = 0
+        let totalPages = 0
+        let stableOverlap = false
+        let orderingAnomaly = false
+        while (page <= MAX_QUICK_PAGES) {
+            const result = await provider.favorites(page)
+            remoteTotal = result.total
+            totalPages = result.pages
+            const ids = result.docs.map((comic) => comic._id)
+            if (new Set(ids).size !== ids.length) orderingAnomaly = true
+            collected.push(...result.docs)
+            for (const id of ids) if (!known.has(id)) unseen.add(id)
+            let trailingKnown = 0
+            for (let index = collected.length - 1; index >= 0; index--) {
+                if (!known.has(collected[index]._id)) break
+                trailingKnown += 1
+            }
+            stableOverlap = trailingKnown >= STABLE_OVERLAP_IDS
+            onProgress?.({
+                phase: 'reading',
+                mode: 'quick',
+                page,
+                pages: totalPages,
+                fetched: collected.length,
+                total: remoteTotal,
+                found: unseen.size
+            })
+            const countConsistent = remoteTotal === known.size + unseen.size
+            if (stableOverlap && countConsistent && !orderingAnomaly) break
+            if (page >= totalPages) break
+            page += 1
+        }
+
+        const countConsistent = remoteTotal === known.size + unseen.size
+        if (!stableOverlap || !countConsistent || orderingAnomaly) {
+            const reason = orderingAnomaly
+                ? 'pagination-ordering-anomaly'
+                : !countConsistent
+                  ? 'remote-count-anomaly'
+                  : 'stable-overlap-not-found'
+            return full(reason)
+        }
+
+        onProgress?.({
+            phase: 'processing',
+            mode: 'quick',
+            fetched: collected.length,
+            total: remoteTotal,
+            found: unseen.size
+        })
+        const result = this.database.importFavorites(
+            collected.map(providerComicRecord),
+            'pica:favorites:quick',
+            false,
             true
         )
+        const headIds = collected.slice(0, 20).map((comic) => comic._id)
+        this.database.saveFavoritesSyncState({
+            ...previous,
+            lastQuickSyncAt: now.toISOString(),
+            previousRemoteCount: remoteTotal,
+            lastHeadIds: headIds,
+            lastHeadFingerprint: fingerprint(headIds),
+            lastKnownPageSize: collected.length
+                ? Math.min(collected.length, previous.lastKnownPageSize || 20)
+                : previous.lastKnownPageSize
+        })
+        return {
+            ...result,
+            syncMode: 'quick' as const,
+            pagesChecked: page,
+            foundNew: unseen.size,
+            fallbackReason: undefined
+        }
     }
 
     async search(keyword: string) {

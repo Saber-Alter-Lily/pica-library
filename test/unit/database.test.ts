@@ -209,7 +209,10 @@ describe('library database', () => {
         })
         expect(first.comicId).toBe('raw-1')
         expect(github).toMatchObject({ comicId: 'raw-2', runner: 'GITHUB' })
-        expect(database.summary().comics).toBe(2)
+        expect(database.summary()).toMatchObject({
+            comics: 0,
+            catalogComics: 2
+        })
         database.close()
     })
 

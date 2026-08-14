@@ -1,6 +1,14 @@
 # Pica Library v0.2.0 本地产品架构
 
-状态：`0.2.0-dev.1` 本地验收设计；公开稳定版仍为 `v0.1.3`。
+状态：`0.2.0-dev.2` 本地验收设计；公开稳定版仍为 `v0.1.3`。
+
+## dev.2 数据语义与后台生命周期
+
+- `comics` 继续作为完整 metadata/catalog cache；搜索、推荐和详情读取不会被删除。
+- `library_membership(comic_id, reason)` 独立记录 Pica 收藏、书架、真实下载和显式导入等持久理由。普通“漫画库”只查询该集合，“全部缓存记录”才显示全部 `comics`。
+- `favorites_sync_state` 保存最近全量/快速同步时间、远端数量、头部 ID 指纹和页大小。默认快速同步以远端总数与至少 8 个连续已知 ID 的稳定重叠共同判定；异常、重排、无法建立边界或距离上次全量达到 24 小时时自动转完整校验。
+- 推荐活动状态保存 cycle、当前 session、batch、session IDs 和 seen IDs。应用启动自动准备 Session 1；进入 Batch 2 时有界预热下一 Session，跨 Session 以 canonical comic ID 严格去重。
+- Reader 用视口中心页作为连续模式当前位置，400ms debounce 写入，并在退出、切章、pagehide、visibilitychange 时强制 flush。ZIP 为默认章节归档，CBZ 保持兼容。
 
 ## 稳定边界
 

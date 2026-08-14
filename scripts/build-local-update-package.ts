@@ -36,10 +36,14 @@ function sourceSha(entries: Map<string, Buffer>) {
     return value
 }
 
-function versionFromName(file: string, marker: string) {
+function versionFromName(file: string, markers: string[]) {
     const match = path
         .basename(file)
-        .match(new RegExp(`^Pica-Library-v(.+)-${marker}-windows-x64\\.zip$`))
+        .match(
+            new RegExp(
+                `^Pica-Library-v(.+)-(?:${markers.join('|')})-windows-x64\\.zip$`
+            )
+        )
     if (!match)
         throw new Error(`Could not read version from ${path.basename(file)}`)
     return match[1]
@@ -50,8 +54,11 @@ export function buildLocalUpdatePackage(
     targetZipFile: string,
     outputFile: string
 ) {
-    const sourceVersion = versionFromName(sourceZipFile, 'update-base')
-    const targetVersion = versionFromName(targetZipFile, 'local-test')
+    const sourceVersion = versionFromName(sourceZipFile, [
+        'update-base',
+        'local-test'
+    ])
+    const targetVersion = versionFromName(targetZipFile, ['local-test'])
     const sourceEntries = files(new AdmZip(sourceZipFile))
     const targetEntries = files(new AdmZip(targetZipFile))
     const changed = [...targetEntries.entries()].filter(([name, value]) => {

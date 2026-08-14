@@ -69,6 +69,34 @@ describe('local incremental update package builder', () => {
         expect(names).not.toContain('runtime/node.exe')
     })
 
+    it('accepts an accepted local-test package as the next update baseline', () => {
+        const directory = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-update-build-')
+        )
+        directories.push(directory)
+        const source = fullPackage(
+            directory,
+            'Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip',
+            '1'.repeat(40),
+            'old'
+        )
+        const target = fullPackage(
+            directory,
+            'Pica-Library-v0.2.0-dev.2-local-test-windows-x64.zip',
+            '2'.repeat(40),
+            'new'
+        )
+        const result = buildLocalUpdatePackage(
+            source,
+            target,
+            path.join(directory, 'update.zip')
+        )
+        expect(result.manifest).toMatchObject({
+            sourceVersionRange: '=0.2.0-dev.1',
+            targetVersion: '0.2.0-dev.2'
+        })
+    })
+
     it('rejects runtime changes, updater self replacement and user data', () => {
         const directory = fs.mkdtempSync(
             path.join(os.tmpdir(), 'pica-update-build-')

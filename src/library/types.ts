@@ -247,6 +247,11 @@ export interface RecallEvidence {
     route: RecallRoute
     source: string
     seedComicId?: string
+    providerPage?: number
+    providerRank?: number
+    retrievedAt?: string
+    queryTag?: string
+    queryCombination?: string[]
 }
 
 export interface RecommendationCandidate {

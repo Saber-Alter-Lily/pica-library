@@ -5,6 +5,8 @@ $version = [string]$package.version
 $nodeVersion = '24.15.0'
 $name = if ($version -eq '0.2.0') {
     'Pica-Library-v0.2.0-windows-x64'
+} elseif ($version -eq '0.3.0') {
+    'Pica-Library-v0.3.0-windows-x64'
 } elseif ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {
@@ -70,11 +72,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 # The legacy compiler embeds a timestamp and a random module ID. When launcher
 # source is unchanged, each incremental target reuses the previous package's
 # launcher bytes so a file-diff update does not report a false replacement.
-if ($version -in @('0.2.0-dev.1','0.2.0-dev.2')) {
+if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0')) {
     $baseZip = if ($version -eq '0.2.0-dev.1') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
-    } else {
+    } elseif ($version -eq '0.2.0-dev.2') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'
+    } else {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
     }
     if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -103,8 +107,8 @@ Pica Library v$version for Windows 10/11 x64
 3. Complete setup in the browser.
 4. To use Browser Lite, open Settings > Browser Lite and export the data package.
 
-Users upgrading from v0.1.3 must use this complete v0.2.0 Windows ZIP.
-From v0.2.0 onward, future compatible releases may use the built-in incremental update flow.
+Users upgrading from v0.1.3 must use a complete Windows ZIP.
+From v0.2.0 onward, compatible releases may use the built-in incremental update flow.
 No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@

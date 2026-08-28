@@ -49,16 +49,30 @@ function versionFromName(file: string, markers: string[]) {
     return match[1]
 }
 
+function windowsPackageVersion(file: string) {
+    const basename = path.basename(file)
+    const stable = basename.match(
+        /^Pica-Library-v(\d+\.\d+\.\d+)-windows-x64\.zip$/
+    )
+    if (stable) return { version: stable[1], stable: true }
+    const version = versionFromName(file, ['update-base', 'local-test'])
+    return {
+        version: version
+            .replace(/-update-base$/, '')
+            .replace(/-local-test$/, ''),
+        stable: false
+    }
+}
+
 export function buildLocalUpdatePackage(
     sourceZipFile: string,
     targetZipFile: string,
     outputFile: string
 ) {
-    const sourceVersion = versionFromName(sourceZipFile, [
-        'update-base',
-        'local-test'
-    ])
-    const targetVersion = versionFromName(targetZipFile, ['local-test'])
+    const source = windowsPackageVersion(sourceZipFile)
+    const target = windowsPackageVersion(targetZipFile)
+    const sourceVersion = source.version
+    const targetVersion = target.version
     const sourceEntries = files(new AdmZip(sourceZipFile))
     const targetEntries = files(new AdmZip(targetZipFile))
     const changed = [...targetEntries.entries()].filter(([name, value]) => {
@@ -99,7 +113,8 @@ export function buildLocalUpdatePackage(
         )
     const manifest: UpdateManifest = {
         manifestVersion: 1,
-        packageType: 'local-test',
+        packageType:
+            source.stable && target.stable ? 'incremental' : 'local-test',
         sourceVersionRange: `=${sourceVersion}`,
         sourceSha: sourceSha(sourceEntries),
         targetVersion,

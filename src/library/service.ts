@@ -40,6 +40,12 @@ import {
     ProviderService,
     type FavoritesSyncMode
 } from '../services/provider-service'
+import { buildV3Profile } from '../recommendation-v3/taste-model'
+import { buildBehaviorProfile } from '../recommendation-v3/behavior-profile'
+import { mineTagCombinations } from '../recommendation-v3/tag-combinations'
+import { rankV3 } from '../recommendation-v3/ranker'
+import { rerankV3 } from '../recommendation-v3/reranker'
+import type { UserEventInput } from '../recommendation-v3/types'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -122,6 +128,10 @@ export class LibraryService {
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
     private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
+
+    recordRecommendationEvent(input: UserEventInput) {
+        return this.database.recordUserEvent(input)
+    }
 
     constructor(
         readonly database: LibraryDatabase,
@@ -309,7 +319,11 @@ export class LibraryService {
     }
 
     async recommendations(
-        options: { limit?: number; seedCount?: number } = {}
+        options: {
+            limit?: number
+            seedCount?: number
+            appSessionId?: string | null
+        } = {}
     ) {
         const limit = Math.max(1, Math.min(options.limit ?? 30, 500))
         const favorites = this.database
@@ -333,6 +347,16 @@ export class LibraryService {
             seedComicId: seed.comicId,
             load: () => pica.related(seed.comicId)
         }))
+        const recallTelemetry = new Map<
+            string,
+            {
+                requests: number
+                failures: number
+                raw: number
+                unique: number
+                latencyMs: number
+            }
+        >()
         for (const item of profile.tags.slice(0, 2))
             recallTasks.push({
                 route: 'tag',
@@ -347,6 +371,45 @@ export class LibraryService {
                             normalizeAuthorKey(item.value)
                     )
             })
+        const combinations = mineTagCombinations(
+            favorites,
+            this.database.listComics({ limit: 5000 })
+        )
+        for (const combination of [
+            ...combinations.pairs.slice(0, 2),
+            ...combinations.triples.slice(0, 1)
+        ]) {
+            const anchor = combination.tags
+                .map((tag) => ({
+                    tag,
+                    count: favorites.filter((comic) =>
+                        comic.tags.some(
+                            (value) =>
+                                normalizeAuthorKey(value) ===
+                                normalizeAuthorKey(tag)
+                        )
+                    ).length
+                }))
+                .sort(
+                    (a, b) => a.count - b.count || a.tag.localeCompare(b.tag)
+                )[0]?.tag
+            if (!anchor) continue
+            recallTasks.push({
+                route: 'tag',
+                source: `combination:${combination.tags.join('+')}`,
+                load: async () =>
+                    (await pica.comicsPage('', anchor, pica.Order.loved, 1))
+                        .docs,
+                accepts: (comic) =>
+                    combination.tags.every((wanted) =>
+                        comic.tags.some(
+                            (value) =>
+                                normalizeAuthorKey(value) ===
+                                normalizeAuthorKey(wanted)
+                        )
+                    )
+            })
+        }
         for (const item of profile.categories.slice(0, 2))
             recallTasks.push({
                 route: 'category',
@@ -386,8 +449,19 @@ export class LibraryService {
         const recalled = await Promise.all(
             recallTasks.map((task) =>
                 gate(async (): Promise<RecommendationCandidate[]> => {
+                    const startedAt = Date.now()
+                    const telemetry = recallTelemetry.get(task.route) ?? {
+                        requests: 0,
+                        failures: 0,
+                        raw: 0,
+                        unique: 0,
+                        latencyMs: 0
+                    }
+                    telemetry.requests += 1
                     try {
-                        return (await task.load())
+                        const loaded = await task.load()
+                        telemetry.raw += loaded.length
+                        const result = loaded
                             .filter((comic) => task.accepts?.(comic) ?? true)
                             .map((comic) => ({
                                 comic: comicToRecord(comic),
@@ -395,26 +469,175 @@ export class LibraryService {
                                     {
                                         route: task.route,
                                         source: task.source,
-                                        seedComicId: task.seedComicId
+                                        seedComicId: task.seedComicId,
+                                        providerPage: 1,
+                                        providerRank: loaded.indexOf(comic) + 1,
+                                        retrievedAt: new Date().toISOString(),
+                                        queryTag:
+                                            task.route === 'tag' &&
+                                            !task.source.startsWith(
+                                                'combination:'
+                                            )
+                                                ? task.source
+                                                : undefined,
+                                        queryCombination:
+                                            task.source.startsWith(
+                                                'combination:'
+                                            )
+                                                ? task.source
+                                                      .slice(
+                                                          'combination:'.length
+                                                      )
+                                                      .split('+')
+                                                : undefined
                                     }
                                 ]
                             }))
+                        telemetry.unique += new Set(
+                            result.map((item) => item.comic.comicId)
+                        ).size
+                        telemetry.latencyMs += Date.now() - startedAt
+                        recallTelemetry.set(task.route, telemetry)
+                        return result
                     } catch {
+                        telemetry.failures += 1
+                        telemetry.latencyMs += Date.now() - startedAt
+                        recallTelemetry.set(task.route, telemetry)
                         return []
                     }
                 })
             )
         )
         const candidates = mergeRecallCandidates(recalled.flat())
+        for (const candidate of candidates)
+            for (const evidence of candidate.recalls)
+                if (evidence.route === 'related' && evidence.seedComicId)
+                    this.database.recordRecommendationEdge({
+                        sourceComicId: evidence.seedComicId,
+                        targetComicId: candidate.comic.comicId,
+                        edgeType: 'provider-related',
+                        confidence: 0.5,
+                        metadata: { source: evidence.source }
+                    })
         this.database.importCatalog(
             candidates.map((item) => item.comic),
             'pica:recommendations'
         )
-        return recommendComics(
-            this.database.listComics({ limit: 5000 }),
-            limit,
-            candidates
-        )
+        const catalog = this.database.listComics({ limit: 5000 })
+        try {
+            const v3Profile = buildBehaviorProfile(
+                buildV3Profile(favorites, catalog),
+                this.database.listUserEvents({ limit: 5000 }),
+                catalog,
+                options.appSessionId
+            )
+            const ranked = rankV3(
+                catalog.filter((comic) =>
+                    candidates.some(
+                        (item) => item.comic.comicId === comic.comicId
+                    )
+                ),
+                favorites,
+                v3Profile,
+                this.database.listUserEvents()
+            )
+            const byId = new Map(catalog.map((comic) => [comic.comicId, comic]))
+            const reranked = rerankV3(ranked, byId, limit)
+            const recallById = new Map(
+                candidates.map((item) => [item.comic.comicId, item.recalls])
+            )
+            if (reranked.length) {
+                return {
+                    profile: {
+                        favoriteCount: favorites.length,
+                        finishedRatio: favorites.length
+                            ? favorites.filter((comic) => comic.finished)
+                                  .length / favorites.length
+                            : 0,
+                        tags: v3Profile.historical.tags
+                            .slice(0, 20)
+                            .map((item) => ({
+                                value: item.tag,
+                                count: item.favoriteCount,
+                                weight: item.score
+                            })),
+                        categories: [],
+                        authors: [],
+                        circles: []
+                    },
+                    recommendations: reranked.map((item) => {
+                        const comic = byId.get(item.comicId)!
+                        const evidence = recallById.get(item.comicId) ?? []
+                        return {
+                            comic,
+                            score: item.score,
+                            reasons: item.reasons,
+                            recallSources: [
+                                ...new Set(evidence.map((value) => value.route))
+                            ],
+                            matchedSignals: item.reasons,
+                            exploration: item.features.novelty > 0
+                        }
+                    }),
+                    audit: {
+                        favoriteCount: favorites.length,
+                        seedCount: seeds.length,
+                        seedAuthorDiversity: new Set(
+                            seeds.map((item) => item.authorId)
+                        ).size,
+                        seedTagDiversity: new Set(
+                            seeds.flatMap((item) => item.tags)
+                        ).size,
+                        candidateCountByRecallRoute: {
+                            related: candidates.filter((item) =>
+                                item.recalls.some((r) => r.route === 'related')
+                            ).length,
+                            author: candidates.filter((item) =>
+                                item.recalls.some((r) => r.route === 'author')
+                            ).length,
+                            tag: candidates.filter((item) =>
+                                item.recalls.some((r) => r.route === 'tag')
+                            ).length,
+                            category: candidates.filter((item) =>
+                                item.recalls.some((r) => r.route === 'category')
+                            ).length,
+                            circle: candidates.filter((item) =>
+                                item.recalls.some((r) => r.route === 'circle')
+                            ).length
+                        },
+                        deduplicatedCandidateCount: candidates.length,
+                        alreadyFavoriteExcludedCount: 0,
+                        finalRecommendationCount: reranked.length,
+                        maxSameAuthorInTopN: 2,
+                        explorationCount: reranked.filter(
+                            (item) => item.features.novelty > 0
+                        ).length,
+                        recallTelemetry: Object.fromEntries(
+                            [...recallTelemetry.entries()].map(
+                                ([route, value]) => [
+                                    route,
+                                    {
+                                        ...value,
+                                        duplicateCount: Math.max(
+                                            0,
+                                            value.raw - value.unique
+                                        ),
+                                        pageDepth: 1,
+                                        yield:
+                                            value.unique /
+                                            Math.max(1, value.requests)
+                                    }
+                                ]
+                            )
+                        )
+                    }
+                }
+            }
+        } catch {
+            // V3 is deliberately fail-safe: preserve the V2 contract if a
+            // profile, ranking, or schema-8 derived artifact is unavailable.
+        }
+        return recommendComics(catalog, limit, candidates)
     }
 
     async checkUpdates(comicIds?: string[]) {

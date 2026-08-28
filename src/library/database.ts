@@ -36,6 +36,7 @@ import {
 } from '../storage/sqlite/migrations'
 import type { UpdateFinding } from '../maintenance/updates'
 import { trustedCoverUrl } from './cover-url'
+import type { UserEvent, UserEventInput } from '../recommendation-v3/types'
 
 type SqlRow = Record<string, unknown>
 
@@ -146,6 +147,349 @@ export class LibraryDatabase {
 
     close() {
         this.db.close()
+    }
+
+    recordUserEvent(input: UserEventInput): UserEvent {
+        const id = input.id ?? randomUUID()
+        const occurredAt = input.occurredAt ?? new Date().toISOString()
+        const createdAt = new Date().toISOString()
+        const metadata = input.metadata ?? {}
+        const dedupeKey = input.dedupeKey ?? null
+        const serialized = JSON.stringify(metadata)
+        if (
+            !input.eventType ||
+            /(?:password|token|authorization|cookie|pica_account|pica_password|pica_proxy)/i.test(
+                serialized
+            )
+        )
+            throw new Error('Invalid recommendation event metadata')
+        this.db
+            .prepare(
+                `
+            INSERT OR IGNORE INTO user_events(
+                id, occurred_at, event_type, comic_id, source, app_session_id,
+                context_id, recommendation_cycle_id, recommendation_session_id,
+                recommendation_batch_index, rank_position, metadata_json,
+                dedupe_key, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+            )
+            .run(
+                id,
+                occurredAt,
+                input.eventType,
+                input.comicId ?? null,
+                input.source ?? null,
+                input.appSessionId ?? null,
+                input.contextId ?? null,
+                input.recommendationCycleId ?? null,
+                input.recommendationSessionId ?? null,
+                input.recommendationBatchIndex ?? null,
+                input.rankPosition ?? null,
+                serialized,
+                dedupeKey,
+                createdAt
+            )
+        const row = (
+            dedupeKey
+                ? this.db
+                      .prepare(
+                          'SELECT * FROM user_events WHERE event_type = ? AND dedupe_key = ?'
+                      )
+                      .get(input.eventType, dedupeKey)
+                : this.db
+                      .prepare('SELECT * FROM user_events WHERE id = ?')
+                      .get(id)
+        ) as SqlRow
+        if (!row) throw new Error('Failed to record recommendation event')
+        return {
+            id: String(row.id),
+            occurredAt: String(row.occurred_at),
+            eventType: String(row.event_type) as UserEvent['eventType'],
+            comicId: row.comic_id ? String(row.comic_id) : null,
+            source: row.source ? String(row.source) : null,
+            appSessionId: row.app_session_id
+                ? String(row.app_session_id)
+                : null,
+            contextId: row.context_id ? String(row.context_id) : null,
+            recommendationCycleId: row.recommendation_cycle_id
+                ? String(row.recommendation_cycle_id)
+                : null,
+            recommendationSessionId: row.recommendation_session_id
+                ? String(row.recommendation_session_id)
+                : null,
+            recommendationBatchIndex:
+                row.recommendation_batch_index === null
+                    ? null
+                    : numberValue(row.recommendation_batch_index),
+            rankPosition:
+                row.rank_position === null
+                    ? null
+                    : numberValue(row.rank_position),
+            metadata: JSON.parse(String(row.metadata_json ?? '{}')) as Record<
+                string,
+                unknown
+            >,
+            dedupeKey: row.dedupe_key ? String(row.dedupe_key) : null,
+            createdAt: String(row.created_at)
+        }
+    }
+
+    listUserEvents(
+        options: { eventType?: string; comicId?: string; limit?: number } = {}
+    ): UserEvent[] {
+        const where: string[] = []
+        const args: (string | number)[] = []
+        if (options.eventType) {
+            where.push('event_type = ?')
+            args.push(options.eventType)
+        }
+        if (options.comicId) {
+            where.push('comic_id = ?')
+            args.push(options.comicId)
+        }
+        const limit = Math.max(1, Math.min(5000, options.limit ?? 500))
+        const rows = this.db
+            .prepare(
+                `SELECT * FROM user_events ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY occurred_at, created_at LIMIT ?`
+            )
+            .all(...args, limit) as SqlRow[]
+        return rows.map((row) => this.recordFromRow(row))
+    }
+
+    recordRecommendationEdge(input: {
+        sourceComicId: string
+        targetComicId: string
+        edgeType: string
+        confidence?: number
+        metadata?: Record<string, unknown>
+    }) {
+        const now = new Date().toISOString()
+        this.db
+            .prepare(
+                `
+            INSERT INTO recommendation_item_edges(
+                source_comic_id, target_comic_id, edge_type,
+                first_observed_at, last_observed_at, observation_count,
+                confidence, metadata_json
+            ) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+            ON CONFLICT(source_comic_id, target_comic_id, edge_type) DO UPDATE SET
+                last_observed_at = excluded.last_observed_at,
+                observation_count = recommendation_item_edges.observation_count + 1,
+                confidence = MAX(recommendation_item_edges.confidence, excluded.confidence),
+                metadata_json = excluded.metadata_json
+        `
+            )
+            .run(
+                input.sourceComicId,
+                input.targetComicId,
+                input.edgeType,
+                now,
+                now,
+                Math.max(0, Math.min(1, input.confidence ?? 0.5)),
+                JSON.stringify(input.metadata ?? {})
+            )
+    }
+
+    listRecommendationEdges(sourceComicId?: string) {
+        const rows = sourceComicId
+            ? this.db
+                  .prepare(
+                      'SELECT * FROM recommendation_item_edges WHERE source_comic_id = ? ORDER BY confidence DESC, observation_count DESC'
+                  )
+                  .all(sourceComicId)
+            : this.db
+                  .prepare(
+                      'SELECT * FROM recommendation_item_edges ORDER BY confidence DESC, observation_count DESC'
+                  )
+                  .all()
+        return (rows as SqlRow[]).map((row) => ({
+            sourceComicId: String(row.source_comic_id),
+            targetComicId: String(row.target_comic_id),
+            edgeType: String(row.edge_type),
+            firstObservedAt: String(row.first_observed_at),
+            lastObservedAt: String(row.last_observed_at),
+            observationCount: numberValue(row.observation_count),
+            confidence: numberValue(row.confidence),
+            metadata: JSON.parse(String(row.metadata_json ?? '{}')) as Record<
+                string,
+                unknown
+            >
+        }))
+    }
+
+    saveV3CandidatePool(input: {
+        id?: string
+        appSessionId?: string | null
+        cycleId: string
+        candidateIds: string[]
+        telemetry?: Record<string, unknown>
+        modelVersion?: string
+        expiresAt?: string | null
+    }) {
+        const id = input.id ?? randomUUID()
+        const generatedAt = new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO recommendation_v3_candidate_pools(
+            id, app_session_id, recommendation_cycle_id, generated_at,
+            expires_at, model_version, telemetry_json, candidate_ids_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+                id,
+                input.appSessionId ?? null,
+                input.cycleId,
+                generatedAt,
+                input.expiresAt ?? null,
+                input.modelVersion ?? 'v3.0.0-local-explainable',
+                JSON.stringify(input.telemetry ?? {}),
+                JSON.stringify([...new Set(input.candidateIds)])
+            )
+        return {
+            id,
+            generatedAt,
+            candidateIds: [...new Set(input.candidateIds)]
+        }
+    }
+
+    getV3CandidatePool(id: string) {
+        const row = this.db
+            .prepare(
+                'SELECT * FROM recommendation_v3_candidate_pools WHERE id = ?'
+            )
+            .get(id) as SqlRow | undefined
+        return row
+            ? {
+                  id: String(row.id),
+                  appSessionId: row.app_session_id
+                      ? String(row.app_session_id)
+                      : null,
+                  cycleId: String(row.recommendation_cycle_id),
+                  generatedAt: String(row.generated_at),
+                  candidateIds: jsonArray(row.candidate_ids_json),
+                  telemetry: JSON.parse(
+                      String(row.telemetry_json ?? '{}')
+                  ) as Record<string, unknown>
+              }
+            : null
+    }
+
+    latestV3CandidatePool(cycleId: string) {
+        const row = this.db
+            .prepare(
+                `
+            SELECT id FROM recommendation_v3_candidate_pools
+            WHERE recommendation_cycle_id = ?
+            ORDER BY generated_at DESC LIMIT 1
+        `
+            )
+            .get(cycleId) as SqlRow | undefined
+        return row ? this.getV3CandidatePool(String(row.id)) : null
+    }
+
+    saveV3Batch(input: {
+        poolId: string
+        cycleId: string
+        sessionId?: string | null
+        batchIndex: number
+        contextId: string
+        itemIds: string[]
+        evidence?: Record<string, unknown>
+    }) {
+        const id = randomUUID()
+        const generatedAt = new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO recommendation_v3_batches(
+            id, pool_id, recommendation_cycle_id, recommendation_session_id,
+            batch_index, context_id, generated_at, item_ids_json, evidence_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+                id,
+                input.poolId,
+                input.cycleId,
+                input.sessionId ?? null,
+                input.batchIndex,
+                input.contextId,
+                generatedAt,
+                JSON.stringify(input.itemIds),
+                JSON.stringify(input.evidence ?? {})
+            )
+        return { id, generatedAt, ...input }
+    }
+
+    listV3Batches(poolId: string) {
+        return (
+            this.db
+                .prepare(
+                    `
+            SELECT * FROM recommendation_v3_batches
+            WHERE pool_id = ? ORDER BY batch_index
+        `
+                )
+                .all(poolId) as SqlRow[]
+        ).map((row) => ({
+            id: String(row.id),
+            poolId: String(row.pool_id),
+            cycleId: String(row.recommendation_cycle_id),
+            sessionId: row.recommendation_session_id
+                ? String(row.recommendation_session_id)
+                : null,
+            batchIndex: numberValue(row.batch_index),
+            contextId: String(row.context_id),
+            generatedAt: String(row.generated_at),
+            itemIds: jsonArray(row.item_ids_json),
+            evidence: JSON.parse(String(row.evidence_json ?? '{}')) as Record<
+                string,
+                unknown
+            >
+        }))
+    }
+
+    allocateRecommendationIds(cycleId: string, comicIds: string[]) {
+        const now = new Date().toISOString()
+        const statement = this.db.prepare(`
+            INSERT OR IGNORE INTO recommendation_seen(
+                cycle_id, comic_id, first_seen_at
+            ) VALUES (?, ?, ?)
+        `)
+        for (const comicId of comicIds) statement.run(cycleId, comicId, now)
+    }
+
+    private recordFromRow(row: SqlRow): UserEvent {
+        return {
+            id: String(row.id),
+            occurredAt: String(row.occurred_at),
+            eventType: String(row.event_type) as UserEvent['eventType'],
+            comicId: row.comic_id ? String(row.comic_id) : null,
+            source: row.source ? String(row.source) : null,
+            appSessionId: row.app_session_id
+                ? String(row.app_session_id)
+                : null,
+            contextId: row.context_id ? String(row.context_id) : null,
+            recommendationCycleId: row.recommendation_cycle_id
+                ? String(row.recommendation_cycle_id)
+                : null,
+            recommendationSessionId: row.recommendation_session_id
+                ? String(row.recommendation_session_id)
+                : null,
+            recommendationBatchIndex:
+                row.recommendation_batch_index === null
+                    ? null
+                    : numberValue(row.recommendation_batch_index),
+            rankPosition:
+                row.rank_position === null
+                    ? null
+                    : numberValue(row.rank_position),
+            metadata: JSON.parse(String(row.metadata_json ?? '{}')) as Record<
+                string,
+                unknown
+            >,
+            dedupeKey: row.dedupe_key ? String(row.dedupe_key) : null,
+            createdAt: String(row.created_at)
+        }
     }
 
     private migrate() {
@@ -1738,7 +2082,25 @@ export class LibraryDatabase {
             )
         if (result.changes !== 1)
             throw new Error(`Download job changed concurrently: ${id}`)
-        return this.getDownloadJob(id)
+        const updated = this.getDownloadJob(id)
+        const eventType =
+            status === 'RUNNING'
+                ? 'download_start'
+                : status === 'COMPLETED'
+                  ? 'download_complete'
+                  : status === 'CANCELLED'
+                    ? 'download_cancel'
+                    : status === 'FAILED'
+                      ? 'download_failed'
+                      : null
+        if (eventType)
+            this.recordUserEvent({
+                eventType,
+                comicId: updated.comicId,
+                source: updated.source,
+                metadata: { jobId: updated.id, retryCount: updated.retryCount }
+            })
+        return updated
     }
 
     retryDownloadJob(id: string): DownloadJob {

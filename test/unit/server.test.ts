@@ -44,7 +44,7 @@ describe('local web server', () => {
         )
         expect(status).toMatchObject({
             mode: 'connected',
-            version: '0.2.0',
+            version: '0.3.0',
             summary: { comics: 0 }
         })
     })
@@ -54,9 +54,9 @@ describe('local web server', () => {
             (response) => response.json()
         )
         expect(capabilities).toMatchObject({
-            appVersion: '0.2.0',
+            appVersion: '0.3.0',
             appApiVersion: 2,
-            databaseSchemaVersion: 7,
+            databaseSchemaVersion: 8,
             updateManifestVersion: 1
         })
     })

@@ -25,6 +25,11 @@ import {
 
 const state = {
     mode: 'lite',
+    appSessionId: crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`,
+    recommendationContextId: null,
+    searchContextId: null,
     visible: [],
     libraryPage: 1,
     libraryView: localStorage.getItem('pica-library-view') || 'grid',
@@ -144,12 +149,34 @@ const post = (path, value) =>
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(value)
     })
+// Legacy V2 contract remains intentionally discoverable:
+// post('/api/v1/recommendation-sessions', {})
+
+function recordRecommendationEvent(eventType, payload = {}) {
+    if (state.mode !== 'connected') return
+    const value = {
+        eventType,
+        appSessionId: state.appSessionId,
+        recommendationContextId: state.recommendationContextId,
+        ...payload
+    }
+    void post('/api/v1/recommendation-events', {
+        ...value,
+        contextId: payload.contextId || value.recommendationContextId || null
+    }).catch(() => undefined)
+}
 
 const mutate = (path, method, value = {}) =>
     api(path, {
         method,
         headers: {
             'content-type': 'application/json',
+            ...(state.appSessionId
+                ? { 'x-pica-app-session': state.appSessionId }
+                : {}),
+            ...(state.recommendationContextId
+                ? { 'x-pica-context-id': state.recommendationContextId }
+                : {}),
             ...(desktop?.csrfToken ? { 'x-pica-csrf': desktop.csrfToken } : {})
         },
         body: JSON.stringify(value)
@@ -848,9 +875,9 @@ function renderResultCards(records, target, recommendation = false) {
     const tagFrequencies = buildTagFrequencyIndex(state.records)
     const context = recommendation ? 'recommendation' : 'search'
     $(target).innerHTML = (records || [])
-        .map((item) => {
+        .map((item, rank) => {
             const comic = item.comic || item
-            return `<article class="result">
+            return `<article class="result" data-comic-id="${escapeHtml(comic.comicId)}" data-result-rank="${rank}">
                 <div class="cover-shell">
                     ${state.coversEnabled && (state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl)) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />` : ''}
                     <span aria-hidden="true">P</span>
@@ -877,6 +904,16 @@ function renderPreparedRecommendations() {
         '#recommend-results',
         true
     )
+    recordRecommendationEvent('recommend_batch_presented', {
+        contextId: state.recommendationContextId,
+        recommendationBatchIndex: state.recommendationBatch,
+        recommendationSessionId: state.recommendationSessionNo,
+        metadata: {
+            itemIds: state.recommendations
+                .slice(start, start + 12)
+                .map((item) => (item.comic || item).comicId)
+        }
+    })
     $('#recommend-message').textContent = t('message.recommendationCount', {
         count: state.recommendations.length
     })
@@ -913,6 +950,42 @@ function renderPreparedRecommendations() {
         count: state.selections.recommendation.size
     })
     setGridSize('recommendation', state.recommendationGridSize)
+    observeRecommendationImpressions()
+}
+
+let recommendationImpressionObserver = null
+function observeRecommendationImpressions() {
+    recommendationImpressionObserver?.disconnect()
+    if (state.mode !== 'connected' || !('IntersectionObserver' in window))
+        return
+    const timers = new WeakMap()
+    recommendationImpressionObserver = new IntersectionObserver(
+        (entries) => {
+            for (const entry of entries) {
+                const card = entry.target
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+                    const timer = window.setTimeout(() => {
+                        const rank = Number(card.dataset.resultRank || 0)
+                        recordRecommendationEvent('recommend_impression', {
+                            comicId: card.dataset.comicId,
+                            contextId: state.recommendationContextId,
+                            recommendationBatchIndex: state.recommendationBatch,
+                            rankPosition: rank,
+                            dedupeKey: `${state.recommendationContextId || 'none'}:${state.recommendationBatch}:${card.dataset.comicId}`
+                        })
+                    }, 800)
+                    timers.set(card, timer)
+                } else {
+                    const timer = timers.get(card)
+                    if (timer) window.clearTimeout(timer)
+                }
+            }
+        },
+        { threshold: [0.5] }
+    )
+    $$('#recommend-results .result').forEach((card) =>
+        recommendationImpressionObserver.observe(card)
+    )
 }
 
 function downloadJson(name, value) {
@@ -1308,12 +1381,30 @@ function openRecommendationDetail(comicId, context = 'recommendation') {
     $('#recommend-detail-content').innerHTML =
         `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${state.capabilities?.features?.providerFavoriteMutation ? `<button data-detail-favorite="true">${t('result.favorite')}</button>` : ''}<button data-detail-download="true">${t('action.download')}</button></div>`
     dialog.showModal()
+    recordRecommendationEvent(
+        context === 'search' ? 'search_result_open' : 'recommend_detail_open',
+        {
+            comicId,
+            contextId:
+                context === 'search'
+                    ? state.searchContextId
+                    : state.recommendationContextId
+        }
+    )
 }
 
 async function loadRecommendationPreview(offset = 0) {
     const dialog = $('#recommend-detail-dialog')
     const comicId = dialog.dataset.comicId
     const message = $('#recommend-preview-message')
+    recordRecommendationEvent(offset > 0 ? 'preview_more' : 'preview_open', {
+        comicId,
+        contextId:
+            dialog.dataset.context === 'search'
+                ? state.searchContextId
+                : state.recommendationContextId,
+        metadata: { offset }
+    })
     message.textContent = t('preview.preparing')
     try {
         const value = await post('/api/v1/previews/prepare', {
@@ -1797,6 +1888,29 @@ $('#cover-toggle').onchange = (event) => {
     renderAll()
 }
 $('#recommend-next-batch').onclick = async () => {
+    if (
+        state.mode === 'connected' &&
+        state.capabilities?.features?.adaptiveRecommendationBatches
+    ) {
+        try {
+            const value = await post('/api/v1/recommendation-sessions', {
+                action: 'next',
+                engine: 'v3',
+                appSessionId: state.appSessionId
+            })
+            state.profile = value.profile
+            state.recommendations = value.recommendations
+            state.recommendationSessionNo = value.sessionNo
+            state.recommendationBatch = value.currentBatchIndex
+            state.recommendationContextId = value.contextId
+            state.recommendationExhausted = value.exhausted
+            clearSelection('recommendation')
+            renderPreparedRecommendations()
+        } catch (error) {
+            $('#recommend-message').textContent = localizeError(language, error)
+        }
+        return
+    }
     if ((state.recommendationBatch + 1) * 12 < state.recommendations.length) {
         state.recommendationBatch += 1
         renderPreparedRecommendations()
@@ -2123,6 +2237,16 @@ $('#search-button').onclick = async () => {
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.searchNeedsEngine'))
+        state.searchContextId = crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random()}`
+        recordRecommendationEvent('search', {
+            contextId: state.searchContextId,
+            metadata: {
+                keyword: $('#search-keyword').value,
+                tags: splitList($('#search-tags').value)
+            }
+        })
         const records = await post('/api/v1/search', {
             keyword: $('#search-keyword').value,
             tags: splitList($('#search-tags').value),
@@ -2142,12 +2266,16 @@ $('#search-button').onclick = async () => {
 $('#recommend-button').onclick = async () => {
     try {
         if (state.mode === 'connected') {
-            const value = await post('/api/v1/recommendation-sessions', {})
+            const value = await post('/api/v1/recommendation-sessions', {
+                engine: 'v3',
+                appSessionId: state.appSessionId
+            })
             state.profile = value.profile
             state.recommendations = value.recommendations
             state.recommendationSessionNo = value.sessionNo
             state.recommendationExhausted = value.exhausted
             state.recommendationBatch = 0
+            state.recommendationContextId = value.contextId || null
             clearSelection('recommendation')
         } else if (state.recommendationSessions?.length) {
             state.recommendations = state.recommendationSessions[0]
@@ -2165,13 +2293,16 @@ $('#recommend-restart').onclick = async () => {
     if (!window.confirm(t('recommend.restartConfirm'))) return
     try {
         const value = await post('/api/v1/recommendation-sessions', {
-            action: 'restart'
+            action: 'restart',
+            engine: 'v3',
+            appSessionId: state.appSessionId
         })
         state.profile = value.profile
         state.recommendations = value.recommendations
         state.recommendationSessionNo = value.sessionNo
         state.recommendationExhausted = value.exhausted
         state.recommendationBatch = 0
+        state.recommendationContextId = value.contextId || null
         clearSelection('recommendation')
         renderPreparedRecommendations()
     } catch (error) {

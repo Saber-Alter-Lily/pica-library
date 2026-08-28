@@ -1,7 +1,11 @@
 import { evaluateAblations } from '../src/recommendation-v3/evaluator'
 import type { StoredComic } from '../src/library/types'
 
-function comic(index: number, tags: string[], isFavorite: boolean): StoredComic {
+function comic(
+    index: number,
+    tags: string[],
+    isFavorite: boolean
+): StoredComic {
     const author = `author-${index % 6}`
     return {
         comicId: `fixture-${index}`,

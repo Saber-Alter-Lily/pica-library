@@ -1,5 +1,6 @@
 import type { StoredComic } from '../library/types'
 import type { V3Recommendation } from './types'
+import { recommendComics } from '../library/recommendation'
 import { buildV3Profile } from './taste-model'
 import { rankV3 } from './ranker'
 
@@ -48,6 +49,11 @@ export function evaluationMetrics(
         ndcgAt20: ndcgAt(20),
         mrr: first < 0 ? 0 : 1 / (first + 1),
         catalogCoverage: new Set(ids).size,
+        clusterCoverage: new Set(
+            ranked
+                .filter((item) => item.features.historicalClusterSimilarity > 0)
+                .map((item) => item.comicId)
+        ).size,
         authorDiversity: authors.size,
         tagDiversity: tags.size,
         combinationDiversity: new Set(
@@ -114,9 +120,48 @@ export function evaluateAblations(
 ) {
     const heldOut = deterministicHoldout(records, 'random', 'v3-ablation')
     const training = withoutHeldOut(records, heldOut)
-    const catalog = records
+    // Keep held-out items in the candidate catalog, but mark them non-favorite.
+    // This prevents candidate omission while ensuring profile construction cannot
+    // observe held-out preference labels.
+    const heldOutIds = new Set(heldOut.map((item) => item.comicId))
+    const catalog = records.map((item) =>
+        heldOutIds.has(item.comicId) ? { ...item, isFavorite: false } : item
+    )
     const profile = buildV3Profile(training, catalog)
     const base = rankV3(catalog.slice(0, candidateLimit), training, profile)
+    const v2 = recommendComics(catalog, candidateLimit).recommendations.map(
+        (item): V3Recommendation => ({
+            comicId: item.comic.comicId,
+            score: item.score,
+            features: {
+                historicalSimilarity: 0,
+                historicalClusterSimilarity: 0,
+                lifetimeSimilarity: 0,
+                recentSimilarity: 0,
+                sessionSimilarity: 0,
+                authorAffinity: 0,
+                singleTagAffinity: 0,
+                circleAffinity: 0,
+                categorySimilarity: 0,
+                itemSimilarity: 0,
+                relatedGraphScore: 0,
+                positiveBehaviorSimilarity: 0,
+                negativeBehaviorPenalty: 0,
+                popularity: item.comic.totalLikes ? 1 : 0,
+                novelty: 0,
+                pairInteractionBonus: 0,
+                tripleInteractionBonus: 0,
+                previousImpressionCount: 0,
+                recentExposurePenalty: 0,
+                alreadyFavorite: false,
+                alreadyDownloaded: item.comic.downloadedPictures > 0,
+                alreadyRead: false,
+                recallRouteSupport: 0
+            },
+            reasons: ['v2-baseline'],
+            provenance: []
+        })
+    )
     const withoutCombinations = base
         .map((item) => ({
             ...item,
@@ -134,7 +179,7 @@ export function evaluateAblations(
         .sort((a, b) => b.score - a.score || a.comicId.localeCompare(b.comicId))
     return {
         heldOutIds: heldOut.map((item) => item.comicId),
-        v2: evaluationMetrics(base, heldOut),
+        v2: evaluationMetrics(v2, heldOut),
         v3WithoutCombinations: evaluationMetrics(withoutCombinations, heldOut),
         v3WithPairs: evaluationMetrics(pairs, heldOut),
         v3WithPairsAndTriples: evaluationMetrics(base, heldOut)

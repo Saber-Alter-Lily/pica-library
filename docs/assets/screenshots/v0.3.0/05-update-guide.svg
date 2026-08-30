@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs><marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#e53935"/></marker><filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity=".18"/></filter></defs>
+  <image href="05-maintenance-update.png" x="0" y="0" width="1600" height="1000" preserveAspectRatio="none"/>
+  <g font-family="Microsoft YaHei, PingFang SC, Arial, sans-serif" fill="#d62828" stroke="#e53935" stroke-width="3">
+    <g filter="url(#shadow)"><rect x="70" y="285" width="300" height="72" rx="12" fill="#fff" fill-opacity=".95"/><text x="90" y="315" font-size="20" font-weight="700" stroke="none">① 软件更新入口</text><text x="90" y="343" font-size="16" stroke="none">以后升级主要从这里进入</text></g><line x1="220" y1="285" x2="220" y2="235" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="1280" y="535" width="260" height="88" rx="12" fill="#fff" fill-opacity=".95"/><text x="1300" y="565" font-size="20" font-weight="700" stroke="none">② 手动更新</text><text x="1300" y="593" font-size="16" stroke="none">拖入 update.zip</text><text x="1300" y="617" font-size="16" stroke="none">或点击选择更新包</text></g><line x1="1280" y1="580" x2="1180" y2="580" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="835" y="785" width="320" height="72" rx="12" fill="#fff" fill-opacity=".95"/><text x="855" y="815" font-size="20" font-weight="700" stroke="none">③ 一键检查并更新</text><text x="855" y="843" font-size="16" stroke="none">联网时最方便</text></g><line x1="835" y1="820" x2="760" y2="815" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="90" y="785" width="310" height="72" rx="12" fill="#fff" fill-opacity=".95"/><text x="110" y="815" font-size="20" font-weight="700" stroke="none">④ 也可以先只检查更新</text><text x="110" y="843" font-size="16" stroke="none">确认后再决定是否安装</text></g><line x1="400" y1="820" x2="455" y2="815" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="565" y="390" width="250" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="585" y="427" font-size="20" font-weight="700" stroke="none">⑤ 当前版本号</text></g><line x1="565" y1="420" x2="515" y2="420" marker-end="url(#arrow)"/>
+  </g>
+</svg>

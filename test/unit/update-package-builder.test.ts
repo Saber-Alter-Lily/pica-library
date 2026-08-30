@@ -97,6 +97,48 @@ describe('local incremental update package builder', () => {
         })
     })
 
+    it('includes immutable Registry V3 runtime assets in an incremental update', () => {
+        const directory = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-update-build-')
+        )
+        directories.push(directory)
+        const source = fullPackage(
+            directory,
+            'Pica-Library-v0.2.0-windows-x64.zip',
+            '1'.repeat(40),
+            'same'
+        )
+        const target = fullPackage(
+            directory,
+            'Pica-Library-v0.3.0-windows-x64.zip',
+            '2'.repeat(40),
+            'same',
+            {
+                'src/data/registry-v3-final/PICA_REGISTRY_V3_FINAL_MANIFEST.json':
+                    '{"runtime_semantic_file":"PICA_TAG_REGISTRY_V3_RUNTIME.csv"}',
+                'src/data/registry-v3-final/PICA_TAG_REGISTRY_V3_RUNTIME.csv':
+                    'raw_tag,canonical_tag\n',
+                'app/runtime-assets/registry-v3-final/PICA_REGISTRY_V3_FINAL_MANIFEST.json':
+                    '{"runtime_semantic_file":"PICA_TAG_REGISTRY_V3_RUNTIME.csv"}',
+                'app/runtime-assets/registry-v3-final/PICA_TAG_REGISTRY_V3_RUNTIME.csv':
+                    'raw_tag,canonical_tag\n'
+            }
+        )
+        const output = path.join(directory, 'update.zip')
+        const result = buildLocalUpdatePackage(source, target, output)
+        expect(result.manifest.sourceVersionRange).toBe('=0.2.0')
+        const entries = new AdmZip(output)
+            .getEntries()
+            .map((entry) => entry.entryName)
+        expect(entries).toEqual(
+            expect.arrayContaining([
+                'app/runtime-assets/registry-v3-final/PICA_REGISTRY_V3_FINAL_MANIFEST.json',
+                'app/runtime-assets/registry-v3-final/PICA_TAG_REGISTRY_V3_RUNTIME.csv'
+            ])
+        )
+        expect(entries.some((entry) => entry.startsWith('src/'))).toBe(false)
+    })
+
     it('rejects runtime changes, updater self replacement and user data', () => {
         const directory = fs.mkdtempSync(
             path.join(os.tmpdir(), 'pica-update-build-')

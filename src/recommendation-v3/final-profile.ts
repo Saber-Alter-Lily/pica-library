@@ -6,6 +6,7 @@ import {
     resolveTagV3,
     type TagRegistryV3
 } from './tag-resolution-v3'
+import { runtimeRegistryDirectory } from './runtime-registry-path'
 
 export const FINAL_PROFILE_VERSION = '3.1.0-lifetime-sparse'
 
@@ -107,7 +108,7 @@ export function buildFinalLifetimeProfileV3(
     ].sort((a, b) => a.comicId.localeCompare(b.comicId))
     const registry =
         options.registry ??
-        loadTagRegistryV3(options.registryDir ?? 'src/data/registry-v3-final')
+        loadTagRegistryV3(options.registryDir ?? runtimeRegistryDirectory())
 
     type Row = {
         canonicalKey: string

@@ -57,12 +57,17 @@ describe('desktop setup and settings UI contract', () => {
         expect(build).toContain(
             "$version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0')"
         )
+        expect(build).toContain("'src\\data\\registry-v3-final'")
+        expect(build).toContain('Required Registry V3 runtime asset is missing')
         expect(build).toContain('git -C $root diff --quiet')
         expect(build).toContain(
             'Launcher source changed; a full install is required'
         )
         expect(read('scripts/test-windows-artifact.ps1')).toContain(
             "@('README-WINDOWS.txt','README-WINDOWS.zh-CN.txt')"
+        )
+        expect(read('scripts/test-windows-artifact.ps1')).toContain(
+            'Clean package Atlas rebuild failed'
         )
     })
 

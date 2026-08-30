@@ -55,6 +55,41 @@ Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\LI
 Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $stage 'app')
 Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $stage 'licenses\THIRD_PARTY_LICENSES.txt')
 Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse
+$registrySource = Join-Path $root 'src\data\registry-v3-final'
+$registryTarget = Join-Path $stage 'src\data\registry-v3-final'
+$registryMirror = Join-Path $stage 'app\runtime-assets\registry-v3-final'
+New-Item -ItemType Directory -Force -Path $registryTarget,$registryMirror | Out-Null
+Copy-Item -Path (Join-Path $registrySource '*') -Destination $registryTarget -Recurse
+Copy-Item -Path (Join-Path $registrySource '*') -Destination $registryMirror -Recurse
+$registryManifestFile = Join-Path $registryTarget 'PICA_REGISTRY_V3_FINAL_MANIFEST.json'
+if (-not (Test-Path -LiteralPath $registryManifestFile)) { throw 'Registry V3 runtime manifest is missing' }
+$registryManifest = Get-Content -Raw -LiteralPath $registryManifestFile | ConvertFrom-Json
+$requiredRegistryAssets = @(
+    'PICA_REGISTRY_V3_FINAL_MANIFEST.json',
+    [string]$registryManifest.runtime_semantic_file,
+    'PICA_ENTITY_REGISTRY_V3_FINAL.csv',
+    'PICA_TAG_ALIAS_MAP_V3_FINAL.json',
+    'PICA_TAG_UNRESOLVED_V3_FINAL_WATCHLIST.csv',
+    'PICA_TAG_LIBRARY_V2_REVIEWED.csv',
+    'PICA_TAG_ALIAS_MAP_V2.json'
+)
+foreach ($asset in $requiredRegistryAssets) {
+    if (-not $asset -or -not (Test-Path -LiteralPath (Join-Path $registryTarget $asset))) {
+        throw "Required Registry V3 runtime asset is missing: $asset"
+    }
+}
+foreach ($sourceAsset in @(Get-ChildItem -LiteralPath $registrySource -File)) {
+    $targetAsset = Join-Path $registryTarget $sourceAsset.Name
+    $mirrorAsset = Join-Path $registryMirror $sourceAsset.Name
+    if (
+        -not (Test-Path -LiteralPath $targetAsset) -or
+        -not (Test-Path -LiteralPath $mirrorAsset) -or
+        (Get-Sha256 $sourceAsset.FullName) -ne (Get-Sha256 $targetAsset) -or
+        (Get-Sha256 $sourceAsset.FullName) -ne (Get-Sha256 $mirrorAsset)
+    ) {
+        throw "Registry V3 runtime asset copy mismatch: $($sourceAsset.Name)"
+    }
+}
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
 foreach ($notice in @('NOTICE.md','UPSTREAM.md')) { Copy-Item -LiteralPath (Join-Path $root $notice) -Destination $stage }
 foreach ($requiredLicense in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICENSES.txt')) {
@@ -77,7 +112,7 @@ if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0')) {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
     } elseif ($version -eq '0.2.0-dev.2') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'
-    } else {
+    } elseif ($version -eq '0.3.0') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
     }
     if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }

@@ -6,6 +6,7 @@ import {
     type TagRegistryV3,
     type TagResolutionV3
 } from './tag-resolution-v3'
+import { runtimeRegistryDirectory } from './runtime-registry-path'
 
 export type ProfileLayer = 'LIFETIME' | 'RECENT' | 'SESSION'
 
@@ -94,7 +95,7 @@ const profileRegistry = (options: ProfileBuilderOptionsV3) =>
         options.registryDir ??
             // The production package is resolved from the process checkout.
             // Callers may provide an explicit directory for portable replay.
-            'src/data/registry-v3-final'
+            runtimeRegistryDirectory()
     )
 
 function finite(value: number) {

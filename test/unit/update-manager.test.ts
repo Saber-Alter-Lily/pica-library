@@ -125,6 +125,19 @@ describe('UpdateManager', () => {
         ])
             expect(() => normalizeUpdatePath(value)).toThrow()
         expect(normalizeUpdatePath('web/app.js')).toBe('web/app.js')
+        expect(() =>
+            normalizeUpdatePath(
+                'src/data/registry-v3-final/PICA_REGISTRY_V3_FINAL_MANIFEST.json'
+            )
+        ).toThrow()
+        expect(
+            normalizeUpdatePath(
+                'app/runtime-assets/registry-v3-final/PICA_REGISTRY_V3_FINAL_MANIFEST.json'
+            )
+        ).toBe(
+            'app/runtime-assets/registry-v3-final/PICA_REGISTRY_V3_FINAL_MANIFEST.json'
+        )
+        expect(() => normalizeUpdatePath('src/data/other.json')).toThrow()
     })
 
     it('accepts and stages a verified local-test update for a dev build', async () => {

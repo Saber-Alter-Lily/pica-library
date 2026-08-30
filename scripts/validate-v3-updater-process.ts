@@ -116,6 +116,14 @@ async function runScenario(broken: boolean) {
     const local = path.join(scenario, 'localappdata')
     expand(baseZip, install)
     fs.mkdirSync(local, { recursive: true })
+    const retainedDataFile = path.join(
+        local,
+        'Pica Library',
+        'data',
+        'retention-sentinel.txt'
+    )
+    fs.mkdirSync(path.dirname(retainedDataFile), { recursive: true })
+    fs.writeFileSync(retainedDataFile, 'retain-across-update', 'utf8')
     const oldDesktopHash = hash(path.join(install, 'app', 'desktop.js'))
     const { instruction, progress } = writeInstruction({
         install,
@@ -141,6 +149,9 @@ async function runScenario(broken: boolean) {
     )
     const restored =
         hash(path.join(install, 'app', 'desktop.js')) === oldDesktopHash
+    let atlasCleanUpdate: boolean | null = null
+    let recommendationCleanUpdate: boolean | null = null
+    let version: string | null = null
     try {
         const instance = JSON.parse(
             fs.readFileSync(
@@ -156,13 +167,45 @@ async function runScenario(broken: boolean) {
         if (instance.url) {
             const status = (await fetch(
                 `${instance.url}/api/v1/desktop/status`
-            ).then((response) => response.json())) as { csrfToken?: string }
+            ).then((response) => response.json())) as {
+                csrfToken?: string
+                version?: string
+            }
+            version = status.version ?? null
+            if (status.csrfToken && !broken) {
+                const headers = {
+                    'content-type': 'application/json',
+                    'x-pica-csrf': status.csrfToken,
+                    origin: instance.url
+                }
+                const atlas = (await fetch(
+                    `${instance.url}/api/v1/recommendation/profile/rebuild`,
+                    { method: 'POST', headers, body: '{}' }
+                ).then((response) => response.json())) as {
+                    available?: boolean
+                    snapshot?: { snapshotVersion?: number }
+                }
+                atlasCleanUpdate =
+                    atlas.available === true &&
+                    atlas.snapshot?.snapshotVersion === 2
+                const recommendation = (await fetch(
+                    `${instance.url}/api/v1/recommendations`,
+                    { method: 'POST', headers, body: '{"limit":12}' }
+                ).then((response) => response.json())) as {
+                    engine?: unknown
+                    recommendations?: unknown
+                }
+                recommendationCleanUpdate =
+                    Boolean(recommendation.engine) &&
+                    Array.isArray(recommendation.recommendations)
+            }
             if (status.csrfToken)
                 await fetch(`${instance.url}/api/v1/desktop/shutdown`, {
                     method: 'POST',
                     headers: {
                         'content-type': 'application/json',
-                        'x-pica-csrf': status.csrfToken
+                        'x-pica-csrf': status.csrfToken,
+                        origin: instance.url
                     },
                     body: '{}'
                 })
@@ -174,6 +217,13 @@ async function runScenario(broken: boolean) {
     return {
         phase: final.phase,
         rollbackRestored: restored,
+        version,
+        atlasCleanUpdate,
+        recommendationCleanUpdate,
+        userDataRetained:
+            fs.existsSync(retainedDataFile) &&
+            fs.readFileSync(retainedDataFile, 'utf8') ===
+                'retain-across-update',
         message: final.message ?? null
     }
 }

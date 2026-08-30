@@ -55,6 +55,7 @@ import {
     buildHistoricalTasteSnapshot,
     type HistoricalTasteSnapshot
 } from '../recommendation-v3/taste-chronicle'
+import { runtimeRegistryDirectory } from '../recommendation-v3/runtime-registry-path'
 import {
     buildFinalLifetimeProfileV3,
     FINAL_PROFILE_VERSION
@@ -234,7 +235,7 @@ export class LibraryService {
         const pica = await this.connect()
         const catalog = this.database.listComics({ limit: 10000 })
         const favorites = catalog.filter((comic) => comic.isFavorite)
-        const registry = loadTagRegistryV3('src/data/registry-v3-final')
+        const registry = loadTagRegistryV3(runtimeRegistryDirectory())
         const profile = buildFinalLifetimeProfileV3(catalog, { registry })
         const history: IntentCycleHistory[] = this.database
             .listV3CandidatePools(50)

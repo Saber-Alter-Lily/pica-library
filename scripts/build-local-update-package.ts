@@ -36,6 +36,31 @@ function sourceSha(entries: Map<string, Buffer>) {
     return value
 }
 
+const registrySourceRoot = 'src/data/registry-v3-final/'
+const registryMirrorRoot = 'app/runtime-assets/registry-v3-final/'
+
+function incrementalChanges(
+    sourceEntries: Map<string, Buffer>,
+    targetEntries: Map<string, Buffer>
+) {
+    return [...targetEntries.entries()].filter(([name, value]) => {
+        const previous = sourceEntries.get(name)
+        if (previous?.equals(value)) return false
+        if (!name.startsWith(registrySourceRoot)) return true
+        const mirror = targetEntries.get(
+            `${registryMirrorRoot}${name.slice(registrySourceRoot.length)}`
+        )
+        if (!mirror?.equals(value))
+            throw new Error(
+                `Registry runtime mirror mismatch for incremental update: ${name}`
+            )
+        // Full packages retain the source-compatible path. Existing updaters
+        // can safely install the byte-identical mirror under the established
+        // app/ allowlist without replacing their own path-safety helper.
+        return false
+    })
+}
+
 function versionFromName(file: string, markers: string[]) {
     const match = path
         .basename(file)
@@ -75,10 +100,7 @@ export function buildLocalUpdatePackage(
     const targetVersion = target.version
     const sourceEntries = files(new AdmZip(sourceZipFile))
     const targetEntries = files(new AdmZip(targetZipFile))
-    const changed = [...targetEntries.entries()].filter(([name, value]) => {
-        const previous = sourceEntries.get(name)
-        return !previous || !previous.equals(value)
-    })
+    const changed = incrementalChanges(sourceEntries, targetEntries)
     const deleted = [...sourceEntries.keys()].filter(
         (name) => !targetEntries.has(name)
     )

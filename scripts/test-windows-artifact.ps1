@@ -4,6 +4,8 @@ param(
     [switch]$SetupPersistence
 )
 $ErrorActionPreference = 'Stop'
+$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$expectedVersion = [string]((Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'package.json') | ConvertFrom-Json).version)
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ("pica-artifact-smoke-" + [guid]::NewGuid().ToString('N'))
 $extract = Join-Path $work 'extract'
@@ -24,6 +26,30 @@ foreach ($guide in @('README-WINDOWS.txt','README-WINDOWS.zh-CN.txt')) {
 }
 $sourceSha = [IO.File]::ReadAllText((Join-Path $rootPath 'SOURCE_SHA.txt')).Trim()
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Packaged source SHA is invalid' }
+$registryRoot = Join-Path $rootPath 'src\data\registry-v3-final'
+$registryMirror = Join-Path $rootPath 'app\runtime-assets\registry-v3-final'
+$registryManifestFile = Join-Path $registryRoot 'PICA_REGISTRY_V3_FINAL_MANIFEST.json'
+if (-not (Test-Path -LiteralPath $registryManifestFile)) { throw 'Packaged Registry V3 manifest is missing' }
+$registryManifest = Get-Content -Raw -LiteralPath $registryManifestFile | ConvertFrom-Json
+foreach ($asset in @(
+    [string]$registryManifest.runtime_semantic_file,
+    'PICA_ENTITY_REGISTRY_V3_FINAL.csv',
+    'PICA_TAG_ALIAS_MAP_V3_FINAL.json',
+    'PICA_TAG_UNRESOLVED_V3_FINAL_WATCHLIST.csv',
+    'PICA_TAG_LIBRARY_V2_REVIEWED.csv',
+    'PICA_TAG_ALIAS_MAP_V2.json'
+)) {
+    $primary = Join-Path $registryRoot $asset
+    $mirror = Join-Path $registryMirror $asset
+    if (
+        -not $asset -or
+        -not (Test-Path -LiteralPath $primary) -or
+        -not (Test-Path -LiteralPath $mirror) -or
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $primary).Hash -ne (Get-FileHash -Algorithm SHA256 -LiteralPath $mirror).Hash
+    ) {
+        throw "Packaged Registry V3 runtime asset is missing: $asset"
+    }
+}
 foreach ($license in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICENSES.txt')) {
     $licenseFile = Join-Path $rootPath $license
     if (-not (Test-Path -LiteralPath $licenseFile) -or (Get-Item -LiteralPath $licenseFile).Length -eq 0) {
@@ -58,7 +84,11 @@ try {
     $publishedMs = $watch.ElapsedMilliseconds
     if ($PortCollision -and $instance.url -eq 'http://127.0.0.1:4789') { throw 'Packaged app attached to unrelated port occupant' }
     $status = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/status') -TimeoutSec 10
-    if ($status.application -ne 'Pica Library' -or $status.version -ne '0.3.0' -or $status.configured) { throw 'Unexpected packaged status' }
+    if ($status.application -ne 'Pica Library' -or $status.version -ne $expectedVersion -or $status.configured) { throw 'Unexpected packaged status' }
+    $atlas = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/recommendation/profile/rebuild') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body '{}' -TimeoutSec 30
+    if (-not $atlas.available -or $atlas.snapshot.snapshotVersion -ne 2) { throw 'Clean package Atlas rebuild failed' }
+    $recommendation = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/recommendations') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body '{"limit":12}' -TimeoutSec 30
+    if (-not $recommendation.engine -or $null -eq $recommendation.recommendations) { throw 'Clean package recommendation preparation failed' }
     $setup = Invoke-WebRequest -UseBasicParsing -Uri ($instance.url + '/setup') -TimeoutSec 10
     if ($setup.StatusCode -ne 200 -or $setup.Content -notmatch 'Set up Pica Library') { throw 'Setup page is unavailable' }
     if ($setup.Content -notmatch 'id="language-select"' -or $setup.Content -notmatch 'option value="zh-CN"') { throw 'Language controls are unavailable' }
@@ -138,7 +168,7 @@ try {
         if (Get-Process -Id $second.pid -ErrorAction SilentlyContinue) { throw 'Relaunched packaged process did not stop' }
         $relaunch='PASS'
     }
-    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
+    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
 } finally {
     if ($listener) { $listener.Stop() }
     $env:PATH = $originalPath

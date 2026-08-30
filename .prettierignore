@@ -1,7 +1,15 @@
 node_modules/
 dist/
+_validation/
+_reports/*.json
 .live-validation-data/
 pnpm-lock.yaml
 yarn.lock
 *.md
 *.d.ts
+/.pica-v*-backup-*/
+/v3_3/
+/_reports/recommender-v3-final-contract-v1/
+/export-manual-tag-review.ts
+/src/data/registry-v3-final/PICA_TAG_ALIAS_MAP_V2.json
+/src/data/registry-v3-final/PICA_TAG_ALIAS_MAP_V3_FINAL.json

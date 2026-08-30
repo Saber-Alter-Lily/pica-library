@@ -1,146 +1,67 @@
-[简体中文](README.zh-CN.md) | English
+简体中文 | [English](README.en.md)
 
 # Pica Library
 
-Pica Library is a collection-centric manager, explainable discovery engine,
-and shared local/GitHub downloader for long-lived Pica libraries.
+面向大量 Pica 收藏的本地漫画库：同步、整理、发现、下载和阅读，全部在自己的电脑上完成。
 
-It keeps stable library state instead of treating every download as a new job:
+适用于 Windows 10/11 x64。无需安装 Node.js、Git，也无需使用命令行。
 
-- **Library:** synchronize or import favorites, filter by tags and normalized authors.
-- **Discover:** search the provider and get explainable recommendations from the whole collection.
-- **Download:** add any result to one persistent queue with progress, retry, pause and resume.
-- **Maintain:** detect new episodes, repair missing files, review author identities and organize folders.
+它把收藏、搜索结果、推荐和下载状态放进同一个持续维护的本地资料库，而不是每次下载都从头开始。长期连载可以检查新章节，作者名称可以统一整理，推荐结果也会说明它与现有收藏的联系。普通用户只需要解压并双击启动；需要更细控制时，仍可查看任务、文件和维护状态。
 
-## Try it
+![Pica Library 漫画库界面](docs/assets/screenshots/v0.3.0/02-library.png)
+<!-- CAPTION_PENDING -->
 
-Current stable release: `v0.2.0`. This release provides a Windows 10/11
-x64 package for ordinary users:
+## 开始使用
 
-1. Download `Pica-Library-v0.2.0-windows-x64.zip` from the release.
-2. Extract the entire ZIP.
-3. Double-click `Pica Library.exe` and complete setup in the browser.
+1. 打开 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases)。
+2. 下载 `Pica-Library-v0.3.0-windows-x64.zip`。
+3. 完整解压 ZIP，不要直接在压缩软件中运行。
+4. 双击 `Pica Library.exe`。
+5. 按首次设置完成账号、可选代理和保存目录配置，然后同步收藏。
 
-v0.2.0 includes full Simplified Chinese localization, bilingual onboarding,
-and the Browser Lite data-package export flow.
+详细步骤见 [中文快速开始](docs/quick-start.zh-CN.md)。
 
-The stable v0.2.0 release adds quick favorites synchronization,
-shelves, author/tag facets and advanced filtering, persistent recommendation
-sessions with background pre-generation and previews, real add/remove Pica
-favorite actions, richer download and downloaded-library management, an
-internal Web Reader with reading progress, ZIP/CBZ export, and the incremental
-update framework.
+## 能做什么
 
-Important upgrade note: users of v0.1.3 must download and extract the full
-`Pica-Library-v0.2.0-windows-x64.zip` package. v0.1.3 does not contain the new
-UpdateManager and cannot consume a v0.2.0 incremental package. v0.2.0
-establishes the baseline from which future compatible releases may use the
-built-in incremental Update ZIP flow.
+- **收藏管理：**同步长期收藏，按作者、标签、分类和书架快速筛选；再次同步时保留已经建立的本地状态。
+- **个性化推荐：**从自己的收藏偏好出发，生成带理由、可换批次的推荐；可以重新生成一轮，也可以把感兴趣的作品加入书架。
+- **收藏图鉴：**把作者、作品系列、主题和兴趣组合整理成只保存在本机的收藏画像，并可导出一页结果卡。
+- **下载与阅读：**管理下载队列、字节进度、失败重试、暂停和继续；下载完成后可在内置阅读器中保存阅读进度。
+- **书架与整理：**统一同一作者的不同署名，维护本地文件命名，追踪长期连载更新而不重复下载已有章节。
+- **维护与一键更新：**检查内容更新、修复缺失文件、查看健康状态，并从 v0.2.0 安全升级到兼容版本。
 
-### Browser Lite
+![Pica Library 个性化推荐](docs/assets/screenshots/v0.3.0/03-recommendations.png)
+<!-- CAPTION_PENDING -->
 
-Browser Lite displays an exported library in the browser and never asks for a
-Pica account or password. To prepare its recommended data package:
+![Pica Library 收藏图鉴](docs/assets/screenshots/v0.3.0/04-atlas.png)
+<!-- CAPTION_PENDING -->
 
-1. Download and open the [Pica Library Windows release](https://github.com/Saber-Alter-Lily/pica-library/releases).
-2. Complete setup and prepare the library.
-3. Open **Settings → Browser Lite → Export Browser Lite Data Package**.
-4. Open Browser Lite and import `pica-library-bundle.json`.
+![Pica Library 软件更新](docs/assets/screenshots/v0.3.0/05-maintenance-update.png)
+<!-- CAPTION_PENDING -->
 
-The complete package can carry prepared library, author and recommendation
-data. Existing compatible CSV and JSON imports remain available.
+## 从旧版本升级
 
-v0.2.0 provides an internal Web Reader and ZIP/CBZ export. It also exposes an
-external-reader integration interface, but does not bundle a third-party
-reader or import arbitrary local CBZ/ZIP files.
+使用 v0.2.0 时，打开 **Maintenance → 软件更新 → 一键检查并更新**，即可安装官方 v0.3.0 增量更新。使用 v0.1.x 时，请下载完整 Windows ZIP 并重新解压。
 
-The package carries its own official Node.js runtime. It does not require a
-terminal, Node.js, npm, pnpm, Git, administrator access, or `.env.local`.
-Credentials are protected for the current Windows user with DPAPI and are never
-stored in the normal configuration file. The unsigned open-source executable
-may initially show a Windows SmartScreen reputation warning.
+用户数据库、收藏和下载文件位于独立的数据目录；兼容更新只替换应用文件，不会删除这些数据。
 
-Application data lives under `%LOCALAPPDATA%\Pica Library` by default, separate
-from the extracted application. Replacing a future application folder will not
-remove the library database, cover cache, configuration, or downloads.
+更新前会校验官方版本、文件范围和 SHA-256，并保留失败回滚边界。完整安装包适合新用户和跨越旧版架构的升级；增量包只服务于明确兼容的来源版本。
 
-For source development and advanced local use:
+## 数据与安全
 
-```powershell
-pnpm install --frozen-lockfile
-Copy-Item .env.template .env.local
-pnpm build
-node dist/pica-library.js serve
-```
+- 数据默认保存在本机，与应用解压目录分离。
+- Pica 账号凭据使用当前 Windows 用户的 DPAPI 加密保存。
+- 本地服务只监听 `127.0.0.1` 回环地址。
+- 项目不会把 Pica 密码写入数据库、导出包或发布文件。
 
-Open `http://127.0.0.1:4789`. Connected commands read `PICA_ACCOUNT` and
-`PICA_PASSWORD` from the local environment. Credentials are not written to the
-database, Bundle, artifact, or logs.
+Browser Lite 可以导入由本地应用准备的数据包进行只读浏览，不会要求输入 Pica 密码。私有 GitHub Runner 面向了解 GitHub Actions 的进阶用户，普通 Windows 用户无需配置它。
 
-The static `web/` directory also works in Browser Lite mode. It can import a
-Pica Library Bundle, browse and filter records, review authors, view prepared
-recommendations, and export a download plan. Cover references stay lightweight;
-images are loaded lazily and failed images fall back to a local placeholder. It
-never asks for a Pica password.
+## 更多
 
-The connected Library defaults to a cover grid, offers a compact list view, and
-renders large collections 48 items at a time. Discover combines bounded related,
-author, circle, tag, and category recall into personalized, explainable
-recommendations. Scores and recall evidence remain available in data/audit
-outputs while normal cards stay concise.
+- [详细 Windows 使用指南](docs/windows-distribution.zh-CN.md)
+- [开发与架构](docs/architecture.md)
+- [Browser Lite 与私有 GitHub Runner](docs/private-github-runner.md)
+- [许可证与上游来源](LICENSE)、[NOTICE](NOTICE.md)、[UPSTREAM](UPSTREAM.md)
+- [提交 Issue](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
-## Runners
-
-| Runner | Best for | State | Output |
-| --- | --- | --- | --- |
-| Local Engine | Persistent libraries, resume, updates, repair and organization | SQLite on your machine | Author-first `library/` |
-| GitHub private caller | Short, manual, ephemeral download batches | Secrets and run belong to a private repository | One-day private Artifact |
-
-Both runners call the same `pica-library` CLI and shared download engine. The
-GitHub engine accepts one favorites page or up to 20 comic IDs and uploads
-`library/`, `download-result.json`, `manifest.json`, and `errors.json` when
-failures exist. The reusable workflow refuses any caller whose repository is
-not private. This keeps credentials, run logs, and downloaded artifacts in a
-user-controlled private repository even if the source repository becomes
-public. See [the private runner guide](docs/private-github-runner.md). Only
-download material you are authorized to access and do not redistribute it.
-
-## Security boundaries
-
-- Provider credentials are environment/Repository Secrets only; they are not
-  persisted in SQLite, Browser Lite, Bundles, or artifacts.
-- API authentication and media transfer use separate HTTP clients. Cover and
-  page requests never inherit API Authorization/signature headers.
-- The local server binds to loopback by default. Its cover route accepts a comic
-  ID, never an arbitrary proxy URL, and caches only bounded `image/*` responses
-  under the selected data directory.
-- Portable Bundles contain metadata, not embedded base64 cover libraries or
-  absolute maintainer paths.
-
-## CLI
-
-```text
-pica-library library sync|list|import|export
-pica-library discover search|recommend
-pica-library download list|run|pause|resume|retry|cancel
-pica-library maintenance updates|repair|authors|health
-pica-library serve
-pica-library doctor
-```
-
-Run `pica-library help` for compatibility commands and options.
-
-## Provenance
-
-The provider transport, API client and mature picture transfer behavior are
-derived from the MIT-licensed [`justorez/pica-cli`](https://github.com/justorez/pica-cli)
-by Neo. Pica Library is independently maintained and adds the persistent library,
-author, recommendation, queue, maintenance, Bundle, runner integration and Web
-architecture. See [UPSTREAM.md](UPSTREAM.md), [NOTICE.md](NOTICE.md), and
-[LICENSE](LICENSE).
-
-Architecture and review records are in [docs/architecture.md](docs/architecture.md)
-and [docs/audit](docs/audit).
-
-See the [Windows distribution guide](docs/windows-distribution.md) for setup,
-upgrades, SmartScreen guidance and SHA-256 verification.
+请只下载你有权访问的内容，不要重新分发漫画文件。

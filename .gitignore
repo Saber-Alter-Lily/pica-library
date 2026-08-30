@@ -16,9 +16,17 @@ pica-download/
 /downloads/
 artifacts/
 /tmp/
+_validation/
 /temp/
 /cache/
 /screenshots/
+/output/
+/PICA_V3_ACCEPTANCE/
+/v3_3/
+/.pica-v*-backup-*/
+/.pica-v*-last-backup.txt
+/_reports/recommender-v3-final-contract-v1/
+/export-manual-tag-review.ts
 *.sqlite*
 /pica-library-live-validation*/
 /*_REVIEW_PACKAGE.zip

@@ -18,15 +18,15 @@
 
 首次使用先同步收藏，之后可以使用快速同步检查变化。漫画库支持标题、作者、标签、分类和书架筛选。
 
-![漫画库](assets/screenshots/v0.3.0/02-library.png)
+![漫画库使用示意](assets/screenshots/v0.3.0/02-library-guide.png)
 
 ## 04 使用推荐和收藏图鉴
 
 推荐页根据本地收藏画像生成分批推荐；收藏图鉴则把长期收藏整理成作品/IP、作者和语义兴趣地图。
 
-![推荐](assets/screenshots/v0.3.0/03-recommendations.png)
+![推荐使用示意](assets/screenshots/v0.3.0/03-recommendations-guide.png)
 
-![收藏图鉴](assets/screenshots/v0.3.0/04-atlas.png)
+![收藏图鉴使用示意](assets/screenshots/v0.3.0/04-atlas-guide.png)
 
 ## 05 下载与阅读
 
@@ -36,6 +36,6 @@
 
 从 v0.2.0 起，打开 **库维护 → 软件更新 → 一键检查并更新**。也可以手动选择官方 Update ZIP。v0.1.x 用户请重新下载完整 Windows ZIP。
 
-![软件更新](assets/screenshots/v0.3.0/05-maintenance-update.png)
+![软件更新使用示意](assets/screenshots/v0.3.0/05-update-guide.png)
 
 应用文件与数据目录彼此独立；兼容更新不会删除本地数据库、收藏或已下载内容。

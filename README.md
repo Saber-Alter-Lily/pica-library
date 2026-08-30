@@ -6,7 +6,7 @@
 
 **Windows 10/11 x64 · 解压即用 · 数据默认保存在本机。**
 
-![Pica Library 漫画库](docs/assets/screenshots/v0.3.0/02-library.png)
+![Pica Library 漫画库使用示意](docs/assets/screenshots/v0.3.0/02-library-guide.png)
 
 ## 开始使用
 
@@ -28,13 +28,13 @@
 
 ### 个性化推荐
 
-![Pica Library 个性化推荐](docs/assets/screenshots/v0.3.0/03-recommendations.png)
+![Pica Library 推荐使用示意](docs/assets/screenshots/v0.3.0/03-recommendations-guide.png)
 
 推荐来自本地收藏画像。每轮分批浏览，可以换一批，也可以重新生成新的推荐轮次。
 
 ### 收藏图鉴
 
-![Pica Library 收藏图鉴](docs/assets/screenshots/v0.3.0/04-atlas.png)
+![Pica Library 收藏图鉴使用示意](docs/assets/screenshots/v0.3.0/04-atlas-guide.png)
 
 收藏图鉴把作品/IP、作者和长期语义偏好整理成本地图谱，并支持导出结果卡 PDF。
 
@@ -43,7 +43,7 @@
 - **v0.2.0 → v0.3.0：**打开 **库维护 → 软件更新 → 一键检查并更新**。
 - **v0.1.x：**请重新下载完整 Windows ZIP。
 
-![Pica Library 软件更新](docs/assets/screenshots/v0.3.0/05-maintenance-update.png)
+![Pica Library 软件更新示意](docs/assets/screenshots/v0.3.0/05-update-guide.png)
 
 用户数据库、收藏和下载内容位于独立数据目录；兼容更新不会因为替换应用文件而删除这些数据。
 

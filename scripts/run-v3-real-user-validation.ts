@@ -29,8 +29,9 @@ const authors = new Set(
 const circles = new Set(records.map((item) => item.circle).filter(Boolean))
 const tagCounts = records.map((item) => item.tags.length).sort((a, b) => a - b)
 const percentile = (value: number) =>
-    tagCounts[Math.min(tagCounts.length - 1, Math.floor(tagCounts.length * value))] ??
-    0
+    tagCounts[
+        Math.min(tagCounts.length - 1, Math.floor(tagCounts.length * value))
+    ] ?? 0
 
 const bootstrapStart = performance.now()
 const profile = buildV3Profile(favorites, records, '2026-08-28T00:00:00.000Z')
@@ -100,9 +101,14 @@ const output = {
         kinds: holdoutKinds,
         randomRuns: randomRuns.length,
         summary: Object.fromEntries(
-            (['recallAt12', 'ndcgAt12', 'authorDiversity', 'tagDiversity'] as const).map(
-                (key) => [key, metricSummary(key)]
-            )
+            (
+                [
+                    'recallAt12',
+                    'ndcgAt12',
+                    'authorDiversity',
+                    'tagDiversity'
+                ] as const
+            ).map((key) => [key, metricSummary(key)])
         ),
         ablations
     },
@@ -124,9 +130,10 @@ const output = {
     },
     dbGrowthBytes: afterSize - beforeSize,
     userDataReadOnlyCopy: true,
-    trainingLeakageGuard: withoutHeldOut(records, deterministicHoldout(records, 'random')).every(
-        (item) => item.isFavorite
-    )
+    trainingLeakageGuard: withoutHeldOut(
+        records,
+        deterministicHoldout(records, 'random')
+    ).every((item) => item.isFavorite)
 }
 fs.mkdirSync(path.dirname(reportPath), { recursive: true })
 fs.writeFileSync(reportPath, JSON.stringify(output, null, 2), 'utf8')

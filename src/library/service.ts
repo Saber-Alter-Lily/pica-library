@@ -41,11 +41,46 @@ import {
     type FavoritesSyncMode
 } from '../services/provider-service'
 import { buildV3Profile } from '../recommendation-v3/taste-model'
+import {
+    buildRecommendationIntents,
+    planSemanticQueries
+} from '../recommendation-v3/query-planner'
+import { normalizeTag } from '../recommendation-v3/semantic-core'
 import { buildBehaviorProfile } from '../recommendation-v3/behavior-profile'
 import { mineTagCombinations } from '../recommendation-v3/tag-combinations'
 import { rankV3 } from '../recommendation-v3/ranker'
 import { rerankV3 } from '../recommendation-v3/reranker'
 import type { UserEventInput } from '../recommendation-v3/types'
+import {
+    buildHistoricalTasteSnapshot,
+    type HistoricalTasteSnapshot
+} from '../recommendation-v3/taste-chronicle'
+import {
+    buildFinalLifetimeProfileV3,
+    FINAL_PROFILE_VERSION
+} from '../recommendation-v3/final-profile'
+import {
+    buildRecommendationIntentsV3,
+    INTENT_PLANNER_VERSION,
+    type IntentCycleHistory
+} from '../recommendation-v3/intent-planner-v3'
+import {
+    translateIntentPlanV3,
+    QUERY_TRANSLATOR_VERSION
+} from '../recommendation-v3/provider-query-translator'
+import {
+    retrieveCandidatesV3,
+    RETRIEVER_VERSION
+} from '../recommendation-v3/retriever-v3'
+import {
+    rankCandidatesWithFrozenRankerV3,
+    RANKER_ADAPTER_VERSION
+} from '../recommendation-v3/ranker-adapter-v3'
+import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
+import {
+    loadTagRegistryV3,
+    resolveTagV3
+} from '../recommendation-v3/tag-resolution-v3'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -195,6 +230,117 @@ export class LibraryService {
         return { ...image, cached: false }
     }
 
+    async buildFinalRecommendationCycleV3(cycleId: string) {
+        const pica = await this.connect()
+        const catalog = this.database.listComics({ limit: 10000 })
+        const favorites = catalog.filter((comic) => comic.isFavorite)
+        const registry = loadTagRegistryV3('src/data/registry-v3-final')
+        const profile = buildFinalLifetimeProfileV3(catalog, { registry })
+        const history: IntentCycleHistory[] = this.database
+            .listV3CandidatePools(50)
+            .flatMap((pool) => {
+                const state = String(pool.telemetry.state ?? '')
+                const completedAt = String(pool.telemetry.completedAt ?? '')
+                const plan = Array.isArray(pool.telemetry.intentPlan)
+                    ? (pool.telemetry.intentPlan as Array<{
+                          intentId?: unknown
+                      }>)
+                    : []
+                return completedAt &&
+                    (state === 'EXHAUSTED' || state === 'SUPERSEDED')
+                    ? [
+                          {
+                              state,
+                              completedAt,
+                              intentIds: plan
+                                  .map((intent) =>
+                                      String(intent.intentId ?? '')
+                                  )
+                                  .filter(Boolean)
+                          } as IntentCycleHistory
+                      ]
+                    : []
+            })
+        const intents = buildRecommendationIntentsV3({
+            profile,
+            favorites,
+            history
+        })
+        const routes = translateIntentPlanV3(intents)
+        const store = (comics: Comic[]) => {
+            const records = comics.map(comicToRecord)
+            this.database.importCatalog(records, 'pica:recommendations')
+            return records.flatMap((record) => {
+                const stored = this.database.getComic(record.comicId)
+                return stored ? [stored] : []
+            })
+        }
+        const retrieved = await retrieveCandidatesV3({
+            provider: {
+                keyword: async (query, page) =>
+                    store(
+                        (
+                            await pica.comicsPage(
+                                '',
+                                query,
+                                pica.Order.loved,
+                                page
+                            )
+                        ).docs
+                    ),
+                author: async (query, page) =>
+                    store(
+                        (await pica.search(query, page, pica.Order.loved)).docs
+                    ),
+                related: async (comicId) => store(await pica.related(comicId))
+            },
+            routes,
+            intents,
+            favoriteIds: new Set(favorites.map((comic) => comic.comicId)),
+            isSafetyExcluded: (comic) =>
+                comic.tags.some((tag) => {
+                    const resolved = resolveTagV3(tag, registry)
+                    return (
+                        resolved.resolutionType === 'SAFETY' ||
+                        resolved.recommendationRole === 'SAFETY_EXCLUDE'
+                    )
+                }),
+            candidateFandomKeys: (comic) =>
+                comic.tags.flatMap((tag) => {
+                    const resolved = resolveTagV3(tag, registry)
+                    return resolved.facet === 'FANDOM_IP' &&
+                        resolved.resolutionStatus === 'RESOLVED'
+                        ? [resolved.canonicalKey]
+                        : []
+                })
+        })
+        const ranked = rankCandidatesWithFrozenRankerV3({
+            candidates: retrieved.candidates,
+            favorites,
+            graphEdges: this.database.listRecommendationEdges().map((edge) => ({
+                sourceComicId: edge.sourceComicId,
+                targetComicId: edge.targetComicId,
+                confidence: edge.confidence,
+                observationCount: edge.observationCount
+            }))
+        })
+        return {
+            profile,
+            intents,
+            routes,
+            ranked,
+            readiness: retrieved.readiness,
+            telemetry: { ...retrieved.telemetry, cycleId },
+            versions: {
+                profileVersion: FINAL_PROFILE_VERSION,
+                registryVersion: profile.registryVersion,
+                rankerModelVersion: RANKER_ADAPTER_VERSION,
+                candidatePoolVersion: `${INTENT_PLANNER_VERSION}/${QUERY_TRANSLATOR_VERSION}/${RETRIEVER_VERSION}`,
+                allocatorVersion: BATCH_ALLOCATOR_VERSION
+            }
+        }
+    }
+
     async downloadedCover(comicId: string) {
         const file = this.database.downloadedCoverPath(comicId)
         if (!file) throw new Error('Downloaded cover is unavailable')
@@ -216,6 +362,53 @@ export class LibraryService {
         return { ...this.favoritesProgress }
     }
 
+    private tasteChroniclePath() {
+        return path.join(this.dataDir, 'taste-chronicle.json')
+    }
+
+    tasteChronicle(): HistoricalTasteSnapshot | null {
+        try {
+            return JSON.parse(
+                fs.readFileSync(this.tasteChroniclePath(), 'utf8')
+            ) as HistoricalTasteSnapshot
+        } catch {
+            return null
+        }
+    }
+
+    rebuildTasteChronicle(_orderIds?: string[]) {
+        // Atlas V2 intentionally ignores historical favorite order. The current
+        // favorite set is the only preference authority; orderIds remains in the
+        // method signature so full-sync callers stay backward compatible.
+        void _orderIds
+        const records = this.database.listComics({ limit: 5000 })
+        const snapshot = buildHistoricalTasteSnapshot(records)
+        const target = this.tasteChroniclePath()
+        const nonce = `${process.pid}-${Date.now()}`
+        const temporary = `${target}.${nonce}.new`
+        const backup = `${target}.${nonce}.previous`
+        fs.writeFileSync(temporary, JSON.stringify(snapshot), 'utf8')
+        let movedPrevious = false
+        try {
+            if (fs.existsSync(target)) {
+                fs.renameSync(target, backup)
+                movedPrevious = true
+            }
+            fs.renameSync(temporary, target)
+            if (movedPrevious) fs.unlinkSync(backup)
+        } catch (error) {
+            if (
+                !fs.existsSync(target) &&
+                movedPrevious &&
+                fs.existsSync(backup)
+            )
+                fs.renameSync(backup, target)
+            if (fs.existsSync(temporary)) fs.unlinkSync(temporary)
+            throw error
+        }
+        return snapshot
+    }
+
     async syncFavorites(mode: FavoritesSyncMode = 'quick') {
         this.favoritesProgress = { phase: 'reading' }
         try {
@@ -228,6 +421,8 @@ export class LibraryService {
                     ...progress
                 }
             })
+            if (result.syncMode === 'full' && result.favoriteOrderIds?.length)
+                this.rebuildTasteChronicle(result.favoriteOrderIds)
             this.favoritesProgress = {
                 phase: 'complete',
                 mode: result.syncMode,
@@ -335,6 +530,32 @@ export class LibraryService {
         const seedBudget = Math.max(1, Math.min(options.seedCount ?? 12, 16))
         const seeds = selectDiversifiedSeeds(favorites, seedBudget)
         const profile = recommendComics(favorites, limit).profile
+        const semanticProfile = buildV3Profile(
+            favorites,
+            this.database.listComics({ limit: 5000 })
+        )
+        const semanticPlans = planSemanticQueries(
+            buildRecommendationIntents(semanticProfile, favorites)
+        )
+        const boundedTagSearch = async (tag: string) => {
+            const first = await pica.comicsPage('', tag, pica.Order.loved, 1)
+            const docs = [...first.docs]
+            for (let page = 2; page <= Math.min(first.pages, 3); page++)
+                docs.push(
+                    ...(await pica.comicsPage('', tag, pica.Order.loved, page))
+                        .docs
+                )
+            return docs
+        }
+        const boundedAuthorSearch = async (author: string) => {
+            const first = await pica.search(author, 1, pica.Order.loved)
+            const docs = [...first.docs]
+            for (let page = 2; page <= Math.min(first.pages, 2); page++)
+                docs.push(
+                    ...(await pica.search(author, page, pica.Order.loved)).docs
+                )
+            return docs
+        }
         const recallTasks: Array<{
             route: RecallRoute
             source: string
@@ -347,6 +568,65 @@ export class LibraryService {
             seedComicId: seed.comicId,
             load: () => pica.related(seed.comicId)
         }))
+        // Self-designed semantic routes own the first bounded retrieval budget;
+        // native related remains a later auxiliary route in the merged pool.
+        for (const plan of semanticPlans.slice(0, 4))
+            for (const route of plan.routes.slice(0, 2)) {
+                if (route.kind === 'tag' || route.kind === 'fandom')
+                    recallTasks.push({
+                        route: 'tag',
+                        source: `semantic:${route.kind}:${route.query}`,
+                        load: () => boundedTagSearch(route.query),
+                        accepts: (comic) =>
+                            comic.tags.some(
+                                (tag) =>
+                                    normalizeTag(tag) ===
+                                    normalizeTag(route.query)
+                            )
+                    })
+                else if (route.kind === 'author')
+                    recallTasks.push({
+                        route: 'author',
+                        source: `semantic:${route.query}`,
+                        load: () => boundedAuthorSearch(route.query)
+                    })
+                else if (route.kind === 'genre')
+                    recallTasks.push({
+                        route: 'category',
+                        source: `semantic:genre:${route.query}`,
+                        load: async () => {
+                            const first = await pica.comicsPage(
+                                route.query,
+                                '',
+                                pica.Order.loved,
+                                1
+                            )
+                            const pages = Math.min(
+                                first.pages ?? 1,
+                                route.maxPages
+                            )
+                            const docs = [...first.docs]
+                            for (let page = 2; page <= pages; page++)
+                                docs.push(
+                                    ...(
+                                        await pica.comicsPage(
+                                            route.query,
+                                            '',
+                                            pica.Order.loved,
+                                            page
+                                        )
+                                    ).docs
+                                )
+                            return docs
+                        },
+                        accepts: (comic) =>
+                            comic.categories.some(
+                                (category) =>
+                                    normalizeTag(category) ===
+                                    normalizeTag(route.query)
+                            )
+                    })
+            }
         const recallTelemetry = new Map<
             string,
             {
@@ -361,14 +641,10 @@ export class LibraryService {
             recallTasks.push({
                 route: 'tag',
                 source: item.value,
-                load: async () =>
-                    (await pica.comicsPage('', item.value, pica.Order.loved, 1))
-                        .docs,
+                load: () => boundedTagSearch(item.value),
                 accepts: (comic) =>
                     comic.tags.some(
-                        (tag) =>
-                            normalizeAuthorKey(tag) ===
-                            normalizeAuthorKey(item.value)
+                        (tag) => normalizeTag(tag) === normalizeTag(item.value)
                     )
             })
         const combinations = mineTagCombinations(
@@ -384,9 +660,7 @@ export class LibraryService {
                     tag,
                     count: favorites.filter((comic) =>
                         comic.tags.some(
-                            (value) =>
-                                normalizeAuthorKey(value) ===
-                                normalizeAuthorKey(tag)
+                            (value) => normalizeTag(value) === normalizeTag(tag)
                         )
                     ).length
                 }))
@@ -397,15 +671,12 @@ export class LibraryService {
             recallTasks.push({
                 route: 'tag',
                 source: `combination:${combination.tags.join('+')}`,
-                load: async () =>
-                    (await pica.comicsPage('', anchor, pica.Order.loved, 1))
-                        .docs,
+                load: () => boundedTagSearch(anchor),
                 accepts: (comic) =>
                     combination.tags.every((wanted) =>
                         comic.tags.some(
                             (value) =>
-                                normalizeAuthorKey(value) ===
-                                normalizeAuthorKey(wanted)
+                                normalizeTag(value) === normalizeTag(wanted)
                         )
                     )
             })
@@ -428,8 +699,7 @@ export class LibraryService {
             recallTasks.push({
                 route: 'author',
                 source: item.value,
-                load: async () =>
-                    (await pica.search(item.value, 1, pica.Order.loved)).docs,
+                load: () => boundedAuthorSearch(item.value),
                 accepts: (comic) =>
                     normalizeAuthorKey(comic.author) ===
                     normalizeAuthorKey(item.value)
@@ -438,16 +708,19 @@ export class LibraryService {
             recallTasks.push({
                 route: 'circle',
                 source: item.value,
-                load: async () =>
-                    (await pica.search(item.value, 1, pica.Order.loved)).docs,
+                load: () => boundedAuthorSearch(item.value),
                 accepts: (comic) =>
                     normalizeAuthorKey(comic.author).includes(
                         normalizeAuthorKey(item.value)
                     )
             })
+        // Keep the cycle bounded even when semantic and legacy fallback routes
+        // are both available. Native related seeds occupy the first slots;
+        // semantic routes then receive the remaining bounded budget.
+        const boundedRecallTasks = recallTasks.slice(0, 24)
         const gate = pLimit(3)
         const recalled = await Promise.all(
-            recallTasks.map((task) =>
+            boundedRecallTasks.map((task) =>
                 gate(async (): Promise<RecommendationCandidate[]> => {
                     const startedAt = Date.now()
                     const telemetry = recallTelemetry.get(task.route) ?? {
@@ -508,7 +781,24 @@ export class LibraryService {
                 })
             )
         )
-        const candidates = mergeRecallCandidates(recalled.flat())
+        const mergedCandidates = mergeRecallCandidates(recalled.flat())
+        // Native related is auxiliary only: semantic/tag/creator/category
+        // routes own the pool, while related results can rescue a bounded
+        // fraction of candidates and add graph corroboration.
+        const semanticCandidates = mergedCandidates.filter((candidate) =>
+            candidate.recalls.some((recall) => recall.route !== 'related')
+        )
+        const nativeCandidates = mergedCandidates.filter((candidate) =>
+            candidate.recalls.every((recall) => recall.route === 'related')
+        )
+        const nativeBudget = Math.min(
+            120,
+            Math.max(24, Math.floor(mergedCandidates.length * 0.25))
+        )
+        const candidates = [
+            ...semanticCandidates,
+            ...nativeCandidates.slice(0, nativeBudget)
+        ].slice(0, 1500)
         for (const candidate of candidates)
             for (const evidence of candidate.recalls)
                 if (evidence.route === 'related' && evidence.seedComicId)
@@ -539,10 +829,46 @@ export class LibraryService {
                 ),
                 favorites,
                 v3Profile,
-                this.database.listUserEvents()
+                this.database.listUserEvents(),
+                {
+                    graphEdges: this.database
+                        .listRecommendationEdges()
+                        .map((edge) => ({
+                            sourceComicId: edge.sourceComicId,
+                            targetComicId: edge.targetComicId,
+                            confidence: edge.confidence,
+                            observationCount: edge.observationCount
+                        })),
+                    routeFamilies: new Map(
+                        [
+                            'related',
+                            'cluster',
+                            'tag',
+                            'combination',
+                            'author',
+                            'circle'
+                        ].map((route) => [
+                            route,
+                            new Set(
+                                candidates
+                                    .filter((item) =>
+                                        item.recalls.some(
+                                            (recall) => recall.route === route
+                                        )
+                                    )
+                                    .map((item) => item.comic.comicId)
+                            )
+                        ])
+                    )
+                }
             )
             const byId = new Map(catalog.map((comic) => [comic.comicId, comic]))
-            const reranked = rerankV3(ranked, byId, limit)
+            const reranked = rerankV3(
+                ranked,
+                byId,
+                limit,
+                v3Profile.historical.clusters
+            )
             const recallById = new Map(
                 candidates.map((item) => [item.comic.comicId, item.recalls])
             )

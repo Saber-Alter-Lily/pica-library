@@ -29,6 +29,10 @@ const state = {
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`,
     recommendationContextId: null,
+    recommendationCycleId: null,
+    recommendationBatchId: null,
+    recommendationManagedV3: false,
+    recommendationPending: false,
     searchContextId: null,
     visible: [],
     libraryPage: 1,
@@ -49,6 +53,7 @@ const state = {
         localStorage.getItem('pica-shelf-covers-enabled') !== 'false',
     coversEnabled: localStorage.getItem('pica-covers-enabled') !== 'false',
     recommendationBatch: 0,
+    recommendationMaxVisibleBatches: 6,
     stagedUpdate: null,
     ...emptyLiteState(),
     capabilities: null,
@@ -66,6 +71,7 @@ const state = {
     recommendationSessionNo: 1,
     recommendationExhausted: false,
     updateProgress: null,
+    chronicleSnapshot: null,
     reader: {
         comicId: null,
         episodeId: null,
@@ -151,6 +157,9 @@ const post = (path, value) =>
     })
 // Legacy V2 contract remains intentionally discoverable:
 // post('/api/v1/recommendation-sessions', {})
+// api('/api/v1/recommendation-sessions/status')
+// action: 'restart'
+// recommendation.nextSessionReady
 
 function recordRecommendationEvent(eventType, payload = {}) {
     if (state.mode !== 'connected') return
@@ -158,6 +167,7 @@ function recordRecommendationEvent(eventType, payload = {}) {
         eventType,
         appSessionId: state.appSessionId,
         recommendationContextId: state.recommendationContextId,
+        recommendationCycleId: state.recommendationCycleId,
         ...payload
     }
     void post('/api/v1/recommendation-events', {
@@ -242,6 +252,7 @@ async function loadDesktop() {
 }
 
 const updatePhaseText = {
+    downloading: 'update.phase.downloading',
     validating: 'update.phase.validating',
     extracting: 'update.phase.extracting',
     staged: 'update.phase.staged',
@@ -275,25 +286,7 @@ function renderUpdateProgress(progress) {
     }
 }
 
-async function stageUpdateFile(file) {
-    if (!desktop) throw new Error(t('update.localOnly'))
-    if (!file || !file.name.toLowerCase().endsWith('.zip'))
-        throw new Error(t('update.chooseZip'))
-    const message = $('#update-message')
-    message.textContent = t('update.validating')
-    renderUpdateProgress({ phase: 'validating' })
-    const response = await fetch('/api/v1/update/stage', {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/zip',
-            'x-pica-csrf': desktop.csrfToken,
-            'x-update-filename': encodeURIComponent(file.name)
-        },
-        body: file
-    })
-    const value = await response.json()
-    if (!response.ok)
-        throw new Error(value.error || t('update.validationFailed'))
+function renderStagedUpdate(value) {
     state.stagedUpdate = value
     const summary = $('#update-summary')
     summary.hidden = false
@@ -309,7 +302,7 @@ async function stageUpdateFile(file) {
         }
     )}`
     $('#update-apply').hidden = Boolean(value.requiresFullInstall)
-    message.textContent = value.requiresFullInstall
+    $('#update-message').textContent = value.requiresFullInstall
         ? t('update.fullRequired')
         : t('update.staged')
     renderUpdateProgress({
@@ -317,6 +310,43 @@ async function stageUpdateFile(file) {
         current: value.fileCount,
         total: value.fileCount
     })
+    return value
+}
+
+async function stageUpdateFile(file) {
+    if (!desktop) throw new Error(t('update.localOnly'))
+    if (!file || !file.name.toLowerCase().endsWith('.zip'))
+        throw new Error(t('update.chooseZip'))
+    $('#update-message').textContent = t('update.validating')
+    renderUpdateProgress({ phase: 'validating' })
+    const response = await fetch('/api/v1/update/stage', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/zip',
+            'x-pica-csrf': desktop.csrfToken,
+            'x-update-filename': encodeURIComponent(file.name)
+        },
+        body: file
+    })
+    const value = await response.json()
+    if (!response.ok)
+        throw new Error(value.error || t('update.validationFailed'))
+    return renderStagedUpdate(value)
+}
+
+async function applyStagedUpdate(
+    value = state.stagedUpdate,
+    skipConfirm = false
+) {
+    if (!value) return
+    if (
+        !skipConfirm &&
+        !window.confirm(t('update.confirm', { version: value.targetVersion }))
+    )
+        return
+    await desktopPost('/api/v1/update/apply', { id: value.id })
+    $('#update-message').textContent = t('update.applying')
+    renderUpdateProgress({ phase: 'waiting-for-exit' })
 }
 
 const updateDropzone = $('#update-dropzone')
@@ -350,6 +380,10 @@ $('#update-file').onchange = (event) => {
 }
 $('#update-check').onclick = async () => {
     const message = $('#update-message')
+    if (!desktop) {
+        message.textContent = t('update.localOnly')
+        return
+    }
     message.textContent = t('update.checking')
     try {
         const value = await api('/api/v1/update/check')
@@ -357,36 +391,79 @@ $('#update-check').onclick = async () => {
             message.textContent = t('update.current')
             return
         }
-        const releaseUrl = escapeHtml(value.releaseUrl)
         if (value.status === 'full-install') {
             message.innerHTML = t('update.fullFound', {
                 version: escapeHtml(value.version),
-                url: releaseUrl
+                url: escapeHtml(value.releaseUrl)
             })
             return
         }
         message.innerHTML = t('update.incrementalFound', {
             version: escapeHtml(value.version),
-            url: releaseUrl
+            url: escapeHtml(value.releaseUrl)
         })
     } catch (error) {
         message.textContent = localizeError(language, error)
     }
 }
-$('#update-apply').onclick = async () => {
-    if (!state.stagedUpdate) return
-    if (
-        !window.confirm(
-            t('update.confirm', {
-                version: state.stagedUpdate.targetVersion
-            })
-        )
-    )
+$('#update-one-click').onclick = async () => {
+    const button = $('#update-one-click')
+    const message = $('#update-message')
+    if (!desktop) {
+        message.textContent = t('update.localOnly')
         return
+    }
+    button.disabled = true
     try {
-        await desktopPost('/api/v1/update/apply', { id: state.stagedUpdate.id })
-        $('#update-message').textContent = t('update.applying')
-        renderUpdateProgress({ phase: 'waiting-for-exit' })
+        message.textContent = t('update.checking')
+        const available = await api('/api/v1/update/check')
+        if (available.status === 'current') {
+            message.textContent = t('update.current')
+            return
+        }
+        if (available.status === 'full-install') {
+            message.innerHTML = t('update.fullFound', {
+                version: escapeHtml(available.version),
+                url: escapeHtml(available.releaseUrl)
+            })
+            return
+        }
+        if (
+            !window.confirm(
+                t('update.oneClickConfirm', { version: available.version })
+            )
+        )
+            return
+        message.textContent = t('update.downloading', {
+            version: available.version
+        })
+        renderUpdateProgress({ phase: 'downloading' })
+        const staged = await desktopPost('/api/v1/update/prepare-latest')
+        if (staged.status === 'current') {
+            message.textContent = t('update.current')
+            renderUpdateProgress({ phase: 'idle' })
+            return
+        }
+        if (staged.status === 'full-install') {
+            message.innerHTML = t('update.fullFound', {
+                version: escapeHtml(staged.version),
+                url: escapeHtml(staged.releaseUrl)
+            })
+            renderUpdateProgress({ phase: 'idle' })
+            return
+        }
+        renderStagedUpdate(staged)
+        await applyStagedUpdate(staged, true)
+    } catch (error) {
+        message.textContent = localizeError(language, error)
+        renderUpdateProgress({ phase: 'failed' })
+    } finally {
+        button.disabled = false
+    }
+}
+$('#update-apply').onclick = async () => {
+    try {
+        await applyStagedUpdate()
     } catch (error) {
         $('#update-message').textContent = localizeError(language, error)
         renderUpdateProgress({ phase: 'failed' })
@@ -898,7 +975,9 @@ function renderResultCards(records, target, recommendation = false) {
 
 function renderPreparedRecommendations() {
     $('#profile').innerHTML = ''
-    const start = state.recommendationBatch * 12
+    const start = state.recommendationManagedV3
+        ? 0
+        : state.recommendationBatch * 12
     renderResultCards(
         state.recommendations.slice(start, start + 12),
         '#recommend-results',
@@ -906,9 +985,13 @@ function renderPreparedRecommendations() {
     )
     recordRecommendationEvent('recommend_batch_presented', {
         contextId: state.recommendationContextId,
+        recommendationCycleId: state.recommendationCycleId,
+        recommendationBatchId: state.recommendationBatchId,
         recommendationBatchIndex: state.recommendationBatch,
+        dedupeKey: `${state.recommendationCycleId || 'none'}:${state.recommendationBatchId || state.recommendationBatch}`,
         recommendationSessionId: state.recommendationSessionNo,
         metadata: {
+            batchId: state.recommendationBatchId,
             itemIds: state.recommendations
                 .slice(start, start + 12)
                 .map((item) => (item.comic || item).comicId)
@@ -929,22 +1012,37 @@ function renderPreparedRecommendations() {
         'aria-pressed',
         String(state.recommendationView === 'list')
     )
-    $('#recommend-next-batch').hidden = state.recommendations.length <= 12
+    $('#recommend-next-batch').hidden = state.recommendationManagedV3
+        ? state.recommendationExhausted
+        : state.recommendations.length <= 12
     const batchCount = Math.max(1, Math.ceil(state.recommendations.length / 12))
+    const batchLabel = state.recommendationManagedV3
+        ? t('recommend.managedBatch', {
+              current: state.recommendationBatch + 1,
+              max: state.recommendationMaxVisibleBatches
+          })
+        : t('message.recommendationBatch', {
+              current: state.recommendationBatch + 1,
+              total: batchCount
+          })
     $('#recommend-batch').textContent =
         state.recommendations.length > 0
-            ? t('recommend.round', {
-                  session: state.recommendationSessionNo,
-                  batch: t('message.recommendationBatch', {
-                      current: state.recommendationBatch + 1,
-                      total: batchCount
-                  }),
-                  next: state.recommendationNextReady
-                      ? t('recommend.nextReady')
-                      : state.recommendationBatch > 0
-                        ? t('recommend.preparingNext')
-                        : ''
-              })
+            ? state.recommendationManagedV3
+                ? t('recommend.managedRound', {
+                      batch: batchLabel,
+                      state: state.recommendationExhausted
+                          ? t('recommend.roundFinished')
+                          : ''
+                  })
+                : t('recommend.round', {
+                      session: state.recommendationSessionNo,
+                      batch: batchLabel,
+                      next: state.recommendationNextReady
+                          ? t('recommend.nextReady')
+                          : state.recommendationBatch > 0
+                            ? t('recommend.preparingNext')
+                            : ''
+                  })
             : ''
     $('#recommend-selection-status').textContent = t('library.selected', {
         count: state.selections.recommendation.size
@@ -954,11 +1052,14 @@ function renderPreparedRecommendations() {
 }
 
 let recommendationImpressionObserver = null
+const recommendationImpressionTimers = new Map()
 function observeRecommendationImpressions() {
     recommendationImpressionObserver?.disconnect()
+    for (const timer of recommendationImpressionTimers.values())
+        window.clearTimeout(timer)
+    recommendationImpressionTimers.clear()
     if (state.mode !== 'connected' || !('IntersectionObserver' in window))
         return
-    const timers = new WeakMap()
     recommendationImpressionObserver = new IntersectionObserver(
         (entries) => {
             for (const entry of entries) {
@@ -969,15 +1070,17 @@ function observeRecommendationImpressions() {
                         recordRecommendationEvent('recommend_impression', {
                             comicId: card.dataset.comicId,
                             contextId: state.recommendationContextId,
+                            recommendationCycleId: state.recommendationCycleId,
                             recommendationBatchIndex: state.recommendationBatch,
                             rankPosition: rank,
                             dedupeKey: `${state.recommendationContextId || 'none'}:${state.recommendationBatch}:${card.dataset.comicId}`
                         })
                     }, 800)
-                    timers.set(card, timer)
+                    recommendationImpressionTimers.set(card, timer)
                 } else {
-                    const timer = timers.get(card)
+                    const timer = recommendationImpressionTimers.get(card)
                     if (timer) window.clearTimeout(timer)
+                    recommendationImpressionTimers.delete(card)
                 }
             }
         },
@@ -986,6 +1089,42 @@ function observeRecommendationImpressions() {
     $$('#recommend-results .result').forEach((card) =>
         recommendationImpressionObserver.observe(card)
     )
+}
+
+const recommendationRequestId = (action) =>
+    `${action}:${state.appSessionId}:${Date.now()}:${crypto.randomUUID ? crypto.randomUUID() : Math.random()}`
+
+function applyManagedRecommendationBatch(value) {
+    state.recommendationManagedV3 = true
+    state.recommendations = value.recommendations || []
+    state.recommendationCycleId = value.cycleId || value.activeCycleId || null
+    state.recommendationBatchId = value.batchId || null
+    state.recommendationBatch = Number(value.batchIndex ?? 0)
+    state.recommendationMaxVisibleBatches = Number(
+        value.maxVisibleBatches ?? state.recommendationMaxVisibleBatches ?? 6
+    )
+    state.recommendationContextId = value.contextId || value.batchId || null
+    state.recommendationExhausted = Boolean(value.exhausted)
+    // Managed V3 does not pre-build a future cycle during ordinary paging.
+    // A new cycle exists only after the user explicitly chooses regenerate.
+    state.recommendationNextReady = false
+    clearSelection('recommendation')
+}
+
+async function waitForFinalCycle(previousCycleId = null) {
+    for (let attempt = 0; attempt < 120; attempt++) {
+        const status = await api(
+            '/api/v1/recommendation-sessions/status?mode=final'
+        )
+        if (
+            status.activeCycleId &&
+            !status.buildingCycleId &&
+            (!previousCycleId || status.activeCycleId !== previousCycleId)
+        )
+            return status
+        await new Promise((resolve) => window.setTimeout(resolve, 1000))
+    }
+    throw new Error(t('recommend.buildTimeout'))
 }
 
 function downloadJson(name, value) {
@@ -1806,6 +1945,7 @@ $$('nav [data-view], [data-go]').forEach((button) =>
         if (id === 'downloaded') void loadDownloaded()
         if (id === 'shelves') void loadShelves()
         if (id === 'settings') void loadPreviewCacheStats()
+        if (id === 'chronicle') void loadChronicle()
         document.body.classList.toggle('reader-active', id === 'reader')
     })
 )
@@ -1888,6 +2028,28 @@ $('#cover-toggle').onchange = (event) => {
     renderAll()
 }
 $('#recommend-next-batch').onclick = async () => {
+    if (state.mode === 'connected' && state.recommendationManagedV3) {
+        if (state.recommendationPending) return
+        state.recommendationPending = true
+        $('#recommend-next-batch').disabled = true
+        try {
+            const value = await post('/api/v1/recommendations', {
+                action: 'next',
+                requestId: recommendationRequestId('next'),
+                appSessionId: state.appSessionId
+            })
+            applyManagedRecommendationBatch(value)
+            renderPreparedRecommendations()
+            if (value.exhausted)
+                $('#recommend-message').textContent = t('recommend.exhausted')
+        } catch (error) {
+            $('#recommend-message').textContent = localizeError(language, error)
+        } finally {
+            state.recommendationPending = false
+            $('#recommend-next-batch').disabled = false
+        }
+        return
+    }
     if (
         state.mode === 'connected' &&
         state.capabilities?.features?.adaptiveRecommendationBatches
@@ -2266,17 +2428,23 @@ $('#search-button').onclick = async () => {
 $('#recommend-button').onclick = async () => {
     try {
         if (state.mode === 'connected') {
-            const value = await post('/api/v1/recommendation-sessions', {
+            state.recommendationPending = true
+            $('#recommend-button').disabled = true
+            const started = await post('/api/v1/recommendation-sessions', {
                 engine: 'v3',
+                action: 'resume_or_create',
+                requestId: recommendationRequestId('resume'),
                 appSessionId: state.appSessionId
             })
-            state.profile = value.profile
-            state.recommendations = value.recommendations
-            state.recommendationSessionNo = value.sessionNo
-            state.recommendationExhausted = value.exhausted
-            state.recommendationBatch = 0
-            state.recommendationContextId = value.contextId || null
-            clearSelection('recommendation')
+            if (!started.activeCycleId) {
+                $('#recommend-message').textContent = t('recommend.preparing')
+                await waitForFinalCycle()
+            }
+            const value = await post('/api/v1/recommendations', {
+                action: 'current',
+                appSessionId: state.appSessionId
+            })
+            applyManagedRecommendationBatch(value)
         } else if (state.recommendationSessions?.length) {
             state.recommendations = state.recommendationSessions[0]
             state.recommendationSessionNo = 1
@@ -2287,26 +2455,37 @@ $('#recommend-button').onclick = async () => {
         renderPreparedRecommendations()
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
+    } finally {
+        state.recommendationPending = false
+        $('#recommend-button').disabled = false
     }
 }
 $('#recommend-restart').onclick = async () => {
     if (!window.confirm(t('recommend.restartConfirm'))) return
     try {
-        const value = await post('/api/v1/recommendation-sessions', {
-            action: 'restart',
+        if (state.recommendationPending) return
+        state.recommendationPending = true
+        $('#recommend-restart').disabled = true
+        const previousCycleId = state.recommendationCycleId
+        await post('/api/v1/recommendation-sessions', {
+            action: 'force_new',
             engine: 'v3',
+            requestId: recommendationRequestId('force-new'),
             appSessionId: state.appSessionId
         })
-        state.profile = value.profile
-        state.recommendations = value.recommendations
-        state.recommendationSessionNo = value.sessionNo
-        state.recommendationExhausted = value.exhausted
-        state.recommendationBatch = 0
-        state.recommendationContextId = value.contextId || null
-        clearSelection('recommendation')
+        $('#recommend-message').textContent = t('recommend.rebuilding')
+        await waitForFinalCycle(previousCycleId)
+        const value = await post('/api/v1/recommendations', {
+            action: 'current',
+            appSessionId: state.appSessionId
+        })
+        applyManagedRecommendationBatch(value)
         renderPreparedRecommendations()
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
+    } finally {
+        state.recommendationPending = false
+        $('#recommend-restart').disabled = false
     }
 }
 ;['#search-results', '#recommend-results'].forEach((selector) => {
@@ -2442,6 +2621,587 @@ $('#author-list').onclick = async (event) => {
     renderAuthors()
 }
 
+function chronicleEscape(value) {
+    const node = document.createElement('span')
+    node.textContent = String(value ?? '')
+    return node.innerHTML
+}
+
+function chronicleTrend(value) {
+    return (
+        {
+            STABLE: t('chronicle.stable'),
+            RISING: t('chronicle.rising'),
+            STRONGLY_RISING: t('chronicle.stronglyRising'),
+            DECLINING: t('chronicle.declining'),
+            DORMANT: t('chronicle.dormant'),
+            EMERGING: t('chronicle.emerging'),
+            INSUFFICIENT_DATA: t('chronicle.insufficient')
+        }[value] || t('chronicle.changing')
+    )
+}
+
+function renderChronicleLegacy(snapshot) {
+    const content = $('#chronicle-content')
+    if (!snapshot) return
+    const metric = (label, value) =>
+        `<div class="chronicle-metric"><strong>${chronicleEscape(value)}</strong><span>${chronicleEscape(label)}</span></div>`
+    content.innerHTML = `<article class="chronicle-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.hero')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric('Tags', snapshot.globalStats.tags)}${metric('Interests', snapshot.tasteClusters.length)}</div><small>${t('chronicle.local')}</small></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.keywords')}</h2><div class="chronicle-tags">${snapshot.tagPreferences
+        .slice(0, 20)
+        .map(
+            (tag) =>
+                `<span class="chronicle-tag">${chronicleEscape(tag.value)} · ${chronicleTrend(tag.trend)}</span>`
+        )
+        .join('')}</div></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.lines')}</h2><div class="chronicle-clusters">${snapshot.tasteClusters
+        .map(
+            (cluster, index) =>
+                `<section class="chronicle-cluster"><small>${index < 3 ? t('chronicle.main') : t('chronicle.side')} ${String(index + 1).padStart(2, '0')} · ${chronicleTrend(cluster.trend)}</small><h3>${chronicleEscape(cluster.displayName)}</h3><p>${t('chronicle.share')} ${Math.round(cluster.weight * 100)}%</p><p>${cluster.authors.slice(0, 3).map(chronicleEscape).join(' · ')}</p><div class="chronicle-covers">${(
+                    cluster.representativeWorks || []
+                )
+                    .slice(0, 4)
+                    .map((work) =>
+                        state.mode === 'connected' && work.coverUrl
+                            ? `<figure><img src="/api/v1/covers/${encodeURIComponent(work.comicId)}" alt="" loading="lazy"><figcaption>${chronicleEscape(work.title)}</figcaption></figure>`
+                            : `<figure class="cover-fallback"><span>◇</span><figcaption>${chronicleEscape(work.title)}</figcaption></figure>`
+                    )
+                    .join('')}</div></section>`
+        )
+        .join('')}</div></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.universe')}</h2><p>${t('chronicle.universeNote')}</p><div class="chronicle-universe">${snapshot.tasteClusters
+        .map((cluster, index) => {
+            const angle =
+                (Math.PI * 2 * index) /
+                Math.max(1, snapshot.tasteClusters.length)
+            const radius = 27 + (index % 3) * 7
+            const x = 50 + Math.cos(angle) * radius
+            const y = 50 + Math.sin(angle) * radius
+            const size = 70 + Math.sqrt(cluster.weight) * 90
+            const label =
+                cluster.displayName.length > 18
+                    ? `${cluster.displayName.slice(0, 17)}…`
+                    : cluster.displayName
+            return `<div class="universe-node" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px"><span>${chronicleEscape(label)}</span></div>`
+        })
+        .join('')}</div></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.familiar')}</h2><div class="chronicle-preference-grid"><section><h3>${t('chronicle.authors')}</h3>${snapshot.authorPreferences
+        .slice(0, 12)
+        .map(
+            (item) =>
+                `<p><strong>${chronicleEscape(item.value)}</strong><span>${chronicleTrend(item.trend)}</span></p>`
+        )
+        .join(
+            ''
+        )}</section><section><h3>${t('chronicle.circles')}</h3>${snapshot.circlePreferences
+        .slice(0, 12)
+        .map(
+            (item) =>
+                `<p><strong>${chronicleEscape(item.value)}</strong><span>${chronicleTrend(item.trend)}</span></p>`
+        )
+        .join('')}</section></div></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.lifetimeRecent')}</h2><div class="chronicle-bars">${snapshot.tagPreferences
+        .slice(0, 12)
+        .map(
+            (tag) =>
+                `<div class="chronicle-double-bar"><span>${chronicleEscape(tag.value)}</span><i style="width:${Math.max(4, tag.lifetimeSupport * 100)}%"></i><b style="width:${Math.max(4, tag.recentWeightedSupport * 100)}%"></b></div>`
+        )
+        .join('')}</div><p>${t('chronicle.lifetimeRecentNote')}</p></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.change')}</h2><div class="chronicle-bars">${snapshot.tagPreferences
+        .slice(0, 12)
+        .map(
+            (tag) =>
+                `<div class="chronicle-bar"><span>${chronicleEscape(tag.value)}</span><i style="width:${Math.max(5, Math.min(100, tag.lateSupport * 100))}%"></i></div>`
+        )
+        .join('')}</div><p>${t('chronicle.ordinalNote')}</p></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.combinations')}</h2><div class="chronicle-tags">${snapshot.tagCombinations
+        .slice(0, 16)
+        .map(
+            (item) =>
+                `<span class="chronicle-tag">${item.tags.map(chronicleEscape).join(' + ')}</span>`
+        )
+        .join('')}</div><p>${t('chronicle.comboNote')}</p></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.style')}</h2>${snapshot.collectionStyle.map((item) => `<h3>${chronicleEscape(item.label)} · ${chronicleEscape(item.level)}</h3><p>${chronicleEscape(item.description)}</p>`).join('')}</article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.popularity')}</h2><p>${t('chronicle.popularityNote', { finished: Math.round(snapshot.globalStats.finishedRatio * 100), clusters: snapshot.tasteClusters.length })}</p><div class="chronicle-tags">${snapshot.tasteClusters
+        .slice()
+        .sort((left, right) => left.weight - right.weight)
+        .slice(0, 8)
+        .map(
+            (cluster) =>
+                `<span class="chronicle-tag">${chronicleEscape(cluster.displayName)} · ${Math.round(cluster.weight * 100)}%</span>`
+        )
+        .join(
+            ''
+        )}</div><div class="chronicle-subsection"><h2>${t('chronicle.future')}</h2><p>${t('chronicle.futureNote')}</p><ol class="chronicle-flow"><li>${t('chronicle.futureLifetime')}</li><li>${t('chronicle.futureRecent')}</li><li>${t('chronicle.futureBalance')}</li></ol><p>${t('chronicle.futureSafety')}</p></div></article>
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.about')}</h2><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><p>${t('chronicle.definition')}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · Generated locally by Pica Library</small><h3>${t('chronicle.return')}</h3></article>`
+}
+
+function chronicleFacetLabel(facet) {
+    const value = t(`chronicle.facet.${facet}`)
+    return value || facet
+}
+
+function chronicleGroupForFacet(facet) {
+    if (['FANDOM_IP', 'FANDOM_CHARACTER'].includes(facet)) return 'fandom'
+    if (['RELATIONSHIP', 'STORY_TROPE', 'GENRE_THEME'].includes(facet))
+        return 'story'
+    if (
+        [
+            'IDENTITY_ROLE',
+            'APPEARANCE_TRAIT',
+            'APPEARANCE_OUTFIT',
+            'BODY_ATTRIBUTE'
+        ].includes(facet)
+    )
+        return 'appearance'
+    if (
+        [
+            'SEXUAL_BEHAVIOR',
+            'CONTROL_COERCION',
+            'FETISH_TROPE',
+            'PHYSIOLOGY_STATE'
+        ].includes(facet)
+    )
+        return 'content'
+    if (['SPECIES_FANTASY', 'SETTING_LOCATION'].includes(facet))
+        return 'fantasy'
+    return 'style'
+}
+
+function chronicleGroupLabel(group) {
+    return t(`chronicle.group.${group}`)
+}
+
+function chronicleCover(work) {
+    return state.mode === 'connected' && work.coverUrl
+        ? `<figure><img src="/api/v1/covers/${encodeURIComponent(work.comicId)}" alt="" loading="lazy"><figcaption>${chronicleEscape(work.title)}</figcaption></figure>`
+        : `<figure class="cover-fallback"><span>◇</span><figcaption>${chronicleEscape(work.title)}</figcaption></figure>`
+}
+
+function renderChronicleUniverse(snapshot) {
+    const themes = snapshot.themes || []
+    if (!themes.length)
+        return `<div class="atlas-empty">${t('chronicle.noThemes')}</div>`
+    const width = 1000
+    const height = 560
+    const positions = themes.map((theme, index) => {
+        const angle =
+            -Math.PI / 2 + (Math.PI * 2 * index) / Math.max(1, themes.length)
+        const ring = index % 2 === 0 ? 1 : 0.82
+        return {
+            theme,
+            x: width / 2 + Math.cos(angle) * 360 * ring,
+            y: height / 2 + Math.sin(angle) * 205 * ring,
+            r: Math.max(
+                34,
+                Math.min(72, 34 + Math.sqrt(theme.supportShare || 0) * 115)
+            )
+        }
+    })
+    const byId = new Map(positions.map((item) => [item.theme.themeId, item]))
+    const edges = (snapshot.themeEdges || [])
+        .map((edge) => {
+            const left = byId.get(edge.sourceThemeId)
+            const right = byId.get(edge.targetThemeId)
+            if (!left || !right) return ''
+            const strength = Math.max(
+                1,
+                Math.min(6, 1 + Number(edge.jaccard || 0) * 14)
+            )
+            return `<line x1="${left.x}" y1="${left.y}" x2="${right.x}" y2="${right.y}" class="atlas-universe-edge" style="--edge-width:${strength}px" />`
+        })
+        .join('')
+    const nodes = positions
+        .map(({ theme, x, y, r }) => {
+            const label =
+                String(theme.displayName || '').length > 18
+                    ? `${String(theme.displayName).slice(0, 17)}…`
+                    : String(theme.displayName || '')
+            const family = theme.type === 'FANDOM' ? 'fandom' : 'semantic'
+            return `<g class="atlas-universe-node atlas-universe-node-${family}" transform="translate(${x} ${y})"><circle r="${r}"></circle><text text-anchor="middle" dominant-baseline="middle"><tspan x="0" dy="-0.15em">${chronicleEscape(label)}</tspan><tspan x="0" dy="1.35em" class="atlas-universe-count">${chronicleEscape(theme.supportCount)}</tspan></text></g>`
+        })
+        .join('')
+    return `<div class="atlas-universe-wrap"><svg class="atlas-universe-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${chronicleEscape(t('chronicle.universe'))}">${edges}${nodes}</svg></div>`
+}
+
+function renderChronicleV2(snapshot) {
+    const content = $('#chronicle-content')
+    const metric = (label, value) =>
+        `<div class="chronicle-metric"><strong>${chronicleEscape(value)}</strong><span>${chronicleEscape(label)}</span></div>`
+    const bands = snapshot.facetBands || []
+    const grouped = new Map()
+    for (const band of bands) {
+        const group = chronicleGroupForFacet(band.facet)
+        grouped.set(group, [...(grouped.get(group) || []), band])
+    }
+    const groupOrder = [
+        'fandom',
+        'story',
+        'appearance',
+        'content',
+        'fantasy',
+        'style'
+    ]
+    const keywordGroups = groupOrder
+        .filter((group) => grouped.has(group))
+        .map((group) => {
+            const interests = grouped
+                .get(group)
+                .flatMap((band) => band.interests || [])
+                .sort(
+                    (a, b) =>
+                        Number(b.supportCount || 0) -
+                            Number(a.supportCount || 0) ||
+                        String(a.label).localeCompare(String(b.label))
+                )
+                .slice(0, 10)
+            return `<section class="atlas-keyword-group atlas-group-${group}"><h3>${chronicleEscape(chronicleGroupLabel(group))}</h3><div class="atlas-chip-cloud">${interests
+                .map((item) => {
+                    const mix = Math.round(
+                        16 +
+                            Math.min(
+                                1,
+                                Number(item.facetConditionalShare || 0)
+                            ) *
+                                46
+                    )
+                    return `<span class="atlas-chip" style="--mix:${mix}%"><strong>${chronicleEscape(item.label)}</strong><small>${chronicleEscape(item.supportCount)}</small></span>`
+                })
+                .join('')}</div></section>`
+        })
+        .join('')
+    const themes = (snapshot.themes || [])
+        .map((theme, index) => {
+            const detail =
+                theme.type === 'SEMANTIC_COMBINATION' && theme.lift
+                    ? `${t('chronicle.coverage', { count: theme.supportCount })} · ${t('chronicle.association', { value: Number(theme.lift).toFixed(2) })}`
+                    : t('chronicle.coverage', { count: theme.supportCount })
+            return `<section class="atlas-theme atlas-theme-${String(theme.family || '').toLowerCase()}"><small>${t('chronicle.theme')} ${String(index + 1).padStart(2, '0')}</small><h3>${chronicleEscape(theme.displayName)}</h3><p>${chronicleEscape(detail)}</p><div class="atlas-theme-anchors">${(
+                theme.anchors || []
+            )
+                .map(
+                    (anchor) =>
+                        `<span>${chronicleEscape(chronicleFacetLabel(anchor.facet))} · ${chronicleEscape(anchor.label)}</span>`
+                )
+                .join('')}</div><div class="chronicle-covers">${(
+                theme.representativeWorks || []
+            )
+                .slice(0, 4)
+                .map(chronicleCover)
+                .join('')}</div></section>`
+        })
+        .join('')
+    const heatmap = bands
+        .slice(0, 12)
+        .map((band) => {
+            const group = chronicleGroupForFacet(band.facet)
+            return `<section class="atlas-heat-row atlas-group-${group}"><header><strong>${chronicleEscape(chronicleFacetLabel(band.facet))}</strong><span>${t('chronicle.facetCoverage', { count: band.comicCount })}</span></header><div class="atlas-heat-cells">${(
+                band.interests || []
+            )
+                .slice(0, 8)
+                .map((item) => {
+                    const mix = Math.round(
+                        14 +
+                            Math.min(
+                                1,
+                                Number(item.facetConditionalShare || 0)
+                            ) *
+                                58
+                    )
+                    return `<span class="atlas-heat-cell" style="--mix:${mix}%"><b>${chronicleEscape(item.label)}</b><small>${Math.round(Number(item.facetConditionalShare || 0) * 100)}%</small></span>`
+                })
+                .join('')}</div></section>`
+        })
+        .join('')
+    const preferenceList = (items) =>
+        (items || [])
+            .slice(0, 12)
+            .map(
+                (item) =>
+                    `<p><strong>${chronicleEscape(item.label || item.value)}</strong><span>${t('chronicle.itemsCount', { count: item.supportCount })}</span></p>`
+            )
+            .join('')
+    const combinations = (snapshot.combinations || [])
+        .slice(0, 12)
+        .map(
+            (item) =>
+                `<article class="atlas-combination"><h3>${item.tags.map(chronicleEscape).join(' × ')}</h3><p>${t('chronicle.comboStats', { count: item.supportCount, lift: Number(item.lift || 0).toFixed(2) })}</p><small>${item.facets.map((facet) => chronicleEscape(chronicleFacetLabel(facet))).join(' · ')}</small></article>`
+        )
+        .join('')
+    const style = (snapshot.collectionStyle || [])
+        .map(
+            (item) =>
+                `<article class="atlas-style-card"><div><strong>${chronicleEscape(item.label)}</strong><span>${chronicleEscape(item.level)}</span></div><p>${chronicleEscape(item.description)}</p></article>`
+        )
+        .join('')
+
+    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">01</p><h2>${t('chronicle.keywordsV2')}</h2></div></div><div class="atlas-keyword-groups">${keywordGroups}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">02</p><h2>${t('chronicle.themes')}</h2></div><p>${t('chronicle.themesNote')}</p></div><div class="atlas-themes">${themes}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">03</p><h2>${t('chronicle.universe')}</h2></div><p>${t('chronicle.universeNoteV2')}</p></div>${renderChronicleUniverse(snapshot)}</article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">04</p><h2>${t('chronicle.preferenceMap')}</h2></div><p>${t('chronicle.preferenceMapNote')}</p></div><div class="atlas-heatmap">${heatmap}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">05</p><h2>${t('chronicle.familiarV2')}</h2></div></div><div class="chronicle-preference-grid atlas-preference-grid"><section><h3>${t('chronicle.fandoms')}</h3>${preferenceList(snapshot.fandomPreferences)}</section><section><h3>${t('chronicle.authors')}</h3>${preferenceList(snapshot.authorPreferences)}</section><section><h3>${t('chronicle.circles')}</h3>${preferenceList(snapshot.circlePreferences)}</section></div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">06</p><h2>${t('chronicle.combinationsV2')}</h2></div><p>${t('chronicle.combinationsNoteV2')}</p></div><div class="atlas-combinations">${combinations || `<div class="atlas-empty">${t('chronicle.noCombinations')}</div>`}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">07</p><h2>${t('chronicle.styleV2')}</h2></div></div><div class="atlas-style-grid">${style}</div></article>
+    <article class="chronicle-section chronicle-page atlas-about"><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · Generated locally by Pica Library</small></article>`
+}
+
+function renderChronicle(snapshot) {
+    if (!snapshot) return
+    state.chronicleSnapshot = snapshot
+    if (Number(snapshot.snapshotVersion || 0) >= 2 && snapshot.facetBands) {
+        renderChronicleV2(snapshot)
+        return
+    }
+    renderChronicleLegacy(snapshot)
+}
+
+async function loadChronicle() {
+    if (state.mode !== 'connected') {
+        $('#chronicle-status').textContent = t('chronicle.lite')
+        return
+    }
+    try {
+        const value = await api('/api/v1/recommendation/profile')
+        renderChronicle(value.snapshot)
+    } catch {
+        $('#chronicle-status').textContent = t('chronicle.needSync')
+    }
+}
+
+async function rebuildChronicle() {
+    $('#chronicle-status').textContent = t('chronicle.building')
+    try {
+        const value = await post('/api/v1/recommendation/profile/rebuild', {})
+        renderChronicle(value.snapshot)
+        $('#chronicle-status').textContent = t('chronicle.ready')
+    } catch (error) {
+        $('#chronicle-status').textContent = localizeError(language, error)
+    }
+}
+
+$('#chronicle-build').onclick = rebuildChronicle
+$('#chronicle-refresh').onclick = rebuildChronicle
+
+function chroniclePrintCover(work) {
+    if (state.mode !== 'connected' || !work?.comicId || !work?.coverUrl)
+        return `<div class="atlas-print-cover atlas-print-cover-fallback"><span>◇</span></div>`
+    return `<div class="atlas-print-cover"><img src="/api/v1/covers/${encodeURIComponent(work.comicId)}" alt="" loading="eager"></div>`
+}
+
+function buildChroniclePrintV2(snapshot) {
+    let root = $('#chronicle-print-document')
+    if (!root) {
+        root = document.createElement('div')
+        root.id = 'chronicle-print-document'
+        root.className = 'chronicle-print-document'
+        document.body.append(root)
+    }
+
+    const bands = snapshot.facetBands || []
+    const grouped = new Map()
+    for (const band of bands) {
+        const group = chronicleGroupForFacet(band.facet)
+        grouped.set(group, [...(grouped.get(group) || []), band])
+    }
+
+    // PDF V4 is a purpose-built fixed result card, not a responsive Web layout.
+    // Every region has a fixed A4-landscape box so the browser cannot reflow it
+    // into overlapping or clipped sections during print.
+    const groupOrder = ['story', 'appearance', 'fantasy', 'fandom', 'content']
+    const palettes = {
+        story: ['#fff4f7', '#fde7ee', '#fbd7e2', '#f5bed1', '#eda1bd'],
+        appearance: ['#fff8ef', '#fceeda', '#f9dfc2', '#f2c998', '#eaae69'],
+        fantasy: ['#f7f5ff', '#eeeafd', '#e0daf8', '#cfc5ef', '#b8a9e5'],
+        fandom: ['#f3f5ff', '#e7ebff', '#d5dcfb', '#bdc7f6', '#9aa9ef'],
+        content: ['#eefaf7', '#dbf3ed', '#c3e9df', '#9ddacb', '#72c7b4']
+    }
+    const semanticBands = groupOrder
+        .filter((group) => grouped.has(group))
+        .slice(0, 5)
+        .map((group) => {
+            const items = grouped
+                .get(group)
+                .flatMap((band) => band.interests || [])
+                .sort(
+                    (a, b) =>
+                        Number(b.supportCount || 0) -
+                            Number(a.supportCount || 0) ||
+                        String(a.label).localeCompare(String(b.label))
+                )
+                .slice(0, 4)
+            const max = Math.max(
+                1,
+                ...items.map((item) => Number(item.supportCount || 0))
+            )
+            const colors = palettes[group] || palettes.fandom
+            return `<section class="rc-facet rc-facet-${group}"><header><strong>${chronicleEscape(chronicleGroupLabel(group))}</strong></header><div>${items
+                .map((item) => {
+                    const ratio = Number(item.supportCount || 0) / max
+                    const tier = Math.max(0, Math.min(4, Math.round(ratio * 4)))
+                    return `<span style="background:${colors[tier]} !important"><b>${chronicleEscape(item.label)}</b><small>${chronicleEscape(item.supportCount)}</small></span>`
+                })
+                .join('')}</div></section>`
+        })
+        .join('')
+
+    const themes = (snapshot.themes || [])
+        .slice(0, 4)
+        .map((theme) => {
+            const work = (theme.representativeWorks || [])[0]
+            const detail =
+                theme.type === 'SEMANTIC_COMBINATION' && theme.lift
+                    ? `${t('chronicle.coverage', { count: theme.supportCount })} · ${Number(theme.lift).toFixed(2)}×`
+                    : t('chronicle.coverage', { count: theme.supportCount })
+            return `<article class="rc-theme rc-theme-${String(theme.family || '').toLowerCase()}">${chroniclePrintCover(work).replaceAll('atlas-print-cover', 'rc-cover')}<div class="rc-theme-copy"><h3>${chronicleEscape(theme.displayName)}</h3><p>${chronicleEscape(detail)}</p><div class="rc-theme-tags">${(
+                theme.anchors || []
+            )
+                .slice(0, 2)
+                .map(
+                    (anchor) => `<span>${chronicleEscape(anchor.label)}</span>`
+                )
+                .join('')}</div></div></article>`
+        })
+        .join('')
+
+    const orbitThemes = (snapshot.themes || []).slice(0, 6)
+    const maxThemeSupport = Math.max(
+        1,
+        ...orbitThemes.map((theme) => Number(theme.supportCount || 0))
+    )
+    const positions = [
+        { x: 150, y: 190 },
+        { x: 78, y: 92 },
+        { x: 225, y: 92 },
+        { x: 62, y: 292 },
+        { x: 238, y: 286 },
+        { x: 150, y: 350 }
+    ]
+    const orbitSvg = (() => {
+        if (!orbitThemes.length) return ''
+        const center = positions[0]
+        const lines = orbitThemes
+            .slice(1)
+            .map((_, index) => {
+                const point = positions[index + 1]
+                return `<line x1="${center.x}" y1="${center.y}" x2="${point.x}" y2="${point.y}" stroke="#d9deef" stroke-width="2" />`
+            })
+            .join('')
+        const nodes = orbitThemes
+            .map((theme, index) => {
+                const point = positions[index]
+                const support = Number(theme.supportCount || 0)
+                const ratio = Math.sqrt(Math.max(0, support) / maxThemeSupport)
+                const radius = Math.round(25 + ratio * 10)
+                const family =
+                    String(theme.family || '').toLowerCase() === 'semantic'
+                        ? 'semantic'
+                        : 'fandom'
+                const rawLabel = String(theme.displayName || '')
+                const label =
+                    rawLabel.length > 18
+                        ? `${rawLabel.slice(0, 17)}…`
+                        : rawLabel
+                const fill = family === 'semantic' ? '#eaf8f4' : '#eef1ff'
+                const stroke = family === 'semantic' ? '#35a98f' : '#6675e8'
+                return `<g class="rc-orbit-node rc-orbit-node-${family}" transform="translate(${point.x} ${point.y})"><circle r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="2"></circle><text text-anchor="middle" fill="#2c3444" font-size="12" font-weight="800"><tspan x="0" dy="-2">${chronicleEscape(label)}</tspan><tspan x="0" dy="16" fill="#697283" font-size="10" font-weight="600">${chronicleEscape(support)}</tspan></text></g>`
+            })
+            .join('')
+        return `<svg class="rc-orbit-svg" viewBox="0 0 300 410" preserveAspectRatio="xMidYMid meet"><g class="rc-orbit-lines">${lines}</g>${nodes}</svg>`
+    })()
+
+    const compactList = (items, limit = 3) =>
+        (items || [])
+            .slice(0, limit)
+            .map(
+                (item) =>
+                    `<li><strong>${chronicleEscape(item.label || item.value)}</strong><span>${chronicleEscape(item.supportCount)}</span></li>`
+            )
+            .join('')
+
+    const combos = (snapshot.combinations || [])
+        .slice(0, 3)
+        .map(
+            (item, index) =>
+                `<article class="rc-combo"><span>${index + 1}</span><div><h3>${item.tags.map(chronicleEscape).join(' × ')}</h3><p>${chronicleEscape(item.supportCount)} · ${Number(item.lift || 0).toFixed(2)}×</p></div></article>`
+        )
+        .join('')
+
+    const styles = (snapshot.collectionStyle || [])
+        .slice(0, 3)
+        .map(
+            (item) =>
+                `<article class="rc-trait"><strong>${chronicleEscape(item.label)}</strong><span>${chronicleEscape(item.level)}</span></article>`
+        )
+        .join('')
+
+    const profileResult =
+        snapshot.collectionStyle?.[0]?.label ||
+        t('chronicle.profileResultFallback')
+    const profileDescription =
+        snapshot.collectionStyle?.[0]?.description ||
+        snapshot.reportNarratives?.summary ||
+        ''
+    const metric = (label, value) =>
+        `<div class="rc-metric"><strong>${chronicleEscape(value)}</strong><span>${chronicleEscape(label)}</span></div>`
+
+    root.innerHTML = `<section class="rc-sheet">
+        <div class="rc-hero">
+            <div class="rc-brand"><img src="./pica-library-icon.svg" alt=""><div><p>PICA LIBRARY · COLLECTION PROFILE</p><h1>${chronicleEscape(profileResult)}</h1><span>${chronicleEscape(profileDescription)}</span></div></div>
+            <div class="rc-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div>
+        </div>
+
+        <section class="rc-panel rc-semantic"><div class="rc-panel-title"><small>01</small><h2>${t('chronicle.preferenceMap')}</h2></div><div class="rc-facet-stack">${semanticBands}</div></section>
+        <section class="rc-panel rc-universe"><div class="rc-panel-title"><small>02</small><h2>${t('chronicle.universe')}</h2></div><div class="rc-orbit">${orbitSvg}</div></section>
+        <section class="rc-panel rc-signatures"><div class="rc-panel-title"><small>03</small><h2>${t('chronicle.themes')}</h2></div><div class="rc-theme-grid">${themes}</div></section>
+
+        <section class="rc-footer-panel rc-footer-ip"><h2>${t('chronicle.fandoms')}</h2><ul>${compactList(snapshot.fandomPreferences)}</ul></section>
+        <section class="rc-footer-panel rc-footer-author"><h2>${t('chronicle.authors')}</h2><ul>${compactList(snapshot.authorPreferences)}</ul></section>
+        <section class="rc-footer-panel rc-footer-combos"><h2>${t('chronicle.combinationsV2')}</h2><div class="rc-combos">${combos}</div></section>
+        <section class="rc-footer-panel rc-footer-traits"><h2>${t('chronicle.styleV2')}</h2><div class="rc-traits">${styles}</div></section>
+
+        <div class="rc-meta"><span>Pica Library · Snapshot v${chronicleEscape(snapshot.snapshotVersion)}</span><small>${chronicleEscape(String(snapshot.generatedAt || '').slice(0, 10))} · Generated locally</small></div>
+    </section>`
+    return root
+}
+
+async function waitForChroniclePrintImages(root) {
+    const images = [...root.querySelectorAll('img')]
+    for (const image of images) image.loading = 'eager'
+    await Promise.race([
+        Promise.allSettled(
+            images.map(async (image) => {
+                if (!image.complete)
+                    await new Promise((resolve) => {
+                        image.addEventListener('load', resolve, { once: true })
+                        image.addEventListener('error', resolve, { once: true })
+                    })
+                if (image.decode) await image.decode().catch(() => undefined)
+            })
+        ),
+        new Promise((resolve) => setTimeout(resolve, 3500))
+    ])
+}
+
+$('#chronicle-print').onclick = async () => {
+    const previousTitle = document.title
+    const day = new Date().toISOString().slice(0, 10).replaceAll('-', '')
+    document.title = `${t('chronicle.filename')}-${day}`
+    const snapshot = state.chronicleSnapshot
+    if (
+        snapshot &&
+        Number(snapshot.snapshotVersion || 0) >= 2 &&
+        snapshot.facetBands
+    ) {
+        const root = buildChroniclePrintV2(snapshot)
+        await waitForChroniclePrintImages(root)
+    }
+    window.print()
+    setTimeout(() => {
+        document.title = previousTitle
+    }, 500)
+}
+
 async function detect() {
     if (new URLSearchParams(location.search).get('mode') === 'browser-lite') {
         document.body.classList.add('browser-lite-forced')
@@ -2469,17 +3229,25 @@ async function detect() {
             offset: 0
         })
         renderAll(status.summary)
-        const recommendation = await api(
-            '/api/v1/recommendation-sessions/status'
+        let recommendation = await api(
+            '/api/v1/recommendation-sessions/status?mode=final'
         )
-        if (recommendation.recommendations?.length) {
-            state.recommendations = recommendation.recommendations
-            state.recommendationSessionNo = recommendation.sessionNo
-            state.recommendationBatch = recommendation.currentBatchIndex || 0
-            state.recommendationExhausted = recommendation.exhausted
-            state.recommendationNextReady = recommendation.nextSessionReady
-            renderPreparedRecommendations()
-        } else if (recommendation.preparing) {
+        if (!recommendation.activeCycleId && !recommendation.buildingCycleId) {
+            recommendation = await post('/api/v1/recommendation-sessions', {
+                engine: 'v3',
+                action: 'resume_or_create',
+                requestId: recommendationRequestId('initial'),
+                appSessionId: state.appSessionId
+            })
+        }
+        if (recommendation.activeCycleId) {
+            const current = await post('/api/v1/recommendations', {
+                action: 'current',
+                appSessionId: state.appSessionId
+            })
+            applyManagedRecommendationBatch(current)
+            if (state.recommendations.length) renderPreparedRecommendations()
+        } else if (recommendation.buildingCycleId) {
             $('#recommend-message').textContent = t('recommend.preparing')
         }
     } catch {
@@ -2489,6 +3257,13 @@ async function detect() {
         renderAll()
     }
     if (state.recommendations.length) renderPreparedRecommendations()
+    if (new URLSearchParams(location.search).get('view') === 'chronicle') {
+        activeView = 'chronicle'
+        $$('.view').forEach((view) =>
+            view.classList.toggle('active', view.id === 'chronicle')
+        )
+        await loadChronicle()
+    }
 }
 
 detect()

@@ -124,6 +124,10 @@ export class ProviderService {
                 ...result,
                 syncMode: 'full' as const,
                 pagesChecked,
+                favoriteOrderIds: comics.map((comic) => comic._id),
+                favoritePageSize: comics.length
+                    ? Math.ceil(comics.length / Math.max(1, pages))
+                    : 20,
                 fallbackReason
             }
         }
@@ -206,6 +210,8 @@ export class ProviderService {
             syncMode: 'quick' as const,
             pagesChecked: page,
             foundNew: unseen.size,
+            favoriteOrderIds: undefined,
+            favoritePageSize: undefined,
             fallbackReason: undefined
         }
     }

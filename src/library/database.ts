@@ -151,9 +151,13 @@ export class LibraryDatabase {
 
     recordUserEvent(input: UserEventInput): UserEvent {
         const id = input.id ?? randomUUID()
-        const occurredAt = input.occurredAt ?? new Date().toISOString()
+        const occurredAt = new Date().toISOString()
         const createdAt = new Date().toISOString()
-        const metadata = input.metadata ?? {}
+        const metadata = { ...(input.metadata ?? {}) }
+        if (input.occurredAt)
+            metadata.clientObservedAt = String(input.occurredAt)
+        if (input.occurredAt)
+            metadata.clientObservedTimeTrust = 'UNTRUSTED_CLIENT_TIME'
         const dedupeKey = input.dedupeKey ?? null
         const serialized = JSON.stringify(metadata)
         if (
@@ -318,6 +322,73 @@ export class LibraryDatabase {
         }))
     }
 
+    saveOrReuseV3Profile(input: {
+        profileKind: string
+        evidenceCutoff: string
+        modelVersion: string
+        profile: Record<string, unknown>
+        identity: string
+    }) {
+        const rows = this.db
+            .prepare(
+                `SELECT * FROM recommendation_v3_profiles
+                 WHERE profile_kind = ? AND model_version = ?
+                 ORDER BY generated_at DESC`
+            )
+            .all(input.profileKind, input.modelVersion) as SqlRow[]
+        for (const row of rows) {
+            const profile = JSON.parse(String(row.profile_json)) as Record<
+                string,
+                unknown
+            >
+            if (profile.identity === input.identity)
+                return {
+                    id: String(row.id),
+                    generatedAt: String(row.generated_at),
+                    reused: true,
+                    profile
+                }
+        }
+        const id = randomUUID()
+        const generatedAt = new Date().toISOString()
+        const profile = { ...input.profile, identity: input.identity }
+        this.db
+            .prepare(
+                `INSERT INTO recommendation_v3_profiles(
+                    id, profile_kind, generated_at, evidence_cutoff,
+                    model_version, profile_json
+                ) VALUES (?, ?, ?, ?, ?, ?)`
+            )
+            .run(
+                id,
+                input.profileKind,
+                generatedAt,
+                input.evidenceCutoff,
+                input.modelVersion,
+                JSON.stringify(profile)
+            )
+        return { id, generatedAt, reused: false, profile }
+    }
+
+    getV3Profile(id: string) {
+        const row = this.db
+            .prepare('SELECT * FROM recommendation_v3_profiles WHERE id = ?')
+            .get(id) as SqlRow | undefined
+        return row
+            ? {
+                  id: String(row.id),
+                  profileKind: String(row.profile_kind),
+                  generatedAt: String(row.generated_at),
+                  evidenceCutoff: String(row.evidence_cutoff),
+                  modelVersion: String(row.model_version),
+                  profile: JSON.parse(String(row.profile_json)) as Record<
+                      string,
+                      unknown
+                  >
+              }
+            : null
+    }
+
     saveV3CandidatePool(input: {
         id?: string
         appSessionId?: string | null
@@ -388,6 +459,39 @@ export class LibraryDatabase {
         return row ? this.getV3CandidatePool(String(row.id)) : null
     }
 
+    updateV3CandidatePoolState(
+        cycleId: string,
+        state: string,
+        at = new Date().toISOString()
+    ) {
+        const pool = this.latestV3CandidatePool(cycleId)
+        if (!pool) return false
+        const telemetry = {
+            ...pool.telemetry,
+            state,
+            ...(state === 'SUPERSEDED' ? { supersededAt: at } : {}),
+            ...(state === 'EXHAUSTED' ? { exhaustedAt: at } : {})
+        }
+        this.db
+            .prepare(
+                'UPDATE recommendation_v3_candidate_pools SET telemetry_json = ? WHERE id = ?'
+            )
+            .run(JSON.stringify(telemetry), pool.id)
+        return true
+    }
+
+    listV3CandidatePools(limit = 50) {
+        const rows = this.db
+            .prepare(
+                `SELECT id FROM recommendation_v3_candidate_pools
+                 ORDER BY generated_at DESC LIMIT ?`
+            )
+            .all(Math.max(1, Math.min(500, limit))) as SqlRow[]
+        return rows
+            .map((row) => this.getV3CandidatePool(String(row.id)))
+            .filter((row): row is NonNullable<typeof row> => Boolean(row))
+    }
+
     saveV3Batch(input: {
         poolId: string
         cycleId: string
@@ -418,6 +522,55 @@ export class LibraryDatabase {
                 JSON.stringify(input.evidence ?? {})
             )
         return { id, generatedAt, ...input }
+    }
+
+    saveV3BatchAndAllocate(input: {
+        id?: string
+        poolId: string
+        cycleId: string
+        sessionId?: string | null
+        batchIndex: number
+        contextId: string
+        itemIds: string[]
+        evidence?: Record<string, unknown>
+    }) {
+        const id = input.id ?? randomUUID()
+        const generatedAt = new Date().toISOString()
+        const itemIds = [...new Set(input.itemIds)]
+        this.db.exec('BEGIN IMMEDIATE')
+        try {
+            this.db
+                .prepare(
+                    `INSERT INTO recommendation_v3_batches(
+                        id, pool_id, recommendation_cycle_id,
+                        recommendation_session_id, batch_index, context_id,
+                        generated_at, item_ids_json, evidence_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                )
+                .run(
+                    id,
+                    input.poolId,
+                    input.cycleId,
+                    input.sessionId ?? null,
+                    input.batchIndex,
+                    input.contextId,
+                    generatedAt,
+                    JSON.stringify(itemIds),
+                    JSON.stringify(input.evidence ?? {})
+                )
+            const seen = this.db.prepare(
+                `INSERT OR IGNORE INTO recommendation_seen(
+                    cycle_id, comic_id, first_seen_at
+                ) VALUES (?, ?, ?)`
+            )
+            for (const comicId of itemIds)
+                seen.run(input.cycleId, comicId, generatedAt)
+            this.db.exec('COMMIT')
+        } catch (error) {
+            this.db.exec('ROLLBACK')
+            throw error
+        }
+        return { id, generatedAt, ...input, itemIds }
     }
 
     listV3Batches(poolId: string) {

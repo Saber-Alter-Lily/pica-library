@@ -1,6 +1,14 @@
 import { normalizeAuthorKey } from '../library/author'
 import type { StoredComic } from '../library/types'
 import type { ItemFeature } from './types'
+import { recommendationTags } from './semantic-core'
+
+export interface TagStats {
+    catalogCount: number
+    documentCount: number
+    idf: number
+    informativeness: number
+}
 
 export function normalizeFeatureValue(value: unknown) {
     return String(value ?? '')
@@ -36,11 +44,14 @@ export function popularityBucket(
 }
 
 export function itemFeature(comic: StoredComic): ItemFeature {
+    const semantic = recommendationTags(comic).map(
+        (feature) => feature.canonical
+    )
     return {
         comicId: comic.comicId,
         author: normalizeFeatureValue(comic.canonicalAuthor ?? comic.author),
         circle: normalizeFeatureValue(comic.circle),
-        tags: unique(comic.tags),
+        tags: unique(semantic),
         categories: unique(comic.categories),
         finished: Boolean(comic.finished),
         lengthBucket: lengthBucket(comic),
@@ -48,12 +59,21 @@ export function itemFeature(comic: StoredComic): ItemFeature {
     }
 }
 
-export function featureSimilarity(left: ItemFeature, right: ItemFeature) {
+export function featureSimilarity(
+    left: ItemFeature,
+    right: ItemFeature,
+    stats?: Map<string, TagStats>
+) {
     const overlap = (a: string[], b: string[]) => {
         const bSet = new Set(b)
-        return a.length
-            ? a.filter((x) => bSet.has(x)).length / Math.max(a.length, b.length)
-            : 0
+        if (!a.length) return 0
+        const weight = (x: string) => stats?.get(x)?.informativeness ?? 1
+        const totalA = a.reduce((s, x) => s + weight(x), 0),
+            totalB = b.reduce((s, x) => s + weight(x), 0)
+        const common = a
+            .filter((x) => bSet.has(x))
+            .reduce((s, x) => s + weight(x), 0)
+        return common / Math.max(totalA, totalB, 1)
     }
     return (
         (left.author && left.author === right.author ? 0.35 : 0) +

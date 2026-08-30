@@ -223,6 +223,32 @@ describe('fast favorites synchronization', () => {
         database.close()
     })
 
+    it('full_sync_preserves_provider_order_across_pages', async () => {
+        const { database } = setup(2)
+        const providerOrder = [
+            comic('newest-page-1'),
+            comic('page-1-tail'),
+            comic('page-2-head'),
+            comic('oldest-page-2')
+        ]
+        const provider = {
+            favoritesAll: vi.fn(async (_all, onPage) => {
+                onPage?.({ page: 1, pages: 2, fetched: 2, total: 4 })
+                onPage?.({ page: 2, pages: 2, fetched: 4, total: 4 })
+                return { comics: providerOrder, pages: 2 }
+            })
+        } as unknown as Pica
+        const result = await new ProviderService(
+            async () => provider,
+            database
+        ).syncFavorites('full')
+        expect(result.favoriteOrderIds).toEqual(
+            providerOrder.map((item) => item._id)
+        )
+        expect(result.favoritePageSize).toBe(2)
+        database.close()
+    })
+
     it('quick_sync_no_duplicate_ids', async () => {
         const { database, records } = setup(20)
         const provider = {

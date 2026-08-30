@@ -5,6 +5,11 @@ import {
     normalizeFeatureValue
 } from './features'
 import { mineTagCombinations, mineTagPreferences } from './tag-combinations'
+import {
+    TAG_ALIAS_VERSION,
+    TAG_ONTOLOGY_VERSION,
+    semanticTagFeatures
+} from './semantic-core'
 import type { TasteCluster, V3Profile } from './types'
 
 function clusterKey(ids: string[]) {
@@ -16,10 +21,22 @@ function clusterFor(
     index: number,
     totalItems: number
 ): TasteCluster {
-    const all = members.flatMap((comic) =>
-        comic.tags.map(normalizeFeatureValue)
-    )
+    const semantic = members.flatMap((comic) => semanticTagFeatures(comic))
+    const all = semantic
+        .filter(
+            (feature) =>
+                feature.eligibleForCluster &&
+                feature.recommendationRole !== 'MODIFIER'
+        )
+        .map((feature) => feature.canonical)
     const tags = [...new Set(all)].sort()
+    const modifiers = [
+        ...new Set(
+            semantic
+                .filter((feature) => feature.recommendationRole === 'MODIFIER')
+                .map((feature) => feature.canonical)
+        )
+    ].sort()
     const authors = [
         ...new Set(
             members
@@ -36,7 +53,12 @@ function clusterFor(
                 .filter(Boolean)
         )
     ].sort()
-    const combinations = mineTagCombinations(members)
+    // Cluster combinations are representative hints; global profile mining
+    // computes the authoritative interactions once, avoiding quadratic work.
+    const combinations = {
+        pairs: [] as { tags: string[] }[],
+        triples: [] as { tags: string[] }[]
+    }
     return {
         clusterId: `cluster_${index + 1}_${clusterKey(members.map((item) => item.comicId)).slice(0, 18)}`,
         weight: members.length / Math.max(1, totalItems),
@@ -45,6 +67,7 @@ function clusterFor(
         authors: authors.slice(0, 30),
         circles: circles.slice(0, 30),
         tags: tags.slice(0, 30),
+        modifiers: modifiers.slice(0, 12),
         tagPairs: combinations.pairs.slice(0, 30).map((item) => item.tags),
         tagTriples: combinations.triples.slice(0, 30).map((item) => item.tags),
         confidence: Math.min(1, members.length / 3)
@@ -53,7 +76,46 @@ function clusterFor(
 
 export function chooseClusterCount(records: StoredComic[]) {
     if (records.length < 8) return records.length ? 1 : 0
-    return Math.max(1, Math.min(12, Math.round(Math.sqrt(records.length / 3))))
+    const ordered = [...records].sort((a, b) =>
+        a.comicId.localeCompare(b.comicId)
+    )
+    const sample = ordered
+        .slice(0, Math.min(120, ordered.length))
+        .map(itemFeature)
+    const maxK = Math.min(
+        12,
+        Math.max(1, Math.floor(Math.sqrt(records.length)))
+    )
+    let bestK = 1,
+        bestScore = -Infinity
+    for (let k = 1; k <= maxK; k++) {
+        const reps = sample.filter((_, i) => i % k === 0).slice(0, k)
+        const groups = reps.map(() => [] as typeof sample)
+        for (const item of sample) {
+            const values = reps.map((rep) => featureSimilarity(item, rep))
+            const i = values.reduce((a, v, j) => (v > values[a] ? j : a), 0)
+            groups[i]?.push(item)
+        }
+        const cohesion =
+            groups.reduce(
+                (s, g, i) =>
+                    s +
+                    (g.length
+                        ? g.reduce(
+                              (x, item) => x + featureSimilarity(item, reps[i]),
+                              0
+                          ) / g.length
+                        : 0),
+                0
+            ) / Math.max(1, groups.length)
+        const penalty = groups.some((g) => g.length < 3) ? 0.08 : 0
+        const score = cohesion - penalty - k * 0.002
+        if (score > bestScore) {
+            bestScore = score
+            bestK = k
+        }
+    }
+    return bestK
 }
 
 export function buildTasteClusters(records: StoredComic[]): TasteCluster[] {
@@ -64,6 +126,9 @@ export function buildTasteClusters(records: StoredComic[]): TasteCluster[] {
     // highest novelty against prior representatives, then assigns by similarity.
     const ordered = [...items].sort((a, b) =>
         a.comicId.localeCompare(b.comicId)
+    )
+    const features = new Map(
+        ordered.map((item) => [item.comicId, itemFeature(item)])
     )
     const representatives = [ordered[0]]
     while (representatives.length < count) {
@@ -76,8 +141,8 @@ export function buildTasteClusters(records: StoredComic[]): TasteCluster[] {
                             (rep) =>
                                 1 -
                                 featureSimilarity(
-                                    itemFeature(candidate),
-                                    itemFeature(rep)
+                                    features.get(candidate.comicId)!,
+                                    features.get(rep.comicId)!
                                 )
                         )
                     )
@@ -91,20 +156,16 @@ export function buildTasteClusters(records: StoredComic[]): TasteCluster[] {
     }
     const groups = representatives.map(() => [] as StoredComic[])
     for (const item of ordered) {
-        const index = representatives
-            .map((rep) =>
-                featureSimilarity(itemFeature(item), itemFeature(rep))
+        const values = representatives.map((rep) =>
+            featureSimilarity(
+                features.get(item.comicId)!,
+                features.get(rep.comicId)!
             )
-            .reduce(
-                (best, value, current) =>
-                    value >
-                    representatives.map((r) =>
-                        featureSimilarity(itemFeature(item), itemFeature(r))
-                    )[best]
-                        ? current
-                        : best,
-                0
-            )
+        )
+        const index = values.reduce(
+            (best, value, current) => (value > values[best] ? current : best),
+            0
+        )
         groups[index].push(item)
     }
     return groups
@@ -121,6 +182,18 @@ export function buildV3Profile(
     const tags = mineTagPreferences(favorites, allCatalog)
     const combinations = mineTagCombinations(favorites, allCatalog)
     const clusters = buildTasteClusters(records)
+    const facetMaps = new Map<string, Map<string, number>>()
+    for (const comic of favorites)
+        for (const feature of semanticTagFeatures(comic)) {
+            if (feature.recommendationRole === 'IGNORE') continue
+            const values =
+                facetMaps.get(feature.facet) ?? new Map<string, number>()
+            values.set(
+                feature.canonical,
+                (values.get(feature.canonical) ?? 0) + 1
+            )
+            facetMaps.set(feature.facet, values)
+        }
     const empty = {
         clusters: [],
         tags: [] as ReturnType<typeof mineTagPreferences>,
@@ -134,6 +207,23 @@ export function buildV3Profile(
         session: empty,
         generatedAt,
         modelVersion: 'v3.0.0-local-explainable',
-        evidenceCutoff: generatedAt
+        evidenceCutoff: generatedAt,
+        semantic: {
+            ontologyVersion: TAG_ONTOLOGY_VERSION,
+            aliasVersion: TAG_ALIAS_VERSION,
+            facets: Object.fromEntries(
+                [...facetMaps].map(([facet, values]) => [
+                    facet,
+                    [...values]
+                        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                        .slice(0, 50)
+                        .map(([value, count]) => ({
+                            value,
+                            count,
+                            score: count / Math.max(1, favorites.length)
+                        }))
+                ])
+            )
+        }
     }
 }

@@ -20,6 +20,11 @@ import { PreviewCacheManager } from '../services/preview-cache-manager'
 import { PreviewService } from '../services/preview-service'
 import { ReaderService } from '../services/reader-service'
 import type { UserEventInput, V3EventType } from '../recommendation-v3/types'
+import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
+import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
+import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
+import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
+import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -82,6 +87,30 @@ async function binaryBody(request: IncomingMessage, limit = 128 * 1024 * 1024) {
         chunks.push(buffer)
     }
     return Buffer.concat(chunks)
+}
+async function downloadUpdateAsset(
+    value: string,
+    limit = 128 * 1024 * 1024
+): Promise<Buffer> {
+    const target = new URL(value)
+    if (target.protocol !== 'https:')
+        throw new Error('Official update URL must use HTTPS')
+    const response = await fetch(target, {
+        redirect: 'follow',
+        headers: { 'user-agent': 'Pica-Library-UpdateDownloader' },
+        signal: AbortSignal.timeout(120_000)
+    })
+    if (!response.ok)
+        throw new Error(
+            `Official update download failed: HTTP ${response.status}`
+        )
+    const declared = Number(response.headers.get('content-length') ?? 0)
+    if (Number.isFinite(declared) && declared > limit)
+        throw new Error('Official update package is too large')
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.byteLength > limit)
+        throw new Error('Official update package is too large')
+    return buffer
 }
 
 function webRoot() {
@@ -172,6 +201,17 @@ export async function startLibraryServer(options: {
         options.database,
         (limit, appSessionId) =>
             options.service.recommendations({ limit, appSessionId })
+    )
+    const finalRecommendationCoordinator = new CycleCoordinatorV3(
+        options.database,
+        (cycleId) => options.service.buildFinalRecommendationCycleV3(cycleId),
+        {
+            profileVersion: FINAL_PROFILE_VERSION,
+            registryVersion: 'PICA Registry V3',
+            rankerModelVersion: RANKER_ADAPTER_VERSION,
+            candidatePoolVersion: RETRIEVER_VERSION,
+            allocatorVersion: BATCH_ALLOCATOR_VERSION
+        }
     )
     void recommendationService.ensureInitialPrepared().catch(() => {
         // Connected startup must remain available while provider preparation
@@ -284,6 +324,38 @@ export async function startLibraryServer(options: {
                     return json(response, 400, {
                         error: 'Event type must be recorded by its authoritative server operation'
                     })
+                const cycleId = input.recommendationCycleId
+                    ? String(input.recommendationCycleId)
+                    : null
+                const batchIndex =
+                    input.recommendationBatchIndex === undefined
+                        ? null
+                        : Number(input.recommendationBatchIndex)
+                const comicId = input.comicId ? String(input.comicId) : null
+                const rankPosition =
+                    input.rankPosition === undefined
+                        ? null
+                        : Number(input.rankPosition)
+                const batchId = input.recommendationBatchId
+                    ? String(input.recommendationBatchId)
+                    : null
+                if (
+                    eventType === 'recommend_batch_presented' &&
+                    (!cycleId || batchIndex === null || !batchId)
+                )
+                    return json(response, 400, {
+                        error: 'Batch presentation requires cycle and batch context'
+                    })
+                if (
+                    eventType === 'recommend_impression' &&
+                    (!cycleId ||
+                        batchIndex === null ||
+                        !comicId ||
+                        rankPosition === null)
+                )
+                    return json(response, 400, {
+                        error: 'Recommendation impression requires cycle, batch, comic, and rank context'
+                    })
                 return json(
                     response,
                     200,
@@ -292,7 +364,7 @@ export async function startLibraryServer(options: {
                         occurredAt: input.occurredAt
                             ? String(input.occurredAt)
                             : undefined,
-                        comicId: input.comicId ? String(input.comicId) : null,
+                        comicId,
                         source: input.source ? String(input.source) : null,
                         appSessionId: input.appSessionId
                             ? String(input.appSessionId)
@@ -300,27 +372,29 @@ export async function startLibraryServer(options: {
                         contextId: input.contextId
                             ? String(input.contextId)
                             : null,
-                        recommendationCycleId: input.recommendationCycleId
-                            ? String(input.recommendationCycleId)
-                            : null,
+                        recommendationCycleId: cycleId,
                         recommendationSessionId: input.recommendationSessionId
                             ? String(input.recommendationSessionId)
                             : null,
-                        recommendationBatchIndex:
-                            input.recommendationBatchIndex === undefined
-                                ? null
-                                : Number(input.recommendationBatchIndex),
-                        rankPosition:
-                            input.rankPosition === undefined
-                                ? null
-                                : Number(input.rankPosition),
+                        recommendationBatchIndex: batchIndex,
+                        rankPosition,
                         metadata:
                             typeof input.metadata === 'object' && input.metadata
-                                ? (input.metadata as Record<string, unknown>)
+                                ? {
+                                      ...(input.metadata as Record<
+                                          string,
+                                          unknown
+                                      >),
+                                      ...(batchId ? { batchId } : {})
+                                  }
                                 : {},
                         dedupeKey: input.dedupeKey
                             ? String(input.dedupeKey)
-                            : null
+                            : eventType === 'recommend_batch_presented' &&
+                                cycleId &&
+                                batchId
+                              ? `${cycleId}:${batchId}`
+                              : null
                     } satisfies UserEventInput)
                 )
             }
@@ -341,6 +415,38 @@ export async function startLibraryServer(options: {
                 options.desktop?.updateProgress
             ) {
                 return json(response, 200, options.desktop.updateProgress())
+            }
+            if (
+                url.pathname === '/api/v1/update/prepare-latest' &&
+                request.method === 'POST'
+            ) {
+                if (
+                    !options.desktop?.checkForUpdate ||
+                    !options.desktop?.stageUpdate
+                )
+                    throw new Error('Updates are unavailable in this mode')
+                if (
+                    request.headers['x-pica-csrf'] !== options.desktop.csrfToken
+                )
+                    return json(response, 403, {
+                        error: 'This local request could not be verified'
+                    })
+                const available = await options.desktop.checkForUpdate()
+                if (available.status !== 'incremental')
+                    return json(response, 200, available)
+                const assetName = path.basename(
+                    String(available.assetName ?? '')
+                )
+                const assetUrl = String(available.assetUrl ?? '')
+                if (!assetName || !assetUrl)
+                    throw new Error(
+                        'Official incremental update asset is missing'
+                    )
+                const staged = await options.desktop.stageUpdate(
+                    assetName,
+                    await downloadUpdateAsset(assetUrl)
+                )
+                return json(response, 200, staged)
             }
             if (
                 url.pathname === '/api/v1/update/stage' &&
@@ -629,6 +735,24 @@ export async function startLibraryServer(options: {
                     const appSessionId = input.appSessionId
                         ? String(input.appSessionId)
                         : null
+                    if (input.action === 'resume_or_create')
+                        return json(
+                            response,
+                            200,
+                            finalRecommendationCoordinator.resumeOrCreate(
+                                input.requestId
+                                    ? String(input.requestId)
+                                    : undefined
+                            )
+                        )
+                    if (input.action === 'force_new')
+                        return json(
+                            response,
+                            200,
+                            finalRecommendationCoordinator.forceNew(
+                                String(input.requestId ?? '')
+                            )
+                        )
                     return json(
                         response,
                         200,
@@ -664,7 +788,9 @@ export async function startLibraryServer(options: {
                     200,
                     url.searchParams.get('engine') === 'v2'
                         ? recommendationService.currentState()
-                        : adaptiveRecommendationService.status()
+                        : url.searchParams.get('mode') === 'final'
+                          ? finalRecommendationCoordinator.status()
+                          : adaptiveRecommendationService.status()
                 )
             const favoriteRoute = url.pathname.match(
                 /^\/api\/v1\/provider\/favorites\/([^/]+)$/
@@ -685,7 +811,7 @@ export async function startLibraryServer(options: {
                     request.method === 'PUT'
                         ? await providerService.addFavorite(comicId)
                         : await providerService.removeFavorite(comicId)
-                if (result.isFavorite === (request.method === 'PUT'))
+                if (result.changed)
                     options.database.recordUserEvent({
                         eventType:
                             request.method === 'PUT'
@@ -1053,21 +1179,53 @@ export async function startLibraryServer(options: {
                 )
             }
             if (
+                url.pathname === '/api/v1/recommendation/profile' &&
+                request.method === 'GET'
+            ) {
+                const snapshot = options.service.tasteChronicle()
+                return json(response, snapshot ? 200 : 404, {
+                    available: Boolean(snapshot),
+                    snapshot
+                })
+            }
+            if (
+                url.pathname === '/api/v1/recommendation/profile/rebuild' &&
+                request.method === 'POST'
+            ) {
+                return json(response, 200, {
+                    available: true,
+                    snapshot: options.service.rebuildTasteChronicle()
+                })
+            }
+            if (
                 url.pathname === '/api/v1/recommendations' &&
                 request.method === 'POST'
             ) {
                 const input = await body(request)
-                return json(
-                    response,
-                    200,
-                    await options.service.recommendations({
+                if (input.action === 'current')
+                    return json(
+                        response,
+                        200,
+                        finalRecommendationCoordinator.current()
+                    )
+                if (input.action === 'next')
+                    return json(
+                        response,
+                        200,
+                        await finalRecommendationCoordinator.next(
+                            String(input.requestId ?? '')
+                        )
+                    )
+                return json(response, 200, {
+                    engine: 'legacy',
+                    ...(await options.service.recommendations({
                         limit: Number(input.limit ?? 30),
                         seedCount: Number(input.seedCount ?? 12),
                         appSessionId: input.appSessionId
                             ? String(input.appSessionId)
                             : null
-                    })
-                )
+                    }))
+                })
             }
             if (
                 url.pathname === '/api/v1/download' &&

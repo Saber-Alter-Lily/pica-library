@@ -1,5 +1,7 @@
 # Recommendation V3
 
+Historical ordinal integration is documented in [TASTE_CHRONICLE.md](./TASTE_CHRONICLE.md). It adds snapshot-relative recency without fabricating favorite timestamps; lifetime preference remains the stable foundation. Pair/triple ranking remains disabled.
+
 Recommendation V3 is a local-first, explainable recommendation engine layered on the existing Pica Library v0.2 contracts.
 
 ## Architecture

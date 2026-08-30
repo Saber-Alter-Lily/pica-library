@@ -9,6 +9,22 @@ import type {
     V3Recommendation
 } from './types'
 
+export interface RankingContext {
+    graphEdges?: Array<{
+        sourceComicId: string
+        targetComicId: string
+        confidence?: number
+        observationCount?: number
+    }>
+    routeFamilies?: Map<string, Set<string>>
+}
+type FavoriteIndex = {
+    features: ReturnType<typeof itemFeature>[]
+    authorCounts: Map<string, number>
+    circleCounts: Map<string, number>
+    categoryIndex: Map<string, ReturnType<typeof itemFeature>[]>
+}
+
 export const RANKING_CONFIG = {
     historicalSimilarity: 0.28,
     clusterSimilarity: 0.18,
@@ -18,8 +34,13 @@ export const RANKING_CONFIG = {
     authorAffinity: 0.18,
     circleAffinity: 0.08,
     singleTagAffinity: 0.2,
-    pairResidual: 0.08,
-    tripleResidual: 0.04,
+    // Pair evidence is retained for explanations/analytics; ablations did not
+    // show stable ranking gains across author and cluster strata.
+    pairResidual: 0,
+    // Triple evidence remains available for analytics/profile display; the
+    // real-user ablation found no incremental ranking gain, so default weight
+    // is disabled until a larger unbiased background is available.
+    tripleResidual: 0,
     categorySimilarity: 0.05,
     graph: 0.08,
     popularity: 0.025,
@@ -45,24 +66,35 @@ export function extractRankingFeatures(
     candidate: StoredComic,
     favorites: StoredComic[],
     profile: V3Profile,
-    events: UserEvent[] = []
+    events: UserEvent[] = [],
+    context: RankingContext = {},
+    index?: FavoriteIndex
 ): V3RankingFeatures {
     const feature = itemFeature(candidate)
-    const favoriteFeatures = favorites.map(itemFeature)
+    const favoriteFeatures = index?.features ?? favorites.map(itemFeature)
     const residual = residualCombinationBonus(
         feature.tags,
         profile.historical.pairs,
         profile.historical.triples
     )
     const authorAffinity =
-        favoriteFeatures.filter(
-            (item) => item.author && item.author === feature.author
-        ).length / Math.max(1, favorites.length)
+        (index?.authorCounts.get(feature.author) ??
+            favoriteFeatures.filter((item) => item.author === feature.author)
+                .length) / Math.max(1, favorites.length)
     const circleAffinity =
-        favoriteFeatures.filter(
-            (item) => item.circle && item.circle === feature.circle
-        ).length / Math.max(1, favorites.length)
-    const categorySimilarity = favoriteFeatures.reduce(
+        (index?.circleCounts.get(feature.circle) ??
+            favoriteFeatures.filter((item) => item.circle === feature.circle)
+                .length) / Math.max(1, favorites.length)
+    const categoryCandidates = index
+        ? [
+              ...new Set(
+                  feature.categories.flatMap(
+                      (category) => index.categoryIndex.get(category) ?? []
+                  )
+              )
+          ]
+        : favoriteFeatures
+    const categorySimilarity = categoryCandidates.reduce(
         (best, item) =>
             Math.max(
                 best,
@@ -97,7 +129,30 @@ export function extractRankingFeatures(
         eventCount(events, 'reader_complete', candidate.comicId)
     const downloads = eventCount(events, 'download_complete', candidate.comicId)
     const confidence = profileConfidence(profile)
+    const graph = (context.graphEdges ?? []).filter(
+        (edge) => edge.targetComicId === candidate.comicId
+    )
+    const relatedGraphScore = Math.min(
+        1,
+        graph.reduce(
+            (sum, edge) =>
+                sum +
+                Math.min(1, edge.confidence ?? 0.5) *
+                    Math.min(1, (edge.observationCount ?? 1) / 3),
+            0
+        ) / 3
+    )
+    const routeSupport = context.routeFamilies
+        ? Math.min(
+              1,
+              [...context.routeFamilies.values()].filter((ids) =>
+                  ids.has(candidate.comicId)
+              ).length / 3
+          )
+        : 0
+    const historicalOrdinalSimilarity = 0
     return {
+        historicalOrdinalSimilarity,
         historicalSimilarity:
             tagScore(feature.tags, profile.historical) * confidence.historical,
         historicalClusterSimilarity,
@@ -114,7 +169,7 @@ export function extractRankingFeatures(
         tripleInteractionBonus: residual.triple,
         categorySimilarity,
         itemSimilarity: historicalClusterSimilarity,
-        relatedGraphScore: 0,
+        relatedGraphScore,
         positiveBehaviorSimilarity: Math.min(1, (reads + downloads) / 3),
         negativeBehaviorPenalty: Math.min(1, removed),
         popularity:
@@ -129,7 +184,7 @@ export function extractRankingFeatures(
         alreadyFavorite: candidate.isFavorite,
         alreadyDownloaded: candidate.downloadedPictures > 0,
         alreadyRead: reads > 0,
-        recallRouteSupport: 0
+        recallRouteSupport: routeSupport
     }
 }
 
@@ -137,8 +192,37 @@ export function rankV3(
     candidates: StoredComic[],
     favorites: StoredComic[],
     profile: V3Profile,
-    events: UserEvent[] = []
+    events: UserEvent[] = [],
+    context: RankingContext = {}
 ): V3Recommendation[] {
+    const favoriteFeatures = favorites.map(itemFeature)
+    const authorCounts = new Map<string, number>(),
+        circleCounts = new Map<string, number>()
+    for (const item of favoriteFeatures) {
+        if (item.author)
+            authorCounts.set(
+                item.author,
+                (authorCounts.get(item.author) ?? 0) + 1
+            )
+        if (item.circle)
+            circleCounts.set(
+                item.circle,
+                (circleCounts.get(item.circle) ?? 0) + 1
+            )
+    }
+    const categoryIndex = new Map<string, ReturnType<typeof itemFeature>[]>()
+    for (const item of favoriteFeatures)
+        for (const category of item.categories)
+            categoryIndex.set(category, [
+                ...(categoryIndex.get(category) ?? []),
+                item
+            ])
+    const index: FavoriteIndex = {
+        features: favoriteFeatures,
+        authorCounts,
+        circleCounts,
+        categoryIndex
+    }
     return candidates
         .filter((item) => !item.isFavorite)
         .map((candidate) => {
@@ -146,7 +230,9 @@ export function rankV3(
                 candidate,
                 favorites,
                 profile,
-                events
+                events,
+                context,
+                index
             )
             const score =
                 f.historicalSimilarity * RANKING_CONFIG.historicalSimilarity +
@@ -162,6 +248,7 @@ export function rankV3(
                 f.tripleInteractionBonus * RANKING_CONFIG.tripleResidual +
                 f.categorySimilarity * RANKING_CONFIG.categorySimilarity +
                 f.relatedGraphScore * RANKING_CONFIG.graph +
+                f.recallRouteSupport * 0.06 +
                 f.popularity * RANKING_CONFIG.popularity +
                 f.novelty * RANKING_CONFIG.novelty -
                 f.recentExposurePenalty * RANKING_CONFIG.impressionPenalty -

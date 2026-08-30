@@ -4,13 +4,28 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Pica Library</title>
+        <meta name="theme-color" content="#5f6ee8" />
+        <link rel="icon" type="image/svg+xml" href="./pica-library-icon.svg" />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href="./pica-library-icon-192.png"
+        />
         <link rel="stylesheet" href="./styles.css" />
     </head>
     <body>
         <header class="app-header">
-            <div>
-                <h1>Pica Library</h1>
-                <p>收藏整理、个性发现与增量下载</p>
+            <div class="app-brand">
+                <img
+                    class="app-brand-icon"
+                    src="./pica-library-icon.svg"
+                    alt=""
+                />
+                <div>
+                    <h1>Pica Library</h1>
+                    <p>收藏整理、个性发现与增量下载</p>
+                </div>
             </div>
             <div class="header-controls">
                 <label class="language-control"
@@ -23,11 +38,12 @@
                 <span id="mode" class="mode">正在检测模式</span>
             </div>
         </header>
-        <nav aria-label="主导航">
+        <nav class="app-nav" aria-label="主导航">
             <button data-view="home" class="active">Home</button>
             <button data-view="library">Library</button>
             <button data-view="shelves">书架</button>
             <button data-view="discover">Discover</button>
+            <button data-view="chronicle">我的收藏图鉴</button>
             <button data-view="downloads">Downloads</button>
             <button data-view="downloaded">Downloaded</button>
             <button data-view="maintenance">Maintenance</button>
@@ -35,11 +51,13 @@
                 Settings
             </button>
         </nav>
-        <main>
+        <main class="app-main">
             <section id="setup" class="view setup-view">
                 <div class="setup-shell">
                     <div class="setup-heading">
-                        <span class="setup-mark">P</span>
+                        <span class="setup-mark"
+                            ><img src="./pica-library-icon.svg" alt=""
+                        /></span>
                         <div>
                             <h2>Set up Pica Library</h2>
                             <p>Your library stays on this computer.</p>
@@ -327,6 +345,34 @@
                 </div>
                 <div class="load-more-wrap">
                     <button id="load-more" hidden>加载更多</button>
+                </div>
+            </section>
+
+            <section id="chronicle" class="view chronicle-view">
+                <div class="page-heading no-print">
+                    <div>
+                        <p class="eyebrow">我的收藏图鉴</p>
+                        <h2>你的收藏，已经走了很远。</h2>
+                        <p>从你的收藏里，看看一路喜欢过什么。</p>
+                    </div>
+                    <div class="actions">
+                        <button id="chronicle-refresh">重新整理</button
+                        ><button id="chronicle-print" class="primary">
+                            导出结果卡 PDF
+                        </button>
+                    </div>
+                </div>
+                <p id="chronicle-status" class="status"></p>
+                <div id="chronicle-content" class="chronicle-content">
+                    <article class="chronicle-empty">
+                        <h3>收藏图鉴还没有整理</h3>
+                        <p>
+                            完成一次完整收藏同步后，就可以在这里看到兴趣主线和收藏变化。
+                        </p>
+                        <button id="chronicle-build" class="primary">
+                            整理我的收藏图鉴
+                        </button>
+                    </article>
                 </div>
             </section>
 
@@ -666,7 +712,8 @@
 
             <section id="maintenance" class="view">
                 <div class="tabs">
-                    <button data-tab="updates" class="active">更新</button>
+                    <button data-tab="updates" class="active">内容更新</button>
+                    <button data-tab="software-updates">软件更新</button>
                     <button data-tab="repair">修复</button>
                     <button data-tab="authors">作者归一</button>
                     <button data-tab="health">健康检查</button>
@@ -682,6 +729,74 @@
                         </button>
                     </div>
                     <pre id="update-result" class="output"></pre>
+                </div>
+                <div id="software-updates" class="tab">
+                    <article id="settings-update" class="panel update-panel">
+                        <div class="section-heading">
+                            <div>
+                                <p class="eyebrow">本地更新</p>
+                                <h3>更新</h3>
+                            </div>
+                            <span
+                                id="update-current-version"
+                                class="mode"
+                            ></span>
+                        </div>
+                        <p>
+                            可直接检查并安装官方更新，也可以拖入或选择本地更新
+                            ZIP 包。
+                        </p>
+                        <label
+                            id="update-dropzone"
+                            class="update-dropzone"
+                            tabindex="0"
+                        >
+                            <strong>将 Pica Library 更新包拖到这里</strong>
+                            <span>或选择 Pica-Library-vX.Y.Z-update.zip</span>
+                            <input
+                                id="update-file"
+                                class="file-picker-input"
+                                type="file"
+                                accept=".zip,application/zip"
+                            />
+                        </label>
+                        <div
+                            id="update-summary"
+                            class="update-summary"
+                            hidden
+                        ></div>
+                        <div
+                            id="update-progress"
+                            class="operation-progress"
+                            hidden
+                        >
+                            <span id="update-progress-phase"></span>
+                            <progress
+                                id="update-progress-bar"
+                                max="1"
+                            ></progress>
+                        </div>
+                        <p
+                            id="update-message"
+                            class="status"
+                            aria-live="polite"
+                        ></p>
+                        <div class="actions">
+                            <button id="update-check" type="button">
+                                检查更新
+                            </button>
+                            <button
+                                id="update-one-click"
+                                class="primary"
+                                type="button"
+                            >
+                                一键检查并更新
+                            </button>
+                            <button id="update-apply" type="button" hidden>
+                                使用已上传更新包并重启
+                            </button>
+                        </div>
+                    </article>
                 </div>
                 <div id="repair" class="tab">
                     <div class="page-heading">
@@ -831,57 +946,6 @@
                     <button id="preview-cache-clear" type="button">
                         清理预览缓存
                     </button>
-                </article>
-                <article id="settings-update" class="panel update-panel">
-                    <div class="section-heading">
-                        <div>
-                            <p class="eyebrow">本地更新</p>
-                            <h3>更新</h3>
-                        </div>
-                        <span id="update-current-version" class="mode"></span>
-                    </div>
-                    <p>下载官方更新包后，可直接在这里校验、暂存并更新。</p>
-                    <label
-                        id="update-dropzone"
-                        class="update-dropzone"
-                        tabindex="0"
-                    >
-                        <strong>将 Pica Library 更新包拖到这里</strong>
-                        <span>或选择 Pica-Library-vX.Y.Z-update.zip</span>
-                        <input
-                            id="update-file"
-                            class="file-picker-input"
-                            type="file"
-                            accept=".zip,application/zip"
-                        />
-                    </label>
-                    <div
-                        id="update-summary"
-                        class="update-summary"
-                        hidden
-                    ></div>
-                    <div id="update-progress" class="operation-progress" hidden>
-                        <span id="update-progress-phase"></span>
-                        <progress id="update-progress-bar" max="1"></progress>
-                    </div>
-                    <p
-                        id="update-message"
-                        class="status"
-                        aria-live="polite"
-                    ></p>
-                    <div class="actions">
-                        <button id="update-check" type="button">
-                            检查更新
-                        </button>
-                        <button
-                            id="update-apply"
-                            class="primary"
-                            type="button"
-                            hidden
-                        >
-                            更新并重启
-                        </button>
-                    </div>
                 </article>
             </section>
         </main>

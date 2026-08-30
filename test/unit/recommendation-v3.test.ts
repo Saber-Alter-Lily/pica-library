@@ -13,6 +13,10 @@ import {
     profileConfidence
 } from '../../src/recommendation-v3/behavior-profile'
 import { rankV3 } from '../../src/recommendation-v3/ranker'
+import { extractRankingFeatures } from '../../src/recommendation-v3/ranker'
+import { retrieveV3 } from '../../src/recommendation-v3/retrieval'
+import { residualCombinationBonus } from '../../src/recommendation-v3/tag-combinations'
+import { rerankV3 } from '../../src/recommendation-v3/reranker'
 import {
     deterministicHoldout,
     evaluationMetrics,
@@ -213,5 +217,94 @@ describe('Recommendation V3', () => {
         const metrics = evaluationMetrics(ranked, held)
         expect(metrics.recallAt12).toBe(1)
         expect(metrics.ndcgAt12).toBe(1)
+    })
+
+    it('changes seeded random holdouts while remaining reproducible', () => {
+        const records = Array.from({ length: 30 }, (_, i) =>
+            comic(`h-${i}`, [`t-${i % 3}`])
+        )
+        const a = deterministicHoldout(records, 'random', 'a').map(
+            (x) => x.comicId
+        )
+        const b = deterministicHoldout(records, 'random', 'b').map(
+            (x) => x.comicId
+        )
+        expect(a).toEqual(
+            deterministicHoldout(records, 'random', 'a').map((x) => x.comicId)
+        )
+        expect(a).not.toEqual(b)
+    })
+
+    it('uses retrieval candidates and bounded graph/route evidence', () => {
+        const favorites = [comic('f', ['a'])]
+        const catalog = [
+            ...favorites,
+            comic('x', ['a']),
+            comic('y', ['b'])
+        ].map((x) => ({ ...x, isFavorite: x.comicId === 'f' }))
+        const profile = buildV3Profile(favorites, catalog)
+        const ids = retrieveV3(catalog, favorites, profile, 10)
+        expect(ids).toContain('x')
+        const feature = extractRankingFeatures(
+            catalog[1],
+            favorites,
+            profile,
+            [],
+            {
+                graphEdges: [
+                    {
+                        sourceComicId: 'f',
+                        targetComicId: 'x',
+                        confidence: 1,
+                        observationCount: 3
+                    }
+                ],
+                routeFamilies: new Map([
+                    ['tag', new Set(['x'])],
+                    ['related', new Set(['x'])]
+                ])
+            }
+        )
+        expect(feature.relatedGraphScore).toBeGreaterThan(0)
+        expect(feature.recallRouteSupport).toBeGreaterThan(0)
+        expect(feature.recallRouteSupport).toBeLessThanOrEqual(1)
+    })
+
+    it('protects residual combination bonuses from overlap and honors exploration quota', () => {
+        const pair = {
+            order: 2 as const,
+            tags: ['a', 'b'],
+            favoriteCount: 4,
+            favoriteSupport: 0.5,
+            backgroundCount: 1,
+            backgroundSupport: 0.1,
+            enrichment: 1,
+            withinFavoriteInteraction: 1,
+            backgroundInteraction: 0,
+            specificInteraction: 1,
+            reliability: 1,
+            score: 1
+        }
+        const triple = { ...pair, order: 3 as const, tags: ['a', 'b', 'c'] }
+        const bonus = residualCombinationBonus(
+            ['a', 'b', 'c'],
+            [pair],
+            [triple]
+        )
+        expect(bonus.pair).toBeLessThanOrEqual(1)
+        expect(bonus.triple).toBeLessThanOrEqual(1)
+        const comics = new Map([
+            ['x', comic('x', ['a'])],
+            ['y', comic('y', ['b'])],
+            ['z', comic('z', ['c'])]
+        ])
+        const ranked = [...comics.keys()].map((id, i) => ({
+            comicId: id,
+            score: 1 - i * 0.01,
+            features: { novelty: i === 2 ? 1 : 0 } as never,
+            reasons: [],
+            provenance: []
+        }))
+        expect(rerankV3(ranked, comics, 3)).toHaveLength(3)
     })
 })

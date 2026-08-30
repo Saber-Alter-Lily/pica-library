@@ -3,6 +3,19 @@ import type { V3Recommendation } from './types'
 import { recommendComics } from '../library/recommendation'
 import { buildV3Profile } from './taste-model'
 import { rankV3 } from './ranker'
+import { retrieveV3 } from './retrieval'
+
+function stableHash(value: string) {
+    let h = 2166136261
+    for (let i = 0; i < value.length; i++) {
+        h ^= value.charCodeAt(i)
+        h = Math.imul(h, 16777619)
+    }
+    return h >>> 0
+}
+function normalizeTag(value: string) {
+    return value.normalize('NFKC').trim().toLocaleLowerCase()
+}
 
 function dcg(ids: string[], relevant: Set<string>, limit: number) {
     return ids
@@ -83,19 +96,31 @@ export function deterministicHoldout(
 ) {
     const favorites = records
         .filter((item) => item.isFavorite)
-        .sort((a, b) =>
-            `${seed}:${a.comicId}`.localeCompare(`${seed}:${b.comicId}`)
+        .sort(
+            (a, b) =>
+                stableHash(`${seed}:${a.comicId}`) -
+                    stableHash(`${seed}:${b.comicId}`) ||
+                a.comicId.localeCompare(b.comicId)
         )
     const target = Math.max(1, Math.floor(favorites.length * 0.2))
-    if (kind === 'author')
-        return favorites
-            .filter(
-                (item, index) =>
-                    index %
-                        Math.max(2, Math.floor(favorites.length / target)) ===
-                    0
+    if (kind === 'author') {
+        const groups = new Map<string, StoredComic[]>()
+        for (const item of favorites) {
+            const key = item.canonicalAuthor ?? item.author ?? ''
+            groups.set(key, [...(groups.get(key) ?? []), item])
+        }
+        return [...groups.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .flatMap(([, items]) =>
+                items.filter(
+                    (_, i) =>
+                        stableHash(`${seed}:${i}`) %
+                            Math.max(1, Math.ceil(items.length / target)) ===
+                        0
+                )
             )
             .slice(0, target)
+    }
     if (kind === 'long-tail')
         return [...favorites]
             .sort(
@@ -104,8 +129,30 @@ export function deterministicHoldout(
                     a.comicId.localeCompare(b.comicId)
             )
             .slice(0, target)
-    if (kind === 'cluster')
-        return favorites.filter((_, index) => index % 3 === 0).slice(0, target)
+    if (kind === 'cluster') {
+        const groups = new Map<number, StoredComic[]>()
+        for (const item of favorites) {
+            const bucket =
+                stableHash(
+                    `${seed}:cluster:${item.tags
+                        .map((x) => normalizeTag(x))
+                        .sort()
+                        .join('|')}`
+                ) % 5
+            groups.set(bucket, [...(groups.get(bucket) ?? []), item])
+        }
+        return [...groups.values()]
+            .flatMap((items) =>
+                items.slice(
+                    0,
+                    Math.max(
+                        1,
+                        Math.ceil((items.length * target) / favorites.length)
+                    )
+                )
+            )
+            .slice(0, target)
+    }
     return favorites.slice(0, target)
 }
 
@@ -116,9 +163,11 @@ export function withoutHeldOut(records: StoredComic[], heldOut: StoredComic[]) {
 
 export function evaluateAblations(
     records: StoredComic[],
-    candidateLimit = 500
+    candidateLimit = 500,
+    holdoutKind: 'random' | 'author' | 'cluster' | 'long-tail' = 'random',
+    seed = 'v3-ablation'
 ) {
-    const heldOut = deterministicHoldout(records, 'random', 'v3-ablation')
+    const heldOut = deterministicHoldout(records, holdoutKind, seed)
     const training = withoutHeldOut(records, heldOut)
     // Keep held-out items in the candidate catalog, but mark them non-favorite.
     // This prevents candidate omission while ensuring profile construction cannot
@@ -128,12 +177,19 @@ export function evaluateAblations(
         heldOutIds.has(item.comicId) ? { ...item, isFavorite: false } : item
     )
     const profile = buildV3Profile(training, catalog)
-    const base = rankV3(catalog.slice(0, candidateLimit), training, profile)
+    const candidateIds = retrieveV3(catalog, training, profile, candidateLimit)
+    const candidateSet = new Set(candidateIds)
+    const base = rankV3(
+        catalog.filter((item) => candidateSet.has(item.comicId)),
+        training,
+        profile
+    )
     const v2 = recommendComics(catalog, candidateLimit).recommendations.map(
         (item): V3Recommendation => ({
             comicId: item.comic.comicId,
             score: item.score,
             features: {
+                historicalOrdinalSimilarity: 0,
                 historicalSimilarity: 0,
                 historicalClusterSimilarity: 0,
                 lifetimeSimilarity: 0,

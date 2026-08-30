@@ -74,7 +74,14 @@ export interface TagPreference {
     enrichment: number
     reliability: number
     score: number
+    idf?: number
+    informativeness?: number
 }
+
+export type BackgroundQuality =
+    | 'NONE'
+    | 'LOCAL_BIASED'
+    | 'OBSERVED_PROVIDER_CATALOG'
 
 export interface TagCombinationPreference {
     order: 2 | 3
@@ -89,6 +96,9 @@ export interface TagCombinationPreference {
     specificInteraction: number
     reliability: number
     score: number
+    backgroundQuality?: BackgroundQuality
+    facets?: string[]
+    interactionType?: string
 }
 
 export interface TasteCluster {
@@ -99,6 +109,7 @@ export interface TasteCluster {
     authors: string[]
     circles: string[]
     tags: string[]
+    modifiers?: string[]
     tagPairs: string[][]
     tagTriples: string[][]
     confidence: number
@@ -112,6 +123,14 @@ export interface V3Profile {
     generatedAt: string
     modelVersion: string
     evidenceCutoff: string
+    semantic?: {
+        ontologyVersion: number
+        aliasVersion: number
+        facets: Record<
+            string,
+            Array<{ value: string; count: number; score: number }>
+        >
+    }
 }
 
 export interface ProfileWindow {
@@ -119,9 +138,13 @@ export interface ProfileWindow {
     tags: TagPreference[]
     pairs: TagCombinationPreference[]
     triples: TagCombinationPreference[]
+    authors?: Array<{ value: string; count: number }>
+    circles?: Array<{ value: string; count: number }>
+    itemSeeds?: string[]
 }
 
 export interface V3RankingFeatures {
+    historicalOrdinalSimilarity: number
     historicalSimilarity: number
     historicalClusterSimilarity: number
     lifetimeSimilarity: number

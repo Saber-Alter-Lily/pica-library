@@ -1,6 +1,6 @@
 import type { StoredComic } from '../library/types'
 import { buildTasteClusters } from './taste-model'
-import { mineTagPreferences } from './tag-combinations'
+import { mineTagCombinations, mineTagPreferences } from './tag-combinations'
 import type { ProfileWindow, UserEvent, V3EventType, V3Profile } from './types'
 
 export const BEHAVIOR_CONFIG = {
@@ -60,8 +60,36 @@ function profileWindow(
     return {
         clusters: buildTasteClusters(evidence),
         tags: mineTagPreferences(evidence, catalog),
-        pairs: [],
-        triples: []
+        ...(evidence.length >= 3
+            ? mineTagCombinations(evidence, catalog, {
+                  maxPairs: 20,
+                  maxTriples: 10,
+                  maxMiningTags: 40
+              })
+            : { pairs: [], triples: [] }),
+        authors: [
+            ...new Set(
+                evidence
+                    .map((c) => c.canonicalAuthor ?? c.author)
+                    .filter(Boolean)
+            )
+        ]
+            .map((value) => ({
+                value: value!,
+                count: evidence.filter(
+                    (c) => (c.canonicalAuthor ?? c.author) === value
+                ).length
+            }))
+            .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+            .slice(0, 30),
+        circles: [...new Set(evidence.map((c) => c.circle).filter(Boolean))]
+            .map((value) => ({
+                value: value!,
+                count: evidence.filter((c) => c.circle === value).length
+            }))
+            .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+            .slice(0, 30),
+        itemSeeds: evidence.map((c) => c.comicId).slice(0, 30)
     }
 }
 

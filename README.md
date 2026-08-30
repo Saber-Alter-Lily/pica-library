@@ -6,11 +6,17 @@
 
 **Windows 10/11 x64 · 解压即用 · 数据默认保存在本机。**
 
+### 直接下载
+
+- **新用户 / 完整安装：**[Pica-Library-v0.3.0-windows-x64.zip](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-windows-x64.zip)
+- **v0.2.0 手动升级包：**[Pica-Library-v0.3.0-update.zip](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-update.zip)
+- [查看 v0.3.0 Release 页面](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.0)
+
 ![Pica Library 漫画库使用示意](docs/assets/screenshots/v0.3.0/02-library-guide.png)
 
 ## 开始使用
 
-1. 在 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases) 下载 `Pica-Library-v0.3.0-windows-x64.zip`。
+1. 下载上面的 **完整安装包** `Pica-Library-v0.3.0-windows-x64.zip`。
 2. **完整解压** ZIP，不要直接在压缩软件中运行。
 3. 双击 `Pica Library.exe`。
 4. 按首次设置填写账号、可选代理和保存目录。
@@ -40,8 +46,9 @@
 
 ## 从旧版本升级
 
-- **v0.2.0 → v0.3.0：**打开 **库维护 → 软件更新 → 一键检查并更新**。
-- **v0.1.x：**请重新下载完整 Windows ZIP。
+- **v0.2.0 → v0.3.0：**优先打开 **库维护 → 软件更新 → 一键检查并更新**。
+- 如果自动读取 GitHub Release 失败，直接下载 [Pica-Library-v0.3.0-update.zip](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-update.zip)，然后在更新页拖入或手动选择该 ZIP。
+- **v0.1.x：**请下载 [完整 Windows 安装包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-windows-x64.zip) 重新解压。
 
 ![Pica Library 软件更新示意](docs/assets/screenshots/v0.3.0/05-update-guide.png)
 

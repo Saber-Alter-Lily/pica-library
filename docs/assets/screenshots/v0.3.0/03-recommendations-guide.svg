@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs><marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#e53935"/></marker><filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity=".18"/></filter></defs>
+  <image href="03-recommendations.png" x="0" y="0" width="1600" height="1000" preserveAspectRatio="none"/>
+  <g font-family="Microsoft YaHei, PingFang SC, Arial, sans-serif" fill="#d62828" stroke="#e53935" stroke-width="3">
+    <g filter="url(#shadow)"><rect x="225" y="185" width="330" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="245" y="222" font-size="20" font-weight="700" stroke="none">① “为你推荐”是个性化入口</text></g><line x1="225" y1="214" x2="150" y2="225" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="1010" y="260" width="300" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="1030" y="297" font-size="20" font-weight="700" stroke="none">② 查看推荐：生成这一轮结果</text></g><line x1="1010" y1="289" x2="940" y2="302" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="170" y="390" width="300" height="72" rx="12" fill="#fff" fill-opacity=".95"/><text x="190" y="420" font-size="20" font-weight="700" stroke="none">③ 每轮 6 批，每批 12 条</text><text x="190" y="448" font-size="16" stroke="none">同一轮内候选不会重复</text></g><line x1="250" y1="462" x2="220" y2="520" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="520" y="480" width="310" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="540" y="517" font-size="20" font-weight="700" stroke="none">④ 换一批：查看本轮下一批</text></g><line x1="520" y1="508" x2="120" y2="560" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="1170" y="350" width="330" height="72" rx="12" fill="#fff" fill-opacity=".95"/><text x="1190" y="380" font-size="20" font-weight="700" stroke="none">⑤ 重新开始推荐</text><text x="1190" y="408" font-size="16" stroke="none">重新生成一个新的推荐轮次</text></g><line x1="1380" y1="350" x2="1440" y2="305" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="520" y="835" width="440" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="540" y="872" font-size="20" font-weight="700" stroke="none">⑥ 推荐卡展示作品，后续可加入书架或下载</text></g><line x1="740" y1="835" x2="740" y2="785" marker-end="url(#arrow)"/>
+  </g>
+</svg>

@@ -6,9 +6,7 @@
 
 **Windows 10/11 x64 · 解压即用 · 数据默认保存在本机。**
 
-![Pica Library 漫画库](docs/assets/screenshots/v0.3.0/02-library.png)
-
-> 收藏同步后，可按作者、标签、分类和书架筛选；本地状态会持续保留，不需要每次重新整理。
+![Pica Library 漫画库使用示意](docs/assets/screenshots/v0.3.0/02-library-guide.svg)
 
 ## 开始使用
 
@@ -28,18 +26,24 @@
 - **下载与阅读：**统一管理下载队列、失败重试和阅读进度，支持内置 Web Reader。
 - **维护与更新：**检查内容更新、修复缺失文件，并在应用内安装兼容的官方更新。
 
-![Pica Library 个性化推荐](docs/assets/screenshots/v0.3.0/03-recommendations.png)
+### 个性化推荐
 
-> 推荐来自本地收藏画像；可以查看理由、换一批，也可以重新生成新的推荐轮次。
+![Pica Library 推荐使用示意](docs/assets/screenshots/v0.3.0/03-recommendations-guide.svg)
 
-![Pica Library 收藏图鉴](docs/assets/screenshots/v0.3.0/04-atlas.png)
+推荐来自本地收藏画像。每轮分批浏览，可以换一批，也可以重新生成新的推荐轮次。
 
-> 收藏图鉴把作品/IP、作者和长期语义偏好整理成一张本地图谱，不依赖公开个人数据。
+### 收藏图鉴
+
+![Pica Library 收藏图鉴使用示意](docs/assets/screenshots/v0.3.0/04-atlas-guide.svg)
+
+收藏图鉴把作品/IP、作者和长期语义偏好整理成本地图谱，并支持导出结果卡 PDF。
 
 ## 从旧版本升级
 
-- **v0.2.0 → v0.3.0：**打开 **Maintenance → 软件更新 → 一键检查并更新**。
+- **v0.2.0 → v0.3.0：**打开 **库维护 → 软件更新 → 一键检查并更新**。
 - **v0.1.x：**请重新下载完整 Windows ZIP。
+
+![Pica Library 软件更新示意](docs/assets/screenshots/v0.3.0/05-update-guide.svg)
 
 用户数据库、收藏和下载内容位于独立数据目录；兼容更新不会因为替换应用文件而删除这些数据。
 

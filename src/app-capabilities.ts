@@ -1,7 +1,7 @@
 import { PRODUCT_VERSION } from './version'
 
 export const APP_API_VERSION = 2
-export const DATABASE_SCHEMA_VERSION = 7
+export const DATABASE_SCHEMA_VERSION = 8
 export const BUNDLE_FORMAT_VERSION = 1
 export const UPDATE_MANIFEST_VERSION = 1
 export const READER_API_VERSION = 1
@@ -22,6 +22,10 @@ export interface AppCapabilities {
         updatePackages: boolean
         recommendationSessions: boolean
         previewPages: boolean
+        recommendationV3: boolean
+        behaviorLearning: boolean
+        multiTagPreference: boolean
+        adaptiveRecommendationBatches: boolean
     }
 }
 
@@ -43,7 +47,11 @@ export function appCapabilities(
             archiveReader: false,
             updatePackages: true,
             recommendationSessions: true,
-            previewPages: true
+            previewPages: true,
+            recommendationV3: true,
+            behaviorLearning: true,
+            multiTagPreference: true,
+            adaptiveRecommendationBatches: true
         }
     }
 }

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "policy": "safe-mechanical-and-curated-high-confidence-only",
+  "aliases": {
+    "彩色": "全彩",
+    "black and white": "黑白",
+    "3d": "3d"
+  },
+  "ambiguous": []
+}

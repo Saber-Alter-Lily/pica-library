@@ -374,6 +374,82 @@ export const migrations: Migration[] = [
                OR source LIKE '%bundle%'
                OR source = 'legacy/unknown';
         `
+    },
+    {
+        version: 8,
+        name: 'recommendation_v3_additive',
+        up: `
+            CREATE TABLE IF NOT EXISTS user_events (
+                id TEXT PRIMARY KEY,
+                occurred_at TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                comic_id TEXT,
+                source TEXT,
+                app_session_id TEXT,
+                context_id TEXT,
+                recommendation_cycle_id TEXT,
+                recommendation_session_id TEXT,
+                recommendation_batch_index INTEGER,
+                rank_position INTEGER,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                dedupe_key TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(event_type, dedupe_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_events_time ON user_events(occurred_at);
+            CREATE INDEX IF NOT EXISTS idx_user_events_type_time ON user_events(event_type, occurred_at);
+            CREATE INDEX IF NOT EXISTS idx_user_events_comic_time ON user_events(comic_id, occurred_at);
+            CREATE INDEX IF NOT EXISTS idx_user_events_context ON user_events(context_id, recommendation_cycle_id);
+
+            CREATE TABLE IF NOT EXISTS recommendation_item_edges (
+                source_comic_id TEXT NOT NULL,
+                target_comic_id TEXT NOT NULL,
+                edge_type TEXT NOT NULL,
+                first_observed_at TEXT NOT NULL,
+                last_observed_at TEXT NOT NULL,
+                observation_count INTEGER NOT NULL DEFAULT 1,
+                confidence REAL NOT NULL DEFAULT 0,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (source_comic_id, target_comic_id, edge_type)
+            );
+            CREATE INDEX IF NOT EXISTS idx_recommendation_edges_source ON recommendation_item_edges(source_comic_id, edge_type);
+            CREATE INDEX IF NOT EXISTS idx_recommendation_edges_target ON recommendation_item_edges(target_comic_id, edge_type);
+
+            CREATE TABLE IF NOT EXISTS recommendation_v3_profiles (
+                id TEXT PRIMARY KEY,
+                profile_kind TEXT NOT NULL,
+                generated_at TEXT NOT NULL,
+                evidence_cutoff TEXT NOT NULL,
+                model_version TEXT NOT NULL,
+                profile_json TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_recommendation_v3_profiles_kind ON recommendation_v3_profiles(profile_kind, generated_at);
+
+            CREATE TABLE IF NOT EXISTS recommendation_v3_candidate_pools (
+                id TEXT PRIMARY KEY,
+                app_session_id TEXT,
+                recommendation_cycle_id TEXT,
+                generated_at TEXT NOT NULL,
+                expires_at TEXT,
+                model_version TEXT NOT NULL,
+                telemetry_json TEXT NOT NULL DEFAULT '{}',
+                candidate_ids_json TEXT NOT NULL DEFAULT '[]'
+            );
+
+            CREATE TABLE IF NOT EXISTS recommendation_v3_batches (
+                id TEXT PRIMARY KEY,
+                pool_id TEXT NOT NULL REFERENCES recommendation_v3_candidate_pools(id) ON DELETE CASCADE,
+                recommendation_cycle_id TEXT NOT NULL,
+                recommendation_session_id TEXT,
+                batch_index INTEGER NOT NULL,
+                context_id TEXT NOT NULL,
+                generated_at TEXT NOT NULL,
+                item_ids_json TEXT NOT NULL DEFAULT '[]',
+                evidence_json TEXT NOT NULL DEFAULT '{}',
+                UNIQUE(pool_id, batch_index)
+            );
+            CREATE INDEX IF NOT EXISTS idx_recommendation_v3_batches_cycle ON recommendation_v3_batches(recommendation_cycle_id, batch_index);
+        `
     }
 ]
 

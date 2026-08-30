@@ -5,6 +5,8 @@ $version = [string]$package.version
 $nodeVersion = '24.15.0'
 $name = if ($version -eq '0.2.0') {
     'Pica-Library-v0.2.0-windows-x64'
+} elseif ($version -eq '0.3.0') {
+    'Pica-Library-v0.3.0-windows-x64'
 } elseif ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {
@@ -70,11 +72,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 # The legacy compiler embeds a timestamp and a random module ID. When launcher
 # source is unchanged, each incremental target reuses the previous package's
 # launcher bytes so a file-diff update does not report a false replacement.
-if ($version -in @('0.2.0-dev.1','0.2.0-dev.2')) {
+if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0')) {
     $baseZip = if ($version -eq '0.2.0-dev.1') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
-    } else {
+    } elseif ($version -eq '0.2.0-dev.2') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'
+    } else {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
     }
     if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -103,14 +107,14 @@ Pica Library v$version for Windows 10/11 x64
 3. Complete setup in the browser.
 4. To use Browser Lite, open Settings > Browser Lite and export the data package.
 
-Users upgrading from v0.1.3 must use this complete v0.2.0 Windows ZIP.
-From v0.2.0 onward, future compatible releases may use the built-in incremental update flow.
+Users upgrading from v0.1.3 must use a complete Windows ZIP.
+From v0.2.0 onward, compatible releases may use the built-in incremental update flow.
 No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
-$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHYwLjIuMCBXaW5kb3dzIDEwLzExIHg2NAoKMS4g6Kej5Y6L5a6M5pW0IFpJUOOAggoyLiDlj4zlh7sgUGljYSBMaWJyYXJ5LmV4ZeOAggozLiDlnKjmtY/op4jlmajkuK3lrozmiJDpppbmrKHorr7nva7jgIIKNC4g5Y+v5Zyo6K6+572u5Lit5L2/55So5ZCM5q2l44CB5LiL6L2944CB5bey5LiL6L295ryr55S744CB6ZiF6K+75Zmo5LiO5pu05paw5Yqf6IO944CCCgrku44gdjAuMS4zIOWNh+e6p+W/hemhu+S4i+i9veW5tuino+WOi+WujOaVtOeahCB2MC4yLjAgV2luZG93cyBaSVDjgIIK5LuOIHYwLjIuMCDotbfvvIzlkI7nu63lhbzlrrnniYjmnKzlj6/kvb/nlKjlhoXnva7lop7ph4/mm7TmlrDmtYHnqIvjgIIK5peg6ZyA5Y2V54us5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBt44CBR2l0IOaIlueuoeeQhuWRmOadg+mZkOOAgg=='
-$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64))
+$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 

@@ -113,18 +113,8 @@ No separate Node.js, npm, pnpm, Git, terminal, or administrator access is requir
 This unsigned open-source build may show a Windows SmartScreen reputation warning.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
-$readmeZh = @"
-Pica Library v$version Windows 10/11 x64
-
-1. 完整解压 ZIP。
-2. 双击 Pica Library.exe。
-3. 在浏览器中完成首次设置。
-4. 设置完成后同步收藏，即可使用漫画库、推荐、下载和阅读。
-
-v0.2.0 用户可使用内置软件更新安装兼容的 v0.3.0 增量包。
-v0.1.x 用户请下载并解压完整 Windows ZIP。
-无需安装 Node.js、npm、pnpm 或 Git，也无需管理员权限。
-"@
+$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 

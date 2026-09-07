@@ -19,14 +19,15 @@ public class PairingActivity extends Activity {
     @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(Ui.BG);render();handleDeepLink(getIntent().getData());}
 
     private void render(){
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(Ui.dp(this,22),Ui.dp(this,24),Ui.dp(this,22),Ui.dp(this,24));root.setBackgroundColor(Ui.BG);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
+        root.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(Ui.dp(this,22),insets.getSystemWindowInsetTop()+Ui.dp(this,18),Ui.dp(this,22),insets.getSystemWindowInsetBottom()+Ui.dp(this,18));return insets;});
         root.addView(Ui.text(this,"连接 Pica Library",28,Ui.TEXT,true));Ui.gap(root,this,8);
         root.addView(Ui.text(this,"确保手机和电脑连接同一 Wi‑Fi。在电脑 Pica Library → Settings → 手机连接 中查看地址和 6 位配对码。",14,Ui.MUTED,false));Ui.gap(root,this,18);
         host=new EditText(this);host.setHint("电脑地址，例如 http://192.168.1.12:7788");host.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);host.setText(BridgeStore.host(this));root.addView(host);
         code=new EditText(this);code.setHint("6 位配对码");code.setInputType(InputType.TYPE_CLASS_NUMBER);root.addView(code);
         status=Ui.text(this,"",13,Ui.MUTED,false);root.addView(status);
         Button pair=new Button(this);pair.setText("连接电脑");pair.setAllCaps(false);pair.setOnClickListener(v->pair());root.addView(pair);
-        if(BridgeStore.paired(this)){Ui.gap(root,this,12);Button clear=new Button(this);clear.setText("解除配对");clear.setAllCaps(false);clear.setOnClickListener(v->{BridgeStore.clear(this);finish();});root.addView(clear);}setContentView(root);
+        if(BridgeStore.paired(this)){Ui.gap(root,this,12);Button clear=new Button(this);clear.setText("解除配对");clear.setAllCaps(false);clear.setOnClickListener(v->{BridgeStore.clear(this);finish();});root.addView(clear);}setContentView(root);root.requestApplyInsets();
     }
 
     private void pair(){

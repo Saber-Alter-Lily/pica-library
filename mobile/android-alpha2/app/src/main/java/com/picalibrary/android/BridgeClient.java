@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -18,10 +19,10 @@ import java.util.List;
 
 final class BridgeClient {
     static final class ComicItem {
-        final String id, title, author;
+        final String id, title, author, coverPath;
         final int downloadedPictures;
-        ComicItem(String id, String title, String author, int downloadedPictures) {
-            this.id=id; this.title=title; this.author=author; this.downloadedPictures=downloadedPictures;
+        ComicItem(String id, String title, String author, String coverPath, int downloadedPictures) {
+            this.id=id; this.title=title; this.author=author; this.coverPath=coverPath; this.downloadedPictures=downloadedPictures;
         }
     }
     static final class ChapterItem {
@@ -52,34 +53,45 @@ final class BridgeClient {
     private static HttpURLConnection open(String host, String path, String token, String method) throws Exception {
         URL url = new URL(host.replaceAll("/$", "") + path);
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
-        con.setConnectTimeout(3500);
+        con.setConnectTimeout(2500);
         con.setReadTimeout(12000);
         con.setRequestMethod(method);
         con.setRequestProperty("Accept", "application/json");
+        con.setUseCaches(false);
         if (token != null && !token.isEmpty()) con.setRequestProperty("Authorization", "Bearer " + token);
         return con;
     }
 
     private static String read(HttpURLConnection con) throws Exception {
-        int status=con.getResponseCode();
-        InputStream stream=status>=400?con.getErrorStream():con.getInputStream();
-        if(stream==null) throw new IllegalStateException("HTTP " + status);
-        BufferedReader r=new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
-        StringBuilder b=new StringBuilder(); String line;
-        while((line=r.readLine())!=null)b.append(line);
-        if(status>=400) throw new IllegalStateException("HTTP " + status + ": " + b);
-        return b.toString();
+        try {
+            int status=con.getResponseCode();
+            InputStream stream=status>=400?con.getErrorStream():con.getInputStream();
+            if(stream==null) throw new IllegalStateException("HTTP " + status);
+            BufferedReader r=new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+            StringBuilder b=new StringBuilder(); String line;
+            while((line=r.readLine())!=null)b.append(line);
+            if(status>=400) throw new IllegalStateException("HTTP " + status + ": " + b);
+            return b.toString();
+        } catch (SocketTimeoutException e) {
+            throw new IllegalStateException("Desktop 响应超时");
+        } finally {
+            con.disconnect();
+        }
     }
 
     static String get(Context c, String path) throws Exception {
         String host=BridgeStore.host(c);
-        if(host.isEmpty()) throw new IllegalStateException("not paired");
+        if(host.isEmpty()) throw new IllegalStateException("尚未配对 Desktop");
         return read(open(host,path,BridgeStore.token(c),"GET"));
+    }
+
+    static JSONObject device(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/device"));
     }
 
     static String post(Context c, String path, JSONObject value) throws Exception {
         String host=BridgeStore.host(c);
-        if(host.isEmpty()) throw new IllegalStateException("not paired");
+        if(host.isEmpty()) throw new IllegalStateException("尚未配对 Desktop");
         HttpURLConnection con=open(host,path,BridgeStore.token(c),"POST");
         con.setDoOutput(true); con.setRequestProperty("Content-Type","application/json; charset=utf-8");
         try(OutputStream out=con.getOutputStream()){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}
@@ -102,7 +114,13 @@ final class BridgeClient {
         List<ComicItem> out=new ArrayList<>();
         if(items!=null) for(int i=0;i<items.length();i++){
             JSONObject o=items.optJSONObject(i); if(o==null)continue;
-            out.add(new ComicItem(o.optString("comicId"),o.optString("title","未命名漫画"),o.optString("author","未知作者"),o.optInt("downloadedPictures",0)));
+            out.add(new ComicItem(
+                o.optString("comicId"),
+                o.optString("title","未命名漫画"),
+                o.optString("author","未知作者"),
+                o.optString("coverPath","/mobile/v1/covers/"+o.optString("comicId")),
+                o.optInt("downloadedPictures",0)
+            ));
         }
         return out;
     }
@@ -131,14 +149,21 @@ final class BridgeClient {
     }
 
     static Bitmap bitmap(Context c,String relative) throws Exception {
-        String host=BridgeStore.host(c); if(host.isEmpty())throw new IllegalStateException("not paired");
+        String host=BridgeStore.host(c); if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");
         HttpURLConnection con=open(host,relative,BridgeStore.token(c),"GET");
+        con.setReadTimeout(15000);
         con.setRequestProperty("Accept","image/*");
-        int status=con.getResponseCode(); if(status>=400)throw new IllegalStateException("HTTP "+status);
-        try(InputStream in=con.getInputStream()){
-            Bitmap bitmap=BitmapFactory.decodeStream(in);
-            if(bitmap==null)throw new IllegalStateException("图片解码失败");
-            return bitmap;
+        try {
+            int status=con.getResponseCode(); if(status>=400)throw new IllegalStateException("HTTP "+status);
+            try(InputStream in=con.getInputStream()){
+                Bitmap bitmap=BitmapFactory.decodeStream(in);
+                if(bitmap==null)throw new IllegalStateException("图片解码失败");
+                return bitmap;
+            }
+        } catch (SocketTimeoutException e) {
+            throw new IllegalStateException("图片读取超时");
+        } finally {
+            con.disconnect();
         }
     }
 

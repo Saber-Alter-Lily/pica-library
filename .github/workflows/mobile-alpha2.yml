@@ -63,6 +63,17 @@ jobs:
         run: node scripts/apply-mobile-alpha2-patch.mjs
       - name: Mobile Bridge unit test
         run: pnpm exec vitest run test/unit/mobile-bridge.test.ts
+      - name: Restore accepted v0.2.0 launcher base
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $url = 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.2.0/Pica-Library-v0.2.0-windows-x64.zip'
+          $file = 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
+          $sha = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '219d853bad6c0193adfcae2837c54f3bc72644aab664d1dae55c55259682d75e') {
+            throw "v0.2.0 launcher base SHA mismatch: $sha"
+          }
       - run: pnpm build:windows
       - name: Rename candidate
         shell: powershell

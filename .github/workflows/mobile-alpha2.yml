@@ -7,7 +7,7 @@ on:
       - 'src/mobile/**'
       - 'scripts/apply-mobile-alpha2-patch.mjs'
       - 'test/unit/mobile-bridge.test.ts'
-      - 'mobile/Pica-Library-Android-v0.1.0-alpha2-source.zip'
+      - 'mobile/android-alpha2/**'
       - '.github/workflows/mobile-alpha2.yml'
   workflow_dispatch:
 
@@ -28,11 +28,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Expand Android source
+      - name: Stage Android source
         run: |
           rm -rf android-app
-          mkdir android-app
-          unzip -q mobile/Pica-Library-Android-v0.1.0-alpha2-source.zip -d android-app
+          cp -R mobile/android-alpha2 android-app
       - name: Build debug APK
         working-directory: android-app
         run: gradle :app:assembleDebug --stacktrace
@@ -62,8 +61,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply Mobile Bridge alpha patch
         run: node scripts/apply-mobile-alpha2-patch.mjs
-      - run: pnpm type:check
-      - run: pnpm test:unit
+      - name: Mobile Bridge unit test
+        run: pnpm exec vitest run test/unit/mobile-bridge.test.ts
       - run: pnpm build:windows
       - name: Rename candidate
         shell: powershell

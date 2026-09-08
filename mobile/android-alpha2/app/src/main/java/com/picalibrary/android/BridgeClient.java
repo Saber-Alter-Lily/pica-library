@@ -57,6 +57,15 @@ final class BridgeClient {
         final String id, title, author, reason;
         RecommendationItem(String id,String title,String author,String reason){this.id=id;this.title=title;this.author=author;this.reason=reason;}
     }
+    static final class RecommendationBatch {
+        final List<RecommendationItem> items;
+        final String source;
+        final boolean cached;
+        final int batchIndex, maxVisibleBatches;
+        RecommendationBatch(List<RecommendationItem> items,String source,boolean cached,int batchIndex,int maxVisibleBatches){
+            this.items=items;this.source=source;this.cached=cached;this.batchIndex=batchIndex;this.maxVisibleBatches=maxVisibleBatches;
+        }
+    }
 
     private static HttpURLConnection open(String host, String path, String token, String method) throws Exception {
         URL url = new URL(host.replaceAll("/$", "") + path);
@@ -201,6 +210,10 @@ final class BridgeClient {
     }
 
     static List<RecommendationItem> recommendations(Context c,int limit) throws Exception {
+        return recommendationBatch(c,limit).items;
+    }
+
+    static RecommendationBatch recommendationBatch(Context c,int limit) throws Exception {
         JSONObject root=new JSONObject(get(c,"/mobile/v1/recommendations?limit="+limit));
         JSONArray arr=root.optJSONArray("recommendations"); List<RecommendationItem> out=new ArrayList<>();
         if(arr!=null) for(int i=0;i<arr.length();i++){
@@ -210,7 +223,7 @@ final class BridgeClient {
             if(reasons!=null&&reasons.length()>0)reason=reasons.optString(0,reason);
             out.add(new RecommendationItem(comic.optString("comicId"),comic.optString("title","未命名漫画"),comic.optString("author","未知作者"),reason));
         }
-        return out;
+        return new RecommendationBatch(out,root.optString("source",""),root.optBoolean("cached",false),root.optInt("batchIndex",-1),root.optInt("maxVisibleBatches",0));
     }
 
     static JSONObject atlas(Context c) throws Exception { return new JSONObject(get(c,"/mobile/v1/atlas")); }

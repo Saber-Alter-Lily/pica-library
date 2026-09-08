@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.concurrent.*;
 
-/** Disk cache contains encoded pages; decoded images belong only to visible holders. */
+/** Persistent encoded-page cache shared by Desktop/WebDAV and future online reader sources. */
 final class ReaderImages implements AutoCloseable {
     interface Callback { void complete(Bitmap bitmap); void failed(); }
     static final class Request {
@@ -24,17 +24,20 @@ final class ReaderImages implements AutoCloseable {
             if (future != null) future.cancel(true);
         }
     }
-    private final ExecutorService workers = Executors.newFixedThreadPool(3);
+    private final ExecutorService workers = Executors.newFixedThreadPool(4);
     private final Handler main = new Handler(Looper.getMainLooper());
     private final File cache;
     private final ReaderSource source;
     private volatile boolean closed;
-    private static final long LIMIT = 256L * 1024 * 1024;
+    private static final long LIMIT = 1024L * 1024 * 1024;
+    private static final String ROOT = "reader-pages-v2";
+
     ReaderImages(Context context, ReaderSource source) {
         this.source = source;
-        cache = new File(context.getCacheDir(), "reader-pages/" + source.scope());
+        cache = new File(context.getFilesDir(), ROOT + "/" + source.scope());
         cache.mkdirs();
     }
+
     Request load(String path, int width, Callback callback) {
         Request request = new Request();
         request.future = workers.submit(() -> {
@@ -82,12 +85,21 @@ final class ReaderImages implements AutoCloseable {
         });
         return request;
     }
+
     private synchronized void trim(File active) {
-        File[] files = cache.listFiles(file -> !file.getName().endsWith(".part"));
-        if (files == null) return;
-        Arrays.sort(files, Comparator.comparingLong(File::lastModified));
-        long total = 0; for (File file : files) total += file.length();
-        for (File file : files) if (total > LIMIT && !file.equals(active)) { long n = file.length(); if (file.delete()) total -= n; }
+        File root=cache.getParentFile();
+        File[] scopes=root==null?null:root.listFiles(File::isDirectory);
+        if(scopes==null)return;
+        java.util.ArrayList<File> files=new java.util.ArrayList<>();
+        for(File scope:scopes){File[] nested=scope.listFiles(file -> file.isFile()&&!file.getName().endsWith(".part"));if(nested!=null)files.addAll(Arrays.asList(nested));}
+        files.sort(Comparator.comparingLong(File::lastModified));
+        long total=0;for(File file:files)total+=file.length();
+        for(File file:files)if(total>LIMIT&&!file.equals(active)){long n=file.length();if(file.delete())total-=n;}
     }
+
+    static long cacheBytes(Context context){return bytes(new File(context.getFilesDir(),ROOT));}
+    private static long bytes(File file){if(file==null||!file.exists())return 0;if(file.isFile())return file.length();long total=0;File[] children=file.listFiles();if(children!=null)for(File child:children)total+=bytes(child);return total;}
+    static void clearCache(Context context){delete(new File(context.getFilesDir(),ROOT));}
+    private static void delete(File file){if(file==null||!file.exists())return;if(file.isDirectory()){File[] children=file.listFiles();if(children!=null)for(File child:children)delete(child);}file.delete();}
     public void close() { closed = true; workers.shutdownNow(); }
 }

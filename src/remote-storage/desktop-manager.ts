@@ -7,29 +7,15 @@ import {
     saveRemoteStorageConfig
 } from './config'
 import { createRemoteStorageProvider } from './factory'
-import {
-    RemoteLibrarySyncService,
-    type RemoteSyncProgress
-} from './sync-service'
+import { RemoteLibrarySyncService } from './sync-service'
 import type { RemoteStoragePublicConfig } from './types'
 
 export class RemoteStorageDesktopManager {
     private publicConfig: RemoteStoragePublicConfig | null
     private credentials: StoredCredentials | null
-    private activeSync: Promise<unknown> | null = null
-    private syncProgress: RemoteSyncProgress = {
+    private syncProgress: Record<string, unknown> = {
         phase: 'idle',
-        updatedAt: new Date().toISOString(),
-        totalComics: 0,
-        completedComics: 0,
-        currentComicIndex: 0,
-        currentComicTitle: '',
-        currentComicPages: 0,
-        currentComicCompletedPages: 0,
-        totalPages: 0,
-        completedPages: 0,
-        uploadedObjects: 0,
-        uploadedBytes: 0
+        updatedAt: new Date().toISOString()
     }
 
     constructor(
@@ -45,7 +31,6 @@ export class RemoteStorageDesktopManager {
     }
 
     status() {
-        const syncProgress = { ...this.syncProgress }
         return this.publicConfig
             ? {
                   configured: true,
@@ -54,12 +39,12 @@ export class RemoteStorageDesktopManager {
                       this.credentials?.remoteStorageUsername ||
                           this.credentials?.remoteStoragePassword
                   ),
-                  syncProgress
+                  syncProgress: this.syncProgress
               }
             : {
                   configured: false,
                   kind: 'webdav' as const,
-                  syncProgress
+                  syncProgress: this.syncProgress
               }
     }
 
@@ -113,17 +98,15 @@ export class RemoteStorageDesktopManager {
         }
     }
 
-    private syncService(
-        input: Record<string, unknown>,
-        onProgress?: (progress: RemoteSyncProgress) => void
-    ) {
+    private syncService(input: Record<string, unknown>) {
         const { provider } = this.provider(input)
         return new RemoteLibrarySyncService(
             this.database,
             this.dataDir,
             provider,
-            onProgress,
-            4
+            (progress) => {
+                this.syncProgress = progress as unknown as Record<string, unknown>
+            }
         )
     }
 
@@ -153,18 +136,47 @@ export class RemoteStorageDesktopManager {
         return { success: true, remoteStorage: this.status() }
     }
 
+    private portableShelves() {
+        return {
+            schemaVersion: 1,
+            updatedAt: new Date().toISOString(),
+            shelves: this.database.listShelves().map((shelf) => ({
+                id: shelf.id,
+                name: shelf.name,
+                createdAt: shelf.createdAt,
+                updatedAt: shelf.updatedAt,
+                sortOrder: shelf.sortOrder,
+                items: this.database.listShelfComics(shelf.id).map((comic) => ({
+                    comicId: comic.comicId,
+                    title: comic.title,
+                    author: comic.author,
+                    canonicalAuthor: comic.canonicalAuthor,
+                    tags: comic.tags,
+                    categories: comic.categories,
+                    downloadedPictures: comic.downloadedPictures,
+                    knownPictures: comic.knownPictures,
+                    updatedAt: comic.updatedAt
+                }))
+            }))
+        }
+    }
+
     async sync(input: Record<string, unknown>) {
-        if (this.activeSync) throw new Error('远程同步已经在进行中')
         this.save(input)
         await this.test(input)
-        const task = this.syncService(input, (progress) => {
-            this.syncProgress = progress
-        }).sync()
-        this.activeSync = task
-        try {
-            return await task
-        } finally {
-            this.activeSync = null
-        }
+        const { provider } = this.provider(input)
+        // Shelf classification is portable metadata. Publish it independently of
+        // page upload progress so Android can import the web bookshelf even when
+        // a long first comic sync is still running.
+        await provider.putJson('v1/state/shelves.json', this.portableShelves())
+        const service = new RemoteLibrarySyncService(
+            this.database,
+            this.dataDir,
+            provider,
+            (progress) => {
+                this.syncProgress = progress as unknown as Record<string, unknown>
+            }
+        )
+        return await service.sync()
     }
 }

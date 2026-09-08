@@ -10,8 +10,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 7
-        versionName '0.1.0-alpha7-cloud'
+        versionCode 8
+        versionName '0.1.0-alpha7-cloud-run22'
     }
 
     buildTypes {

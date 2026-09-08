@@ -7,12 +7,30 @@ import {
     saveRemoteStorageConfig
 } from './config'
 import { createRemoteStorageProvider } from './factory'
-import { RemoteLibrarySyncService } from './sync-service'
+import {
+    RemoteLibrarySyncService,
+    type RemoteSyncProgress
+} from './sync-service'
 import type { RemoteStoragePublicConfig } from './types'
 
 export class RemoteStorageDesktopManager {
     private publicConfig: RemoteStoragePublicConfig | null
     private credentials: StoredCredentials | null
+    private activeSync: Promise<unknown> | null = null
+    private syncProgress: RemoteSyncProgress = {
+        phase: 'idle',
+        updatedAt: new Date().toISOString(),
+        totalComics: 0,
+        completedComics: 0,
+        currentComicIndex: 0,
+        currentComicTitle: '',
+        currentComicPages: 0,
+        currentComicCompletedPages: 0,
+        totalPages: 0,
+        completedPages: 0,
+        uploadedObjects: 0,
+        uploadedBytes: 0
+    }
 
     constructor(
         private readonly configFile: string,
@@ -27,6 +45,7 @@ export class RemoteStorageDesktopManager {
     }
 
     status() {
+        const syncProgress = { ...this.syncProgress }
         return this.publicConfig
             ? {
                   configured: true,
@@ -34,9 +53,14 @@ export class RemoteStorageDesktopManager {
                   credentialsConfigured: Boolean(
                       this.credentials?.remoteStorageUsername ||
                           this.credentials?.remoteStoragePassword
-                  )
+                  ),
+                  syncProgress
               }
-            : { configured: false, kind: 'webdav' as const }
+            : {
+                  configured: false,
+                  kind: 'webdav' as const,
+                  syncProgress
+              }
     }
 
     private selection(input: Record<string, unknown>) {
@@ -89,12 +113,17 @@ export class RemoteStorageDesktopManager {
         }
     }
 
-    private syncService(input: Record<string, unknown>) {
+    private syncService(
+        input: Record<string, unknown>,
+        onProgress?: (progress: RemoteSyncProgress) => void
+    ) {
         const { provider } = this.provider(input)
         return new RemoteLibrarySyncService(
             this.database,
             this.dataDir,
-            provider
+            provider,
+            onProgress,
+            4
         )
     }
 
@@ -125,8 +154,17 @@ export class RemoteStorageDesktopManager {
     }
 
     async sync(input: Record<string, unknown>) {
+        if (this.activeSync) throw new Error('远程同步已经在进行中')
         this.save(input)
         await this.test(input)
-        return await this.syncService(input).sync()
+        const task = this.syncService(input, (progress) => {
+            this.syncProgress = progress
+        }).sync()
+        this.activeSync = task
+        try {
+            return await task
+        } finally {
+            this.activeSync = null
+        }
     }
 }

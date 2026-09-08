@@ -1,0 +1,99 @@
+name: Alpha 7 Cloud Mobile
+
+on:
+  push:
+    branches: [alpha7-cloud-mobile]
+    paths:
+      - 'src/remote-storage/**'
+      - 'src/desktop/**'
+      - 'src/mobile/**'
+      - 'web/**'
+      - 'mobile/android-alpha2/**'
+      - 'scripts/apply-alpha7-integration.mjs'
+      - 'scripts/apply-mobile-alpha2-patch.mjs'
+      - 'scripts/apply-mobile-recommendation-cache-patch.mjs'
+      - '.github/workflows/alpha7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply Alpha7 integration
+        run: node scripts/apply-alpha7-integration.mjs
+      - name: Type check
+        run: pnpm type:check
+      - name: Web syntax check
+        run: pnpm web:check && node --check web/alpha7-cloud.js
+      - name: Mobile Bridge tests
+        run: pnpm exec vitest run test/unit/mobile-bridge.test.ts
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build Android source smoke test
+        working-directory: mobile/android-alpha2
+        run: gradle :app:assembleDebug --stacktrace
+
+  windows:
+    runs-on: windows-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply Alpha7 integration
+        run: node scripts/apply-alpha7-integration.mjs
+      - name: Restore accepted launcher base
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $url = 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.2.0/Pica-Library-v0.2.0-windows-x64.zip'
+          $file = 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
+          $sha = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '219d853bad6c0193adfcae2837c54f3bc72644aab664d1dae55c55259682d75e') { throw "launcher base SHA mismatch: $sha" }
+      - run: pnpm build:windows
+      - name: Prepare Alpha7 Windows artifact
+        shell: powershell
+        run: |
+          Copy-Item artifacts\Pica-Library-v0.3.0-windows-x64.zip artifacts\Pica-Library-v0.3.0-alpha7-cloud-windows-x64.zip
+          $sha = (Get-FileHash artifacts\Pica-Library-v0.3.0-alpha7-cloud-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sha  Pica-Library-v0.3.0-alpha7-cloud-windows-x64.zip" | Set-Content artifacts\Pica-Library-v0.3.0-alpha7-cloud-windows-x64.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Windows-Alpha7-Cloud
+          path: |
+            artifacts/Pica-Library-v0.3.0-alpha7-cloud-windows-x64.zip
+            artifacts/Pica-Library-v0.3.0-alpha7-cloud-windows-x64.sha256
+          retention-days: 7

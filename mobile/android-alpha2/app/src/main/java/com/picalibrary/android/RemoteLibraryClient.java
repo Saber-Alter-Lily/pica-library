@@ -37,20 +37,14 @@ final class RemoteLibraryClient {
     JSONObject episode(String manifestPath) throws Exception {return json(manifestPath);}
     Bitmap bitmap(String path) throws Exception {HttpURLConnection c=open(path,"image/*");try{int status=c.getResponseCode();if(status>=400)throw new IllegalStateException("WebDAV HTTP "+status);try(InputStream in=c.getInputStream()){Bitmap b=BitmapFactory.decodeStream(in);if(b==null)throw new IllegalStateException("图片解码失败");return b;}}finally{c.disconnect();}}
     boolean test() throws Exception {
-        // Android's HttpURLConnection implementation rejects WebDAV-only verbs such as
-        // PROPFIND before the request reaches the server. The mobile client does not need
-        // directory enumeration: all cloud objects are addressed through manifests.
-        // Probe the configured collection with standard HTTP verbs instead.
-        HttpURLConnection c=open("","*/*");
-        c.setRequestMethod("HEAD");
+        // A brand-new WebDAV account may not contain PicaLibrary yet. Probe the
+        // manifest path with ordinary GET: 404 means the endpoint and credentials
+        // are usable but the first Desktop sync has not initialized the library.
+        HttpURLConnection c=open("v1/control/current.json","application/json");
+        c.setRequestMethod("GET");
         try {
             int s=c.getResponseCode();
-            if(s>=200&&s<400)return true;
-            if(s!=405&&s!=501)return false;
+            return s==404||(s>=200&&s<400);
         } finally { c.disconnect(); }
-        HttpURLConnection fallback=open("","*/*");
-        fallback.setRequestMethod("GET");
-        try { int s=fallback.getResponseCode();return s>=200&&s<400; }
-        finally { fallback.disconnect(); }
     }
 }

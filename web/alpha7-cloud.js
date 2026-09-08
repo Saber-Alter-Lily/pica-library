@@ -78,14 +78,15 @@ function renderPlan(plan) {
     list.innerHTML = ''
     for (const comic of (plan.comics || [])
         .filter((item) => item.action !== 'unchanged')
-        .slice(0, 80)) {
+        .slice(0, 120)) {
         const row = document.createElement('div')
         row.className = 'list-item'
+        const detail = comic.action === 'skip'
+            ? `跳过 · ${escapeHtml(comic.reason || '本地文件不完整')}`
+            : `${comic.action === 'update' ? '更新' : '新增'} · ${comic.pages || 0} 页 · ${bytes(comic.bytes)}`
         row.innerHTML = `<div class="grow"><strong>${escapeHtml(
             comic.title || comic.comicId
-        )}</strong><p>${comic.action === 'update' ? '更新' : '新增'} · ${
-            comic.pages || 0
-        } 页 · ${bytes(comic.bytes)}</p></div>`
+        )}</strong><p>${detail}</p></div>`
         list.appendChild(row)
     }
 }
@@ -141,10 +142,12 @@ $('#remote-plan')?.addEventListener('click', async () => {
             formValue('plan')
         )
         renderPlan(result)
+        const skipped = Number(result.skippedComicCount || 0)
         message(
             `扫描完成：${result.uploadComicCount || 0} 部需要上传/更新，预计 ${bytes(
                 result.uploadBytes
-            )}。`
+            )}${skipped ? `；${skipped} 部因本地文件不完整将跳过。` : '。'}`,
+            false
         )
     } catch (error) {
         message(`扫描失败：${error.message}`, true)
@@ -154,7 +157,7 @@ $('#remote-plan')?.addEventListener('click', async () => {
 $('#remote-sync')?.addEventListener('click', async () => {
     if (
         !confirm(
-            '开始增量同步？云端已有但电脑当前没有的漫画会保留，不会自动删除。'
+            '开始增量同步？云端已有但电脑当前没有的漫画会保留；本地文件不完整的漫画会跳过，不会自动删除云端内容。'
         )
     )
         return
@@ -164,10 +167,11 @@ $('#remote-sync')?.addEventListener('click', async () => {
     try {
         const result = await post('/api/v1/desktop/settings', formValue('sync'))
         $('#remote-password').value = ''
+        const skipped = Number(result.skippedComicCount || 0)
         message(
             `同步完成 · 云端 ${result.comicCount || 0} 部 · 上传 ${
                 result.uploadedObjects || 0
-            } 个对象 · ${bytes(result.uploadedBytes)}。`
+            } 个对象 · ${bytes(result.uploadedBytes)}${skipped ? ` · 跳过 ${skipped} 部本地文件不完整漫画` : ''}。`
         )
         $('#remote-sync-plan').hidden = true
         await load()

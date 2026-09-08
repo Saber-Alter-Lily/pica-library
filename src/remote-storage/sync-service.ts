@@ -27,6 +27,8 @@ interface LocalComic {
     cover?: { file: string; path: string; sha256: string; bytes: number; contentType: string }
     episodes: LocalEpisode[]
 }
+interface LocalIssue { comicId: string; title: string; reason: string }
+interface LocalScan { comics: LocalComic[]; issues: LocalIssue[]; localIds: Set<string>; total: number }
 
 export interface RemoteSyncPlan {
     schemaVersion: 1
@@ -36,15 +38,18 @@ export interface RemoteSyncPlan {
     remoteComicCount: number
     uploadComicCount: number
     unchangedComicCount: number
+    skippedComicCount: number
     retainedRemoteOnlyCount: number
     uploadPages: number
     uploadBytes: number
+    issues: LocalIssue[]
     comics: Array<{
         comicId: string
         title: string
-        action: 'upload' | 'update' | 'unchanged'
+        action: 'upload' | 'update' | 'unchanged' | 'skip'
         pages: number
         bytes: number
+        reason?: string
     }>
 }
 
@@ -69,11 +74,11 @@ export class RemoteLibrarySyncService {
     private safeFile(file: string) {
         const resolved = path.resolve(file)
         if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile())
-            throw new Error(`Local comic file is unavailable: ${path.basename(file)}`)
+            throw new Error(`本地文件缺失：${path.basename(file)}`)
         const real = fs.realpathSync(resolved)
         const relative = path.relative(this.root, real)
         if (relative.startsWith('..') || path.isAbsolute(relative))
-            throw new Error('Remote sync file escaped the Library root')
+            throw new Error('本地图片不在当前 Library 目录内')
         return real
     }
 
@@ -88,7 +93,7 @@ export class RemoteLibrarySyncService {
                 const file = this.safeFile(picture.localPath)
                 const extension = path.extname(file).toLowerCase()
                 const contentType = imageTypes[extension]
-                if (!contentType) throw new Error('Remote sync encountered an unsafe image type')
+                if (!contentType) throw new Error('发现不支持的本地图片类型')
                 const digest = hashFile(file)
                 return {
                     file,
@@ -167,11 +172,26 @@ export class RemoteLibrarySyncService {
         }
     }
 
-    private localLibrary() {
-        return this.query.query({ scope: 'downloaded', limit: 5000, offset: 0 }).items.flatMap((comic) => {
-            const value = this.localComic(comic.comicId)
-            return value ? [value] : []
-        })
+    private localLibrary(): LocalScan {
+        const summaries = this.query.query({ scope: 'downloaded', limit: 5000, offset: 0 }).items
+        const comics: LocalComic[] = []
+        const issues: LocalIssue[] = []
+        const localIds = new Set<string>()
+        for (const summary of summaries) {
+            localIds.add(summary.comicId)
+            try {
+                const value = this.localComic(summary.comicId)
+                if (value) comics.push(value)
+                else issues.push({ comicId: summary.comicId, title: summary.title, reason: '没有可同步的本地章节文件' })
+            } catch (error) {
+                issues.push({
+                    comicId: summary.comicId,
+                    title: summary.title,
+                    reason: error instanceof Error ? error.message : String(error)
+                })
+            }
+        }
+        return { comics, issues, localIds, total: summaries.length }
     }
 
     private async remoteCatalog() {
@@ -207,7 +227,8 @@ export class RemoteLibrarySyncService {
     }
 
     async plan(): Promise<RemoteSyncPlan> {
-        const local = this.localLibrary()
+        const scan = this.localLibrary()
+        const local = scan.comics
         const remoteCatalog = await this.remoteCatalog()
         const remoteById = new Map((remoteCatalog?.comics ?? []).map((comic) => [comic.comicId, comic]))
         const comics: RemoteSyncPlan['comics'] = []
@@ -226,25 +247,37 @@ export class RemoteLibrarySyncService {
                 bytes
             })
         }
-        const localIds = new Set(local.map((comic) => comic.entry.comicId))
+        for (const issue of scan.issues) comics.push({
+            comicId: issue.comicId,
+            title: issue.title,
+            action: 'skip',
+            pages: 0,
+            bytes: 0,
+            reason: issue.reason
+        })
         return {
             schemaVersion: 1,
             mode: 'additive',
             generatedAt: new Date().toISOString(),
-            localComicCount: local.length,
+            localComicCount: scan.total,
             remoteComicCount: remoteCatalog?.comics.length ?? 0,
-            uploadComicCount: comics.filter((comic) => comic.action !== 'unchanged').length,
+            uploadComicCount: comics.filter((comic) => comic.action === 'upload' || comic.action === 'update').length,
             unchangedComicCount,
-            retainedRemoteOnlyCount: (remoteCatalog?.comics ?? []).filter((comic) => !localIds.has(comic.comicId)).length,
+            skippedComicCount: scan.issues.length,
+            retainedRemoteOnlyCount: (remoteCatalog?.comics ?? []).filter((comic) => !scan.localIds.has(comic.comicId)).length,
             uploadPages,
             uploadBytes,
+            issues: scan.issues,
             comics
         }
     }
 
     async sync() {
-        const local = this.localLibrary()
+        const scan = this.localLibrary()
+        const local = scan.comics
         const previous = await this.remoteCatalog()
+        if (!local.length && !previous)
+            throw new Error(`没有完整可同步的漫画；${scan.issues.length} 部存在本地文件问题，请先修复或重新下载`)
         const previousById = new Map((previous?.comics ?? []).map((comic) => [comic.comicId, comic]))
         const entries = new Map(previousById)
         let uploadedObjects = 0, uploadedBytes = 0
@@ -297,7 +330,9 @@ export class RemoteLibrarySyncService {
             comicCount: catalog.comics.length,
             uploadedObjects,
             uploadedBytes,
-            retainedRemoteOnlyCount: catalog.comics.length - local.length
+            skippedComicCount: scan.issues.length,
+            issues: scan.issues,
+            retainedRemoteOnlyCount: catalog.comics.filter((comic) => !scan.localIds.has(comic.comicId)).length
         }
     }
 }

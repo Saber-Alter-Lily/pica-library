@@ -14,6 +14,8 @@ export interface StoredCredentials {
     password: string
     proxyUsername?: string
     proxyPassword?: string
+    remoteStorageUsername?: string
+    remoteStoragePassword?: string
 }
 
 export interface SetupInput {

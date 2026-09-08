@@ -70,6 +70,8 @@ export interface RemoteComicManifest {
     title: string
     author: string
     coverPath?: string
+    coverSha256?: string
+    coverBytes?: number
     generatedAt: string
     episodes: RemoteComicEpisodeEntry[]
 }

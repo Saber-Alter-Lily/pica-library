@@ -27,7 +27,7 @@ final class RemoteLibraryClient {
     String scope(){try{byte[] raw=MessageDigest.getInstance("SHA-256").digest((config.baseUrl+"\n"+config.root+"\n"+config.username).getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:raw)out.append(String.format(Locale.ROOT,"%02x",b));return out.toString();}catch(Exception e){return config.baseUrl+"/"+config.root;}}
     private URL url(String path) throws Exception {String p=path==null?"":path.replaceAll("^/+","");return new URL(config.baseUrl+"/"+config.root+"/"+p);}
     HttpURLConnection open(String path,String accept) throws Exception {
-        HttpURLConnection c=(HttpURLConnection)url(path).openConnection();c.setConnectTimeout(7000);c.setReadTimeout(20000);c.setUseCaches(true);c.setRequestProperty("Accept",accept);
+        HttpURLConnection c=(HttpURLConnection)url(path).openConnection();c.setConnectTimeout(7000);c.setReadTimeout(20000);c.setUseCaches(true);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept",accept);
         if(!config.username.isEmpty()||!config.password.isEmpty())c.setRequestProperty("Authorization","Basic "+Base64.encodeToString((config.username+":"+config.password).getBytes(StandardCharsets.UTF_8),Base64.NO_WRAP));return c;
     }
     private String text(String path) throws Exception {HttpURLConnection c=open(path,"application/json");try{int status=c.getResponseCode();if(status>=400)throw new IllegalStateException("WebDAV HTTP "+status);try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))>0)out.write(b,0,n);return out.toString("UTF-8");}}finally{c.disconnect();}}
@@ -36,5 +36,21 @@ final class RemoteLibraryClient {
     JSONObject comic(String manifestPath) throws Exception {return json(manifestPath);}
     JSONObject episode(String manifestPath) throws Exception {return json(manifestPath);}
     Bitmap bitmap(String path) throws Exception {HttpURLConnection c=open(path,"image/*");try{int status=c.getResponseCode();if(status>=400)throw new IllegalStateException("WebDAV HTTP "+status);try(InputStream in=c.getInputStream()){Bitmap b=BitmapFactory.decodeStream(in);if(b==null)throw new IllegalStateException("图片解码失败");return b;}}finally{c.disconnect();}}
-    boolean test() throws Exception {HttpURLConnection c=open("","*/*");c.setRequestMethod("PROPFIND");c.setRequestProperty("Depth","0");try{int s=c.getResponseCode();return s==200||s==207;}finally{c.disconnect();}}
+    boolean test() throws Exception {
+        // Android's HttpURLConnection implementation rejects WebDAV-only verbs such as
+        // PROPFIND before the request reaches the server. The mobile client does not need
+        // directory enumeration: all cloud objects are addressed through manifests.
+        // Probe the configured collection with standard HTTP verbs instead.
+        HttpURLConnection c=open("","*/*");
+        c.setRequestMethod("HEAD");
+        try {
+            int s=c.getResponseCode();
+            if(s>=200&&s<400)return true;
+            if(s!=405&&s!=501)return false;
+        } finally { c.disconnect(); }
+        HttpURLConnection fallback=open("","*/*");
+        fallback.setRequestMethod("GET");
+        try { int s=fallback.getResponseCode();return s>=200&&s<400; }
+        finally { fallback.disconnect(); }
+    }
 }

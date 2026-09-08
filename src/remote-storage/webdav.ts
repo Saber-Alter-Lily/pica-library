@@ -48,7 +48,18 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         const suffix = [this.root, path.replace(/^\/+/, '')]
             .filter(Boolean)
             .join('/')
-        return `${this.baseUrl}/${suffix}`
+        return suffix ? `${this.baseUrl}/${suffix}` : this.baseUrl
+    }
+
+    private rawUrl(path = '') {
+        const suffix = path.replace(/^\/+/, '')
+        return suffix ? `${this.baseUrl}/${suffix}` : this.baseUrl
+    }
+
+    private headers(extra?: HeadersInit) {
+        const headers = new Headers(extra)
+        if (this.authorization) headers.set('authorization', this.authorization)
+        return headers
     }
 
     private async request(
@@ -56,36 +67,35 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         init: RequestInit,
         accepted: number[]
     ) {
-        const headers = new Headers(init.headers)
-        if (this.authorization) headers.set('authorization', this.authorization)
         const response = await fetch(this.url(path), {
             ...init,
-            headers,
+            headers: this.headers(init.headers),
             signal: AbortSignal.timeout(this.timeoutMs)
         })
         if (!accepted.includes(response.status))
-            throw new Error(`WebDAV ${init.method ?? 'GET'} failed: HTTP ${response.status}`)
+            throw new Error(
+                `WebDAV ${init.method ?? 'GET'} failed: HTTP ${response.status}`
+            )
         return response
     }
 
     async test() {
-        const response = await this.request(
-            '',
-            {
-                method: 'PROPFIND',
-                headers: { depth: '0' }
-            },
-            [200, 207]
-        )
+        // Test the configured WebDAV endpoint itself. The PicaLibrary root may
+        // not exist yet; the first sync is responsible for creating it.
+        const response = await fetch(this.baseUrl, {
+            method: 'PROPFIND',
+            headers: this.headers({ depth: '0' }),
+            signal: AbortSignal.timeout(this.timeoutMs)
+        })
+        if (![200, 207].includes(response.status))
+            throw new Error(`WebDAV PROPFIND failed: HTTP ${response.status}`)
         return { success: true as const, status: response.status }
     }
 
     async exists(path: string) {
         const response = await fetch(this.url(path), {
             method: 'HEAD',
-            headers: this.authorization
-                ? { authorization: this.authorization }
-                : undefined,
+            headers: this.headers(),
             signal: AbortSignal.timeout(this.timeoutMs)
         })
         if (response.status === 404) return false
@@ -93,33 +103,33 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         if (response.status === 405) {
             const fallback = await fetch(this.url(path), {
                 method: 'PROPFIND',
-                headers: {
-                    depth: '0',
-                    ...(this.authorization
-                        ? { authorization: this.authorization }
-                        : {})
-                },
+                headers: this.headers({ depth: '0' }),
                 signal: AbortSignal.timeout(this.timeoutMs)
             })
             if (fallback.status === 404) return false
             if ([200, 207].includes(fallback.status)) return true
         }
-        throw new Error(`WebDAV existence check failed: HTTP ${response.status}`)
+        throw new Error(
+            `WebDAV existence check failed: HTTP ${response.status}`
+        )
     }
 
     async ensureDirectory(path: string) {
-        const segments = path
+        // Build both the configured root and the requested descendants from the
+        // WebDAV endpoint. This lets a brand-new account start with no
+        // PicaLibrary directory at all.
+        const segments = [this.root, path]
+            .filter(Boolean)
+            .join('/')
             .replace(/^\/+|\/+$/g, '')
             .split('/')
             .filter(Boolean)
         let current = ''
         for (const segment of segments) {
             current = current ? `${current}/${segment}` : segment
-            const response = await fetch(this.url(current), {
+            const response = await fetch(this.rawUrl(current), {
                 method: 'MKCOL',
-                headers: this.authorization
-                    ? { authorization: this.authorization }
-                    : undefined,
+                headers: this.headers(),
                 signal: AbortSignal.timeout(this.timeoutMs)
             })
             if ([201, 301, 405].includes(response.status)) continue
@@ -133,9 +143,7 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     async get(path: string): Promise<RemoteObject | null> {
         const response = await fetch(this.url(path), {
             method: 'GET',
-            headers: this.authorization
-                ? { authorization: this.authorization }
-                : undefined,
+            headers: this.headers(),
             signal: AbortSignal.timeout(this.timeoutMs)
         })
         if (response.status === 404) return null
@@ -151,13 +159,15 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
 
     async put(path: string, data: Buffer, contentType?: string) {
         const parent = path.split('/').slice(0, -1).join('/')
-        if (parent) await this.ensureDirectory(parent)
+        await this.ensureDirectory(parent)
         await this.request(
             path,
             {
                 method: 'PUT',
                 body: data,
-                headers: contentType ? { 'content-type': contentType } : undefined
+                headers: contentType
+                    ? { 'content-type': contentType }
+                    : undefined
             },
             [200, 201, 204]
         )

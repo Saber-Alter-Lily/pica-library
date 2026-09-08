@@ -26,22 +26,40 @@ function basicAuthorization(credentials: RemoteStorageCredentials) {
     return `Basic ${Buffer.from(`${credentials.username ?? ''}:${credentials.password ?? ''}`, 'utf8').toString('base64')}`
 }
 
+function sleep(ms: number) {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+function retryableStatus(status: number) {
+    return (
+        status === 408 ||
+        status === 425 ||
+        status === 429 ||
+        (status >= 500 && status <= 599)
+    )
+}
+
 export class WebDavStorageProvider implements RemoteStorageProvider {
     readonly kind = 'webdav' as const
     private readonly baseUrl: string
     private readonly root: string
     private readonly authorization?: string
+    private readonly ensuredDirectories = new Set<string>()
+    private readonly metadataTimeoutMs: number
+    private readonly uploadTimeoutMs: number
 
     constructor(
         config: RemoteStoragePublicConfig,
         credentials: RemoteStorageCredentials = {},
-        private readonly timeoutMs = 15_000
+        timeoutMs = 30_000
     ) {
         if (config.kind !== 'webdav')
             throw new Error('WebDavStorageProvider requires WebDAV config')
         this.baseUrl = normalizeBaseUrl(config.baseUrl)
         this.root = normalizeRoot(config.root)
         this.authorization = basicAuthorization(credentials)
+        this.metadataTimeoutMs = Math.max(15_000, timeoutMs)
+        this.uploadTimeoutMs = Math.max(120_000, timeoutMs)
     }
 
     private url(path = '') {
@@ -62,16 +80,52 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         return headers
     }
 
+    private async fetchWithRetry(
+        url: string,
+        init: RequestInit,
+        timeoutMs: number,
+        attempts: number
+    ) {
+        let lastError: unknown = null
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                const response = await fetch(url, {
+                    ...init,
+                    headers: this.headers(init.headers),
+                    signal: AbortSignal.timeout(timeoutMs)
+                })
+                if (!retryableStatus(response.status) || attempt === attempts)
+                    return response
+                try {
+                    await response.body?.cancel()
+                } catch {
+                    // Best-effort connection cleanup before retrying.
+                }
+                await sleep(Math.min(4000, 500 * 2 ** (attempt - 1)))
+            } catch (error) {
+                lastError = error
+                if (attempt === attempts) throw error
+                await sleep(Math.min(4000, 500 * 2 ** (attempt - 1)))
+            }
+        }
+        throw lastError instanceof Error
+            ? lastError
+            : new Error('WebDAV request failed')
+    }
+
     private async request(
         path: string,
         init: RequestInit,
-        accepted: number[]
+        accepted: number[],
+        timeoutMs = this.metadataTimeoutMs,
+        attempts = 2
     ) {
-        const response = await fetch(this.url(path), {
-            ...init,
-            headers: this.headers(init.headers),
-            signal: AbortSignal.timeout(this.timeoutMs)
-        })
+        const response = await this.fetchWithRetry(
+            this.url(path),
+            init,
+            timeoutMs,
+            attempts
+        )
         if (!accepted.includes(response.status))
             throw new Error(
                 `WebDAV ${init.method ?? 'GET'} failed: HTTP ${response.status}`
@@ -82,30 +136,33 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     async test() {
         // Test the configured WebDAV endpoint itself. The PicaLibrary root may
         // not exist yet; the first sync is responsible for creating it.
-        const response = await fetch(this.baseUrl, {
-            method: 'PROPFIND',
-            headers: this.headers({ depth: '0' }),
-            signal: AbortSignal.timeout(this.timeoutMs)
-        })
+        const response = await this.fetchWithRetry(
+            this.baseUrl,
+            { method: 'PROPFIND', headers: { depth: '0' } },
+            this.metadataTimeoutMs,
+            2
+        )
         if (![200, 207].includes(response.status))
             throw new Error(`WebDAV PROPFIND failed: HTTP ${response.status}`)
         return { success: true as const, status: response.status }
     }
 
     async exists(path: string) {
-        const response = await fetch(this.url(path), {
-            method: 'HEAD',
-            headers: this.headers(),
-            signal: AbortSignal.timeout(this.timeoutMs)
-        })
+        const response = await this.fetchWithRetry(
+            this.url(path),
+            { method: 'HEAD' },
+            this.metadataTimeoutMs,
+            2
+        )
         if (response.status === 404) return false
         if (response.ok) return true
         if (response.status === 405) {
-            const fallback = await fetch(this.url(path), {
-                method: 'PROPFIND',
-                headers: this.headers({ depth: '0' }),
-                signal: AbortSignal.timeout(this.timeoutMs)
-            })
+            const fallback = await this.fetchWithRetry(
+                this.url(path),
+                { method: 'PROPFIND', headers: { depth: '0' } },
+                this.metadataTimeoutMs,
+                2
+            )
             if (fallback.status === 404) return false
             if ([200, 207].includes(fallback.status)) return true
         }
@@ -115,9 +172,10 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     }
 
     async ensureDirectory(path: string) {
-        // Build both the configured root and the requested descendants from the
-        // WebDAV endpoint. This lets a brand-new account start with no
-        // PicaLibrary directory at all.
+        // WebDAV MKCOL is comparatively expensive on many hosted providers.
+        // Cache every confirmed collection for the lifetime of this provider so
+        // a 468-page sync does not recreate/check the same parent path hundreds
+        // of times.
         const segments = [this.root, path]
             .filter(Boolean)
             .join('/')
@@ -127,13 +185,20 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         let current = ''
         for (const segment of segments) {
             current = current ? `${current}/${segment}` : segment
-            const response = await fetch(this.rawUrl(current), {
-                method: 'MKCOL',
-                headers: this.headers(),
-                signal: AbortSignal.timeout(this.timeoutMs)
-            })
-            if ([201, 301, 405].includes(response.status)) continue
-            if (response.status >= 200 && response.status < 300) continue
+            if (this.ensuredDirectories.has(current)) continue
+            const response = await this.fetchWithRetry(
+                this.rawUrl(current),
+                { method: 'MKCOL' },
+                this.metadataTimeoutMs,
+                3
+            )
+            if (
+                [201, 301, 405].includes(response.status) ||
+                (response.status >= 200 && response.status < 300)
+            ) {
+                this.ensuredDirectories.add(current)
+                continue
+            }
             throw new Error(
                 `WebDAV MKCOL ${current} failed: HTTP ${response.status}`
             )
@@ -141,11 +206,12 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     }
 
     async get(path: string): Promise<RemoteObject | null> {
-        const response = await fetch(this.url(path), {
-            method: 'GET',
-            headers: this.headers(),
-            signal: AbortSignal.timeout(this.timeoutMs)
-        })
+        const response = await this.fetchWithRetry(
+            this.url(path),
+            { method: 'GET' },
+            this.metadataTimeoutMs,
+            2
+        )
         if (response.status === 404) return null
         if (!response.ok)
             throw new Error(`WebDAV GET failed: HTTP ${response.status}`)
@@ -169,7 +235,9 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
                     ? { 'content-type': contentType }
                     : undefined
             },
-            [200, 201, 204]
+            [200, 201, 204],
+            this.uploadTimeoutMs,
+            3
         )
     }
 

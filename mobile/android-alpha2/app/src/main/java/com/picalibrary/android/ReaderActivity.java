@@ -3,7 +3,6 @@ package com.picalibrary.android;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -15,8 +14,6 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +26,9 @@ public class ReaderActivity extends Activity {
     private SeekBar seek;
     private String comicId,title,episodeId,sourceKind;
     private ReaderSource source;
+    private ReaderImages images;
+    private ReaderProgress progress;
+    private ReaderImages.Request activeRequest;
     private List<BridgeClient.PageItem> pages;
     private List<BridgeClient.ChapterItem> chapters=new ArrayList<>();
     private int index=0;
@@ -44,8 +44,22 @@ public class ReaderActivity extends Activity {
         episodeId=getIntent().getStringExtra("episodeId");
         sourceKind=getIntent().getStringExtra("source");
         source="remote".equals(sourceKind)?new RemoteReaderSource(this):new DesktopReaderSource(this);
+        images=new ReaderImages(this,source);
+        progress=new ReaderProgress(this,source);
         render();
         loadChapter();
+    }
+
+    @Override protected void onPause(){
+        super.onPause();
+        saveLocalProgress(true);
+        progress.sync();
+    }
+
+    @Override protected void onDestroy(){
+        if(activeRequest!=null)activeRequest.cancel();
+        if(images!=null)images.close();
+        super.onDestroy();
     }
 
     private void render(){
@@ -70,7 +84,7 @@ public class ReaderActivity extends Activity {
         seek=new SeekBar(this);seek.setMax(0);seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             @Override public void onProgressChanged(SeekBar s,int value,boolean fromUser){if(fromUser&&pages!=null&&!pages.isEmpty()){index=Math.max(0,Math.min(value,pages.size()-1));showPage();}}
             @Override public void onStartTrackingTouch(SeekBar s){}
-            @Override public void onStopTrackingTouch(SeekBar s){}
+            @Override public void onStopTrackingTouch(SeekBar s){saveLocalProgress(false);progress.sync();}
         });bottomBar.addView(seek,new LinearLayout.LayoutParams(-1,Ui.dp(this,36)));
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER);
         Button prev=darkButton("上一页");prev.setOnClickListener(v->flip(-1));
@@ -91,6 +105,10 @@ public class ReaderActivity extends Activity {
         new Thread(()->{try{
             chapters=source.chapters(comicId);
             String targetId=episodeId;
+            if(targetId==null||targetId.isEmpty()){
+                String recent=progress.recentChapter(comicId);
+                if(recent!=null&&!recent.isEmpty())targetId=recent;
+            }
             if(targetId==null||targetId.isEmpty())for(BridgeClient.ChapterItem c:chapters)if(c.downloadedPictures>0){targetId=c.id;break;}
             if(targetId==null)throw new IllegalStateException("这本漫画没有可读章节");
             final BridgeClient.ChapterData data=source.chapter(comicId,targetId);
@@ -99,32 +117,55 @@ public class ReaderActivity extends Activity {
     }
 
     private void applyChapter(BridgeClient.ChapterData data){
-        episodeId=data.episode.id;pages=data.pages;index=Math.min(Math.max(0,data.progressIndex),Math.max(0,pages.size()-1));seek.setMax(Math.max(0,pages.size()-1));titleView.setText((title==null?"漫画":title)+" · "+data.episode.title);showPage();
+        episodeId=data.episode.id;
+        pages=data.pages;
+        int local=progress.position(comicId,episodeId,data.progressIndex);
+        index=Math.min(Math.max(0,local),Math.max(0,pages.size()-1));
+        seek.setMax(Math.max(0,pages.size()-1));
+        titleView.setText((title==null?"漫画":title)+" · "+data.episode.title);
+        showPage();
     }
 
-    private Bitmap loadBitmap(String path) throws Exception {
-        HttpURLConnection con=source.image(path);
-        try{int status=con.getResponseCode();if(status>=400)throw new IllegalStateException("HTTP "+status);try(InputStream in=con.getInputStream()){Bitmap bitmap=BitmapFactory.decodeStream(in);if(bitmap==null)throw new IllegalStateException("图片解码失败");return bitmap;}}finally{con.disconnect();}
+    private void saveLocalProgress(boolean flush){
+        if(progress==null||comicId==null||episodeId==null||pages==null||pages.isEmpty())return;
+        progress.save(comicId,episodeId,index,flush);
     }
-
-    private String cacheKey(BridgeClient.PageItem p){return source.kind()+":"+p.url;}
 
     private void showPage(){
         if(pages==null||pages.isEmpty()){loading.setVisibility(View.GONE);pageView.setText("该章节没有可读取页面");return;}
-        index=Math.max(0,Math.min(pages.size()-1,index));seek.setProgress(index);BridgeClient.PageItem p=pages.get(index);final int serial=++loadSerial;pageView.setText((index+1)+" / "+pages.size()+("remote".equals(source.kind())?" · 云端":""));
-        Bitmap hit=ImageRepository.cached(cacheKey(p));
-        if(hit!=null){image.setImageBitmap(hit);image.resetZoom();loading.setVisibility(View.GONE);source.saveProgress(comicId,episodeId,index);prefetchAround();return;}
+        index=Math.max(0,Math.min(pages.size()-1,index));
+        seek.setProgress(index);
+        BridgeClient.PageItem page=pages.get(index);
+        final int serial=++loadSerial;
+        pageView.setText((index+1)+" / "+pages.size()+("remote".equals(source.kind())?" · 云端":""));
         loading.setVisibility(View.VISIBLE);
-        new Thread(()->{try{Bitmap b=loadBitmap(p.url);ImageRepository.put(cacheKey(p),b);runOnUiThread(()->{if(serial!=loadSerial)return;image.setImageBitmap(b);image.resetZoom();loading.setVisibility(View.GONE);source.saveProgress(comicId,episodeId,index);prefetchAround();});}catch(Exception e){runOnUiThread(()->{if(serial!=loadSerial)return;loading.setVisibility(View.GONE);pageView.setText("页面读取失败："+e.getMessage());});}}).start();
+        saveLocalProgress(false);
+        if(activeRequest!=null)activeRequest.cancel();
+        int width=Math.max(root.getWidth(),getResources().getDisplayMetrics().widthPixels);
+        activeRequest=images.load(page.url,width,new ReaderImages.Callback(){
+            @Override public void complete(Bitmap bitmap){
+                if(serial!=loadSerial){bitmap.recycle();return;}
+                image.setImageBitmap(bitmap);image.resetZoom();loading.setVisibility(View.GONE);
+                progress.sync();prefetchAround();
+            }
+            @Override public void failed(){
+                if(serial!=loadSerial)return;
+                loading.setVisibility(View.GONE);pageView.setText("页面读取失败 · 点击下一页后可重试");
+            }
+        });
     }
 
     private void prefetchAround(){
-        if(pages==null)return;int[] offsets={1,2,-1};for(int d:offsets){int i=index+d;if(i>=0&&i<pages.size())prefetch(pages.get(i));}
-    }
-
-    private void prefetch(BridgeClient.PageItem page){
-        String key=cacheKey(page);if(ImageRepository.cached(key)!=null)return;
-        new Thread(()->{try{ImageRepository.put(key,loadBitmap(page.url));}catch(Exception ignored){}}).start();
+        if(pages==null)return;
+        int[] offsets={1,2,-1};
+        int width=Math.max(root.getWidth(),getResources().getDisplayMetrics().widthPixels);
+        for(int d:offsets){
+            int i=index+d;if(i<0||i>=pages.size())continue;
+            images.load(pages.get(i).url,width,new ReaderImages.Callback(){
+                @Override public void complete(Bitmap bitmap){bitmap.recycle();}
+                @Override public void failed(){}
+            });
+        }
     }
 
     private void flip(int d){
@@ -140,7 +181,8 @@ public class ReaderActivity extends Activity {
     }
 
     private void loadSpecificChapter(String id){
-        loading.setVisibility(View.VISIBLE);new Thread(()->{try{BridgeClient.ChapterData data=source.chapter(comicId,id);runOnUiThread(()->applyChapter(data));}catch(Exception e){runOnUiThread(()->{loading.setVisibility(View.GONE);pageView.setText("章节读取失败："+e.getMessage());});}}).start();
+        saveLocalProgress(true);progress.sync();loading.setVisibility(View.VISIBLE);
+        new Thread(()->{try{BridgeClient.ChapterData data=source.chapter(comicId,id);runOnUiThread(()->applyChapter(data));}catch(Exception e){runOnUiThread(()->{loading.setVisibility(View.GONE);pageView.setText("章节读取失败："+e.getMessage());});}}).start();
     }
 
     private void showChapterPicker(){

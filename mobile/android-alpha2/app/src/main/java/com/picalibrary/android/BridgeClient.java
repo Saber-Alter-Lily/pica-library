@@ -25,6 +25,14 @@ final class BridgeClient {
             this.id=id; this.title=title; this.author=author; this.coverPath=coverPath; this.downloadedPictures=downloadedPictures;
         }
     }
+    static final class RecentItem {
+        final ComicItem comic;
+        final String episodeId, episodeTitle, updatedAt;
+        final int pageIndex, episodeOrder;
+        RecentItem(ComicItem comic,String episodeId,String episodeTitle,int episodeOrder,int pageIndex,String updatedAt){
+            this.comic=comic;this.episodeId=episodeId;this.episodeTitle=episodeTitle;this.episodeOrder=episodeOrder;this.pageIndex=pageIndex;this.updatedAt=updatedAt;
+        }
+    }
     static final class ChapterItem {
         final String id, title;
         final int order, downloadedPictures;
@@ -109,7 +117,13 @@ final class BridgeClient {
     }
 
     static List<ComicItem> library(Context c, String scope, int limit) throws Exception {
-        JSONObject root=new JSONObject(get(c,"/mobile/v1/library?scope="+scope+"&limit="+limit));
+        return library(c,scope,limit,"","latest");
+    }
+
+    static List<ComicItem> library(Context c, String scope, int limit, String text, String sort) throws Exception {
+        String path="/mobile/v1/library?scope="+enc(scope)+"&limit="+limit+"&sort="+enc(sort==null?"latest":sort);
+        if(text!=null&&!text.trim().isEmpty())path+="&text="+enc(text.trim());
+        JSONObject root=new JSONObject(get(c,path));
         JSONArray items=root.optJSONArray("items");
         List<ComicItem> out=new ArrayList<>();
         if(items!=null) for(int i=0;i<items.length();i++){
@@ -121,6 +135,18 @@ final class BridgeClient {
                 o.optString("coverPath","/mobile/v1/covers/"+o.optString("comicId")),
                 o.optInt("downloadedPictures",0)
             ));
+        }
+        return out;
+    }
+
+    static List<RecentItem> recent(Context c,int limit) throws Exception {
+        JSONObject root=new JSONObject(get(c,"/mobile/v1/reader/recent?limit="+limit));
+        JSONArray items=root.optJSONArray("items");List<RecentItem> out=new ArrayList<>();
+        if(items!=null)for(int i=0;i<items.length();i++){
+            JSONObject o=items.optJSONObject(i);if(o==null)continue;
+            String id=o.optString("comicId");
+            ComicItem comic=new ComicItem(id,o.optString("title","未命名漫画"),o.optString("author","未知作者"),o.optString("coverPath","/mobile/v1/covers/"+id),o.optInt("downloadedPictures",0));
+            out.add(new RecentItem(comic,o.optString("episodeId"),o.optString("episodeTitle","章节"),o.optInt("episodeOrder",0),o.optInt("pageIndex",0),o.optString("updatedAt","")));
         }
         return out;
     }
@@ -189,5 +215,5 @@ final class BridgeClient {
 
     static JSONObject atlas(Context c) throws Exception { return new JSONObject(get(c,"/mobile/v1/atlas")); }
 
-    private static String enc(String value) throws Exception { return java.net.URLEncoder.encode(value,"UTF-8").replace("+","%20"); }
+    private static String enc(String value) throws Exception { return java.net.URLEncoder.encode(value==null?"":value,"UTF-8").replace("+","%20"); }
 }

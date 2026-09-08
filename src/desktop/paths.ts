@@ -5,6 +5,7 @@ export interface DesktopPaths {
     root: string
     config: string
     credentials: string
+    remoteStorageConfig: string
     data: string
     cache: string
     logs: string
@@ -27,6 +28,7 @@ export function desktopPaths(rootOverride?: string): DesktopPaths {
         root: local,
         config: path.join(local, 'config', 'config.json'),
         credentials: path.join(local, 'config', 'credentials.dat'),
+        remoteStorageConfig: path.join(local, 'config', 'remote-storage.json'),
         data: path.join(local, 'data'),
         cache: path.join(local, 'cache'),
         logs: path.join(local, 'logs'),

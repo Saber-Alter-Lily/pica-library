@@ -7,6 +7,7 @@ import android.util.Base64;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
 import org.json.*;
 
@@ -23,7 +24,7 @@ final class RemoteLibraryClient {
     private final RemoteConfigStore.Config config;
     RemoteLibraryClient(Context context){this(RemoteConfigStore.load(context));}
     RemoteLibraryClient(RemoteConfigStore.Config config){this.config=config;if(!config.configured())throw new IllegalStateException("尚未配置 WebDAV");}
-    String scope(){return ReaderPolicy.hash(config.baseUrl+"\n"+config.root+"\n"+config.username);}
+    String scope(){try{byte[] raw=MessageDigest.getInstance("SHA-256").digest((config.baseUrl+"\n"+config.root+"\n"+config.username).getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:raw)out.append(String.format(Locale.ROOT,"%02x",b));return out.toString();}catch(Exception e){return config.baseUrl+"/"+config.root;}}
     private URL url(String path) throws Exception {String p=path==null?"":path.replaceAll("^/+","");return new URL(config.baseUrl+"/"+config.root+"/"+p);}
     HttpURLConnection open(String path,String accept) throws Exception {
         HttpURLConnection c=(HttpURLConnection)url(path).openConnection();c.setConnectTimeout(7000);c.setReadTimeout(20000);c.setUseCaches(true);c.setRequestProperty("Accept",accept);

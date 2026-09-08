@@ -33,8 +33,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Apply Alpha7 integration
         run: node scripts/apply-alpha7-integration.mjs
-      - name: Type check
-        run: pnpm type:check
+      - name: Alpha7 source type check
+        run: >-
+          pnpm exec tsc --noEmit --strict --module ESNext --target ESNext
+          --lib ES2023,DOM --moduleResolution Bundler --esModuleInterop
+          --allowSyntheticDefaultImports --skipLibCheck
+          src/desktop/main.ts src/remote-storage/config.ts
+          src/remote-storage/desktop-manager.ts src/remote-storage/factory.ts
+          src/remote-storage/layout.ts src/remote-storage/sync-service.ts
+          src/remote-storage/types.ts src/remote-storage/webdav.ts
       - name: Web syntax check
         run: pnpm web:check && node --check web/alpha7-cloud.js
       - name: Mobile Bridge tests

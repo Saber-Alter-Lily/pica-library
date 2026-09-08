@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { LibraryDatabase } from '../library/database'
 import type { LibraryService } from '../library/service'
-import type { LibraryScope } from '../library/types'
+import type { LibraryScope, SortMode } from '../library/types'
 import { PRODUCT_VERSION } from '../version'
 import { LibraryQueryService } from '../services/library-query-service'
 import { ReaderService } from '../services/reader-service'
@@ -128,6 +128,18 @@ function normalizeScope(value: string | null): LibraryScope {
     )
         return value
     return 'favorites'
+}
+
+function normalizeSort(value: string | null): SortMode {
+    if (
+        value === 'latest' ||
+        value === 'oldest' ||
+        value === 'title' ||
+        value === 'likes' ||
+        value === 'views'
+    )
+        return value
+    return 'latest'
 }
 
 function readState(file: string | undefined) {
@@ -288,7 +300,9 @@ export async function startMobileBridge(options: {
                     0,
                     5000
                 )
-                const result = library.query({ scope, limit, offset })
+                const text = url.searchParams.get('text')?.trim() || undefined
+                const sort = normalizeSort(url.searchParams.get('sort'))
+                const result = library.query({ scope, limit, offset, text, sort })
                 return json(response, 200, {
                     ...result,
                     items: result.items.map((comic) => ({
@@ -298,6 +312,42 @@ export async function startMobileBridge(options: {
                         )}`
                     }))
                 })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/reader/recent' &&
+                request.method === 'GET'
+            ) {
+                const limit = boundedInt(
+                    url.searchParams.get('limit'),
+                    20,
+                    1,
+                    100
+                )
+                const seen = new Set<string>()
+                const items = []
+                for (const progress of reader.recentProgress()) {
+                    if (seen.has(progress.comicId)) continue
+                    seen.add(progress.comicId)
+                    const comic = options.database.getComic(progress.comicId)
+                    if (!comic) continue
+                    const episode = reader
+                        .chapters(progress.comicId)
+                        .find((item) => item.id === progress.episodeId)
+                    items.push({
+                        ...progress,
+                        title: comic.title,
+                        author: comic.author,
+                        downloadedPictures: comic.downloadedPictures,
+                        episodeTitle: episode?.title ?? '章节',
+                        episodeOrder: episode?.order ?? 0,
+                        coverPath: `/mobile/v1/covers/${encodeURIComponent(
+                            progress.comicId
+                        )}`
+                    })
+                    if (items.length >= limit) break
+                }
+                return json(response, 200, { items })
             }
 
             const coverRoute = url.pathname.match(

@@ -1,0 +1,68 @@
+name: Mobile Recommendation Hotfix
+
+on:
+  push:
+    branches: [android-alpha5-recommendation-cache]
+    paths:
+      - 'scripts/apply-mobile-recommendation-cache-patch.mjs'
+      - '.github/workflows/mobile-recommendation-hotfix.yml'
+      - 'src/mobile/**'
+      - 'src/recommendation-v3/**'
+      - 'src/services/recommendation-service.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-mobile-bridge:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply Mobile Bridge base patch
+        run: node scripts/apply-mobile-alpha2-patch.mjs
+      - name: Apply recommendation cache hotfix
+        run: node scripts/apply-mobile-recommendation-cache-patch.mjs
+      - name: Verify cached Final V3 route
+        shell: powershell
+        run: |
+          $source = Get-Content src\mobile\bridge-server.ts -Raw
+          if (-not $source.Contains("source: 'final-v3-current'")) { throw 'Final V3 mobile cache route missing' }
+          if ($source.Contains('await options.service.recommendations({ limit })')) { throw 'Mobile route still triggers live recommendation generation' }
+      - name: Mobile Bridge unit test
+        run: pnpm exec vitest run test/unit/mobile-bridge.test.ts
+      - name: Restore accepted v0.2.0 launcher base
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $url = 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.2.0/Pica-Library-v0.2.0-windows-x64.zip'
+          $file = 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $file
+          $sha = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne '219d853bad6c0193adfcae2837c54f3bc72644aab664d1dae55c55259682d75e') {
+            throw "v0.2.0 launcher base SHA mismatch: $sha"
+          }
+      - run: pnpm build:windows
+      - name: Rename candidate
+        shell: powershell
+        run: |
+          Copy-Item artifacts\Pica-Library-v0.3.0-windows-x64.zip artifacts\Pica-Library-v0.3.0-mobile-recommendation-hotfix-windows-x64.zip
+          $sha = (Get-FileHash artifacts\Pica-Library-v0.3.0-mobile-recommendation-hotfix-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sha  Pica-Library-v0.3.0-mobile-recommendation-hotfix-windows-x64.zip" | Set-Content artifacts\Pica-Library-v0.3.0-mobile-recommendation-hotfix-windows-x64.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Windows-Mobile-Recommendation-Hotfix
+          path: |
+            artifacts/Pica-Library-v0.3.0-mobile-recommendation-hotfix-windows-x64.zip
+            artifacts/Pica-Library-v0.3.0-mobile-recommendation-hotfix-windows-x64.sha256
+          retention-days: 7

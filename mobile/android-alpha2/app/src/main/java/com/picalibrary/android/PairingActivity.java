@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -38,8 +39,29 @@ public class PairingActivity extends Activity {
             JSONObject result=BridgeClient.pair(h,c);String token=result.optString("token");String name=result.optString("serverName","Pica Library Desktop");
             if(token.isEmpty())throw new IllegalStateException("配对响应缺少 token");
             BridgeStore.save(this,h,token,name);
-            runOnUiThread(()->{Toast.makeText(this,"配对成功",Toast.LENGTH_SHORT).show();finish();});
+            runOnUiThread(this::offerFavoriteImport);
         }catch(Exception e){runOnUiThread(()->status.setText("连接失败："+e.getMessage()));}}).start();
+    }
+
+    private void offerFavoriteImport(){
+        status.setText("配对成功");
+        new AlertDialog.Builder(this)
+            .setTitle("导入电脑收藏到手机？")
+            .setMessage("收藏元数据本身很小。你还可以把封面一起缓存到手机，之后电脑离线时仍能浏览收藏列表。")
+            .setPositiveButton("收藏 + 封面",(d,w)->syncFavorites(true))
+            .setNeutralButton("仅收藏",(d,w)->syncFavorites(false))
+            .setNegativeButton("稍后",(d,w)->{Toast.makeText(this,"配对成功",Toast.LENGTH_SHORT).show();finish();})
+            .setCancelable(false)
+            .show();
+    }
+
+    private void syncFavorites(boolean covers){
+        status.setText(covers?"正在导入收藏并缓存封面…":"正在导入收藏…");
+        new Thread(()->{try{
+            FavoriteCacheStore.Snapshot snapshot=FavoriteCacheStore.syncFromDesktop(this,covers,(done,total,phase)->runOnUiThread(()->status.setText(phase+(total>0?" · "+done+" / "+total:""))));
+            runOnUiThread(()->{Toast.makeText(this,"已导入 "+snapshot.items.size()+" 本收藏",Toast.LENGTH_SHORT).show();finish();});
+        }catch(Exception e){runOnUiThread(()->{status.setText("收藏导入失败："+e.getMessage());new AlertDialog.Builder(this).setTitle("配对已成功").setMessage("收藏缓存暂时没有完成，可以稍后在“连接”里重新导入。")
+            .setPositiveButton("完成",(d,w)->finish()).show();});}}).start();
     }
 
     private void handleDeepLink(Uri u){

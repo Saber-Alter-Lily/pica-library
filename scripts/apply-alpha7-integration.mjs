@@ -33,7 +33,7 @@ replaceOnce(
 replaceOnce(
     'src/desktop/main.ts',
     "async function testConnection(input: Record<string, unknown>) {\n    const { account, password } = connectionCredentials(input, credentials)\n",
-    "async function testConnection(input: Record<string, unknown>) {\n    const remoteAction = String(input.remoteStorageAction ?? '')\n    if (remoteAction === 'test') {\n        if (!remoteStorageManager) throw new Error('Remote storage is not ready')\n        return await remoteStorageManager.test(input)\n    }\n    if (remoteAction === 'plan') {\n        if (!remoteStorageManager) throw new Error('Remote storage is not ready')\n        return await remoteStorageManager.plan(input)\n    }\n    const { account, password } = connectionCredentials(input, credentials)\n"
+    "async function testConnection(input: Record<string, unknown>) {\n    const remoteAction = String(input.remoteStorageAction ?? '')\n    if (remoteAction === 'test') {\n        if (!remoteStorageManager) throw new Error('Remote storage is not ready')\n        return await remoteStorageManager.test(input)\n    }\n    if (remoteAction === 'plan') {\n        if (!remoteStorageManager) throw new Error('Remote storage is not ready')\n        return await remoteStorageManager.plan(input)\n    }\n    const mobileAction = String(input.mobileBridgeAction ?? '')\n    if (mobileAction === 'rotate') {\n        if (!mobileBridge) throw new Error('Mobile Bridge is not ready')\n        mobileBridge.rotatePairingCode()\n        return { success: true }\n    }\n    const { account, password } = connectionCredentials(input, credentials)\n"
 )
 replaceOnce(
     'src/desktop/main.ts',

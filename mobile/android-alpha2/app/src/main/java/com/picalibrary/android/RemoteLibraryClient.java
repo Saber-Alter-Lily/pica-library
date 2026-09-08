@@ -9,6 +9,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
+import javax.net.ssl.SSLException;
 import org.json.*;
 
 /** WebDAV catalog client with persistent metadata/cover fallback for previously visited content. */
@@ -43,7 +44,7 @@ final class RemoteLibraryClient {
     String scope(){try{byte[] raw=MessageDigest.getInstance("SHA-256").digest((config.baseUrl+"\n"+config.root+"\n"+config.username).getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:raw)out.append(String.format(Locale.ROOT,"%02x",b));return out.toString();}catch(Exception e){return ReaderPolicy.hash(config.baseUrl+"/"+config.root);}}
     private URL url(String path) throws Exception {String p=path==null?"":path.replaceAll("^/+","");return new URL(config.baseUrl+"/"+config.root+"/"+p);}
     HttpURLConnection open(String path,String accept) throws Exception {
-        HttpURLConnection c=(HttpURLConnection)url(path).openConnection();c.setConnectTimeout(7000);c.setReadTimeout(30000);c.setUseCaches(false);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept",accept);
+        HttpURLConnection c=(HttpURLConnection)url(path).openConnection();c.setConnectTimeout(9000);c.setReadTimeout(30000);c.setUseCaches(false);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept",accept);
         if(!config.username.isEmpty()||!config.password.isEmpty())c.setRequestProperty("Authorization","Basic "+Base64.encodeToString((config.username+":"+config.password).getBytes(StandardCharsets.UTF_8),Base64.NO_WRAP));return c;
     }
 
@@ -85,8 +86,28 @@ final class RemoteLibraryClient {
         finally{if(c!=null)c.disconnect();}
     }
 
+    private boolean testOnce() throws Exception {
+        HttpURLConnection c=null;
+        try{
+            c=open("v1/control/current.json","application/json");c.setRequestMethod("GET");int s=c.getResponseCode();
+            if(s==401||s==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+s+" · 请检查用户名和 App Password");
+            if(s==404)return true;
+            if(s==408||s==425||s==429||(s>=500&&s<=599))throw new IOException("WebDAV 服务暂时不可用 · HTTP "+s);
+            if(s>=200&&s<400)return true;
+            throw new IOException("WebDAV 返回异常状态 · HTTP "+s);
+        }finally{if(c!=null)c.disconnect();}
+    }
     boolean test() throws Exception {
-        HttpURLConnection c=open("v1/control/current.json","application/json");c.setRequestMethod("GET");
-        try{int s=c.getResponseCode();return s==404||(s>=200&&s<400);}finally{c.disconnect();}
+        Exception last=null;
+        for(int attempt=0;attempt<2;attempt++){
+            try{return testOnce();}
+            catch(UnknownHostException e){throw new IllegalStateException("DNS 解析失败 · 手机无法找到 WebDAV 域名；通常不需要梯子，请先切换 Wi‑Fi/移动网络后重试",e);}
+            catch(SocketTimeoutException e){last=e;if(attempt==0){try{Thread.sleep(600);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException("连接已取消",interrupted);}continue;}throw new IllegalStateException("WebDAV 连接超时 · 当前手机网络到网盘线路不稳定；通常不需要梯子，可尝试切换 Wi‑Fi/移动网络",e);}
+            catch(SSLException e){throw new IllegalStateException("TLS/证书连接失败 · 请检查系统时间、证书或当前网络/VPN",e);}
+            catch(ConnectException e){last=e;if(attempt==0){try{Thread.sleep(600);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException("连接已取消",interrupted);}continue;}throw new IllegalStateException("无法连接 WebDAV 服务器 · 请检查地址和当前网络",e);}
+            catch(IllegalStateException e){throw e;}
+            catch(IOException e){last=e;if(attempt==0){try{Thread.sleep(600);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException("连接已取消",interrupted);}continue;}throw new IllegalStateException(e.getMessage()==null?"WebDAV 网络请求失败":e.getMessage(),e);}
+        }
+        throw last==null?new IllegalStateException("WebDAV 测试失败"):last;
     }
 }

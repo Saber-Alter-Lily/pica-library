@@ -3,18 +3,20 @@ package com.picalibrary.android;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +27,8 @@ public class ReaderActivity extends Activity {
     private TextView titleView,pageView;
     private ProgressBar loading;
     private SeekBar seek;
-    private String comicId,title,episodeId;
+    private String comicId,title,episodeId,sourceKind;
+    private ReaderSource source;
     private List<BridgeClient.PageItem> pages;
     private List<BridgeClient.ChapterItem> chapters=new ArrayList<>();
     private int index=0;
@@ -39,6 +42,8 @@ public class ReaderActivity extends Activity {
         comicId=getIntent().getStringExtra("comicId");
         title=getIntent().getStringExtra("title");
         episodeId=getIntent().getStringExtra("episodeId");
+        sourceKind=getIntent().getStringExtra("source");
+        source="remote".equals(sourceKind)?new RemoteReaderSource(this):new DesktopReaderSource(this);
         render();
         loadChapter();
     }
@@ -81,13 +86,14 @@ public class ReaderActivity extends Activity {
     private Button darkButton(String text){Button b=new Button(this);b.setText(text);b.setAllCaps(false);b.setTextColor(Color.WHITE);b.setTextSize(13);b.setBackgroundColor(Color.TRANSPARENT);return b;}
 
     private void loadChapter(){
-        if(!BridgeStore.paired(this)||comicId==null){loading.setVisibility(View.GONE);pageView.setText("请先连接 Desktop");return;}
+        if(comicId==null){loading.setVisibility(View.GONE);pageView.setText("缺少漫画信息");return;}
+        if(source instanceof DesktopReaderSource&&!BridgeStore.paired(this)){loading.setVisibility(View.GONE);pageView.setText("请先连接 Desktop");return;}
         new Thread(()->{try{
-            chapters=BridgeClient.chapters(this,comicId);
+            chapters=source.chapters(comicId);
             String targetId=episodeId;
             if(targetId==null||targetId.isEmpty())for(BridgeClient.ChapterItem c:chapters)if(c.downloadedPictures>0){targetId=c.id;break;}
-            if(targetId==null)throw new IllegalStateException("这本漫画没有已下载章节");
-            final BridgeClient.ChapterData data=BridgeClient.chapter(this,comicId,targetId);
+            if(targetId==null)throw new IllegalStateException("这本漫画没有可读章节");
+            final BridgeClient.ChapterData data=source.chapter(comicId,targetId);
             runOnUiThread(()->applyChapter(data));
         }catch(Exception e){runOnUiThread(()->{loading.setVisibility(View.GONE);pageView.setText("无法开始阅读："+e.getMessage());});}}).start();
     }
@@ -96,17 +102,29 @@ public class ReaderActivity extends Activity {
         episodeId=data.episode.id;pages=data.pages;index=Math.min(Math.max(0,data.progressIndex),Math.max(0,pages.size()-1));seek.setMax(Math.max(0,pages.size()-1));titleView.setText((title==null?"漫画":title)+" · "+data.episode.title);showPage();
     }
 
+    private Bitmap loadBitmap(String path) throws Exception {
+        HttpURLConnection con=source.image(path);
+        try{int status=con.getResponseCode();if(status>=400)throw new IllegalStateException("HTTP "+status);try(InputStream in=con.getInputStream()){Bitmap bitmap=BitmapFactory.decodeStream(in);if(bitmap==null)throw new IllegalStateException("图片解码失败");return bitmap;}}finally{con.disconnect();}
+    }
+
+    private String cacheKey(BridgeClient.PageItem p){return source.kind()+":"+p.url;}
+
     private void showPage(){
         if(pages==null||pages.isEmpty()){loading.setVisibility(View.GONE);pageView.setText("该章节没有可读取页面");return;}
-        index=Math.max(0,Math.min(pages.size()-1,index));seek.setProgress(index);BridgeClient.PageItem p=pages.get(index);final int serial=++loadSerial;pageView.setText((index+1)+" / "+pages.size());
-        Bitmap hit=ImageRepository.cached(p.url);
-        if(hit!=null){image.setImageBitmap(hit);image.resetZoom();loading.setVisibility(View.GONE);BridgeClient.saveProgress(this,comicId,episodeId,index);prefetchAround();return;}
+        index=Math.max(0,Math.min(pages.size()-1,index));seek.setProgress(index);BridgeClient.PageItem p=pages.get(index);final int serial=++loadSerial;pageView.setText((index+1)+" / "+pages.size()+("remote".equals(source.kind())?" · 云端":""));
+        Bitmap hit=ImageRepository.cached(cacheKey(p));
+        if(hit!=null){image.setImageBitmap(hit);image.resetZoom();loading.setVisibility(View.GONE);source.saveProgress(comicId,episodeId,index);prefetchAround();return;}
         loading.setVisibility(View.VISIBLE);
-        new Thread(()->{try{Bitmap b=BridgeClient.bitmap(this,p.url);ImageRepository.put(p.url,b);runOnUiThread(()->{if(serial!=loadSerial)return;image.setImageBitmap(b);image.resetZoom();loading.setVisibility(View.GONE);BridgeClient.saveProgress(this,comicId,episodeId,index);prefetchAround();});}catch(Exception e){runOnUiThread(()->{if(serial!=loadSerial)return;loading.setVisibility(View.GONE);pageView.setText("页面读取失败："+e.getMessage());});}}).start();
+        new Thread(()->{try{Bitmap b=loadBitmap(p.url);ImageRepository.put(cacheKey(p),b);runOnUiThread(()->{if(serial!=loadSerial)return;image.setImageBitmap(b);image.resetZoom();loading.setVisibility(View.GONE);source.saveProgress(comicId,episodeId,index);prefetchAround();});}catch(Exception e){runOnUiThread(()->{if(serial!=loadSerial)return;loading.setVisibility(View.GONE);pageView.setText("页面读取失败："+e.getMessage());});}}).start();
     }
 
     private void prefetchAround(){
-        if(pages==null)return;int[] offsets={1,2,-1};for(int d:offsets){int i=index+d;if(i>=0&&i<pages.size())ImageRepository.prefetch(this,pages.get(i).url);}
+        if(pages==null)return;int[] offsets={1,2,-1};for(int d:offsets){int i=index+d;if(i>=0&&i<pages.size())prefetch(pages.get(i));}
+    }
+
+    private void prefetch(BridgeClient.PageItem page){
+        String key=cacheKey(page);if(ImageRepository.cached(key)!=null)return;
+        new Thread(()->{try{ImageRepository.put(key,loadBitmap(page.url));}catch(Exception ignored){}}).start();
     }
 
     private void flip(int d){
@@ -122,7 +140,7 @@ public class ReaderActivity extends Activity {
     }
 
     private void loadSpecificChapter(String id){
-        loading.setVisibility(View.VISIBLE);new Thread(()->{try{BridgeClient.ChapterData data=BridgeClient.chapter(this,comicId,id);runOnUiThread(()->applyChapter(data));}catch(Exception e){runOnUiThread(()->{loading.setVisibility(View.GONE);pageView.setText("章节读取失败："+e.getMessage());});}}).start();
+        loading.setVisibility(View.VISIBLE);new Thread(()->{try{BridgeClient.ChapterData data=source.chapter(comicId,id);runOnUiThread(()->applyChapter(data));}catch(Exception e){runOnUiThread(()->{loading.setVisibility(View.GONE);pageView.setText("章节读取失败："+e.getMessage());});}}).start();
     }
 
     private void showChapterPicker(){

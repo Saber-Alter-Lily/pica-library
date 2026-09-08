@@ -78,7 +78,7 @@ export class RemoteStorageDesktopManager {
         }
     }
 
-    async test(input: Record<string, unknown>) {
+    async test(input: Record<string, unknown>): Promise<Record<string, unknown>> {
         const { selected, provider } = this.provider(input)
         const result = await provider.test()
         return {
@@ -98,9 +98,12 @@ export class RemoteStorageDesktopManager {
         )
     }
 
-    async plan(input: Record<string, unknown>) {
+    async plan(input: Record<string, unknown>): Promise<Record<string, unknown>> {
         await this.test(input)
-        return await this.syncService(input).plan()
+        return (await this.syncService(input).plan()) as unknown as Record<
+            string,
+            unknown
+        >
     }
 
     save(input: Record<string, unknown>) {

@@ -9,6 +9,7 @@
         <activity android:name=".UnifiedComicDetailActivity" android:exported="false" />
         <activity android:name=".ComicDetailActivity" android:exported="false" />
         <activity android:name=".StorageSettingsActivity" android:exported="false" />
+        <activity android:name=".PicaBrowseActivity" android:exported="false" />
         <activity android:name=".PicaAccountActivity" android:exported="false" />
         <activity android:name=".RemoteStorageActivity" android:exported="false" />
         <activity android:name=".PairingActivity" android:exported="true">

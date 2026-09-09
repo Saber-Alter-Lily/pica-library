@@ -10,8 +10,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 14
-        versionName '0.1.0-alpha7-portable-state-safe'
+        versionCode 15
+        versionName '0.1.0-alpha7-storage-manager-foundation'
     }
 
     buildTypes {

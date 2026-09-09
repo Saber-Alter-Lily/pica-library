@@ -32,7 +32,12 @@ final class DesktopReaderSource implements ReaderSource {
         String host=BridgeStore.host(context);if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");
         HttpURLConnection c=(HttpURLConnection)new URL(host.replaceAll("/$","")+path).openConnection();c.setConnectTimeout(2500);c.setReadTimeout(15000);c.setRequestProperty("Accept","image/*");c.setRequestProperty("Authorization","Bearer "+BridgeStore.token(context));c.setUseCaches(false);return c;
     }
-    public void saveProgress(String comicId,String episodeId,int pageIndex){BridgeClient.saveProgress(context,comicId,episodeId,pageIndex);}
+    public void saveProgress(String comicId,String episodeId,int pageIndex){
+        try{
+            JSONObject body=new JSONObject();body.put("comicId",comicId);body.put("episodeId",episodeId);body.put("pageIndex",pageIndex);
+            BridgeClient.post(context,"/mobile/v1/reader/progress",body);
+        }catch(Exception e){throw new IllegalStateException("Desktop 阅读进度同步失败",e);}
+    }
 }
 
 final class RemoteReaderSource implements ReaderSource {

@@ -6,6 +6,7 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
         <activity android:name=".ReaderActivity" android:screenOrientation="unspecified" />
+        <activity android:name=".UnifiedComicDetailActivity" android:exported="false" />
         <activity android:name=".ComicDetailActivity" android:exported="false" />
         <activity android:name=".RemoteStorageActivity" android:exported="false" />
         <activity android:name=".PairingActivity" android:exported="true">

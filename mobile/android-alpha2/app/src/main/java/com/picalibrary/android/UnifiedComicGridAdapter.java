@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -12,7 +13,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -23,14 +23,14 @@ final class UnifiedComicGridAdapter extends BaseAdapter {
     interface Click { void open(UnifiedCatalogStore.Entry entry); }
     private final Activity activity;
     private final List<UnifiedCatalogStore.Entry> items;
-    private final Click click;
     private final ExecutorService pool=Executors.newFixedThreadPool(4);
     private final Map<String,Bitmap> remoteMemory=new ConcurrentHashMap<>();
     private final RemoteLibraryClient remoteClient;
+    private boolean opening;
 
-    UnifiedComicGridAdapter(Activity activity,List<UnifiedCatalogStore.Entry> items,Click click){
-        this.activity=activity;this.items=items;this.click=click;RemoteLibraryClient remote=null;
-        try{if(RemoteConfigStore.load(activity).configured())remote=new RemoteLibraryClient(activity);}catch(Exception ignored){}
+    UnifiedComicGridAdapter(Activity activity,List<UnifiedCatalogStore.Entry> items,Click ignored){
+        this.activity=activity;this.items=items;RemoteLibraryClient remote=null;
+        try{if(RemoteConfigStore.load(activity).configured())remote=new RemoteLibraryClient(activity);}catch(Exception ignoredError){}
         this.remoteClient=remote;
     }
 
@@ -48,7 +48,13 @@ final class UnifiedComicGridAdapter extends BaseAdapter {
             TextView tags=Ui.text(activity,"",10.5f,Ui.PRIMARY,false);tags.setMaxLines(1);tags.setPadding(0,Ui.dp(activity,3),0,0);card.addView(tags);
             holder=new Holder(card,cover,title,meta,tags);card.setTag(holder);reuse=card;
         }else holder=(Holder)reuse.getTag();
-        UnifiedCatalogStore.Entry item=getItem(position);holder.title.setText(item.title);holder.meta.setText(item.displayAuthor()+" · "+availability(item));String tagLine=tagLine(item);holder.tags.setText(tagLine);holder.tags.setVisibility(tagLine.isEmpty()?View.GONE:View.VISIBLE);reuse.setOnClickListener(v->click.open(item));loadCover(holder.cover,item);return reuse;
+        UnifiedCatalogStore.Entry item=getItem(position);holder.title.setText(item.title);holder.meta.setText(item.displayAuthor()+" · "+availability(item));String tagLine=tagLine(item);holder.tags.setText(tagLine);holder.tags.setVisibility(tagLine.isEmpty()?View.GONE:View.VISIBLE);
+        View cardView=reuse;reuse.setOnClickListener(v->{
+            if(opening)return;
+            opening=true;cardView.setAlpha(.62f);cardView.setEnabled(false);
+            Intent intent=new Intent(activity,UnifiedComicDetailActivity.class);intent.putExtra("comicId",item.id);intent.putExtra("title",item.title);intent.putExtra("author",item.displayAuthor());activity.startActivity(intent);
+        });
+        loadCover(holder.cover,item);return reuse;
     }
 
     private String availability(UnifiedCatalogStore.Entry item){List<String> values=new ArrayList<>();if(item.phoneDownloaded)values.add("手机");if(item.desktopDownloaded)values.add("电脑");if(item.remoteAvailable)values.add("云端");if(item.picaAvailable)values.add("在线");if(values.isEmpty())values.add("仅元数据");if(item.favorite)values.add("收藏");if(item.inShelf)values.add("书架");return join(values," · ");}

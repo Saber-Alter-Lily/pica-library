@@ -1,14 +1,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
         android:allowBackup="true"
         android:label="Pica Library"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         <activity android:name=".ReaderActivity" android:screenOrientation="unspecified" />
         <activity android:name=".UnifiedComicDetailActivity" android:exported="false" />
         <activity android:name=".ComicDetailActivity" android:exported="false" />
         <activity android:name=".StorageSettingsActivity" android:exported="false" />
+        <activity android:name=".UpdateActivity" android:exported="false" />
         <activity android:name=".PicaBrowseActivity" android:exported="false" />
         <activity android:name=".PicaAccountActivity" android:exported="false" />
         <activity android:name=".RemoteStorageActivity" android:exported="false" />

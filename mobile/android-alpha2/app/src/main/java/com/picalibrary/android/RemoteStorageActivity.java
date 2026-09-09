@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.*;
 import java.util.Locale;
@@ -25,8 +26,9 @@ public class RemoteStorageActivity extends Activity {
         Button clear=button("清除网盘配置");clear.setOnClickListener(v->{RemoteConfigStore.clear(this);finish();});p.addView(clear);
 
         Ui.gap(p,this,18);p.addView(Ui.text(this,"手机存储管理",18,Ui.TEXT,true));
-        p.addView(Ui.text(this,"阅读页缓存默认上限约 1 GB；封面缓存和 WebDAV 元数据分别有独立上限。清理缓存不会删除收藏、网盘漫画、阅读进度或登录信息。",12,Ui.MUTED,false));
+        p.addView(Ui.text(this,"阅读页缓存、封面缓存和预加载都可以自行调整；手机主动下载的漫画属于持久下载，不参与缓存 LRU 自动清理。",12,Ui.MUTED,false));
         storageStatus=Ui.text(this,"",13,Ui.MUTED,false);p.addView(storageStatus);refreshStorageStatus();
+        Button detailed=button("缓存上限 / 预加载 / 存储位置");detailed.setOnClickListener(v->startActivity(new Intent(this,StorageSettingsActivity.class)));p.addView(detailed);
         LinearLayout clearRow1=new LinearLayout(this);Button clearPages=button("清阅读页");Button clearCovers=button("清封面");clearRow1.addView(clearPages,new LinearLayout.LayoutParams(0,-2,1));clearRow1.addView(clearCovers,new LinearLayout.LayoutParams(0,-2,1));p.addView(clearRow1);
         LinearLayout clearRow2=new LinearLayout(this);Button clearMetadata=button("清元数据缓存");Button clearAll=button("清全部缓存");clearRow2.addView(clearMetadata,new LinearLayout.LayoutParams(0,-2,1));clearRow2.addView(clearAll,new LinearLayout.LayoutParams(0,-2,1));p.addView(clearRow2);
         clearPages.setOnClickListener(v->{StoragePolicy.clearPages(this);refreshStorageStatus();});
@@ -36,7 +38,7 @@ public class RemoteStorageActivity extends Activity {
         setContentView(scroll);
     }
     private EditText field(LinearLayout p,String label,String value,String hint){p.addView(Ui.text(this,label,13,Ui.TEXT,true));EditText e=new EditText(this);e.setSingleLine(true);e.setText(value);e.setHint(hint);p.addView(e,new LinearLayout.LayoutParams(-1,Ui.dp(this,50)));return e;}
-    private void refreshStorageStatus(){StoragePolicy.Usage u=StoragePolicy.usage(this);storageStatus.setText("阅读页 "+format(u.pages)+" · 封面 "+format(u.covers)+" · 元数据 "+format(u.metadata)+" · 合计 "+format(u.total));}
+    private void refreshStorageStatus(){StoragePolicy.Usage u=StoragePolicy.usage(this);storageStatus.setText("阅读页 "+format(u.pages)+" / "+StorageSettings.limitLabel(StorageSettings.pageMb(this))+" · 封面 "+format(u.covers)+" / "+StorageSettings.limitLabel(StorageSettings.coverMb(this))+" · 预加载 "+StorageSettings.prefetchPages(this)+" 页 · 合计 "+format(u.total));}
     private void test(boolean save){
         status.setText(save?"正在保存并测试…":"正在测试 WebDAV…");
         new Thread(()->{try{
@@ -51,7 +53,7 @@ public class RemoteStorageActivity extends Activity {
     }
     private void refreshPortableState(){
         if(!RemoteConfigStore.load(this).configured()){status.setText("请先保存 WebDAV 配置");return;}
-        status.setText("正在刷新便携状态…");new Thread(()->{try{FavoriteCacheStore.Snapshot snapshot=FavoriteCacheStore.syncFromRemote(this);ReaderSettingsStore.reconcile(this);StoragePolicy.maintain(this);runOnUiThread(()->{status.setText("便携状态已刷新 · 收藏 "+snapshot.items.size()+" 本 · 阅读进度/设置会自动同步");refreshStorageStatus();});}catch(Exception e){runOnUiThread(()->status.setText("便携状态刷新失败："+(e.getMessage()==null?"尚未由电脑发布":e.getMessage())));}}).start();
+        status.setText("正在刷新便携状态…");new Thread(()->{try{FavoriteCacheStore.Snapshot snapshot=FavoriteCacheStore.syncFromRemote(this);ReaderSettingsStore.reconcile(this);UnifiedRemoteCatalogSync.refresh(this);StoragePolicy.maintain(this);runOnUiThread(()->{status.setText("便携状态已刷新 · 收藏 "+snapshot.items.size()+" 本 · 目录/阅读进度/设置已检查");refreshStorageStatus();});}catch(Exception e){runOnUiThread(()->status.setText("便携状态刷新失败："+(e.getMessage()==null?"尚未由电脑发布":e.getMessage())));}}).start();
     }
     private String format(long value){if(value<1024)return value+" B";if(value<1024L*1024)return String.format(Locale.ROOT,"%.1f KB",value/1024.0);if(value<1024L*1024*1024)return String.format(Locale.ROOT,"%.1f MB",value/1024.0/1024.0);return String.format(Locale.ROOT,"%.2f GB",value/1024.0/1024.0/1024.0);}
 }

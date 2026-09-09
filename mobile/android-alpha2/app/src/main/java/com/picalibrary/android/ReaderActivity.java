@@ -42,7 +42,7 @@ public class ReaderActivity extends Activity {
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         String sourceKind = getIntent().getStringExtra("source");
-        if("remote".equals(sourceKind))source=new RemoteReaderSource(this);else if("pica".equals(sourceKind))source=new PicaReaderSource(this);else source=new DesktopReaderSource(this);
+        if("phone".equals(sourceKind))source=new PhoneDownloadReaderSource(this);else if("remote".equals(sourceKind))source=new RemoteReaderSource(this);else if("pica".equals(sourceKind))source=new PicaReaderSource(this);else source=new DesktopReaderSource(this);
         images = new ReaderImages(this, source);
         progress = new ReaderProgress(this, source);
         comic = getIntent().getStringExtra("comicId"); title = getIntent().getStringExtra("title");
@@ -74,7 +74,7 @@ public class ReaderActivity extends Activity {
             } catch (Exception e) { main.post(() -> { if (valid(serial)) failChapter(); }); }});
     }
     private boolean valid(int serial) { return !destroyed && serial == generation; }
-    private void failChapter() {loading.setVisibility(View.GONE); retry.setVisibility(View.VISIBLE); setChrome(true);String label=source instanceof RemoteReaderSource?"WebDAV":source instanceof PicaReaderSource?"Pica 在线":"电脑连接";counter.setText("无法读取章节，请检查 "+label+" 或本地缓存后重试");}
+    private void failChapter() {loading.setVisibility(View.GONE); retry.setVisibility(View.VISIBLE); setChrome(true);String label=source instanceof PhoneDownloadReaderSource?"手机下载":source instanceof RemoteReaderSource?"WebDAV":source instanceof PicaReaderSource?"Pica 在线":"电脑连接";counter.setText("无法读取章节，请检查 "+label+" 或本地缓存后重试");}
     private void loadChapter(String id, int start) {save(true); desiredChapter = id; final int serial = ++generation;if (chapterRequest != null) chapterRequest.cancel(true);chapterReady = false; loading.setVisibility(View.VISIBLE); retry.setVisibility(View.GONE); clearPages();chapterRequest = metadata.submit(() -> {try {BridgeClient.ChapterData data = source.chapter(comic, id);main.post(() -> { if (valid(serial)) apply(data, start); });} catch (Exception e) { main.post(() -> { if (valid(serial)) failChapter(); }); }});}
     private void apply(BridgeClient.ChapterData data, int start) {chapter = desiredChapter = data.episode.id; pages = data.pages;index = ReaderPolicy.clampPage(start == -2 ? pages.size() - 1 : start >= 0 ? start : progress.position(comic, chapter, data.progressIndex), pages.size());heading.setText((title == null ? "漫画" : title) + " · " + data.episode.title);loading.setVisibility(View.GONE); chapterReady = true; seek.setMax(Math.max(0, pages.size() - 1));buildPages(); updateCounter();prefetchAround();if (pages.isEmpty()) { counter.setText("该章节尚无可读取页面"); setChrome(true); }}
     private void clearPages() {if (pager != null) pager.setAdapter(null); if (continuous != null) continuous.setAdapter(null);for (Holder holder : new ArrayList<>(holders)) holder.cancel();holders.clear(); canvas.removeAllViews(); pager = null; continuous = null;}
@@ -85,7 +85,7 @@ public class ReaderActivity extends Activity {
     }
     private void selected(int p) { index = ReaderPolicy.clampPage(p, pages.size()); updateCounter();prefetchAround(); save(false); }
     private void prefetchAround(){int count=StorageSettings.prefetchPages(this);List<String> targets=new ArrayList<>();if(count>0&&!pages.isEmpty())for(int step=1;step<=count;step++){int p=index+step;if(p>=pages.size())break;targets.add(pages.get(p).url);}images.prefetch(targets);}
-    private String sourceLabel(){return source instanceof RemoteReaderSource?"云端/缓存":source instanceof PicaReaderSource?"Pica/缓存":"电脑/缓存";}
+    private String sourceLabel(){return source instanceof PhoneDownloadReaderSource?"手机":source instanceof RemoteReaderSource?"云端/缓存":source instanceof PicaReaderSource?"Pica/缓存":"电脑/缓存";}
     private void updateCounter() { if (!dragging) { seek.setProgress(index); counter.setText((pages.isEmpty() ? 0 : index + 1) + " / " + pages.size() + " · "+sourceLabel()+" · 预载 "+StorageSettings.prefetchPages(this)); } }
     private void save(boolean flush) {if (!chapterReady || pages.isEmpty()) return;boolean displayed = false; for (Holder h : holders) if (h.position == index && h.loaded) displayed = true;if (!displayed) return;progress.save(comic, chapter, index, flush); main.removeCallbacks(syncProgress);if (flush) progress.sync(); else main.postDelayed(syncProgress, 1200);}
     private void go(int p, boolean smooth) {if (!chapterReady || pages.isEmpty()) return; p = ReaderPolicy.clampPage(p, pages.size());if (pager != null) pager.setCurrentItem(p, smooth);else if (continuous != null) { ((LinearLayoutManager)continuous.getLayoutManager()).scrollToPositionWithOffset(p, 0); selected(p); }}

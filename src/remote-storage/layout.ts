@@ -16,6 +16,10 @@ export function generationId(now = new Date()) {
 export const remoteLayout = {
     root: ROOT,
     current: `${ROOT}/control/current.json`,
+    shelves: `${ROOT}/state/shelves.json`,
+    favorites: `${ROOT}/state/favorites.json`,
+    readingRoot: `${ROOT}/state/reading`,
+    readingCurrent: `${ROOT}/state/reading/current.json`,
     generationCatalog(generation: string) {
         return `${ROOT}/index/generations/${remoteIdSegment(generation)}.json`
     },

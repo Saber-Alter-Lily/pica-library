@@ -1,18 +1,27 @@
 import type { LibraryDatabase } from '../library/database'
 import type { CredentialStore } from '../desktop/credentials'
 import type { StoredCredentials } from '../desktop/types'
+import { LibraryQueryService } from '../services/library-query-service'
 import {
     loadRemoteStorageConfig,
     normalizeRemoteStorageConfig,
     saveRemoteStorageConfig
 } from './config'
 import { createRemoteStorageProvider } from './factory'
+import { remoteLayout } from './layout'
 import { RemoteLibrarySyncService } from './sync-service'
-import type { RemoteStoragePublicConfig } from './types'
+import type {
+    RemoteFavoriteState,
+    RemoteReadingEntry,
+    RemoteReadingState,
+    RemoteStorageProvider,
+    RemoteStoragePublicConfig
+} from './types'
 
 export class RemoteStorageDesktopManager {
     private publicConfig: RemoteStoragePublicConfig | null
     private credentials: StoredCredentials | null
+    private readonly query: LibraryQueryService
     private syncProgress: Record<string, unknown> = {
         phase: 'idle',
         updatedAt: new Date().toISOString()
@@ -28,6 +37,7 @@ export class RemoteStorageDesktopManager {
     ) {
         this.credentials = credentials
         this.publicConfig = loadRemoteStorageConfig(configFile)
+        this.query = new LibraryQueryService(database)
     }
 
     status() {
@@ -161,14 +171,101 @@ export class RemoteStorageDesktopManager {
         }
     }
 
+    private portableFavorites(): RemoteFavoriteState {
+        const items = this.query.query({
+            scope: 'favorites',
+            limit: 5000,
+            offset: 0,
+            sort: 'latest'
+        }).items
+        return {
+            schemaVersion: 1,
+            updatedAt: new Date().toISOString(),
+            items: items.map((comic) => ({
+                comicId: comic.comicId,
+                title: comic.title,
+                author: comic.author,
+                canonicalAuthor: comic.canonicalAuthor,
+                // Keep the Desktop cover route as a stable cache key on Android.
+                // When Desktop is offline, already-prefetched covers still resolve
+                // locally; cloud cover availability remains a separate source fact.
+                coverPath: `/mobile/v1/covers/${encodeURIComponent(comic.comicId)}`,
+                downloadedPictures: comic.downloadedPictures,
+                knownPictures: comic.knownPictures,
+                updatedAt: comic.updatedAt
+            }))
+        }
+    }
+
+    private readingKey(entry: Pick<RemoteReadingEntry, 'comicId' | 'episodeId'>) {
+        return `${entry.comicId}\n${entry.episodeId}`
+    }
+
+    private async portableReading(
+        provider: RemoteStorageProvider
+    ): Promise<RemoteReadingState> {
+        const previous =
+            (await provider.getJson<RemoteReadingState>(
+                remoteLayout.readingCurrent
+            )) ?? {
+                schemaVersion: 1 as const,
+                updatedAt: '',
+                entries: []
+            }
+        const merged = new Map<string, RemoteReadingEntry>()
+        for (const entry of previous.entries ?? []) {
+            if (!entry?.comicId || !entry?.episodeId) continue
+            merged.set(this.readingKey(entry), entry)
+        }
+        for (const progress of this.database.readingProgress()) {
+            const comic = this.database.getComic(progress.comicId)
+            const episode = this.database
+                .listReaderEpisodes(progress.comicId)
+                .find((item) => item.id === progress.episodeId)
+            const local: RemoteReadingEntry = {
+                comicId: progress.comicId,
+                episodeId: progress.episodeId,
+                pageIndex: progress.pageIndex,
+                updatedAt: progress.updatedAt,
+                deviceId: 'desktop',
+                comicTitle: comic?.title,
+                author: comic?.canonicalAuthor ?? comic?.author,
+                episodeTitle: episode?.title,
+                episodeOrder: episode?.order
+            }
+            const prior = merged.get(this.readingKey(local))
+            if (!prior || local.updatedAt >= prior.updatedAt)
+                merged.set(this.readingKey(local), local)
+        }
+        const entries = [...merged.values()].sort((left, right) =>
+            right.updatedAt.localeCompare(left.updatedAt)
+        )
+        return {
+            schemaVersion: 1,
+            updatedAt: entries[0]?.updatedAt ?? new Date().toISOString(),
+            entries
+        }
+    }
+
+    private async publishPortableState(provider: RemoteStorageProvider) {
+        await provider.ensureDirectory('v1/state')
+        await provider.ensureDirectory(remoteLayout.readingRoot)
+        await provider.putJson(remoteLayout.shelves, this.portableShelves())
+        await provider.putJson(remoteLayout.favorites, this.portableFavorites())
+        await provider.putJson(
+            remoteLayout.readingCurrent,
+            await this.portableReading(provider)
+        )
+    }
+
     async sync(input: Record<string, unknown>) {
         this.save(input)
         await this.test(input)
         const { provider } = this.provider(input)
-        // Shelf classification is portable metadata. Publish it independently of
-        // page upload progress so Android can import the web bookshelf even when
-        // a long first comic sync is still running.
-        await provider.putJson('v1/state/shelves.json', this.portableShelves())
+        // Portable user-state metadata is small and independent from comic page
+        // upload. Publish it first so shelves/favorites/progress stay usable even
+        // when a long first comic sync is still running.
+        await this.publishPortableState(provider)
         const service = new RemoteLibrarySyncService(
             this.database,
             this.dataDir,

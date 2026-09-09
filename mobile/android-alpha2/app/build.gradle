@@ -10,8 +10,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 10
-        versionName '0.1.0-alpha7-portable-favorites'
+        versionCode 11
+        versionName '0.1.0-alpha7-portable-state'
     }
 
     buildTypes {

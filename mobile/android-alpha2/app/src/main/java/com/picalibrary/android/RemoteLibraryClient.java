@@ -8,11 +8,12 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.*;
 import javax.net.ssl.SSLException;
 import org.json.*;
 
-/** WebDAV catalog client with persistent metadata/cover fallback for previously visited content. */
+/** WebDAV catalog client with persistent metadata/cover fallback and portable reading state. */
 final class RemoteLibraryClient {
     static final class Comic {
         final String id,title,author,manifestPath,coverPath;
@@ -24,6 +25,7 @@ final class RemoteLibraryClient {
         Catalog(String generation,List<Comic> comics){this.generation=generation;this.comics=comics;}
     }
 
+    private static final String READING_PATH="v1/state/reading/current.json";
     private final RemoteConfigStore.Config config;
     private final File metadataCache;
     private final File coverCache;
@@ -66,14 +68,76 @@ final class RemoteLibraryClient {
         finally{if(c!=null)c.disconnect();}
     }
 
+    private JSONObject optionalJson(String path) throws Exception {
+        File local=cached(metadataCache,path);HttpURLConnection c=null;
+        try{
+            c=open(path,"application/json");int status=c.getResponseCode();
+            if(status==404)return null;
+            if(status==401||status==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+status);
+            if(status>=400)throw new IOException("WebDAV HTTP "+status);
+            try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))>0)out.write(b,0,n);byte[] data=out.toByteArray();writeFile(local,data);return new JSONObject(new String(data,StandardCharsets.UTF_8));}
+        }catch(IllegalStateException e){throw e;}
+        catch(Exception e){if(local!=null&&local.isFile())return new JSONObject(readFile(local));throw e;}
+        finally{if(c!=null)c.disconnect();}
+    }
+
+    private void putJson(String path,JSONObject value) throws Exception {
+        byte[] data=value.toString().getBytes(StandardCharsets.UTF_8);HttpURLConnection c=null;
+        try{
+            c=open(path,"application/json");c.setRequestMethod("PUT");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json; charset=utf-8");c.setFixedLengthStreamingMode(data.length);
+            try(OutputStream out=c.getOutputStream()){out.write(data);}
+            int status=c.getResponseCode();
+            if(status==401||status==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+status);
+            if(status==409)throw new IllegalStateException("云端状态目录尚未初始化 · 请先在新版电脑端执行一次云同步");
+            if(status<200||status>=300)throw new IOException("WebDAV PUT failed · HTTP "+status);
+            writeFile(cached(metadataCache,path),data);
+        }finally{if(c!=null)c.disconnect();}
+    }
+
     JSONObject json(String path) throws Exception {return new JSONObject(text(path));}
     Catalog catalog() throws Exception {
         JSONObject pointer=json("v1/control/current.json");String generation=pointer.optString("generation","");String catalogPath=pointer.optString("catalogPath","");if(catalogPath.isEmpty())throw new IllegalStateException("云端书库尚未发布");
         JSONObject root=json(catalogPath);JSONArray arr=root.optJSONArray("comics");List<Comic> list=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o==null)continue;list.add(new Comic(o.optString("comicId"),o.optString("title","未命名漫画"),o.optString("author","未知作者"),o.optString("manifestPath"),o.optString("coverPath"),o.optInt("episodeCount",0),o.optInt("pageCount",0)));}return new Catalog(generation,list);
     }
     JSONObject shelves() throws Exception {return json("v1/state/shelves.json");}
+    JSONObject favorites() throws Exception {return json("v1/state/favorites.json");}
     JSONObject comic(String manifestPath) throws Exception {return json(manifestPath);}
     JSONObject episode(String manifestPath) throws Exception {return json(manifestPath);}
+
+    private JSONObject readingState() throws Exception {
+        JSONObject state=optionalJson(READING_PATH);
+        if(state!=null)return state;
+        JSONObject empty=new JSONObject();empty.put("schemaVersion",1);empty.put("updatedAt","");empty.put("entries",new JSONArray());return empty;
+    }
+
+    int progress(String comicId,String episodeId) throws Exception {
+        JSONArray entries=readingState().optJSONArray("entries");int page=0;String latest="";
+        if(entries!=null)for(int i=0;i<entries.length();i++){
+            JSONObject e=entries.optJSONObject(i);if(e==null||!comicId.equals(e.optString("comicId"))||!episodeId.equals(e.optString("episodeId")))continue;
+            String updated=e.optString("updatedAt","");if(updated.compareTo(latest)>=0){latest=updated;page=Math.max(0,e.optInt("pageIndex",0));}
+        }
+        return page;
+    }
+
+    String recentChapter(String comicId) throws Exception {
+        JSONArray entries=readingState().optJSONArray("entries");String chapter="",latest="";
+        if(entries!=null)for(int i=0;i<entries.length();i++){
+            JSONObject e=entries.optJSONObject(i);if(e==null||!comicId.equals(e.optString("comicId")))continue;String updated=e.optString("updatedAt","");
+            if(updated.compareTo(latest)>0){latest=updated;chapter=e.optString("episodeId","");}
+        }
+        return chapter;
+    }
+
+    synchronized void saveReadingProgress(String deviceId,String comicId,String episodeId,int pageIndex) {
+        try{
+            JSONObject state=readingState();JSONArray existing=state.optJSONArray("entries");LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
+            if(existing!=null)for(int i=0;i<existing.length();i++){JSONObject e=existing.optJSONObject(i);if(e==null)continue;String c=e.optString("comicId","");String ep=e.optString("episodeId","");if(c.isEmpty()||ep.isEmpty())continue;merged.put(c+"\n"+ep,e);}
+            String key=comicId+"\n"+episodeId;JSONObject prior=merged.get(key);JSONObject entry=prior==null?new JSONObject():new JSONObject(prior.toString());String now=Instant.now().toString();
+            entry.put("comicId",comicId);entry.put("episodeId",episodeId);entry.put("pageIndex",Math.max(0,pageIndex));entry.put("updatedAt",now);entry.put("deviceId",deviceId);merged.put(key,entry);
+            ArrayList<JSONObject> ordered=new ArrayList<>(merged.values());ordered.sort((a,b)->b.optString("updatedAt","").compareTo(a.optString("updatedAt","")));JSONArray out=new JSONArray();for(JSONObject value:ordered)out.put(value);
+            JSONObject next=new JSONObject();next.put("schemaVersion",1);next.put("updatedAt",now);next.put("entries",out);putJson(READING_PATH,next);
+        }catch(Exception e){throw new IllegalStateException(e.getMessage()==null?"云端阅读进度同步失败":e.getMessage(),e);}
+    }
 
     Bitmap bitmap(String path) throws Exception {
         if(path==null||path.isEmpty())throw new IllegalStateException("没有封面路径");File target=cached(coverCache,path);

@@ -76,6 +76,41 @@ export interface RemoteComicManifest {
     episodes: RemoteComicEpisodeEntry[]
 }
 
+export interface RemoteFavoriteItem {
+    comicId: string
+    title: string
+    author: string
+    canonicalAuthor?: string | null
+    coverPath?: string
+    downloadedPictures: number
+    knownPictures: number
+    updatedAt?: string
+}
+
+export interface RemoteFavoriteState {
+    schemaVersion: typeof REMOTE_LIBRARY_SCHEMA_VERSION
+    updatedAt: string
+    items: RemoteFavoriteItem[]
+}
+
+export interface RemoteReadingEntry {
+    comicId: string
+    episodeId: string
+    pageIndex: number
+    updatedAt: string
+    deviceId: string
+    comicTitle?: string
+    author?: string
+    episodeTitle?: string
+    episodeOrder?: number
+}
+
+export interface RemoteReadingState {
+    schemaVersion: typeof REMOTE_LIBRARY_SCHEMA_VERSION
+    updatedAt: string
+    entries: RemoteReadingEntry[]
+}
+
 export interface RemoteObject {
     path: string
     data: Buffer

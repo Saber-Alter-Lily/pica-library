@@ -34,8 +34,9 @@ final class DesktopReaderSource implements ReaderSource {
 }
 
 final class RemoteReaderSource implements ReaderSource {
+    private final Context context;
     private final RemoteLibraryClient client;
-    RemoteReaderSource(Context context){client=new RemoteLibraryClient(context);}
+    RemoteReaderSource(Context context){this.context=context.getApplicationContext();client=new RemoteLibraryClient(this.context);}
     public String kind(){return "remote";}
     public String scope(){return client.scope();}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
@@ -48,8 +49,8 @@ final class RemoteReaderSource implements ReaderSource {
         if(episodes!=null)for(int i=0;i<episodes.length();i++){JSONObject o=episodes.optJSONObject(i);if(o!=null&&episodeId.equals(o.optString("episodeId"))){selected=o;break;}}
         if(selected==null)throw new IllegalStateException("云端章节不存在");JSONObject episode=client.episode(selected.optString("manifestPath"));JSONArray arr=episode.optJSONArray("pages");List<BridgeClient.PageItem> pages=new ArrayList<>();
         if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o==null)continue;String objectPath=o.optString("objectPath");pages.add(new BridgeClient.PageItem(objectPath,objectPath,o.optInt("index",i)+1));}
-        BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(episodeId,episode.optString("title",selected.optString("title","章节")),episode.optInt("order",selected.optInt("order",0)),pages.size());return new BridgeClient.ChapterData(item,pages,0);
+        BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(episodeId,episode.optString("title",selected.optString("title","章节")),episode.optInt("order",selected.optInt("order",0)),pages.size());return new BridgeClient.ChapterData(item,pages,client.progress(comicId,episodeId));
     }
     public HttpURLConnection image(String path) throws Exception {if(path==null||!path.startsWith("v1/")||path.contains("..")||path.contains("\\"))throw new IllegalArgumentException("无效的云端图片路径");return client.open(path,"image/*");}
-    public void saveProgress(String comicId,String episodeId,int pageIndex){/* Local source-scoped bookmark is authoritative until cloud state sync lands. */}
+    public void saveProgress(String comicId,String episodeId,int pageIndex){client.saveReadingProgress(DeviceIdentity.id(context),comicId,episodeId,pageIndex);}
 }

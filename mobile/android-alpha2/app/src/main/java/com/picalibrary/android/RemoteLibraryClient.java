@@ -13,7 +13,7 @@ import java.util.*;
 import javax.net.ssl.SSLException;
 import org.json.*;
 
-/** WebDAV catalog client with persistent metadata/cover fallback and portable reading state. */
+/** WebDAV catalog client with persistent metadata/cover fallback and portable user state. */
 final class RemoteLibraryClient {
     static final class Comic {
         final String id,title,author,manifestPath,coverPath;
@@ -23,6 +23,13 @@ final class RemoteLibraryClient {
     static final class Catalog {
         final String generation;final List<Comic> comics;
         Catalog(String generation,List<Comic> comics){this.generation=generation;this.comics=comics;}
+    }
+    static final class ReadingEntry {
+        final String comicId,episodeId,updatedAt,deviceId,comicTitle,author,episodeTitle;
+        final int pageIndex,episodeOrder;
+        ReadingEntry(String comicId,String episodeId,int pageIndex,String updatedAt,String deviceId,String comicTitle,String author,String episodeTitle,int episodeOrder){
+            this.comicId=comicId;this.episodeId=episodeId;this.pageIndex=pageIndex;this.updatedAt=updatedAt;this.deviceId=deviceId;this.comicTitle=comicTitle;this.author=author;this.episodeTitle=episodeTitle;this.episodeOrder=episodeOrder;
+        }
     }
 
     private static final String READING_PATH="v1/state/reading/current.json";
@@ -72,7 +79,7 @@ final class RemoteLibraryClient {
         File local=cached(metadataCache,path);HttpURLConnection c=null;
         try{
             c=open(path,"application/json");int status=c.getResponseCode();
-            if(status==404)return null;
+            if(status==404)return local!=null&&local.isFile()?new JSONObject(readFile(local)):null;
             if(status==401||status==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+status);
             if(status>=400)throw new IOException("WebDAV HTTP "+status);
             try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))>0)out.write(b,0,n);byte[] data=out.toByteArray();writeFile(local,data);return new JSONObject(new String(data,StandardCharsets.UTF_8));}
@@ -110,30 +117,31 @@ final class RemoteLibraryClient {
         JSONObject empty=new JSONObject();empty.put("schemaVersion",1);empty.put("updatedAt","");empty.put("entries",new JSONArray());return empty;
     }
 
-    int progress(String comicId,String episodeId) throws Exception {
-        JSONArray entries=readingState().optJSONArray("entries");int page=0;String latest="";
+    List<ReadingEntry> readingEntries() throws Exception {
+        JSONArray entries=readingState().optJSONArray("entries");List<ReadingEntry> out=new ArrayList<>();
         if(entries!=null)for(int i=0;i<entries.length();i++){
-            JSONObject e=entries.optJSONObject(i);if(e==null||!comicId.equals(e.optString("comicId"))||!episodeId.equals(e.optString("episodeId")))continue;
-            String updated=e.optString("updatedAt","");if(updated.compareTo(latest)>=0){latest=updated;page=Math.max(0,e.optInt("pageIndex",0));}
+            JSONObject e=entries.optJSONObject(i);if(e==null)continue;String comicId=e.optString("comicId","");String episodeId=e.optString("episodeId","");if(comicId.isEmpty()||episodeId.isEmpty())continue;
+            out.add(new ReadingEntry(comicId,episodeId,Math.max(0,e.optInt("pageIndex",0)),e.optString("updatedAt",""),e.optString("deviceId",""),e.optString("comicTitle",""),e.optString("author",""),e.optString("episodeTitle",""),e.optInt("episodeOrder",0)));
         }
-        return page;
+        out.sort((a,b)->b.updatedAt.compareTo(a.updatedAt));return out;
+    }
+
+    int progress(String comicId,String episodeId) throws Exception {
+        int page=0;String latest="";for(ReadingEntry e:readingEntries())if(comicId.equals(e.comicId)&&episodeId.equals(e.episodeId)&&e.updatedAt.compareTo(latest)>=0){latest=e.updatedAt;page=e.pageIndex;}return page;
     }
 
     String recentChapter(String comicId) throws Exception {
-        JSONArray entries=readingState().optJSONArray("entries");String chapter="",latest="";
-        if(entries!=null)for(int i=0;i<entries.length();i++){
-            JSONObject e=entries.optJSONObject(i);if(e==null||!comicId.equals(e.optString("comicId")))continue;String updated=e.optString("updatedAt","");
-            if(updated.compareTo(latest)>0){latest=updated;chapter=e.optString("episodeId","");}
-        }
-        return chapter;
+        for(ReadingEntry e:readingEntries())if(comicId.equals(e.comicId))return e.episodeId;return "";
     }
 
-    synchronized void saveReadingProgress(String deviceId,String comicId,String episodeId,int pageIndex) {
+    synchronized void saveReadingProgress(String deviceId,String comicId,String episodeId,int pageIndex,String comicTitle,String author,String episodeTitle,int episodeOrder) {
         try{
             JSONObject state=readingState();JSONArray existing=state.optJSONArray("entries");LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
             if(existing!=null)for(int i=0;i<existing.length();i++){JSONObject e=existing.optJSONObject(i);if(e==null)continue;String c=e.optString("comicId","");String ep=e.optString("episodeId","");if(c.isEmpty()||ep.isEmpty())continue;merged.put(c+"\n"+ep,e);}
             String key=comicId+"\n"+episodeId;JSONObject prior=merged.get(key);JSONObject entry=prior==null?new JSONObject():new JSONObject(prior.toString());String now=Instant.now().toString();
-            entry.put("comicId",comicId);entry.put("episodeId",episodeId);entry.put("pageIndex",Math.max(0,pageIndex));entry.put("updatedAt",now);entry.put("deviceId",deviceId);merged.put(key,entry);
+            entry.put("comicId",comicId);entry.put("episodeId",episodeId);entry.put("pageIndex",Math.max(0,pageIndex));entry.put("updatedAt",now);entry.put("deviceId",deviceId);
+            if(comicTitle!=null&&!comicTitle.isEmpty())entry.put("comicTitle",comicTitle);if(author!=null&&!author.isEmpty())entry.put("author",author);if(episodeTitle!=null&&!episodeTitle.isEmpty())entry.put("episodeTitle",episodeTitle);if(episodeOrder>0)entry.put("episodeOrder",episodeOrder);
+            merged.put(key,entry);
             ArrayList<JSONObject> ordered=new ArrayList<>(merged.values());ordered.sort((a,b)->b.optString("updatedAt","").compareTo(a.optString("updatedAt","")));JSONArray out=new JSONArray();for(JSONObject value:ordered)out.put(value);
             JSONObject next=new JSONObject();next.put("schemaVersion",1);next.put("updatedAt",now);next.put("entries",out);putJson(READING_PATH,next);
         }catch(Exception e){throw new IllegalStateException(e.getMessage()==null?"云端阅读进度同步失败":e.getMessage(),e);}

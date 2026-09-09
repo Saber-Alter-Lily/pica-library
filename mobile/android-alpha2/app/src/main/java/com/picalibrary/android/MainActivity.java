@@ -11,12 +11,20 @@ import android.widget.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Alpha7 converged shell: Alpha6 reader UX + cloud + portable shelves. No mobile Atlas. */
+/** Alpha7 converged shell: mature reader + cloud + portable user state. No mobile Atlas. */
 public class MainActivity extends Activity {
+    private static final class HistoryItem {
+        final String comicId,title,author,episodeId,episodeTitle,updatedAt;
+        final int episodeOrder,pageIndex;
+        HistoryItem(String comicId,String title,String author,String episodeId,String episodeTitle,int episodeOrder,int pageIndex,String updatedAt){
+            this.comicId=comicId;this.title=title;this.author=author;this.episodeId=episodeId;this.episodeTitle=episodeTitle;this.episodeOrder=episodeOrder;this.pageIndex=pageIndex;this.updatedAt=updatedAt;
+        }
+    }
+
     private FrameLayout body;
     private LinearLayout nav;
-    private int current, serial, columns=2;
-    private String scope="desktop", sort="latest", query="", activeShelfId="";
+    private int current,serial,columns=2;
+    private String scope="desktop",sort="latest",query="",activeShelfId="";
     private SharedPreferences preferences;
     private ComicGridAdapter gridAdapter;
     private RemoteComicGridAdapter remoteGridAdapter;
@@ -148,16 +156,24 @@ public class MainActivity extends Activity {
         if(!cached.items.isEmpty()){
             load.setVisibility(View.GONE);status.setText("本地收藏缓存 · "+cachedVisible.size()+" / "+cached.items.size()+" 部");showComicGrid(g,cachedVisible,this::openFavoriteComic);
         }
-        if(!BridgeStore.paired(this)){
-            if(cached.items.isEmpty()){load.setVisibility(View.GONE);note(p,"还没有收藏缓存","首次配对电脑时可选择“收藏 + 封面”或“仅收藏”。之后电脑离线仍可浏览已缓存收藏。 ");p.addView(button("配对电脑",v->pair()));}
-            else status.setText("电脑当前未配对 · 正在使用本地收藏缓存 · "+cachedVisible.size()+" 部");
-            return;
-        }
         final int id=serial;
-        pending=requests.submit(()->{try{
-            List<BridgeClient.ComicItem> all=FavoriteCacheStore.fetchAll(this);boolean keepCoverFlag=cached.coversPrefetched&&sameFavoriteIds(cached.items,all);FavoriteCacheStore.save(this,all,keepCoverFlag);List<BridgeClient.ComicItem> visible=favoriteView(all);
-            runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);status.setText("Desktop 在线 · 已更新手机收藏缓存 · "+visible.size()+" / "+all.size()+" 部");showComicGrid(g,visible,this::openFavoriteComic);});
-        }catch(Exception e){runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);if(cached.items.isEmpty())failure(p,load,status);else status.setText("Desktop 暂不可达 · 使用本地收藏缓存 · "+cachedVisible.size()+" 部");});}});
+        pending=requests.submit(()->{
+            try{
+                if(BridgeStore.paired(this)){
+                    try{
+                        List<BridgeClient.ComicItem> all=FavoriteCacheStore.fetchAll(this);boolean keepCoverFlag=cached.coversPrefetched&&sameFavoriteIds(cached.items,all);FavoriteCacheStore.save(this,all,keepCoverFlag);List<BridgeClient.ComicItem> visible=favoriteView(all);
+                        runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);status.setText("Desktop 在线 · 已更新手机收藏缓存 · "+visible.size()+" / "+all.size()+" 部");showComicGrid(g,visible,this::openFavoriteComic);});return;
+                    }catch(Exception ignored){}
+                }
+                if(RemoteConfigStore.load(this).configured()){
+                    FavoriteCacheStore.Snapshot remote=FavoriteCacheStore.syncFromRemote(this);List<BridgeClient.ComicItem> visible=favoriteView(remote.items);
+                    runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);status.setText("WebDAV 便携收藏 · "+visible.size()+" / "+remote.items.size()+" 部");showComicGrid(g,visible,this::openFavoriteComic);});return;
+                }
+                runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);if(cached.items.isEmpty()){note(p,"还没有收藏缓存","首次配对电脑时可选择“收藏 + 封面”或“仅收藏”；也可以从 WebDAV 导入便携收藏。");p.addView(button("配对电脑",v->pair()));}else status.setText("当前离线 · 使用本地收藏缓存 · "+cachedVisible.size()+" 部");});
+            }catch(Exception e){
+                runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);if(cached.items.isEmpty())failure(p,load,status);else status.setText("当前来源暂不可达 · 使用本地收藏缓存 · "+cachedVisible.size()+" 部");});
+            }
+        });
     }
 
     private void loadCloudLibrary(LinearLayout p){
@@ -209,10 +225,45 @@ public class MainActivity extends Activity {
     }
 
     private void history(){
-        LinearLayout p=page("继续阅读","Desktop 历史与手机 source-scoped 本地进度并存",true);
-        if(!BridgeStore.paired(this)){note(p,"电脑历史暂不可用","云端漫画的阅读位置已经保存在手机本地；完整跨来源历史列表将在 portable reading state 接入后统一显示。");return;}
-        p.addView(button("刷新阅读记录",v->showTab()));TextView status=Ui.text(this,"正在读取记录…",13,Ui.MUTED,false);p.addView(status);ProgressBar load=loading(p);final int id=serial;
-        pending=requests.submit(()->{try{List<BridgeClient.RecentItem> items=BridgeClient.recent(this,80);runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);status.setText(items.size()+" 条 Desktop 阅读记录");if(items.isEmpty())note(p,"还没有阅读记录","从书库打开已下载漫画开始阅读。");for(BridgeClient.RecentItem r:items){LinearLayout card=Ui.card(this);card.addView(Ui.text(this,r.comic.title,18,Ui.TEXT,true));card.addView(Ui.text(this,r.episodeTitle+" · 第 "+(r.pageIndex+1)+" 页",13,Ui.PRIMARY,false));card.addView(Ui.text(this,r.comic.author,12,Ui.MUTED,false));card.addView(button("继续阅读",v->{Intent intent=new Intent(this,ReaderActivity.class);intent.putExtra("comicId",r.comic.id);intent.putExtra("title",r.comic.title);intent.putExtra("episodeId",r.episodeId);intent.putExtra("source","desktop");startActivity(intent);}));p.addView(card);}});}catch(Exception e){runOnUiThread(()->{if(valid(id))failure(p,load,status);});}});
+        LinearLayout p=page("继续阅读","WebDAV 便携进度 + Desktop 历史按更新时间合并",true);
+        p.addView(button("刷新阅读记录",v->showTab()));TextView status=Ui.text(this,"正在合并阅读记录…",13,Ui.MUTED,false);p.addView(status);ProgressBar load=loading(p);final int id=serial;
+        pending=requests.submit(()->{
+            Map<String,HistoryItem> merged=new HashMap<>();Map<String,RemoteLibraryClient.Comic> cloud=new HashMap<>();boolean remoteOk=false,desktopOk=false;
+            if(RemoteConfigStore.load(this).configured()){
+                try{
+                    RemoteLibraryClient client=new RemoteLibraryClient(this);try{for(RemoteLibraryClient.Comic c:client.catalog().comics)cloud.put(c.id,c);}catch(Exception ignored){}
+                    for(RemoteLibraryClient.ReadingEntry e:client.readingEntries()){
+                        RemoteLibraryClient.Comic c=cloud.get(e.comicId);String title=e.comicTitle.isEmpty()?(c==null?"漫画":c.title):e.comicTitle;String author=e.author.isEmpty()?(c==null?"未知作者":c.author):e.author;String episode=e.episodeTitle.isEmpty()?"章节":e.episodeTitle;
+                        HistoryItem item=new HistoryItem(e.comicId,title,author,e.episodeId,episode,e.episodeOrder,e.pageIndex,e.updatedAt);merged.put(e.comicId+"\n"+e.episodeId,item);
+                    }
+                    remoteOk=true;
+                }catch(Exception ignored){}
+            }
+            if(BridgeStore.paired(this)){
+                try{
+                    for(BridgeClient.RecentItem r:BridgeClient.recent(this,100)){
+                        String key=r.comic.id+"\n"+r.episodeId;HistoryItem prior=merged.get(key);HistoryItem item=new HistoryItem(r.comic.id,r.comic.title,r.comic.author,r.episodeId,r.episodeTitle,r.episodeOrder,r.pageIndex,r.updatedAt);
+                        if(prior==null||item.updatedAt.compareTo(prior.updatedAt)>0)merged.put(key,item);
+                    }
+                    desktopOk=true;
+                }catch(Exception ignored){}
+            }
+            List<HistoryItem> items=new ArrayList<>(merged.values());items.sort((a,b)->b.updatedAt.compareTo(a.updatedAt));if(items.size()>100)items=new ArrayList<>(items.subList(0,100));
+            final List<HistoryItem> visible=items;final boolean remoteAvailable=remoteOk,desktopAvailable=desktopOk;final Map<String,RemoteLibraryClient.Comic> cloudSnapshot=new HashMap<>(cloud);
+            runOnUiThread(()->{
+                if(!valid(id))return;load.setVisibility(View.GONE);
+                String label=(remoteAvailable?"WebDAV":"")+(remoteAvailable&&desktopAvailable?" + ":"")+(desktopAvailable?"Desktop":"");status.setText(visible.size()+" 条阅读记录"+(label.isEmpty()?" · 当前仅有本地 source-scoped 书签":" · "+label));
+                if(visible.isEmpty()){note(p,"还没有可合并的阅读记录","云端阅读会自动写入便携进度；Desktop 进度会在云同步时合并到 WebDAV。");return;}
+                for(HistoryItem h:visible){
+                    LinearLayout card=Ui.card(this);card.addView(Ui.text(this,h.title,18,Ui.TEXT,true));card.addView(Ui.text(this,h.episodeTitle+" · 第 "+(h.pageIndex+1)+" 页",13,Ui.PRIMARY,false));card.addView(Ui.text(this,h.author,12,Ui.MUTED,false));RemoteLibraryClient.Comic cloudComic=cloudSnapshot.get(h.comicId);String origin=cloudComic!=null?"云端可继续":"需要电脑在线";card.addView(Ui.text(this,origin,11,Ui.MUTED,false));
+                    card.addView(button("继续阅读",v->{
+                        RemoteLibraryClient.Comic c=cloudSnapshot.get(h.comicId);if(c!=null){Intent intent=new Intent(this,ReaderActivity.class);intent.putExtra("comicId",h.comicId);intent.putExtra("title",h.title);intent.putExtra("episodeId",h.episodeId);intent.putExtra("source","remote");startActivity(intent);return;}
+                        if(BridgeStore.paired(this)){Intent intent=new Intent(this,ReaderActivity.class);intent.putExtra("comicId",h.comicId);intent.putExtra("title",h.title);intent.putExtra("episodeId",h.episodeId);intent.putExtra("source","desktop");startActivity(intent);return;}
+                        Toast.makeText(this,"该记录当前没有可用正文来源。",Toast.LENGTH_LONG).show();
+                    }));p.addView(card);
+                }
+            });
+        });
     }
 
     private void syncFavoriteCache(TextView state,boolean covers){
@@ -225,13 +276,13 @@ public class MainActivity extends Activity {
     }
 
     private void sources(){
-        LinearLayout p=page("连接与设置","来源、收藏、缓存与阅读工具分开管理",true);
+        LinearLayout p=page("连接与设置","来源、便携状态、缓存与阅读工具分开管理",true);
         LinearLayout desktop=Ui.card(this);desktop.addView(Ui.text(this,"局域网电脑",18,Ui.TEXT,true));TextView state=Ui.text(this,BridgeStore.paired(this)?"已配对 · 正在检查连接":"尚未配对",13,Ui.MUTED,false);desktop.addView(state);if(BridgeStore.paired(this))desktop.addView(Ui.text(this,BridgeStore.serverName(this),13,Ui.MUTED,false));desktop.addView(button(BridgeStore.paired(this)?"管理电脑连接":"配对电脑",v->pair()));p.addView(desktop);
         if(BridgeStore.paired(this)){final int id=serial;pending=requests.submit(()->{try{BridgeClient.device(this);runOnUiThread(()->{if(valid(id))state.setText("电脑在线 · 可读取本地书库");});}catch(Exception e){runOnUiThread(()->{if(valid(id))state.setText("已配对 · 电脑当前不可达");});}});}
 
         FavoriteCacheStore.Snapshot favoriteSnapshot=FavoriteCacheStore.load(this);LinearLayout favorites=Ui.card(this);favorites.addView(Ui.text(this,"手机收藏缓存",18,Ui.TEXT,true));TextView favoriteState=Ui.text(this,favoriteSnapshot.items.isEmpty()?"尚未导入":"已缓存 "+favoriteSnapshot.items.size()+" 本 · 元数据 "+formatBytes(FavoriteCacheStore.metadataBytes(this))+" · 电脑封面缓存 "+formatBytes(ImageRepository.diskBytes(this)),13,Ui.MUTED,false);favorites.addView(favoriteState);favorites.addView(Ui.text(this,"首次配对可选择是否导入封面；以后即使电脑离线，收藏列表和已缓存封面仍保留在手机。",12,Ui.MUTED,false));LinearLayout favActions=new LinearLayout(this);favActions.addView(button("仅更新收藏",v->syncFavoriteCache(favoriteState,false)),new LinearLayout.LayoutParams(0,-2,1));favActions.addView(button("收藏 + 封面",v->syncFavoriteCache(favoriteState,true)),new LinearLayout.LayoutParams(0,-2,1));favorites.addView(favActions);p.addView(favorites);
 
-        RemoteConfigStore.Config remote=RemoteConfigStore.load(this);LinearLayout cloud=Ui.card(this);cloud.addView(Ui.text(this,"WebDAV 云端",18,Ui.TEXT,true));cloud.addView(Ui.text(this,remote.configured()?"已配置 · "+remote.root:"尚未配置",13,Ui.MUTED,false));cloud.addView(button(remote.configured()?"管理 WebDAV":"配置 WebDAV",v->startActivity(new Intent(this,RemoteStorageActivity.class))));p.addView(cloud);
+        RemoteConfigStore.Config remote=RemoteConfigStore.load(this);LinearLayout cloud=Ui.card(this);cloud.addView(Ui.text(this,"WebDAV 云端",18,Ui.TEXT,true));cloud.addView(Ui.text(this,remote.configured()?"已配置 · "+remote.root:"尚未配置",13,Ui.MUTED,false));cloud.addView(Ui.text(this,"书架、收藏和阅读进度现在都有便携状态；漫画正文仍按 generation/manifest 独立管理。",12,Ui.MUTED,false));cloud.addView(button(remote.configured()?"管理 WebDAV / 刷新便携状态":"配置 WebDAV",v->startActivity(new Intent(this,RemoteStorageActivity.class))));p.addView(cloud);
         LinearLayout cache=Ui.card(this);cache.addView(Ui.text(this,"本地阅读缓存",18,Ui.TEXT,true));TextView cacheState=Ui.text(this,"已缓存 "+formatBytes(ReaderImages.cacheBytes(this))+" · 上限约 1 GB",13,Ui.MUTED,false);cache.addView(cacheState);cache.addView(Ui.text(this,"从 WebDAV 或未来 Pica 在线源看过的页面会保存在手机本地；再次阅读优先走本地缓存。",12,Ui.MUTED,false));cache.addView(button("清除阅读缓存",v->{ReaderImages.clearCache(this);cacheState.setText("已缓存 0 B · 上限约 1 GB");}));p.addView(cache);
         note(p,"阅读设置","打开漫画后可切换横向左→右、横向右→左、纵向连续阅读，以及屏幕常亮。阅读模式会保存。\n所有来源使用同一套 Alpha6 成熟 Reader。");
         note(p,"关于","Pica Library Android "+getVersion()+"\n手机端不再包含图鉴。网页端 Taste Chronicle 保留。不要把局域网 Bridge 直接映射到公网。");

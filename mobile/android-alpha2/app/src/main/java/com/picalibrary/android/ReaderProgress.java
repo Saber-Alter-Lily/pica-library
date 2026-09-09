@@ -23,7 +23,11 @@ final class ReaderProgress {
         try { return new JSONObject(store.getString(key(comic, chapter), "{}")).optInt("page", fallback); }
         catch (Exception e) { return fallback; }
     }
-    String recentChapter(String comic) { return store.getString("recent:" + prefix + comic, ""); }
+    String recentChapter(String comic) {
+        String local=store.getString("recent:" + prefix + comic, "");
+        if(local!=null&&!local.isEmpty())return local;
+        try{return source.recentChapter(comic);}catch(Exception ignored){return "";}
+    }
     void save(String comic, String chapter, int page, boolean flush) {
         if (comic == null || chapter == null) return;
         try {

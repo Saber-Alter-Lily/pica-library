@@ -10,8 +10,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 17
-        versionName '0.1.0-alpha7-background-foundation'
+        versionCode 18
+        versionName '0.1.0-alpha8-native-foundation'
     }
 
     buildTypes {
@@ -23,6 +23,7 @@ android {
 }
 
 dependencies {
+    implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.viewpager2:viewpager2:1.1.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.work:work-runtime:2.9.1'

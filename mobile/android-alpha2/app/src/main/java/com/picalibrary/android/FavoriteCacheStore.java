@@ -16,13 +16,11 @@ final class FavoriteCacheStore {
         final String updatedAt;
         final boolean coversPrefetched;
         final List<BridgeClient.ComicItem> items;
-        Snapshot(String updatedAt,boolean coversPrefetched,List<BridgeClient.ComicItem> items){
-            this.updatedAt=updatedAt;this.coversPrefetched=coversPrefetched;this.items=items;
-        }
+        Snapshot(String updatedAt,boolean coversPrefetched,List<BridgeClient.ComicItem> items){this.updatedAt=updatedAt;this.coversPrefetched=coversPrefetched;this.items=items;}
     }
     private FavoriteCacheStore(){}
 
-    private static File file(Context context){return new File(context.getFilesDir(),"favorite-catalog-v1.json");}
+    private static File file(Context context){return MobileStoragePaths.dataFile(context,"favorite-catalog-v1.json");}
 
     static Snapshot load(Context context){
         File source=file(context);if(!source.isFile())return new Snapshot("",false,new ArrayList<>());
@@ -48,7 +46,7 @@ final class FavoriteCacheStore {
         try{
             JSONObject root=new JSONObject();root.put("schemaVersion",1);root.put("updatedAt",new Date().toInstant().toString());root.put("coversPrefetched",coversPrefetched);JSONArray arr=new JSONArray();
             for(BridgeClient.ComicItem item:items){JSONObject o=new JSONObject();o.put("id",item.id);o.put("title",item.title);o.put("author",item.author);o.put("coverPath",item.coverPath);o.put("downloadedPictures",item.downloadedPictures);arr.put(o);}root.put("items",arr);
-            File target=file(context),tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}
+            File target=file(context);target.getParentFile().mkdirs();File tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}
             if(target.exists()&&!target.delete())throw new IOException("favorite cache replace failed");if(!tmp.renameTo(target))throw new IOException("favorite cache rename failed");
         }catch(Exception e){throw new IllegalStateException("无法保存本地收藏缓存",e);}
     }

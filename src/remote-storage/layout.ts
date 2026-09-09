@@ -18,6 +18,7 @@ export const remoteLayout = {
     current: `${ROOT}/control/current.json`,
     shelves: `${ROOT}/state/shelves.json`,
     favorites: `${ROOT}/state/favorites.json`,
+    readerSettings: `${ROOT}/state/reader-settings.json`,
     readingRoot: `${ROOT}/state/reading`,
     readingCurrent: `${ROOT}/state/reading/current.json`,
     generationCatalog(generation: string) {

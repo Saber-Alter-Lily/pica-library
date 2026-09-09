@@ -31,8 +31,21 @@ final class RemoteLibraryClient {
             this.comicId=comicId;this.episodeId=episodeId;this.pageIndex=pageIndex;this.updatedAt=updatedAt;this.deviceId=deviceId;this.comicTitle=comicTitle;this.author=author;this.episodeTitle=episodeTitle;this.episodeOrder=episodeOrder;
         }
     }
+    static final class ReaderSettings {
+        final int mode;
+        final boolean keepOn;
+        final String updatedAt,deviceId;
+        ReaderSettings(int mode,boolean keepOn,String updatedAt,String deviceId){this.mode=mode;this.keepOn=keepOn;this.updatedAt=updatedAt;this.deviceId=deviceId;}
+    }
+    private static final class JsonVersion {
+        final JSONObject value;
+        final boolean exists;
+        final String etag,lastModified;
+        JsonVersion(JSONObject value,boolean exists,String etag,String lastModified){this.value=value;this.exists=exists;this.etag=etag==null?"":etag;this.lastModified=lastModified==null?"":lastModified;}
+    }
 
     private static final String READING_PATH="v1/state/reading/current.json";
+    private static final String SETTINGS_PATH="v1/state/reader-settings.json";
     private final RemoteConfigStore.Config config;
     private final File metadataCache;
     private final File coverCache;
@@ -62,8 +75,7 @@ final class RemoteLibraryClient {
     private void writeFile(File target,byte[] data) throws Exception {if(target==null)return;File tmp=File.createTempFile("remote-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){out.write(data);}if(target.exists()&&!target.delete())throw new IOException("cache replace failed");if(!tmp.renameTo(target))throw new IOException("cache rename failed");}
 
     private String text(String path) throws Exception {
-        File cached=cached(metadataCache,path);
-        HttpURLConnection c=null;
+        File cached=cached(metadataCache,path);HttpURLConnection c=null;
         try{
             c=open(path,"application/json");int status=c.getResponseCode();
             if(status==401||status==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+status);
@@ -88,16 +100,32 @@ final class RemoteLibraryClient {
         finally{if(c!=null)c.disconnect();}
     }
 
-    private void putJson(String path,JSONObject value) throws Exception {
+    private JsonVersion liveJson(String path) throws Exception {
+        HttpURLConnection c=null;
+        try{
+            c=open(path,"application/json");int status=c.getResponseCode();
+            if(status==404)return new JsonVersion(null,false,"","");
+            if(status==401||status==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+status);
+            if(status>=400)throw new IOException("WebDAV HTTP "+status);
+            String etag=c.getHeaderField("ETag"),lastModified=c.getHeaderField("Last-Modified");
+            try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))>0)out.write(b,0,n);byte[] data=out.toByteArray();writeFile(cached(metadataCache,path),data);return new JsonVersion(new JSONObject(new String(data,StandardCharsets.UTF_8)),true,etag,lastModified);}
+        }finally{if(c!=null)c.disconnect();}
+    }
+
+    private boolean putJsonConditional(String path,JSONObject value,JsonVersion expected) throws Exception {
         byte[] data=value.toString().getBytes(StandardCharsets.UTF_8);HttpURLConnection c=null;
         try{
-            c=open(path,"application/json");c.setRequestMethod("PUT");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json; charset=utf-8");c.setFixedLengthStreamingMode(data.length);
-            try(OutputStream out=c.getOutputStream()){out.write(data);}
-            int status=c.getResponseCode();
+            c=open(path,"application/json");c.setRequestMethod("PUT");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json; charset=utf-8");
+            if(!expected.exists)c.setRequestProperty("If-None-Match","*");
+            else if(!expected.etag.isEmpty())c.setRequestProperty("If-Match",expected.etag);
+            else if(!expected.lastModified.isEmpty())c.setRequestProperty("If-Unmodified-Since",expected.lastModified);
+            else throw new IllegalStateException("WebDAV 未返回 ETag/Last-Modified，无法安全合并多设备状态");
+            c.setFixedLengthStreamingMode(data.length);try(OutputStream out=c.getOutputStream()){out.write(data);}int status=c.getResponseCode();
+            if(status==412)return false;
             if(status==401||status==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+status);
             if(status==409)throw new IllegalStateException("云端状态目录尚未初始化 · 请先在新版电脑端执行一次云同步");
-            if(status<200||status>=300)throw new IOException("WebDAV PUT failed · HTTP "+status);
-            writeFile(cached(metadataCache,path),data);
+            if(status<200||status>=300)throw new IOException("WebDAV conditional PUT failed · HTTP "+status);
+            writeFile(cached(metadataCache,path),data);return true;
         }finally{if(c!=null)c.disconnect();}
     }
 
@@ -111,40 +139,58 @@ final class RemoteLibraryClient {
     JSONObject comic(String manifestPath) throws Exception {return json(manifestPath);}
     JSONObject episode(String manifestPath) throws Exception {return json(manifestPath);}
 
-    private JSONObject readingState() throws Exception {
-        JSONObject state=optionalJson(READING_PATH);
-        if(state!=null)return state;
-        JSONObject empty=new JSONObject();empty.put("schemaVersion",1);empty.put("updatedAt","");empty.put("entries",new JSONArray());return empty;
+    private JSONObject emptyReadingState() throws Exception {JSONObject empty=new JSONObject();empty.put("schemaVersion",1);empty.put("updatedAt","");empty.put("entries",new JSONArray());return empty;}
+    private JSONObject readingState() throws Exception {JSONObject state=optionalJson(READING_PATH);return state==null?emptyReadingState():state;}
+    private static int compareStamp(String timeA,String deviceA,String timeB,String deviceB){int time=(timeA==null?"":timeA).compareTo(timeB==null?"":timeB);if(time!=0)return time;return (deviceA==null?"":deviceA).compareTo(deviceB==null?"":deviceB);}
+
+    private ReadingEntry readingEntry(JSONObject e){
+        if(e==null)return null;String comicId=e.optString("comicId","");String episodeId=e.optString("episodeId","");if(comicId.isEmpty()||episodeId.isEmpty())return null;
+        return new ReadingEntry(comicId,episodeId,Math.max(0,e.optInt("pageIndex",0)),e.optString("updatedAt",""),e.optString("deviceId",""),e.optString("comicTitle",""),e.optString("author",""),e.optString("episodeTitle",""),e.optInt("episodeOrder",0));
     }
 
     List<ReadingEntry> readingEntries() throws Exception {
         JSONArray entries=readingState().optJSONArray("entries");List<ReadingEntry> out=new ArrayList<>();
-        if(entries!=null)for(int i=0;i<entries.length();i++){
-            JSONObject e=entries.optJSONObject(i);if(e==null)continue;String comicId=e.optString("comicId","");String episodeId=e.optString("episodeId","");if(comicId.isEmpty()||episodeId.isEmpty())continue;
-            out.add(new ReadingEntry(comicId,episodeId,Math.max(0,e.optInt("pageIndex",0)),e.optString("updatedAt",""),e.optString("deviceId",""),e.optString("comicTitle",""),e.optString("author",""),e.optString("episodeTitle",""),e.optInt("episodeOrder",0)));
-        }
-        out.sort((a,b)->b.updatedAt.compareTo(a.updatedAt));return out;
+        if(entries!=null)for(int i=0;i<entries.length();i++){ReadingEntry entry=readingEntry(entries.optJSONObject(i));if(entry!=null)out.add(entry);}out.sort((a,b)->b.updatedAt.compareTo(a.updatedAt));return out;
     }
 
-    int progress(String comicId,String episodeId) throws Exception {
-        int page=0;String latest="";for(ReadingEntry e:readingEntries())if(comicId.equals(e.comicId)&&episodeId.equals(e.episodeId)&&e.updatedAt.compareTo(latest)>=0){latest=e.updatedAt;page=e.pageIndex;}return page;
+    ReadingEntry progressEntry(String comicId,String episodeId) throws Exception {
+        ReadingEntry best=null;for(ReadingEntry e:readingEntries())if(comicId.equals(e.comicId)&&episodeId.equals(e.episodeId)&&(best==null||compareStamp(e.updatedAt,e.deviceId,best.updatedAt,best.deviceId)>0))best=e;return best;
     }
-
-    String recentChapter(String comicId) throws Exception {
-        for(ReadingEntry e:readingEntries())if(comicId.equals(e.comicId))return e.episodeId;return "";
-    }
+    int progress(String comicId,String episodeId) throws Exception {ReadingEntry entry=progressEntry(comicId,episodeId);return entry==null?0:entry.pageIndex;}
+    String recentChapter(String comicId) throws Exception {for(ReadingEntry e:readingEntries())if(comicId.equals(e.comicId))return e.episodeId;return "";}
 
     synchronized void saveReadingProgress(String deviceId,String comicId,String episodeId,int pageIndex,String comicTitle,String author,String episodeTitle,int episodeOrder) {
+        String eventTime=Instant.now().toString();
         try{
-            JSONObject state=readingState();JSONArray existing=state.optJSONArray("entries");LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
-            if(existing!=null)for(int i=0;i<existing.length();i++){JSONObject e=existing.optJSONObject(i);if(e==null)continue;String c=e.optString("comicId","");String ep=e.optString("episodeId","");if(c.isEmpty()||ep.isEmpty())continue;merged.put(c+"\n"+ep,e);}
-            String key=comicId+"\n"+episodeId;JSONObject prior=merged.get(key);JSONObject entry=prior==null?new JSONObject():new JSONObject(prior.toString());String now=Instant.now().toString();
-            entry.put("comicId",comicId);entry.put("episodeId",episodeId);entry.put("pageIndex",Math.max(0,pageIndex));entry.put("updatedAt",now);entry.put("deviceId",deviceId);
-            if(comicTitle!=null&&!comicTitle.isEmpty())entry.put("comicTitle",comicTitle);if(author!=null&&!author.isEmpty())entry.put("author",author);if(episodeTitle!=null&&!episodeTitle.isEmpty())entry.put("episodeTitle",episodeTitle);if(episodeOrder>0)entry.put("episodeOrder",episodeOrder);
-            merged.put(key,entry);
-            ArrayList<JSONObject> ordered=new ArrayList<>(merged.values());ordered.sort((a,b)->b.optString("updatedAt","").compareTo(a.optString("updatedAt","")));JSONArray out=new JSONArray();for(JSONObject value:ordered)out.put(value);
-            JSONObject next=new JSONObject();next.put("schemaVersion",1);next.put("updatedAt",now);next.put("entries",out);putJson(READING_PATH,next);
+            for(int attempt=0;attempt<4;attempt++){
+                JsonVersion version=liveJson(READING_PATH);JSONObject state=version.value==null?emptyReadingState():version.value;JSONArray existing=state.optJSONArray("entries");LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
+                if(existing!=null)for(int i=0;i<existing.length();i++){JSONObject e=existing.optJSONObject(i);if(e==null)continue;String c=e.optString("comicId","");String ep=e.optString("episodeId","");if(c.isEmpty()||ep.isEmpty())continue;String key=c+"\n"+ep;JSONObject prior=merged.get(key);if(prior==null||compareStamp(e.optString("updatedAt",""),e.optString("deviceId",""),prior.optString("updatedAt",""),prior.optString("deviceId",""))>0)merged.put(key,e);}
+                String key=comicId+"\n"+episodeId;JSONObject prior=merged.get(key);
+                if(prior!=null&&compareStamp(prior.optString("updatedAt",""),prior.optString("deviceId",""),eventTime,deviceId)>0)return;
+                JSONObject entry=prior==null?new JSONObject():new JSONObject(prior.toString());entry.put("comicId",comicId);entry.put("episodeId",episodeId);entry.put("pageIndex",Math.max(0,pageIndex));entry.put("updatedAt",eventTime);entry.put("deviceId",deviceId);
+                if(comicTitle!=null&&!comicTitle.isEmpty())entry.put("comicTitle",comicTitle);if(author!=null&&!author.isEmpty())entry.put("author",author);if(episodeTitle!=null&&!episodeTitle.isEmpty())entry.put("episodeTitle",episodeTitle);if(episodeOrder>0)entry.put("episodeOrder",episodeOrder);merged.put(key,entry);
+                ArrayList<JSONObject> ordered=new ArrayList<>(merged.values());ordered.sort((a,b)->compareStamp(b.optString("updatedAt",""),b.optString("deviceId",""),a.optString("updatedAt",""),a.optString("deviceId","")));JSONArray out=new JSONArray();for(JSONObject value:ordered)out.put(value);
+                JSONObject next=new JSONObject();next.put("schemaVersion",1);next.put("updatedAt",ordered.isEmpty()?eventTime:ordered.get(0).optString("updatedAt",eventTime));next.put("entries",out);if(putJsonConditional(READING_PATH,next,version))return;
+            }
+            throw new IllegalStateException("阅读进度发生并发更新，请重试");
         }catch(Exception e){throw new IllegalStateException(e.getMessage()==null?"云端阅读进度同步失败":e.getMessage(),e);}
+    }
+
+    private ReaderSettings parseReaderSettings(JSONObject root){
+        if(root==null)return null;int mode=root.optInt("mode",0);if(mode<0||mode>2)mode=0;return new ReaderSettings(mode,root.optBoolean("keepOn",true),root.optString("updatedAt",""),root.optString("deviceId",""));
+    }
+    ReaderSettings readerSettings() throws Exception {return parseReaderSettings(optionalJson(SETTINGS_PATH));}
+    synchronized ReaderSettings saveReaderSettings(String deviceId,int mode,boolean keepOn,String updatedAt) {
+        int safeMode=mode<0||mode>2?0:mode;String eventTime=(updatedAt==null||updatedAt.isEmpty())?Instant.now().toString():updatedAt;
+        try{
+            for(int attempt=0;attempt<4;attempt++){
+                JsonVersion version=liveJson(SETTINGS_PATH);ReaderSettings current=parseReaderSettings(version.value);
+                if(current!=null&&compareStamp(current.updatedAt,current.deviceId,eventTime,deviceId)>0)return current;
+                JSONObject next=new JSONObject();next.put("schemaVersion",1);next.put("updatedAt",eventTime);next.put("deviceId",deviceId);next.put("mode",safeMode);next.put("keepOn",keepOn);
+                if(putJsonConditional(SETTINGS_PATH,next,version))return new ReaderSettings(safeMode,keepOn,eventTime,deviceId);
+            }
+            throw new IllegalStateException("阅读设置发生并发更新，请重试");
+        }catch(Exception e){throw new IllegalStateException(e.getMessage()==null?"云端阅读设置同步失败":e.getMessage(),e);}
     }
 
     Bitmap bitmap(String path) throws Exception {

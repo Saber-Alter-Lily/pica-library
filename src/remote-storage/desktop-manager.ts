@@ -186,9 +186,6 @@ export class RemoteStorageDesktopManager {
                 title: comic.title,
                 author: comic.author,
                 canonicalAuthor: comic.canonicalAuthor,
-                // Keep the Desktop cover route as a stable cache key on Android.
-                // When Desktop is offline, already-prefetched covers still resolve
-                // locally; cloud cover availability remains a separate source fact.
                 coverPath: `/mobile/v1/covers/${encodeURIComponent(comic.comicId)}`,
                 downloadedPictures: comic.downloadedPictures,
                 knownPictures: comic.knownPictures,
@@ -201,17 +198,7 @@ export class RemoteStorageDesktopManager {
         return `${entry.comicId}\n${entry.episodeId}`
     }
 
-    private async portableReading(
-        provider: RemoteStorageProvider
-    ): Promise<RemoteReadingState> {
-        const previous =
-            (await provider.getJson<RemoteReadingState>(
-                remoteLayout.readingCurrent
-            )) ?? {
-                schemaVersion: 1 as const,
-                updatedAt: '',
-                entries: []
-            }
+    private portableReading(previous: RemoteReadingState): RemoteReadingState {
         const merged = new Map<string, RemoteReadingEntry>()
         for (const entry of previous.entries ?? []) {
             if (!entry?.comicId || !entry?.episodeId) continue
@@ -247,24 +234,46 @@ export class RemoteStorageDesktopManager {
         }
     }
 
+    private async publishPortableReading(provider: RemoteStorageProvider) {
+        for (let attempt = 1; attempt <= 4; attempt++) {
+            const version = await provider.getJsonVersioned<RemoteReadingState>(
+                remoteLayout.readingCurrent
+            )
+            const previous = version.value ?? {
+                schemaVersion: 1 as const,
+                updatedAt: '',
+                entries: []
+            }
+            const next = this.portableReading(previous)
+            if (
+                await provider.putJsonConditional(
+                    remoteLayout.readingCurrent,
+                    next,
+                    version
+                )
+            )
+                return next
+        }
+        throw new Error(
+            'Portable reading state changed concurrently too many times; retry sync'
+        )
+    }
+
     private async publishPortableState(provider: RemoteStorageProvider) {
         await provider.ensureDirectory('v1/state')
         await provider.ensureDirectory(remoteLayout.readingRoot)
         await provider.putJson(remoteLayout.shelves, this.portableShelves())
         await provider.putJson(remoteLayout.favorites, this.portableFavorites())
-        await provider.putJson(
-            remoteLayout.readingCurrent,
-            await this.portableReading(provider)
-        )
+        await this.publishPortableReading(provider)
     }
 
     async sync(input: Record<string, unknown>) {
         this.save(input)
         await this.test(input)
         const { provider } = this.provider(input)
-        // Portable user-state metadata is small and independent from comic page
-        // upload. Publish it first so shelves/favorites/progress stay usable even
-        // when a long first comic sync is still running.
+        // Portable metadata is small and independent from comic page upload.
+        // Reading state uses optimistic concurrency so a Desktop sync cannot
+        // silently erase a newer Android progress write.
         await this.publishPortableState(provider)
         const service = new RemoteLibrarySyncService(
             this.database,

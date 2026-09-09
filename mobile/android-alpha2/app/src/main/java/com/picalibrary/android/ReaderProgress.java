@@ -2,6 +2,7 @@ package com.picalibrary.android;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -14,33 +15,76 @@ final class ReaderProgress {
     private final ReaderSource source;
     private final String prefix;
     private boolean syncing;
+
     ReaderProgress(Context context, ReaderSource source) {
         store = context.getSharedPreferences("reader-bookmarks-v1", Context.MODE_PRIVATE);
-        this.source = source; prefix = source.scope() + ":";
+        this.source = source;
+        prefix = source.scope() + ":";
     }
-    private String key(String comic, String chapter) { return prefix + ReaderPolicy.hash(comic + "\n" + chapter); }
+
+    private static String bookmarkKey(String prefix, String comic, String chapter) {
+        return prefix + ReaderPolicy.hash(comic + "\n" + chapter);
+    }
+    private String key(String comic, String chapter) { return bookmarkKey(prefix, comic, chapter); }
+
     int position(String comic, String chapter, int fallback) {
         try { return new JSONObject(store.getString(key(comic, chapter), "{}")).optInt("page", fallback); }
         catch (Exception e) { return fallback; }
     }
+
     String recentChapter(String comic) {
-        String local=store.getString("recent:" + prefix + comic, "");
-        if(local!=null&&!local.isEmpty())return local;
-        try{return source.recentChapter(comic);}catch(Exception ignored){return "";}
+        String local = store.getString("recent:" + prefix + comic, "");
+        return local == null ? "" : local;
     }
+
+    static void mergeRemote(
+        Context context,
+        String scope,
+        String comic,
+        String chapter,
+        int page,
+        String updatedAt
+    ) {
+        if (comic == null || chapter == null || updatedAt == null || updatedAt.isEmpty()) return;
+        SharedPreferences store = context.getSharedPreferences("reader-bookmarks-v1", Context.MODE_PRIVATE);
+        String prefix = scope + ":";
+        String key = bookmarkKey(prefix, comic, chapter);
+        try {
+            JSONObject local = new JSONObject(store.getString(key, "{}"));
+            String localUpdatedAt = local.optString("updatedAt", "");
+            if (!localUpdatedAt.isEmpty() && localUpdatedAt.compareTo(updatedAt) > 0) return;
+            JSONObject value = new JSONObject();
+            value.put("comic", comic);
+            value.put("chapter", chapter);
+            value.put("page", Math.max(0, page));
+            value.put("revision", local.optLong("revision", 0));
+            value.put("updatedAt", updatedAt);
+            value.put("pending", false);
+            store.edit()
+                .putString(key, value.toString())
+                .putString("recent:" + prefix + comic, chapter)
+                .apply();
+        } catch (Exception ignored) { }
+    }
+
     void save(String comic, String chapter, int page, boolean flush) {
         if (comic == null || chapter == null) return;
         try {
             String key = key(comic, chapter);
             JSONObject prior = new JSONObject(store.getString(key, "{}"));
             JSONObject value = new JSONObject();
-            value.put("comic", comic); value.put("chapter", chapter); value.put("page", page);
-            value.put("revision", prior.optLong("revision", 0) + 1); value.put("pending", true);
+            value.put("comic", comic);
+            value.put("chapter", chapter);
+            value.put("page", page);
+            value.put("revision", prior.optLong("revision", 0) + 1);
+            value.put("updatedAt", Instant.now().toString());
+            value.put("pending", true);
             SharedPreferences.Editor edit = store.edit().putString(key, value.toString())
                 .putString("recent:" + prefix + comic, chapter);
             if (flush) edit.commit(); else edit.apply();
         } catch (Exception e) { throw new IllegalStateException("无法保存阅读进度", e); }
     }
+
     synchronized void sync() {
         if (syncing) return;
         syncing = true;
@@ -56,7 +100,8 @@ final class ReaderProgress {
                             try {
                                 JSONObject current = new JSONObject(store.getString(entry.getKey(), "{}"));
                                 if (ReaderPolicy.acknowledge(sent.getLong("revision"), current.optLong("revision", -1))) {
-                                    current.put("pending", false); store.edit().putString(entry.getKey(), current.toString()).apply();
+                                    current.put("pending", false);
+                                    store.edit().putString(entry.getKey(), current.toString()).apply();
                                 }
                             } catch (Exception ignored) { }
                         });

@@ -2,7 +2,6 @@ package com.picalibrary.android;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -28,7 +27,6 @@ public class ReaderActivity extends Activity {
     private ReaderSource source;
     private ReaderImages images;
     private ReaderProgress progress;
-    private SharedPreferences settings;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService metadata = Executors.newFixedThreadPool(2);
     private Future<?> chapterRequest;
@@ -45,14 +43,15 @@ public class ReaderActivity extends Activity {
         String sourceKind = getIntent().getStringExtra("source");
         source = "remote".equals(sourceKind) ? new RemoteReaderSource(this) : new DesktopReaderSource(this);
         images = new ReaderImages(this, source);
-        progress = new ReaderProgress(this, source); settings = getSharedPreferences("reader-display", MODE_PRIVATE);
+        progress = new ReaderProgress(this, source);
         comic = getIntent().getStringExtra("comicId"); title = getIntent().getStringExtra("title");
         desiredChapter = saved == null ? getIntent().getStringExtra("episodeId") : saved.getString("chapter");
         if (desiredChapter == null || desiredChapter.isEmpty()) desiredChapter = progress.recentChapter(comic);
-        mode = settings.getInt("mode", 0);
+        ReaderSettingsStore.Snapshot localSettings = ReaderSettingsStore.local(this);
+        mode = localSettings.mode;
         getWindow().setStatusBarColor(Color.BLACK); getWindow().setNavigationBarColor(Color.BLACK);
-        if (settings.getBoolean("keepOn", true)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        render(); loadInitial(); progress.sync();
+        if (localSettings.keepOn) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        render(); syncPortableSettings(); loadInitial(); progress.sync();
     }
     private Button button(String text, View.OnClickListener click) {
         Button b = new Button(this); b.setText(text); b.setTextColor(Color.WHITE);
@@ -88,6 +87,19 @@ public class ReaderActivity extends Activity {
         });
         setContentView(root); setChrome(true);
     }
+    private void syncPortableSettings() {
+        metadata.submit(() -> {
+            ReaderSettingsStore.Snapshot snapshot = ReaderSettingsStore.reconcile(ReaderActivity.this);
+            main.post(() -> {
+                if (destroyed) return;
+                boolean modeChanged = mode != snapshot.mode;
+                mode = snapshot.mode;
+                if (snapshot.keepOn) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                if (modeChanged && chapterReady) buildPages();
+            });
+        });
+    }
     private void loadInitial() {
         final int serial = ++generation;
         if (chapterRequest != null) chapterRequest.cancel(true);
@@ -98,6 +110,10 @@ public class ReaderActivity extends Activity {
                 available.removeIf(c -> c.downloadedPictures <= 0); available.sort(Comparator.comparingInt(c -> c.order));
                 if (available.isEmpty()) throw new IllegalStateException("没有可读章节");
                 String selected = desiredChapter;
+                if (selected == null || selected.isEmpty()) {
+                    try { selected = source.recentChapter(comic); }
+                    catch (Exception ignored) { selected = ""; }
+                }
                 if ((selected == null || selected.isEmpty()) && source instanceof DesktopReaderSource) {
                     try { for (BridgeClient.RecentItem r : BridgeClient.recent(ReaderActivity.this, 100)) if (r.comic.id.equals(comic)) { selected = r.episodeId; break; } }
                     catch (Exception ignored) { /* local source-scoped history remains authoritative */ }
@@ -188,10 +204,15 @@ public class ReaderActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("章节").setItems(titles, (d, i) -> loadChapter(chapters.get(i).id, -1)).show();
     }
     private void displayOptions() {
-        String[] choices = {"横向翻页（从左到右）", "横向翻页（从右到左）", "纵向连续阅读", "屏幕常亮：" + (settings.getBoolean("keepOn", true) ? "开" : "关")};
+        ReaderSettingsStore.Snapshot current = ReaderSettingsStore.local(this);
+        String[] choices = {"横向翻页（从左到右）", "横向翻页（从右到左）", "纵向连续阅读", "屏幕常亮：" + (current.keepOn ? "开" : "关")};
         new AlertDialog.Builder(this).setTitle("阅读设置").setItems(choices, (d, i) -> {
-            if (i < 3) { save(true); mode = i; settings.edit().putInt("mode", mode).apply(); buildPages(); }
-            else { boolean keep = !settings.getBoolean("keepOn", true); settings.edit().putBoolean("keepOn", keep).apply(); if (keep) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); }
+            if (i < 3) {
+                save(true); mode = i; ReaderSettingsStore.saveLocal(this, mode, current.keepOn); ReaderSettingsStore.pushAsync(this); buildPages();
+            } else {
+                boolean keep = !current.keepOn; ReaderSettingsStore.saveLocal(this, mode, keep); ReaderSettingsStore.pushAsync(this);
+                if (keep) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
         }).show();
     }
     private void setChrome(boolean visible) {

@@ -1,4 +1,5 @@
 import type {
+    RemoteJsonVersion,
     RemoteObject,
     RemoteStorageCredentials,
     RemoteStorageProvider,
@@ -174,8 +175,7 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     async ensureDirectory(path: string) {
         // WebDAV MKCOL is comparatively expensive on many hosted providers.
         // Cache every confirmed collection for the lifetime of this provider so
-        // a 468-page sync does not recreate/check the same parent path hundreds
-        // of times.
+        // a large page sync does not recreate/check the same parent path.
         const segments = [this.root, path]
             .filter(Boolean)
             .join('/')
@@ -219,7 +219,8 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
             path,
             data: Buffer.from(await response.arrayBuffer()),
             contentType: response.headers.get('content-type') ?? undefined,
-            etag: response.headers.get('etag') ?? undefined
+            etag: response.headers.get('etag') ?? undefined,
+            lastModified: response.headers.get('last-modified') ?? undefined
         }
     }
 
@@ -253,5 +254,55 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
             Buffer.from(JSON.stringify(value, null, 2), 'utf8'),
             'application/json; charset=utf-8'
         )
+    }
+
+    async getJsonVersioned<T>(path: string): Promise<RemoteJsonVersion<T>> {
+        const object = await this.get(path)
+        if (!object) return { value: null, exists: false }
+        return {
+            value: JSON.parse(object.data.toString('utf8')) as T,
+            exists: true,
+            etag: object.etag,
+            lastModified: object.lastModified
+        }
+    }
+
+    async putJsonConditional(
+        path: string,
+        value: unknown,
+        expected: Pick<
+            RemoteJsonVersion<unknown>,
+            'exists' | 'etag' | 'lastModified'
+        >
+    ) {
+        const parent = path.split('/').slice(0, -1).join('/')
+        await this.ensureDirectory(parent)
+        const headers: Record<string, string> = {
+            'content-type': 'application/json; charset=utf-8'
+        }
+        if (!expected.exists) headers['if-none-match'] = '*'
+        else if (expected.etag) headers['if-match'] = expected.etag
+        else if (expected.lastModified)
+            headers['if-unmodified-since'] = expected.lastModified
+        else
+            throw new Error(
+                'WebDAV server did not return ETag/Last-Modified; safe portable-state update is unavailable'
+            )
+        const response = await this.fetchWithRetry(
+            this.url(path),
+            {
+                method: 'PUT',
+                body: Buffer.from(JSON.stringify(value, null, 2), 'utf8'),
+                headers
+            },
+            this.uploadTimeoutMs,
+            3
+        )
+        if (response.status === 412) return false
+        if (![200, 201, 204].includes(response.status))
+            throw new Error(
+                `WebDAV conditional PUT failed: HTTP ${response.status}`
+            )
+        return true
     }
 }

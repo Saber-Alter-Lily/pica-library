@@ -111,11 +111,27 @@ export interface RemoteReadingState {
     entries: RemoteReadingEntry[]
 }
 
+export interface RemoteReaderSettings {
+    schemaVersion: typeof REMOTE_LIBRARY_SCHEMA_VERSION
+    updatedAt: string
+    deviceId: string
+    mode: 0 | 1 | 2
+    keepOn: boolean
+}
+
 export interface RemoteObject {
     path: string
     data: Buffer
     contentType?: string
     etag?: string
+    lastModified?: string
+}
+
+export interface RemoteJsonVersion<T> {
+    value: T | null
+    exists: boolean
+    etag?: string
+    lastModified?: string
 }
 
 export interface RemoteStorageProvider {
@@ -127,4 +143,13 @@ export interface RemoteStorageProvider {
     put(path: string, data: Buffer, contentType?: string): Promise<void>
     getJson<T>(path: string): Promise<T | null>
     putJson(path: string, value: unknown): Promise<void>
+    getJsonVersioned<T>(path: string): Promise<RemoteJsonVersion<T>>
+    putJsonConditional(
+        path: string,
+        value: unknown,
+        expected: Pick<
+            RemoteJsonVersion<unknown>,
+            'exists' | 'etag' | 'lastModified'
+        >
+    ): Promise<boolean>
 }

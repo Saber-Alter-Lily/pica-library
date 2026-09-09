@@ -28,50 +28,60 @@ Metadata retained independently of availability:
 - shelf membership
 - known page count
 
-## Filter UX
+## Library screen
 
-Do not place source/status/tag/author switches as a row of permanent controls.
-
-The library header should converge to:
+The source tabs are removed from the library surface. The visible header is intentionally compact:
 
 ```text
 我的书库
-[搜索标题 / 作者 / 标签...]
+[搜索标题 / 作者 / 标签 / 分类...]
 [筛选与排序 (N)] [刷新] [2/3列]
 ```
 
+Opening the library renders the persisted local catalog first. Desktop and WebDAV are refreshed in the background; failures keep the last usable catalog instead of blanking the screen.
+
+Every comic card can display merged availability such as `电脑 · 云端 · 收藏`, while the comic itself is still represented once.
+
+## Filter UX
+
 `筛选与排序` opens one grouped panel with:
 
-1. **可用位置** — 手机已下载 / 电脑已下载 / WebDAV / Pica 在线.
-2. **收藏与阅读** — 收藏 / 在书架 / unread-reading-finished when portable read-state classification is ready.
+1. **可用位置** — 手机已下载 / 电脑已下载 / WebDAV.
+2. **收藏与书架** — 仅收藏 / 仅书架内.
 3. **作者** — searchable multi-select.
 4. **标签** — searchable multi-select with ANY / ALL semantics.
 5. **分类** — searchable multi-select.
-6. **连载状态** — 连载 / 完结.
-7. **排序** — 最近更新 / 标题 / 作者 initially; later 最近阅读 / 加入时间.
+6. **连载状态** — 全部 / 连载 / 完结.
+7. **排序** — 最近更新 / 标题 / 作者.
+
+Large author/tag/category lists open secondary searchable pickers and only render a bounded number of matches at once.
 
 Selections inside one group are generally OR; distinct groups combine with AND. Tags additionally support an explicit ALL mode.
 
 `N` counts active filter groups rather than every selected chip, so selecting three authors remains one active author filter.
 
+Filter state is persisted separately from source configuration.
+
 ## Refresh contract
 
 - Opening the library reads the local catalog first and must not block on Desktop or WebDAV.
-- Explicit/background refresh reconciles each reachable source.
-- A comic missing from WebDAV after refresh becomes `remoteAvailable=false`; it is not deleted from the unified catalog.
-- A comic missing from Desktop becomes `desktopDownloaded=false`; portable metadata remains.
-- WebDAV refresh will later compare the cached generation id with `control/current.json` before fetching a new generation catalog.
+- Background/explicit refresh reconciles each reachable source.
+- A comic missing from WebDAV after a successful refresh becomes `remoteAvailable=false`; it is not deleted from the unified catalog.
+- A comic missing from Desktop after a successful refresh loses Desktop availability; portable metadata remains.
+- Failed source refreshes do not overwrite a previously valid source snapshot.
+- Favorites and shelves are portable references merged into the same comic records.
 
 ## Source resolution
 
-UI asks to open a comic; a resolver chooses the best readable source. Target priority:
+UI asks to open a comic; a resolver supplies ordered candidates. Current target priority is:
 
 ```text
 PHONE_DOWNLOAD
-→ PHONE_CACHE
 → DESKTOP_LAN
 → WEBDAV
 → PICA_ONLINE
 ```
+
+The opening flow probes Desktop before committing to it, so a previously paired but currently offline PC can fall through to WebDAV.
 
 The user can still filter by availability when they intentionally want a specific storage/network characteristic.

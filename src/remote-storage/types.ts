@@ -24,6 +24,13 @@ export interface RemoteCatalogEntry {
     comicId: string
     title: string
     author: string
+    canonicalAuthor?: string | null
+    authorId?: string | null
+    tags?: string[]
+    categories?: string[]
+    finished?: boolean
+    isFavorite?: boolean
+    knownPictures?: number
     manifestPath: string
     coverPath?: string
     episodeCount: number

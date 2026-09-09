@@ -34,6 +34,16 @@ final class FavoriteCacheStore {
         }catch(Exception e){return new Snapshot("",false,new ArrayList<>());}
     }
 
+    static Snapshot fromRemote(JSONObject root){
+        JSONArray arr=root.optJSONArray("items");List<BridgeClient.ComicItem> items=new ArrayList<>();
+        if(arr!=null)for(int i=0;i<arr.length();i++){
+            JSONObject o=arr.optJSONObject(i);if(o==null)continue;String id=o.optString("comicId",o.optString("id",""));if(id.isEmpty())continue;
+            String author=o.optString("canonicalAuthor",o.optString("author","未知作者"));if(author.isEmpty())author=o.optString("author","未知作者");
+            items.add(new BridgeClient.ComicItem(id,o.optString("title","未命名漫画"),author,o.optString("coverPath","/mobile/v1/covers/"+id),o.optInt("downloadedPictures",0)));
+        }
+        return new Snapshot(root.optString("updatedAt",""),false,items);
+    }
+
     static void save(Context context,List<BridgeClient.ComicItem> items,boolean coversPrefetched){
         try{
             JSONObject root=new JSONObject();root.put("schemaVersion",1);root.put("updatedAt",new Date().toInstant().toString());root.put("coversPrefetched",coversPrefetched);JSONArray arr=new JSONArray();
@@ -41,6 +51,10 @@ final class FavoriteCacheStore {
             File target=file(context),tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}
             if(target.exists()&&!target.delete())throw new IOException("favorite cache replace failed");if(!tmp.renameTo(target))throw new IOException("favorite cache rename failed");
         }catch(Exception e){throw new IllegalStateException("无法保存本地收藏缓存",e);}
+    }
+
+    private static boolean sameIds(List<BridgeClient.ComicItem> a,List<BridgeClient.ComicItem> b){
+        if(a.size()!=b.size())return false;Set<String> ids=new HashSet<>();for(BridgeClient.ComicItem item:a)ids.add(item.id);for(BridgeClient.ComicItem item:b)if(!ids.remove(item.id))return false;return ids.isEmpty();
     }
 
     static List<BridgeClient.ComicItem> fetchAll(Context context) throws Exception {
@@ -67,6 +81,10 @@ final class FavoriteCacheStore {
         }
         if(progress!=null)progress.update(items.size(),items.size(),covers?(allCovers?"收藏和封面已缓存":"收藏已缓存；部分封面可稍后重试"):"收藏元数据已缓存");
         return load(context);
+    }
+
+    static Snapshot syncFromRemote(Context context) throws Exception {
+        Snapshot prior=load(context);Snapshot remote=fromRemote(new RemoteLibraryClient(context).favorites());boolean keepCovers=prior.coversPrefetched&&sameIds(prior.items,remote.items);save(context,remote.items,keepCovers);return load(context);
     }
 
     static long metadataBytes(Context context){File f=file(context);return f.isFile()?f.length():0;}

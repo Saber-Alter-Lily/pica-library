@@ -14,13 +14,19 @@ on:
       - 'scripts/apply-mobile-recommendation-cache-patch.mjs'
       - '.github/workflows/alpha7.yml'
   workflow_dispatch:
+    inputs:
+      publish_preview:
+        description: 'Publish/replace the single Android Preview release asset'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: alpha7-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -79,6 +85,36 @@ jobs:
             artifacts/Pica-Library-Android-v0.1.0-alpha7-cloud.apk
             artifacts/Pica-Library-Android-v0.1.0-alpha7-cloud.sha256
           retention-days: 7
+      - name: Prepare moving Android Preview release
+        if: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.publish_preview) }}
+        run: |
+          cp artifacts/Pica-Library-Android-v0.1.0-alpha7-cloud.apk artifacts/Pica-Library-Android-Preview.apk
+          SHA=$(sha256sum artifacts/Pica-Library-Android-Preview.apk | awk '{print $1}')
+          VERSION_CODE=$(sed -n 's/.*versionCode \([0-9][0-9]*\).*/\1/p' mobile/android-alpha2/app/build.gradle | head -1)
+          VERSION_NAME=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" mobile/android-alpha2/app/build.gradle | head -1)
+          python - "$VERSION_CODE" "$VERSION_NAME" "$SHA" <<'PY'
+          import json, sys
+          code = int(sys.argv[1])
+          name = sys.argv[2]
+          sha = sys.argv[3]
+          value = {
+              "versionCode": code,
+              "versionName": name,
+              "apkUrl": "https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk",
+              "sha256": sha,
+              "releaseNotes": "Android Preview generated from the current alpha7-cloud-mobile integration branch.",
+              "minimumSupportedVersionCode": 1,
+          }
+          with open("artifacts/android-update.json", "w", encoding="utf-8") as f:
+              json.dump(value, f, ensure_ascii=False, indent=2)
+          PY
+      - name: Publish one moving Android Preview release
+        if: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-preview]')) || (github.event_name == 'workflow_dispatch' && inputs.publish_preview) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view android-preview >/dev/null 2>&1 || gh release create android-preview --prerelease --title "Pica Library Android Preview" --notes "Single moving preview channel for in-app updates."
+          gh release upload android-preview artifacts/Pica-Library-Android-Preview.apk artifacts/android-update.json --clobber
 
   windows:
     runs-on: windows-latest

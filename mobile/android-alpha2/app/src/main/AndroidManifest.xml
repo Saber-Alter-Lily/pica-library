@@ -19,6 +19,7 @@
         <activity android:name=".UnifiedComicDetailActivity" android:exported="false" />
         <activity android:name=".ComicDetailActivity" android:exported="false" />
         <activity android:name=".StorageSettingsActivity" android:exported="false" />
+        <activity android:name=".DownloadsActivity" android:exported="false" />
         <activity android:name=".UpdateActivity" android:exported="false" />
         <activity android:name=".PicaBrowseActivity" android:exported="false" />
         <activity android:name=".PicaAccountActivity" android:exported="false" />

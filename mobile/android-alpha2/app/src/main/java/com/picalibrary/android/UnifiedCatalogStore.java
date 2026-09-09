@@ -32,7 +32,7 @@ final class UnifiedCatalogStore {
     }
 
     private UnifiedCatalogStore(){}
-    private static File file(Context context){return new File(context.getFilesDir(),"unified-catalog-v1.json");}
+    private static File file(Context context){return MobileStoragePaths.dataFile(context,"unified-catalog-v1.json");}
 
     static Snapshot load(Context context){
         File source=file(context);if(!source.isFile())return new Snapshot();
@@ -47,12 +47,11 @@ final class UnifiedCatalogStore {
     static void save(Context context,Snapshot snapshot){
         try{
             snapshot.generatedAt=Instant.now().toString();JSONObject root=new JSONObject();root.put("schemaVersion",1);root.put("generatedAt",snapshot.generatedAt);root.put("desktopUpdatedAt",snapshot.desktopUpdatedAt);root.put("remoteUpdatedAt",snapshot.remoteUpdatedAt);root.put("remoteGeneration",snapshot.remoteGeneration);JSONArray arr=new JSONArray();for(Entry entry:snapshot.byId.values())arr.put(json(entry));root.put("entries",arr);
-            File target=file(context),tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}
+            File target=file(context);target.getParentFile().mkdirs();File tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}
             if(target.exists()&&!target.delete())throw new IOException("unified catalog replace failed");if(!tmp.renameTo(target))throw new IOException("unified catalog rename failed");
         }catch(Exception e){throw new IllegalStateException("无法保存统一书库目录",e);}
     }
 
-    /** Full Desktop library snapshot. Call only after a successful bridge read. */
     static Snapshot refreshDesktop(Context context) throws Exception {
         Snapshot snapshot=load(context);for(Entry entry:snapshot.byId.values()){entry.desktopAvailable=false;entry.desktopDownloaded=false;entry.desktopDownloadedPictures=0;}
         int offset=0,total=Integer.MAX_VALUE;final int pageSize=500;
@@ -64,10 +63,10 @@ final class UnifiedCatalogStore {
         snapshot.desktopUpdatedAt=Instant.now().toString();applyLocalReferences(context,snapshot);save(context,snapshot);return snapshot;
     }
 
-    /** Full published WebDAV generation. Missing comics lose only remote availability. */
     static Snapshot refreshRemote(Context context) throws Exception {
         Snapshot snapshot=load(context);for(Entry entry:snapshot.byId.values()){entry.remoteAvailable=false;entry.remotePageCount=0;entry.remoteEpisodeCount=0;entry.remoteCoverPath="";entry.remoteManifestPath="";}
         RemoteLibraryClient client=new RemoteLibraryClient(context);JSONObject pointer=client.json("v1/control/current.json");String generation=pointer.optString("generation","");String catalogPath=pointer.optString("catalogPath","");if(catalogPath.isEmpty())throw new IllegalStateException("云端书库尚未发布");
+        if(!generation.isEmpty()&&generation.equals(snapshot.remoteGeneration)){snapshot.remoteUpdatedAt=Instant.now().toString();applyLocalReferences(context,snapshot);save(context,snapshot);return snapshot;}
         JSONObject root=client.json(catalogPath);JSONArray arr=root.optJSONArray("comics");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o!=null)mergeRemote(snapshot,o);}
         snapshot.remoteGeneration=generation;snapshot.remoteUpdatedAt=Instant.now().toString();applyLocalReferences(context,snapshot);save(context,snapshot);return snapshot;
     }

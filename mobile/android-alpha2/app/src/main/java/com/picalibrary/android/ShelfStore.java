@@ -25,7 +25,7 @@ final class ShelfStore {
     }
 
     private ShelfStore(){}
-    private static File file(Context context){return new File(context.getFilesDir(),"portable-shelves-v1.json");}
+    private static File file(Context context){return MobileStoragePaths.dataFile(context,"portable-shelves-v1.json");}
 
     static Snapshot fromRemote(JSONObject root){
         List<Shelf> shelves=new ArrayList<>();JSONArray shelfArray=root.optJSONArray("shelves");
@@ -51,7 +51,7 @@ final class ShelfStore {
         try{
             JSONObject root=new JSONObject();root.put("schemaVersion",1);root.put("updatedAt",snapshot.updatedAt);JSONArray shelves=new JSONArray();
             for(Shelf shelf:snapshot.shelves){JSONObject s=new JSONObject();s.put("id",shelf.id);s.put("name",shelf.name);JSONArray items=new JSONArray();for(Item item:shelf.items){JSONObject o=new JSONObject();o.put("comicId",item.comicId);o.put("title",item.title);o.put("author",item.author);o.put("canonicalAuthor",item.author);o.put("downloadedPictures",item.downloadedPictures);o.put("knownPictures",item.knownPictures);items.put(o);}s.put("items",items);shelves.put(s);}root.put("shelves",shelves);
-            File target=file(context),tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}
+            File target=file(context);target.getParentFile().mkdirs();File tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}
             if(target.exists()&&!target.delete())throw new IOException("replace failed");if(!tmp.renameTo(target))throw new IOException("rename failed");
         }catch(Exception e){throw new IllegalStateException("无法保存本地书架",e);}
     }

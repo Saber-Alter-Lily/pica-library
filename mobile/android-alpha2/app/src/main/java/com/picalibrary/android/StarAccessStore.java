@@ -6,7 +6,6 @@ import android.os.Handler;
 import android.os.Looper;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -41,7 +40,7 @@ final class StarAccessStore {
             callback.done(false,"请输入有效的 GitHub 用户名");return;
         }
         new Thread(()->{
-            boolean ok=false;String message;
+            boolean ok=false;String message="没有检测到该账号对 Pica Library 的 Star";
             HttpURLConnection connection=null;
             try{
                 for(int page=1;page<=100&&!ok;page++){
@@ -54,13 +53,13 @@ final class StarAccessStore {
                     int code=connection.getResponseCode();
                     if(code==403||code==429){message="GitHub 暂时限制了验证请求，请稍后重试";break;}
                     if(code!=200){message="GitHub Star 验证失败（HTTP "+code+"）";break;}
-                    StringBuilder body=new StringBuilder();try(java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream(),java.nio.charset.StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null)body.append(line);}
+                    StringBuilder body=new StringBuilder();
+                    try(java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream(),java.nio.charset.StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null)body.append(line);}
                     JSONArray users=new JSONArray(body.toString());
                     for(int i=0;i<users.length();i++){JSONObject item=users.optJSONObject(i);if(item!=null&&user.equalsIgnoreCase(item.optString("login",""))){ok=true;break;}}
                     connection.disconnect();connection=null;
                     if(ok){String at=java.time.Instant.now().toString();prefs(app).edit().putString("github_user",user).putString("verified_at",at).apply();message="已验证 GitHub Star，个性化装扮已解锁";break;}
-                    if(users.length()<100){message="没有检测到该账号对 Pica Library 的 Star";break;}
-                    message="没有检测到该账号对 Pica Library 的 Star";
+                    if(users.length()<100)break;
                 }
             }catch(Exception e){message="无法连接 GitHub 验证 Star："+e.getMessage();}
             finally{if(connection!=null)connection.disconnect();}

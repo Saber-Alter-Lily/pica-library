@@ -1,0 +1,19 @@
+name: Create v0.3.4 Tag From Current Head
+
+on:
+  push:
+    paths:
+      - '.github/workflows/create-v034-current-head.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create v0.3.4 tag at current public head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: gh api repos/Saber-Alter-Lily/pica-library/git/refs -X POST -f ref='refs/tags/v0.3.4' -f sha="$SHA"

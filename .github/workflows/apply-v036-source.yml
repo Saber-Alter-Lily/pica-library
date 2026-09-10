@@ -1,0 +1,46 @@
+name: Apply v0.3.6 source transforms
+
+on:
+  push:
+    branches: [feature/v0.3.6-settings-hub]
+    paths:
+      - '.github/workflows/apply-v036-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.3.6-settings-hub
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply deterministic source transforms
+        run: node scripts/apply-v036-settings-star-polish.mjs
+      - name: Verify transformed contracts before commit
+        run: |
+          set -euo pipefail
+          node --check web/alpha8-7-desktop-hub.js
+          node --check web/alpha8-star-access.js
+          grep -q 'repos/Saber-Alter-Lily/pica-library/stargazers?per_page=100' src/services/personalization-service.ts
+          ! grep -q 'users/.*starred/Saber-Alter-Lily/pica-library' src/services/personalization-service.ts
+          grep -q 'stargazers?per_page=100&page=' mobile/android-alpha2/app/src/main/java/com/picalibrary/android/StarAccessStore.java
+          grep -q '"version": "0.3.6"' package.json
+          grep -q 'versionCode 33' mobile/android-alpha2/app/build.gradle
+      - name: Commit transformed source
+        run: |
+          set -euo pipefail
+          git config user.name 'Saber-Alter-Lily'
+          git config user.email '3178088154@qq.com'
+          git add src/services/personalization-service.ts \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/StarAccessStore.java \
+            mobile/android-alpha2/app/build.gradle package.json \
+            scripts/build-windows-package.ps1 README.md README.en.md
+          git diff --cached --quiet && { echo 'No transform changes'; exit 1; }
+          git commit -m 'fix: verify public Stars and bump v0.3.6 clients'
+          git push origin HEAD:feature/v0.3.6-settings-hub

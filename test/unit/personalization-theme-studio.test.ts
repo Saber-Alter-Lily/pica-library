@@ -29,7 +29,10 @@ function serviceWithAccess() {
         path.join(root, 'personalization'),
         web
     )
-    fs.writeFileSync(service.starProofFile, JSON.stringify({ githubUser: 'theme-qa', verifiedAt: new Date().toISOString() }), 'utf8')
+    service.installAuthenticatedStarProof({
+        githubUser: 'theme-qa',
+        githubUserId: 424242
+    })
     return service
 }
 

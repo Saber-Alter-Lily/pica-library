@@ -1,0 +1,93 @@
+name: Publish Android v29 Preview OTA
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-android-v29.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      ARTIFACT_URL: 'https://sdmntprnorthcentralus.oaiusercontent.com/files/00000000-13d8-822f-801d-f145b7ab6569/raw?se=2026-09-10T08%3A28%3A45Z&sp=r&sv=2026-02-06&sr=b&scid=5a9c3ebb-ee4f-577a-b265-63791ddca3d3&skoid=80e81ea6-3c08-46f9-bd84-b87176742bcd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-10T03%3A14%3A10Z&ske=2026-09-11T03%3A14%3A10Z&sks=b&skv=2026-02-06&sig=MUnt0jOqhHFISvFbTDMbXTDYSr2P/1813lcdwtZH%2BnM%3D'
+      EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+      VERSION_CODE: '29'
+      VERSION_NAME: '0.1.0-alpha8.4.2-scroll-ranking'
+    steps:
+      - name: Download verified private build artifact first
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --retry-delay 1 "$ARTIFACT_URL" -o "$RUNNER_TEMP/v29-unsigned.zip"
+          mkdir -p "$RUNNER_TEMP/v29"
+          unzip -q "$RUNNER_TEMP/v29-unsigned.zip" -d "$RUNNER_TEMP/v29"
+          test -s "$RUNNER_TEMP/v29/Pica-Library-Android-v29-Alpha8.4.2-UNSIGNED.apk"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'build-tools;35.0.0'
+      - name: Sign and verify official OTA APK
+        env:
+          PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${PREVIEW_KEYSTORE_B64:-}"
+          test -n "${PREVIEW_KEYSTORE_PASSWORD:-}"
+          INPUT="$RUNNER_TEMP/v29/Pica-Library-Android-v29-Alpha8.4.2-UNSIGNED.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$INPUT" | grep -q "package: name='com.picalibrary.android' versionCode='29'"
+          KEYSTORE="$RUNNER_TEMP/pica-preview.jks"
+          printf '%s' "$PREVIEW_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          mkdir -p publish
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --ks "$KEYSTORE" --ks-key-alias pica-preview \
+            --ks-pass "pass:$PREVIEW_KEYSTORE_PASSWORD" --key-pass "pass:$PREVIEW_KEYSTORE_PASSWORD" \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled false --v4-signing-enabled false \
+            --out publish/Pica-Library-Android-Preview.apk "$INPUT"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs publish/Pica-Library-Android-Preview.apk
+          CERT_SHA=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs publish/Pica-Library-Android-Preview.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr 'A-F' 'a-f')
+          test "$CERT_SHA" = "$EXPECTED_CERT"
+          printf '%s\n' "$CERT_SHA" > publish/Pica-Library-Android-Preview.cert-sha256
+          SHA=$(sha256sum publish/Pica-Library-Android-Preview.apk | awk '{print $1}')
+          python - "$VERSION_CODE" "$VERSION_NAME" "$SHA" "$CERT_SHA" <<'PY'
+          import json, sys
+          code, name, sha, cert = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+          manifest = {
+              'versionCode': code,
+              'versionName': name,
+              'apkUrl': 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk',
+              'sha256': sha,
+              'releaseNotes': 'Alpha8.4.2: returning from comic details restores the prior viewport in Library, Recommendations and Online; Online ranking supports 24 hours, 7 days and 30 days.',
+              'minimumSupportedVersionCode': 23,
+          }
+          with open('publish/android-update.json','w',encoding='utf-8') as f: json.dump(manifest,f,ensure_ascii=False,indent=2)
+          with open('publish/BUILD_TRANSPARENCY.json','w',encoding='utf-8') as f:
+              json.dump({'product':'Pica Library Android Preview','versionCode':code,'versionName':name,'apkSha256':sha,'signerCertificateSha256':cert,'channel':'android-preview','sourcePolicy':'delayed-source-release','buildValidation':['unit-tests','leaderboard-range-test','lint','R8-release-build','viewport-contract-check','stable-signer-verification']},f,ensure_ascii=False,indent=2)
+          PY
+          rm -f "$KEYSTORE"
+      - name: Replace Android Preview OTA assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view android-preview >/dev/null
+          gh release edit android-preview --prerelease --title 'Pica Library Android Preview' --notes 'Alpha8.4.2 / v29: restore Library/Recommendation/Online viewport after comic details, plus selectable 24h / 7d / 30d Online rankings.'
+          gh release upload android-preview publish/Pica-Library-Android-Preview.apk publish/android-update.json publish/Pica-Library-Android-Preview.cert-sha256 publish/BUILD_TRANSPARENCY.json --clobber
+      - name: Final live OTA manifest check
+        run: |
+          set -euo pipefail
+          sleep 3
+          curl -L --fail --retry 3 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/android-update.json' -o "$RUNNER_TEMP/live-update.json"
+          python - "$RUNNER_TEMP/live-update.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1],encoding='utf-8') as f: x=json.load(f)
+          assert x['versionCode']==29, x
+          assert x['versionName']=='0.1.0-alpha8.4.2-scroll-ranking', x
+          assert len(x['sha256'])==64, x
+          print('OTA manifest PASS:', x['versionCode'], x['sha256'])
+          PY

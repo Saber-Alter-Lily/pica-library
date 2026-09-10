@@ -29,6 +29,7 @@
         <activity android:name=".TaskCenterActivity" android:exported="false" />
         <activity android:name=".RemoteStorageActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".HomeActivity" android:exported="false" />
         <activity android:name=".PairingActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -37,7 +38,7 @@
                 <data android:scheme="picalibrary" android:host="pair" />
             </intent-filter>
         </activity>
-        <activity android:name=".HomeActivity" android:exported="true">
+        <activity android:name=".DisclaimerActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

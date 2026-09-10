@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Pica Library">
+  <defs>
+    <linearGradient id="bg" x1="38" y1="28" x2="218" y2="228" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6672F5"/>
+      <stop offset="1" stop-color="#22B8A2"/>
+    </linearGradient>
+    <linearGradient id="page" x1="78" y1="72" x2="174" y2="184" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#ECF9F7"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="18" width="220" height="220" rx="54" fill="url(#bg)"/>
+  <path d="M128 85C110 72 88 68 65 70c-8 1-13 7-13 15v87c0 7 6 12 13 11 23-2 45 3 63 17V85Z" fill="url(#page)"/>
+  <path d="M128 85c18-13 40-17 63-15 8 1 13 7 13 15v87c0 7-6 12-13 11-23-2-45 3-63 17V85Z" fill="#FFFFFF"/>
+  <path d="M128 85v115" stroke="#D7ECE8" stroke-width="7" stroke-linecap="round"/>
+  <path d="M69 160c18-5 36-3 53 5" fill="none" stroke="#45B5A5" stroke-width="8" stroke-linecap="round"/>
+  <path d="M134 165c17-8 35-10 53-5" fill="none" stroke="#6572E8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M84 102c12-2 24 0 35 5M84 122c12-2 24 0 35 5M137 107c11-5 23-7 35-5M137 127c11-5 23-7 35-5" fill="none" stroke="#90A5AE" stroke-width="5" stroke-linecap="round" opacity=".54"/>
+</svg>

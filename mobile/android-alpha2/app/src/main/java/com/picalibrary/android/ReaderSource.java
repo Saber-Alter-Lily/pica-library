@@ -1,0 +1,90 @@
+package com.picalibrary.android;
+
+import android.content.Context;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+interface ReaderSource {
+    String kind();
+    String scope();
+    List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception;
+    BridgeClient.ChapterData chapter(String comicId,String episodeId) throws Exception;
+    String recentChapter(String comicId) throws Exception;
+    HttpURLConnection image(String path) throws Exception;
+    void saveProgress(String comicId,String episodeId,int pageIndex);
+}
+
+final class DesktopReaderSource implements ReaderSource {
+    private final Context context;
+    DesktopReaderSource(Context context){this.context=context.getApplicationContext();}
+    public String kind(){return "desktop";}
+    public String scope(){return ReaderPolicy.hash(BridgeStore.host(context)+"\n"+BridgeStore.token(context));}
+    public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {return BridgeClient.chapters(context,comicId);}
+    public BridgeClient.ChapterData chapter(String comicId,String episodeId) throws Exception {return BridgeClient.chapter(context,comicId,episodeId);}
+    public String recentChapter(String comicId){return "";}
+    public HttpURLConnection image(String path) throws Exception {
+        String host=BridgeStore.host(context);if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");
+        HttpURLConnection c=(HttpURLConnection)new URL(host.replaceAll("/$","")+path).openConnection();c.setConnectTimeout(2500);c.setReadTimeout(15000);c.setRequestProperty("Accept","image/*");c.setRequestProperty("Authorization","Bearer "+BridgeStore.token(context));c.setUseCaches(false);return c;
+    }
+    public void saveProgress(String comicId,String episodeId,int pageIndex){
+        try{JSONObject body=new JSONObject();body.put("comicId",comicId);body.put("episodeId",episodeId);body.put("pageIndex",pageIndex);BridgeClient.post(context,"/mobile/v1/reader/progress",body);}
+        catch(Exception e){throw new IllegalStateException("Desktop 阅读进度同步失败",e);}
+    }
+}
+
+final class RemoteReaderSource implements ReaderSource {
+    private final Context context;
+    private final RemoteLibraryClient client;
+    private final Map<String,BridgeClient.ChapterItem> knownChapters=new HashMap<>();
+    private String comicTitle="",author="";
+    RemoteReaderSource(Context context){this.context=context.getApplicationContext();client=new RemoteLibraryClient(this.context);}
+    public String kind(){return "remote";}
+    public String scope(){return client.scope();}
+    public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
+        JSONObject root=client.comic("v1/comics/"+java.net.URLEncoder.encode(comicId,"UTF-8").replace("+","%20")+"/manifest.json");comicTitle=root.optString("title",comicTitle);author=root.optString("author",author);
+        JSONArray arr=root.optJSONArray("episodes");List<BridgeClient.ChapterItem> out=new ArrayList<>();knownChapters.clear();
+        if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o==null)continue;BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(o.optString("episodeId"),o.optString("title","章节"),o.optInt("order",i+1),o.optInt("pageCount",0));out.add(item);knownChapters.put(item.id,item);}return out;
+    }
+    public BridgeClient.ChapterData chapter(String comicId,String episodeId) throws Exception {
+        JSONObject comic=client.comic("v1/comics/"+java.net.URLEncoder.encode(comicId,"UTF-8").replace("+","%20")+"/manifest.json");comicTitle=comic.optString("title",comicTitle);author=comic.optString("author",author);JSONArray episodes=comic.optJSONArray("episodes");JSONObject selected=null;
+        if(episodes!=null)for(int i=0;i<episodes.length();i++){JSONObject o=episodes.optJSONObject(i);if(o!=null&&episodeId.equals(o.optString("episodeId"))){selected=o;break;}}
+        if(selected==null)throw new IllegalStateException("云端章节不存在");JSONObject episode=client.episode(selected.optString("manifestPath"));JSONArray arr=episode.optJSONArray("pages");List<BridgeClient.PageItem> pages=new ArrayList<>();
+        if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o==null)continue;String objectPath=o.optString("objectPath");pages.add(new BridgeClient.PageItem(objectPath,objectPath,o.optInt("index",i)+1));}
+        BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(episodeId,episode.optString("title",selected.optString("title","章节")),episode.optInt("order",selected.optInt("order",0)),pages.size());knownChapters.put(item.id,item);
+        RemoteLibraryClient.ReadingEntry remote=client.progressEntry(comicId,episodeId);int remotePage=remote==null?0:remote.pageIndex;if(remote!=null)ReaderProgress.mergeRemote(context,scope(),comicId,episodeId,remote.pageIndex,remote.updatedAt);
+        return new BridgeClient.ChapterData(item,pages,remotePage);
+    }
+    public String recentChapter(String comicId) throws Exception {return client.recentChapter(comicId);}
+    public HttpURLConnection image(String path) throws Exception {if(path==null||!path.startsWith("v1/")||path.contains("..")||path.contains("\\"))throw new IllegalArgumentException("无效的云端图片路径");return client.open(path,"image/*");}
+    public void saveProgress(String comicId,String episodeId,int pageIndex){BridgeClient.ChapterItem chapter=knownChapters.get(episodeId);client.saveReadingProgress(DeviceIdentity.id(context),comicId,episodeId,pageIndex,comicTitle,author,chapter==null?"":chapter.title,chapter==null?0:chapter.order);}
+}
+
+final class PicaReaderSource implements ReaderSource {
+    private final Context context;
+    private final PicaClient client;
+    private final Map<String,PicaClient.Episode> episodes=new HashMap<>();
+    private final Map<String,BridgeClient.ChapterItem> knownChapters=new HashMap<>();
+    private String comicTitle="",author="";
+    PicaReaderSource(Context context){this.context=context.getApplicationContext();this.client=new PicaClient(this.context);}
+    public String kind(){return "pica";}
+    public String scope(){PicaAccountStore.Session session=PicaAccountStore.load(context);return ReaderPolicy.hash("pica\n"+session.account);}
+    public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
+        PicaClient.Comic comic=client.comic(comicId);comicTitle=comic.title;author=comic.author;List<PicaClient.Episode> remote=client.episodes(comicId);List<BridgeClient.ChapterItem> out=new ArrayList<>();episodes.clear();knownChapters.clear();
+        for(PicaClient.Episode episode:remote){episodes.put(episode.id,episode);BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(episode.id,episode.title,episode.order,1);knownChapters.put(item.id,item);out.add(item);}return out;
+    }
+    public BridgeClient.ChapterData chapter(String comicId,String episodeId) throws Exception {
+        PicaClient.Episode episode=episodes.get(episodeId);if(episode==null){for(PicaClient.Episode value:client.episodes(comicId)){episodes.put(value.id,value);if(value.id.equals(episodeId))episode=value;}}
+        if(episode==null)throw new IllegalStateException("Pica 章节不存在");List<PicaClient.Page> remote=client.pages(comicId,episode.order);List<BridgeClient.PageItem> pages=new ArrayList<>();for(PicaClient.Page page:remote)pages.add(new BridgeClient.PageItem(page.id,page.url,page.position+1));BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(episode.id,episode.title,episode.order,pages.size());knownChapters.put(item.id,item);return new BridgeClient.ChapterData(item,pages,0);
+    }
+    public String recentChapter(String comicId){return "";}
+    public HttpURLConnection image(String path) throws Exception {return client.media(path);}
+    public void saveProgress(String comicId,String episodeId,int pageIndex){
+        if(!RemoteConfigStore.load(context).configured())return;BridgeClient.ChapterItem chapter=knownChapters.get(episodeId);try{new RemoteLibraryClient(context).saveReadingProgress(DeviceIdentity.id(context),comicId,episodeId,pageIndex,comicTitle,author,chapter==null?"":chapter.title,chapter==null?0:chapter.order);}catch(Exception e){throw new IllegalStateException("Pica 阅读进度云端同步失败",e);}
+    }
+}

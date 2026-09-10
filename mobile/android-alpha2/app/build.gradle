@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+def previewKeystorePath = System.getenv('ANDROID_PREVIEW_KEYSTORE_PATH')
+def previewKeystorePassword = System.getenv('ANDROID_PREVIEW_KEYSTORE_PASSWORD')
+def previewSigningConfigured = previewKeystorePath != null && !previewKeystorePath.isBlank() &&
+        previewKeystorePassword != null && !previewKeystorePassword.isBlank()
+
+android {
+    namespace 'com.picalibrary.android'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.picalibrary.android'
+        minSdk 28
+        targetSdk 35
+        versionCode 31
+        versionName '0.1.0-alpha8.6-star-personalization'
+    }
+
+    signingConfigs {
+        if (previewSigningConfigured) {
+            preview {
+                storeFile file(previewKeystorePath)
+                storePassword previewKeystorePassword
+                keyAlias 'pica-preview'
+                keyPassword previewKeystorePassword
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (previewSigningConfigured) {
+                signingConfig signingConfigs.preview
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+    implementation 'androidx.viewpager2:viewpager2:1.1.0'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.work:work-runtime:2.9.1'
+    implementation 'com.google.zxing:core:3.5.3'
+    testImplementation 'junit:junit:4.13.2'
+}

@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+# Windows launchers and scripts remain executable by their native hosts with LF.
+*.ps1 text eol=lf
+*.cs text eol=lf

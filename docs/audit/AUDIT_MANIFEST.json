@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "repository": "Saber-Alter-Lily/pica-library",
+  "repositoryVisibility": "PRIVATE",
+  "releaseCandidateBinding": "PICA_LIBRARY_V0_1_0_RC2_FINAL_REVIEW_PACKAGE/RELEASE_CANDIDATE_SHA.txt",
+  "tests": { "passed": 84, "failed": 0, "files": 21 },
+  "node22Ci": "PENDING_EXACT_SHA_FREEZE",
+  "node24Ci": "PENDING_EXACT_SHA_FREEZE",
+  "localLiveValidation": "PASS",
+  "githubRunnerLiveValidation": "PASS",
+  "privateCallerLiveValidation": "PASS",
+  "recommendationV2": "PASS",
+  "browserLite": "PASS_DESKTOP_AND_390X844",
+  "secretScan": "PASS",
+  "releaseCreated": false,
+  "tagCreated": false,
+  "pagesDeployed": false,
+  "npmPublished": false
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs><marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#e53935"/></marker><filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity=".18"/></filter></defs>
+  <image href="04-atlas.png" x="0" y="0" width="1600" height="1000" preserveAspectRatio="none"/>
+  <g font-family="Microsoft YaHei, PingFang SC, Arial, sans-serif" fill="#d62828" stroke="#e53935" stroke-width="3">
+    <g filter="url(#shadow)"><rect x="430" y="125" width="390" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="450" y="162" font-size="20" font-weight="700" stroke="none">① 收藏图鉴：把长期偏好整理成语义地图</text></g><line x1="430" y1="154" x2="350" y2="170" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="1080" y="150" width="290" height="72" rx="12" fill="#fff" fill-opacity=".95"/><text x="1100" y="180" font-size="20" font-weight="700" stroke="none">② 收藏变化后点“重新整理”</text><text x="1100" y="208" font-size="16" stroke="none">生成最新本地快照</text></g><line x1="1240" y1="222" x2="1325" y2="250" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="1270" y="255" width="280" height="72" rx="12" fill="#fff" fill-opacity=".95"/><text x="1290" y="285" font-size="20" font-weight="700" stroke="none">③ 导出结果卡 PDF</text><text x="1290" y="313" font-size="16" stroke="none">适合保存或分享</text></g><line x1="1420" y1="255" x2="1470" y2="205" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="595" y="580" width="360" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="615" y="617" font-size="20" font-weight="700" stroke="none">④ 先看整体规模与主要兴趣方向</text></g><line x1="770" y1="580" x2="770" y2="520" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)"><rect x="380" y="720" width="420" height="58" rx="12" fill="#fff" fill-opacity=".95"/><text x="400" y="757" font-size="20" font-weight="700" stroke="none">⑤ 再看语义词汇：理解长期偏好的核心构成</text></g><line x1="400" y1="748" x2="310" y2="770" marker-end="url(#arrow)"/>
+  </g>
+</svg>

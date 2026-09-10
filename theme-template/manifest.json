@@ -1,0 +1,8 @@
+{
+  "themeFormatVersion": 1,
+  "id": "my-theme",
+  "name": "My Theme",
+  "author": "Theme Author",
+  "version": "1.0.0",
+  "description": "A custom Pica Library visual theme."
+}

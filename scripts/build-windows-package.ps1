@@ -1,0 +1,199 @@
+$ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $PSScriptRoot
+$package = Get-Content -Raw -LiteralPath (Join-Path $root 'package.json') | ConvertFrom-Json
+$version = [string]$package.version
+$nodeVersion = '24.15.0'
+$name = if ($version -eq '0.2.0') {
+    'Pica-Library-v0.2.0-windows-x64'
+} elseif ($version -eq '0.3.0') {
+    'Pica-Library-v0.3.0-windows-x64'
+} elseif ($version -eq '0.3.1') {
+    'Pica-Library-v0.3.1-windows-x64'
+} elseif ($version -eq '0.3.2') {
+    'Pica-Library-v0.3.2-windows-x64'
+} elseif ($version -eq '0.3.3') {
+    'Pica-Library-v0.3.3-windows-x64'
+} elseif ($version -eq '0.3.4') {
+    'Pica-Library-v0.3.4-windows-x64'
+} elseif ($version -eq '0.2.0-dev.0') {
+    'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
+} elseif ($version -eq '0.2.0-dev.1') {
+    'Pica-Library-v0.2.0-dev.1-local-test-windows-x64'
+} elseif ($version -eq '0.2.0-dev.2') {
+    'Pica-Library-v0.2.0-dev.2-local-test-windows-x64'
+} else {
+    throw "Unsupported Windows package version: $version"
+}
+$buildRoot = Join-Path $root 'artifacts\windows-package'
+$stage = Join-Path $buildRoot $name
+$zip = Join-Path $root "artifacts\$name.zip"
+$runtimeCache = Join-Path $root "artifacts\cache\node-v$nodeVersion-win-x64.zip"
+$runtimeFile = "node-v$nodeVersion-win-x64.zip"
+$gitSourceSha = (git -C $root rev-parse HEAD).Trim()
+$sourceSha = if ($env:PICA_LIBRARY_BUILD_PROVENANCE) { [string]$env:PICA_LIBRARY_BUILD_PROVENANCE } else { $gitSourceSha }
+
+function Get-Sha256([string]$file) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($algorithm.ComputeHash([IO.File]::OpenRead($file)))).Replace('-','').ToLowerInvariant() }
+    finally { $algorithm.Dispose() }
+}
+
+if ($gitSourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve Git source commit SHA' }
+if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Build provenance must be exactly 40 lowercase hex characters' }
+if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
+if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }
+New-Item -ItemType Directory -Force -Path (Join-Path $stage 'app'),(Join-Path $stage 'runtime'),(Join-Path $stage 'licenses'),(Split-Path $runtimeCache -Parent) | Out-Null
+
+Push-Location $root
+try { pnpm build } finally { Pop-Location }
+
+if (-not (Test-Path -LiteralPath $runtimeCache)) {
+    Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip" -OutFile $runtimeCache
+}
+$checksums = (Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v$nodeVersion/SHASUMS256.txt").Content
+$expectedLine = @($checksums -split "`n" | Where-Object { $_ -match "\s$([regex]::Escape($runtimeFile))\s*$" })[0]
+if (-not $expectedLine) { throw 'Official Node.js runtime checksum was not found' }
+$expectedHash = ($expectedLine -split '\s+')[0].ToLowerInvariant()
+$actualHash = Get-Sha256 $runtimeCache
+if ($actualHash -ne $expectedHash) { throw 'Official Node.js runtime checksum mismatch' }
+$runtimeExtract = Join-Path $buildRoot 'runtime-extract'
+if (Test-Path -LiteralPath $runtimeExtract) { Remove-Item -Recurse -Force -LiteralPath $runtimeExtract }
+Expand-Archive -LiteralPath $runtimeCache -DestinationPath $runtimeExtract
+Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\node.exe") -Destination (Join-Path $stage 'runtime\node.exe')
+Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\LICENSE") -Destination (Join-Path $stage 'licenses\Node.js-LICENSE.txt')
+
+Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $stage 'app')
+Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $stage 'licenses\THIRD_PARTY_LICENSES.txt')
+Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse
+$registrySource = Join-Path $root 'src\data\registry-v3-final'
+$registryTarget = Join-Path $stage 'src\data\registry-v3-final'
+$registryMirror = Join-Path $stage 'app\runtime-assets\registry-v3-final'
+New-Item -ItemType Directory -Force -Path $registryTarget,$registryMirror | Out-Null
+Copy-Item -Path (Join-Path $registrySource '*') -Destination $registryTarget -Recurse
+Copy-Item -Path (Join-Path $registrySource '*') -Destination $registryMirror -Recurse
+$registryManifestFile = Join-Path $registryTarget 'PICA_REGISTRY_V3_FINAL_MANIFEST.json'
+if (-not (Test-Path -LiteralPath $registryManifestFile)) { throw 'Registry V3 runtime manifest is missing' }
+$registryManifest = Get-Content -Raw -LiteralPath $registryManifestFile | ConvertFrom-Json
+$requiredRegistryAssets = @(
+    'PICA_REGISTRY_V3_FINAL_MANIFEST.json',
+    [string]$registryManifest.runtime_semantic_file,
+    'PICA_ENTITY_REGISTRY_V3_FINAL.csv',
+    'PICA_TAG_ALIAS_MAP_V3_FINAL.json',
+    'PICA_TAG_UNRESOLVED_V3_FINAL_WATCHLIST.csv',
+    'PICA_TAG_LIBRARY_V2_REVIEWED.csv',
+    'PICA_TAG_ALIAS_MAP_V2.json'
+)
+foreach ($asset in $requiredRegistryAssets) {
+    if (-not $asset -or -not (Test-Path -LiteralPath (Join-Path $registryTarget $asset))) {
+        throw "Required Registry V3 runtime asset is missing: $asset"
+    }
+}
+foreach ($sourceAsset in @(Get-ChildItem -LiteralPath $registrySource -File)) {
+    $targetAsset = Join-Path $registryTarget $sourceAsset.Name
+    $mirrorAsset = Join-Path $registryMirror $sourceAsset.Name
+    if (
+        -not (Test-Path -LiteralPath $targetAsset) -or
+        -not (Test-Path -LiteralPath $mirrorAsset) -or
+        (Get-Sha256 $sourceAsset.FullName) -ne (Get-Sha256 $targetAsset) -or
+        (Get-Sha256 $sourceAsset.FullName) -ne (Get-Sha256 $mirrorAsset)
+    ) {
+        throw "Registry V3 runtime asset copy mismatch: $($sourceAsset.Name)"
+    }
+}
+Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
+foreach ($notice in @('NOTICE.md','UPSTREAM.md')) { Copy-Item -LiteralPath (Join-Path $root $notice) -Destination $stage }
+foreach ($requiredLicense in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICENSES.txt')) {
+    $licensePath = Join-Path $stage $requiredLicense
+    if (-not (Test-Path -LiteralPath $licensePath) -or (Get-Item -LiteralPath $licensePath).Length -eq 0) {
+        throw "Required redistributed license material is missing: $requiredLicense"
+    }
+}
+
+$csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework compiler is unavailable' }
+& $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll "/out:$stage\Pica Library.exe" (Join-Path $root 'packaging\windows\Launcher.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
+
+if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','0.3.4')) {
+    $baseZip = if ($version -eq '0.2.0-dev.1') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
+    } elseif ($version -eq '0.2.0-dev.2') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'
+    } elseif ($version -eq '0.3.0') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
+    } elseif ($version -eq '0.3.1') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.0-windows-x64.zip'
+    } elseif ($version -eq '0.3.2') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.1-windows-x64.zip'
+    } elseif ($version -eq '0.3.3') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.2-windows-x64.zip'
+    } elseif ($version -eq '0.3.4') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.3-windows-x64.zip'
+    }
+    if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [IO.Compression.ZipFile]::OpenRead($baseZip)
+    try {
+        $baseSourceEntry = $archive.GetEntry('SOURCE_SHA.txt')
+        $baseLauncherEntry = $archive.GetEntry('Pica Library.exe')
+        if (-not $baseSourceEntry -or -not $baseLauncherEntry) { throw 'The dev.0 package is missing launcher provenance' }
+        $reader = New-Object IO.StreamReader($baseSourceEntry.Open())
+        try { $baseSourceSha = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
+        if ($version -in @('0.3.2','0.3.3','0.3.4')) {
+            # Stable v0.3.1+ packages intentionally store opaque public provenance rather than private Git SHAs.
+            # Verify the launcher source itself is still byte-identical before reusing the accepted launcher binary.
+            $launcherBlob = (git -C $root hash-object 'packaging/windows/Launcher.cs').Trim()
+            if ($launcherBlob -ne '1351568469abf3edcb61354144498ec9734ad08f') {
+                throw 'Launcher source changed since accepted stable package; a full install is required'
+            }
+        } else {
+            & git -C $root diff --quiet "$baseSourceSha..$gitSourceSha" -- 'packaging/windows/Launcher.cs'
+            if ($LASTEXITCODE -ne 0) { throw 'Launcher source changed; a full install is required' }
+        }
+        $destination = [IO.File]::Open((Join-Path $stage 'Pica Library.exe'),[IO.FileMode]::Create,[IO.FileAccess]::Write)
+        try {
+            $source = $baseLauncherEntry.Open()
+            try { $source.CopyTo($destination) } finally { $source.Dispose() }
+        } finally { $destination.Dispose() }
+    } finally { $archive.Dispose() }
+}
+
+$readme = @"
+Pica Library v$version for Windows 10/11 x64
+
+1. Extract the entire ZIP.
+2. Double-click Pica Library.exe.
+3. Complete setup in the browser.
+4. To use Browser Lite, open Settings > Browser Lite and export the data package.
+
+Users upgrading from v0.1.3 must use a complete Windows ZIP.
+From v0.2.0 onward, compatible releases may use the built-in incremental update flow.
+No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
+This unsigned build may show a Windows SmartScreen reputation warning.
+"@
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
+$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
+
+$forbidden = Get-ChildItem -LiteralPath $stage -Recurse -Force | Where-Object {
+    $_.Name -eq '.git' -or
+    $_.Name -match '^\.env($|\.)' -or
+    $_.Name -match '\.db(-shm|-wal)?$' -or
+    $_.FullName -match '\\node_modules\\'
+}
+if ($forbidden) { throw 'Forbidden package content detected' }
+$textFiles = Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object {
+    $_.Extension -in @('.js','.html','.css','.json','.md','.txt')
+}
+foreach ($file in $textFiles) {
+    $text = [IO.File]::ReadAllText($file.FullName)
+    if ($text -match '(?i)[A-Z]:\\Users\\[^\\]+\\' -or $text -match '(?im)^\s*PICA_(ACCOUNT|PASSWORD)\s*=\s*[^;\r\n]+$') {
+        throw "Sensitive or developer-specific content detected in $($file.Name)"
+    }
+}
+Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+$hash = Get-Sha256 $zip
+[IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
+[ordered]@{ path=$zip; sha256=$hash; size_bytes=(Get-Item $zip).Length; uncompressed_bytes=(Get-ChildItem $stage -File -Recurse | Measure-Object Length -Sum).Sum; file_count=@(Get-ChildItem $stage -File -Recurse).Count; node_version=$nodeVersion; product_version=$version; source_sha=$sourceSha } | ConvertTo-Json

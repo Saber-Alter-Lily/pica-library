@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Pica Library</title>
+        <meta name="theme-color" content="#5f6ee8" />
+        <link rel="icon" type="image/png" sizes="512x512" href="./pica-library-icon.webp" />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href="./pica-library-icon.webp"
+        />
+        <link rel="stylesheet" href="./styles.css" />
+        <link rel="stylesheet" href="./alpha8-6.css" />
+    </head>
+    <body>
+        <header class="app-header">
+            <div class="app-brand">
+                <img
+                    class="app-brand-icon"
+                    src="./pica-library-icon.webp"
+                    alt=""
+                />
+                <div>
+                    <h1>Pica Library</h1>
+                    <p>收藏整理、个性发现与增量下载</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <label class="language-control"
+                    ><span>界面语言</span>
+                    <select id="language-select">
+                        <option value="zh-CN">简体中文</option>
+                        <option value="en">English</option>
+                    </select>
+                </label>
+                <span id="mode" class="mode">正在检测模式</span>
+            </div>
+        </header>
+        <nav class="app-nav" aria-label="主导航">
+            <button data-view="home" class="active">Home</button>
+            <button data-view="library">Library</button>
+            <button data-view="shelves">书架</button>
+            <button data-view="discover">Discover</button>
+            <button data-view="chronicle">我的收藏图鉴</button>
+            <button data-view="downloads">Downloads</button>
+            <button data-view="downloaded">Downloaded</button>
+            <button data-view="maintenance">Maintenance</button>
+            <button data-view="settings" id="settings-nav" hidden>
+                Settings
+            </button>
+        </nav>
+        <main class="app-main">
+            <section id="setup" class="view setup-view">
+                <div class="setup-shell">
+                    <div class="setup-heading">
+                        <span class="setup-mark"
+                            ><img src="./pica-library-icon.webp" alt=""
+                        /></span>
+                        <div>
+                            <h2>Set up Pica Library</h2>
+                            <p>Your library stays on this computer.</p>
+                        </div>
+                    </div>
+                    <form id="setup-form" class="settings-form">
+                        <label
+                            >Account<input
+                                id="setup-account"
+                                autocomplete="username"
+                                required
+                        /></label>
+                        <label
+                            >Password<input
+                                id="setup-password"
+                                type="password"
+                                autocomplete="current-password"
+                                required
+                        /></label>
+                        <label class="wide"
+                            >Library and download folder<span class="folder-row"
+                                ><input id="setup-directory" required /><button
+                                    id="setup-folder"
+                                    type="button"
+                                >
+                                    Choose Folder...
+                                </button></span
+                            ></label
+                        >
+                        <label
+                            >Download profile<select id="setup-profile">
+                                <option value="conservative">
+                                    Conservative
+                                </option>
+                                <option value="balanced" selected>
+                                    Balanced
+                                </option>
+                                <option value="fast">Fast</option>
+                            </select></label
+                        >
+                        <div class="wide setup-proxy-section">
+                            <h3>Network Proxy</h3>
+                            <button id="detect-proxy" type="button">
+                                Auto-detect proxy
+                            </button>
+                            <label
+                                >HTTP/HTTPS proxy (optional)<input
+                                    id="setup-proxy"
+                                    placeholder="http://127.0.0.1:7890"
+                            /></label>
+                        </div>
+                        <p id="setup-security" class="setup-help wide">
+                            账号和密码仅用于连接 Pica 服务。Windows 版本使用当前
+                            Windows 用户的 DPAPI 加密保存凭据。
+                        </p>
+                        <p
+                            id="setup-message"
+                            class="status wide"
+                            role="status"
+                        ></p>
+                        <div class="actions wide">
+                            <button id="setup-test" type="button">
+                                Test Connection</button
+                            ><button class="primary" type="submit">
+                                Save and Continue
+                            </button>
+                        </div>
+                        <div id="setup-next-step" class="wide notice" hidden>
+                            <strong>连接成功</strong>
+                            <p>下一步：同步你的 Pica 收藏，建立本地漫画库。</p>
+                            <button
+                                id="setup-sync"
+                                type="button"
+                                class="primary"
+                            >
+                                同步收藏
+                            </button>
+                            <button id="setup-sync-later" type="button">
+                                稍后同步
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+            <section id="home" class="view active">
+                <div class="page-heading">
+                    <div>
+                        <h2>开始使用</h2>
+                        <p>网页轻量查看，连接本地服务后同步、搜索和下载。</p>
+                    </div>
+                    <button id="clear-lite-state">清空本地数据</button>
+                </div>
+                <div class="quick-start">
+                    <button id="home-sync">
+                        <strong>同步收藏</strong
+                        ><span>建立或更新本地漫画库</span>
+                    </button>
+                    <button data-go="library">
+                        <strong>导入收藏</strong><span>CSV 或数据包</span>
+                    </button>
+                    <button data-go="discover">
+                        <strong>查看推荐</strong><span>基于收藏偏好</span>
+                    </button>
+                    <button data-go="downloads">
+                        <strong>管理下载</strong><span>任务、进度与重试</span>
+                    </button>
+                </div>
+                <div id="summary" class="metrics"></div>
+                <article id="browser-lite-onboarding" class="onboarding-card">
+                    <p class="eyebrow">Browser Lite</p>
+                    <h3>开始使用 Browser Lite</h3>
+                    <p class="onboarding-intro">
+                        Browser Lite 使用从 Pica Library
+                        导出的数据包，无需在网页中填写 Pica 账号或密码。
+                    </p>
+                    <ol>
+                        <li>下载并打开 Pica Library Windows 版</li>
+                        <li>完成首次设置并准备好漫画库</li>
+                        <li>
+                            在“设置 → Browser Lite”中导出 Browser Lite 数据包
+                        </li>
+                        <li>将生成的 pica-library-bundle.json 导入这里</li>
+                    </ol>
+                    <p class="onboarding-detail">
+                        完整数据包可包含已准备好的漫画库、作者信息和推荐结果。
+                    </p>
+                    <div class="actions">
+                        <button id="onboarding-import" class="primary">
+                            选择 Browser Lite 数据包
+                        </button>
+                        <a
+                            id="onboarding-download"
+                            class="button-link"
+                            href="https://github.com/Saber-Alter-Lily/pica-library/releases"
+                            >下载 Windows 版</a
+                        >
+                    </div>
+                    <p class="compatibility-note">
+                        也支持现有兼容的 CSV / JSON 文件。
+                    </p>
+                </article>
+                <article class="notice">
+                    <strong>两种模式</strong>
+                    <p>
+                        Browser Lite
+                        把导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号不会写入导出包。
+                    </p>
+                </article>
+            </section>
+
+            <section id="library" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Library</h2>
+                        <p>筛选、核对并选择需要下载的作品。</p>
+                    </div>
+                    <div class="actions">
+                        <input
+                            id="import-file"
+                            class="file-picker-input"
+                            type="file"
+                            accept=".csv,.json"
+                        />
+                        <label
+                            id="import-file-label"
+                            class="button-control"
+                            for="import-file"
+                            >选择数据文件</label
+                        >
+                        <button id="import-button" class="primary">导入</button>
+                        <button id="sync-button">更新收藏</button>
+                        <button id="full-sync-button">完整校验收藏</button>
+                    </div>
+                </div>
+                <p id="import-result" class="status"></p>
+                <div id="library-operation" class="operation-progress" hidden>
+                    <span id="library-operation-phase"></span>
+                    <progress id="library-operation-bar" max="1"></progress>
+                </div>
+                <div id="lite-snapshot-bar" class="notice" hidden>
+                    <span id="lite-snapshot-time"></span>
+                    <button id="lite-reimport" type="button">
+                        重新导入数据包
+                    </button>
+                </div>
+                <div
+                    class="toolbar responsive-toolbar"
+                    data-control-scope="library"
+                >
+                    <div class="control-group">
+                        <button id="view-grid" aria-pressed="true">
+                            封面网格
+                        </button>
+                        <button id="view-list" aria-pressed="false">
+                            紧凑列表
+                        </button>
+                    </div>
+                    <div class="control-group grid-size-controls">
+                        <button
+                            data-grid-size="small"
+                            data-size-scope="library"
+                        >
+                            小
+                        </button>
+                        <button
+                            data-grid-size="medium"
+                            data-size-scope="library"
+                        >
+                            中
+                        </button>
+                        <button
+                            data-grid-size="large"
+                            data-size-scope="library"
+                            aria-pressed="true"
+                        >
+                            大
+                        </button>
+                    </div>
+                    <label
+                        ><input id="cover-toggle" type="checkbox" checked />
+                        <span id="cover-toggle-label">Load covers</span></label
+                    >
+                    <input id="filter-text" placeholder="标题或作者" />
+                    <select id="filter-scope">
+                        <option value="library" selected>漫画库</option>
+                        <option value="favorites">Pica 收藏</option>
+                        <option value="downloaded">已下载</option>
+                        <option value="catalog">全部缓存记录</option>
+                    </select>
+                    <label class="facet-control"
+                        >作者<input
+                            id="filter-author-input"
+                            list="filter-author-options"
+                            placeholder="输入或选择作者" /><datalist
+                            id="filter-author-options"
+                        ></datalist
+                    ></label>
+                    <label class="facet-control"
+                        >标签<input
+                            id="filter-tag"
+                            list="filter-tag-options"
+                            placeholder="输入标签，回车添加" /><datalist
+                            id="filter-tag-options"
+                        ></datalist
+                    ></label>
+                    <select id="filter-tag-mode" aria-label="标签匹配">
+                        <option value="all">标签：全部匹配</option>
+                        <option value="any">标签：任一匹配</option>
+                    </select>
+                    <select id="sort-mode">
+                        <option value="latest">最近更新</option>
+                        <option value="likes">爱心数量</option>
+                        <option value="views">浏览数量</option>
+                        <option value="title">标题</option>
+                    </select>
+                    <button id="apply-filter" class="primary">筛选</button>
+                    <button id="queue-selected">加入下载</button>
+                    <button id="library-add-shelf">加入书架</button>
+                    <button id="library-add-filtered-shelf">
+                        将全部筛选结果加入书架
+                    </button>
+                    <button id="library-clear-selection">取消选择</button>
+                    <button id="export-plan">导出计划</button>
+                </div>
+                <div id="filter-chips" class="filter-chips"></div>
+                <p id="library-selection-status" class="status"></p>
+                <p id="last-sync" class="status"></p>
+                <p id="library-count" class="status"></p>
+                <div id="comic-grid" class="comic-grid"></div>
+                <div id="comic-table" class="table-wrap" hidden>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>标题</th>
+                                <th>归一作者</th>
+                                <th>标签</th>
+                                <th>爱心</th>
+                                <th>更新</th>
+                                <th>进度</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comic-rows"></tbody>
+                    </table>
+                </div>
+                <div class="load-more-wrap">
+                    <button id="load-more" hidden>加载更多</button>
+                </div>
+            </section>
+
+            <section id="chronicle" class="view chronicle-view">
+                <div class="page-heading no-print">
+                    <div>
+                        <p class="eyebrow">我的收藏图鉴</p>
+                        <h2>你的收藏，已经走了很远。</h2>
+                        <p>从你的收藏里，看看一路喜欢过什么。</p>
+                    </div>
+                    <div class="actions">
+                        <button id="chronicle-refresh">重新整理</button
+                        ><button id="chronicle-print" class="primary">
+                            导出结果卡 PDF
+                        </button>
+                    </div>
+                </div>
+                <p id="chronicle-status" class="status"></p>
+                <div id="chronicle-content" class="chronicle-content">
+                    <article class="chronicle-empty">
+                        <h3>收藏图鉴还没有整理</h3>
+                        <p>
+                            完成一次完整收藏同步后，就可以在这里看到兴趣主线和收藏变化。
+                        </p>
+                        <button id="chronicle-build" class="primary">
+                            整理我的收藏图鉴
+                        </button>
+                    </article>
+                </div>
+            </section>
+
+            <section id="shelves" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>书架</h2>
+                        <p>本地整理空间；不会改变 Pica 收藏或删除下载文件。</p>
+                    </div>
+                    <button id="shelf-create" class="primary">
+                        + 新建书架
+                    </button>
+                </div>
+                <p id="shelf-message" class="status"></p>
+                <div
+                    class="toolbar responsive-toolbar"
+                    id="shelf-view-controls"
+                >
+                    <button id="shelf-grid" aria-pressed="true">网格</button>
+                    <button id="shelf-list-view" aria-pressed="false">
+                        列表
+                    </button>
+                    <div class="control-group grid-size-controls">
+                        <button data-grid-size="small" data-size-scope="shelf">
+                            小
+                        </button>
+                        <button data-grid-size="medium" data-size-scope="shelf">
+                            中
+                        </button>
+                        <button
+                            data-grid-size="large"
+                            data-size-scope="shelf"
+                            aria-pressed="true"
+                        >
+                            大
+                        </button>
+                    </div>
+                    <label
+                        ><input
+                            id="shelf-cover-toggle"
+                            type="checkbox"
+                            checked
+                        />
+                        <span id="shelf-cover-toggle-label"
+                            >加载封面</span
+                        ></label
+                    >
+                </div>
+                <div class="shelf-layout">
+                    <div id="shelf-list" class="shelf-list"></div>
+                    <div id="shelf-detail" class="shelf-detail">
+                        <article class="notice">选择一个书架查看内容。</article>
+                    </div>
+                </div>
+            </section>
+
+            <section id="discover" class="view">
+                <div class="tabs">
+                    <button data-tab="recommend" class="active">
+                        专属推荐
+                    </button>
+                    <button data-tab="search">站内搜索</button>
+                </div>
+                <div id="recommend" class="tab active">
+                    <div class="page-heading">
+                        <div>
+                            <h2>专属推荐</h2>
+                            <p>展示可解释的作者、社团、标签和分类偏好。</p>
+                        </div>
+                        <button id="recommend-button" class="primary">
+                            查看推荐
+                        </button>
+                        <button id="recommend-restart">重新开始推荐</button>
+                    </div>
+                    <div id="profile" class="profile"></div>
+                    <p id="recommend-message" class="status"></p>
+                    <div class="toolbar recommendation-toolbar">
+                        <button id="recommend-grid" aria-pressed="true">
+                            网格
+                        </button>
+                        <button id="recommend-list" aria-pressed="false">
+                            列表
+                        </button>
+                        <label
+                            ><input
+                                id="recommend-cover-toggle"
+                                type="checkbox"
+                                checked
+                            />
+                            <span id="recommend-cover-toggle-label"
+                                >Load covers</span
+                            ></label
+                        >
+                        <div class="control-group grid-size-controls">
+                            <button
+                                data-grid-size="small"
+                                data-size-scope="recommendation"
+                            >
+                                小
+                            </button>
+                            <button
+                                data-grid-size="medium"
+                                data-size-scope="recommendation"
+                            >
+                                中
+                            </button>
+                            <button
+                                data-grid-size="large"
+                                data-size-scope="recommendation"
+                                aria-pressed="true"
+                            >
+                                大
+                            </button>
+                        </div>
+                    </div>
+                    <p id="recommend-batch" class="status"></p>
+                    <button id="recommend-next-batch">Next batch</button>
+                    <button id="recommend-add-shelf">将所选加入书架</button>
+                    <button id="recommend-clear-selection">取消选择</button>
+                    <span id="recommend-selection-status" class="status"></span>
+                    <div id="recommend-results" class="results"></div>
+                </div>
+                <div id="search" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>站内搜索</h2>
+                            <p>按关键词和标签查找并排序。</p>
+                        </div>
+                    </div>
+                    <div class="toolbar">
+                        <input id="search-keyword" placeholder="关键词" />
+                        <input id="search-tags" placeholder="标签，逗号分隔" />
+                        <select id="search-sort">
+                            <option value="likes">爱心数量</option>
+                            <option value="views">浏览数量</option>
+                            <option value="latest">最近更新</option>
+                        </select>
+                        <button id="search-button" class="primary">搜索</button>
+                    </div>
+                    <p id="search-message" class="status"></p>
+                    <div class="selection-toolbar">
+                        <button id="search-add-shelf">将所选加入书架</button>
+                        <button id="search-clear-selection">取消选择</button>
+                        <span
+                            id="search-selection-status"
+                            class="status"
+                        ></span>
+                    </div>
+                    <div id="search-results" class="results"></div>
+                </div>
+            </section>
+
+            <section id="reader" class="view reader-view">
+                <div class="reader-header">
+                    <div>
+                        <p class="eyebrow">本地阅读器</p>
+                        <h2 id="reader-title">阅读</h2>
+                        <p id="reader-chapter-title" class="status"></p>
+                    </div>
+                    <div class="reader-controls">
+                        <button id="reader-exit" class="primary">
+                            ← 退出阅读
+                        </button>
+                        <select id="reader-mode">
+                            <option value="vertical">连续纵向</option>
+                            <option value="single">单页</option>
+                            <option value="double">双页</option>
+                        </select>
+                        <select id="reader-direction">
+                            <option value="ltr">从左到右</option>
+                            <option value="rtl">从右到左</option>
+                        </select>
+                        <select id="reader-fit">
+                            <option value="width">适应宽度</option>
+                            <option value="height">适应高度</option>
+                        </select>
+                        <button id="reader-fullscreen">全屏</button>
+                        <button id="reader-export-zip">导出 ZIP</button>
+                        <button id="reader-export-cbz">导出 CBZ</button>
+                    </div>
+                </div>
+                <div class="reader-shell">
+                    <aside id="reader-chapters" class="reader-chapters"></aside>
+                    <div
+                        id="reader-pages"
+                        class="reader-pages reader-vertical"
+                    ></div>
+                </div>
+                <p id="reader-message" class="status"></p>
+            </section>
+
+            <section id="downloads" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Downloads</h2>
+                        <p>本地与 GitHub 任务使用同一套持久化队列语义。</p>
+                    </div>
+                    <div class="actions">
+                        <button
+                            id="sync-export-browser-lite"
+                            class="primary"
+                            type="button"
+                        >
+                            同步并导出 Browser Lite 数据包
+                        </button>
+                        <select id="performance-profile" aria-label="性能配置">
+                            <option value="conservative">Conservative</option>
+                            <option value="balanced" selected>Balanced</option>
+                            <option value="fast">Fast</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <div
+                            id="custom-performance"
+                            class="custom-performance"
+                            hidden
+                        >
+                            <label
+                                >Jobs
+                                <input
+                                    id="custom-jobs"
+                                    type="number"
+                                    min="1"
+                                    value="2"
+                            /></label>
+                            <label
+                                >Media
+                                <input
+                                    id="custom-media"
+                                    type="number"
+                                    min="1"
+                                    value="5"
+                            /></label>
+                            <label
+                                >Interval ms
+                                <input
+                                    id="custom-interval"
+                                    type="number"
+                                    min="0"
+                                    value="250"
+                            /></label>
+                            <label
+                                >Retries
+                                <input
+                                    id="custom-retries"
+                                    type="number"
+                                    min="0"
+                                    value="2"
+                            /></label>
+                        </div>
+                        <button id="refresh-jobs">刷新</button>
+                        <button id="run-jobs" class="primary">运行队列</button>
+                    </div>
+                </div>
+                <div
+                    id="download-summary"
+                    class="metrics download-summary"
+                ></div>
+                <div id="download-operation" class="operation-progress" hidden>
+                    <span id="download-operation-phase"></span>
+                </div>
+                <div id="job-list" class="list"></div>
+            </section>
+
+            <section id="downloaded" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Downloaded</h2>
+                        <p>包含至少一个真实存在的本地下载文件。</p>
+                    </div>
+                    <div
+                        class="view-controls responsive-toolbar"
+                        data-control-scope="downloaded"
+                    >
+                        <div class="control-group">
+                            <button id="downloaded-grid" aria-pressed="true">
+                                网格
+                            </button>
+                            <button id="downloaded-list" aria-pressed="false">
+                                列表
+                            </button>
+                        </div>
+                        <div class="control-group grid-size-controls">
+                            <button
+                                data-grid-size="small"
+                                data-size-scope="downloaded"
+                            >
+                                小
+                            </button>
+                            <button
+                                data-grid-size="medium"
+                                data-size-scope="downloaded"
+                            >
+                                中
+                            </button>
+                            <button
+                                data-grid-size="large"
+                                data-size-scope="downloaded"
+                                aria-pressed="true"
+                            >
+                                大
+                            </button>
+                        </div>
+                        <label
+                            ><input
+                                id="downloaded-cover-toggle"
+                                type="checkbox"
+                                checked
+                            />
+                            <span id="downloaded-cover-toggle-label"
+                                >加载封面</span
+                            ></label
+                        >
+                    </div>
+                </div>
+                <p id="downloaded-count" class="status"></p>
+                <div
+                    id="downloaded-grid-items"
+                    class="comic-grid view-grid-size-large"
+                ></div>
+                <div id="downloaded-table" class="table-wrap" hidden>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>标题</th>
+                                <th>作者</th>
+                                <th>状态</th>
+                                <th>章节</th>
+                                <th>图片</th>
+                                <th>本地大小</th>
+                                <th>最近下载</th>
+                            </tr>
+                        </thead>
+                        <tbody id="downloaded-rows"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="maintenance" class="view">
+                <div class="tabs">
+                    <button data-tab="updates" class="active">内容更新</button>
+                    <button data-tab="software-updates">软件更新</button>
+                    <button data-tab="repair">修复</button>
+                    <button data-tab="authors">作者归一</button>
+                    <button data-tab="health">健康检查</button>
+                </div>
+                <div id="updates" class="tab active">
+                    <div class="page-heading">
+                        <div>
+                            <h2>更新检测</h2>
+                            <p>默认只检查已经建立本地下载状态的漫画。</p>
+                        </div>
+                        <button id="check-updates" class="primary">
+                            检查下载内容更新
+                        </button>
+                    </div>
+                    <pre id="update-result" class="output"></pre>
+                </div>
+                <div id="software-updates" class="tab">
+                    <article id="settings-update" class="panel update-panel">
+                        <div class="section-heading">
+                            <div>
+                                <p class="eyebrow">本地更新</p>
+                                <h3>更新</h3>
+                            </div>
+                            <span
+                                id="update-current-version"
+                                class="mode"
+                            ></span>
+                        </div>
+                        <p>
+                            可直接检查并安装官方更新，也可以拖入或选择本地更新
+                            ZIP 包。
+                        </p>
+                        <label
+                            id="update-dropzone"
+                            class="update-dropzone"
+                            tabindex="0"
+                        >
+                            <strong>将 Pica Library 更新包拖到这里</strong>
+                            <span>或选择 Pica-Library-vX.Y.Z-update.zip</span>
+                            <input
+                                id="update-file"
+                                class="file-picker-input"
+                                type="file"
+                                accept=".zip,application/zip"
+                            />
+                        </label>
+                        <div
+                            id="update-summary"
+                            class="update-summary"
+                            hidden
+                        ></div>
+                        <div
+                            id="update-progress"
+                            class="operation-progress"
+                            hidden
+                        >
+                            <span id="update-progress-phase"></span>
+                            <progress
+                                id="update-progress-bar"
+                                max="1"
+                            ></progress>
+                        </div>
+                        <p
+                            id="update-message"
+                            class="status"
+                            aria-live="polite"
+                        ></p>
+                        <div class="actions">
+                            <button id="update-check" type="button">
+                                检查更新
+                            </button>
+                            <button
+                                id="update-one-click"
+                                class="primary"
+                                type="button"
+                            >
+                                一键检查并更新
+                            </button>
+                            <button id="update-apply" type="button" hidden>
+                                使用已上传更新包并重启
+                            </button>
+                        </div>
+                    </article>
+                </div>
+                <div id="repair" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>文件修复</h2>
+                            <p>扫描缺失、空文件和失败记录。</p>
+                        </div>
+                        <button id="scan-repair" class="primary">
+                            扫描问题
+                        </button>
+                    </div>
+                    <pre id="repair-result" class="output"></pre>
+                </div>
+                <div id="authors" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>作者归一</h2>
+                            <p>自动建议只作为候选，合并决定由用户确认。</p>
+                        </div>
+                    </div>
+                    <label
+                        ><input id="pending-only" type="checkbox" />
+                        仅看待审核</label
+                    >
+                    <div id="author-list" class="list"></div>
+                </div>
+                <div id="health" class="tab">
+                    <div class="page-heading">
+                        <div>
+                            <h2>健康检查</h2>
+                            <p>确认模式、数据统计和服务可用性。</p>
+                        </div>
+                        <button id="run-health" class="primary">
+                            运行检查
+                        </button>
+                    </div>
+                    <pre id="health-result" class="output"></pre>
+                </div>
+            </section>
+            <section id="settings" class="view">
+                <div class="page-heading">
+                    <div>
+                        <h2>Settings</h2>
+                        <p>Manage this Windows installation.</p>
+                    </div>
+                    <span id="settings-version" class="mode"></span>
+                </div>
+                <form id="settings-form" class="settings-form panel">
+                    <label
+                        >Account<input
+                            id="settings-account"
+                            autocomplete="username"
+                            placeholder="Keep current account"
+                    /></label>
+                    <label
+                        >Change password<input
+                            id="settings-password"
+                            type="password"
+                            autocomplete="new-password"
+                            placeholder="Leave blank to keep current password"
+                    /></label>
+                    <label class="wide"
+                        >Library and download folder<span class="folder-row"
+                            ><input id="settings-directory" required /><button
+                                id="settings-folder"
+                                type="button"
+                            >
+                                Choose Folder...
+                            </button></span
+                        ></label
+                    >
+                    <label
+                        >Download profile<select id="settings-profile">
+                            <option value="conservative">Conservative</option>
+                            <option value="balanced">Balanced</option>
+                            <option value="fast">Fast</option>
+                        </select></label
+                    >
+                    <div class="wide setup-proxy-section">
+                        <h3>网络代理</h3>
+                        <label
+                            >HTTP/HTTPS proxy<input
+                                id="settings-proxy"
+                                placeholder="Disabled"
+                        /></label>
+                    </div>
+                    <button id="settings-detect-proxy" type="button">
+                        自动检测代理
+                    </button>
+                    <p id="browser-lite-timestamps" class="status"></p>
+                    <p
+                        id="settings-message"
+                        class="status wide"
+                        role="status"
+                    ></p>
+                    <div class="actions wide">
+                        <button id="settings-test" type="button">
+                            Test Connection</button
+                        ><button class="primary" type="submit">
+                            Save Settings</button
+                        ><button id="open-data" type="button">
+                            Open Library Folder</button
+                        ><button id="open-logs" type="button">Open Logs</button
+                        ><button
+                            id="exit-app"
+                            type="button"
+                            class="danger-action"
+                        >
+                            Exit Pica Library
+                        </button>
+                    </div>
+                </form>
+                <article id="settings-browser-lite" class="panel export-panel">
+                    <h3>Browser Lite</h3>
+                    <p>
+                        将当前漫画库导出为 Browser Lite 数据包，之后可在独立的
+                        Browser Lite 网页中导入使用。
+                    </p>
+                    <div class="actions">
+                        <button
+                            id="export-browser-lite"
+                            class="primary"
+                            type="button"
+                        >
+                            导出 Browser Lite 数据包
+                        </button>
+                        <button
+                            id="open-browser-lite-export"
+                            type="button"
+                            hidden
+                        >
+                            打开所在文件夹
+                        </button>
+                        <button id="open-browser-lite" type="button">
+                            Open Browser Lite
+                        </button>
+                    </div>
+                    <p
+                        id="browser-lite-export-message"
+                        class="status"
+                        role="status"
+                    ></p>
+                </article>
+                <article id="settings-remote-storage" class="panel">
+                    <h3>远程存储 · WebDAV</h3>
+                    <p>把电脑已经下载的漫画增量同步到远程存储。Alpha7 使用 <code>PicaLibrary/v1</code> generation 结构；手机之后可在电脑关机时直接读取。</p>
+                    <p id="remote-storage-state" class="status"></p>
+                    <div class="settings-form">
+                        <label class="wide">WebDAV 地址<input id="remote-webdav-url" placeholder="https://dav.example.com/path" /></label>
+                        <label>根目录<input id="remote-root" value="PicaLibrary" /></label>
+                        <label>用户名<input id="remote-username" autocomplete="username" placeholder="留空沿用已保存用户名" /></label>
+                        <label>密码 / App Password<input id="remote-password" type="password" autocomplete="new-password" placeholder="留空沿用已保存密码" /></label>
+                    </div>
+                    <div class="actions">
+                        <button id="remote-test" type="button">测试连接</button>
+                        <button id="remote-save" type="button">保存设置</button>
+                        <button id="remote-plan" type="button">扫描同步计划</button>
+                        <button id="remote-sync" type="button" class="primary">同步已下载漫画</button>
+                    </div>
+                    <p id="remote-storage-message" class="status" role="status"></p>
+                    <div id="remote-sync-plan" hidden>
+                        <p><strong>同步计划</strong></p>
+                        <p class="status">本地 <span id="remote-plan-local">0</span> 部 · 云端 <span id="remote-plan-remote">0</span> 部 · 待上传/更新 <span id="remote-plan-upload">0</span> 部 · 不变 <span id="remote-plan-unchanged">0</span> 部 · 保留云端独有 <span id="remote-plan-retained">0</span> 部</p>
+                        <p class="status">预计上传 <span id="remote-plan-pages">0</span> 页 · <span id="remote-plan-bytes">0 B</span></p>
+                        <div id="remote-plan-list"></div>
+                    </div>
+                    <p class="status">默认只做增量/加法同步，不删除云端独有漫画。新 generation 完成后最后才切换 <code>current.json</code>。</p>
+                </article>
+                <article id="settings-mobile-bridge" class="panel">
+                    <h3>手机连接</h3>
+                    <p>让 Pica Library Android 在同一 Wi-Fi 下直接读取这台电脑的漫画库、推荐和已下载章节。</p>
+                    <p id="mobile-bridge-state" class="status"></p>
+                    <div id="mobile-bridge-details" hidden>
+                        <p><strong>电脑地址</strong></p>
+                        <code id="mobile-bridge-address"></code>
+                        <p><strong>6 位配对码</strong></p>
+                        <div id="mobile-bridge-code" style="font-size:2rem;font-weight:700;letter-spacing:.18em"></div>
+                        <p id="mobile-bridge-expiry" class="status"></p>
+                        <p id="mobile-bridge-devices" class="status"></p>
+                        <p class="status">首次连接如 Windows 弹出防火墙提示，请允许“专用网络”。</p>
+                    </div>
+                    <button id="mobile-bridge-refresh" type="button">生成新配对码</button>
+                </article>
+                <article class="panel preview-cache-panel">
+                    <h3>预览缓存</h3>
+                    <p id="preview-cache-stats">正在读取缓存占用…</p>
+                    <button id="preview-cache-clear" type="button">
+                        清理预览缓存
+                    </button>
+                </article>
+            </section>
+        </main>
+        <dialog id="shelf-dialog" class="app-dialog">
+            <form method="dialog">
+                <h3 id="shelf-dialog-title">加入书架</h3>
+                <label
+                    >选择书架<select id="shelf-dialog-select"></select
+                ></label>
+                <p id="shelf-dialog-count" class="status"></p>
+                <div class="actions">
+                    <button value="cancel">取消</button>
+                    <button
+                        id="shelf-dialog-confirm"
+                        value="default"
+                        class="primary"
+                    >
+                        确认
+                    </button>
+                </div>
+            </form>
+        </dialog>
+        <dialog id="recommend-detail-dialog" class="app-dialog detail-dialog">
+            <button id="recommend-detail-close" class="dialog-close">
+                关闭
+            </button>
+            <div id="recommend-detail-content"></div>
+            <div id="recommend-preview" class="preview-pages"></div>
+            <p id="recommend-preview-message" class="status"></p>
+        </dialog>
+        <template id="author-template">
+            <article class="list-item">
+                <div class="grow">
+                    <strong class="author-name"></strong>
+                    <p class="author-meta"></p>
+                    <p class="author-evidence"></p>
+                </div>
+                <div class="actions">
+                    <button data-decision="approved">确认</button
+                    ><button data-decision="keep_separate">保持分离</button
+                    ><button data-decision="needs_research">待研究</button>
+                </div>
+            </article>
+        </template>
+        <script type="module" src="./app.js"></script>
+        <script type="module" src="./alpha7-cloud.js"></script>
+        <script type="module" src="./alpha8-product.js"></script>
+        <script type="module" src="./alpha8-update-ui.js"></script>
+        <script type="module" src="./alpha8-theme-help.js"></script>
+        <script type="module" src="./alpha8-connections.js"></script>
+        <script type="module" src="./alpha8-star-access.js"></script>
+    </body>
+</html>

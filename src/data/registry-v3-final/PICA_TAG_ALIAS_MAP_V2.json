@@ -1,0 +1,198 @@
+[
+  {
+    "raw_tag": "初音",
+    "proposed_canonical_tag": "VOCALOID: 初音未來",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "medium",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "KOF：不知火舞",
+    "proposed_canonical_tag": "KOF: 不知火舞",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "medium",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "COSPLAY",
+    "proposed_canonical_tag": "角色扮演",
+    "proposed_facet_v2": "APPEARANCE_OUTFIT",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "项圈",
+    "proposed_canonical_tag": "項圈",
+    "proposed_facet_v2": "FETISH_TROPE",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO",
+    "proposed_canonical_tag": "Fate / Grand Order",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO: 馬修",
+    "proposed_canonical_tag": "Fate / Grand Order: 馬修",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO: 源賴光",
+    "proposed_canonical_tag": "Fate / Grand Order: 源賴光",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "LOVELIVE",
+    "proposed_canonical_tag": "LoveLive!",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "幼馴染",
+    "proposed_canonical_tag": "青梅竹馬",
+    "proposed_facet_v2": "RELATIONSHIP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO: 斯卡哈",
+    "proposed_canonical_tag": "Fate / Grand Order: 斯卡哈",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "睡奸",
+    "proposed_canonical_tag": "睡姦",
+    "proposed_facet_v2": "CONTROL_COERCION",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO: 貞德",
+    "proposed_canonical_tag": "Fate / Grand Order: 貞德",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "RE: 雷姆",
+    "proposed_canonical_tag": "Re:從零開始的異世界生活: 雷姆",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "艦娘",
+    "proposed_canonical_tag": "艦隊Collection",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO: 沖田總司",
+    "proposed_canonical_tag": "Fate / Grand Order: 沖田總司",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "SAO: 阿詩娜",
+    "proposed_canonical_tag": "刀劍神域: 阿詩娜",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "艦娘: 時雨",
+    "proposed_canonical_tag": "艦隊Collection: 時雨",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO: 酒吞童子",
+    "proposed_canonical_tag": "Fate / Grand Order: 酒吞童子",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FGO: 玉藻前",
+    "proposed_canonical_tag": "Fate / Grand Order: 玉藻前",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "Overwatch",
+    "proposed_canonical_tag": "守望先锋",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "RE: 艾米莉婭",
+    "proposed_canonical_tag": "Re:從零開始的異世界生活: 艾米莉婭",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "RE: 從零開始的異世界生活",
+    "proposed_canonical_tag": "Re:從零開始的異世界生活",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "SAO",
+    "proposed_canonical_tag": "刀劍神域",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "SAO: 桐人",
+    "proposed_canonical_tag": "刀劍神域: 桐人",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "SAO: 直葉",
+    "proposed_canonical_tag": "刀劍神域: 直葉",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "vocaloid",
+    "proposed_canonical_tag": "VOCALOID",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "FATE: 澟",
+    "proposed_canonical_tag": "FATE: 凜",
+    "proposed_facet_v2": "FANDOM_CHARACTER",
+    "confidence": "high",
+    "safety_status": "OK"
+  },
+  {
+    "raw_tag": "POKEMON",
+    "proposed_canonical_tag": "Pokémon",
+    "proposed_facet_v2": "FANDOM_IP",
+    "confidence": "high",
+    "safety_status": "OK"
+  }
+]

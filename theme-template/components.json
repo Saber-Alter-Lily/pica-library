@@ -1,0 +1,24 @@
+{
+  "typography": {
+    "title": "comic",
+    "navigation": "rounded"
+  },
+  "navigation": {
+    "selectedEffect": "pill",
+    "iconScale": "standard"
+  },
+  "progress": {
+    "style": "mascot",
+    "headAsset": "assets/mascot-head.webp",
+    "motion": "bobble",
+    "effect": "sparkle"
+  },
+  "background": {
+    "patternAsset": "assets/pattern.webp",
+    "patternOpacityLight": 0.10,
+    "patternOpacityDark": 0.08
+  },
+  "reader": {
+    "chrome": "themed"
+  }
+}

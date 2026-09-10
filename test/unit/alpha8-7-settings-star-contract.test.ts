@@ -1,78 +1,63 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { PersonalizationService } from '../../src/services/personalization-service'
 
 const roots: string[] = []
-const originalFetch = globalThis.fetch
 
 function root() {
-    const value = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-alpha87-'))
+    const value = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-alpha88-'))
     roots.push(value)
     return value
 }
 
-function response(status: number, value: unknown) {
-    return new Response(JSON.stringify(value), {
-        status,
-        headers: { 'content-type': 'application/json' }
-    })
-}
-
 afterEach(() => {
-    vi.restoreAllMocks()
-    globalThis.fetch = originalFetch
     for (const value of roots.splice(0))
         fs.rmSync(value, { recursive: true, force: true })
 })
 
-describe('Alpha8.7 desktop/mobile convergence', () => {
-    it('verifies a public stargazer from the repository list and persists the proof', async () => {
-        const calls: string[] = []
-        globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-            const url = String(input)
-            calls.push(url)
-            return response(200, [
-                { login: 'someone-else' },
-                { login: 'Saber-Alter-Lily' }
-            ])
-        }) as typeof fetch
-
+describe('Alpha8.7/8.8 desktop/mobile convergence', () => {
+    it('persists only account-authenticated GitHub Star proof with immutable user id', () => {
         const service = new PersonalizationService(root())
-        await expect(
-            service.verifyGitHubStar('saber-alter-lily')
-        ).resolves.toMatchObject({
+        expect(
+            service.installAuthenticatedStarProof({
+                githubUser: 'Saber-Alter-Lily',
+                githubUserId: 197705186
+            })
+        ).toMatchObject({
             starUnlocked: true,
-            starUser: 'saber-alter-lily'
+            starUser: 'Saber-Alter-Lily',
+            starUserId: 197705186,
+            starAuthMethod: 'github-account-device-flow'
         })
-        expect(calls).toEqual([
-            'https://api.github.com/repos/Saber-Alter-Lily/pica-library/stargazers?per_page=100&page=1'
-        ])
         expect(service.starProof()).toMatchObject({
+            schema: 2,
             unlocked: true,
-            githubUser: 'saber-alter-lily'
+            githubUser: 'Saber-Alter-Lily',
+            githubUserId: 197705186,
+            authMethod: 'github-account-device-flow'
         })
     })
 
-    it('paginates public stargazers before deciding that a user is absent', async () => {
-        const first = Array.from({ length: 100 }, (_, index) => ({
-            login: `reader-${index}`
-        }))
-        globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-            const url = String(input)
-            if (url.endsWith('page=1')) return response(200, first)
-            return response(200, [{ login: 'Target-Reader' }])
-        }) as typeof fetch
-
-        const service = new PersonalizationService(root())
-        await expect(
-            service.verifyGitHubStar('target-reader')
-        ).resolves.toMatchObject({ starUnlocked: true })
-        expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+    it('does not accept legacy username-only proof as authentication', async () => {
+        const directory = root()
+        const service = new PersonalizationService(directory)
+        fs.writeFileSync(
+            path.join(directory, 'github-star-proof-v1.json'),
+            JSON.stringify({
+                unlocked: true,
+                githubUser: 'Saber-Alter-Lily',
+                verifiedAt: new Date().toISOString()
+            })
+        )
+        expect(service.starProof()).toBeNull()
+        await expect(service.verifyGitHubStar()).rejects.toThrow(
+            /公开用户名 Star 验证已停用/
+        )
     })
 
-    it('uses the same stargazer contract on Android and removes the invalid exact-user endpoint', () => {
+    it('removes public username Star lookup from the active Desktop and Android gates', () => {
         const desktop = fs.readFileSync(
             'src/services/personalization-service.ts',
             'utf8'
@@ -81,17 +66,18 @@ describe('Alpha8.7 desktop/mobile convergence', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/StarAccessStore.java',
             'utf8'
         )
-        for (const source of [desktop, android]) {
-            expect(source).toContain('/stargazers?per_page=100&page=')
-            expect(source).not.toMatch(/users\/.+starred\/Saber-Alter-Lily\/pica-library/)
-        }
-        expect(android).toContain('equalsIgnoreCase')
+        expect(desktop).not.toContain('/stargazers?per_page=100&page=')
+        expect(desktop).not.toContain('/users/${encodeURIComponent(githubUser)}/starred')
+        expect(android).not.toContain('checkRepositoryStargazers')
+        expect(android).not.toContain('checkUserStars')
+        expect(android).toContain('github_user_id')
+        expect(android).toContain('github-account-device-flow')
     })
 
     it('collapses only completed/cancelled download history while retaining failed jobs', () => {
         const hub = fs.readFileSync('web/alpha8-7-desktop-hub.js', 'utf8')
         expect(hub).toContain("status === 'COMPLETED' || status === 'CANCELLED'")
-        expect(hub).toContain("pica-show-finished-downloads")
+        expect(hub).toContain('pica-show-finished-downloads')
         expect(hub).toContain("url.pathname !== '/api/v1/downloads'")
         expect(hub).not.toContain("status === 'FAILED' || status === 'COMPLETED'")
     })
@@ -108,7 +94,7 @@ describe('Alpha8.7 desktop/mobile convergence', () => {
         ])
             expect(hub).toContain(section)
         expect(hub).toContain('#settings-nav{display:none!important}')
-        expect(hub).toContain("maintenanceNav.textContent = text().nav")
+        expect(hub).toContain('maintenanceNav.textContent = text().nav')
         expect(hub).toContain("panels.get('software').appendChild(software)")
     })
 
@@ -117,6 +103,5 @@ describe('Alpha8.7 desktop/mobile convergence', () => {
         expect(hub).toContain('#a87-appearance-panel #a83-personalization')
         expect(hub).toContain('grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr)')
         expect(hub).toContain('.a86-star-actions{display:grid!important;grid-template-columns:1fr!important')
-        expect(hub).toContain('.a86-star-field input{width:100%!important')
     })
 })

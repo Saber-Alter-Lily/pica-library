@@ -7,6 +7,7 @@ import android.os.Looper;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Lightweight community gate for official builds. A successful Star check is remembered locally. */
@@ -43,20 +44,24 @@ final class StarAccessStore {
             boolean ok=false;String message;
             HttpURLConnection connection=null;
             try{
-                String encoded=URLEncoder.encode(user,"UTF-8").replace("+","%20");
-                URL url=new URL("https://api.github.com/users/"+encoded+"/starred/"+REPOSITORY);
-                connection=(HttpURLConnection)url.openConnection();
-                connection.setConnectTimeout(12000);connection.setReadTimeout(12000);connection.setRequestMethod("GET");
-                connection.setRequestProperty("Accept","application/vnd.github+json");
-                connection.setRequestProperty("User-Agent","Pica-Library-Android");
-                int code=connection.getResponseCode();
-                if(code==204){
-                    ok=true;String at=java.time.Instant.now().toString();
-                    prefs(app).edit().putString("github_user",user).putString("verified_at",at).apply();
-                    message="已验证 GitHub Star，个性化装扮已解锁";
-                }else if(code==404){message="没有检测到该账号对 Pica Library 的 Star";}
-                else if(code==403||code==429){message="GitHub 暂时限制了验证请求，请稍后重试";}
-                else message="GitHub Star 验证失败（HTTP "+code+"）";
+                for(int page=1;page<=100&&!ok;page++){
+                    URL url=new URL("https://api.github.com/repos/"+REPOSITORY+"/stargazers?per_page=100&page="+page);
+                    connection=(HttpURLConnection)url.openConnection();
+                    connection.setConnectTimeout(12000);connection.setReadTimeout(12000);connection.setRequestMethod("GET");
+                    connection.setRequestProperty("Accept","application/vnd.github+json");
+                    connection.setRequestProperty("X-GitHub-Api-Version","2022-11-28");
+                    connection.setRequestProperty("User-Agent","Pica-Library-Android");
+                    int code=connection.getResponseCode();
+                    if(code==403||code==429){message="GitHub 暂时限制了验证请求，请稍后重试";break;}
+                    if(code!=200){message="GitHub Star 验证失败（HTTP "+code+"）";break;}
+                    StringBuilder body=new StringBuilder();try(java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.InputStreamReader(connection.getInputStream(),java.nio.charset.StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null)body.append(line);}
+                    JSONArray users=new JSONArray(body.toString());
+                    for(int i=0;i<users.length();i++){JSONObject item=users.optJSONObject(i);if(item!=null&&user.equalsIgnoreCase(item.optString("login",""))){ok=true;break;}}
+                    connection.disconnect();connection=null;
+                    if(ok){String at=java.time.Instant.now().toString();prefs(app).edit().putString("github_user",user).putString("verified_at",at).apply();message="已验证 GitHub Star，个性化装扮已解锁";break;}
+                    if(users.length()<100){message="没有检测到该账号对 Pica Library 的 Star";break;}
+                    message="没有检测到该账号对 Pica Library 的 Star";
+                }
             }catch(Exception e){message="无法连接 GitHub 验证 Star："+e.getMessage();}
             finally{if(connection!=null)connection.disconnect();}
             final boolean result=ok;final String text=message;

@@ -17,6 +17,8 @@ $name = if ($version -eq '0.2.0') {
     'Pica-Library-v0.3.4-windows-x64'
 } elseif ($version -eq '0.3.5') {
     'Pica-Library-v0.3.5-windows-x64'
+} elseif ($version -eq '0.3.6') {
+    'Pica-Library-v0.3.6-windows-x64'
 } elseif ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {
@@ -116,7 +118,7 @@ if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework comp
 & $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll "/out:$stage\Pica Library.exe" (Join-Path $root 'packaging\windows\Launcher.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 
-if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','0.3.4','0.3.5')) {
+if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','0.3.4','0.3.5','0.3.6')) {
     $baseZip = if ($version -eq '0.2.0-dev.1') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
     } elseif ($version -eq '0.2.0-dev.2') {
@@ -133,6 +135,8 @@ if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','
         Join-Path $root 'artifacts\Pica-Library-v0.3.3-windows-x64.zip'
     } elseif ($version -eq '0.3.5') {
         Join-Path $root 'artifacts\Pica-Library-v0.3.4-windows-x64.zip'
+    } elseif ($version -eq '0.3.6') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.5-windows-x64.zip'
     }
     if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -143,7 +147,7 @@ if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','
         if (-not $baseSourceEntry -or -not $baseLauncherEntry) { throw 'The dev.0 package is missing launcher provenance' }
         $reader = New-Object IO.StreamReader($baseSourceEntry.Open())
         try { $baseSourceSha = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
-        if ($version -in @('0.3.2','0.3.3','0.3.4','0.3.5')) {
+        if ($version -in @('0.3.2','0.3.3','0.3.4','0.3.5','0.3.6')) {
             # Stable v0.3.1+ packages intentionally store opaque public provenance rather than private Git SHAs.
             # Verify the launcher source itself is still byte-identical before reusing the accepted launcher binary.
             $launcherBlob = (git -C $root hash-object 'packaging/windows/Launcher.cs').Trim()

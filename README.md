@@ -8,20 +8,20 @@
 
 ## 当前版本
 
-- **Windows / Desktop：v0.3.5**
-- **Android Preview：v32 · 0.1.0-alpha8.6.1-theme-hotfix**
-- **当前公开源码：Alpha8.6.1**
+- **Windows / Desktop：v0.3.6**
+- **Android Preview：v33 · 0.1.0-alpha8.7-settings-star-fix**
+- **当前公开源码：Alpha8.7**
 
 ### 下载
 
-- [Windows v0.3.5 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.5/Pica-Library-v0.3.5-windows-x64.zip)
-- [Windows v0.3.5 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.5/Pica-Library-v0.3.5-update.zip)
-- [Windows v0.3.5 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.5)
+- [Windows v0.3.6 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.6/Pica-Library-v0.3.6-windows-x64.zip)
+- [Windows v0.3.6 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.6/Pica-Library-v0.3.6-update.zip)
+- [Windows v0.3.6 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.6)
 - [Android Preview Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-Windows v0.3.5 更新包已验证支持从 **v0.3.3 / v0.3.4** 直接升级。优先使用应用内 **设置 → 软件更新**。如果 v0.3.3 所在网络必须依赖应用内代理才能访问 GitHub，则旧版更新器本身可能无法发现 v0.3.5；这种情况下需使用一次完整 v0.3.5 ZIP，之后更新器会复用应用配置的 HTTP/HTTPS 代理。
+Windows v0.3.6 更新包已验证支持从 **v0.3.3 / v0.3.4** 直接升级。优先使用应用内 **设置 → 软件更新**。如果 v0.3.3 所在网络必须依赖应用内代理才能访问 GitHub，则旧版更新器本身可能无法发现 v0.3.6；这种情况下需使用一次完整 v0.3.6 ZIP，之后更新器会复用应用配置的 HTTP/HTTPS 代理。
 
-## Alpha8.6.1 Hotfix
+## Alpha8.7 Hotfix
 
 这一版优先修复更新与个性化装扮的阻断问题：
 

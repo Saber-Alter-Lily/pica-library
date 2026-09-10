@@ -1,0 +1,38 @@
+name: Create v0.3.4 Tag and Release
+
+on:
+  push:
+    paths:
+      - '.github/workflows/create-v034-tag-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: 'Saber-Alter-Lily/pica-library'
+      TARGET: '9b9ff099cd4edb44613ced649d038d20b433fc92'
+    steps:
+      - name: Create tag ref if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GH_REPO/git/ref/tags/v0.3.4" >/dev/null 2>&1; then
+            echo 'v0.3.4 tag already exists'
+          else
+            gh api "repos/$GH_REPO/git/refs" -X POST -f ref='refs/tags/v0.3.4' -f sha="$TARGET"
+          fi
+      - name: Create release if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GH_REPO/releases/tags/v0.3.4" >/dev/null 2>&1; then
+            echo 'v0.3.4 release already exists'
+          else
+            jq -n --arg tag 'v0.3.4' --arg target "$TARGET" --arg name 'Pica Library v0.3.4' --arg body 'Desktop v0.3.4 / Alpha8.6: current source is open again. GitHub Star unlocks personalization independently of donations, with Pica Violet · 星漫 immediately available and Theme Studio themes syncing to paired Android. Fixes top-header collisions and duplicate file-picker launches while retaining resilient update fallback. The update package supports v0.3.1, v0.3.2 and v0.3.3.' '{tag_name:$tag,target_commitish:$target,name:$name,body:$body,draft:false,prerelease:false,make_latest:"true"}' > /tmp/release.json
+            gh api "repos/$GH_REPO/releases" -X POST --input /tmp/release.json
+          fi

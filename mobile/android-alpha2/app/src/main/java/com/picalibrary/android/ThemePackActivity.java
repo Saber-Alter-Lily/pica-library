@@ -23,7 +23,7 @@ public final class ThemePackActivity extends Activity {
             unlock.addView(Ui.text(this,"GitHub Star 解锁",18,Ui.TEXT,true));
             unlock.addView(Ui.text(this,"给 Pica Library 仓库一个 Star 后，在这里输入 GitHub 用户名验证。验证成功会保存在本机。",13,Ui.MUTED,false));
             EditText username=new EditText(this);username.setSingleLine(true);username.setHint("GitHub 用户名");Ui.styleField(username,this);String remembered=StarAccessStore.user(this);if(!remembered.isEmpty())username.setText(remembered);unlock.addView(username);
-            Button verify=Ui.button(this,"验证 GitHub Star",v->{verify.setEnabled(false);String user=username.getText().toString();StarAccessStore.verify(this,user,(ok,message)->{verify.setEnabled(true);Toast.makeText(this,message,ok?Toast.LENGTH_SHORT:Toast.LENGTH_LONG).show();if(ok){Ui.applyTheme(this);recreate();}});},false);
+            Button verify=Ui.button(this,"验证 GitHub Star",v->{Button button=(Button)v;button.setEnabled(false);String user=username.getText().toString();StarAccessStore.verify(this,user,(ok,message)->{button.setEnabled(true);Toast.makeText(this,message,ok?Toast.LENGTH_SHORT:Toast.LENGTH_LONG).show();if(ok){Ui.applyTheme(this);recreate();}});},false);
             unlock.addView(verify);
             if(BridgeStore.paired(this))unlock.addView(Ui.button(this,"从已配对电脑同步解锁与装扮",v->syncFromDesktop(),false));
             content.addView(unlock);

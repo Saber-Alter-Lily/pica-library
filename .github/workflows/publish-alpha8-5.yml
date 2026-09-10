@@ -1,0 +1,151 @@
+name: Publish Alpha8.5 Theme Studio
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-alpha8-5.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_ARTIFACT_URL: 'https://sdmntprcentralus.oaiusercontent.com/files/00000000-cf40-81f5-8bde-824cf19cbe6b/raw?se=2026-09-10T10%3A20%3A51Z&sp=r&sv=2026-02-06&sr=b&scid=7ee470ab-09e9-5dba-9398-10288ffb7983&skoid=80e81ea6-3c08-46f9-bd84-b87176742bcd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-10T07%3A08%3A43Z&ske=2026-09-11T07%3A08%3A43Z&sks=b&skv=2026-02-06&sig=YqlSvSEK49Dhuh7D2zolyVXgPjUFqXAuuCNu2seDFvI%3D'
+      WINDOWS_ARTIFACT_URL: 'https://sdmntprwestcentralus.oaiusercontent.com/files/00000000-c8a8-81fb-b751-eef1b6bd2499/raw?se=2026-09-10T10%3A20%3A22Z&sp=r&sv=2026-02-06&sr=b&scid=ad49515f-6e2c-5210-8127-a1da046a03d4&skoid=80e81ea6-3c08-46f9-bd84-b87176742bcd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-10T05%3A25%3A32Z&ske=2026-09-11T05%3A25%3A32Z&sks=b&skv=2026-02-06&sig=xO2BPiluroIDa6bHGgdsVaFtOQWlnbYSEsABFdJZY3Q%3D'
+      EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+      ANDROID_VERSION_CODE: '30'
+      ANDROID_VERSION_NAME: '0.1.0-alpha8.5-theme-studio'
+      DESKTOP_VERSION: '0.3.2'
+      DESKTOP_PROVENANCE: '85a5e0327c0f4d7b9a1e6c2f0b483da17e659c24'
+      RELEASE_TARGET: '19c916aaea6bd6f656f75362fc970e93fc8d097e'
+    steps:
+      - name: Download private validated artifacts
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 --retry-delay 1 "$ANDROID_ARTIFACT_URL" -o "$RUNNER_TEMP/android.zip"
+          curl -L --fail --retry 3 --retry-delay 1 "$WINDOWS_ARTIFACT_URL" -o "$RUNNER_TEMP/windows.zip"
+          mkdir -p "$RUNNER_TEMP/android" "$RUNNER_TEMP/windows" publish
+          unzip -q "$RUNNER_TEMP/android.zip" -d "$RUNNER_TEMP/android"
+          unzip -q "$RUNNER_TEMP/windows.zip" -d "$RUNNER_TEMP/windows"
+          ANDROID_INPUT=$(find "$RUNNER_TEMP/android" -type f -name 'Pica-Library-Android-v30-Alpha8.5-UNSIGNED.apk' -print -quit)
+          FULL=$(find "$RUNNER_TEMP/windows" -type f -name 'Pica-Library-v0.3.2-windows-x64.zip' -print -quit)
+          UPDATE=$(find "$RUNNER_TEMP/windows" -type f -name 'Pica-Library-v0.3.2-update.zip' -print -quit)
+          test -s "$ANDROID_INPUT"
+          test -s "$FULL"
+          test -s "$UPDATE"
+          cp "$FULL" publish/Pica-Library-v0.3.2-windows-x64.zip
+          cp "$UPDATE" publish/Pica-Library-v0.3.2-update.zip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'build-tools;35.0.0'
+      - name: Sign and verify Android v30
+        env:
+          PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          INPUT=$(find "$RUNNER_TEMP/android" -type f -name 'Pica-Library-Android-v30-Alpha8.5-UNSIGNED.apk' -print -quit)
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$INPUT" | grep -q "package: name='com.picalibrary.android' versionCode='30' versionName='0.1.0-alpha8.5-theme-studio'"
+          KEYSTORE="$RUNNER_TEMP/pica-preview.jks"
+          printf '%s' "$PREVIEW_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --ks "$KEYSTORE" --ks-key-alias pica-preview \
+            --ks-pass "pass:$PREVIEW_KEYSTORE_PASSWORD" --key-pass "pass:$PREVIEW_KEYSTORE_PASSWORD" \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled false --v4-signing-enabled false \
+            --out publish/Pica-Library-Android-Preview.apk "$INPUT"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs publish/Pica-Library-Android-Preview.apk
+          CERT_SHA=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs publish/Pica-Library-Android-Preview.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr 'A-F' 'a-f')
+          test "$CERT_SHA" = "$EXPECTED_CERT"
+          printf '%s\n' "$CERT_SHA" > publish/Pica-Library-Android-Preview.cert-sha256
+          rm -f "$KEYSTORE"
+      - name: Verify Desktop package and build manifests
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, zipfile
+          from pathlib import Path
+          p=Path('publish')
+          full=p/'Pica-Library-v0.3.2-windows-x64.zip'
+          update=p/'Pica-Library-v0.3.2-update.zip'
+          apk=p/'Pica-Library-Android-Preview.apk'
+          def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+          with zipfile.ZipFile(update) as z:
+              m=json.loads(z.read('update-manifest.json'))
+          assert m['sourceVersionRange']=='=0.3.1', m
+          assert m['targetVersion']=='0.3.2', m
+          assert m['requiresFullInstall'] is False, m
+          assert m['targetSourceSha']==os.environ['DESKTOP_PROVENANCE'], m
+          android_sha=sha(apk); full_sha=sha(full); update_sha=sha(update)
+          manifest={
+            'versionCode':30,
+            'versionName':os.environ['ANDROID_VERSION_NAME'],
+            'apkUrl':'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk',
+            'sha256':android_sha,
+            'releaseNotes':'Alpha8.5 Theme Studio: Desktop/Web can export a self-contained AI Theme Creator Kit from a short description and reference images, safely import and immediately apply returned data-only theme packs, and sync the active pack to a paired phone. Adds themed navigation icons/typography, mascot progress runner, recommendation loading/empty artwork, palette/pattern/card styling, and retains Alpha8.4.2 recommendation persistence, viewport restoration, storage spacing, and 24h/7d/30d rankings.',
+            'minimumSupportedVersionCode':23
+          }
+          (p/'android-update.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
+          transparency={
+            'releaseId':'alpha8.5-v30-desktop-0.3.2',
+            'sourcePolicy':'delayed-source-release',
+            'android':{'versionCode':30,'versionName':os.environ['ANDROID_VERSION_NAME'],'sha256':android_sha,'signingCertificateSha256':os.environ['EXPECTED_CERT'],'R8':True},
+            'windows':{'version':'0.3.2','fullZipSha256':full_sha,'updateZipSha256':update_sha,'buildProvenance':os.environ['DESKTOP_PROVENANCE'],'sourceVersionRange':'=0.3.1'},
+            'themePack':{'formatVersion':1,'dataOnly':True,'desktopAndAndroidValidateIndependently':True},
+            'validatedCapabilities':['theme-creator-kit-export','reference-image-input','theme-pack-import-and-activation','desktop-web-theme-rendering','paired-mobile-theme-sync','themed-navigation','mascot-progress-runner','recommendation-inline-progress','viewport-restoration','leaderboard-range-selection']
+          }
+          (p/'BUILD_TRANSPARENCY.json').write_text(json.dumps(transparency,ensure_ascii=False,indent=2),encoding='utf-8')
+          (p/'SHA256SUMS.txt').write_text(f'{full_sha}  {full.name}\n{update_sha}  {update.name}\n',encoding='ascii')
+          print('ANDROID_SHA='+android_sha)
+          print('WINDOWS_FULL_SHA='+full_sha)
+          print('WINDOWS_UPDATE_SHA='+update_sha)
+          PY
+      - name: Publish Android Preview OTA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view android-preview >/dev/null
+          gh release edit android-preview --prerelease --title 'Pica Library Android Preview' --notes 'Alpha8.5 / v30 Theme Studio: AI creator-kit export/import workflow, live theme application, paired-phone theme sync, themed navigation and mascot progress visuals; retains recent recommendation, viewport, storage and leaderboard fixes.'
+          gh release upload android-preview publish/Pica-Library-Android-Preview.apk publish/android-update.json publish/Pica-Library-Android-Preview.cert-sha256 publish/BUILD_TRANSPARENCY.json --clobber
+      - name: Publish Desktop v0.3.2 stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.3.2 >/dev/null 2>&1; then
+            gh release edit v0.3.2 --title 'Pica Library v0.3.2' --notes 'Desktop v0.3.2 / Alpha8.5 Theme Studio: create an AI-ready Theme Creator Kit from a short description and reference images, import and immediately apply returned data-only theme packs, themed navigation/progress/empty states, recommendation progress convergence, view-position restoration, and automatic active-theme sync to paired Android devices.' --latest
+          else
+            gh release create v0.3.2 --target "$RELEASE_TARGET" --title 'Pica Library v0.3.2' --notes 'Desktop v0.3.2 / Alpha8.5 Theme Studio: create an AI-ready Theme Creator Kit from a short description and reference images, import and immediately apply returned data-only theme packs, themed navigation/progress/empty states, recommendation progress convergence, view-position restoration, and automatic active-theme sync to paired Android devices.' --latest
+          fi
+          gh release upload v0.3.2 publish/Pica-Library-v0.3.2-windows-x64.zip publish/Pica-Library-v0.3.2-update.zip publish/SHA256SUMS.txt publish/BUILD_TRANSPARENCY.json --clobber
+      - name: Verify live update channels
+        run: |
+          set -euo pipefail
+          sleep 4
+          curl -L --fail --retry 3 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/android-update.json' -o "$RUNNER_TEMP/android-live.json"
+          python - <<'PY'
+          import json, urllib.request
+          a=json.load(open('/tmp/android-live.json')) if False else None
+          PY
+          python - "$RUNNER_TEMP/android-live.json" <<'PY'
+          import json,sys
+          x=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert x['versionCode']==30,x
+          assert x['versionName']=='0.1.0-alpha8.5-theme-studio',x
+          assert len(x['sha256'])==64,x
+          print('Android OTA live:',x['sha256'])
+          PY
+          curl -L --fail --retry 3 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases/tags/v0.3.2' -o "$RUNNER_TEMP/desktop-live.json"
+          python - "$RUNNER_TEMP/desktop-live.json" <<'PY'
+          import json,sys
+          x=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert not x['draft'] and not x['prerelease'],x
+          names={a['name'] for a in x['assets']}
+          assert {'Pica-Library-v0.3.2-windows-x64.zip','Pica-Library-v0.3.2-update.zip','SHA256SUMS.txt','BUILD_TRANSPARENCY.json'} <= names,names
+          print('Desktop release live')
+          PY

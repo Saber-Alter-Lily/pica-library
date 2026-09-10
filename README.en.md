@@ -8,9 +8,9 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 
 ## Current versions
 
-- **Windows / Desktop:** v0.3.4
-- **Android Preview:** v31 · 0.1.0-alpha8.6-star-personalization
-- **Public source:** Alpha8.6
+- **Windows / Desktop:** v0.3.7
+- **Android Preview:** v34 · 0.1.0-alpha8.7.1-star-401-hotfix
+- **Public source:** Alpha8.7.1
 
 ### Downloads
 

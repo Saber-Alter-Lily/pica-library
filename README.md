@@ -8,9 +8,9 @@
 
 ## 当前版本
 
-- **Windows / Desktop：v0.3.6**
-- **Android Preview：v33 · 0.1.0-alpha8.7-settings-star-fix**
-- **当前公开源码：Alpha8.7**
+- **Windows / Desktop：v0.3.7**
+- **Android Preview：v34 · 0.1.0-alpha8.7.1-star-401-hotfix**
+- **当前公开源码：Alpha8.7.1**
 
 ### 下载
 
@@ -20,6 +20,12 @@
 - [Android Preview Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
 Windows v0.3.6 更新包计划并验证支持从 **v0.3.3 / v0.3.4 / v0.3.5** 直接升级。优先使用应用内 **设置 → 软件更新**。
+
+## Alpha8.7.1 Hotfix
+
+- **修复 Star HTTP 401**：Desktop 对公开 GitHub GET 在应用代理返回 401/403/407/429 时自动尝试一次原生直连；Star 验证同时使用“仓库 stargazers”和“用户 starred repositories”两条独立公开路径。
+- **Android 同步双路径验证**：手机端同样增加用户 Star 列表回退，不再把单一 GitHub 接口异常误判为未 Star。
+- **发布验收修正**：Star 发布门禁必须包含完全不带 Authorization 的匿名 GitHub API 验证，避免 CI token 掩盖真实客户端问题。
 
 ## Alpha8.7
 

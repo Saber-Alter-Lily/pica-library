@@ -29,6 +29,7 @@ jobs:
           pnpm exec vitest run \
             test/unit/alpha8-6-star-personalization-contract.test.ts \
             test/unit/personalization-theme-studio.test.ts \
+            test/unit/update-hotfix-contract.test.ts \
             test/unit/update-manager-release-fallback.test.ts \
             test/unit/update-manager.test.ts
 

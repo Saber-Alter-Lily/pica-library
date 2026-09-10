@@ -26,6 +26,15 @@ function configuredProxy(value = process.env.PICA_PROXY) {
     }
 }
 
+function loopback(url: string) {
+    try {
+        const host = new URL(url).hostname.toLowerCase()
+        return host === 'localhost' || host === '127.0.0.1' || host === '::1'
+    } catch {
+        return false
+    }
+}
+
 function responseHeaders(value: Record<string, unknown>) {
     const headers = new Headers()
     for (const [key, item] of Object.entries(value)) {
@@ -37,18 +46,18 @@ function responseHeaders(value: Record<string, unknown>) {
 
 /**
  * Uses the application's configured HTTP(S) proxy for outbound desktop fetches.
- * Native fetch stays untouched when no proxy is configured. Axios is already
- * bundled by the desktop build, so this does not add another proxy stack.
+ * Native fetch stays untouched when no proxy is configured, and loopback
+ * traffic is always direct so Desktop/Web health checks cannot be proxied.
  */
 export async function applicationFetch(
     input: string | URL | Request,
     init: RequestInit = {}
 ): Promise<Response> {
-    const proxy = configuredProxy()
-    if (!proxy) return nativeFetch(input, init)
-
     const source = input instanceof Request ? input : null
     const url = source?.url ?? String(input)
+    const proxy = configuredProxy()
+    if (!proxy || loopback(url)) return nativeFetch(input, init)
+
     const headers = new Headers(source?.headers)
     new Headers(init.headers).forEach((value, key) => headers.set(key, value))
     const method = String(init.method ?? source?.method ?? 'GET').toUpperCase()
@@ -77,9 +86,9 @@ export async function applicationFetch(
 }
 
 // UpdateManager is imported by the desktop entry point. Installing the wrapper
-// here makes every later desktop fetch (release download and Star verification
-// included) honor the same saved proxy without changing unrelated call sites.
+// here makes every later outbound desktop fetch (release download and Star
+// verification included) honor the saved proxy without changing each call site.
 if (globalThis.fetch !== applicationFetch)
     globalThis.fetch = applicationFetch as typeof fetch
 
-export const applicationFetchInternals = { configuredProxy }
+export const applicationFetchInternals = { configuredProxy, loopback }

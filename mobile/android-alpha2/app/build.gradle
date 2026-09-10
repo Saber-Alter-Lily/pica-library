@@ -15,8 +15,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 31
-        versionName '0.1.0-alpha8.6-star-personalization'
+        versionCode 32
+        versionName '0.1.0-alpha8.6.1-theme-hotfix'
     }
 
     signingConfigs {

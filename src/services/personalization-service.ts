@@ -427,23 +427,29 @@ export class PersonalizationService {
         const githubUser = String(input ?? '').trim()
         if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(githubUser))
             throw new Error('请输入有效的 GitHub 用户名')
-        const target = githubUser.toLocaleLowerCase('en-US')
+
+        const requestHeaders = {
+            accept: 'application/vnd.github+json',
+            'x-github-api-version': '2022-11-28',
+            'user-agent': 'Pica-Library-Star-Access'
+        }
+        const targetUser = githubUser.toLocaleLowerCase('en-US')
+        const targetRepository = 'saber-alter-lily/pica-library'
+        let primaryStatus = 200
+
+        // Primary public route: repository -> stargazers.
         for (let page = 1; page <= 100; page += 1) {
             const response = await fetch(
                 `https://api.github.com/repos/Saber-Alter-Lily/pica-library/stargazers?per_page=100&page=${page}`,
                 {
-                    headers: {
-                        accept: 'application/vnd.github+json',
-                        'x-github-api-version': '2022-11-28',
-                        'user-agent': 'Pica-Library-Star-Access'
-                    },
+                    headers: requestHeaders,
                     signal: AbortSignal.timeout(15_000)
                 }
             )
-            if (response.status === 403 || response.status === 429)
-                throw new Error('GitHub 暂时限制了验证请求，请稍后重试')
-            if (!response.ok)
-                throw new Error(`GitHub Star 验证失败（HTTP ${response.status}）`)
+            if (!response.ok) {
+                primaryStatus = response.status
+                break
+            }
             const users = (await response.json()) as Array<{ login?: unknown }>
             if (!Array.isArray(users))
                 throw new Error('GitHub Star 验证返回了异常数据')
@@ -451,7 +457,7 @@ export class PersonalizationService {
                 users.some(
                     (item) =>
                         String(item?.login ?? '').toLocaleLowerCase('en-US') ===
-                        target
+                        targetUser
                 )
             ) {
                 this.saveStarProof(githubUser)
@@ -459,6 +465,49 @@ export class PersonalizationService {
             }
             if (users.length < 100) break
         }
+
+        // Secondary public route: named user -> starred repositories. This is
+        // deliberately independent of the repository-stargazer endpoint so a
+        // proxy/API 401 on one route cannot incorrectly deny a real Star.
+        let secondaryStatus = 200
+        for (let page = 1; page <= 100; page += 1) {
+            const response = await fetch(
+                `https://api.github.com/users/${encodeURIComponent(githubUser)}/starred?per_page=100&page=${page}`,
+                {
+                    headers: requestHeaders,
+                    signal: AbortSignal.timeout(15_000)
+                }
+            )
+            if (!response.ok) {
+                secondaryStatus = response.status
+                break
+            }
+            const repositories = (await response.json()) as Array<{
+                full_name?: unknown
+            }>
+            if (!Array.isArray(repositories))
+                throw new Error('GitHub Star 验证返回了异常数据')
+            if (
+                repositories.some(
+                    (item) =>
+                        String(item?.full_name ?? '').toLocaleLowerCase('en-US') ===
+                        targetRepository
+                )
+            ) {
+                this.saveStarProof(githubUser)
+                return this.status()
+            }
+            if (repositories.length < 100) break
+        }
+
+        if ([403, 429].includes(primaryStatus) || [403, 429].includes(secondaryStatus))
+            throw new Error('GitHub 暂时限制了验证请求，请稍后重试')
+        if (primaryStatus === 401 && secondaryStatus === 401)
+            throw new Error('GitHub 公开 Star 验证连续返回 HTTP 401，已尝试代理与直连回退；请检查网络或代理')
+        if (secondaryStatus === 404)
+            throw new Error('没有找到该 GitHub 用户')
+        if (primaryStatus !== 200 && secondaryStatus !== 200)
+            throw new Error(`GitHub Star 验证失败（HTTP ${primaryStatus} / ${secondaryStatus}）`)
         throw new Error('没有检测到该账号对 Pica Library 的 Star')
     }
 

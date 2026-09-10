@@ -1,0 +1,65 @@
+name: Publish Desktop v0.3.4 Existing Tag R2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-v034-existing-tag-r2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: 'Saber-Alter-Lily/pica-library'
+      WINDOWS_ARTIFACT_URL: 'https://sdmntprindiasocentral.oaiusercontent.com/files/00000000-d74c-8211-9d1b-3dc6a930a3c6/raw?se=2026-09-10T13%3A27%3A07Z&sp=r&sv=2026-02-06&sr=b&scid=3bfd8519-7ae7-5d47-a854-720fb9c2447c&skoid=80e81ea6-3c08-46f9-bd84-b87176742bcd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-10T03%3A21%3A16Z&ske=2026-09-11T03%3A21%3A16Z&sks=b&skv=2026-02-06&sig=b%2BhaGJ69KRdT0hUvtrZJpZ%2BsPXSMyL2aHJIR7PBshjI%3D'
+      EXPECTED_FULL_SHA: '6f0ebb72fc9bb63891b1337d574eb3f70a01117b1973a521465838d7f2c0e569'
+      EXPECTED_UPDATE_SHA: '372a9aceb4934799822906f4ac837adb74080f5ae6105ac2d81acd382ce2d0dd'
+      PUBLIC_SOURCE_COMMIT: '9b9ff099cd4edb44613ced649d038d20b433fc92'
+    steps:
+      - name: Download and verify Windows artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/w" publish
+          curl -L --fail --retry 3 --retry-delay 1 "$WINDOWS_ARTIFACT_URL" -o "$RUNNER_TEMP/wrapper.zip"
+          unzip -q "$RUNNER_TEMP/wrapper.zip" -d "$RUNNER_TEMP/w"
+          cp "$(find "$RUNNER_TEMP/w" -name 'Pica-Library-v0.3.4-windows-x64.zip' -print -quit)" publish/
+          cp "$(find "$RUNNER_TEMP/w" -name 'Pica-Library-v0.3.4-update.zip' -print -quit)" publish/
+          cp "$(find "$RUNNER_TEMP/w" -name 'SHA256SUMS-v0.3.4.txt' -print -quit)" publish/SHA256SUMS.txt
+          test "$(sha256sum publish/Pica-Library-v0.3.4-windows-x64.zip | cut -d' ' -f1)" = "$EXPECTED_FULL_SHA"
+          test "$(sha256sum publish/Pica-Library-v0.3.4-update.zip | cut -d' ' -f1)" = "$EXPECTED_UPDATE_SHA"
+          python - <<'PY'
+          import json,zipfile,os
+          from pathlib import Path
+          with zipfile.ZipFile('publish/Pica-Library-v0.3.4-update.zip') as z:m=json.loads(z.read('update-manifest.json'))
+          assert m['sourceVersionRange']=='=0.3.1 || =0.3.2 || =0.3.3'
+          assert 'sourceSha' not in m and m['targetVersion']=='0.3.4' and m['targetSourceSha']==os.environ['PUBLIC_SOURCE_COMMIT'] and not m['requiresFullInstall']
+          t={'releaseId':'desktop-v0.3.4-alpha8.6','sourcePolicy':'current-source-open','publicSourceCommit':os.environ['PUBLIC_SOURCE_COMMIT'],'version':'0.3.4','fullZipSha256':os.environ['EXPECTED_FULL_SHA'],'updateZipSha256':os.environ['EXPECTED_UPDATE_SHA'],'sourceVersionRange':m['sourceVersionRange'],'personalization':{'gate':'github-star','defaultTheme':'Pica Violet · 星漫','dataOnly':True}}
+          Path('publish/BUILD_TRANSPARENCY.json').write_text(json.dumps(t,ensure_ascii=False,indent=2),encoding='utf-8')
+          PY
+      - name: Publish v0.3.4 using existing tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NOTES='Desktop v0.3.4 / Alpha8.6: current source is open again. GitHub Star unlocks personalization independently of donations, with Pica Violet · 星漫 immediately available and Theme Studio themes syncing to paired Android. Fixes top-header collisions and duplicate file-picker launches while retaining resilient update fallback. The update package supports v0.3.1, v0.3.2 and v0.3.3.'
+          if ! gh release view v0.3.4 --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release create v0.3.4 --repo "$GH_REPO" --verify-tag --title 'Pica Library v0.3.4' --notes "$NOTES" --latest
+          fi
+          gh release edit v0.3.4 --repo "$GH_REPO" --title 'Pica Library v0.3.4' --notes "$NOTES" --latest
+          gh release upload v0.3.4 --repo "$GH_REPO" publish/Pica-Library-v0.3.4-windows-x64.zip publish/Pica-Library-v0.3.4-update.zip publish/SHA256SUMS.txt publish/BUILD_TRANSPARENCY.json --clobber
+      - name: Verify latest
+        run: |
+          set -euo pipefail
+          sleep 3
+          curl -L --fail --retry 3 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases/latest' -o /tmp/latest.json
+          python - <<'PY'
+          import json,os
+          x=json.load(open('/tmp/latest.json')); assert x['tag_name']=='v0.3.4' and not x['draft'] and not x['prerelease']
+          a={i['name']:i for i in x['assets']}
+          assert a['Pica-Library-v0.3.4-windows-x64.zip']['digest']=='sha256:'+os.environ['EXPECTED_FULL_SHA']
+          assert a['Pica-Library-v0.3.4-update.zip']['digest']=='sha256:'+os.environ['EXPECTED_UPDATE_SHA']
+          assert {'SHA256SUMS.txt','BUILD_TRANSPARENCY.json'}<=set(a)
+          print('Desktop v0.3.4 live and verified')
+          PY

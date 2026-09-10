@@ -14,24 +14,25 @@
 
 ### 下载
 
-- [Windows v0.3.6 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.6/Pica-Library-v0.3.6-windows-x64.zip)
-- [Windows v0.3.6 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.6/Pica-Library-v0.3.6-update.zip)
-- [Windows v0.3.6 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.6)
+- [Windows v0.3.7 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.7/Pica-Library-v0.3.7-windows-x64.zip)
+- [Windows v0.3.7 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.7/Pica-Library-v0.3.7-update.zip)
+- [Windows v0.3.7 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.7)
 - [Android Preview Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-Windows v0.3.6 更新包计划并验证支持从 **v0.3.3 / v0.3.4 / v0.3.5** 直接升级。优先使用应用内 **设置 → 软件更新**。
+Windows v0.3.7 增量更新包已验证支持从 **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6** 直接升级。优先使用应用内 **设置 → 软件更新**。
 
 ## Alpha8.7.1 Hotfix
 
-- **修复 Star HTTP 401**：Desktop 对公开 GitHub GET 在应用代理返回 401/403/407/429 时自动尝试一次原生直连；Star 验证同时使用“仓库 stargazers”和“用户 starred repositories”两条独立公开路径。
-- **Android 同步双路径验证**：手机端同样增加用户 Star 列表回退，不再把单一 GitHub 接口异常误判为未 Star。
-- **发布验收修正**：Star 发布门禁必须包含完全不带 Authorization 的匿名 GitHub API 验证，避免 CI token 掩盖真实客户端问题。
+- **修复真实客户端 Star HTTP 401**：GitHub 当前对匿名“仓库 stargazers 列表”请求返回 `401 Requires authentication`；Desktop 与 Android 会继续走“该用户名公开的 starred repositories”路径确认 Star，不再把第一条接口的 401 当成验证失败。
+- **Desktop 网络回退**：公开 GitHub GET 经应用代理得到 401/403/407/429 时，可安全尝试一次原生直连；带 Authorization 或 Cookie 的请求不会使用这条回退。
+- **双路径验证**：Star 验证保留仓库 stargazers + 用户 starred repositories 两条独立路径；任一路径确认即可写入本地 Star 凭证。
+- **发布验收修正**：正式发布门禁已在完全不带 Authorization 的条件下真实复现第一条接口 HTTP 401，并由第二条匿名接口返回 200、确认 `Saber-Alter-Lily/pica-library` 后才允许发布。
 
 ## Alpha8.7
 
 这一版集中处理真实客户端验收中暴露出的桌面信息架构、下载队列和 Star 验证问题：
 
-- **Star 验证修复**：Desktop 与 Android 不再调用错误的 `/users/{user}/starred/{repo}` 路径，统一读取仓库公开 `stargazers` 列表并分页匹配 GitHub 用户名；发布前使用真实已 Star 账号做在线验收。
+- **Star 验证修复**：Desktop 与 Android 不再调用错误的 `/users/{user}/starred/{repo}` 路径，改为读取 GitHub 的公开 Star 信息；Alpha8.7.1 又针对 GitHub 当前的匿名 stargazers 401 行为增加了用户 Star 列表回退。
 - **桌面设置中心重构**：原来的“库维护”和“设置”合并为一个 **设置** 入口，内部按 **基本设置 / 连接与同步 / 外观与个性化 / 下载与存储 / 维护工具 / 软件更新** 六个目录组织，逻辑与手机端“连接与设置”尽量对齐。
 - **个性化排版重构**：Star 解锁区与 Theme Studio 使用完整内容宽度；用户名、验证操作和主题制作区改为响应式布局，不再被挤压成窄列。
 - **下载任务收敛**：下载页默认收起 `COMPLETED` 和 `CANCELLED` 历史任务，只展示仍需处理的队列；`FAILED` 保留以便重试，并提供“显示已结束任务”开关。历史数据库记录不删除。

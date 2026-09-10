@@ -14,12 +14,26 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 
 ### Downloads
 
-- [Windows v0.3.4 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.4/Pica-Library-v0.3.4-windows-x64.zip)
-- [Windows v0.3.4 update package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.4/Pica-Library-v0.3.4-update.zip)
-- [Windows v0.3.4 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.4)
+- [Windows v0.3.7 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.7/Pica-Library-v0.3.7-windows-x64.zip)
+- [Windows v0.3.7 update package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.7/Pica-Library-v0.3.7-update.zip)
+- [Windows v0.3.7 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.7)
 - [Android Preview release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-The v0.3.4 incremental update supports direct upgrades from **v0.3.1, v0.3.2, and v0.3.3**. Prefer the in-app **Settings → Software Update** flow.
+The v0.3.7 incremental update is verified for direct upgrades from **v0.3.3, v0.3.4, v0.3.5, and v0.3.6**. Prefer the in-app **Settings → Software Update** flow.
+
+## Alpha8.7.1 hotfix
+
+- **Real-client Star HTTP 401 fix:** GitHub currently answers anonymous repository-stargazer-list requests with `401 Requires authentication`. Desktop and Android now continue to the named user's public starred-repositories endpoint instead of treating that first 401 as a failed verification.
+- **Desktop network fallback:** anonymous public GitHub GET requests that receive 401/403/407/429 through the configured application proxy may retry once through the native direct transport. Requests carrying Authorization or Cookie headers never use this fallback.
+- **Dual verification paths:** Star verification keeps both repository stargazers and user starred repositories as independent evidence routes; either route can confirm the Star and persist the local proof.
+- **Acceptance parity:** the release gate reproduced the anonymous primary HTTP 401, then confirmed `Saber-Alter-Lily/pica-library` through the second anonymous API with HTTP 200 and no Authorization header before publication.
+
+## Alpha8.7
+
+- **Desktop Settings hub:** the former Maintenance and Settings top-level areas are merged into one Settings entry with General, Connections & Sync, Appearance, Downloads & Storage, Maintenance, and Software Update sections.
+- **Personalization layout:** the Star unlock and Theme Studio surfaces use the full content width with responsive controls instead of the previous squeezed column.
+- **Download queue:** `COMPLETED` and `CANCELLED` history is collapsed by default; `FAILED` jobs stay visible for retry, and historical records are not deleted.
+- **Theme data preservation:** Pica Violet · 星漫 and existing custom themes keep their original local storage across the upgrade.
 
 ## Alpha8.6
 
@@ -28,8 +42,7 @@ The v0.3.4 incremental update supports direct upgrades from **v0.3.1, v0.3.2, an
 - **Theme Studio:** enter a short theme description and reference images, export an AI Creator Kit, then drag the returned `.pica-theme` back into Desktop to validate, apply, and sync it to a paired phone.
 - **Data-only theme packs:** controlled JSON plus PNG/JPG/WebP resources only; no script, HTML, font, or executable payloads.
 - **Unified brand icon:** Desktop/Web and Android use the same anime-style application identity.
-- **UI fixes:** the Desktop header no longer lets theme art overlap language/connection controls, and theme file pickers no longer reopen twice for one click.
-- **Android header cleanup:** Recommendation refresh and Online account are compact 48dp icon actions; the mobile bottom navigation remains exactly **Library / Recommend / Online / Connect**.
+- **Android header cleanup:** Recommendation refresh and Online account use compact icon actions; the mobile bottom navigation remains **Library / Recommend / Online / Connect**.
 
 ## Main features
 
@@ -51,11 +64,9 @@ The official-build personalization gate is a GitHub Star community reward, not a
 4. Use Desktop Theme Studio to create your own `.pica-theme` through the AI Creator Kit workflow.
 5. Pair Desktop and Android to sync the Star proof and active theme to the phone.
 
-The verification implementation is visible in source. Official signed builds keep this product rule; forks may change it under the repository license.
-
 ## Open source and security
 
-The current application source is public again. The repository does not contain official Android signing private keys/keystores, account or payment credentials, CI secrets, local databases, downloaded comics, or user caches.
+The current application source is public again. The repository does not contain official Android signing private keys/keystores, account credentials, CI secrets, local databases, downloaded comics, or user caches.
 
 User data stays local by default. Windows credentials are protected with DPAPI for the current Windows user. Official binaries remain tied to published SHA-256 values, build transparency metadata, and the fixed Android Preview signing identity.
 

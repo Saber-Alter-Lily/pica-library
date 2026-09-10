@@ -21,7 +21,11 @@ jobs:
         with:
           node-version: '24'
       - name: Apply deterministic source transforms
-        run: node scripts/apply-v036-settings-star-polish.mjs
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');const f='scripts/apply-v036-settings-star-polish.mjs';let s=fs.readFileSync(f,'utf8');s=s.replace("['README.md', 'README.en.md']","['README.md']");fs.writeFileSync(f,s)
+          NODE
+          node scripts/apply-v036-settings-star-polish.mjs
       - name: Verify transformed contracts before commit
         run: |
           set -euo pipefail
@@ -40,7 +44,7 @@ jobs:
           git add src/services/personalization-service.ts \
             mobile/android-alpha2/app/src/main/java/com/picalibrary/android/StarAccessStore.java \
             mobile/android-alpha2/app/build.gradle package.json \
-            scripts/build-windows-package.ps1 README.md README.en.md
+            scripts/build-windows-package.ps1 README.md
           git diff --cached --quiet && { echo 'No transform changes'; exit 1; }
           git commit -m 'fix: verify public Stars and bump v0.3.6 clients'
           git push origin HEAD:feature/v0.3.6-settings-hub

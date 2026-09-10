@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "releaseId": "alpha8.3-v26-desktop-0.3.1",
+  "android": {
+    "versionCode": 26,
+    "versionName": "0.1.0-alpha8.3-updater-themes",
+    "sha256": "d97b73ffb0da596fae8acc0ba822517abdebbf5a96677e9df687c96f3b6cd4ab",
+    "signingCertificateSha256": "64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d"
+  },
+  "windows": {
+    "version": "0.3.1",
+    "fullZipSha256": "7c22ed730e44fc518ecbc059019e3e52c9d21a5e08b0b38ec8f63a4587f1fb09",
+    "updateZipSha256": "4141f5b0bb4f1fb9a873eb2739b074b1072525b2e7502b4edfdaa6ae681d5d84"
+  },
+  "sourcePolicy": "delayed-source-release",
+  "security": {
+    "androidReleaseUsesR8": true,
+    "officialUpdatesVerifyHashPackageVersionAndSigner": true
+  }
+}

@@ -70,7 +70,7 @@ function mount() {
         gate.remove()
     })
     document.querySelector('#pica-disclaimer-exit').addEventListener('click', () => {
-        document.body.innerHTML = '<main style="font-family:system-ui;padding:32px;max-width:720px;margin:auto"><h2>Pica Library 已停止</h2><p>你没有接受使用提示。关闭此页面即可；未发生新的内容访问或下载操作。</p></main>'
+        document.body.innerHTML = '<main style="font-family:system-ui;padding:32px;max-width:720px;margin:auto"><h2>Pica Library 已停止显示主界面</h2><p>你没有接受本次使用提示。关闭此页面即可。</p></main>'
     })
 }
 

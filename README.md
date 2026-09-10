@@ -2,64 +2,89 @@
 
 # Pica Library
 
-把 Pica 收藏同步成一个可持续维护的本地漫画库，并在同一个界面里完成整理、推荐、下载和阅读。
+把 Pica 收藏同步成一个可持续维护的本地漫画库，并在同一个产品里完成整理、推荐、下载、阅读与多端同步。
 
-**Windows 10/11 x64 · 解压即用 · 数据默认保存在本机。**
+**Windows 10/11 x64 · Android Preview · 当前源码重新开放。**
 
-### 直接下载
+## 当前版本
 
-- **新用户 / 完整安装：**[Pica-Library-v0.3.0-windows-x64.zip](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-windows-x64.zip)
-- **v0.2.0 手动升级包：**[Pica-Library-v0.3.0-update.zip](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-update.zip)
-- [查看 v0.3.0 Release 页面](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.0)
+- **Windows / Desktop：v0.3.4**
+- **Android Preview：v31 · 0.1.0-alpha8.6-star-personalization**
+- **当前公开源码：Alpha8.6**
 
-![Pica Library 漫画库使用示意](docs/assets/screenshots/v0.3.0/02-library-guide.png)
+### 下载
 
-## 开始使用
+- [Windows v0.3.4 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.4/Pica-Library-v0.3.4-windows-x64.zip)
+- [Windows v0.3.4 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.4/Pica-Library-v0.3.4-update.zip)
+- [Windows v0.3.4 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.4)
+- [Android Preview Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-1. 下载上面的 **完整安装包** `Pica-Library-v0.3.0-windows-x64.zip`。
-2. **完整解压** ZIP，不要直接在压缩软件中运行。
-3. 双击 `Pica Library.exe`。
-4. 按首次设置填写账号、可选代理和保存目录。
-5. 同步收藏，开始使用。
+Windows v0.3.4 更新包支持从 **v0.3.1 / v0.3.2 / v0.3.3** 直接升级。优先使用应用内 **设置 → 软件更新**。
 
-更详细的首次使用步骤见 [快速开始](docs/quick-start.zh-CN.md)。
+## Alpha8.6
+
+这一版重新回到当前源码开放模式，同时完成个性化装扮第一阶段：
+
+- **GitHub Star 解锁个性化装扮**：与打赏无关；官方构建验证公开 Star 状态后在本机长期记住。
+- **Pica Violet · 星漫**：Star 解锁后立即可用的官方默认主题。
+- **Theme Studio**：输入一句主题描述、加入角色/风格参考图，导出 AI Creator Kit；AI 返回 `.pica-theme` 后拖回 Desktop 即可校验、应用，并同步到已配对手机。
+- **数据型 Theme Pack**：主题只允许受控 JSON 和 PNG/JPG/WebP 资源，不执行脚本、HTML、字体或二进制代码。
+- **统一品牌图标**：Desktop/Web 与 Android 使用同一套二次元品牌图标。
+- **界面修复**：Desktop 顶栏不再让主题人物图遮挡语言/连接控件；主题文件选择器不再一次点击弹两次。
+- **Android 顶栏优化**：推荐页刷新和在线页账号改为紧凑 48dp 图标操作；底栏仍固定为 **书库 / 推荐 / 在线 / 连接**。
 
 ## 主要功能
 
-- **漫画库：**同步收藏，按作者、标签、分类和书架筛选与整理。
-- **个性化推荐：**根据自己的收藏画像生成推荐，显示推荐理由，可换一批或重新生成。
-- **收藏图鉴：**把长期收藏整理成作品/IP、作者和语义兴趣画像，并可导出结果卡。
-- **下载与阅读：**统一管理下载队列、失败重试和阅读进度，支持内置 Web Reader。
-- **维护与更新：**检查内容更新、修复缺失文件，并在应用内安装兼容的官方更新。
+- **漫画库**：同步收藏，按作者、标签、分类和书架筛选与整理。
+- **个性化推荐**：根据收藏画像生成分批推荐和推荐理由；收藏后当前推荐不会被清空。
+- **在线浏览**：收藏、搜索、分类和 **24 小时 / 7 天 / 30 天** 排行。
+- **下载与阅读**：统一管理下载任务、阅读进度与本地缓存。
+- **Desktop ↔ Android**：手机可直接读取电脑已下载漫画，并同步主题与部分状态。
+- **WebDAV**：电脑离线时可作为移动端后备阅读来源。
+- **软件更新**：Desktop 具备 GitHub Release API + Release 文件回退链路；Android Preview 校验版本、SHA-256、包名与固定签名证书后安装。
 
-### 个性化推荐
+## 个性化装扮
 
-![Pica Library 推荐使用示意](docs/assets/screenshots/v0.3.0/03-recommendations-guide.png)
+官方构建中的装扮入口是一个社区 Star 奖励，而不是付费功能。当前 V1 流程：
 
-推荐来自本地收藏画像。每轮分批浏览，可以换一批，也可以重新生成新的推荐轮次。
+1. 给本仓库一个 Star。
+2. 在 Desktop 或 Android 个性化页面输入 GitHub 用户名并验证。
+3. 验证通过后立即使用 **Pica Violet · 星漫**。
+4. Desktop Theme Studio 可导出 AI Creator Kit，自制 `.pica-theme`。
+5. Desktop 与 Android 配对后，可把 Star 凭证和当前主题同步到手机。
 
-### 收藏图鉴
+源码中可以看到完整验证逻辑；官方签名构建保留上述产品规则，fork 当然可以按照开源许可证自行修改。
 
-![Pica Library 收藏图鉴使用示意](docs/assets/screenshots/v0.3.0/04-atlas-guide.png)
+## 开源与安全
 
-收藏图鉴把作品/IP、作者和长期语义偏好整理成本地图谱，并支持导出结果卡 PDF。
+当前应用源码重新公开。发布仓库不会包含：
 
-## 从旧版本升级
+- Android 官方签名私钥或 keystore；
+- 账号、密码、支付凭据或 CI secrets；
+- 本地数据库、漫画下载内容或用户缓存。
 
-- **v0.2.0 → v0.3.0：**优先打开 **库维护 → 软件更新 → 一键检查并更新**。
-- 如果自动读取 GitHub Release 失败，直接下载 [Pica-Library-v0.3.0-update.zip](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-update.zip)，然后在更新页拖入或手动选择该 ZIP。
-- **v0.1.x：**请下载 [完整 Windows 安装包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.0/Pica-Library-v0.3.0-windows-x64.zip) 重新解压。
+用户数据默认保存在本机；Windows 凭据使用当前 Windows 用户的 DPAPI 保护。官方发布产物仍通过固定签名、SHA-256 和构建透明度信息进行校验。
 
-![Pica Library 软件更新示意](docs/assets/screenshots/v0.3.0/05-update-guide.png)
+## 开始使用
 
-用户数据库、收藏和下载内容位于独立数据目录；兼容更新不会因为替换应用文件而删除这些数据。
+1. 下载完整 Windows ZIP 并完整解压。
+2. 双击 `Pica Library.exe`。
+3. 完成账号、可选代理和漫画保存目录设置。
+4. 同步收藏并开始使用。
+5. Android 端通过 Desktop 提供的配对信息连接。
 
-## 数据与安全
+更详细的首次使用步骤见 [快速开始](docs/quick-start.zh-CN.md)。
 
-- 数据默认保存在本机。
-- 账号凭据使用当前 Windows 用户的 DPAPI 加密保存。
-- 本地服务只监听 `127.0.0.1`。
-- Pica 密码不会写入数据库、导出包或发布文件。
+## 开发
+
+```bash
+pnpm install --frozen-lockfile
+pnpm web:check
+pnpm build
+pnpm test:unit
+```
+
+Android 工程位于 `mobile/android-alpha2`。官方 Android APK 的发布签名私钥不在仓库内。
 
 ## 更多
 

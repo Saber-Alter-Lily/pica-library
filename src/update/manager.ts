@@ -9,6 +9,7 @@ import {
     UPDATE_MANIFEST_VERSION
 } from '../app-capabilities'
 import { sanitizedChildEnv } from '../desktop/child-process'
+import { applicationFetch } from './application-fetch'
 import { normalizeUpdatePath, updaterSelfReplacement } from './path-safety'
 import type {
     StagedUpdate,
@@ -186,9 +187,15 @@ export class UpdateManager {
 
     progress(): UpdateProgress {
         try {
-            return JSON.parse(
+            const value = JSON.parse(
                 fs.readFileSync(this.progressFile, 'utf8')
             ) as UpdateProgress
+            if (
+                value.phase === 'complete' &&
+                value.targetVersion === this.options.currentVersion
+            )
+                return { phase: 'idle', updatedAt: value.updatedAt }
+            return value
         } catch {
             return { phase: 'idle', updatedAt: new Date().toISOString() }
         }
@@ -207,7 +214,7 @@ export class UpdateManager {
         archiveName: string,
         archiveHash: string
     ) {
-        const request = this.options.fetchImplementation ?? fetch
+        const request = this.options.fetchImplementation ?? applicationFetch
         const tag = `v${manifest.targetVersion}`
         try {
             const response = await request(
@@ -290,7 +297,8 @@ export class UpdateManager {
     }
 
     async checkForUpdate() {
-        const request = this.options.fetchImplementation ?? fetch
+        this.writeProgress({ phase: 'idle' })
+        const request = this.options.fetchImplementation ?? applicationFetch
         try {
             const response = await request(
                 `https://api.github.com/repos/${officialRepository}/releases/latest`,
@@ -358,9 +366,10 @@ export class UpdateManager {
                     : undefined
             )
         } catch {
-            throw new Error(
+            const message =
                 '无法读取官方更新通道。GitHub API 与 Release 下载通道均不可用，请检查网络或代理后重试。'
-            )
+            this.writeProgress({ phase: 'failed', message })
+            throw new Error(message)
         }
     }
 

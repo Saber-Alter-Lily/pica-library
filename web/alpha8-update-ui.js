@@ -3,6 +3,8 @@ let cancelToken = null
 let monitor = null
 let lastSignature = ''
 let lastChangedAt = 0
+let observedBackendVersion = null
+let reloadTriggered = false
 
 async function request(path, init = {}) {
     const response = await fetch(path, { cache: 'no-store', ...init })
@@ -16,6 +18,16 @@ async function csrf() {
     const value = await request('/api/v1/desktop/status')
     return value.csrfToken || ''
 }
+async function reloadIfBackendChanged() {
+    const status = await request('/api/v1/desktop/status')
+    const version = String(status?.version || '')
+    if (!version) return
+    if (!observedBackendVersion) { observedBackendVersion = version; return }
+    if (!reloadTriggered && version !== observedBackendVersion) {
+        reloadTriggered = true
+        location.reload()
+    }
+}
 function prettyBytes(value) {
     const n = Number(value || 0)
     if (n < 1024) return `${n} B`
@@ -24,7 +36,7 @@ function prettyBytes(value) {
     return `${(n / 1024 ** 3).toFixed(2)} GB`
 }
 function phaseLabel(phase) {
-    return ({idle:'空闲',downloading:'正在下载',validating:'正在验证',extracting:'正在准备文件',staged:'更新已准备好','waiting-for-exit':'等待程序退出',applying:'正在应用',healthcheck:'正在验证新版本',complete:'更新完成',failed:'更新失败',cancelled:'下载已取消'})[phase] || phase
+    return ({idle:'空闲',downloading:'正在下载',validating:'正在验证',extracting:'正在准备文件',staged:'更新已准备好','waiting-for-exit':'等待程序退出','preparing-backup':'正在备份当前版本','replacing-files':'正在替换文件',starting:'正在启动新版本','health-check':'正在验证新版本',applying:'正在应用',healthcheck:'正在验证新版本',rollback:'更新失败，正在回滚',complete:'更新完成',failed:'更新失败',cancelled:'下载已取消'})[phase] || phase
 }
 
 async function cancelDownload() {
@@ -46,6 +58,8 @@ async function poll() {
     const live = $u('#a83-update-live'), cancel = $u('#a83-update-cancel')
     if (!live) return
     try {
+        await reloadIfBackendChanged()
+        if (reloadTriggered) return
         const p = await request('/api/v1/update/progress')
         const signature = JSON.stringify(p)
         if (signature !== lastSignature) { lastSignature = signature; lastChangedAt = Date.now() }
@@ -55,11 +69,12 @@ async function poll() {
         let detail = phaseLabel(phase)
         if (total > 0) detail += download ? ` · ${prettyBytes(current)} / ${prettyBytes(total)} · ${Math.round(current / total * 100)}%` : ` · ${current}/${total} · ${Math.round(current / total * 100)}%`
         else if (download && current > 0) detail += ` · ${prettyBytes(current)}`
-        if (p.error) detail += ` · ${p.error}`
-        const active = ['downloading','validating','extracting','applying','healthcheck'].includes(phase)
+        const problem = p.error || p.message
+        if (problem) detail += ` · ${problem}`
+        const active = ['downloading','validating','extracting','waiting-for-exit','preparing-backup','replacing-files','starting','health-check','applying','healthcheck','rollback'].includes(phase)
         if (active && lastChangedAt && Date.now() - lastChangedAt > 120000) detail += ' · 状态长时间未变化'
         live.textContent = detail
-        live.className = `a83-update-detail ${phase === 'failed' ? 'a83-bad' : phase === 'complete' || phase === 'staged' ? 'a83-good' : ''}`
+        live.className = `a83-update-detail ${phase === 'failed' || phase === 'rollback' ? 'a83-bad' : phase === 'complete' || phase === 'staged' ? 'a83-good' : ''}`
         if (cancel) cancel.hidden = !download
         if (!active && monitor) { clearInterval(monitor); monitor = null }
     } catch (error) {
@@ -69,7 +84,7 @@ async function poll() {
 
 function startMonitor() {
     if (monitor) clearInterval(monitor)
-    lastSignature = ''; lastChangedAt = Date.now()
+    lastSignature = ''; lastChangedAt = Date.now(); reloadTriggered = false
     monitor = setInterval(poll, 500)
     poll()
 }

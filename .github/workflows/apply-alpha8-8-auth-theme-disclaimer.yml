@@ -1,0 +1,46 @@
+name: Apply Alpha8.8 auth theme disclaimer
+
+on:
+  push:
+    branches: [feature/v0.3.8-auth-theme-disclaimer]
+    paths:
+      - '.github/workflows/apply-alpha8-8-auth-theme-disclaimer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/v0.3.8-auth-theme-disclaimer
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply deterministic transforms
+        run: node scripts/apply-alpha8-8-auth-theme-disclaimer.mjs
+      - name: Validate transformed source contracts
+        run: |
+          set -euo pipefail
+          grep -q 'github-star-proof-v2.json' src/services/personalization-service.ts
+          grep -q 'github-auth-start' src/desktop/main.ts
+          grep -q 'github-auth-poll' src/desktop/main.ts
+          grep -q '"version": "0.3.8"' package.json
+          grep -q 'versionCode 35' mobile/android-alpha2/app/build.gradle
+          grep -q "versionName '0.1.0-alpha8.8-account-auth-theme-decouple'" mobile/android-alpha2/app/build.gradle
+          grep -q "'DISCLAIMER.md'" scripts/build-windows-package.ps1
+          grep -q "'0.3.8'" scripts/build-windows-package.ps1
+          git diff --check
+      - name: Commit transformed files
+        run: |
+          set -euo pipefail
+          git config user.name 'Saber-Alter-Lily'
+          git config user.email '3178088154@qq.com'
+          git add src/services/personalization-service.ts src/desktop/main.ts package.json \
+            mobile/android-alpha2/app/build.gradle scripts/build-windows-package.ps1
+          git diff --cached --quiet && { echo 'No integration changes'; exit 1; }
+          git commit -m 'feat: integrate GitHub account auth and Alpha8.8 versions'
+          git push origin HEAD:feature/v0.3.8-auth-theme-disclaimer

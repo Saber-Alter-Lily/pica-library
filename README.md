@@ -8,18 +8,28 @@
 
 ## 当前版本
 
-- **Windows / Desktop：v0.3.4**
-- **Android Preview：v31 · 0.1.0-alpha8.6-star-personalization**
-- **当前公开源码：Alpha8.6**
+- **Windows / Desktop：v0.3.5**
+- **Android Preview：v32 · 0.1.0-alpha8.6.1-theme-hotfix**
+- **当前公开源码：Alpha8.6.1**
 
 ### 下载
 
-- [Windows v0.3.4 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.4/Pica-Library-v0.3.4-windows-x64.zip)
-- [Windows v0.3.4 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.4/Pica-Library-v0.3.4-update.zip)
-- [Windows v0.3.4 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.4)
+- [Windows v0.3.5 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.5/Pica-Library-v0.3.5-windows-x64.zip)
+- [Windows v0.3.5 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.5/Pica-Library-v0.3.5-update.zip)
+- [Windows v0.3.5 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.5)
 - [Android Preview Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-Windows v0.3.4 更新包支持从 **v0.3.1 / v0.3.2 / v0.3.3** 直接升级。优先使用应用内 **设置 → 软件更新**。
+Windows v0.3.5 更新包已验证支持从 **v0.3.3 / v0.3.4** 直接升级。优先使用应用内 **设置 → 软件更新**。如果 v0.3.3 所在网络必须依赖应用内代理才能访问 GitHub，则旧版更新器本身可能无法发现 v0.3.5；这种情况下需使用一次完整 v0.3.5 ZIP，之后更新器会复用应用配置的 HTTP/HTTPS 代理。
+
+## Alpha8.6.1 Hotfix
+
+这一版优先修复更新与个性化装扮的阻断问题：
+
+- **Desktop 更新代理修复**：GitHub API、Release 下载与 GitHub Star 验证会复用 Pica Library 中配置的 HTTP/HTTPS 代理，本机回环请求保持直连。
+- **更新状态修复**：新的更新检查会清除旧的成功状态，不再同时显示“官方通道失败”和历史“更新完成”；后端升级成功后网页会重新载入新版本。
+- **Android 个性化装扮修复**：真实页面入口统一改用 GitHub Star 权限，不再被旧 Supporter Entitlement 错误拦截。
+- **Android Star 验证入口**：可在手机直接输入 GitHub 用户名验证，也可从已配对 Desktop 同步 Star 凭证与主题。
+- **主题数据保留**：内置 **Pica Violet · 星漫** 与已存在的自定义主题继续使用原本的本地主题存储，不因本次升级清空。
 
 ## Alpha8.6
 

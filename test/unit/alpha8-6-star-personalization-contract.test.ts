@@ -20,7 +20,7 @@ describe('Alpha8.6 Star personalization contracts', () => {
         expect(ui).toContain('static ImageButton iconButton')
     })
 
-    it('uses GitHub Star rather than supporter entitlement as the theme gate', () => {
+    it('uses GitHub Star rather than supporter entitlement across the whole mobile theme entry path', () => {
         const service = fs.readFileSync(
             'src/services/personalization-service.ts',
             'utf8'
@@ -33,10 +33,24 @@ describe('Alpha8.6 Star personalization contracts', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackSync.java',
             'utf8'
         )
+        const appearance = fs.readFileSync(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AppearanceActivity.java',
+            'utf8'
+        )
+        const activity = fs.readFileSync(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java',
+            'utf8'
+        )
         expect(service).toContain('verifyGitHubStar')
         expect(service).toContain('github-star-proof-v1.json')
         expect(store).toContain('StarAccessStore.enabled(c)')
         expect(sync).toContain('/mobile/v1/star-access')
+        expect(appearance).toContain('StarAccessStore.enabled(this)')
+        expect(activity).toContain('StarAccessStore.enabled(this)')
+        expect(activity).toContain('StarAccessStore.verify(this')
+        expect(activity).toContain('从已配对电脑同步解锁与装扮')
+        expect(appearance).not.toContain('SupporterEntitlement.themePacksEnabled')
+        expect(activity).not.toContain('SupporterEntitlement.themePacksEnabled')
     })
 
     it('prevents the double file-picker trigger and header mascot collision', () => {

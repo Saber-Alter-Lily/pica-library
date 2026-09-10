@@ -15,8 +15,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 34
-        versionName '0.1.0-alpha8.7.1-star-401-hotfix'
+        versionCode 35
+        versionName '0.1.0-alpha8.8-account-auth-theme-decouple'
     }
 
     signingConfigs {

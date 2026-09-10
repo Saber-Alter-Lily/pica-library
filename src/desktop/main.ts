@@ -16,6 +16,7 @@ import { PRODUCT_VERSION } from '../version'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
 import { UpdateManager } from '../update/manager'
 import { PersonalizationService } from '../services/personalization-service'
+import { GitHubAccountAuthService } from '../services/github-account-auth'
 import {
     buildConfig,
     connectionProxy,
@@ -71,6 +72,7 @@ const personalization = new PersonalizationService(
     path.join(paths.runtimeState, 'personalization'),
     path.join(applicationRoot, 'web')
 )
+const githubAccountAuth = new GitHubAccountAuthService()
 if (['0.3.2', '0.3.3'].includes(PRODUCT_VERSION)) {
     try { personalization.installBundledTesterGrant() } catch { /* tester access never blocks startup */ }
 }
@@ -461,8 +463,22 @@ async function startEngine(preferredPort: number) {
                 return await remoteStorageManager.sync(input)
             }
             const personalizationAction = String(input.personalizationAction ?? '')
-            if (personalizationAction === 'verify-star') {
-                return { success: true, personalization: await personalization.verifyGitHubStar(input.githubUser) }
+            if (personalizationAction === 'verify-star')
+                throw new Error('公开用户名 Star 验证已停用，请使用 GitHub 账号认证')
+            if (personalizationAction === 'github-auth-start') {
+                return { success: true, githubAuth: await githubAccountAuth.start() }
+            }
+            if (personalizationAction === 'github-auth-poll') {
+                const githubAuth = await githubAccountAuth.poll(input.flowId)
+                if (githubAuth.state === 'complete') {
+                    const personalizationStatus = personalization.installAuthenticatedStarProof(githubAuth.identity)
+                    return {
+                        success: true,
+                        githubAuth: { state: 'complete' },
+                        personalization: personalizationStatus
+                    }
+                }
+                return { success: true, githubAuth }
             }
             if (personalizationAction === 'import-theme') {
                 const filename = String(input.fileName ?? 'theme.pica-theme')

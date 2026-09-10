@@ -338,7 +338,7 @@ export class PersonalizationService {
         this.packsRoot = path.join(root, 'packs')
         this.entitlementFile = path.join(root, 'supporter-entitlement-v1.json')
         this.activeThemeFile = path.join(root, 'active-theme-v1.json')
-        this.starProofFile = path.join(root, 'github-star-proof-v1.json')
+        this.starProofFile = path.join(root, 'github-star-proof-v2.json')
         fs.mkdirSync(this.packsRoot, { recursive: true })
         this.ensureBuiltinPack()
     }
@@ -401,114 +401,61 @@ export class PersonalizationService {
     starProof() {
         try {
             const value = JSON.parse(fs.readFileSync(this.starProofFile, 'utf8')) as {
+                schema?: unknown
                 githubUser?: unknown
+                githubUserId?: unknown
                 verifiedAt?: unknown
+                authMethod?: unknown
             }
             const githubUser = String(value.githubUser ?? '').trim()
+            const githubUserId = Number(value.githubUserId ?? 0)
             const verifiedAt = String(value.verifiedAt ?? '').trim()
+            const authMethod = String(value.authMethod ?? '').trim()
+            if (Number(value.schema) !== 2) return null
+            if (authMethod !== 'github-account-device-flow') return null
             if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(githubUser)) return null
+            if (!Number.isSafeInteger(githubUserId) || githubUserId <= 0) return null
             if (!verifiedAt || !Date.parse(verifiedAt)) return null
-            return { unlocked: true, githubUser, verifiedAt }
+            return {
+                schema: 2 as const,
+                unlocked: true,
+                githubUser,
+                githubUserId,
+                verifiedAt,
+                authMethod: 'github-account-device-flow' as const
+            }
         } catch {
             return null
         }
     }
 
-    private saveStarProof(githubUser: string) {
+    installAuthenticatedStarProof(input: { githubUser: string; githubUserId: number }) {
+        const githubUser = String(input?.githubUser ?? '').trim()
+        const githubUserId = Number(input?.githubUserId ?? 0)
+        if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(githubUser))
+            throw new Error('GitHub 账号用户名无效')
+        if (!Number.isSafeInteger(githubUserId) || githubUserId <= 0)
+            throw new Error('GitHub 账号 ID 无效')
         fs.mkdirSync(this.root, { recursive: true })
-        const proof = { unlocked: true, githubUser, verifiedAt: new Date().toISOString() }
+        const proof = {
+            schema: 2,
+            unlocked: true,
+            githubUser,
+            githubUserId,
+            verifiedAt: new Date().toISOString(),
+            authMethod: 'github-account-device-flow'
+        }
         const temporary = `${this.starProofFile}.${process.pid}.tmp`
-        fs.writeFileSync(temporary, JSON.stringify(proof, null, 2), { encoding: 'utf8', mode: 0o600 })
+        fs.writeFileSync(temporary, JSON.stringify(proof, null, 2), {
+            encoding: 'utf8',
+            mode: 0o600
+        })
         fs.renameSync(temporary, this.starProofFile)
-        return proof
+        return this.status()
     }
 
-    async verifyGitHubStar(input: unknown) {
-        const githubUser = String(input ?? '').trim()
-        if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(githubUser))
-            throw new Error('请输入有效的 GitHub 用户名')
-
-        const requestHeaders = {
-            accept: 'application/vnd.github+json',
-            'x-github-api-version': '2022-11-28',
-            'user-agent': 'Pica-Library-Star-Access'
-        }
-        const targetUser = githubUser.toLocaleLowerCase('en-US')
-        const targetRepository = 'saber-alter-lily/pica-library'
-        let primaryStatus = 200
-
-        // Primary public route: repository -> stargazers.
-        for (let page = 1; page <= 100; page += 1) {
-            const response = await fetch(
-                `https://api.github.com/repos/Saber-Alter-Lily/pica-library/stargazers?per_page=100&page=${page}`,
-                {
-                    headers: requestHeaders,
-                    signal: AbortSignal.timeout(15_000)
-                }
-            )
-            if (!response.ok) {
-                primaryStatus = response.status
-                break
-            }
-            const users = (await response.json()) as Array<{ login?: unknown }>
-            if (!Array.isArray(users))
-                throw new Error('GitHub Star 验证返回了异常数据')
-            if (
-                users.some(
-                    (item) =>
-                        String(item?.login ?? '').toLocaleLowerCase('en-US') ===
-                        targetUser
-                )
-            ) {
-                this.saveStarProof(githubUser)
-                return this.status()
-            }
-            if (users.length < 100) break
-        }
-
-        // Secondary public route: named user -> starred repositories. This is
-        // deliberately independent of the repository-stargazer endpoint so a
-        // proxy/API 401 on one route cannot incorrectly deny a real Star.
-        let secondaryStatus = 200
-        for (let page = 1; page <= 100; page += 1) {
-            const response = await fetch(
-                `https://api.github.com/users/${encodeURIComponent(githubUser)}/starred?per_page=100&page=${page}`,
-                {
-                    headers: requestHeaders,
-                    signal: AbortSignal.timeout(15_000)
-                }
-            )
-            if (!response.ok) {
-                secondaryStatus = response.status
-                break
-            }
-            const repositories = (await response.json()) as Array<{
-                full_name?: unknown
-            }>
-            if (!Array.isArray(repositories))
-                throw new Error('GitHub Star 验证返回了异常数据')
-            if (
-                repositories.some(
-                    (item) =>
-                        String(item?.full_name ?? '').toLocaleLowerCase('en-US') ===
-                        targetRepository
-                )
-            ) {
-                this.saveStarProof(githubUser)
-                return this.status()
-            }
-            if (repositories.length < 100) break
-        }
-
-        if ([403, 429].includes(primaryStatus) || [403, 429].includes(secondaryStatus))
-            throw new Error('GitHub 暂时限制了验证请求，请稍后重试')
-        if (primaryStatus === 401 && secondaryStatus === 401)
-            throw new Error('GitHub 公开 Star 验证连续返回 HTTP 401，已尝试代理与直连回退；请检查网络或代理')
-        if (secondaryStatus === 404)
-            throw new Error('没有找到该 GitHub 用户')
-        if (primaryStatus !== 200 && secondaryStatus !== 200)
-            throw new Error(`GitHub Star 验证失败（HTTP ${primaryStatus} / ${secondaryStatus}）`)
-        throw new Error('没有检测到该账号对 Pica Library 的 Star')
+    async verifyGitHubStar() {
+        throw new Error('公开用户名 Star 验证已停用，请使用 GitHub 账号认证')
     }
 
     private hasThemeAccess() {
@@ -541,10 +488,12 @@ export class PersonalizationService {
         return {
             supporter: unlocked,
             features: unlocked ? ['theme-packs'] : [],
-            supporterId: proof ? `github:${proof.githubUser}` : null,
+            supporterId: proof ? `github-id:${proof.githubUserId}` : null,
             starUnlocked: unlocked,
             starUser: proof?.githubUser ?? null,
+            starUserId: proof?.githubUserId ?? null,
             starVerifiedAt: proof?.verifiedAt ?? null,
+            starAuthMethod: proof?.authMethod ?? null,
             activeThemeId: unlocked ? this.activeThemeId() : null
         }
     }
@@ -569,7 +518,7 @@ export class PersonalizationService {
 
     private requireThemeAccess() {
         const proof = this.starProof()
-        if (!proof) throw new Error('给 Pica Library 项目 Star 后即可解锁个性化装扮')
+        if (!proof) throw new Error('请先使用 GitHub 账号认证并验证 Star')
         return proof
     }
 

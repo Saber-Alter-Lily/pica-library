@@ -8,28 +8,29 @@
 
 ## 当前版本
 
-- **Windows / Desktop：v0.3.5**
-- **Android Preview：v32 · 0.1.0-alpha8.6.1-theme-hotfix**
-- **当前公开源码：Alpha8.6.1**
+- **Windows / Desktop：v0.3.6**
+- **Android Preview：v33 · 0.1.0-alpha8.7-settings-star-fix**
+- **当前公开源码：Alpha8.7**
 
 ### 下载
 
-- [Windows v0.3.5 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.5/Pica-Library-v0.3.5-windows-x64.zip)
-- [Windows v0.3.5 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.5/Pica-Library-v0.3.5-update.zip)
-- [Windows v0.3.5 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.5)
+- [Windows v0.3.6 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.6/Pica-Library-v0.3.6-windows-x64.zip)
+- [Windows v0.3.6 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.6/Pica-Library-v0.3.6-update.zip)
+- [Windows v0.3.6 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.6)
 - [Android Preview Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-Windows v0.3.5 更新包已验证支持从 **v0.3.3 / v0.3.4** 直接升级。优先使用应用内 **设置 → 软件更新**。如果 v0.3.3 所在网络必须依赖应用内代理才能访问 GitHub，则旧版更新器本身可能无法发现 v0.3.5；这种情况下需使用一次完整 v0.3.5 ZIP，之后更新器会复用应用配置的 HTTP/HTTPS 代理。
+Windows v0.3.6 更新包计划并验证支持从 **v0.3.3 / v0.3.4 / v0.3.5** 直接升级。优先使用应用内 **设置 → 软件更新**。
 
-## Alpha8.6.1 Hotfix
+## Alpha8.7
 
-这一版优先修复更新与个性化装扮的阻断问题：
+这一版集中处理真实客户端验收中暴露出的桌面信息架构、下载队列和 Star 验证问题：
 
-- **Desktop 更新代理修复**：GitHub API、Release 下载与 GitHub Star 验证会复用 Pica Library 中配置的 HTTP/HTTPS 代理，本机回环请求保持直连。
-- **更新状态修复**：新的更新检查会清除旧的成功状态，不再同时显示“官方通道失败”和历史“更新完成”；后端升级成功后网页会重新载入新版本。
-- **Android 个性化装扮修复**：真实页面入口统一改用 GitHub Star 权限，不再被旧 Supporter Entitlement 错误拦截。
-- **Android Star 验证入口**：可在手机直接输入 GitHub 用户名验证，也可从已配对 Desktop 同步 Star 凭证与主题。
-- **主题数据保留**：内置 **Pica Violet · 星漫** 与已存在的自定义主题继续使用原本的本地主题存储，不因本次升级清空。
+- **Star 验证修复**：Desktop 与 Android 不再调用错误的 `/users/{user}/starred/{repo}` 路径，统一读取仓库公开 `stargazers` 列表并分页匹配 GitHub 用户名；发布前使用真实已 Star 账号做在线验收。
+- **桌面设置中心重构**：原来的“库维护”和“设置”合并为一个 **设置** 入口，内部按 **基本设置 / 连接与同步 / 外观与个性化 / 下载与存储 / 维护工具 / 软件更新** 六个目录组织，逻辑与手机端“连接与设置”尽量对齐。
+- **个性化排版重构**：Star 解锁区与 Theme Studio 使用完整内容宽度；用户名、验证操作和主题制作区改为响应式布局，不再被挤压成窄列。
+- **下载任务收敛**：下载页默认收起 `COMPLETED` 和 `CANCELLED` 历史任务，只展示仍需处理的队列；`FAILED` 保留以便重试，并提供“显示已结束任务”开关。历史数据库记录不删除。
+- **延续 v0.3.5 更新修复**：GitHub 更新、Release 下载与 Desktop Star 请求继续复用 Pica Library 配置的 HTTP/HTTPS 代理，本机回环请求保持直连；旧的“更新完成”状态不会污染新的检查结果。
+- **主题数据保留**：内置 **Pica Violet · 星漫** 与已有自定义主题继续使用原本的本地主题存储，升级不清空。
 
 ## Alpha8.6
 
@@ -40,8 +41,7 @@ Windows v0.3.5 更新包已验证支持从 **v0.3.3 / v0.3.4** 直接升级。�
 - **Theme Studio**：输入一句主题描述、加入角色/风格参考图，导出 AI Creator Kit；AI 返回 `.pica-theme` 后拖回 Desktop 即可校验、应用，并同步到已配对手机。
 - **数据型 Theme Pack**：主题只允许受控 JSON 和 PNG/JPG/WebP 资源，不执行脚本、HTML、字体或二进制代码。
 - **统一品牌图标**：Desktop/Web 与 Android 使用同一套二次元品牌图标。
-- **界面修复**：Desktop 顶栏不再让主题人物图遮挡语言/连接控件；主题文件选择器不再一次点击弹两次。
-- **Android 顶栏优化**：推荐页刷新和在线页账号改为紧凑 48dp 图标操作；底栏仍固定为 **书库 / 推荐 / 在线 / 连接**。
+- **Android 顶栏优化**：推荐页刷新和在线页账号使用紧凑图标操作；底栏固定为 **书库 / 推荐 / 在线 / 连接**。
 
 ## 主要功能
 
@@ -55,7 +55,7 @@ Windows v0.3.5 更新包已验证支持从 **v0.3.3 / v0.3.4** 直接升级。�
 
 ## 个性化装扮
 
-官方构建中的装扮入口是一个社区 Star 奖励，而不是付费功能。当前 V1 流程：
+官方构建中的装扮入口是一个社区 Star 奖励，而不是付费功能：
 
 1. 给本仓库一个 Star。
 2. 在 Desktop 或 Android 个性化页面输入 GitHub 用户名并验证。
@@ -63,17 +63,9 @@ Windows v0.3.5 更新包已验证支持从 **v0.3.3 / v0.3.4** 直接升级。�
 4. Desktop Theme Studio 可导出 AI Creator Kit，自制 `.pica-theme`。
 5. Desktop 与 Android 配对后，可把 Star 凭证和当前主题同步到手机。
 
-源码中可以看到完整验证逻辑；官方签名构建保留上述产品规则，fork 当然可以按照开源许可证自行修改。
-
 ## 开源与安全
 
-当前应用源码重新公开。发布仓库不会包含：
-
-- Android 官方签名私钥或 keystore；
-- 账号、密码、支付凭据或 CI secrets；
-- 本地数据库、漫画下载内容或用户缓存。
-
-用户数据默认保存在本机；Windows 凭据使用当前 Windows 用户的 DPAPI 保护。官方发布产物仍通过固定签名、SHA-256 和构建透明度信息进行校验。
+当前应用源码重新公开。发布仓库不会包含 Android 官方签名私钥或 keystore、账号密码、CI secrets、本地数据库、漫画下载内容或用户缓存。用户数据默认保存在本机；Windows 凭据使用当前 Windows 用户的 DPAPI 保护。官方发布产物仍通过固定签名、SHA-256 和构建透明度信息进行校验。
 
 ## 开始使用
 

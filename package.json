@@ -1,6 +1,6 @@
 {
   "name": "pica-library",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "author": "Saber-Alter-Lily",
   "contributors": [
@@ -26,7 +26,7 @@
     "lint:fix": "eslint --no-cache --fix --ignore-path .gitignore .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "web:check": "node --check web/app.js && node --check web/author-state.js && node --check web/i18n.js && node --check web/lite-state.js && node --check web/alpha7-cloud.js && node --check web/alpha8-product.js && node --check web/alpha8-update-ui.js && node --check web/alpha8-theme-help.js && node --check web/alpha8-connections.js",
+    "web:check": "node --check web/app.js && node --check web/author-state.js && node --check web/i18n.js && node --check web/lite-state.js && node --check web/alpha7-cloud.js && node --check web/alpha8-product.js && node --check web/alpha8-update-ui.js && node --check web/alpha8-theme-help.js && node --check web/alpha8-connections.js && node --check web/alpha8-7-desktop-hub.js",
     "benchmark": "tsx scripts/benchmark/download-harness.ts"
   },
   "engines": {

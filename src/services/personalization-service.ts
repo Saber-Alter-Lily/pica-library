@@ -427,21 +427,39 @@ export class PersonalizationService {
         const githubUser = String(input ?? '').trim()
         if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(githubUser))
             throw new Error('请输入有效的 GitHub 用户名')
-        const response = await fetch(
-            `https://api.github.com/users/${encodeURIComponent(githubUser)}/starred/Saber-Alter-Lily/pica-library`,
-            {
-                headers: { accept: 'application/vnd.github+json', 'user-agent': 'Pica-Library-Star-Access' },
-                signal: AbortSignal.timeout(15_000)
+        const target = githubUser.toLocaleLowerCase('en-US')
+        for (let page = 1; page <= 100; page += 1) {
+            const response = await fetch(
+                `https://api.github.com/repos/Saber-Alter-Lily/pica-library/stargazers?per_page=100&page=${page}`,
+                {
+                    headers: {
+                        accept: 'application/vnd.github+json',
+                        'x-github-api-version': '2022-11-28',
+                        'user-agent': 'Pica-Library-Star-Access'
+                    },
+                    signal: AbortSignal.timeout(15_000)
+                }
+            )
+            if (response.status === 403 || response.status === 429)
+                throw new Error('GitHub 暂时限制了验证请求，请稍后重试')
+            if (!response.ok)
+                throw new Error(`GitHub Star 验证失败（HTTP ${response.status}）`)
+            const users = (await response.json()) as Array<{ login?: unknown }>
+            if (!Array.isArray(users))
+                throw new Error('GitHub Star 验证返回了异常数据')
+            if (
+                users.some(
+                    (item) =>
+                        String(item?.login ?? '').toLocaleLowerCase('en-US') ===
+                        target
+                )
+            ) {
+                this.saveStarProof(githubUser)
+                return this.status()
             }
-        )
-        if (response.status === 204) {
-            this.saveStarProof(githubUser)
-            return this.status()
+            if (users.length < 100) break
         }
-        if (response.status === 404) throw new Error('没有检测到该账号对 Pica Library 的 Star')
-        if (response.status === 403 || response.status === 429)
-            throw new Error('GitHub 暂时限制了验证请求，请稍后重试')
-        throw new Error(`GitHub Star 验证失败（HTTP ${response.status}）`)
+        throw new Error('没有检测到该账号对 Pica Library 的 Star')
     }
 
     private hasThemeAccess() {

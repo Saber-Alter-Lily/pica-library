@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+const nativeFetch = globalThis.fetch.bind(globalThis)
+
 function configuredProxy(value = process.env.PICA_PROXY) {
     if (!value?.trim()) return null
     const parsed = new URL(value.trim())
@@ -34,7 +36,7 @@ function responseHeaders(value: Record<string, unknown>) {
 }
 
 /**
- * Uses the application's configured HTTP(S) proxy for outbound GitHub traffic.
+ * Uses the application's configured HTTP(S) proxy for outbound desktop fetches.
  * Native fetch stays untouched when no proxy is configured. Axios is already
  * bundled by the desktop build, so this does not add another proxy stack.
  */
@@ -43,7 +45,7 @@ export async function applicationFetch(
     init: RequestInit = {}
 ): Promise<Response> {
     const proxy = configuredProxy()
-    if (!proxy) return fetch(input, init)
+    if (!proxy) return nativeFetch(input, init)
 
     const source = input instanceof Request ? input : null
     const url = source?.url ?? String(input)
@@ -73,5 +75,11 @@ export async function applicationFetch(
     Object.defineProperty(response, 'url', { value: finalUrl })
     return response
 }
+
+// UpdateManager is imported by the desktop entry point. Installing the wrapper
+// here makes every later desktop fetch (release download and Star verification
+// included) honor the same saved proxy without changing unrelated call sites.
+if (globalThis.fetch !== applicationFetch)
+    globalThis.fetch = applicationFetch as typeof fetch
 
 export const applicationFetchInternals = { configuredProxy }

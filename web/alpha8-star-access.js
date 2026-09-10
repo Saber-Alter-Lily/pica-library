@@ -1,3 +1,5 @@
+import './alpha8-7-desktop-hub.js'
+
 const a86$=(s)=>document.querySelector(s)
 async function a86Status(){const r=await fetch('/api/v1/desktop/status',{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
 async function a86Verify(username){const current=await a86Status();const r=await fetch('/api/v1/desktop/settings',{method:'POST',headers:{'content-type':'application/json','x-pica-csrf':current.csrfToken||''},body:JSON.stringify({personalizationAction:'verify-star',githubUser:username})});const v=await r.json();if(!r.ok)throw new Error(v.error||`HTTP ${r.status}`);return v}

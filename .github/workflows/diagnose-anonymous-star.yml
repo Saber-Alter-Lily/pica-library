@@ -1,0 +1,39 @@
+name: Diagnose anonymous GitHub Star routes
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diagnose-anonymous-star.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe anonymous public routes without Authorization
+        run: |
+          python - <<'PY'
+          import urllib.error, urllib.request
+          routes=[
+            ('repo_api','https://api.github.com/repos/Saber-Alter-Lily/pica-library/stargazers?per_page=100&page=1'),
+            ('user_api','https://api.github.com/users/Saber-Alter-Lily/starred?per_page=100&page=1'),
+            ('repo_html','https://github.com/Saber-Alter-Lily/pica-library/stargazers'),
+            ('user_html','https://github.com/Saber-Alter-Lily?tab=stars'),
+          ]
+          headers={'User-Agent':'Pica-Library-Anonymous-Star-Diagnostic','Accept':'application/vnd.github+json'}
+          assert 'Authorization' not in headers
+          for name,url in routes:
+              req=urllib.request.Request(url,headers=headers,method='GET')
+              try:
+                  with urllib.request.urlopen(req,timeout=20) as response:
+                      body=response.read().decode('utf-8','replace')
+                      print(f'{name}: status={response.status} final={response.geturl()} bytes={len(body)} has_account={"Saber-Alter-Lily" in body} has_repo={"pica-library" in body}')
+              except urllib.error.HTTPError as e:
+                  body=e.read().decode('utf-8','replace')
+                  print(f'{name}: status={e.code} final={e.geturl()} bytes={len(body)} body={body[:300]!r}')
+              except Exception as e:
+                  print(f'{name}: exception={type(e).__name__}: {e}')
+          print('AUTHORIZATION_HEADER=ABSENT')
+          PY

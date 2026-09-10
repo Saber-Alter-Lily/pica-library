@@ -30,10 +30,9 @@ describe('Alpha8.7.1 migration boundary', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/GitHubAccountAuth.java',
             'utf8'
         )
-        for (const source of [desktop, android]) {
-            expect(source).toContain('/user/starred/Saber-Alter-Lily/pica-library')
-            expect(source).toContain('/user')
-            expect(source).toContain('Authorization')
-        }
+        expect(desktop).toContain('/user/starred/Saber-Alter-Lily/pica-library')
+        expect(desktop).toContain("authorization: `Bearer ${token}`")
+        expect(android).toContain('https://api.github.com/user/starred/'+ '"+REPOSITORY')
+        expect(android).toContain('setRequestProperty("Authorization","Bearer "+token)')
     })
 })

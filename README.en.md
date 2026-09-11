@@ -8,7 +8,7 @@ Pica Library is a local-first manga library manager for long-lived collections. 
 
 **Windows 10/11 x64 · Android Preview · Open source · Free**
 
-[Windows v0.3.10](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10) · [Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
+[Windows v0.3.11](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11) · [Android Preview v38](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
 > The Android build is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
@@ -53,28 +53,16 @@ Android uses four primary tabs: **Library / Recommend / Online / Connect**. Afte
 
 Theme packs can sync across devices, but **Desktop and Android do not have to use the same active theme**.
 
-## Personalization
-
-Personalization is unlocked by a GitHub Star, but identity is never inferred from a public username.
-
-1. Star `Saber-Alter-Lily/pica-library`.
-2. Generate a one-time GitHub device code in Desktop or Android.
-3. Confirm or copy the code inside Pica Library first, then explicitly open GitHub.
-4. After authorization, return to Pica Library; it checks whether the **currently authenticated account** has starred the repository.
-5. Theme functionality unlocks after successful verification.
-
-The OAuth access token is used only during verification and is **not persisted**.
-
 ## Downloads and updates
 
 ### Windows
 
-- [v0.3.10 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
-- [v0.3.10 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
+- [v0.3.11 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-windows-x64.zip)
+- [v0.3.11 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-update.zip)
 
-v0.3.10 has been individually verified for direct in-app upgrades from every formal **v0.3.x** release:
+v0.3.11 has been individually verified for direct in-app upgrades from every formal **v0.3.x** release:
 
-`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.10`
+`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.11`
 
 Prefer **Settings → Software Update** on Desktop.
 

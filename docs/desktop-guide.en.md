@@ -1,12 +1,12 @@
 # Pica Library Desktop / Web Guide
 
-> Windows Desktop / local Web UI. Current formal release: **v0.3.10 / Alpha8.10**.
+> Windows Desktop / local Web UI. Current formal release: **v0.3.11 / Alpha8.11**.
 
 ![Desktop / Web overview](assets/desktop-overview.webp)
 
 ## Install and start
 
-1. Download `Pica-Library-v0.3.10-windows-x64.zip` from the [v0.3.10 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10).
+1. Download `Pica-Library-v0.3.11-windows-x64.zip` from the [v0.3.11 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11).
 2. Extract the full ZIP and run `Pica Library.exe`.
 3. A versioned usage notice is shown on first launch.
 4. Configure your Pica account, optional proxy, and library folder as needed.
@@ -36,7 +36,7 @@ Settings are grouped into General, Connections & Sync, Appearance & Personalizat
 
 When phone and PC are on the same LAN, enable the mobile bridge on Desktop and finish pairing from **Android → Connect → Manage connection**. A paired phone can access local covers and downloaded content, sync selected state and theme packs, and use WebDAV as an optional fallback when Desktop is unavailable.
 
-## GitHub Star personalization
+## theme access
 
 Personalization unlocks only after authenticating your own GitHub account and confirming that account has starred this repository.
 
@@ -46,7 +46,7 @@ Desktop may import and sync `.pica-theme` packs. Desktop and Android keep their 
 
 ## Updates
 
-Prefer **Settings → Software Update**. The v0.3.10 universal incremental package has been individually verified for direct upgrades from every formal v0.3.x release from **v0.3.0 through v0.3.9**.
+Prefer **Settings → Software Update**. The v0.3.11 universal incremental package has been individually verified for direct upgrades from every formal v0.3.x release from **v0.3.0 through v0.3.9**.
 
 ## Data and safety
 

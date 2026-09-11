@@ -1,6 +1,6 @@
 # Pica Library Android Guide
 
-> Current build: **Android Preview v37 · Alpha8.10**. The Android app is **not published in any app store**. Download the APK only from this repository's GitHub Release.
+> Current build: **Android Preview v38 · Alpha8.11**. The Android app is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
 ![Android overview](assets/android-overview.webp)
 
@@ -30,7 +30,7 @@ WebDAV can be configured as a fallback source when Desktop is offline. Pica acco
 
 ## Appearance and personalization
 
-Basic system/light/dark modes are available without GitHub Star verification.
+Basic system/light/dark modes are available without theme access
 
 Theme packs remain locked until you authenticate your own GitHub account and that account is confirmed to have starred `Saber-Alter-Lily/pica-library`.
 

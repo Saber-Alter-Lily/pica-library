@@ -8,9 +8,17 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 
 ## Current versions
 
-- **Windows / Desktop:** v0.3.8
-- **Android Preview:** v35 · 0.1.0-alpha8.8-account-auth-theme-decouple
-- **Public source:** Alpha8.8
+- **Windows / Desktop:** v0.3.9
+- **Android Preview:** v36 · 0.1.0-alpha8.9-auth-ux-204-fix
+- **Public source:** Alpha8.9
+
+## Alpha8.9
+
+- **HTTP 204 Star success fix:** the Desktop proxy fetch layer now constructs bodyless 204/205/304 responses correctly instead of throwing `Invalid response status code 204`.
+- **See the code before leaving the app:** Desktop now renders the GitHub device code first and exposes separate Copy Code and Open GitHub actions; it no longer opens GitHub automatically.
+- **Android device-code persistence:** Android follows the same explicit two-step flow and does not rebuild the theme-auth page when returning from the external browser while authorization is pending.
+- **Android disclaimer insets:** the startup notice reserves status-bar, display-cutout, and bottom-system-bar space.
+- **Alpha8.8 security model retained:** authenticated GitHub identity, transient OAuth access tokens, per-device active themes, and theme-pack sync remain unchanged.
 
 ## Alpha8.8
 

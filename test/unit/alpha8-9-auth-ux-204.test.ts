@@ -44,7 +44,8 @@ describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
     it('shows the Desktop device code before GitHub can be opened', () => {
         const source = fs.readFileSync('web/alpha8-star-access.js', 'utf8')
         expect(source).toContain('生成 GitHub 验证码')
-        expect(source).toContain('本页面不会自动跳转')
+        expect(source).toContain('box.hidden=false')
+        expect(source).toContain('code.textContent=flow.userCode')
         expect(source).toContain('copy.onclick=async()=>')
         expect(source).toContain('open.onclick=async()=>')
         expect(source.match(/window\.open\(flow\.verificationUri/g)?.length).toBe(1)
@@ -62,7 +63,7 @@ describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
         expect(auth).not.toContain('app.startActivity(browser)')
         expect(activity).toContain('!authInProgress')
         expect(activity).toContain('复制验证码')
-        expect(activity).toContain('步骤 2 · 打开 GitHub 授权页')
+        expect(activity).toContain('Button open=Ui.button(this,"打开 GitHub"')
         expect(activity).toContain('copyCode(userCode)')
     })
 

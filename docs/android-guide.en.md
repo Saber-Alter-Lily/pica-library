@@ -1,6 +1,6 @@
 # Pica Library Android Guide
 
-> Current build: **Android Preview v37 · Alpha8.10**. The Android app is **not published in any app store**. Download the APK only from this repository's GitHub Release.
+> Current build: **Android Preview v38 · Alpha8.11**. The Android app is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
 ![Android overview](assets/android-overview.webp)
 
@@ -30,13 +30,11 @@ WebDAV can be configured as a fallback source when Desktop is offline. Pica acco
 
 ## Appearance and personalization
 
-Basic system/light/dark modes are available without GitHub Star verification.
+System/light/dark appearance modes are available directly.
 
-Theme packs remain locked until you authenticate your own GitHub account and that account is confirmed to have starred `Saber-Alter-Lily/pica-library`.
+Android can use locally available theme packs and can sync available packs from a paired Desktop. If a theme action requires additional verification, follow the prompt shown inside the app.
 
-The device code is shown inside Pica Library first. Copy or confirm it, then explicitly open GitHub, authorize your account, and return to the app. The OAuth access token is not persisted.
-
-A paired Desktop can sync verified proof and theme packs. Theme packs may be shared, but **Desktop and Android independently keep their selected active theme**.
+Theme packs may be shared, but **Desktop and Android independently keep their selected active theme**.
 
 ## Reading Desktop downloads
 

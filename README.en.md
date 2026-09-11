@@ -8,7 +8,7 @@ Pica Library is a local-first manga library manager for long-lived collections. 
 
 **Windows 10/11 x64 · Android Preview · Open source · Free**
 
-[Windows v0.3.10](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10) · [Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
+[Windows v0.3.11](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11) · [Android Preview v38](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
 > The Android build is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
@@ -20,7 +20,7 @@ Pica Library is a local-first manga library manager for long-lived collections. 
 - **Local reading** — manage downloaded comics and open them directly from the local library.
 - **Desktop ↔ Android** — a paired phone can read comics already downloaded by Desktop without downloading the same files again.
 - **WebDAV fallback** — optional backup access path for mobile use when Desktop is unavailable.
-- **Personalization** — authenticate your own GitHub account and confirm a Star to unlock `.pica-theme` packs.
+- **Personalization** — `.pica-theme` packs can be created or imported on Desktop and synced to Android; each device keeps its own active theme.
 - **Verified updates** — Desktop supports in-app incremental updates; Android verifies version, SHA-256, package name, and fixed signing identity.
 
 ## Desktop / Web
@@ -53,28 +53,16 @@ Android uses four primary tabs: **Library / Recommend / Online / Connect**. Afte
 
 Theme packs can sync across devices, but **Desktop and Android do not have to use the same active theme**.
 
-## Personalization
-
-Personalization is unlocked by a GitHub Star, but identity is never inferred from a public username.
-
-1. Star `Saber-Alter-Lily/pica-library`.
-2. Generate a one-time GitHub device code in Desktop or Android.
-3. Confirm or copy the code inside Pica Library first, then explicitly open GitHub.
-4. After authorization, return to Pica Library; it checks whether the **currently authenticated account** has starred the repository.
-5. Theme functionality unlocks after successful verification.
-
-The OAuth access token is used only during verification and is **not persisted**.
-
 ## Downloads and updates
 
 ### Windows
 
-- [v0.3.10 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
-- [v0.3.10 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
+- [v0.3.11 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-windows-x64.zip)
+- [v0.3.11 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-update.zip)
 
-v0.3.10 has been individually verified for direct in-app upgrades from every formal **v0.3.x** release:
+v0.3.11 has been individually verified for direct in-app upgrades from every formal **v0.3.x** release:
 
-`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.10`
+`v0.3.0 / v0.3.1 / ... / v0.3.10 → v0.3.11`
 
 Prefer **Settings → Software Update** on Desktop.
 
@@ -104,7 +92,7 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full notice.
 - [Desktop / Web guide](docs/desktop-guide.en.md)
 - [Android guide](docs/android-guide.en.md)
 - [Quick start](docs/quick-start.en.md)
-- [Windows distribution guide](docs/windows-distribution.md)
+- [Windows distribution](docs/windows-distribution.md)
 - [Architecture](docs/architecture.md)
 
 ## Development
@@ -120,8 +108,8 @@ The Android project lives under `mobile/android-alpha2`. Official Android releas
 
 ## Credits
 
-Pica Library continues from the upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
+Pica Library continues to build on upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
 
 ---
 
-**Only download and store content you are authorized to access. Do not redistribute manga files.**
+**Only download and store content you are authorized to access. Do not redistribute comic files.**

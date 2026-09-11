@@ -1,6 +1,6 @@
 # Pica Library Android 使用说明
 
-> 当前版本：**Android Preview v37 · Alpha8.10**。Android 版本**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
+> 当前版本：**Android Preview v38 · Alpha8.11**。Android 版本**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
 
 ![Android 页面说明](assets/android-overview.webp)
 
@@ -45,26 +45,11 @@
 - 浅色；
 - 深色。
 
-基础明暗模式不需要 GitHub Star 验证。
+基础明暗模式可以直接使用。
 
 ## 6. 个性化装扮
 
-个性化主题属于 GitHub Star 解锁功能。在认证前，主题包不能安装、同步或启用。
-
-认证流程：
-
-1. 先给 `Saber-Alter-Lily/pica-library` 一个 Star。
-2. 进入 **外观 → 个性化装扮**。
-3. 点击 **生成 GitHub 验证码**。
-4. 验证码会先显示在 Pica Library 内；确认或复制后，再点击打开 GitHub。
-5. 在 GitHub 官方页面完成本人账号授权并返回应用。
-6. 验证成功后即可管理本机装扮。
-
-应用不会要求你在 Pica Library 内输入 GitHub 密码；OAuth access token 也不会持久化保存。
-
-若手机已经与 Desktop 配对，也可以从电脑同步已经验证的账号证明与可用主题包。
-
-**主题包会同步，但当前主题不会强制同步。** 电脑和手机可以分别使用不同主题。
+Android 可以使用本机已有主题包，也可以在与 Desktop 配对后同步可用主题包。若某项主题功能需要额外验证，请按应用内提示完成。主题包可以同步，但当前主题仍由手机独立选择。
 
 ## 7. 阅读电脑已下载内容
 

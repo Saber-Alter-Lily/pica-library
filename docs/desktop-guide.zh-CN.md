@@ -1,12 +1,12 @@
 # Pica Library Desktop / Web 使用说明
 
-> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.3.10 / Alpha8.10**。
+> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.3.11 / Alpha8.11**。
 
 ![Desktop / Web 页面说明](assets/desktop-overview.webp)
 
 ## 1. 安装与启动
 
-1. 从 [v0.3.10 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10) 下载 `Pica-Library-v0.3.10-windows-x64.zip`。
+1. 从 [v0.3.11 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11) 下载 `Pica-Library-v0.3.11-windows-x64.zip`。
 2. 完整解压后运行 `Pica Library.exe`，不要直接在压缩包内运行。
 3. 首次启动会显示使用提示；确认后进入本地 Web UI。
 4. 根据需要填写 Pica 账号、代理和漫画保存目录。
@@ -36,7 +36,7 @@ Pica Library 默认在本机运行，本地 Web UI 仅用于操作桌面程序�
 
 - **基本设置**：账号、下载目录和基础参数。
 - **连接与同步**：Android 配对、远程访问与 WebDAV。
-- **外观与个性化**：明暗模式、GitHub Star 验证、主题包。
+- **外观与个性化**：明暗模式与主题包。
 - **下载与存储**：下载任务入口、缓存与存储相关操作。
 - **维护工具**：库维护、修复、作者数据等工具。
 - **软件更新**：检查、下载、校验、应用更新并重启。
@@ -54,29 +54,17 @@ Pica Library 默认在本机运行，本地 Web UI 仅用于操作桌面程序�
 
 WebDAV 可以作为电脑不在线时的备用来源。
 
-## 6. 个性化装扮与 GitHub Star
+## 6. 个性化装扮
 
-个性化装扮需要完成本人 GitHub 账号认证并确认该账号已 Star 本仓库。
-
-流程：
-
-1. 给 `Saber-Alter-Lily/pica-library` 一个 Star。
-2. 打开 **设置 → 外观与个性化**。
-3. 点击生成 GitHub 一次性验证码。
-4. 先在 Pica Library 页面确认或复制验证码，再主动打开 GitHub 官方授权页。
-5. 授权完成后返回 Pica Library，程序会检查当前实际登录账号的 Star 状态。
-
-验证通过后才会解锁主题导入、应用与同步。OAuth access token 仅在验证过程中使用，不持久化保存。
-
-Desktop 可以导入 `.pica-theme` 主题包，并把可用主题包同步到 Android；**Desktop 与 Android 各自保存当前启用主题，不强制保持一致**。
+Desktop 支持导入 `.pica-theme` 主题包，并把可用主题包同步到 Android。若某项主题功能需要额外验证，请按应用内提示完成。Desktop 与 Android 各自保存当前启用主题，不强制保持一致。
 
 ## 7. 软件更新
 
 优先使用 **设置 → 软件更新**。
 
-v0.3.10 的正式增量包已经逐一验证支持：
+v0.3.11 的正式增量包已经逐一验证支持：
 
-`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.10`
+`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.11`
 
 更新过程会校验包来源和文件完整性，并保留用户数据库、下载内容与本地配置。若非常旧的客户端所在网络无法访问 GitHub 更新通道，可改用完整 ZIP 覆盖应用程序目录，用户数据仍应保留在独立数据目录中。
 

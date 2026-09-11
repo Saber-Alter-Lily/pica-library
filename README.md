@@ -8,7 +8,7 @@ Pica Library 是一个面向长期漫画收藏的本地优先管理工具：在 
 
 **Windows 10/11 x64 · Android Preview · 开源 · 免费**
 
-[下载 Windows v0.3.10](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10) · [下载 Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [提交 Issue](https://github.com/Saber-Alter-Lily/pica-library/issues)
+[下载 Windows v0.3.11](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11) · [下载 Android Preview v38](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [提交 Issue](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
 > Android 版本目前**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
 
@@ -20,7 +20,7 @@ Pica Library 是一个面向长期漫画收藏的本地优先管理工具：在 
 - **本地阅读**：已下载漫画集中管理，直接从本地进入阅读。
 - **Desktop ↔ Android**：手机与电脑配对后，可直接读取电脑已经下载的漫画，避免重复下载。
 - **WebDAV 后备访问**：电脑离线时可作为移动端备用内容来源。
-- **个性化装扮**：完成本人 GitHub 账号认证并确认 Star 后，可使用和同步 `.pica-theme` 主题包。
+- **个性化装扮**：支持 `.pica-theme` 主题包，Desktop 可创建、导入并同步到 Android；两端可独立选择当前主题。
 - **安全更新**：Desktop 支持应用内增量更新；Android Preview 会校验版本、SHA-256、包名和固定签名证书。
 
 ## Desktop / Web
@@ -53,28 +53,16 @@ Android 端以 **书库 / 推荐 / 在线 / 连接** 四个主入口组织功能
 
 主题包可以跨端同步，但 **Desktop 与 Android 不强制使用同一个当前主题**。
 
-## 个性化装扮
-
-个性化主题通过 GitHub Star 解锁，但不会通过“输入公开用户名”判断身份。
-
-1. Star `Saber-Alter-Lily/pica-library`。
-2. 在 Desktop 或 Android 中生成 GitHub 一次性设备验证码。
-3. 先在 Pica Library 内确认或复制验证码，再主动打开 GitHub 官方授权页。
-4. 授权后返回 Pica Library；程序只检查**当前真实登录账号**是否已 Star 本仓库。
-5. 验证成功后解锁主题功能。
-
-OAuth access token 只在验证过程中使用，**不会持久化保存**。
-
 ## 下载与更新
 
 ### Windows
 
-- [v0.3.10 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
-- [v0.3.10 增量更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
+- [v0.3.11 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-windows-x64.zip)
+- [v0.3.11 增量更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-update.zip)
 
-v0.3.10 已逐一验证支持所有正式 **v0.3.x** 版本直接应用内升级：
+v0.3.11 已逐一验证支持所有正式 **v0.3.x** 版本直接应用内升级：
 
-`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.10`
+`v0.3.0 / v0.3.1 / ... / v0.3.10 → v0.3.11`
 
 Desktop 用户优先使用 **设置 → 软件更新**。
 

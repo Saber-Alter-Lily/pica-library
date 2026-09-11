@@ -1,0 +1,32 @@
+name: Verify README JPEG posters
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-readme-jpegs.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pillow
+      - name: Decode posters
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          for p in [Path('docs/assets/desktop-overview.jpg'), Path('docs/assets/android-overview.jpg')]:
+              print(p, 'bytes=', p.stat().st_size, 'prefix=', p.read_bytes()[:12].hex())
+              with Image.open(p) as im:
+                  im.load()
+                  print(p, 'format=', im.format, 'size=', im.size, 'mode=', im.mode)
+                  assert im.format == 'JPEG'
+                  assert im.width >= 700 and im.height >= 700
+          PY

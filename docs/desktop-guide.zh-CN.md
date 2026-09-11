@@ -2,7 +2,7 @@
 
 > 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.3.11 / Alpha8.11**。
 
-![Desktop / Web 页面说明](assets/desktop-overview-final.png)
+![Desktop / Web 页面说明](https://raw.githubusercontent.com/Saber-Alter-Lily/pica-library/c55c4f39171874a7fa800803a5a3cf979defd0ab/docs/assets/desktop-overview-final.png)
 
 ## 1. 安装与启动
 

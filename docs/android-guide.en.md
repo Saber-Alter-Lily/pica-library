@@ -2,7 +2,7 @@
 
 > Current build: **Android Preview v38 · Alpha8.11**. The Android app is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
-![Android overview](assets/android-overview-final.png)
+![Android overview](https://raw.githubusercontent.com/Saber-Alter-Lily/pica-library/c55c4f39171874a7fa800803a5a3cf979defd0ab/docs/assets/android-overview-final.png)
 
 ## Download and install
 

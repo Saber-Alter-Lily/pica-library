@@ -2,7 +2,7 @@
 
 > Windows Desktop / local Web UI. Current formal release: **v0.3.11 / Alpha8.11**.
 
-![Desktop / Web overview](assets/desktop-overview-final.png)
+![Desktop / Web overview](https://raw.githubusercontent.com/Saber-Alter-Lily/pica-library/c55c4f39171874a7fa800803a5a3cf979defd0ab/docs/assets/desktop-overview-final.png)
 
 ## Install and start
 

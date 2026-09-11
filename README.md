@@ -37,12 +37,12 @@
 
 ### 下载
 
-- [Windows v0.3.9 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.9/Pica-Library-v0.3.9-windows-x64.zip)
-- [Windows v0.3.9 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.9/Pica-Library-v0.3.9-update.zip)
-- [Windows v0.3.9 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.9)
-- [Android Preview v36](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
+- [Windows v0.3.10 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
+- [Windows v0.3.10 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
+- [Windows v0.3.10 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10)
+- [Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-Windows v0.3.9 增量更新已验证支持从 **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7 / v0.3.8** 升级。Desktop 优先使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
+Windows v0.3.10 增量更新已逐一验证支持从 **v0.3.0 / v0.3.1 / v0.3.2 / v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7 / v0.3.8 / v0.3.9** 直接升级。Desktop 优先使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
 
 ## 主要功能
 

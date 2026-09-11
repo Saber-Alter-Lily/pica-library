@@ -22,7 +22,7 @@
 
 ### 下载
 
-Windows v0.3.8 与 Android v35 通过原有应用内更新通道提供。优先使用软件内 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
+正式 v0.3.8 Release 发布后，Windows 与 Android v35 将通过原有应用内更新通道提供。Desktop 使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
 
 ## 主要功能
 

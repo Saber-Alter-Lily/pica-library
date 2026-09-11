@@ -1,0 +1,49 @@
+name: Apply v0.3.11 no-payment release transform
+
+on:
+  push:
+    branches: [release/v0.3.11-no-payment]
+    paths:
+      - '.github/workflows/apply-v0311-no-payment.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v0.3.11-no-payment
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply deterministic transform
+        run: node scripts/apply-v0311-no-payment.mjs
+      - name: Verify payment removal and release contracts
+        run: |
+          set -euo pipefail
+          test ! -e web/support-wechat.svg
+          test ! -e web/support-alipay.svg
+          test ! -e mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SupportQr.java
+          ! grep -R -n -E 'wxp://|qr\.alipay\.com|微信支付收款码|支付宝收款码|SupportQr|com\.google\.zxing' web mobile/android-alpha2 README.md README.en.md docs || true
+          if grep -R -n -E 'wxp://|qr\.alipay\.com|微信支付收款码|支付宝收款码|SupportQr|com\.google\.zxing' web mobile/android-alpha2 README.md README.en.md docs; then
+            echo 'Payment QR material still present' >&2
+            exit 1
+          fi
+          grep -q '"version": "0.3.11"' package.json
+          grep -q 'versionCode 38' mobile/android-alpha2/app/build.gradle
+          grep -q "versionName '0.1.0-alpha8.11-no-payment'" mobile/android-alpha2/app/build.gradle
+          node --check web/alpha8-product.js
+          git diff --check
+      - name: Commit transformed source
+        run: |
+          set -euo pipefail
+          git config user.name 'Saber-Alter-Lily'
+          git config user.email '3178088154@qq.com'
+          git add -A
+          git diff --cached --quiet && { echo 'No transform changes'; exit 1; }
+          git commit -m 'release: remove payment QR and stage v0.3.11'
+          git push origin HEAD:release/v0.3.11-no-payment

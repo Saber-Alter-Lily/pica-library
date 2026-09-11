@@ -36,17 +36,15 @@ Settings are grouped into General, Connections & Sync, Appearance & Personalizat
 
 When phone and PC are on the same LAN, enable the mobile bridge on Desktop and finish pairing from **Android → Connect → Manage connection**. A paired phone can access local covers and downloaded content, sync selected state and theme packs, and use WebDAV as an optional fallback when Desktop is unavailable.
 
-## theme access
+## Personalization
 
-Personalization unlocks only after authenticating your own GitHub account and confirming that account has starred this repository.
+Desktop can import `.pica-theme` packs and sync available packs to Android. If a theme action requires additional verification, follow the prompt shown inside the app.
 
-The app first shows a one-time GitHub device code inside Pica Library. Copy or confirm the code, explicitly open GitHub, finish authorization, then return to Pica Library. The OAuth access token is used only during verification and is not persisted.
-
-Desktop may import and sync `.pica-theme` packs. Desktop and Android keep their **active theme selections independently**.
+Desktop and Android keep their **active theme selections independently**.
 
 ## Updates
 
-Prefer **Settings → Software Update**. The v0.3.11 universal incremental package has been individually verified for direct upgrades from every formal v0.3.x release from **v0.3.0 through v0.3.9**.
+Prefer **Settings → Software Update**. The v0.3.11 universal incremental package is intended for direct upgrades from formal v0.3.x releases through v0.3.10; the release gate verifies source-package compatibility before publication.
 
 ## Data and safety
 

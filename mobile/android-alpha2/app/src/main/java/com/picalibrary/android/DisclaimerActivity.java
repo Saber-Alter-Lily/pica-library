@@ -2,7 +2,6 @@ package com.picalibrary.android;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.*;
@@ -30,7 +29,18 @@ public final class DisclaimerActivity extends Activity {
     }
 
     private void render(){
-        ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);
+        ScrollView scroll=new ScrollView(this);
+        scroll.setBackgroundColor(Ui.BG);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        // Ui.applyWindow enables edge-to-edge drawing. Reserve the actual
+        // status-bar/notch and navigation-bar insets here so the disclaimer
+        // title never overlaps system UI on phones with cutouts or gesture bars.
+        scroll.setOnApplyWindowInsetsListener((v,insets)->{
+            v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());
+            return insets;
+        });
+
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(Ui.dp(this,20),Ui.dp(this,26),Ui.dp(this,20),Ui.dp(this,28));
         root.addView(Ui.text(this,"Pica Library · 开源工具使用提示",13,Ui.PRIMARY,true));
         root.addView(Ui.text(this,"使用提示与免责声明",25,Ui.TEXT,true));
@@ -50,7 +60,7 @@ public final class DisclaimerActivity extends Activity {
         Button accept=Ui.button(this,"同意并继续",v->{getSharedPreferences(PREF,MODE_PRIVATE).edit().putString(KEY_VERSION,VERSION).apply();continueIntoApp();},false);accept.setEnabled(false);confirm.setOnCheckedChangeListener((button,checked)->accept.setEnabled(checked));root.addView(accept);
         Button exit=Ui.button(this,"不同意并退出",v->finishAndRemoveTask(),true);LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(-1,-2);ep.setMargins(0,Ui.dp(this,8),0,0);root.addView(exit,ep);
         TextView note=Ui.text(this,"本确认仅记录在当前设备；免责声明版本更新后会再次提示。",12,Ui.MUTED,false);note.setGravity(Gravity.CENTER);note.setPadding(0,Ui.dp(this,14),0,0);root.addView(note);
-        scroll.addView(root);setContentView(scroll);
+        scroll.addView(root);setContentView(scroll);scroll.requestApplyInsets();
     }
 
     private void continueIntoApp(){

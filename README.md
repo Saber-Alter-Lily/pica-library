@@ -12,7 +12,7 @@
 - **Android Preview：v35 · 0.1.0-alpha8.8-account-auth-theme-decouple**
 - **当前公开源码：Alpha8.8**
 
-### Alpha8.8
+## Alpha8.8
 
 - **GitHub 账号本人认证**：个性化装扮不再依赖“输入公开用户名并查询 Star”，改为 GitHub Device Flow 登录当前账号，再调用认证用户的 Star 接口验证 `Saber-Alter-Lily/pica-library`。客户端只长期保存 GitHub 用户名、不可变 user ID 和验证时间，不保存 OAuth access token。
 - **主题跨端解耦**：Desktop 仍可把 `.pica-theme` 方案与资源包同步到 Android，但不再同步 `activeThemeId`。电脑和手机可分别选择各自当前主题，例如电脑使用“远坂凛”，手机使用“Pica Violet · 星漫”。
@@ -21,7 +21,7 @@
 
 ### 下载
 
-发布完成后，Windows v0.3.8 与 Android v35 会通过原有应用内更新通道提供。当前稳定发布在正式 v0.3.8 Release 完成前仍以 GitHub Releases 的 latest 为准。
+Windows v0.3.8 与 Android v35 通过原有应用内更新通道提供。优先使用软件内 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
 
 ## 主要功能
 

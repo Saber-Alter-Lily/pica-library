@@ -37,12 +37,12 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 
 ### Downloads
 
-- [Windows v0.3.9 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.9/Pica-Library-v0.3.9-windows-x64.zip)
-- [Windows v0.3.9 update package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.9/Pica-Library-v0.3.9-update.zip)
-- [Windows v0.3.9 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.9)
-- [Android Preview v36](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
+- [Windows v0.3.10 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
+- [Windows v0.3.10 update package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
+- [Windows v0.3.10 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10)
+- [Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-The Windows v0.3.9 incremental update is verified for **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7 / v0.3.8**. Prefer **Settings → Software Update** on Desktop and the existing Preview update screen on Android.
+The Windows v0.3.10 incremental update is individually verified for direct upgrades from **v0.3.0 / v0.3.1 / v0.3.2 / v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7 / v0.3.8 / v0.3.9**. Prefer **Settings → Software Update** on Desktop and the existing Preview update screen on Android.
 
 ## Main features
 

@@ -2,87 +2,110 @@
 
 # Pica Library
 
-Turn a Pica collection into a durable local manga library for organizing, discovering, downloading, reading, and cross-device access.
+**Organize collections · Discover personally · Incremental downloads · Local reading · Cross-device access**
 
-**Windows 10/11 x64 · Android Preview · current source is open again.**
+Pica Library is a local-first manga library manager for long-lived collections. Use Windows to organize, search, discover, download, and read; pair Android to access comics already downloaded on the PC.
 
-## Current versions
+**Windows 10/11 x64 · Android Preview · Open source · Free**
 
-- **Windows / Desktop:** v0.3.10
-- **Android Preview:** v37 · 0.1.0-alpha8.10-release-readiness
-- **Public source:** Alpha8.10
+[Windows v0.3.10](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10) · [Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
-## Alpha8.10
+> The Android build is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
-- **All v0.3.x upgrade compatibility:** release gates cover direct in-app upgrades from v0.3.0 through v0.3.9.
-- **UI cleanup:** redundant helper copy is removed across Desktop/Web and Android while status, errors, and essential safety messaging remain.
-- **Strict personalization gate:** themes cannot be imported, synced, activated, or served before authenticated GitHub Star proof is present.
-- **Star surprise copy removed:** the Star action no longer carries teaser microcopy.
+## What it does
 
-## Alpha8.9
+- **Library and collection management** — sync favorites and organize by author, tag, category, shelf, and other local metadata.
+- **Search, discovery, and recommendations** — search local/online content and generate personalized recommendations from your collection profile.
+- **Persistent download queue** — retain task state across restarts, recover failures, and collapse finished history by default.
+- **Local reading** — manage downloaded comics and open them directly from the local library.
+- **Desktop ↔ Android** — a paired phone can read comics already downloaded by Desktop without downloading the same files again.
+- **WebDAV fallback** — optional backup access path for mobile use when Desktop is unavailable.
+- **Personalization** — authenticate your own GitHub account and confirm a Star to unlock `.pica-theme` packs.
+- **Verified updates** — Desktop supports in-app incremental updates; Android verifies version, SHA-256, package name, and fixed signing identity.
 
-- **HTTP 204 Star success fix:** the Desktop proxy fetch layer now constructs bodyless 204/205/304 responses correctly instead of throwing `Invalid response status code 204`.
-- **See the code before leaving the app:** Desktop now renders the GitHub device code first and exposes separate Copy Code and Open GitHub actions; it no longer opens GitHub automatically.
-- **Android device-code persistence:** Android follows the same explicit two-step flow and does not rebuild the theme-auth page when returning from the external browser while authorization is pending.
-- **Android disclaimer insets:** the startup notice reserves status-bar, display-cutout, and bottom-system-bar space.
-- **Alpha8.8 security model retained:** authenticated GitHub identity, transient OAuth access tokens, per-device active themes, and theme-pack sync remain unchanged.
+## Desktop / Web
 
-## Alpha8.8
+![Pica Library Desktop / Web overview](docs/assets/desktop-overview.webp)
 
-- **Authenticated GitHub Star access:** personalization no longer accepts a public username and infers Star state. Desktop and Android use GitHub Device Flow, identify the authenticated account, and check the current user's Star of `Saber-Alter-Lily/pica-library`. The access token is transient and is not persisted.
-- **Live authenticated acceptance passed:** the production GitHub App Client ID completed a real Device Flow for `Saber-Alter-Lily`, and the authenticated current-user Star check returned HTTP 204.
-- **Per-device active themes:** Desktop may sync `.pica-theme` packs to Android, but it no longer syncs `activeThemeId`. Desktop and Android independently choose which installed theme is active.
-- **Versioned startup disclaimer:** Desktop/Web and Android show an open-source-tool usage notice on first run; acknowledgement is device-local and the notice appears again only when its version changes. The full Windows package includes `DISCLAIMER.md`; in-app upgrades deliver the actual Web startup disclaimer without forcing updater self-replacement for the root documentation copy.
-- **Alpha8.7 improvements retained:** unified Settings hub, improved personalization layout, collapsed finished-download history, and proxy-aware update networking remain in place.
+Desktop provides the full Library, Shelves, Discover, Favorite Atlas, Downloads, Downloaded, and unified Settings experience. Mobile pairing, WebDAV, themes, storage, maintenance, and updates live under Settings.
 
-### Downloads
+**[Desktop / Web detailed guide →](docs/desktop-guide.en.md)**
 
-- [Windows v0.3.10 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
-- [Windows v0.3.10 update package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
-- [Windows v0.3.10 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10)
-- [Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
+## Android
 
-The Windows v0.3.10 incremental update is individually verified for direct upgrades from **v0.3.0 / v0.3.1 / v0.3.2 / v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7 / v0.3.8 / v0.3.9**. Prefer **Settings → Software Update** on Desktop and the existing Preview update screen on Android.
+![Pica Library Android guide](docs/assets/android-overview.webp)
 
-## Main features
+Android uses four primary tabs: **Library / Recommend / Online / Connect**. After pairing with Desktop, it can read local comics stored on the PC and also manage WebDAV, Pica account settings, appearance, and app updates.
 
-- **Library:** sync favorites and filter by author, tag, category, and shelf.
-- **Personal recommendations:** generate explainable recommendation batches from the local collection profile.
-- **Online browsing:** favorites, search, categories, and 24-hour / 7-day / 30-day rankings.
-- **Download and read:** manage downloads, retries, reading progress, and local caches.
-- **Desktop ↔ Android:** a paired phone can read comics already downloaded by Desktop and receive theme packs and selected state; each device keeps its own active theme.
-- **WebDAV:** an optional fallback source for mobile reading while Desktop is offline.
-- **Updates:** Desktop uses GitHub Release API with a release-file fallback path; Android Preview verifies version, SHA-256, package name, and the fixed official signing identity before installation.
+**[Android detailed guide →](docs/android-guide.en.md)**
+
+## Cross-device model
+
+| Capability | Desktop / Web | Android |
+| --- | --- | --- |
+| Library and favorites | ✅ | ✅ |
+| Recommendations / online browsing | ✅ | ✅ |
+| Download management | ✅ primary download side | ✅ mobile tasks / app updates |
+| Read Desktop-downloaded comics | Local | ✅ after pairing |
+| WebDAV | ✅ configure / expose info | ✅ fallback access |
+| Theme packs | ✅ create / import / sync | ✅ receive / use |
+| Active theme | Device-local | Device-local |
+
+Theme packs can sync across devices, but **Desktop and Android do not have to use the same active theme**.
 
 ## Personalization
 
-The official-build personalization gate is a GitHub Star community reward, not a paid feature:
+Personalization is unlocked by a GitHub Star, but identity is never inferred from a public username.
 
-1. Star this repository.
-2. Choose GitHub account authentication in Desktop or Android personalization settings.
-3. First confirm or copy the one-time GitHub device code shown inside Pica Library, then explicitly open the GitHub authorization page.
-4. After authorization, return to Pica Library; it identifies the currently authenticated account and checks that account's Star of this repository.
-5. Only the verified GitHub username, immutable user ID, and verification timestamp are retained locally; the OAuth access token is not persisted.
-6. Desktop can create, import, and sync `.pica-theme` packs, while Desktop and Android independently retain their selected active theme.
+1. Star `Saber-Alter-Lily/pica-library`.
+2. Generate a one-time GitHub device code in Desktop or Android.
+3. Confirm or copy the code inside Pica Library first, then explicitly open GitHub.
+4. After authorization, return to Pica Library; it checks whether the **currently authenticated account** has starred the repository.
+5. Theme functionality unlocks after successful verification.
+
+The OAuth access token is used only during verification and is **not persisted**.
+
+## Downloads and updates
+
+### Windows
+
+- [v0.3.10 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
+- [v0.3.10 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
+
+v0.3.10 has been individually verified for direct in-app upgrades from every formal **v0.3.x** release:
+
+`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.10`
+
+Prefer **Settings → Software Update** on Desktop.
+
+### Android
+
+Download `Pica-Library-Android-Preview.apk` from the [Android Preview release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview).
+
+The Preview is **not distributed through app stores**. Avoid unofficial mirrors and re-uploaded APKs.
+
+## Local-first and security
+
+- User data stays local by default.
+- Windows credentials are protected with DPAPI for the current Windows user.
+- Official releases publish SHA-256 and build-transparency metadata.
+- Android Preview uses a fixed official signing identity.
+- GitHub OAuth access tokens are not persisted.
+- Theme packs are data/image-only and do not execute arbitrary scripts or binaries.
 
 ## Usage notice
 
-Pica Library is an open-source, local-first personal digital-content management tool. It does not sell, host, or redistribute manga content. Users are responsible for ensuring that account use, access, downloading, storage, reading, and backups comply with applicable law, platform terms, copyright, and other permissions. See [DISCLAIMER.md](DISCLAIMER.md) for the full notice.
+Pica Library is an open-source, local-first personal digital-content management tool. It does not sell, host, or redistribute manga content. Users are responsible for ensuring that account use, access, downloading, storage, reading, and backups comply with applicable law, platform terms, copyright, and other permissions.
 
-## Open source and security
-
-The repository does not contain official Android signing private keys/keystores, account credentials, CI secrets, local databases, downloaded comics, or user caches. User data stays local by default. Windows credentials are protected with DPAPI for the current Windows user. Official binaries remain tied to published SHA-256 values, build transparency metadata, and the fixed Android Preview signing identity.
+See [DISCLAIMER.md](DISCLAIMER.md) for the full notice.
 
 ## Get started
 
-1. Download and fully extract the Windows ZIP.
-2. Double-click `Pica Library.exe`.
-3. Read and acknowledge the versioned usage notice.
-4. Finish account, optional proxy, and library-folder setup.
-5. Sync favorites and start using the library.
-6. Pair Android using the Desktop-provided connection information when needed.
-
-See the [quick start](docs/quick-start.en.md) for the guided flow.
+- [Desktop / Web guide](docs/desktop-guide.en.md)
+- [Android guide](docs/android-guide.en.md)
+- [Quick start](docs/quick-start.en.md)
+- [Windows distribution guide](docs/windows-distribution.md)
+- [Architecture](docs/architecture.md)
 
 ## Development
 
@@ -93,10 +116,12 @@ pnpm build
 pnpm test:unit
 ```
 
-The Android project lives under `mobile/android-alpha2`. Official Android release signing private keys are not stored in this repository.
+The Android project lives under `mobile/android-alpha2`. Official Android release signing private keys are not stored in the repository.
 
-## More
+## Credits
 
-[Quick start](docs/quick-start.en.md) · [Windows guide](docs/windows-distribution.md) · [Architecture](docs/architecture.md) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues) · [LICENSE](LICENSE) · [UPSTREAM](UPSTREAM.md)
+Pica Library continues from the upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
 
-Only download material you are authorized to access. Do not redistribute it.
+---
+
+**Only download and store content you are authorized to access. Do not redistribute manga files.**

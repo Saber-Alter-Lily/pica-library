@@ -2,87 +2,110 @@
 
 # Pica Library
 
-把 Pica 收藏同步成一个可持续维护的本地漫画库，并在同一个产品里完成整理、推荐、下载、阅读与多端同步。
+**收藏整理 · 个性发现 · 增量下载 · 本地阅读 · 多端同步**
 
-**Windows 10/11 x64 · Android Preview · 当前源码重新开放。**
+Pica Library 是一个面向长期漫画收藏的本地优先管理工具：在 Windows 上整理、搜索、推荐、下载和阅读漫画，并通过 Android 直接访问电脑已经下载的内容。
 
-## 当前版本
+**Windows 10/11 x64 · Android Preview · 开源 · 免费**
 
-- **Windows / Desktop：v0.3.10**
-- **Android Preview：v37 · 0.1.0-alpha8.10-release-readiness**
-- **当前公开源码：Alpha8.10**
+[下载 Windows v0.3.10](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10) · [下载 Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [提交 Issue](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
-## Alpha8.10
+> Android 版本目前**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
 
-- **全量 v0.3.x 升级兼容**：正式发布门禁覆盖 v0.3.0–v0.3.9 到当前版本的直接应用内升级。
-- **界面收敛**：Desktop/Web 与 Android 删除重复技术说明和冗余小字，保留必要状态、错误和安全提示。
-- **个性化锁定复核**：未完成 GitHub 本人认证时，Desktop 与 Android 均不能导入、同步、启用或读取个性化装扮；移动端主题桥接接口同步加锁。
-- **移除 Star 惊喜文案**：Star 按钮旁不再显示“收藏项目有小惊喜”等暗示性说明。
+## 能做什么
 
-## Alpha8.9
+- **漫画库与收藏整理**：同步收藏，按作者、标签、分类、书架等方式整理长期收藏。
+- **搜索、发现与推荐**：在本地库和在线内容中搜索，并根据收藏画像生成个性化推荐。
+- **持久化下载队列**：下载任务支持持续管理、失败恢复和状态保留；已结束任务默认收起。
+- **本地阅读**：已下载漫画集中管理，直接从本地进入阅读。
+- **Desktop ↔ Android**：手机与电脑配对后，可直接读取电脑已经下载的漫画，避免重复下载。
+- **WebDAV 后备访问**：电脑离线时可作为移动端备用内容来源。
+- **个性化装扮**：完成本人 GitHub 账号认证并确认 Star 后，可使用和同步 `.pica-theme` 主题包。
+- **安全更新**：Desktop 支持应用内增量更新；Android Preview 会校验版本、SHA-256、包名和固定签名证书。
 
-- **修复 GitHub Star 成功却报错**：Desktop 代理网络层正确处理 HTTP 204/205/304 无响应体状态，不再出现 `Response constructor: Invalid response status code 204`。
-- **认证流程改为先看码、再跳转**：Desktop 点击后先在当前页面显示一次性验证码，并提供“复制验证码 / 打开 GitHub 授权页”两个明确步骤；不再自动跳走。
-- **Android 验证码不再消失**：手机同样先显示验证码再由用户主动打开 GitHub；从浏览器返回时认证页面不重建，验证码与等待状态保持。
-- **Android 开屏安全区修复**：免责声明页面显式避让状态栏、刘海与底部系统导航区域。
-- **延续 Alpha8.8**：GitHub 本人账号认证、OAuth Token 不持久化、Desktop/Android 当前主题独立、主题包可同步等逻辑保持不变。
+## Desktop / Web
 
-## Alpha8.8
+![Pica Library Desktop / Web 页面说明](docs/assets/desktop-overview.webp)
 
-- **GitHub 账号本人认证**：个性化装扮不再依赖“输入公开用户名并查询 Star”，改为 GitHub Device Flow 登录当前账号，再调用认证用户的 Star 接口验证 `Saber-Alter-Lily/pica-library`。客户端只长期保存 GitHub 用户名、不可变 user ID 和验证时间，不保存 OAuth access token。
-- **真实授权验收已通过**：使用正式 GitHub App Client ID 完成真实 Device Flow，认证账号为 `Saber-Alter-Lily`，认证后的当前用户 Star 检查返回 HTTP 204。
-- **主题跨端解耦**：Desktop 仍可把 `.pica-theme` 方案与资源包同步到 Android，但不再同步 `activeThemeId`。电脑和手机可分别选择各自当前主题，例如电脑使用“远坂凛”，手机使用“Pica Violet · 星漫”。
-- **版本化开屏免责声明**：Desktop/Web 与 Android 首次运行会显示开源工具使用提示；确认状态只保存在当前设备，免责声明版本升级时才再次提示。Windows 完整包同时包含 `DISCLAIMER.md`；从旧版应用内增量升级时，实际生效的 Web 开屏提示会正常更新，而根目录文档不会触发 updater 自我替换。
-- **延续 Alpha8.7**：统一设置中心、个性化布局优化、已结束下载任务默认收起、代理感知更新链路继续保留。
+Windows Desktop 提供完整的漫画库、书架、发现、收藏图鉴、下载任务、已下载内容和统一设置中心。手机配对、WebDAV、主题、存储、维护和软件更新都集中在设置中管理。
 
-### 下载
+**[查看 Desktop / Web 详细使用说明 →](docs/desktop-guide.zh-CN.md)**
 
-- [Windows v0.3.10 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
-- [Windows v0.3.10 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
-- [Windows v0.3.10 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.10)
-- [Android Preview v37](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
+## Android
 
-Windows v0.3.10 增量更新已逐一验证支持从 **v0.3.0 / v0.3.1 / v0.3.2 / v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7 / v0.3.8 / v0.3.9** 直接升级。Desktop 优先使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
+![Pica Library Android 使用指南](docs/assets/android-overview.webp)
 
-## 主要功能
+Android 端以 **书库 / 推荐 / 在线 / 连接** 四个主入口组织功能。配对 Desktop 后可直接读取电脑本地漫画；也可配置 WebDAV、Pica 账号、外观和软件更新。
 
-- **漫画库**：同步收藏，按作者、标签、分类和书架筛选与整理。
-- **个性化推荐**：根据收藏画像生成分批推荐和推荐理由；收藏后当前推荐不会被清空。
-- **在线浏览**：收藏、搜索、分类和 **24 小时 / 7 天 / 30 天** 排行。
-- **下载与阅读**：统一管理下载任务、阅读进度与本地缓存。
-- **Desktop ↔ Android**：手机可直接读取电脑已下载漫画，并同步主题方案与部分状态；两端当前主题彼此独立。
-- **WebDAV**：电脑离线时可作为移动端后备阅读来源。
-- **软件更新**：Desktop 具备 GitHub Release API + Release 文件回退链路；Android Preview 校验版本、SHA-256、包名与固定签名证书后安装。
+**[查看 Android 详细使用说明 →](docs/android-guide.zh-CN.md)**
+
+## 多端逻辑
+
+| 能力 | Desktop / Web | Android |
+| --- | --- | --- |
+| 收藏与漫画库管理 | ✅ | ✅ |
+| 推荐 / 在线浏览 | ✅ | ✅ |
+| 下载任务管理 | ✅ 主下载端 | ✅ 移动端任务与更新 |
+| 读取 Desktop 已下载漫画 | 本机 | ✅ 配对后直接读取 |
+| WebDAV | ✅ 配置 / 提供连接信息 | ✅ 后备访问 |
+| 主题包 | ✅ 创建 / 导入 / 同步 | ✅ 接收 / 使用 |
+| 当前启用主题 | 本机独立 | 本机独立 |
+
+主题包可以跨端同步，但 **Desktop 与 Android 不强制使用同一个当前主题**。
 
 ## 个性化装扮
 
-官方构建中的装扮入口是一个社区 Star 奖励，而不是付费功能：
+个性化主题通过 GitHub Star 解锁，但不会通过“输入公开用户名”判断身份。
 
-1. 给本仓库一个 Star。
-2. 在 Desktop 或 Android 个性化页面选择“使用 GitHub 账号登录并验证”。
-3. 在当前页面先确认或复制 GitHub 一次性设备验证码，再主动打开 GitHub 授权页。
-4. GitHub 授权完成后回到 Pica Library；软件读取当前登录账号身份，并检查该账号是否已 Star 本仓库。
-5. 验证成功后，本机保存账号身份证明；OAuth access token 不持久化。
-6. Desktop 可创建、导入和同步 `.pica-theme` 方案；Desktop 与 Android 分别保存自己的当前主题。
+1. Star `Saber-Alter-Lily/pica-library`。
+2. 在 Desktop 或 Android 中生成 GitHub 一次性设备验证码。
+3. 先在 Pica Library 内确认或复制验证码，再主动打开 GitHub 官方授权页。
+4. 授权后返回 Pica Library；程序只检查**当前真实登录账号**是否已 Star 本仓库。
+5. 验证成功后解锁主题功能。
 
-## 使用提示
+OAuth access token 只在验证过程中使用，**不会持久化保存**。
 
-Pica Library 是开源、本地优先的个人数字内容管理工具。项目本身不销售、托管或重新分发漫画内容。使用者需要自行确保账号使用、内容访问、下载、保存、阅读和备份符合所在地法律法规、平台条款以及版权或其他授权范围。完整说明见 [DISCLAIMER.md](DISCLAIMER.md)。
+## 下载与更新
 
-## 开源与安全
+### Windows
 
-当前应用源码重新公开。发布仓库不会包含 Android 官方签名私钥或 keystore、账号密码、CI secrets、本地数据库、漫画下载内容或用户缓存。用户数据默认保存在本机；Windows 凭据使用当前 Windows 用户的 DPAPI 保护。官方发布产物仍通过固定签名、SHA-256 和构建透明度信息进行校验。
+- [v0.3.10 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-windows-x64.zip)
+- [v0.3.10 增量更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.10/Pica-Library-v0.3.10-update.zip)
+
+v0.3.10 已逐一验证支持所有正式 **v0.3.x** 版本直接应用内升级：
+
+`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.10`
+
+Desktop 用户优先使用 **设置 → 软件更新**。
+
+### Android
+
+从 [Android Preview Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) 下载 `Pica-Library-Android-Preview.apk`。
+
+Android Preview **未上架应用商店**。请不要从不明网盘、群文件或第三方下载站获取 APK。
+
+## 本地优先与安全
+
+- 用户数据默认保存在本机。
+- Windows 凭据使用当前 Windows 用户的 DPAPI 保护。
+- 官方发布提供 SHA-256 与构建透明度信息。
+- Android Preview 使用固定官方签名身份。
+- GitHub OAuth access token 不持久化保存。
+- 主题包仅允许受控的数据与图片资源，不执行任意脚本或可执行代码。
+
+## 使用说明
+
+Pica Library 是开源、本地优先的个人数字内容管理工具。项目本身不销售、托管或重新分发漫画内容。用户需要自行确保账号使用、内容访问、下载、保存、阅读和备份符合所在地法律法规、平台条款以及版权或其他授权范围。
+
+完整说明见 [DISCLAIMER.md](DISCLAIMER.md)。
 
 ## 开始使用
 
-1. 下载完整 Windows ZIP 并完整解压。
-2. 双击 `Pica Library.exe`。
-3. 阅读并确认版本化使用提示。
-4. 完成账号、可选代理和漫画保存目录设置。
-5. 同步收藏并开始使用。
-6. Android 端通过 Desktop 提供的配对信息连接。
-
-更详细的首次使用步骤见 [快速开始](docs/quick-start.zh-CN.md)。
+- [Desktop / Web 使用说明](docs/desktop-guide.zh-CN.md)
+- [Android 使用说明](docs/android-guide.zh-CN.md)
+- [快速开始](docs/quick-start.zh-CN.md)
+- [Windows 分发说明](docs/windows-distribution.zh-CN.md)
+- [开发与架构](docs/architecture.md)
 
 ## 开发
 
@@ -95,8 +118,10 @@ pnpm test:unit
 
 Android 工程位于 `mobile/android-alpha2`。官方 Android APK 的发布签名私钥不在仓库内。
 
-## 更多
+## 致谢
 
-[快速开始](docs/quick-start.zh-CN.md) · [Windows 使用指南](docs/windows-distribution.zh-CN.md) · [开发与架构](docs/architecture.md) · [Issue](https://github.com/Saber-Alter-Lily/pica-library/issues) · [LICENSE](LICENSE) · [UPSTREAM](UPSTREAM.md)
+Pica Library 的 CLI 能力基于上游 `pica-cli` 工作继续演进。详见 [UPSTREAM.md](UPSTREAM.md)。
 
-请只下载你有权访问的内容，不要重新分发漫画文件。
+---
+
+**请只下载和保存你有权访问的内容，不要重新分发漫画文件。**

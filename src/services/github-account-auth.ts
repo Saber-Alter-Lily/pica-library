@@ -5,7 +5,7 @@ const ACCESS_TOKEN_URL = 'https://github.com/login/oauth/access_token'
 const USER_URL = 'https://api.github.com/user'
 const STAR_URL = 'https://api.github.com/user/starred/Saber-Alter-Lily/pica-library'
 
-export const GITHUB_APP_CLIENT_ID = ''
+export const GITHUB_APP_CLIENT_ID = 'Iv23li2rIouPPVGgMoyI'
 
 interface PendingFlow {
     deviceCode: string
@@ -109,7 +109,7 @@ export class GitHubAccountAuthService {
             body: new URLSearchParams({
                 client_id: configuredClientId(),
                 device_code: pending.deviceCode,
-                grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+                grant_type: 'urn:ietf:params:oauth-grant-type:device_code'
             }).toString(),
             signal: AbortSignal.timeout(15_000)
         })

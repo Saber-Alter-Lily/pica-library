@@ -58,6 +58,20 @@ function responseHeaders(value: Record<string, unknown>) {
     return headers
 }
 
+function responseBody(
+    status: number,
+    method: string,
+    data: ArrayBuffer | Buffer
+): BodyInit | null {
+    // Fetch requires these responses to have a null body. In particular,
+    // GitHub's authenticated "is this repository starred?" endpoint returns
+    // HTTP 204 on success. Passing even an empty Buffer to Response(204)
+    // throws ERR_INVALID_ARG_VALUE / "Invalid response status code 204".
+    if (method === 'HEAD' || status === 204 || status === 205 || status === 304)
+        return null
+    return Buffer.from(data)
+}
+
 /**
  * Uses the application's configured HTTP(S) proxy for outbound desktop fetches.
  * Native fetch stays untouched when no proxy is configured, and loopback
@@ -107,11 +121,14 @@ export async function applicationFetch(
         }
     }
 
-    const response = new Response(Buffer.from(result.data), {
-        status: result.status,
-        statusText: result.statusText,
-        headers: responseHeaders(result.headers as Record<string, unknown>)
-    })
+    const response = new Response(
+        responseBody(result.status, method, result.data),
+        {
+            status: result.status,
+            statusText: result.statusText,
+            headers: responseHeaders(result.headers as Record<string, unknown>)
+        }
+    )
     const finalUrl =
         (result.request as { res?: { responseUrl?: string } } | undefined)?.res
             ?.responseUrl ?? url
@@ -125,4 +142,9 @@ export async function applicationFetch(
 if (globalThis.fetch !== applicationFetch)
     globalThis.fetch = applicationFetch as typeof fetch
 
-export const applicationFetchInternals = { configuredProxy, loopback, publicGitHubRead }
+export const applicationFetchInternals = {
+    configuredProxy,
+    loopback,
+    publicGitHubRead,
+    responseBody
+}

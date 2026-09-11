@@ -8,9 +8,17 @@
 
 ## 当前版本
 
-- **Windows / Desktop：v0.3.8**
-- **Android Preview：v35 · 0.1.0-alpha8.8-account-auth-theme-decouple**
-- **当前公开源码：Alpha8.8**
+- **Windows / Desktop：v0.3.9**
+- **Android Preview：v36 · 0.1.0-alpha8.9-auth-ux-204-fix**
+- **当前公开源码：Alpha8.9**
+
+## Alpha8.9
+
+- **修复 GitHub Star 成功却报错**：Desktop 代理网络层正确处理 HTTP 204/205/304 无响应体状态，不再出现 `Response constructor: Invalid response status code 204`。
+- **认证流程改为先看码、再跳转**：Desktop 点击后先在当前页面显示一次性验证码，并提供“复制验证码 / 打开 GitHub 授权页”两个明确步骤；不再自动跳走。
+- **Android 验证码不再消失**：手机同样先显示验证码再由用户主动打开 GitHub；从浏览器返回时认证页面不重建，验证码与等待状态保持。
+- **Android 开屏安全区修复**：免责声明页面显式避让状态栏、刘海与底部系统导航区域。
+- **延续 Alpha8.8**：GitHub 本人账号认证、OAuth Token 不持久化、Desktop/Android 当前主题独立、主题包可同步等逻辑保持不变。
 
 ## Alpha8.8
 

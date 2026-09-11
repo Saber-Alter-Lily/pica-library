@@ -2,7 +2,7 @@
 
 > 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.3.11 / Alpha8.11**。
 
-![Desktop / Web 页面说明](assets/desktop-overview.webp)
+![Desktop / Web 页面说明](assets/desktop-overview-v0311-final.jpg)
 
 ## 1. 安装与启动
 

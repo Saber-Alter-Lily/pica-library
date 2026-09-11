@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-describe('Alpha8.6 Star personalization contracts', () => {
+describe('Alpha8.6 Star personalization contracts after Alpha8.8 migration', () => {
     it('keeps the official mobile navigation and compact header actions', () => {
         const home = fs.readFileSync(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java',
@@ -20,7 +20,7 @@ describe('Alpha8.6 Star personalization contracts', () => {
         expect(ui).toContain('static ImageButton iconButton')
     })
 
-    it('uses GitHub Star rather than supporter entitlement across the whole mobile theme entry path', () => {
+    it('keeps GitHub Star as the theme gate but now requires authenticated account proof', () => {
         const service = fs.readFileSync(
             'src/services/personalization-service.ts',
             'utf8'
@@ -41,14 +41,15 @@ describe('Alpha8.6 Star personalization contracts', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java',
             'utf8'
         )
-        expect(service).toContain('verifyGitHubStar')
-        expect(service).toContain('github-star-proof-v1.json')
+        expect(service).toContain('installAuthenticatedStarProof')
+        expect(service).toContain('github-star-proof-v2.json')
+        expect(service).toContain('github-account-device-flow')
         expect(store).toContain('StarAccessStore.enabled(c)')
         expect(sync).toContain('/mobile/v1/star-access')
         expect(appearance).toContain('StarAccessStore.enabled(this)')
         expect(activity).toContain('StarAccessStore.enabled(this)')
-        expect(activity).toContain('StarAccessStore.verify(this')
-        expect(activity).toContain('从已配对电脑同步解锁与装扮')
+        expect(activity).toContain('GitHubAccountAuth.start')
+        expect(activity).toContain('从已配对电脑同步已验证账号与装扮包')
         expect(appearance).not.toContain('SupporterEntitlement.themePacksEnabled')
         expect(activity).not.toContain('SupporterEntitlement.themePacksEnabled')
     })

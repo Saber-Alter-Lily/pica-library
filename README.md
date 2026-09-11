@@ -25,7 +25,7 @@ Pica Library 是一个面向长期漫画收藏的本地优先管理工具：在 
 
 ## Desktop / Web
 
-![Pica Library Desktop / Web 页面说明](docs/assets/desktop-overview.webp)
+![Pica Library Desktop / Web 页面说明](docs/assets/desktop-overview-v0311-final.jpg)
 
 Windows Desktop 提供完整的漫画库、书架、发现、收藏图鉴、下载任务、已下载内容和统一设置中心。手机配对、WebDAV、主题、存储、维护和软件更新都集中在设置中管理。
 
@@ -33,7 +33,7 @@ Windows Desktop 提供完整的漫画库、书架、发现、收藏图鉴、下�
 
 ## Android
 
-![Pica Library Android 使用指南](docs/assets/android-overview.webp)
+![Pica Library Android 使用指南](docs/assets/android-overview-v38-final.jpg)
 
 Android 端以 **书库 / 推荐 / 在线 / 连接** 四个主入口组织功能。配对 Desktop 后可直接读取电脑本地漫画；也可配置 WebDAV、Pica 账号、外观和软件更新。
 

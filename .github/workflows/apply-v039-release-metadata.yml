@@ -24,11 +24,11 @@ jobs:
       - name: Verify release metadata
         run: |
           set -euo pipefail
-          grep -q 'Pica-Library-v0.3.9-windows-x64' scripts/build-windows-package.ps1
-          grep -q "Pica-Library-v0.3.8-windows-x64.zip" scripts/build-windows-package.ps1
-          grep -q 'Windows / Desktop：v0.3.9' README.md
-          grep -q 'Android Preview：v36' README.md
-          grep -q 'Windows / Desktop:** v0.3.9' README.en.md
+          grep -Fq 'Pica-Library-v0.3.9-windows-x64' scripts/build-windows-package.ps1
+          grep -Fq 'Pica-Library-v0.3.8-windows-x64.zip' scripts/build-windows-package.ps1
+          grep -Fq 'Windows / Desktop：v0.3.9' README.md
+          grep -Fq 'Android Preview：v36' README.md
+          grep -Fq 'Windows / Desktop:** v0.3.9' README.en.md
           git diff --check
       - name: Commit transformed files
         run: |

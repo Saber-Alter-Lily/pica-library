@@ -5,6 +5,7 @@ const allowedRootFiles = new Set([
     'LICENSE',
     'NOTICE.md',
     'UPSTREAM.md',
+    'DISCLAIMER.md',
     'README-WINDOWS.txt',
     'README-WINDOWS.zh-CN.txt',
     'SOURCE_SHA.txt'

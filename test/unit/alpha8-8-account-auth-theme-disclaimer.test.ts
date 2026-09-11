@@ -69,14 +69,18 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
         expect(sync).not.toContain('ThemePackStore.deactivate(c);else')
     })
 
-    it('labels theme selection as device-local in the Android UI', () => {
+    it('keeps theme selection explicitly device-local in behavior and concise UI', () => {
         const source = fs.readFileSync(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java',
             'utf8'
         )
-        expect(source).toContain('Desktop 和 Android 各自保存当前启用主题')
-        expect(source).toContain('仅在本机使用此装扮')
-        expect(source).toContain('当前手机主题保持不变')
+        const sync = fs.readFileSync(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackSync.java',
+            'utf8'
+        )
+        expect(source).toContain('只同步装扮包；本机主题独立选择')
+        expect(source).toContain('在本机使用')
+        expect(sync).toContain('Deliberately ignore Desktop activeThemeId')
         expect(source).not.toContain('EditText username')
     })
 

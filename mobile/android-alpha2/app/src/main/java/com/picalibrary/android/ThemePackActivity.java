@@ -48,6 +48,9 @@ public final class ThemePackActivity extends Activity {
             code.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));
             unlock.addView(code);
 
+            Button copy=Ui.button(this,"复制验证码",v->{},true);copy.setVisibility(View.GONE);
+            Button open=Ui.button(this,"步骤 2 · 打开 GitHub 授权页",v->{},false);open.setVisibility(View.GONE);
+
             Button verify=Ui.button(this,"生成 GitHub 验证码",v->{
                 Button button=(Button)v;
                 button.setEnabled(false);
@@ -71,9 +74,8 @@ public final class ThemePackActivity extends Activity {
                 });
             },false);
             unlock.addView(verify);
-
-            Button copy=Ui.button(this,"复制验证码",v->{},true);copy.setVisibility(View.GONE);unlock.addView(copy);
-            Button open=Ui.button(this,"步骤 2 · 打开 GitHub 授权页",v->{},false);open.setVisibility(View.GONE);unlock.addView(open);
+            unlock.addView(copy);
+            unlock.addView(open);
 
             unlock.addView(Ui.button(this,"⭐ 打开 Pica Library 项目",v->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(StarAccessStore.REPOSITORY_URL)));}catch(Exception ignored){}},true));
             if(BridgeStore.paired(this))unlock.addView(Ui.button(this,"从已配对电脑同步已验证账号与装扮包",v->syncFromDesktop(),true));

@@ -110,13 +110,16 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
         expect(android).toContain('同意并继续')
     })
 
-    it('packages the full disclaimer and bumps both release trains', () => {
-        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+    it('keeps the Alpha8.8 disclaimer packaging baseline in later release trains', () => {
+        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string }
         const gradle = fs.readFileSync('mobile/android-alpha2/app/build.gradle', 'utf8')
         const windows = fs.readFileSync('scripts/build-windows-package.ps1', 'utf8')
-        expect(pkg.version).toBe('0.3.8')
-        expect(gradle).toContain('versionCode 35')
-        expect(gradle).toContain("versionName '0.1.0-alpha8.8-account-auth-theme-decouple'")
+        const desktopPatch = Number(pkg.version.split('.')[2] ?? 0)
+        const androidVersionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1] ?? 0)
+        expect(pkg.version.startsWith('0.3.')).toBe(true)
+        expect(desktopPatch).toBeGreaterThanOrEqual(8)
+        expect(androidVersionCode).toBeGreaterThanOrEqual(35)
+        expect(gradle).toContain("versionName '0.1.0-alpha8.")
         expect(windows).toContain("'DISCLAIMER.md'")
         expect(windows).toContain("$version -eq '0.3.8'")
     })

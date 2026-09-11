@@ -8,50 +8,29 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 
 ## Current versions
 
-- **Windows / Desktop:** v0.3.7
-- **Android Preview:** v34 · 0.1.0-alpha8.7.1-star-401-hotfix
-- **Public source:** Alpha8.7.1
+- **Windows / Desktop:** v0.3.8
+- **Android Preview:** v35 · 0.1.0-alpha8.8-account-auth-theme-decouple
+- **Public source:** Alpha8.8
+
+## Alpha8.8
+
+- **Authenticated GitHub Star access:** personalization no longer accepts a public username and infers Star state. Desktop and Android use GitHub Device Flow, identify the authenticated account, and check the current user's Star of `Saber-Alter-Lily/pica-library`. The access token is transient and is not persisted.
+- **Per-device active themes:** Desktop may sync `.pica-theme` packs to Android, but it no longer syncs `activeThemeId`. Desktop and Android independently choose which installed theme is active.
+- **Versioned startup disclaimer:** Desktop/Web and Android show an open-source-tool usage notice on first run; acknowledgement is device-local and the notice appears again only when its version changes. The Windows package includes `DISCLAIMER.md`.
+- **Alpha8.7 improvements retained:** unified Settings hub, improved personalization layout, collapsed finished-download history, and proxy-aware update networking remain in place.
 
 ### Downloads
 
-- [Windows v0.3.7 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.7/Pica-Library-v0.3.7-windows-x64.zip)
-- [Windows v0.3.7 update package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.7/Pica-Library-v0.3.7-update.zip)
-- [Windows v0.3.7 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.7)
-- [Android Preview release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
-
-The v0.3.7 incremental update is verified for direct upgrades from **v0.3.3, v0.3.4, v0.3.5, and v0.3.6**. Prefer the in-app **Settings → Software Update** flow.
-
-## Alpha8.7.1 hotfix
-
-- **Real-client Star HTTP 401 fix:** GitHub currently answers anonymous repository-stargazer-list requests with `401 Requires authentication`. Desktop and Android now continue to the named user's public starred-repositories endpoint instead of treating that first 401 as a failed verification.
-- **Desktop network fallback:** anonymous public GitHub GET requests that receive 401/403/407/429 through the configured application proxy may retry once through the native direct transport. Requests carrying Authorization or Cookie headers never use this fallback.
-- **Dual verification paths:** Star verification keeps both repository stargazers and user starred repositories as independent evidence routes; either route can confirm the Star and persist the local proof.
-- **Acceptance parity:** the release gate reproduced the anonymous primary HTTP 401, then confirmed `Saber-Alter-Lily/pica-library` through the second anonymous API with HTTP 200 and no Authorization header before publication.
-
-## Alpha8.7
-
-- **Desktop Settings hub:** the former Maintenance and Settings top-level areas are merged into one Settings entry with General, Connections & Sync, Appearance, Downloads & Storage, Maintenance, and Software Update sections.
-- **Personalization layout:** the Star unlock and Theme Studio surfaces use the full content width with responsive controls instead of the previous squeezed column.
-- **Download queue:** `COMPLETED` and `CANCELLED` history is collapsed by default; `FAILED` jobs stay visible for retry, and historical records are not deleted.
-- **Theme data preservation:** Pica Violet · 星漫 and existing custom themes keep their original local storage across the upgrade.
-
-## Alpha8.6
-
-- **GitHub Star personalization:** personalization is a community Star reward and is independent from donations. Official builds remember a successful public Star verification locally.
-- **Pica Violet · 星漫:** the built-in official theme available immediately after Star unlock.
-- **Theme Studio:** enter a short theme description and reference images, export an AI Creator Kit, then drag the returned `.pica-theme` back into Desktop to validate, apply, and sync it to a paired phone.
-- **Data-only theme packs:** controlled JSON plus PNG/JPG/WebP resources only; no script, HTML, font, or executable payloads.
-- **Unified brand icon:** Desktop/Web and Android use the same anime-style application identity.
-- **Android header cleanup:** Recommendation refresh and Online account use compact icon actions; the mobile bottom navigation remains **Library / Recommend / Online / Connect**.
+Windows v0.3.8 and Android v35 will use the existing in-app update channels after the formal release is published. Until then, GitHub Releases `latest` remains the authoritative stable version.
 
 ## Main features
 
 - **Library:** sync favorites and filter by author, tag, category, and shelf.
-- **Personal recommendations:** generate explainable recommendation batches from the local collection profile; favoriting an item no longer destroys the current recommendation batch.
-- **Online browsing:** favorites, search, categories, and **24-hour / 7-day / 30-day** rankings.
+- **Personal recommendations:** generate explainable recommendation batches from the local collection profile.
+- **Online browsing:** favorites, search, categories, and 24-hour / 7-day / 30-day rankings.
 - **Download and read:** manage downloads, retries, reading progress, and local caches.
-- **Desktop ↔ Android:** a paired phone can read comics already downloaded by Desktop and sync personalization state.
-- **WebDAV:** an optional fallback source for mobile reading while the Desktop is offline.
+- **Desktop ↔ Android:** a paired phone can read comics already downloaded by Desktop and receive theme packs and selected state; each device keeps its own active theme.
+- **WebDAV:** an optional fallback source for mobile reading while Desktop is offline.
 - **Updates:** Desktop uses GitHub Release API with a release-file fallback path; Android Preview verifies version, SHA-256, package name, and the fixed official signing identity before installation.
 
 ## Personalization
@@ -59,24 +38,28 @@ The v0.3.7 incremental update is verified for direct upgrades from **v0.3.3, v0.
 The official-build personalization gate is a GitHub Star community reward, not a paid feature:
 
 1. Star this repository.
-2. Enter your GitHub username in the Desktop or Android personalization page and verify the public Star state.
-3. Use **Pica Violet · 星漫** immediately.
-4. Use Desktop Theme Studio to create your own `.pica-theme` through the AI Creator Kit workflow.
-5. Pair Desktop and Android to sync the Star proof and active theme to the phone.
+2. Choose GitHub account authentication in Desktop or Android personalization settings.
+3. Approve the GitHub Device Flow request.
+4. Pica Library identifies the currently authenticated account and checks that account's Star of this repository.
+5. Only the verified GitHub username, immutable user ID, and verification timestamp are retained locally; the OAuth access token is not persisted.
+6. Desktop can create, import, and sync `.pica-theme` packs, while Desktop and Android independently retain their selected active theme.
+
+## Usage notice
+
+Pica Library is an open-source, local-first personal digital-content management tool. It does not sell, host, or redistribute manga content. Users are responsible for ensuring that account use, access, downloading, storage, reading, and backups comply with applicable law, platform terms, copyright, and other permissions. See [DISCLAIMER.md](DISCLAIMER.md) for the full notice.
 
 ## Open source and security
 
-The current application source is public again. The repository does not contain official Android signing private keys/keystores, account credentials, CI secrets, local databases, downloaded comics, or user caches.
-
-User data stays local by default. Windows credentials are protected with DPAPI for the current Windows user. Official binaries remain tied to published SHA-256 values, build transparency metadata, and the fixed Android Preview signing identity.
+The repository does not contain official Android signing private keys/keystores, account credentials, CI secrets, local databases, downloaded comics, or user caches. User data stays local by default. Windows credentials are protected with DPAPI for the current Windows user. Official binaries remain tied to published SHA-256 values, build transparency metadata, and the fixed Android Preview signing identity.
 
 ## Get started
 
 1. Download and fully extract the Windows ZIP.
 2. Double-click `Pica Library.exe`.
-3. Finish account, optional proxy, and library-folder setup.
-4. Sync favorites and start using the library.
-5. Pair Android using the Desktop-provided connection information when needed.
+3. Read and acknowledge the versioned usage notice.
+4. Finish account, optional proxy, and library-folder setup.
+5. Sync favorites and start using the library.
+6. Pair Android using the Desktop-provided connection information when needed.
 
 See the [quick start](docs/quick-start.en.md) for the guided flow.
 

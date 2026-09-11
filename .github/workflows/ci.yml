@@ -27,6 +27,7 @@ jobs:
           pnpm web:check
           pnpm build
           pnpm exec vitest run \
+            test/unit/alpha8-10-release-readiness.test.ts \
             test/unit/alpha8-9-auth-ux-204.test.ts \
             test/unit/alpha8-8-account-auth-theme-disclaimer.test.ts \
             test/unit/alpha8-7-1-star-401-hotfix.test.ts \

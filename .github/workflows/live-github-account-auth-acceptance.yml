@@ -108,3 +108,5 @@ jobs:
           done
           echo 'Timed out waiting for GitHub Device Flow authorization' >&2
           exit 1
+
+# live acceptance retry 2

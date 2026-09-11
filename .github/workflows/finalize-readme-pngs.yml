@@ -74,80 +74,12 @@ jobs:
                   assert 'android-overview-final.png' in text, path
           print('DIRECT_UPLOADED_PNGS=PASS')
           PY
-      - name: Replace obsolete poster verifier
-        run: |
-          set -euo pipefail
-          rm -f .github/workflows/verify-readme-jpegs.yml
-          cat > .github/workflows/verify-readme-posters.yml <<'YAML'
-          name: Verify README poster assets
-
-          on:
-            push:
-              paths:
-                - 'README.md'
-                - 'README.en.md'
-                - 'docs/*guide*.md'
-                - 'docs/assets/desktop-overview-final.png'
-                - 'docs/assets/android-overview-final.png'
-                - '.github/workflows/verify-readme-posters.yml'
-            pull_request:
-              paths:
-                - 'README.md'
-                - 'README.en.md'
-                - 'docs/*guide*.md'
-                - 'docs/assets/desktop-overview-final.png'
-                - 'docs/assets/android-overview-final.png'
-                - '.github/workflows/verify-readme-posters.yml'
-
-          permissions:
-            contents: read
-
-          jobs:
-            verify:
-              runs-on: ubuntu-latest
-              steps:
-                - uses: actions/checkout@v4
-                - uses: actions/setup-python@v5
-                  with:
-                    python-version: '3.12'
-                - run: python -m pip install --disable-pip-version-check pillow
-                - name: Decode README PNG posters and verify references
-                  run: |
-                    python - <<'PY'
-                    from pathlib import Path
-                    from PIL import Image
-                    import hashlib
-
-                    for path in [Path('docs/assets/desktop-overview-final.png'), Path('docs/assets/android-overview-final.png')]:
-                        data = path.read_bytes()
-                        assert data.startswith(b'\x89PNG\r\n\x1a\n'), (path, data[:12].hex())
-                        with Image.open(path) as im:
-                            im.load()
-                            assert im.format == 'PNG', (path, im.format)
-                            assert im.width >= 700 and im.height >= 700, (path, im.size)
-                            print(path, im.size, hashlib.sha256(data).hexdigest())
-
-                    docs = [
-                        Path('README.md'), Path('README.en.md'),
-                        Path('docs/desktop-guide.zh-CN.md'), Path('docs/android-guide.zh-CN.md'),
-                        Path('docs/desktop-guide.en.md'), Path('docs/android-guide.en.md'),
-                    ]
-                    for path in docs:
-                        text = path.read_text(encoding='utf-8')
-                        if path.name.startswith('README') or 'desktop-guide' in path.name:
-                            assert 'desktop-overview-final.png' in text, path
-                        if path.name.startswith('README') or 'android-guide' in path.name:
-                            assert 'android-overview-final.png' in text, path
-                    print('README_POSTERS=PASS')
-                    PY
-          YAML
-          rm -f .github/workflows/finalize-readme-pngs.yml
-      - name: Commit final README poster cleanup
+      - name: Commit README poster reference cleanup
         run: |
           set -euo pipefail
           git config user.name 'Saber-Alter-Lily'
           git config user.email '3178088154@qq.com'
-          git add -A README.md README.en.md docs .github/workflows
+          git add README.md README.en.md docs/desktop-guide.zh-CN.md docs/android-guide.zh-CN.md docs/desktop-guide.en.md docs/android-guide.en.md
           git diff --cached --check
-          git commit -m 'docs: use directly uploaded PNG posters'
+          git commit -m 'docs: point README to uploaded PNG posters'
           git push origin HEAD:fix/readme-use-uploaded-pngs

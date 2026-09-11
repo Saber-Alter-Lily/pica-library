@@ -17,12 +17,17 @@
 - **GitHub 账号本人认证**：个性化装扮不再依赖“输入公开用户名并查询 Star”，改为 GitHub Device Flow 登录当前账号，再调用认证用户的 Star 接口验证 `Saber-Alter-Lily/pica-library`。客户端只长期保存 GitHub 用户名、不可变 user ID 和验证时间，不保存 OAuth access token。
 - **真实授权验收已通过**：使用正式 GitHub App Client ID 完成真实 Device Flow，认证账号为 `Saber-Alter-Lily`，认证后的当前用户 Star 检查返回 HTTP 204。
 - **主题跨端解耦**：Desktop 仍可把 `.pica-theme` 方案与资源包同步到 Android，但不再同步 `activeThemeId`。电脑和手机可分别选择各自当前主题，例如电脑使用“远坂凛”，手机使用“Pica Violet · 星漫”。
-- **版本化开屏免责声明**：Desktop/Web 与 Android 首次运行会显示开源工具使用提示；确认状态只保存在当前设备，免责声明版本升级时才再次提示。Windows 包同时包含完整 `DISCLAIMER.md`。
+- **版本化开屏免责声明**：Desktop/Web 与 Android 首次运行会显示开源工具使用提示；确认状态只保存在当前设备，免责声明版本升级时才再次提示。Windows 完整包同时包含 `DISCLAIMER.md`；从旧版应用内增量升级时，实际生效的 Web 开屏提示会正常更新，而根目录文档不会触发 updater 自我替换。
 - **延续 Alpha8.7**：统一设置中心、个性化布局优化、已结束下载任务默认收起、代理感知更新链路继续保留。
 
 ### 下载
 
-正式 v0.3.8 Release 发布后，Windows 与 Android v35 将通过原有应用内更新通道提供。Desktop 使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
+- [Windows v0.3.8 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.8/Pica-Library-v0.3.8-windows-x64.zip)
+- [Windows v0.3.8 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.8/Pica-Library-v0.3.8-update.zip)
+- [Windows v0.3.8 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.8)
+- [Android Preview v35](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
+
+Windows v0.3.8 增量更新已验证支持从 **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7** 升级。Desktop 优先使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
 
 ## 主要功能
 

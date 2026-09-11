@@ -20,7 +20,7 @@ Pica Library is a local-first manga library manager for long-lived collections. 
 - **Local reading** — manage downloaded comics and open them directly from the local library.
 - **Desktop ↔ Android** — a paired phone can read comics already downloaded by Desktop without downloading the same files again.
 - **WebDAV fallback** — optional backup access path for mobile use when Desktop is unavailable.
-- **Personalization** — authenticate your own GitHub account and confirm a Star to unlock `.pica-theme` packs.
+- **Personalization** — `.pica-theme` packs can be created or imported on Desktop and synced to Android; each device keeps its own active theme.
 - **Verified updates** — Desktop supports in-app incremental updates; Android verifies version, SHA-256, package name, and fixed signing identity.
 
 ## Desktop / Web
@@ -62,7 +62,7 @@ Theme packs can sync across devices, but **Desktop and Android do not have to us
 
 v0.3.11 has been individually verified for direct in-app upgrades from every formal **v0.3.x** release:
 
-`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.11`
+`v0.3.0 / v0.3.1 / ... / v0.3.10 → v0.3.11`
 
 Prefer **Settings → Software Update** on Desktop.
 
@@ -92,7 +92,7 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full notice.
 - [Desktop / Web guide](docs/desktop-guide.en.md)
 - [Android guide](docs/android-guide.en.md)
 - [Quick start](docs/quick-start.en.md)
-- [Windows distribution guide](docs/windows-distribution.md)
+- [Windows distribution](docs/windows-distribution.md)
 - [Architecture](docs/architecture.md)
 
 ## Development
@@ -108,8 +108,8 @@ The Android project lives under `mobile/android-alpha2`. Official Android releas
 
 ## Credits
 
-Pica Library continues from the upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
+Pica Library continues to build on upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
 
 ---
 
-**Only download and store content you are authorized to access. Do not redistribute manga files.**
+**Only download and store content you are authorized to access. Do not redistribute comic files.**

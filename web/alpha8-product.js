@@ -116,7 +116,7 @@ async function personalizationPanel() {
     if (!settings) return
     const panel = document.createElement('article')
     panel.id = 'a83-personalization'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<div class="section-heading"><div><p class="eyebrow">支持者功能</p><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div><label class="a83-drop" id="a83-theme-drop"><strong>拖入 Pica Theme Pack</strong><br><span>或点击选择 .pica-theme / .zip</span><input id="a83-theme-file" type="file" accept=".pica-theme,.zip,application/zip" hidden></label><p id="a83-theme-message" class="status"></p><div id="a83-theme-list"></div>`
+    panel.innerHTML = `<div class="section-heading"><div><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div><label class="a83-drop" id="a83-theme-drop"><strong>拖入 Pica Theme Pack</strong><br><span>或点击选择 .pica-theme / .zip</span><input id="a83-theme-file" type="file" accept=".pica-theme,.zip,application/zip" hidden></label><p id="a83-theme-message" class="status"></p><div id="a83-theme-list"></div>`
     settings.appendChild(panel)
     const drop = panel.querySelector('#a83-theme-drop')
     const input = panel.querySelector('#a83-theme-file')

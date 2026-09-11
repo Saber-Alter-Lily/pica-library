@@ -30,12 +30,12 @@
 
 ### 下载
 
-- [Windows v0.3.8 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.8/Pica-Library-v0.3.8-windows-x64.zip)
-- [Windows v0.3.8 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.8/Pica-Library-v0.3.8-update.zip)
-- [Windows v0.3.8 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.8)
-- [Android Preview v35](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
+- [Windows v0.3.9 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.9/Pica-Library-v0.3.9-windows-x64.zip)
+- [Windows v0.3.9 更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.9/Pica-Library-v0.3.9-update.zip)
+- [Windows v0.3.9 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.9)
+- [Android Preview v36](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
 
-Windows v0.3.8 增量更新已验证支持从 **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7** 升级。Desktop 优先使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
+Windows v0.3.9 增量更新已验证支持从 **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7 / v0.3.8** 升级。Desktop 优先使用 **设置 → 软件更新**；Android 使用原 Preview 更新入口。
 
 ## 主要功能
 
@@ -53,8 +53,8 @@ Windows v0.3.8 增量更新已验证支持从 **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.
 
 1. 给本仓库一个 Star。
 2. 在 Desktop 或 Android 个性化页面选择“使用 GitHub 账号登录并验证”。
-3. 在 GitHub Device Flow 页面确认授权。
-4. Pica Library 读取当前登录账号身份，并检查该账号是否已 Star 本仓库。
+3. 在当前页面先确认或复制 GitHub 一次性设备验证码，再主动打开 GitHub 授权页。
+4. GitHub 授权完成后回到 Pica Library；软件读取当前登录账号身份，并检查该账号是否已 Star 本仓库。
 5. 验证成功后，本机保存账号身份证明；OAuth access token 不持久化。
 6. Desktop 可创建、导入和同步 `.pica-theme` 方案；Desktop 与 Android 分别保存自己的当前主题。
 

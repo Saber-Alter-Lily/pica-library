@@ -1,14 +1,17 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-describe('Alpha8.10 release readiness', () => {
-    it('stages the next desktop and Android release trains', () => {
-        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+describe('Alpha8.10 release readiness baseline', () => {
+    it('keeps the Alpha8.10 release train and packaging support in later releases', () => {
+        const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string }
         const gradle = fs.readFileSync('mobile/android-alpha2/app/build.gradle', 'utf8')
         const windows = fs.readFileSync('scripts/build-windows-package.ps1', 'utf8')
-        expect(pkg.version).toBe('0.3.10')
-        expect(gradle).toContain('versionCode 37')
-        expect(gradle).toContain("versionName '0.1.0-alpha8.10-release-readiness'")
+        const patch = Number(pkg.version.split('.')[2] || 0)
+        const versionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1] || 0)
+        expect(pkg.version.startsWith('0.3.')).toBe(true)
+        expect(patch).toBeGreaterThanOrEqual(10)
+        expect(versionCode).toBeGreaterThanOrEqual(37)
+        expect(gradle).toContain("versionName '0.1.0-alpha8.")
         expect(windows).toContain("$version -eq '0.3.10'")
         expect(windows).toContain('Pica-Library-v0.3.9-windows-x64.zip')
     })

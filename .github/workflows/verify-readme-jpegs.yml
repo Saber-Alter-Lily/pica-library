@@ -6,8 +6,16 @@ on:
       - 'README.md'
       - 'README.en.md'
       - 'docs/*guide*.md'
-      - 'docs/assets/desktop-overview-v0311-final.jpg'
-      - 'docs/assets/android-overview-v38-final.jpg'
+      - 'docs/assets/desktop-overview-final.png'
+      - 'docs/assets/android-overview-final.png'
+      - '.github/workflows/verify-readme-jpegs.yml'
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'README.en.md'
+      - 'docs/*guide*.md'
+      - 'docs/assets/desktop-overview-final.png'
+      - 'docs/assets/android-overview-final.png'
       - '.github/workflows/verify-readme-jpegs.yml'
 
 permissions:
@@ -22,24 +30,25 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install --disable-pip-version-check pillow
-      - name: Decode final README posters and verify references
+      - name: Decode final README PNG posters and verify references
         run: |
           set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
+          import hashlib
 
           expected = {
-              Path('docs/assets/desktop-overview-v0311-final.jpg'): (700, 989),
-              Path('docs/assets/android-overview-v38-final.jpg'): (700, 746),
+              Path('docs/assets/desktop-overview-final.png'): (1055, 1491),
+              Path('docs/assets/android-overview-final.png'): (1214, 1295),
           }
           for path, size in expected.items():
               data = path.read_bytes()
-              assert data[:3] == b'\xff\xd8\xff', (path, data[:12].hex())
+              assert data.startswith(b'\x89PNG\r\n\x1a\n'), (path, data[:12].hex())
               with Image.open(path) as im:
                   im.load()
-                  print(path, im.format, im.size, len(data))
-                  assert im.format == 'JPEG', (path, im.format)
+                  print(path, im.format, im.size, hashlib.sha256(data).hexdigest())
+                  assert im.format == 'PNG', (path, im.format)
                   assert im.size == size, (path, im.size, size)
 
           docs = [
@@ -49,13 +58,9 @@ jobs:
           ]
           for path in docs:
               text = path.read_text(encoding='utf-8')
-              assert 'desktop-overview.webp' not in text
-              assert 'android-overview.webp' not in text
-              assert 'desktop-overview.jpg' not in text
-              assert 'android-overview.jpg' not in text
-              if 'desktop' in path.name.lower() or path.name.startswith('README'):
-                  assert 'desktop-overview-v0311-final.jpg' in text, path
-              if 'android' in path.name.lower() or path.name.startswith('README'):
-                  assert 'android-overview-v38-final.jpg' in text, path
+              if path.name.startswith('README') or 'desktop-guide' in path.name:
+                  assert 'desktop-overview-final.png' in text, path
+              if path.name.startswith('README') or 'android-guide' in path.name:
+                  assert 'android-overview-final.png' in text, path
           print('README_POSTER_DECODE=PASS')
           PY

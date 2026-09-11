@@ -2,7 +2,7 @@
 
 > Windows Desktop / local Web UI. Current formal release: **v0.3.11 / Alpha8.11**.
 
-![Desktop / Web overview](assets/desktop-overview.jpg)
+![Desktop / Web overview](assets/desktop-overview.webp)
 
 ## Install and start
 

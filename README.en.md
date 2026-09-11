@@ -17,12 +17,17 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 - **Authenticated GitHub Star access:** personalization no longer accepts a public username and infers Star state. Desktop and Android use GitHub Device Flow, identify the authenticated account, and check the current user's Star of `Saber-Alter-Lily/pica-library`. The access token is transient and is not persisted.
 - **Live authenticated acceptance passed:** the production GitHub App Client ID completed a real Device Flow for `Saber-Alter-Lily`, and the authenticated current-user Star check returned HTTP 204.
 - **Per-device active themes:** Desktop may sync `.pica-theme` packs to Android, but it no longer syncs `activeThemeId`. Desktop and Android independently choose which installed theme is active.
-- **Versioned startup disclaimer:** Desktop/Web and Android show an open-source-tool usage notice on first run; acknowledgement is device-local and the notice appears again only when its version changes. The Windows package includes `DISCLAIMER.md`.
+- **Versioned startup disclaimer:** Desktop/Web and Android show an open-source-tool usage notice on first run; acknowledgement is device-local and the notice appears again only when its version changes. The full Windows package includes `DISCLAIMER.md`; in-app upgrades deliver the actual Web startup disclaimer without forcing updater self-replacement for the root documentation copy.
 - **Alpha8.7 improvements retained:** unified Settings hub, improved personalization layout, collapsed finished-download history, and proxy-aware update networking remain in place.
 
 ### Downloads
 
-Windows v0.3.8 and Android v35 are distributed through the existing in-app update channels. Prefer **Settings → Software Update** on Desktop and the existing Preview update screen on Android.
+- [Windows v0.3.8 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.8/Pica-Library-v0.3.8-windows-x64.zip)
+- [Windows v0.3.8 update package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.8/Pica-Library-v0.3.8-update.zip)
+- [Windows v0.3.8 release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.8)
+- [Android Preview v35](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview)
+
+The Windows v0.3.8 incremental update is verified for **v0.3.3 / v0.3.4 / v0.3.5 / v0.3.6 / v0.3.7**. Prefer **Settings → Software Update** on Desktop and the existing Preview update screen on Android.
 
 ## Main features
 

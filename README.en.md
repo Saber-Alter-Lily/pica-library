@@ -21,7 +21,7 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 
 ### Downloads
 
-Windows v0.3.8 and Android v35 will use the existing in-app update channels after the formal release is published. Until then, GitHub Releases `latest` remains the authoritative stable version.
+Windows v0.3.8 and Android v35 are distributed through the existing in-app update channels. Prefer **Settings → Software Update** on Desktop and the existing Preview update screen on Android.
 
 ## Main features
 

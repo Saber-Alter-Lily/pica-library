@@ -15,6 +15,7 @@
 ## Alpha8.8
 
 - **GitHub 账号本人认证**：个性化装扮不再依赖“输入公开用户名并查询 Star”，改为 GitHub Device Flow 登录当前账号，再调用认证用户的 Star 接口验证 `Saber-Alter-Lily/pica-library`。客户端只长期保存 GitHub 用户名、不可变 user ID 和验证时间，不保存 OAuth access token。
+- **真实授权验收已通过**：使用正式 GitHub App Client ID 完成真实 Device Flow，认证账号为 `Saber-Alter-Lily`，认证后的当前用户 Star 检查返回 HTTP 204。
 - **主题跨端解耦**：Desktop 仍可把 `.pica-theme` 方案与资源包同步到 Android，但不再同步 `activeThemeId`。电脑和手机可分别选择各自当前主题，例如电脑使用“远坂凛”，手机使用“Pica Violet · 星漫”。
 - **版本化开屏免责声明**：Desktop/Web 与 Android 首次运行会显示开源工具使用提示；确认状态只保存在当前设备，免责声明版本升级时才再次提示。Windows 包同时包含完整 `DISCLAIMER.md`。
 - **延续 Alpha8.7**：统一设置中心、个性化布局优化、已结束下载任务默认收起、代理感知更新链路继续保留。

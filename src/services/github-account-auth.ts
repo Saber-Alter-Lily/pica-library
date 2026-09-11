@@ -109,7 +109,7 @@ export class GitHubAccountAuthService {
             body: new URLSearchParams({
                 client_id: configuredClientId(),
                 device_code: pending.deviceCode,
-                grant_type: 'urn:ietf:params:oauth-grant-type:device_code'
+                grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
             }).toString(),
             signal: AbortSignal.timeout(15_000)
         })

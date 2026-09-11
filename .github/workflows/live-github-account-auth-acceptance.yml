@@ -10,15 +10,12 @@ permissions:
   contents: read
 
 jobs:
-  live-auth:
+  start-auth:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     env:
       CLIENT_ID: 'Iv23li2rIouPPVGgMoyI'
-      EXPECTED_LOGIN: 'Saber-Alter-Lily'
-      REPOSITORY: 'Saber-Alter-Lily/pica-library'
     steps:
-      - name: Start Device Flow and wait for authenticated Star
+      - name: Request one-time GitHub device code
         shell: bash
         run: |
           set -euo pipefail
@@ -31,14 +28,45 @@ jobs:
           USER_CODE=$(printf '%s' "$START" | jq -r '.user_code // empty')
           VERIFY_URI=$(printf '%s' "$START" | jq -r '.verification_uri // empty')
           INTERVAL=$(printf '%s' "$START" | jq -r '.interval // 5')
+          EXPIRES_IN=$(printf '%s' "$START" | jq -r '.expires_in // 900')
           test -n "$DEVICE_CODE"
           test -n "$USER_CODE"
           test "$VERIFY_URI" = 'https://github.com/login/device'
+          printf '%s\n%s\n%s\n' "$DEVICE_CODE" "$INTERVAL" "$EXPIRES_IN" > "$RUNNER_TEMP/device-flow-state.txt"
           echo "PICA_GITHUB_DEVICE_URL=$VERIFY_URI"
           echo "PICA_GITHUB_DEVICE_CODE=$USER_CODE"
-          echo "Open the URL above, sign in as $EXPECTED_LOGIN, enter the code, and approve Pica Library."
+          echo "PICA_GITHUB_DEVICE_EXPIRES_IN=$EXPIRES_IN"
+      - name: Preserve private polling state
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-live-device-flow-state
+          path: ${{ runner.temp }}/device-flow-state.txt
+          retention-days: 1
+          include-hidden-files: false
 
-          DEADLINE=$(( $(date +%s) + 840 ))
+  verify-auth:
+    needs: start-auth
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLIENT_ID: 'Iv23li2rIouPPVGgMoyI'
+      EXPECTED_LOGIN: 'Saber-Alter-Lily'
+      REPOSITORY: 'Saber-Alter-Lily/pica-library'
+    steps:
+      - name: Restore polling state
+        uses: actions/download-artifact@v4
+        with:
+          name: pica-live-device-flow-state
+          path: ${{ runner.temp }}/pica-live-auth
+      - name: Wait for authenticated account and verify Star
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t STATE < "$RUNNER_TEMP/pica-live-auth/device-flow-state.txt"
+          DEVICE_CODE="${STATE[0]}"
+          INTERVAL="${STATE[1]:-5}"
+          EXPIRES_IN="${STATE[2]:-900}"
+          DEADLINE=$(( $(date +%s) + EXPIRES_IN - 10 ))
           while [ "$(date +%s)" -lt "$DEADLINE" ]; do
             sleep "$INTERVAL"
             TOKEN_JSON=$(curl --fail-with-body -sS -X POST \
@@ -49,17 +77,9 @@ jobs:
               --data-urlencode 'grant_type=urn:ietf:params:oauth:grant-type:device_code' \
               https://github.com/login/oauth/access_token)
             ERROR=$(printf '%s' "$TOKEN_JSON" | jq -r '.error // empty')
-            if [ "$ERROR" = 'authorization_pending' ]; then
-              continue
-            fi
-            if [ "$ERROR" = 'slow_down' ]; then
-              INTERVAL=$(( INTERVAL + 5 ))
-              continue
-            fi
-            if [ -n "$ERROR" ]; then
-              echo "GitHub Device Flow failed: $ERROR" >&2
-              exit 1
-            fi
+            if [ "$ERROR" = 'authorization_pending' ]; then continue; fi
+            if [ "$ERROR" = 'slow_down' ]; then INTERVAL=$(( INTERVAL + 5 )); continue; fi
+            if [ -n "$ERROR" ]; then echo "GitHub Device Flow failed: $ERROR" >&2; exit 1; fi
             TOKEN=$(printf '%s' "$TOKEN_JSON" | jq -r '.access_token // empty')
             test -n "$TOKEN"
             echo "::add-mask::$TOKEN"

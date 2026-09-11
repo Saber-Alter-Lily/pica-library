@@ -12,7 +12,7 @@ import org.json.JSONObject;
 
 /** GitHub account authentication for Star access. Tokens are never persisted. */
 final class GitHubAccountAuth {
-    static final String CLIENT_ID="";
+    static final String CLIENT_ID="Iv23li2rIouPPVGgMoyI";
     private static final String REPOSITORY="Saber-Alter-Lily/pica-library";
     private GitHubAccountAuth(){}
 

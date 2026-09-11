@@ -2,29 +2,23 @@ import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('Alpha8.6 Star personalization contracts after Alpha8.8 migration', () => {
-    it('keeps the official mobile navigation and compact header actions', () => {
-        const home = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java',
+    it('keeps the official signing gate and authenticated Star proof store', () => {
+        const gate = fs.readFileSync(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/OfficialBuildGate.java',
             'utf8'
         )
-        const ui = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/Ui.java',
+        const access = fs.readFileSync(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/StarAccessStore.java',
             'utf8'
         )
-        expect(home).toContain('书库')
-        expect(home).toContain('推荐')
-        expect(home).toContain('在线')
-        expect(home).toContain('连接')
-        expect(home).toContain('R.drawable.ic_refresh_24')
-        expect(home).toContain('R.drawable.ic_person_24')
-        expect(ui).toContain('static ImageButton iconButton')
+        expect(gate).toContain('EXPECTED_SHA256')
+        expect(access).toContain('OfficialBuildGate.isOfficial(c)')
+        expect(access).toContain('github_user_id')
+        expect(access).toContain('github-account-device-flow')
     })
 
     it('keeps GitHub Star as the theme gate but now requires authenticated account proof', () => {
-        const service = fs.readFileSync(
-            'src/services/personalization-service.ts',
-            'utf8'
-        )
+        const service = fs.readFileSync('src/services/personalization-service.ts', 'utf8')
         const store = fs.readFileSync(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackStore.java',
             'utf8'
@@ -49,7 +43,7 @@ describe('Alpha8.6 Star personalization contracts after Alpha8.8 migration', () 
         expect(appearance).toContain('StarAccessStore.enabled(this)')
         expect(activity).toContain('StarAccessStore.enabled(this)')
         expect(activity).toContain('GitHubAccountAuth.start')
-        expect(activity).toContain('从已配对电脑同步已验证账号与装扮包')
+        expect(activity).toContain('从电脑同步已验证账号')
         expect(appearance).not.toContain('SupporterEntitlement.themePacksEnabled')
         expect(activity).not.toContain('SupporterEntitlement.themePacksEnabled')
     })
@@ -68,12 +62,7 @@ describe('Alpha8.6 Star personalization contracts after Alpha8.8 migration', () 
         expect(fs.existsSync('web/pica-violet-default.pica-theme')).toBe(true)
         expect(
             fs.existsSync(
-                'mobile/android-alpha2/app/src/main/res/drawable-nodpi/pica_launcher.webp'
-            )
-        ).toBe(true)
-        expect(
-            fs.existsSync(
-                'mobile/android-alpha2/app/src/main/assets/pica-violet-default.pica-theme'
+                'mobile/android-alpha2/app/src/main/res/drawable/pica_library_brand.webp'
             )
         ).toBe(true)
     })

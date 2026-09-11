@@ -14,6 +14,7 @@ import org.json.JSONObject;
 final class GitHubAccountAuth {
     static final String CLIENT_ID="Iv23li2rIouPPVGgMoyI";
     private static final String REPOSITORY="Saber-Alter-Lily/pica-library";
+    private static final String GITHUB_API_VERSION="2022-11-28";
     private GitHubAccountAuth(){}
 
     interface Callback {
@@ -88,7 +89,7 @@ final class GitHubAccountAuth {
         c.setConnectTimeout(15000);c.setReadTimeout(15000);c.setRequestMethod("GET");
         c.setRequestProperty("Accept","application/vnd.github+json");
         c.setRequestProperty("Authorization","Bearer "+token);
-        c.setRequestProperty("X-GitHub-Api-Version","2026-03-10");
+        c.setRequestProperty("X-GitHub-Api-Version",GITHUB_API_VERSION);
         c.setRequestProperty("User-Agent","Pica-Library-Android");
         return c;
     }

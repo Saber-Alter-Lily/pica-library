@@ -1,8 +1,6 @@
 package com.picalibrary.android;
 
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import java.io.*;
@@ -39,8 +37,13 @@ final class GitHubAccountAuth {
                 int interval=Math.max(5,start.optInt("interval",5));
                 long expiresAt=System.currentTimeMillis()+Math.max(60,start.optInt("expires_in",900))*1000L;
                 if(deviceCode.isEmpty()||userCode.isEmpty()||!verificationUri.startsWith("https://github.com/"))throw new IOException("GitHub 登录启动响应不完整");
+
+                // Deliberately do not launch the browser here. The Activity must
+                // first render the one-time code so the user can see/copy it,
+                // then the user explicitly opens GitHub. Polling may safely run
+                // in the background while the code remains visible in-app.
                 main(()->callback.code(userCode,verificationUri));
-                try{Intent browser=new Intent(Intent.ACTION_VIEW,Uri.parse(verificationUri));browser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);app.startActivity(browser);}catch(Exception ignored){}
+
                 while(System.currentTimeMillis()<expiresAt){
                     Thread.sleep(interval*1000L);
                     JSONObject token=postForm("https://github.com/login/oauth/access_token","client_id="+enc(CLIENT_ID)+"&device_code="+enc(deviceCode)+"&grant_type="+enc("urn:ietf:params:oauth:grant-type:device_code"));

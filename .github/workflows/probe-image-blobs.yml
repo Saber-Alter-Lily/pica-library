@@ -1,0 +1,52 @@
+name: Probe candidate poster blobs
+
+on:
+  push:
+    branches: [fix/readme-poster-binaries]
+    paths:
+      - '.github/workflows/probe-image-blobs.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pillow
+      - name: Probe Git blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/probe"
+          for sha in \
+            193fbfa31aeb47a1ea1c9e603e804873a7fe4a09 \
+            a2f2551cca9ba6b1de134e21a58ac43c221a58ec \
+            905074facddd787b0ef8a5a09c11d4ee16b308a9 \
+            0e6673e3f733344a3b744a9c7635df29600b6e41 \
+            f4a51f69c6dc8b9f185eff609835a39d1d35554a \
+            ea1477321b48b63e0491bd8da52336476ce11f88 \
+            2036bfcb44385d5d6e1d000611617c65fe37d6cc \
+            1d1c5736f4605f63cc1131329352352151772a9a \
+            35079bde742b7e8cb982fe1bda6cf8fff01836f1
+          do
+            out="$RUNNER_TEMP/probe/$sha.bin"
+            gh api "repos/$GITHUB_REPOSITORY/git/blobs/$sha" --jq .content | tr -d '\n' | base64 -d > "$out"
+            SHA="$sha" FILE="$out" python - <<'PY'
+          import os, hashlib
+          from pathlib import Path
+          from PIL import Image
+          p=Path(os.environ['FILE']); data=p.read_bytes(); sha=os.environ['SHA']
+          print('BLOB',sha,'bytes',len(data),'prefix',data[:16].hex(),'sha256',hashlib.sha256(data).hexdigest())
+          try:
+              with Image.open(p) as im:
+                  im.load(); print('IMAGE',im.format,im.size,im.mode)
+          except Exception as e:
+              print('NOT_IMAGE',type(e).__name__,str(e))
+          PY
+          done

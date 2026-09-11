@@ -34,6 +34,7 @@ jobs:
             test/unit/personalization-theme-studio.test.ts \
             test/unit/update-hotfix-contract.test.ts \
             test/unit/update-manager-release-fallback.test.ts \
+            test/unit/v038-disclaimer-update-path.test.ts \
             test/unit/update-manager.test.ts
 
   android:

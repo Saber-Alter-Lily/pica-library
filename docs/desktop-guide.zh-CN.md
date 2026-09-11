@@ -2,7 +2,7 @@
 
 > 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.3.11 / Alpha8.11**。
 
-![Desktop / Web 页面说明](assets/desktop-overview.webp)
+![Desktop / Web 页面说明](assets/desktop-overview.jpg)
 
 ## 1. 安装与启动
 
@@ -64,7 +64,7 @@ Desktop 支持导入 `.pica-theme` 主题包，并把可用主题包同步到 An
 
 v0.3.11 的正式增量包已经逐一验证支持：
 
-`v0.3.0 / v0.3.1 / ... / v0.3.9 → v0.3.11`
+`v0.3.0 / v0.3.1 / ... / v0.3.10 → v0.3.11`
 
 更新过程会校验包来源和文件完整性，并保留用户数据库、下载内容与本地配置。若非常旧的客户端所在网络无法访问 GitHub 更新通道，可改用完整 ZIP 覆盖应用程序目录，用户数据仍应保留在独立数据目录中。
 

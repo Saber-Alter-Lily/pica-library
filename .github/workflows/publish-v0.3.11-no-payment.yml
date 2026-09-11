@@ -1,0 +1,290 @@
+name: Publish v0.3.11 and Android v38 no-payment baseline
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-v0.3.11-no-payment.yml'
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TARGET: '5ef6b7b3c5732fd9a7369da1cd180c379544fbcd'
+  EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+  CLIENT_ID: 'Iv23li2rIouPPVGgMoyI'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: '5ef6b7b3c5732fd9a7369da1cd180c379544fbcd'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '5ef6b7b3c5732fd9a7369da1cd180c379544fbcd'
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Re-run v0.3.11 Desktop release gates
+        shell: pwsh
+        run: |
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec vitest run test/unit/alpha8-11-no-payment-release.test.ts test/unit/alpha8-10-release-readiness.test.ts test/unit/alpha8-9-auth-ux-204.test.ts test/unit/alpha8-8-account-auth-theme-disclaimer.test.ts test/unit/alpha8-7-1-star-401-hotfix.test.ts test/unit/alpha8-7-settings-star-contract.test.ts test/unit/alpha8-6-star-personalization-contract.test.ts test/unit/personalization-theme-studio.test.ts test/unit/update-hotfix-contract.test.ts test/unit/update-manager-release-fallback.test.ts test/unit/update-package-builder.test.ts test/unit/v038-disclaimer-update-path.test.ts test/unit/v038-disclaimer-package-builder.test.ts test/unit/update-manager.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download and verify every accepted formal v0.3.x full package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $items=@(
+            @('0.3.0','8f840a873bc44d3230b928431eb2d548cbfb82614efce49280d60ebf65594374'),
+            @('0.3.1','7c22ed730e44fc518ecbc059019e3e52c9d21a5e08b0b38ec8f63a4587f1fb09'),
+            @('0.3.2','6a3fcaaca0b6dc14f89dc5ff9858a7e7063948dec4573759f20b2d063385038a'),
+            @('0.3.3','fa7e2e282e471bc2e9ee0a0c4c9d2616c97f9383d5b034e019833b8e5ec62e0f'),
+            @('0.3.4','6c52f076ae251e11089ed14fcfd1d9be3897c7220c97dfe025eafa75f50a233b'),
+            @('0.3.5','876ee53b16ff76ab590de7c7f4c8c0d3bf2052c03edd3480b1a1ee243148209d'),
+            @('0.3.6','cb948ab0fe1c796ea19da66367c2f69b2e525549e5139281648cddcb209f5bd0'),
+            @('0.3.7','381b7eec8d6ae00abc3e87bf8a2f156ecfcc579a61639a53f3bf69c22e0b597e'),
+            @('0.3.8','245bc05157e610262fe4ae05f034e3469b3a996a47e68db884d639c6690b63a8'),
+            @('0.3.9','012d1f93f9b4f7008e506f1fda450ec5e1bfc80d9654c2bdf571e7caedabca99'),
+            @('0.3.10','bd4812ab5e89fc72e77da7a731d11236629958b0bba640afd3f3cdc0335b635e')
+          )
+          foreach($item in $items){
+            $v=$item[0];$expected=$item[1];$file="artifacts/Pica-Library-v$v-windows-x64.zip"
+            Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v$v/Pica-Library-v$v-windows-x64.zip" -OutFile $file
+            $actual=(Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant()
+            if($actual -ne $expected){ throw "base $v hash mismatch: $actual" }
+            Write-Host "v$v base SHA-256 PASS"
+          }
+      - name: Build Desktop v0.3.11 full package
+        shell: pwsh
+        run: pnpm build:windows
+      - name: Build universal v0.3.0-v0.3.10 update and prove exact runtime convergence
+        shell: pwsh
+        run: |
+          pnpm exec tsx scripts/build-local-update-package.ts artifacts/Pica-Library-v0.3.10-windows-x64.zip artifacts/Pica-Library-v0.3.11-windows-x64.zip artifacts/Pica-Library-v0.3.11-update.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          root=Path('artifacts')
+          versions=tuple(f'0.3.{i}' for i in range(11))
+          bases={v:root/f'Pica-Library-v{v}-windows-x64.zip' for v in versions}
+          target=root/'Pica-Library-v0.3.11-windows-x64.zip'
+          update=root/'Pica-Library-v0.3.11-update.zip'
+          distribution_only={'DISCLAIMER.md'}
+          source_only_prefix='src/data/registry-v3-final/'
+          forbidden={'Pica Library.exe','app/updater.js','runtime/node.exe'}
+          banned=(b'wxp://',b'qr.alipay.com',b'support-wechat',b'support-alipay',b'SupportQr',b'f2f04_W9ygrHkVzuyBDwcwQ-JD_s0x7ykO1XtWtemaqNViM',b'fkx14989yqljy1lllnfn47b')
+          def entries(path):
+              with zipfile.ZipFile(path) as z:
+                  return {i.filename:z.read(i.filename) for i in z.infolist() if not i.is_dir()}
+          def assert_no_payment(path):
+              with zipfile.ZipFile(path) as z:
+                  for info in z.infolist():
+                      if info.is_dir(): continue
+                      name=info.filename.encode('utf-8','ignore')
+                      data=z.read(info.filename)
+                      for token in banned:
+                          assert token.lower() not in name.lower(),(path.name,info.filename,token)
+                          assert token.lower() not in data.lower(),(path.name,info.filename,token)
+          b={v:entries(path) for v,path in bases.items()};t=entries(target)
+          def runtime_view(values):
+              return {name:data for name,data in values.items() if name not in distribution_only and not name.startswith(source_only_prefix)}
+          rt={v:runtime_view(values) for v,values in b.items()};target_rt=runtime_view(t)
+          changed=sorted(name for name,data in target_rt.items() if any(name not in rt[v] or rt[v][name]!=data for v in versions))
+          deleted=sorted({name for values in rt.values() for name in values if name not in target_rt})
+          touched=forbidden.intersection(changed)|forbidden.intersection(deleted)
+          assert not touched,f'direct update requires protected replacement: {sorted(touched)}'
+          assert 'DISCLAIMER.md' in t
+          with zipfile.ZipFile(update) as z:m=json.loads(z.read('update-manifest.json'))
+          m['sourceVersionRange']=' || '.join(f'={v}' for v in versions)
+          m.pop('sourceSha',None)
+          m['targetVersion']='0.3.11'
+          m['targetSourceSha']='5ef6b7b3c5732fd9a7369da1cd180c379544fbcd'
+          m['requiresFullInstall']=False
+          m['deletions']=deleted
+          m['files']=[{'path':name,'sha256':hashlib.sha256(target_rt[name]).hexdigest(),'size':len(target_rt[name])} for name in changed]
+          tmp=update.with_suffix('.tmp.zip')
+          with zipfile.ZipFile(tmp,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=9) as z:
+              z.writestr('update-manifest.json',json.dumps(m,ensure_ascii=False,indent=2).encode())
+              for name in changed:z.writestr(name,target_rt[name])
+          tmp.replace(update)
+          assert m['sourceVersionRange']=='=0.3.0 || =0.3.1 || =0.3.2 || =0.3.3 || =0.3.4 || =0.3.5 || =0.3.6 || =0.3.7 || =0.3.8 || =0.3.9 || =0.3.10'
+          assert all(item['path'] not in forbidden for item in m['files'])
+          assert all(item not in forbidden for item in m['deletions'])
+          for v in versions:
+              got=dict(rt[v])
+              for name in deleted: got.pop(name,None)
+              for name in changed: got[name]=target_rt[name]
+              missing=sorted(target_rt.keys()-got.keys())
+              extra=sorted(got.keys()-target_rt.keys())
+              mismatch=sorted(name for name in target_rt.keys()&got.keys() if got[name]!=target_rt[name])
+              assert not missing and not extra and not mismatch,(v,missing[:10],extra[:10],mismatch[:10])
+              print(f'v{v} -> v0.3.11 runtime tree PASS')
+          assert_no_payment(target)
+          assert_no_payment(update)
+          assert 'web/support-wechat.svg' in deleted
+          assert 'web/support-alipay.svg' in deleted
+          print('ALL_FORMAL_V0_3_X_DIRECT_UPGRADES=PASS')
+          print('WINDOWS_PAYMENT_SCAN=PASS')
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $full=(Get-FileHash -Algorithm SHA256 artifacts/Pica-Library-v0.3.11-windows-x64.zip).Hash.ToLowerInvariant()
+          $update=(Get-FileHash -Algorithm SHA256 artifacts/Pica-Library-v0.3.11-update.zip).Hash.ToLowerInvariant()
+          "$full  Pica-Library-v0.3.11-windows-x64.zip`n$update  Pica-Library-v0.3.11-update.zip" | Set-Content -Encoding ascii artifacts/SHA256SUMS-v0.3.11.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Windows-v0.3.11-NoPayment
+          path: |
+            artifacts/Pica-Library-v0.3.11-windows-x64.zip
+            artifacts/Pica-Library-v0.3.11-update.zip
+            artifacts/SHA256SUMS-v0.3.11.txt
+          retention-days: 3
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '5ef6b7b3c5732fd9a7369da1cd180c379544fbcd'
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test lint and build Android v38
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
+      - name: Sign, verify and scan Android v38
+        env:
+          PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          INPUT='mobile/android-alpha2/app/build/outputs/apk/release/app-release-unsigned.apk'
+          test -s "$INPUT"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$INPUT" | grep -q "package: name='com.picalibrary.android' versionCode='38' versionName='0.1.0-alpha8.11-no-payment'"
+          mkdir -p release-artifacts
+          KEYSTORE="$RUNNER_TEMP/pica-preview.jks"
+          printf '%s' "$PREVIEW_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+            --ks "$KEYSTORE" --ks-key-alias pica-preview \
+            --ks-pass "pass:$PREVIEW_KEYSTORE_PASSWORD" --key-pass "pass:$PREVIEW_KEYSTORE_PASSWORD" \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled false --v4-signing-enabled false \
+            --out release-artifacts/Pica-Library-Android-Preview.apk "$INPUT"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs release-artifacts/Pica-Library-Android-Preview.apk
+          CERT=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs release-artifacts/Pica-Library-Android-Preview.apk | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr 'A-F' 'a-f')
+          test "$CERT" = "$EXPECTED_CERT"
+          printf '%s\n' "$CERT" > release-artifacts/Pica-Library-Android-Preview.cert-sha256
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          apk=Path('release-artifacts/Pica-Library-Android-Preview.apk')
+          banned=(b'wxp://',b'qr.alipay.com',b'SupportQr',b'f2f04_W9ygrHkVzuyBDwcwQ-JD_s0x7ykO1XtWtemaqNViM',b'fkx14989yqljy1lllnfn47b')
+          with zipfile.ZipFile(apk) as z:
+              for info in z.infolist():
+                  if info.is_dir(): continue
+                  data=z.read(info.filename)
+                  for token in banned:
+                      assert token.lower() not in info.filename.encode('utf-8','ignore').lower(),(info.filename,token)
+                      assert token.lower() not in data.lower(),(info.filename,token)
+          print('ANDROID_PAYMENT_SCAN=PASS')
+          PY
+          sha256sum release-artifacts/Pica-Library-Android-Preview.apk > release-artifacts/ANDROID-SHA256.txt
+          rm -f "$KEYSTORE"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Android-v38-NoPayment
+          path: release-artifacts/
+          retention-days: 3
+
+  publish:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pica-Library-Windows-v0.3.11-NoPayment
+          path: publish
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pica-Library-Android-v38-NoPayment
+          path: publish
+      - name: Verify Device Flow remains enabled
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl --fail-with-body -sS -X POST -H 'Accept: application/json' -H 'Content-Type: application/x-www-form-urlencoded' --data-urlencode "client_id=$CLIENT_ID" https://github.com/login/device/code)
+          test -n "$(printf '%s' "$RESPONSE" | jq -r '.device_code // empty')"
+          test -n "$(printf '%s' "$RESPONSE" | jq -r '.user_code // empty')"
+          echo 'GITHUB_DEVICE_FLOW_START=PASS'
+      - name: Validate artifacts and write release metadata
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,os,zipfile
+          from pathlib import Path
+          p=Path('publish');apk=p/'Pica-Library-Android-Preview.apk';full=p/'Pica-Library-v0.3.11-windows-x64.zip';update=p/'Pica-Library-v0.3.11-update.zip'
+          sha=lambda q:hashlib.sha256(q.read_bytes()).hexdigest()
+          assert apk.is_file() and full.is_file() and update.is_file()
+          with zipfile.ZipFile(full) as z: assert z.read('SOURCE_SHA.txt').decode().strip()==os.environ['RELEASE_TARGET']
+          with zipfile.ZipFile(update) as z:
+              manifest=json.loads(z.read('update-manifest.json'))
+          expected_range='=0.3.0 || =0.3.1 || =0.3.2 || =0.3.3 || =0.3.4 || =0.3.5 || =0.3.6 || =0.3.7 || =0.3.8 || =0.3.9 || =0.3.10'
+          assert manifest['sourceVersionRange']==expected_range,manifest
+          assert manifest['targetVersion']=='0.3.11' and manifest['targetSourceSha']==os.environ['RELEASE_TARGET'] and not manifest['requiresFullInstall']
+          cert=(p/'Pica-Library-Android-Preview.cert-sha256').read_text().strip().lower();assert cert==os.environ['EXPECTED_CERT']
+          ah,fh,uh=sha(apk),sha(full),sha(update)
+          sums=(p/'SHA256SUMS-v0.3.11.txt').read_text();assert f'{fh}  Pica-Library-v0.3.11-windows-x64.zip' in sums;assert f'{uh}  Pica-Library-v0.3.11-update.zip' in sums
+          android={'versionCode':38,'versionName':'0.1.0-alpha8.11-no-payment','apkUrl':'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk','sha256':ah,'releaseNotes':'Alpha8.11 / v38: removes all bundled payment QR codes and payment destinations. Support remains non-monetary. Theme packs and GitHub account verification continue to work without payment features.','minimumSupportedVersionCode':23}
+          (p/'android-update.json').write_text(json.dumps(android,ensure_ascii=False,indent=2),encoding='utf-8')
+          transparency={'releaseId':'alpha8.11-v38-desktop-v0.3.11','publicSourceCommit':os.environ['RELEASE_TARGET'],'paymentFeatures':'REMOVED','paymentArtifactScan':'PASS','android':{'versionCode':38,'versionName':android['versionName'],'sha256':ah,'signingCertificateSha256':cert},'windows':{'version':'0.3.11','fullZipSha256':fh,'updateZipSha256':uh,'sourceVersionRange':manifest['sourceVersionRange'],'buildProvenance':manifest['targetSourceSha']}}
+          (p/'BUILD_TRANSPARENCY.json').write_text(json.dumps(transparency,ensure_ascii=False,indent=2),encoding='utf-8')
+          (p/'SHA256SUMS.txt').write_text(f'{fh}  Pica-Library-v0.3.11-windows-x64.zip\n{uh}  Pica-Library-v0.3.11-update.zip\n',encoding='ascii')
+          print('ANDROID_SHA='+ah);print('WINDOWS_FULL_SHA='+fh);print('WINDOWS_UPDATE_SHA='+uh)
+          PY
+      - name: Publish Android Preview v38
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release edit android-preview --repo "$GITHUB_REPOSITORY" --target "$RELEASE_TARGET" --prerelease --title 'Pica Library Android Preview' --notes 'Alpha8.11 / v38: all bundled WeChat/Alipay payment QR codes, payment destinations, and QR-only dependencies have been removed. The support area is non-monetary. Existing library, pairing, reading, update, and theme functionality remains.'
+          gh release upload android-preview --repo "$GITHUB_REPOSITORY" publish/Pica-Library-Android-Preview.apk publish/android-update.json publish/Pica-Library-Android-Preview.cert-sha256 publish/BUILD_TRANSPARENCY.json --clobber
+      - name: Publish Desktop v0.3.11
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create v0.3.11 --repo "$GITHUB_REPOSITORY" --target "$RELEASE_TARGET" --title 'Pica Library v0.3.11' --notes 'Desktop v0.3.11 / Alpha8.11 removes all bundled payment QR codes and payment destinations from the public product. The support surface is non-monetary. Release artifacts are scanned for the former WeChat/Alipay payment endpoints before publication. The universal incremental update is verified for direct upgrades from every formal v0.3.x release from v0.3.0 through v0.3.10.' publish/Pica-Library-v0.3.11-windows-x64.zip publish/Pica-Library-v0.3.11-update.zip publish/SHA256SUMS.txt publish/BUILD_TRANSPARENCY.json
+      - name: Verify live update channels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/$GITHUB_REPOSITORY/releases/latest --jq .tag_name)" = 'v0.3.11'
+          test "$(gh api repos/$GITHUB_REPOSITORY/releases/tags/v0.3.11 --jq .target_commitish)" = "$RELEASE_TARGET"
+          test "$(gh api repos/$GITHUB_REPOSITORY/releases/tags/android-preview --jq .target_commitish)" = "$RELEASE_TARGET"
+          curl -L --fail --retry 3 --retry-all-errors 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/android-update.json' -o "$RUNNER_TEMP/android-update.json"
+          python - "$RUNNER_TEMP/android-update.json" <<'PY'
+          import json,sys
+          value=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert value['versionCode']==38,value
+          assert value['versionName']=='0.1.0-alpha8.11-no-payment',value
+          print('LIVE_ANDROID_UPDATE_CHANNEL=PASS')
+          PY
+          gh release view v0.3.11 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx 'Pica-Library-v0.3.11-update.zip'
+          gh release view android-preview --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx 'Pica-Library-Android-Preview.apk'
+          echo 'LIVE_DESKTOP_UPDATE_CHANNEL=PASS'

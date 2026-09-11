@@ -8,9 +8,16 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 
 ## Current versions
 
-- **Windows / Desktop:** v0.3.9
-- **Android Preview:** v36 · 0.1.0-alpha8.9-auth-ux-204-fix
-- **Public source:** Alpha8.9
+- **Windows / Desktop:** v0.3.10
+- **Android Preview:** v37 · 0.1.0-alpha8.10-release-readiness
+- **Public source:** Alpha8.10
+
+## Alpha8.10
+
+- **All v0.3.x upgrade compatibility:** release gates cover direct in-app upgrades from v0.3.0 through v0.3.9.
+- **UI cleanup:** redundant helper copy is removed across Desktop/Web and Android while status, errors, and essential safety messaging remain.
+- **Strict personalization gate:** themes cannot be imported, synced, activated, or served before authenticated GitHub Star proof is present.
+- **Star surprise copy removed:** the Star action no longer carries teaser microcopy.
 
 ## Alpha8.9
 

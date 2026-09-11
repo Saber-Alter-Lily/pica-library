@@ -1,0 +1,70 @@
+name: Convert README posters to PNG
+
+on:
+  push:
+    paths:
+      - '.github/workflows/convert-readme-images.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Convert WebP posters to PNG and update Markdown
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check pillow
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          pairs = [
+              (Path('docs/assets/desktop-overview.webp'), Path('docs/assets/desktop-overview.png')),
+              (Path('docs/assets/android-overview.webp'), Path('docs/assets/android-overview.png')),
+          ]
+          for source, target in pairs:
+              with Image.open(source) as im:
+                  im.load()
+                  width, height = im.size
+                  assert width >= 1000 and height >= 800, (source, im.size)
+                  assert im.format == 'WEBP', (source, im.format)
+                  rgb = im.convert('RGB')
+                  rgb.save(target, format='PNG', optimize=True)
+                  print(f'{source}: {width}x{height} -> {target} ({target.stat().st_size} bytes)')
+                  data = target.read_bytes()
+                  assert data.startswith(b'\x89PNG\r\n\x1a\n')
+                  assert target.stat().st_size > 50_000
+
+          docs = [
+              Path('README.md'), Path('README.en.md'),
+              Path('docs/desktop-guide.zh-CN.md'), Path('docs/android-guide.zh-CN.md'),
+              Path('docs/desktop-guide.en.md'), Path('docs/android-guide.en.md'),
+          ]
+          for path in docs:
+              text = path.read_text(encoding='utf-8')
+              text = text.replace('desktop-overview.webp', 'desktop-overview.png')
+              text = text.replace('android-overview.webp', 'android-overview.png')
+              path.write_text(text, encoding='utf-8')
+
+          for path in docs:
+              text = path.read_text(encoding='utf-8')
+              assert 'overview.webp' not in text, path
+          PY
+          git diff --check
+      - name: Commit PNG posters
+        run: |
+          set -euo pipefail
+          git config user.name 'Saber-Alter-Lily'
+          git config user.email '3178088154@qq.com'
+          git add README.md README.en.md docs/*.md docs/assets/desktop-overview.png docs/assets/android-overview.png
+          git commit -m 'docs: use PNG posters for reliable GitHub rendering'
+          git push origin HEAD:main

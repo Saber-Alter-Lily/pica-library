@@ -1,0 +1,39 @@
+name: Apply v0.3.10 final UI cleanup
+
+on:
+  push:
+    branches: [release/v0.3.10-readiness]
+    paths:
+      - '.github/workflows/apply-v0310-final-ui-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v0.3.10-readiness
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/apply-v0310-final-ui-cleanup.mjs
+      - name: Verify cleanup
+        run: |
+          set -euo pipefail
+          ! grep -Fq 'GitHub 收藏项目有小惊喜' web/alpha8-product.js
+          ! grep -Fq 'GitHub 收藏项目有小惊喜' mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java
+          ! grep -Fq '<p class="eyebrow">GitHub Account</p>' web/alpha8-star-access.js
+          ! grep -Fq '<p class="eyebrow">支持者功能</p>' web/alpha8-product.js
+          git diff --check
+      - name: Commit cleanup
+        run: |
+          set -euo pipefail
+          git config user.name 'Saber-Alter-Lily'
+          git config user.email '3178088154@qq.com'
+          git add web/alpha8-star-access.js web/alpha8-product.js mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java
+          git commit -m 'refine: remove release-only surprise and helper microcopy'
+          git push origin HEAD:release/v0.3.10-readiness

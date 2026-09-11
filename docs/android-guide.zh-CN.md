@@ -2,7 +2,7 @@
 
 > 当前版本：**Android Preview v38 · Alpha8.11**。Android 版本**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
 
-![Android 页面说明](assets/android-overview.webp)
+![Android 页面说明](assets/android-overview.jpg)
 
 ## 1. 下载与安装
 

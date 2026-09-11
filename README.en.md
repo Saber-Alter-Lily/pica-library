@@ -15,6 +15,7 @@ Turn a Pica collection into a durable local manga library for organizing, discov
 ## Alpha8.8
 
 - **Authenticated GitHub Star access:** personalization no longer accepts a public username and infers Star state. Desktop and Android use GitHub Device Flow, identify the authenticated account, and check the current user's Star of `Saber-Alter-Lily/pica-library`. The access token is transient and is not persisted.
+- **Live authenticated acceptance passed:** the production GitHub App Client ID completed a real Device Flow for `Saber-Alter-Lily`, and the authenticated current-user Star check returned HTTP 204.
 - **Per-device active themes:** Desktop may sync `.pica-theme` packs to Android, but it no longer syncs `activeThemeId`. Desktop and Android independently choose which installed theme is active.
 - **Versioned startup disclaimer:** Desktop/Web and Android show an open-source-tool usage notice on first run; acknowledgement is device-local and the notice appears again only when its version changes. The Windows package includes `DISCLAIMER.md`.
 - **Alpha8.7 improvements retained:** unified Settings hub, improved personalization layout, collapsed finished-download history, and proxy-aware update networking remain in place.

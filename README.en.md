@@ -25,7 +25,7 @@ Pica Library is a local-first manga library manager for long-lived collections. 
 
 ## Desktop / Web
 
-![Pica Library Desktop / Web overview](docs/assets/ChatGPT Image 2026年9月11日 13_36_37.png)
+![Pica Library Desktop / Web overview](docs/assets/desktop-overview-final.png)
 
 Desktop provides the full Library, Shelves, Discover, Favorite Atlas, Downloads, Downloaded, and unified Settings experience. Mobile pairing, WebDAV, themes, storage, maintenance, and updates live under Settings.
 
@@ -33,7 +33,7 @@ Desktop provides the full Library, Shelves, Discover, Favorite Atlas, Downloads,
 
 ## Android
 
-![Pica Library Android guide](docs/assets/android-overview-v38-final.jpg)
+![Pica Library Android guide](docs/assets/android-overview-final.png)
 
 Android uses four primary tabs: **Library / Recommend / Online / Connect**. After pairing with Desktop, it can read local comics stored on the PC and also manage WebDAV, Pica account settings, appearance, and app updates.
 

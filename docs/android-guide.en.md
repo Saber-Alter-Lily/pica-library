@@ -2,7 +2,7 @@
 
 > Current build: **Android Preview v38 · Alpha8.11**. The Android app is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
-![Android overview](assets/android-overview-v38-final.jpg)
+![Android overview](assets/android-overview-final.png)
 
 ## Download and install
 

@@ -81,7 +81,7 @@ function appearancePanel() {
     const panel = document.createElement('article')
     panel.id = 'a83-appearance'
     panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3>外观</h3><p>基础明暗模式永久免费，并与手机端保持同一套视觉语义。</p><div class="a83-row"></div>`
+    panel.innerHTML = `<h3>外观</h3><div class="a83-row"></div>`
     const row = panel.querySelector('.a83-row')
     for (const [mode, label] of [['system','跟随系统'],['light','浅色'],['dark','深色']]) {
         const button = document.createElement('button')
@@ -99,7 +99,7 @@ function supportPanel() {
     if (!settings || $('#a83-support')) return
     const panel = document.createElement('article')
     panel.id = 'a83-support'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3>支持项目</h3><p>感谢你使用本软件(๑´ㅂ\`๑)<br>软件是完全免费的，若有余力的小伙伴能够充电支持，我将感受到你对我作品的肯定而备受鼓舞，这也是我不断更新的动力ヽ(✿ﾟ▽ﾟ)ノ</p><div class="a83-support-grid"><figure><img src="./support-wechat.svg" alt="微信支付收款码"><figcaption>微信支付</figcaption></figure><figure><img src="./support-alipay.svg" alt="支付宝收款码"><figcaption>支付宝</figcaption></figure></div><p class="status">GitHub 收藏项目有小惊喜。</p><div class="a83-row"><button type="button" id="a83-star">⭐ 给项目 Star</button></div>`
+    panel.innerHTML = `<h3>支持项目</h3><p>感谢你使用 Pica Library。</p><div class="a83-support-grid"><figure><img src="./support-wechat.svg" alt="微信支付收款码"><figcaption>微信支付</figcaption></figure><figure><img src="./support-alipay.svg" alt="支付宝收款码"><figcaption>支付宝</figcaption></figure></div><div class="a83-row"><button type="button" id="a83-star">⭐ 给项目 Star</button></div>`
     panel.querySelector('#a83-star').onclick = () => window.open('https://github.com/Saber-Alter-Lily/pica-library', '_blank', 'noopener')
     settings.appendChild(panel)
 }
@@ -110,13 +110,13 @@ async function personalizationPanel() {
     let value
     try { value = await status() } catch { return }
     const p = value.personalization || {}
-    const enabled = Boolean(p.supporter && Array.isArray(p.features) && p.features.includes('theme-packs'))
+    const enabled = p.starUnlocked === true && Number(p.starUserId || 0) > 0 && p.starAuthMethod === 'github-account-device-flow'
     if (!enabled) return
     const settings = $('#settings')
     if (!settings) return
     const panel = document.createElement('article')
     panel.id = 'a83-personalization'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<div class="section-heading"><div><p class="eyebrow">支持者功能</p><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div><p>把 AI 或你自己制作的 <code>.pica-theme</code> 装扮包拖到这里。电脑会先做安全校验；已安装装扮可通过局域网同步给手机。</p><label class="a83-drop" id="a83-theme-drop"><strong>拖入 Pica Theme Pack</strong><br><span>或点击选择 .pica-theme / .zip</span><input id="a83-theme-file" type="file" accept=".pica-theme,.zip,application/zip" hidden></label><p id="a83-theme-message" class="status"></p><div id="a83-theme-list"></div>`
+    panel.innerHTML = `<div class="section-heading"><div><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div><label class="a83-drop" id="a83-theme-drop"><strong>拖入 Pica Theme Pack</strong><br><span>或点击选择 .pica-theme / .zip</span><input id="a83-theme-file" type="file" accept=".pica-theme,.zip,application/zip" hidden></label><p id="a83-theme-message" class="status"></p><div id="a83-theme-list"></div>`
     settings.appendChild(panel)
     const drop = panel.querySelector('#a83-theme-drop')
     const input = panel.querySelector('#a83-theme-file')

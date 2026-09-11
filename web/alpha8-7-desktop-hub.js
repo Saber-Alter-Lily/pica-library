@@ -4,7 +4,7 @@ const copy = {
     'zh-CN': {
         nav: '设置',
         title: '连接与设置',
-        subtitle: '账号、连接、外观、存储、维护和软件更新统一在这里管理。',
+        subtitle: '',
         general: '基本设置',
         connections: '连接与同步',
         appearance: '外观与个性化',
@@ -12,7 +12,7 @@ const copy = {
         maintenance: '维护工具',
         software: '软件更新',
         storageTitle: '下载与存储',
-        storageCopy: '下载目录与下载性能在“基本设置”中统一保存；这里集中管理缓存和下载任务显示。',
+        storageCopy: '',
         openDownloads: '打开下载任务',
         historyHidden: '已结束任务已收起',
         historyShown: '隐藏已结束任务',
@@ -21,7 +21,7 @@ const copy = {
     en: {
         nav: 'Settings',
         title: 'Connections & Settings',
-        subtitle: 'Manage account, connections, appearance, storage, maintenance and updates in one place.',
+        subtitle: '',
         general: 'General',
         connections: 'Connections & Sync',
         appearance: 'Appearance',
@@ -29,7 +29,7 @@ const copy = {
         maintenance: 'Maintenance',
         software: 'Software Update',
         storageTitle: 'Downloads & Storage',
-        storageCopy: 'The library folder and download profile are saved under General. Cache controls and download visibility live here.',
+        storageCopy: '',
         openDownloads: 'Open Downloads',
         historyHidden: 'Finished tasks are collapsed',
         historyShown: 'Hide finished tasks',
@@ -52,6 +52,7 @@ function injectStyles() {
     style.textContent = `
 #settings-nav{display:none!important}
 #a87-settings-heading{margin-bottom:18px}
+#a87-settings-subtitle:empty,#a87-storage-intro p:empty{display:none}
 .a87-settings-hub>.tabs{margin:0}
 .a87-hub-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px;align-items:start}
 .a87-hub-nav{position:sticky;top:12px;display:flex;flex-direction:column;gap:7px;padding:8px;border:1px solid var(--a83-line,#ddd7e4);border-radius:20px;background:color-mix(in srgb,var(--a83-surface,#fff) 92%,transparent);box-shadow:0 10px 30px rgb(35 23 55 / .05)}

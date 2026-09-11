@@ -8,9 +8,16 @@
 
 ## 当前版本
 
-- **Windows / Desktop：v0.3.9**
-- **Android Preview：v36 · 0.1.0-alpha8.9-auth-ux-204-fix**
-- **当前公开源码：Alpha8.9**
+- **Windows / Desktop：v0.3.10**
+- **Android Preview：v37 · 0.1.0-alpha8.10-release-readiness**
+- **当前公开源码：Alpha8.10**
+
+## Alpha8.10
+
+- **全量 v0.3.x 升级兼容**：正式发布门禁覆盖 v0.3.0–v0.3.9 到当前版本的直接应用内升级。
+- **界面收敛**：Desktop/Web 与 Android 删除重复技术说明和冗余小字，保留必要状态、错误和安全提示。
+- **个性化锁定复核**：未完成 GitHub 本人认证时，Desktop 与 Android 均不能导入、同步、启用或读取个性化装扮；移动端主题桥接接口同步加锁。
+- **移除 Star 惊喜文案**：Star 按钮旁不再显示“收藏项目有小惊喜”等暗示性说明。
 
 ## Alpha8.9
 

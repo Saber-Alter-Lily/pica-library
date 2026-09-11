@@ -358,14 +358,19 @@ export async function startMobileBridge(options: {
                 return
             }
 
-            if (url.pathname === '/mobile/v1/themes' && request.method === 'GET')
+            if (url.pathname === '/mobile/v1/themes' && request.method === 'GET') {
+                if (!personalization.starProof())
+                    return json(response, 403, { error: 'GitHub Star authentication required' })
                 return json(response, 200, {
                     ...personalization.status(),
                     packs: personalization.listThemePacks()
                 })
+            }
 
             const themeRoute = url.pathname.match(/^\/mobile\/v1\/themes\/([^/]+)$/)
             if (themeRoute && request.method === 'GET') {
+                if (!personalization.starProof())
+                    return json(response, 403, { error: 'GitHub Star authentication required' })
                 const pack = personalization.themePack(
                     decodeURIComponent(themeRoute[1])
                 )

@@ -73,9 +73,6 @@ const personalization = new PersonalizationService(
     path.join(applicationRoot, 'web')
 )
 const githubAccountAuth = new GitHubAccountAuthService()
-if (['0.3.2', '0.3.3'].includes(PRODUCT_VERSION)) {
-    try { personalization.installBundledTesterGrant() } catch { /* tester access never blocks startup */ }
-}
 for (const directory of [
     paths.root,
     paths.data,

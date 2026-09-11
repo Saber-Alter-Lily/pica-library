@@ -39,11 +39,19 @@ function sourceSha(entries: Map<string, Buffer>) {
 const registrySourceRoot = 'src/data/registry-v3-final/'
 const registryMirrorRoot = 'app/runtime-assets/registry-v3-final/'
 
+// Distribution documents may be present in a full ZIP without being part of
+// the running application tree. Existing updater helpers deliberately use a
+// narrow allowlist and must never be replaced merely to add such a document.
+// The versioned in-product disclaimer lives under web/ and remains part of the
+// incremental update; only this root documentation copy is full-install-only.
+const distributionOnlyFiles = new Set(['DISCLAIMER.md'])
+
 function incrementalChanges(
     sourceEntries: Map<string, Buffer>,
     targetEntries: Map<string, Buffer>
 ) {
     return [...targetEntries.entries()].filter(([name, value]) => {
+        if (distributionOnlyFiles.has(name)) return false
         const previous = sourceEntries.get(name)
         if (previous?.equals(value)) return false
         if (!name.startsWith(registrySourceRoot)) return true
@@ -102,7 +110,8 @@ export function buildLocalUpdatePackage(
     const targetEntries = files(new AdmZip(targetZipFile))
     const changed = incrementalChanges(sourceEntries, targetEntries)
     const deleted = [...sourceEntries.keys()].filter(
-        (name) => !targetEntries.has(name)
+        (name) =>
+            !distributionOnlyFiles.has(name) && !targetEntries.has(name)
     )
     const unsafeChanged = changed
         .map(([name]) => name)

@@ -1,0 +1,38 @@
+name: Validate staged Desktop poster
+
+on:
+  push:
+    branches: [fix/readme-posters-final]
+    paths:
+      - '.github/workflows/validate-staged-desktop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pillow
+      - name: Reassemble and decode Desktop staging
+        run: |
+          set -euo pipefail
+          cat .tmp-readme-assets/desktop.*.b64 | tr -d '\n\r' | base64 -d > "$RUNNER_TEMP/desktop.jpg"
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib
+          p=Path(__import__('os').environ['RUNNER_TEMP'])/'desktop.jpg'
+          data=p.read_bytes()
+          print('bytes',len(data),'sha256',hashlib.sha256(data).hexdigest(),'prefix',data[:12].hex())
+          assert data[:3]==b'\xff\xd8\xff'
+          with Image.open(p) as im:
+              im.load()
+              print('format',im.format,'size',im.size,'mode',im.mode)
+              assert im.format=='JPEG'
+          print('STAGED_DESKTOP_DECODE=PASS')
+          PY

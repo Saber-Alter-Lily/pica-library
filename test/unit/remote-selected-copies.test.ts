@@ -10,6 +10,9 @@ import {
 } from '../../src/remote-storage/remove-copies'
 import { remoteLayout } from '../../src/remote-storage/layout'
 import { WebDavStorageProvider } from '../../src/remote-storage/webdav'
+import { RemoteStorageDesktopManager } from '../../src/remote-storage/desktop-manager'
+import * as factory from '../../src/remote-storage/factory'
+import type { CredentialStore } from '../../src/desktop/credentials'
 import type {
     RemoteStorageProvider,
     RemoteLibraryCatalog,
@@ -55,6 +58,7 @@ function memoryProvider() {
 const cleanup: Array<() => void> = []
 afterEach(() => {
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
     cleanup.splice(0).forEach((fn) => fn())
 })
 function fixture() {
@@ -103,6 +107,83 @@ function fixture() {
     }
 }
 describe('selected cloud uploads and remote-only deletion', () => {
+    it('binds confirmation to the current cloud account and preserves local deletion exclusions', async () => {
+        const { root, db, provider, puts } = fixture()
+        vi.spyOn(factory, 'createRemoteStorageProvider').mockReturnValue(
+            provider
+        )
+        const store = { save: vi.fn() } as unknown as CredentialStore
+        const manager = new RemoteStorageDesktopManager(
+            path.join(root, 'remote.json'),
+            store,
+            null,
+            db,
+            root,
+            () => {}
+        )
+        manager.save({
+            remoteStorage: {
+                kind: 'webdav',
+                baseUrl: 'https://dav.example',
+                root: 'PicaLibrary',
+                username: 'fixture-alice',
+                password: 'fixture-only'
+            }
+        })
+        await manager.sync({})
+        const inventory = await manager.inventory({})
+        await manager.deleteCopies({
+            comicIds: ['comic-a'],
+            confirmation: 'DELETE_REMOTE_ONLY',
+            remoteScopeId: inventory.scopeId,
+            expectedGeneration: inventory.generation
+        })
+        puts.length = 0
+        await manager.sync({})
+        expect(puts.some((key) => key.startsWith('v1/comics/comic-a/'))).toBe(
+            false
+        )
+        const deleted = (await manager.inventory({})).comics.find(
+            (comic) => comic.comicId === 'comic-a'
+        )!
+        expect(deleted).toMatchObject({
+            state: 'not-uploaded',
+            excludedFromFullSync: true
+        })
+        const stale = await manager.inventory({})
+        manager.save({
+            remoteStorage: {
+                kind: 'webdav',
+                baseUrl: 'https://dav.example',
+                root: 'PicaLibrary',
+                username: 'fixture-bob',
+                password: 'fixture-only'
+            }
+        })
+        await expect(
+            manager.deleteCopies({
+                comicIds: ['comic-b'],
+                confirmation: 'DELETE_REMOTE_ONLY',
+                remoteScopeId: stale.scopeId,
+                expectedGeneration: stale.generation
+            })
+        ).rejects.toThrow('目标未核验')
+        expect(
+            (await manager.inventory({})).comics.find(
+                (comic) => comic.comicId === 'comic-a'
+            )!.excludedFromFullSync
+        ).toBe(false)
+        const current = await manager.inventory({})
+        await manager.sync({
+            comicIds: ['comic-a'],
+            remoteScopeId: current.scopeId
+        })
+        expect(
+            (await manager.inventory({})).comics.find(
+                (comic) => comic.comicId === 'comic-a'
+            )!.state
+        ).toBe('remote-present')
+    })
     it('uploads only selected comics and retains unselected remote comics', async () => {
         const { service, provider, puts } = fixture()
         await service.sync(['comic-b'])

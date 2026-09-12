@@ -1,5 +1,5 @@
 import type { LibraryDatabase } from '../library/database'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { removeRemoteCopies, selectedComicIds } from './remove-copies'
 import type { CredentialStore } from '../desktop/credentials'
 import type { StoredCredentials } from '../desktop/types'
@@ -25,9 +25,17 @@ export class RemoteStorageDesktopManager {
     private credentials: StoredCredentials | null
     private readonly query: LibraryQueryService
     private mutationInFlight = false
+    private scopeId = randomUUID()
 
     private exclusionsKey() {
-        return `remote-excluded-v1:${createHash('sha256').update(JSON.stringify(this.publicConfig)).digest('hex')}`
+        return `remote-excluded-v1:${createHash('sha256')
+            .update(
+                JSON.stringify([
+                    this.publicConfig,
+                    this.credentials?.remoteStorageUsername ?? ''
+                ])
+            )
+            .digest('hex')}`
     }
     private exclusions() {
         return this.database.getAppState<string[]>(this.exclusionsKey()) ?? []
@@ -51,9 +59,9 @@ export class RemoteStorageDesktopManager {
             throw new Error('请先保存网盘配置，再核验漫画副本状态')
         if (this.mutationInFlight)
             throw new Error('网盘操作进行中，请完成后刷新')
-        const scopeId = this.exclusionsKey()
+        const scopeId = this.scopeId
         const result = await this.syncService({}).inventory()
-        if (scopeId !== this.exclusionsKey())
+        if (scopeId !== this.scopeId)
             throw new Error('网盘配置已变化，请重新刷新')
         const pending = new Set(
             this.database.getAppState<string[]>(
@@ -76,7 +84,7 @@ export class RemoteStorageDesktopManager {
         if (input.confirmation !== 'DELETE_REMOTE_ONLY')
             throw new Error('必须明确确认仅删除网盘副本')
         if (
-            input.remoteScopeId !== this.exclusionsKey() ||
+            input.remoteScopeId !== this.scopeId ||
             typeof input.expectedGeneration !== 'string'
         )
             throw new Error('网盘目标未核验或已经变化，请刷新后重新选择')
@@ -247,6 +255,7 @@ export class RemoteStorageDesktopManager {
         this.credentialStore.save(merged)
         this.publicConfig = selected.publicConfig
         this.credentials = merged
+        this.scopeId = randomUUID()
         this.onCredentialsChanged(merged)
         return { success: true, remoteStorage: this.status() }
     }
@@ -378,8 +387,7 @@ export class RemoteStorageDesktopManager {
         if (this.mutationInFlight) throw new Error('已有网盘操作进行中')
         if (
             input.comicIds !== undefined &&
-            (input.remoteStorage ||
-                input.remoteScopeId !== this.exclusionsKey())
+            (input.remoteStorage || input.remoteScopeId !== this.scopeId)
         )
             throw new Error('网盘目标未核验或已经变化，请刷新后重新选择')
         // Reject empty/invalid explicit selections before any external write.

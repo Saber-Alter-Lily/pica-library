@@ -174,6 +174,13 @@ try {
     $env:PATH = $originalPath
     $env:LOCALAPPDATA = $originalLocal
     if (Test-Path -LiteralPath $work) {
+        $resolvedSmoke = (Resolve-Path -LiteralPath $work).Path
+        $resolvedTemp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
+        if (
+            -not $resolvedSmoke.StartsWith($resolvedTemp + '\', [StringComparison]::OrdinalIgnoreCase) -or
+            (Split-Path -Leaf $resolvedSmoke) -notmatch '^pica-artifact-smoke-[0-9a-f]{32}$' -or
+            ((Get-Item -LiteralPath $resolvedSmoke).Attributes -band [IO.FileAttributes]::ReparsePoint)
+        ) { throw 'Refusing cleanup outside the isolated artifact smoke directory' }
         for ($attempt=0; $attempt -lt 5; $attempt++) {
             try { Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction Stop; break }
             catch { if ($attempt -eq 4) { Write-Warning "Temporary smoke directory remains for diagnosis: $work"; break }; Start-Sleep -Milliseconds 300 }

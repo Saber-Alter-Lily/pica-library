@@ -25,6 +25,7 @@ final class PicaClient {
 
     PicaClient(Context context){this.context=context.getApplicationContext();this.token=PicaAccountStore.load(this.context).token;}
     boolean configured(){return PicaAccountStore.load(context).configured();}
+    void register(java.util.Map<String,String> payload) throws Exception { requestRaw("POST","auth/register",new JSONObject(payload),""); }
     String login(String account,String password) throws Exception {JSONObject body=new JSONObject();body.put("email",account);body.put("password",password);JSONObject data=requestRaw("POST","auth/sign-in",body,"");String next=data.optString("token","");if(next.isEmpty())throw new IOException("Pica 登录响应缺少 token");token=next;PicaAccountStore.saveSession(context,account,password,next);return next;}
     void ensureLogin() throws Exception {PicaAccountStore.Session session=PicaAccountStore.load(context);if(token!=null&&!token.isEmpty())return;if(session.token!=null&&!session.token.isEmpty()){token=session.token;return;}if(session.account.isEmpty()||session.password.isEmpty())throw new IllegalStateException("请先配置 Pica 账号");login(session.account,session.password);}
 
@@ -49,7 +50,19 @@ final class PicaClient {
     private JSONObject requestRaw(String method,String path,JSONObject body,String auth) throws Exception {
         String clean=path.replaceAll("^/+|/+$","");HttpURLConnection c=(HttpURLConnection)new URL(API+clean).openConnection();c.setRequestMethod(method);c.setConnectTimeout(7000);c.setReadTimeout(20000);c.setUseCaches(false);c.setRequestProperty("api-key",API_KEY);c.setRequestProperty("accept","application/vnd.picacomic.com.v1+json");c.setRequestProperty("app-channel","2");c.setRequestProperty("nonce",NONCE);c.setRequestProperty("app-version","2.2.1.2.3.3");c.setRequestProperty("app-uuid","defaultUuid");c.setRequestProperty("app-platform","android");c.setRequestProperty("app-build-version","45");c.setRequestProperty("Content-Type","application/json; charset=UTF-8");c.setRequestProperty("User-Agent","okhttp/3.8.1");c.setRequestProperty("image-quality","original");String time=String.valueOf(System.currentTimeMillis()/1000L);c.setRequestProperty("time",time);c.setRequestProperty("signature",signature(clean,time,method));if(auth!=null&&!auth.isEmpty())c.setRequestProperty("authorization",auth);
         if(body!=null&&(method.equals("POST")||method.equals("PUT")||method.equals("PATCH"))){c.setDoOutput(true);byte[] bytes=body.toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=c.getOutputStream()){out.write(bytes);}}
-        int status=c.getResponseCode();InputStream stream=status>=400?c.getErrorStream():c.getInputStream();String text=read(stream);c.disconnect();if(status==401||status==403)throw new AuthException();if(status<200||status>=300)throw new IOException("Pica HTTP "+status+(text.isEmpty()?"":" · "+shortText(text)));JSONObject root=new JSONObject(text);if(root.optInt("code",200)!=200)throw new IOException(root.optString("message",root.optString("error","Pica 请求失败")));JSONObject data=root.optJSONObject("data");return data==null?new JSONObject():data;
+        int status=c.getResponseCode();InputStream stream=status>=400?c.getErrorStream():c.getInputStream();String text=read(stream);c.disconnect();
+        if(clean.equals("auth/register") || clean.equals("auth/sign-in")) {
+            if(status==429)throw new IOException("PICA_ACCOUNT_RATE_LIMIT");
+            if(status>=500)throw new IOException("PICA_ACCOUNT_UNAVAILABLE");
+            if(status<200||status>=300)throw new IOException("PICA_ACCOUNT_REJECTED");
+            try {
+                JSONObject root=new JSONObject(text);
+                if(root.optInt("code",0)!=200)throw new IOException("PICA_ACCOUNT_REJECTED");
+                JSONObject data=root.optJSONObject("data");
+                return data==null?new JSONObject():data;
+            } catch(org.json.JSONException error) { throw new IOException("PICA_ACCOUNT_RESPONSE_INVALID"); }
+        }
+        if(status==401||status==403)throw new AuthException();if(status<200||status>=300)throw new IOException("Pica HTTP "+status+(text.isEmpty()?"":" · "+shortText(text)));JSONObject root=new JSONObject(text);if(root.optInt("code",200)!=200)throw new IOException(root.optString("message",root.optString("error","Pica 请求失败")));JSONObject data=root.optJSONObject("data");return data==null?new JSONObject():data;
     }
     private static String signature(String path,String time,String method) throws Exception {String raw=(path+time+NONCE+method+API_KEY).toLowerCase(Locale.ROOT);Mac mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8),"HmacSHA256"));byte[] digest=mac.doFinal(raw.getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:digest)out.append(String.format(Locale.ROOT,"%02x",b));return out.toString();}
     private static String read(InputStream in) throws IOException {if(in==null)return "";try(InputStream source=in;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=source.read(b))>0){if(out.size()+n>8*1024*1024)throw new IOException("Pica 响应过大");out.write(b,0,n);}return out.toString("UTF-8");}}

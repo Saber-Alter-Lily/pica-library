@@ -7,6 +7,8 @@ import {
     saveLiteState
 } from './lite-state.js'
 import { deriveLiteAuthors } from './author-state.js'
+import { installAccountOnboarding } from './account-onboarding.js'
+import { createDownloadedCloud } from './downloaded-cloud.js'
 import {
     applyTranslations,
     localizeAuthorEvidence,
@@ -120,6 +122,7 @@ function applyLanguage(nextLanguage, persist = false) {
     if (persist) language = saveLanguage(localStorage, language)
     $('#language-select').value = language
     applyTranslations(language)
+    document.dispatchEvent(new Event('pica-language-change'))
     if (persist) {
         renderAll()
         void loadJobs()
@@ -131,6 +134,7 @@ function applyLanguage(nextLanguage, persist = false) {
         if (activeView === 'downloaded') void loadDownloaded()
         if (activeView === 'settings') void loadPreviewCacheStats()
         if (activeView === 'reader') {
+            $('#reader .eyebrow').textContent = t(state.reader.online ? 'reader.online' : 'reader.eyebrow')
             renderReaderChapterHeading()
             renderReaderPages()
         }
@@ -244,25 +248,25 @@ function renderMobileBridge() {
     const mobile = desktop?.mobileBridge
     if (!mobile?.enabled) {
         panel.hidden = true
-        stateLabel.textContent = 'Mobile Bridge 未启动。请查看日志。'
+        stateLabel.textContent = t('mobile.bridgeStopped')
         return
     }
     panel.hidden = false
-    stateLabel.textContent = 'Mobile Bridge 已启动'
+    stateLabel.textContent = t('mobile.bridgeStarted')
     const addresses = Array.isArray(mobile.addresses) ? mobile.addresses : []
     $('#mobile-bridge-address').textContent =
-        addresses[0] || '端口 ' + mobile.port
+        addresses[0] || t('mobile.port', { port: mobile.port })
     $('#mobile-bridge-code').textContent = mobile.pairingCode || '------'
     const expiry = mobile.pairingExpiresAt ? new Date(mobile.pairingExpiresAt) : null
     $('#mobile-bridge-expiry').textContent = expiry && Number.isFinite(expiry.getTime())
-        ? '有效至 ' + expiry.toLocaleTimeString()
+        ? t('mobile.expires', { time: expiry.toLocaleTimeString() })
         : ''
     const devices = Array.isArray(mobile.pairedDevices)
         ? mobile.pairedDevices
         : []
     $('#mobile-bridge-devices').textContent = devices.length
-        ? '已配对：' + devices.map((item) => item.deviceName).join('、')
-        : '尚无已配对设备'
+        ? t('mobile.paired', { devices: devices.map((item) => item.deviceName).join(', ') })
+        : t('mobile.noDevices')
 }
 
 async function loadDesktop() {
@@ -282,6 +286,9 @@ async function loadDesktop() {
             document.body.classList.add('onboarding')
             document.querySelector('nav').hidden = true
             activateView('setup')
+        } else {
+            document.body.classList.remove('onboarding')
+            document.querySelector('nav').hidden = false
         }
     } catch {
         desktop = null
@@ -584,6 +591,8 @@ async function testDesktop(prefix) {
 
 $('#setup-folder').onclick = () => chooseFolder('setup')
 $('#settings-folder').onclick = () => chooseFolder('settings')
+installAccountOnboarding({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
+const downloadedCloud = createDownloadedCloud({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
 $('#setup-test').onclick = () => testDesktop('setup')
 $('#settings-test').onclick = () => testDesktop('settings')
 $('#setup-form').onsubmit = async (event) => {
@@ -865,6 +874,24 @@ function setGridSize(scope, size) {
     )
 }
 
+function mountOnlineReadButtons(container) {
+    if (state.mode !== 'connected') return
+    for (const selector of container.querySelectorAll('input[data-comic-id]')) {
+        const card = selector.closest('article, tr')
+        const target = card?.querySelector('.comic-card-body') || card?.querySelector('td:nth-child(2)')
+        if (!target || target.querySelector('[data-online-comic]')) continue
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.dataset.onlineComic = selector.dataset.comicId
+        button.textContent = t('reader.online')
+        target.append(button)
+    }
+}
+document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-online-comic]')
+    if (button && state.mode === 'connected') void openReaderComic(button.dataset.onlineComic, true)
+})
+
 function renderComics(records = state.records) {
     const query = normalize($('#filter-text').value)
     const tags = splitList($('#filter-tag').value).map(normalize)
@@ -911,7 +938,7 @@ function renderComics(records = state.records) {
     const cover = (comic) => `<div class="cover-shell">
         ${
             coverSource(comic)
-                ? `<img src="${escapeHtml(coverSource(comic))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />`
+                ? `<img src="${escapeHtml(coverSource(comic))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement?.classList.add('cover-missing');this.remove()" />`
                 : ''
         }
         <span aria-hidden="true">P</span>
@@ -956,6 +983,7 @@ function renderComics(records = state.records) {
     })
     $('#load-more').hidden = page.length >= state.visible.length
     setGridSize('library', state.libraryGridSize)
+    mountOnlineReadButtons($('#library'))
 }
 
 function renderAuthors() {
@@ -993,7 +1021,7 @@ function renderResultCards(records, target, recommendation = false) {
             const comic = item.comic || item
             return `<article class="result" data-comic-id="${escapeHtml(comic.comicId)}" data-result-rank="${rank}">
                 <div class="cover-shell">
-                    ${state.coversEnabled && (state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl)) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('cover-missing')" />` : ''}
+                    ${state.coversEnabled && (state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl)) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement?.classList.add('cover-missing');this.remove()" />` : ''}
                     <span aria-hidden="true">P</span>
                 </div>
                 <div class="result-body"><h3>${escapeHtml(comic.title)}</h3>
@@ -1358,7 +1386,7 @@ async function openShelf(shelfId) {
         `<div class="page-heading"><div><h3>${escapeHtml(shelf.name)}</h3><p>${t('shelf.count', { count: Number(value.items.length) })}</p></div><div class="actions"><button data-shelf-rename="${escapeHtml(shelf.id)}">${t('shelf.rename')}</button><button data-shelf-delete="${escapeHtml(shelf.id)}">${t('shelf.delete')}</button></div></div><div id="shelf-items" class="comic-grid ${state.shelfView === 'list' ? 'shelf-list-mode' : ''}">${value.items
             .map(
                 (comic) =>
-                    `<article class="comic-card">${state.shelfCoversEnabled ? `<div class="cover-shell"><img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" onerror="this.remove();this.parentElement.classList.add('cover-missing')"/><span aria-hidden="true">P</span></div>` : '<div class="cover-shell"><span aria-hidden="true">P</span></div>'}<div class="comic-card-body"><label><input type="checkbox" data-selection-context="shelf" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.shelf.has(comic.comicId) ? 'checked' : ''}/> ${t('action.select')}</label><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><div>${(
+                    `<article class="comic-card">${state.shelfCoversEnabled ? `<div class="cover-shell"><img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" onerror="this.parentElement?.classList.add('cover-missing');this.remove()"/><span aria-hidden="true">P</span></div>` : '<div class="cover-shell"><span aria-hidden="true">P</span></div>'}<div class="comic-card-body"><label><input type="checkbox" data-selection-context="shelf" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.shelf.has(comic.comicId) ? 'checked' : ''}/> ${t('action.select')}</label><h3>${escapeHtml(comic.title)}</h3><p>${escapeHtml(comic.canonicalAuthor || comic.author)}</p><div>${(
                         comic.tags || []
                     )
                         .slice(0, 3)
@@ -1374,6 +1402,7 @@ async function openShelf(shelfId) {
                 ''
             )}</div><div class="actions"><button data-shelf-remove-selected="${escapeHtml(shelf.id)}">${t('shelf.removeSelected')}</button></div>`
     setGridSize('shelf', state.shelfGridSize)
+    mountOnlineReadButtons($('#shelf-detail'))
 }
 
 let pendingShelfAction = null
@@ -1556,6 +1585,12 @@ function openRecommendationDetail(comicId, context = 'recommendation') {
     $('#recommend-preview-message').textContent = ''
     $('#recommend-detail-content').innerHTML =
         `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${state.capabilities?.features?.providerFavoriteMutation ? `<button data-detail-favorite="true">${t('result.favorite')}</button>` : ''}<button data-detail-download="true">${t('action.download')}</button></div>`
+    if (state.mode === 'connected') {
+        const button = document.createElement('button')
+        button.dataset.detailOnline = 'true'
+        button.textContent = t('reader.online')
+        $('#recommend-detail-content .detail-actions').prepend(button)
+    }
     dialog.showModal()
     recordRecommendationEvent(
         context === 'search' ? 'search_result_open' : 'recommend_detail_open',
@@ -1622,7 +1657,11 @@ $('#recommend-detail-close').onclick = () =>
 $('#recommend-detail-dialog').onclick = async (event) => {
     const dialog = $('#recommend-detail-dialog')
     const comicId = dialog.dataset.comicId
-    if (event.target.dataset.detailPreview) await loadRecommendationPreview(0)
+    if (event.target.dataset.detailOnline) {
+        dialog.close()
+        await openReaderComic(comicId, true)
+    }
+    else if (event.target.dataset.detailPreview) await loadRecommendationPreview(0)
     else if (event.target.dataset.detailPreviewMore)
         await loadRecommendationPreview(
             Number(dialog.dataset.previewOffset || 0)
@@ -1654,6 +1693,11 @@ $('#recommend-detail-dialog').onclick = async (event) => {
 
 let readerProgressTimer = null
 let readerScrollHandler = null
+let readerChapterRequest = 0
+let readerComicRequest = 0
+function readerApiRoot() {
+    return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
+}
 function renderReaderPages() {
     const reader = state.reader
     if (!reader.chapter) return
@@ -1671,9 +1715,19 @@ function renderReaderPages() {
     target.innerHTML = pages
         .map(
             (page, index) =>
-                `<img src="${escapeHtml(page.url)}" data-reader-page="${mode === 'vertical' ? index : reader.pageIndex + index}" alt="${t('reader.pageAlt', { page: (mode === 'vertical' ? index : reader.pageIndex + index) + 1 })}" />`
+                `<img src="${escapeHtml(page.url)}" loading="lazy" decoding="async" data-reader-page="${mode === 'vertical' ? index : reader.pageIndex + index}" alt="${t('reader.pageAlt', { page: (mode === 'vertical' ? index : reader.pageIndex + index) + 1 })}" />`
         )
         .join('')
+    for (const image of target.querySelectorAll('img')) {
+        image.addEventListener('error', () => {
+            if (!image.isConnected) return
+            const retry = document.createElement('button')
+            retry.type = 'button'
+            retry.textContent = t('reader.retryPage', { page: Number(image.dataset.readerPage) + 1 })
+            retry.onclick = () => { retry.remove(); image.src = image.getAttribute('src') }
+            image.after(retry)
+        })
+    }
     if (readerScrollHandler)
         window.removeEventListener('scroll', readerScrollHandler)
     readerScrollHandler = null
@@ -1731,17 +1785,23 @@ async function flushReaderProgress(keepalive = false) {
         episodeId: state.reader.episodeId,
         pageIndex: state.reader.pageIndex
     }
+    const reader = state.reader
+    const root = readerApiRoot()
     try {
-        if (keepalive)
-            await fetch('/api/v1/reader/progress', {
+        if (keepalive) {
+            const response = await fetch(`${root}/progress`, {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify(payload),
                 keepalive: true
             })
-        else await post('/api/v1/reader/progress', payload)
-        state.reader.progressSaved = payload.pageIndex
-        state.reader.dirty = false
+            if (!response.ok) throw new Error('Progress not saved')
+        }
+        else await post(`${root}/progress`, payload)
+        if (state.reader === reader && reader.episodeId === payload.episodeId && reader.pageIndex === payload.pageIndex) {
+            reader.progressSaved = payload.pageIndex
+            reader.dirty = false
+        }
         return true
     } catch {
         // Reader remains usable if progress persistence briefly fails.
@@ -1750,11 +1810,17 @@ async function flushReaderProgress(keepalive = false) {
 }
 
 async function openReaderChapter(episodeId) {
+    const requestId = ++readerChapterRequest
+    if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
+    readerScrollHandler = null
     if (state.reader.episodeId && state.reader.episodeId !== episodeId)
         await flushReaderProgress()
+    $('#reader-message').textContent = t('reader.loadingChapter')
+    try {
     const chapter = await api(
-        `/api/v1/reader/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`
+        `${readerApiRoot()}/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`
     )
+    if (requestId !== readerChapterRequest) return
     state.reader.episodeId = episodeId
     state.reader.chapter = chapter
     state.reader.pageIndex = Math.min(
@@ -1765,6 +1831,11 @@ async function openReaderChapter(episodeId) {
     state.reader.dirty = false
     renderReaderChapterHeading()
     renderReaderPages()
+    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
+    } catch (error) {
+        if (requestId === readerChapterRequest)
+            $('#reader-message').textContent = localizeError(language, error)
+    }
 }
 
 function renderReaderChapterHeading() {
@@ -1780,15 +1851,33 @@ function renderReaderChapterHeading() {
             : '')
 }
 
-async function openReaderComic(comicId) {
+async function openReaderComic(comicId, online = false) {
+    const requestId = ++readerComicRequest
+    readerChapterRequest++
     try {
+        await flushReaderProgress()
+        if (requestId !== readerComicRequest) return
+        if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
+        readerScrollHandler = null
+        const originView = activeView === 'reader' ? state.reader.originView : activeView
+        state.reader = { comicId, online, episodeId: null, dirty: false, originView }
+        const root = readerApiRoot()
+        activateView('reader')
+        document.body.classList.add('reader-active')
+        $('#reader .eyebrow').textContent = t(online ? 'reader.online' : 'reader.eyebrow')
+        $('#reader-pages').replaceChildren()
+        $('#reader-chapters').replaceChildren()
+        $('#reader-message').textContent = t('reader.loadingChapters')
+        $('#reader-export-zip').hidden = online
+        $('#reader-export-cbz').hidden = online
         const [chapters, recentProgress] = await Promise.all([
             api(
-                `/api/v1/reader/comics/${encodeURIComponent(comicId)}/chapters`
+                `${root}/comics/${encodeURIComponent(comicId)}/chapters`
             ),
-            api('/api/v1/reader/progress')
+            api(`${root}/progress`)
         ])
-        const readable = chapters.filter((item) => item.downloadedPictures > 0)
+        if (requestId !== readerComicRequest) return
+        const readable = chapters.filter((item) => online || item.downloadedPictures > 0)
         if (!readable.length) throw new Error(t('reader.noChapters'))
         const resume = recentProgress.find(
             (item) =>
@@ -1797,6 +1886,7 @@ async function openReaderComic(comicId) {
         )
         state.reader = {
             comicId,
+            online,
             episodeId: null,
             pageIndex: 0,
             chapters,
@@ -1809,14 +1899,14 @@ async function openReaderComic(comicId) {
         $('#reader-chapters').innerHTML = chapters
             .map(
                 (chapter) =>
-                    `<button data-reader-episode="${escapeHtml(chapter.id)}" ${chapter.downloadedPictures ? '' : 'disabled'}>${escapeHtml(chapter.title)} · ${chapter.downloadedPictures}/${chapter.knownPictures}</button>`
+                    `<button data-reader-episode="${escapeHtml(chapter.id)}" ${online || chapter.downloadedPictures ? '' : 'disabled'}>${escapeHtml(chapter.title)}${online ? '' : ` · ${chapter.downloadedPictures}/${chapter.knownPictures}`}</button>`
             )
             .join('')
         activateView('reader')
         document.body.classList.add('reader-active')
         await openReaderChapter(resume?.episodeId || readable[0].id)
     } catch (error) {
-        $('#reader-message').textContent = localizeError(language, error)
+        if (requestId === readerComicRequest) $('#reader-message').textContent = localizeError(language, error)
     }
 }
 
@@ -1844,7 +1934,11 @@ $('#reader-fullscreen').onclick = () =>
         ? document.exitFullscreen()
         : $('#reader').requestFullscreen()
 async function exitReader() {
+    readerComicRequest++
+    readerChapterRequest++
     await flushReaderProgress()
+    if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
+    readerScrollHandler = null
     document.body.classList.remove('reader-active')
     activateView(state.reader.originView || 'downloaded')
 }
@@ -1893,6 +1987,8 @@ document.addEventListener('keydown', (event) => {
 async function loadDownloaded() {
     if (state.mode === 'lite') return
     const records = await api('/api/v1/downloaded')
+    $('#downloaded-grid').setAttribute('aria-pressed', String(state.downloadedView === 'grid'))
+    $('#downloaded-list').setAttribute('aria-pressed', String(state.downloadedView === 'list'))
     $('#downloaded-count').textContent = t('downloaded.count', {
         shown: records.length,
         total: records.length
@@ -1916,6 +2012,7 @@ async function loadDownloaded() {
         )
         .join('')
     setGridSize('downloaded', state.downloadedGridSize)
+    downloadedCloud.mount(records)
 }
 
 $('#downloaded').onclick = (event) => {
@@ -2026,12 +2123,16 @@ $('#downloaded-grid').onclick = () => {
     localStorage.setItem('pica-downloaded-view', 'grid')
     $('#downloaded-grid-items').hidden = false
     $('#downloaded-table').hidden = true
+    $('#downloaded-grid').setAttribute('aria-pressed', 'true')
+    $('#downloaded-list').setAttribute('aria-pressed', 'false')
 }
 $('#downloaded-list').onclick = () => {
     state.downloadedView = 'list'
     localStorage.setItem('pica-downloaded-view', 'list')
     $('#downloaded-grid-items').hidden = true
     $('#downloaded-table').hidden = false
+    $('#downloaded-grid').setAttribute('aria-pressed', 'false')
+    $('#downloaded-list').setAttribute('aria-pressed', 'true')
 }
 function setShelfView(view) {
     state.shelfView = view

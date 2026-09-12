@@ -25,6 +25,7 @@
         <activity android:name=".UpdateActivity" android:exported="false" />
         <activity android:name=".PicaBrowseActivity" android:exported="false" />
         <activity android:name=".PicaAccountActivity" android:exported="false" />
+        <activity android:name=".PicaRegisterActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".DownloadsActivity" android:exported="false" />
         <activity android:name=".TaskCenterActivity" android:exported="false" />
         <activity android:name=".RemoteStorageActivity" android:exported="false" />

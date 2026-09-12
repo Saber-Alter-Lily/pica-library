@@ -52,7 +52,8 @@ describe('dev.2 connected Web lifecycle contracts', () => {
         'reader_resume_after_app_restart',
         'reader_resume_clamps_removed_page'
     ])('%s', () => {
-        expect(app).toContain("api('/api/v1/reader/progress')")
+        expect(app).toContain("'/api/v1/online-reader' : '/api/v1/reader'")
+        expect(app).toContain('api(`${root}/progress`)')
         expect(app).toContain('chapter.progress?.pageIndex || 0')
         expect(app).toContain('Math.max(0, chapter.pages.length - 1)')
     })

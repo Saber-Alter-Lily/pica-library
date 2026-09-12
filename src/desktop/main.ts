@@ -25,6 +25,7 @@ import {
     saveConfig
 } from './config'
 import { DpapiCredentialStore } from './credentials'
+import { PicaAccountError } from '../services/pica-account'
 import { InstanceLock } from './instance'
 import { DesktopLog } from './logging'
 import { desktopPaths } from './paths'
@@ -220,6 +221,7 @@ function applyCredentials(
 }
 
 function friendlyConnectionError(error: unknown) {
+    if (error instanceof PicaAccountError) return error.message
     const message = error instanceof Error ? error.message : String(error)
     log.write(`Connection test failed: ${message}`)
     if (/401|unauthor|credential|account|password|sign-in/i.test(message))
@@ -235,6 +237,10 @@ function friendlyConnectionError(error: unknown) {
 
 async function testConnection(input: Record<string, unknown>) {
     const remoteAction = String(input.remoteStorageAction ?? '')
+    if (remoteAction === 'inventory') {
+        if (!remoteStorageManager) throw new Error('Remote storage is not ready')
+        return await remoteStorageManager.inventory(input)
+    }
     if (remoteAction === 'test') {
         if (!remoteStorageManager) throw new Error('Remote storage is not ready')
         return await remoteStorageManager.test(input)
@@ -268,6 +274,25 @@ async function testConnection(input: Record<string, unknown>) {
     } finally {
         if (previous) process.env.PICA_PROXY = previous
         else delete process.env.PICA_PROXY
+    }
+}
+
+let registrationInFlight = false
+let lastRegistrationStarted = 0
+async function registerAccount(input: Record<string, unknown>) {
+    if (registrationInFlight || Date.now() - lastRegistrationStarted < 30000)
+        throw new Error('注册请求正在处理或刚刚提交，请先检查结果，不要重复提交。')
+    const proxyUrl = connectionProxy(
+        input.proxyUrl === undefined ? undefined : String(input.proxyUrl),
+        config?.proxyUrl,
+        credentials ?? { account: '', password: '' }
+    )
+    registrationInFlight = true
+    lastRegistrationStarted = Date.now()
+    try {
+        return await new Pica({ proxyUrl: proxyUrl || false }).register(input)
+    } finally {
+        registrationInFlight = false
     }
 }
 
@@ -459,6 +484,10 @@ async function startEngine(preferredPort: number) {
                 if (!remoteStorageManager) throw new Error('Remote storage is not ready')
                 return await remoteStorageManager.sync(input)
             }
+            if (remoteAction === 'delete-remote') {
+                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
+                return await remoteStorageManager.deleteCopies(input)
+            }
             const personalizationAction = String(input.personalizationAction ?? '')
             if (personalizationAction === 'verify-star')
                 throw new Error('公开用户名 Star 验证已停用，请使用 GitHub 账号认证')
@@ -541,6 +570,7 @@ async function startEngine(preferredPort: number) {
             return { success: true, restarting: dataChanged }
         },
         testConnection,
+        registerAccount,
         detectProxy,
         chooseFolder,
         exportBrowserLitePackage: async () => {

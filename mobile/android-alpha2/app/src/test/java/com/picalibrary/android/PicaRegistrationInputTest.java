@@ -9,20 +9,33 @@ import static org.junit.Assert.*;
 public class PicaRegistrationInputTest {
     private Map<String,String> fixture() {
         Map<String,String> input = new LinkedHashMap<>();
-        input.put("name", " Demo "); input.put("email", "demo-identifier");
+        input.put("name", " Demo "); input.put("email", "demo_reader");
         input.put("password", " fixture-password "); input.put("confirmPassword", " fixture-password ");
         input.put("birthday", "2000-02-29"); input.put("gender", "bot");
         for (int i = 1; i <= 3; i++) { input.put("question"+i, " Demo question "); input.put("answer"+i, " answer "); }
         return input;
     }
-    @Test public void acceptsAccountIdentifierWithoutAtAndPreservesSecrets() {
+    @Test public void acceptsUsernameWithoutAtAndPreservesSecrets() {
         Map<String,String> out = PicaRegistrationInput.validate(fixture(), true, LocalDate.of(2026, 9, 13));
-        assertEquals("demo-identifier", out.get("email"));
+        assertEquals("demo_reader", out.get("email"));
         assertEquals("Demo", out.get("name"));
         assertEquals(" fixture-password ", out.get("password"));
         assertEquals(" answer ", out.get("answer1"));
         assertFalse(out.containsKey("confirmPassword"));
         assertEquals(11, out.size());
+    }
+    @Test public void newUsernameAndPasswordRulesMatchProviderClients() {
+        Map<String,String> input = fixture();
+        input.put("email", "reader.01_"); input.put("password", "12345678"); input.put("confirmPassword", "12345678");
+        assertEquals("reader.01_", PicaRegistrationInput.validate(input, true, LocalDate.of(2026,9,13)).get("email"));
+        input.put("password", "1234567"); input.put("confirmPassword", "1234567");
+        assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(input, true, LocalDate.of(2026,9,13)));
+        input = fixture(); input.put("email", "reader-name");
+        Map<String,String> invalidSymbol = input;
+        assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(invalidSymbol, true, LocalDate.of(2026,9,13)));
+        input = fixture(); input.put("email", "12345678901234567");
+        Map<String,String> tooLong = input;
+        assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(tooLong, true, LocalDate.of(2026,9,13)));
     }
     @Test public void rejectsMissingConsent() {
         assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(fixture(), false, LocalDate.now()));
@@ -43,9 +56,13 @@ public class PicaRegistrationInputTest {
         input.put("birthday", "2000-02-29"); input.put("answer1", "bad\nanswer");
         assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(input, true, LocalDate.now()));
     }
-    @Test public void neverShowsUntrustedProviderBodies() {
+    @Test public void classifiesKnownProviderFailuresWithoutShowingBodies() {
+        assertEquals("PICA_ACCOUNT_USERNAME_TAKEN", PicaAccountErrors.providerMarker(400, "email already exists sensitive-value"));
+        assertEquals("PICA_ACCOUNT_INVALID_BIRTHDAY", PicaAccountErrors.providerMarker(400, "error 1002 validation error: birthday must be a valid date string"));
         assertFalse(PicaAccountErrors.message(new Exception("token=fixture-sensitive-body")).contains("fixture-sensitive"));
-        assertTrue(PicaAccountErrors.message(new java.net.SocketTimeoutException()).contains("网络"));
+        assertTrue(PicaAccountErrors.message(new java.net.SocketTimeoutException()).contains("直连失败"));
         assertTrue(PicaAccountErrors.message(new Exception("PICA_ACCOUNT_REJECTED")).contains("拒绝"));
+        assertFalse(PicaAccountErrors.retrySafe(new java.net.SocketTimeoutException()));
+        assertTrue(PicaAccountErrors.retrySafe(new Exception("PICA_ACCOUNT_REJECTED")));
     }
 }

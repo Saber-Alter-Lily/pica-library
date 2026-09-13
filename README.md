@@ -8,7 +8,7 @@ Pica Library 是一个面向长期漫画收藏的本地优先管理工具：在 
 
 **Windows 10/11 x64 · Android Preview · 开源 · 免费**
 
-[下载 Windows v0.3.11](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11) · [下载 Android Preview v38](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [提交 Issue](https://github.com/Saber-Alter-Lily/pica-library/issues)
+[下载 Windows v0.3.12](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.12) · [下载 Android Preview v39](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [提交 Issue](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
 > Android 版本目前**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
 
@@ -57,14 +57,16 @@ Android 端以 **书库 / 推荐 / 在线 / 连接** 四个主入口组织功能
 
 ### Windows
 
-- [v0.3.11 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-windows-x64.zip)
-- [v0.3.11 增量更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-update.zip)
+- [v0.3.12 完整包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.12/Pica-Library-v0.3.12-windows-x64.zip)
+- [v0.3.12 增量更新包](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.12/Pica-Library-v0.3.12-update.zip)
 
-v0.3.11 已逐一验证支持所有正式 **v0.3.x** 版本直接应用内升级：
+v0.3.12 已实测支持官方 **v0.3.11 → v0.3.12** 增量升级与故障回滚。
 
-`v0.3.0 / v0.3.1 / ... / v0.3.10 → v0.3.11`
+v0.3.0–v0.3.10 用户请先手动应用 [v0.3.11 增量包](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11)，再检查更新；也可备份数据后使用 v0.3.12 完整包。不要将 v0.3.12 增量包直接应用到不支持的旧版。
 
 Desktop 用户优先使用 **设置 → 软件更新**。
+
+新增双端账号引导与显式注册、网页在线阅读、已下载漫画的网盘状态及选择性上传/云端删除。注册依赖第三方服务；真实注册和各 WebDAV 服务兼容性尚未实测。网盘删除不影响本地下载，不支持安全目录锁的服务会拒绝删除。
 
 ### Android
 

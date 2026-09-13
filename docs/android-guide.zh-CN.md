@@ -1,6 +1,8 @@
 # Pica Library Android 使用说明
 
-> 当前版本：**Android Preview v38 · Alpha8.11**。Android 版本**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
+> 当前版本：**Android Preview v39 · Alpha8.12**。Android 版本**未上架任何应用商店**，请仅从本仓库 GitHub Release 下载 APK。
+
+Pica 账号页面新增首次登录引导和“注册”入口。注册资料由你自行填写并确认后提交至第三方 Pica；不会自动登录、同步或下载。网络超时不一定是密码错误，注册也不代表获得评论权限。真实注册服务兼容性尚未实测；本地、局域网和 WebDAV 阅读不要求 Pica 账号。
 
 ![Android 页面说明](https://raw.githubusercontent.com/Saber-Alter-Lily/pica-library/c55c4f39171874a7fa800803a5a3cf979defd0ab/docs/assets/android-overview-final.png)
 

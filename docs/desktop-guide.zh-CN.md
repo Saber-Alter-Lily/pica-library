@@ -1,12 +1,12 @@
 # Pica Library Desktop / Web 使用说明
 
-> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.3.11 / Alpha8.11**。
+> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.3.12 / Alpha8.12**。
 
 ![Desktop / Web 页面说明](https://raw.githubusercontent.com/Saber-Alter-Lily/pica-library/c55c4f39171874a7fa800803a5a3cf979defd0ab/docs/assets/desktop-overview-final.png)
 
 ## 1. 安装与启动
 
-1. 从 [v0.3.11 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11) 下载 `Pica-Library-v0.3.11-windows-x64.zip`。
+1. 从 [v0.3.12 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.12) 下载 `Pica-Library-v0.3.12-windows-x64.zip`。
 2. 完整解压后运行 `Pica Library.exe`，不要直接在压缩包内运行。
 3. 首次启动会显示使用提示；确认后进入本地 Web UI。
 4. 根据需要填写 Pica 账号、代理和漫画保存目录。
@@ -62,9 +62,13 @@ Desktop 支持导入 `.pica-theme` 主题包，并把可用主题包同步到 An
 
 优先使用 **设置 → 软件更新**。
 
-v0.3.11 的正式增量包已经逐一验证支持：
+v0.3.12 增量包已实测支持官方 v0.3.11 升级及故障回滚：
 
-`v0.3.0 / v0.3.1 / ... / v0.3.10 → v0.3.11`
+`v0.3.11 → v0.3.12`
+
+v0.3.0–v0.3.10 请先手动应用 v0.3.11 增量包再检查更新，或备份数据后使用最新完整包。
+
+首次设置和账号设置页有注册引导；Browser Lite 不接收凭据，请用 Windows 或 Android 客户端注册。漫画库、书架和详情提供在线阅读入口。已下载页可刷新网盘状态、选择未上传漫画上传，或仅删除网盘副本并保留本地下载；真实 WebDAV 兼容性尚未实测，不支持安全目录锁时会停止删除。
 
 更新过程会校验包来源和文件完整性，并保留用户数据库、下载内容与本地配置。若非常旧的客户端所在网络无法访问 GitHub 更新通道，可改用完整 ZIP 覆盖应用程序目录，用户数据仍应保留在独立数据目录中。
 

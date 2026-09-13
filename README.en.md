@@ -8,7 +8,7 @@ Pica Library is a local-first manga library manager for long-lived collections. 
 
 **Windows 10/11 x64 · Android Preview · Open source · Free**
 
-[Windows v0.3.11](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11) · [Android Preview v38](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
+[Windows v0.3.12](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.12) · [Android Preview v39](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
 
 > The Android build is **not published in any app store**. Download the APK only from this repository's GitHub Release.
 
@@ -57,12 +57,14 @@ Theme packs can sync across devices, but **Desktop and Android do not have to us
 
 ### Windows
 
-- [v0.3.11 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-windows-x64.zip)
-- [v0.3.11 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.11/Pica-Library-v0.3.11-update.zip)
+- [v0.3.12 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.12/Pica-Library-v0.3.12-windows-x64.zip)
+- [v0.3.12 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.12/Pica-Library-v0.3.12-update.zip)
 
-v0.3.11 has been individually verified for direct in-app upgrades from every formal **v0.3.x** release:
+The official **v0.3.11 → v0.3.12** incremental upgrade and failure rollback have been tested.
 
-`v0.3.0 / v0.3.1 / ... / v0.3.10 → v0.3.11`
+For v0.3.0–v0.3.10, first manually apply the [v0.3.11 update](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11), then check for updates, or back up data and use the v0.3.12 full package. The v0.3.12 incremental package does not directly support those older versions.
+
+New: account onboarding and explicit registration on both clients, Web online reading, and selected cloud upload/deletion with local files retained. Live registration and individual WebDAV services remain unvalidated; remote deletion fails closed when server-enforced locking is unavailable.
 
 Prefer **Settings → Software Update** on Desktop.
 

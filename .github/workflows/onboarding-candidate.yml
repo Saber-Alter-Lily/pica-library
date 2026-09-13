@@ -1,0 +1,66 @@
+name: Onboarding candidate (no publication)
+
+on:
+  push:
+    branches: [codex/account-onboarding-web-reader]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/onboarding-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-android-candidate:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test and lint before loading signing material
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Build and verify fixed-signature candidate (never publish)
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_PREVIEW_KEYSTORE_B64"
+          test -n "$ANDROID_PREVIEW_KEYSTORE_PASSWORD"
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -f -- "$ANDROID_PREVIEW_KEYSTORE_PATH"; rmdir -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleRelease --no-daemon
+          unset ANDROID_PREVIEW_KEYSTORE_PASSWORD
+          apk=app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pica-candidate-cert.txt"
+          fingerprint=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-candidate-cert.txt")
+          test "$fingerprint" = '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | head -1 > "$RUNNER_TEMP/pica-candidate-package.txt"
+          grep -q "name='com.picalibrary.android' versionCode='39' versionName='0.1.0-alpha8.12-account-onboarding'" "$RUNNER_TEMP/pica-candidate-package.txt"
+          mkdir -p candidate
+          cp "$apk" candidate/Pica-Library-Android-v39-candidate.apk
+          printf '%s\n' "$fingerprint" > candidate/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate/SOURCE_SHA.txt
+          printf '%s\n' 'UNRELEASED CANDIDATE: requires maintainer device and live-service acceptance.' > candidate/STATUS.txt
+          (cd candidate && sha256sum Pica-Library-Android-v39-candidate.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-v39-signed-candidate
+          path: mobile/android-alpha2/candidate/
+          retention-days: 1
+          if-no-files-found: error

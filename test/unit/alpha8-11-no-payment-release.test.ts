@@ -48,17 +48,25 @@ describe('Alpha8.11 no-payment release baseline', () => {
             'README.en.md',
             'docs/desktop-guide.zh-CN.md',
             'docs/android-guide.zh-CN.md'
-        ].map(read).join('\n')
+        ]
+            .map(read)
+            .join('\n')
         expect(docs).not.toContain('个性化装扮与 GitHub Star')
         expect(docs).not.toContain('个性化主题属于 GitHub Star 解锁功能')
-        expect(docs).not.toContain('Personalization:\nThe official-build personalization gate is a GitHub Star')
+        expect(docs).not.toContain(
+            'Personalization:\nThe official-build personalization gate is a GitHub Star'
+        )
     })
 
-    it('stages Desktop v0.3.11 and Android v38', () => {
+    it('retains the no-payment baseline in subsequent versions', () => {
         const pkg = JSON.parse(read('package.json')) as { version: string }
         const gradle = read('mobile/android-alpha2/app/build.gradle')
-        expect(pkg.version).toBe('0.3.11')
-        expect(gradle).toContain('versionCode 38')
-        expect(gradle).toContain("versionName '0.1.0-alpha8.11-no-payment'")
+        const [major, minor, patch] = pkg.version.split('.').map(Number)
+        expect(major * 1000000 + minor * 1000 + patch).toBeGreaterThanOrEqual(
+            3011
+        )
+        expect(
+            Number(gradle.match(/versionCode\s+(\d+)/)?.[1])
+        ).toBeGreaterThanOrEqual(38)
     })
 })

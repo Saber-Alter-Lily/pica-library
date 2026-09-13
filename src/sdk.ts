@@ -183,7 +183,7 @@ export class Pica {
         order = this.Order.default,
         page = 1
     ) {
-        const res = await this.comicsPage(block, tag, order, page)
+        const res = await this.comics(block, tag, order, page)
         return res.comics as PageSearch
     }
 

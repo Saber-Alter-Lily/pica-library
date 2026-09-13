@@ -9,10 +9,10 @@ const read = (relative: string) =>
 describe('Visual System V3 / Result Card Print V4 contracts', () => {
     it('ships a branded Web icon without changing application APIs', () => {
         const index = read('web/index.html')
-        expect(index).toContain('pica-library-icon.svg')
+        expect(index).toContain('pica-library-icon.webp')
         expect(index).toContain('class="app-brand-icon"')
         expect(
-            fs.existsSync(path.join(root, 'web/pica-library-icon.svg'))
+            fs.existsSync(path.join(root, 'web/pica-library-icon.webp'))
         ).toBe(true)
     })
 

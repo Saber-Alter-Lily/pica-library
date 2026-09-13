@@ -24,23 +24,10 @@ jobs:
       - name: Validate Web and Desktop
         run: |
           set -euo pipefail
+          pnpm type:check
           pnpm web:check
+          pnpm test
           pnpm build
-          pnpm exec vitest run \
-            test/unit/alpha8-11-no-payment-release.test.ts \
-            test/unit/alpha8-10-release-readiness.test.ts \
-            test/unit/alpha8-9-auth-ux-204.test.ts \
-            test/unit/alpha8-8-account-auth-theme-disclaimer.test.ts \
-            test/unit/alpha8-7-1-star-401-hotfix.test.ts \
-            test/unit/alpha8-7-settings-star-contract.test.ts \
-            test/unit/alpha8-6-star-personalization-contract.test.ts \
-            test/unit/personalization-theme-studio.test.ts \
-            test/unit/update-hotfix-contract.test.ts \
-            test/unit/update-manager-release-fallback.test.ts \
-            test/unit/update-package-builder.test.ts \
-            test/unit/v038-disclaimer-update-path.test.ts \
-            test/unit/v038-disclaimer-package-builder.test.ts \
-            test/unit/update-manager.test.ts
 
   android:
     runs-on: ubuntu-latest

@@ -62,12 +62,14 @@ describe('runner artifact', () => {
         fs.rmSync(dir, { recursive: true, force: true })
     })
 
-    it('configures the workflow CLI path as a GitHub runner', () => {
-        const workflow = fs.readFileSync(
-            path.resolve('.github/workflows/private-download.yml'),
-            'utf8'
-        )
-        expect(workflow.match(/--runner GITHUB/g)).toHaveLength(2)
-        expect(workflow).toContain('INPUT_PROFILE')
+    it('retains explicit GitHub runner selection without reviving retired provider workflows', () => {
+        const cli = fs.readFileSync(path.resolve('src/library-cli.ts'), 'utf8')
+        expect(cli).toContain("['LOCAL', 'GITHUB'].includes(runner)")
+        expect(cli).toContain('runner: runtime.runner')
+        expect(
+            fs.existsSync(
+                path.resolve('.github/workflows/private-download.yml')
+            )
+        ).toBe(false)
     })
 })

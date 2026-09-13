@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosAdapter, type AxiosResponse } from 'axios'
 import headers from './data/headers.json'
+import { accountHttpError, PicaAccountError, validatePicaRegistration } from './services/pica-account'
 import { createHash, createHmac } from 'node:crypto'
 import path from 'node:path'
 import fs from 'node:fs/promises'
@@ -38,11 +39,10 @@ export class Pica {
     retryMap = new Map<string, number>() // <url, retryCount>
 
     constructor(
-        options: { apiAdapter?: AxiosAdapter; mediaAdapter?: AxiosAdapter } = {}
+        options: { apiAdapter?: AxiosAdapter; mediaAdapter?: AxiosAdapter; proxyUrl?: string | false } = {}
     ) {
-        const httpProxy = process.env.PICA_PROXY
-            ? new URL(process.env.PICA_PROXY as string)
-            : false
+        const proxyUrl = options.proxyUrl ?? process.env.PICA_PROXY
+        const httpProxy = proxyUrl ? new URL(proxyUrl) : false
         this.api = axios.create({
             baseURL: 'https://picaapi.picacomic.com/',
             // baseURL: 'https://api.manhuapica.com/',
@@ -76,7 +76,7 @@ export class Pica {
             headers.signature = hmac.digest('hex')
             headers.time = timestamp
             config.headers.set(headers)
-            if (this.token) {
+            if (this.token && url !== 'auth/register' && url !== 'auth/sign-in') {
                 config.headers.setAuthorization(this.token)
             }
             return config
@@ -88,6 +88,13 @@ export class Pica {
                 url && this.retryMap.delete(url)
 
                 const result = res.data
+
+                // Account responses can echo secrets even on rejection: never log them.
+                if (url === 'auth/sign-in' || url === 'auth/register') {
+                    if (!result || result.code !== 200)
+                        throw new PicaAccountError('REJECTED', res.status)
+                    return result.data ?? {}
+                }
 
                 const responseType = res.config.responseType
                 if (responseType === 'arraybuffer') {
@@ -103,6 +110,9 @@ export class Pica {
             },
             (error: AxiosError) => {
                 const { config, message, response } = error
+
+                if (config?.url === 'auth/sign-in' || config?.url === 'auth/register')
+                    return Promise.reject(accountHttpError(response?.status))
 
                 // 哔咔禁止访问的资源
                 if (response?.status === 400) {
@@ -136,15 +146,18 @@ export class Pica {
         const res = await this.request<string>('post', 'auth/sign-in', {
             email: account,
             password: password
-        }).catch((err) => {
-            debug('\n登录异常 %s', err)
-            throw new Error('登录失败，请检查账号/密码/网络环境')
         })
 
         if (!res.token) {
-            throw new Error('PICA_SECRET_KEY 错误')
+            throw new PicaAccountError('RESPONSE')
         }
         this.token = res.token
+    }
+
+    async register(input: Record<string, unknown>) {
+        const payload = validatePicaRegistration(input)
+        await this.request('post', 'auth/register', payload)
+        return { registered: true }
     }
 
     comics(block: string, tag: string, order: string, page = 1) {
@@ -501,7 +514,8 @@ export class Pica {
             url,
             method,
             headers,
-            data
+            data,
+            ...(/^auth\/(sign-in|register)$/.test(url) ? { timeout: 30000 } : {})
         })
     }
 }

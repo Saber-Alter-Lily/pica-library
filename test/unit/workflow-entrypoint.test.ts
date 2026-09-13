@@ -26,7 +26,7 @@ describe('built CLI entrypoint contract', () => {
         const cli = read('src/library-cli.ts')
         const server = read('src/library/server.ts')
 
-        expect(packageJson.version).toBe('0.3.0')
+        expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/)
         expect(version).toContain("from '../package.json'")
         expect(version).toContain('export const PRODUCT_VERSION')
         expect(cli).toContain('pica-library ${PRODUCT_VERSION}')
@@ -48,11 +48,7 @@ describe('built CLI entrypoint contract', () => {
     })
 
     it('uses the canonical built CLI in runtime automation', () => {
-        const runtimeFiles = [
-            '.github/workflows/private-download.yml',
-            '.github/workflows/prepare-library.yml',
-            'scripts/setup-windows.ps1'
-        ]
+        const runtimeFiles = ['scripts/setup-windows.ps1']
 
         for (const relativePath of runtimeFiles) {
             const content = read(relativePath)
@@ -60,29 +56,28 @@ describe('built CLI entrypoint contract', () => {
             expect(content, relativePath).toContain('dist/pica-library.js')
         }
 
-        const downloadWorkflow = read('.github/workflows/private-download.yml')
-        expect(downloadWorkflow).toContain('--runner GITHUB')
+        expect(read('src/library-cli.ts')).toContain(
+            "['LOCAL', 'GITHUB'].includes(runner)"
+        )
     })
 
-    it('fails closed for public callers and checks out the pinned engine', () => {
-        const wrapper = read('.github/workflows/download.yml')
-        const reusable = read('.github/workflows/private-download.yml')
-        expect(wrapper).toContain(
-            'uses: ./.github/workflows/private-download.yml'
+    it('keeps retired provider workflows absent and current CI read-only', () => {
+        // Current main intentionally ships validation CI, not the former private census/download runners.
+        for (const file of [
+            'download.yml',
+            'private-download.yml',
+            'prepare-library.yml'
+        ])
+            expect(
+                fs.existsSync(path.join(root, '.github/workflows', file))
+            ).toBe(false)
+        const ci = read('.github/workflows/ci.yml')
+        expect(ci).toContain('contents: read')
+        expect(ci).toContain('pull_request:')
+        expect(ci).not.toContain('workflow_call:')
+        expect(ci).not.toMatch(
+            /secrets\.PICA_(ACCOUNT|PASSWORD|SOURCE_TOKEN|SOURCE_SSH_KEY)/
         )
-        expect(reusable).toContain('workflow_call:')
-        expect(reusable).toContain('github.event.repository.private')
-        expect(reusable).toContain("!= 'true'")
-        expect(reusable).toContain('repository: ${{ job.workflow_repository }}')
-        expect(reusable).toContain('ref: ${{ job.workflow_sha }}')
-        expect(reusable).toContain(
-            'token: ${{ secrets.PICA_SOURCE_TOKEN || github.token }}'
-        )
-        expect(reusable).toContain(
-            'ssh-key: ${{ secrets.PICA_SOURCE_SSH_KEY }}'
-        )
-        expect(reusable).toContain('persist-credentials: false')
-        expect(reusable).toContain('retention-days: 1')
     })
 
     it('scopes provider secrets to provider steps and protects all artifacts', () => {
@@ -101,6 +96,27 @@ describe('built CLI entrypoint contract', () => {
                         /secrets\.PICA_(ACCOUNT|PASSWORD)/
                     )
                     expect(content, name).toContain('-SetupPersistence')
+                } else if (name === 'onboarding-candidate.yml') {
+                    // Distributable APKs are public build output, not provider/user data.
+                    // Signing material must remain in runner temp, never in the artifact.
+                    expect(content).toContain('contents: read')
+                    expect(content).toContain(
+                        'branches: [codex/account-onboarding-web-reader]'
+                    )
+                    expect(content).not.toMatch(/pull_request(?:_target)?:/)
+                    expect(content).toContain(
+                        'path: mobile/android-alpha2/candidate/'
+                    )
+                    expect(content).toContain('if-no-files-found: error')
+                    expect(content).toContain(
+                        'mktemp -d "$RUNNER_TEMP/pica-signing-XXXXXXXX"'
+                    )
+                    expect(content).toContain(
+                        '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+                    )
+                    expect(content).not.toMatch(
+                        /contents: write|gh release|git tag/
+                    )
                 } else {
                     expect(content, name).toContain(
                         'github.event.repository.private'
@@ -108,11 +124,10 @@ describe('built CLI entrypoint contract', () => {
                 }
             }
         }
-        const prepared = read('.github/workflows/prepare-library.yml')
-        const reusable = read('.github/workflows/private-download.yml')
-        expect(prepared).toContain("== 'true' ]] ||")
-        expect(prepared).toContain('PICA_ACCOUNT_PRESENT')
-        expect(reusable).toContain('PICA_ACCOUNT_PRESENT')
+        for (const name of workflows)
+            expect(read(`.github/workflows/${name}`), name).not.toMatch(
+                /secrets\.PICA_(ACCOUNT|PASSWORD)/
+            )
     })
 
     it('keeps recommendation diagnostics out of the default UI', () => {

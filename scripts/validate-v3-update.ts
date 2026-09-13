@@ -4,18 +4,19 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import AdmZip from 'adm-zip'
 import { UpdateManager } from '../src/update/manager'
+import assert from 'node:assert/strict'
 
 const root = path.resolve(import.meta.dirname, '..')
-const updateFile = path.join(
-    root,
-    'artifacts',
-    'Pica-Library-v0.3.0-update.zip'
-)
+const updateFile = process.argv[2]
+    ? path.resolve(process.argv[2])
+    : path.join(root, 'artifacts', 'Pica-Library-v0.3.0-update.zip')
 const archive = fs.readFileSync(updateFile)
 const zip = new AdmZip(archive)
 const manifest = JSON.parse(zip.readAsText('update-manifest.json')) as {
     sourceSha: string
     targetSourceSha: string
+    targetVersion: string
+    sourceVersionRange: string
 }
 const temp = fs.mkdtempSync(
     path.join(os.tmpdir(), 'pica-v3-update-validation-')
@@ -23,12 +24,12 @@ const temp = fs.mkdtempSync(
 const fetchImplementation = async () =>
     new Response(
         JSON.stringify({
-            tag_name: 'v0.3.0',
+            tag_name: `v${manifest.targetVersion}`,
             draft: false,
             prerelease: false,
             assets: [
                 {
-                    name: 'Pica-Library-v0.3.0-update.zip',
+                    name: path.basename(updateFile),
                     digest: `sha256:${createHash('sha256').update(archive).digest('hex')}`
                 }
             ]
@@ -37,7 +38,7 @@ const fetchImplementation = async () =>
     )
 try {
     const manager = new UpdateManager({
-        currentVersion: '0.2.0',
+        currentVersion: manifest.sourceVersionRange.replace(/^=/, ''),
         currentSourceSha: manifest.sourceSha,
         applicationRoot: temp,
         stateRoot: path.join(temp, 'state'),
@@ -47,10 +48,7 @@ try {
         instanceFile: path.join(temp, 'instance.json'),
         fetchImplementation: fetchImplementation as typeof fetch
     })
-    const staged = await manager.stage(
-        'Pica-Library-v0.3.0-update.zip',
-        archive
-    )
+    const staged = await manager.stage(path.basename(updateFile), archive)
     console.log(
         JSON.stringify(
             {
@@ -63,5 +61,11 @@ try {
         )
     )
 } finally {
+    assert.equal(
+        path.dirname(fs.realpathSync(temp)).toLowerCase(),
+        fs.realpathSync(os.tmpdir()).toLowerCase()
+    )
+    assert.ok(path.basename(temp).startsWith('pica-v3-update-validation-'))
+    assert.equal(fs.lstatSync(temp).isSymbolicLink(), false)
     fs.rmSync(temp, { recursive: true, force: true })
 }

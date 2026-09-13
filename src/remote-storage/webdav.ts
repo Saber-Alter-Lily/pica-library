@@ -5,6 +5,7 @@ import type {
     RemoteStorageProvider,
     RemoteStoragePublicConfig
 } from './types'
+import { remoteLayout } from './layout'
 
 function normalizeBaseUrl(value: string) {
     const url = new URL(value.trim())
@@ -48,6 +49,7 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     private readonly ensuredDirectories = new Set<string>()
     private readonly metadataTimeoutMs: number
     private readonly uploadTimeoutMs: number
+    private libraryLockToken: string | null = null
 
     constructor(
         config: RemoteStoragePublicConfig,
@@ -92,7 +94,7 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
             try {
                 const response = await fetch(url, {
                     ...init,
-                    headers: this.headers(init.headers),
+                    headers: this.lockedHeaders(url, init),
                     signal: AbortSignal.timeout(timeoutMs)
                 })
                 if (!retryableStatus(response.status) || attempt === attempts)
@@ -112,6 +114,69 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         throw lastError instanceof Error
             ? lastError
             : new Error('WebDAV request failed')
+    }
+
+    private lockedHeaders(url: string, init: RequestInit) {
+        const headers = this.headers(init.headers)
+        const lockRoot = this.url('v1')
+        if (
+            this.libraryLockToken &&
+            init.method !== 'UNLOCK' &&
+            (url === lockRoot || url.startsWith(`${lockRoot}/`))
+        ) {
+            // Tagged root condition also protects newly created descendants.
+            // An expired lock yields 412, not an unguarded write.
+            headers.set('If', `<${lockRoot}> (${this.libraryLockToken})`)
+        }
+        return headers
+    }
+
+    async withExclusiveLibraryWrite<T>(work: () => Promise<T>): Promise<T> {
+        if (this.libraryLockToken) throw new Error('已有网盘删除操作进行中')
+        const response = await this.fetchWithRetry(
+            this.url('v1'),
+            {
+                method: 'LOCK',
+                headers: {
+                    Depth: 'infinity',
+                    Timeout: 'Second-300',
+                    'Content-Type': 'application/xml; charset=utf-8'
+                },
+                body: '<?xml version="1.0"?><D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope><D:locktype><D:write/></D:locktype></D:lockinfo>'
+            },
+            this.metadataTimeoutMs,
+            1
+        )
+        const token = response.headers.get('lock-token')
+        await response.body?.cancel()
+        if (
+            response.status !== 200 ||
+            !token ||
+            !/^<[a-zA-Z][a-zA-Z0-9+.-]*:[^<>\s]+>$/.test(token)
+        )
+            throw new Error(
+                '网盘不支持安全目录锁或正被其他设备使用，已停止删除'
+            )
+        this.libraryLockToken = token
+        try {
+            return await work()
+        } finally {
+            try {
+                const unlocked = await this.fetchWithRetry(
+                    this.url('v1'),
+                    {
+                        method: 'UNLOCK',
+                        headers: { 'Lock-Token': token }
+                    },
+                    this.metadataTimeoutMs,
+                    1
+                )
+                await unlocked.body?.cancel()
+            } catch {
+                /* A lost connection leaves only the bounded server lease. */
+            }
+            this.libraryLockToken = null
+        }
     }
 
     private async request(
@@ -170,6 +235,42 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         throw new Error(
             `WebDAV existence check failed: HTTP ${response.status}`
         )
+    }
+
+    async deleteComic(comicId: string) {
+        // No general-purpose remote DELETE endpoint: only an owned comic subtree.
+        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(comicId))
+            throw new Error('Unsafe remote comic ID')
+        if (!this.libraryLockToken)
+            throw new Error(
+                'Remote deletion requires an exclusive library lock'
+            )
+        // Refresh once per comic; never reacquire after a lost/expired lease.
+        const refreshed = await this.fetchWithRetry(
+            this.url('v1'),
+            {
+                method: 'LOCK',
+                headers: { Timeout: 'Second-300' }
+            },
+            this.metadataTimeoutMs,
+            1
+        )
+        await refreshed.body?.cancel()
+        if (refreshed.status !== 200)
+            throw new Error('网盘目录锁已失效，已停止删除')
+        const target = remoteLayout.comicRoot(comicId)
+        const response = await this.fetchWithRetry(
+            this.url(target),
+            { method: 'DELETE' },
+            this.uploadTimeoutMs,
+            1
+        )
+        if (![200, 204, 404].includes(response.status))
+            throw new Error(
+                `WebDAV comic deletion unconfirmed: HTTP ${response.status}`
+            )
+        if (await this.exists(target))
+            throw new Error('WebDAV comic deletion is not yet confirmed')
     }
 
     async ensureDirectory(path: string) {

@@ -15,8 +15,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 38
-        versionName '0.1.0-alpha8.11-no-payment'
+        versionCode 39
+        versionName '0.1.0-alpha8.12-account-onboarding'
     }
 
     signingConfigs {

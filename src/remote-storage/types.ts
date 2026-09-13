@@ -143,6 +143,8 @@ export interface RemoteJsonVersion<T> {
 
 export interface RemoteStorageProvider {
     readonly kind: RemoteStorageKind
+    withExclusiveLibraryWrite?<T>(work: () => Promise<T>): Promise<T>
+    deleteComic?(comicId: string): Promise<void>
     test(): Promise<{ success: true; status: number }>
     exists(path: string): Promise<boolean>
     ensureDirectory(path: string): Promise<void>

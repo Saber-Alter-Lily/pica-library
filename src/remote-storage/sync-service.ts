@@ -224,8 +224,9 @@ export class RemoteLibrarySyncService {
         }
     }
 
-    private localLibrary(): LocalScan {
+    private localLibrary(selectedIds?: string[]): LocalScan {
         const summaries = this.query.query({ scope: 'downloaded', limit: 5000, offset: 0 }).items
+            .filter((item) => !selectedIds || selectedIds.includes(item.comicId))
         const comics: LocalComic[] = []
         const issues: LocalIssue[] = []
         const localIds = new Set<string>()
@@ -249,7 +250,24 @@ export class RemoteLibrarySyncService {
     private async remoteCatalog() {
         const pointer = await this.provider.getJson<RemoteLibraryPointer>(remoteLayout.current)
         if (!pointer?.catalogPath) return null
-        return await this.provider.getJson<RemoteLibraryCatalog>(pointer.catalogPath)
+        const catalog = await this.provider.getJson<RemoteLibraryCatalog>(pointer.catalogPath)
+        if (!catalog || catalog.schemaVersion !== 1 || !Array.isArray(catalog.comics))
+            throw new Error('网盘目录缺失或格式异常，不能判定为未上传')
+        return catalog
+    }
+
+    async inventory() {
+        const catalog = await this.remoteCatalog()
+        const entries = new Map((catalog?.comics ?? []).map((entry) => [entry.comicId, entry]))
+        return {
+            checkedAt: new Date().toISOString(),
+            generation: catalog?.generation ?? null,
+            comics: this.query.query({ scope: 'downloaded', limit: 5000, offset: 0 }).items.map((comic) => {
+                const remote = entries.get(comic.comicId)
+                return { comicId: comic.comicId, remotePages: remote?.pageCount ?? 0,
+                    state: !remote ? 'not-uploaded' : remote.pageCount < comic.downloadedPictures ? 'needs-update' : 'remote-present' }
+            })
+        }
     }
 
     private async remoteComic(entry: RemoteCatalogEntry) {
@@ -298,8 +316,8 @@ export class RemoteLibrarySyncService {
         return { generation, catalogPath, catalog }
     }
 
-    async plan(): Promise<RemoteSyncPlan> {
-        const scan = this.localLibrary()
+    async plan(selectedIds?: string[]): Promise<RemoteSyncPlan> {
+        const scan = this.localLibrary(selectedIds)
         const local = scan.comics
         const remoteCatalog = await this.remoteCatalog()
         const remoteById = new Map((remoteCatalog?.comics ?? []).map((comic) => [comic.comicId, comic]))
@@ -344,7 +362,7 @@ export class RemoteLibrarySyncService {
         }
     }
 
-    async sync() {
+    async sync(selectedIds?: string[]) {
         let progress: RemoteSyncProgress = {
             phase: 'scanning',
             updatedAt: new Date().toISOString(),
@@ -367,7 +385,7 @@ export class RemoteLibrarySyncService {
         emit({})
 
         try {
-            const scan = this.localLibrary()
+            const scan = this.localLibrary(selectedIds)
             const local = scan.comics
             const totalPages = local.reduce((sum, comic) => sum + comic.entry.pageCount, 0)
             emit({

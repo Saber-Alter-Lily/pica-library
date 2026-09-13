@@ -19,6 +19,7 @@ import { AdaptiveRecommendationSession } from '../recommendation-v3/adaptive-ses
 import { PreviewCacheManager } from '../services/preview-cache-manager'
 import { PreviewService } from '../services/preview-service'
 import { ReaderService } from '../services/reader-service'
+import { OnlineReaderService } from '../services/online-reader-service'
 import type { UserEventInput, V3EventType } from '../recommendation-v3/types'
 import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
 import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
@@ -28,6 +29,7 @@ import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3
 
 export interface DesktopServerController {
     csrfToken: string
+    registerAccount?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     configured: () => boolean
     status: () => Record<string, unknown>
     importThemePack?: (name: string, value: Buffer) => Promise<Record<string, unknown>>
@@ -262,6 +264,11 @@ export async function startLibraryServer(options: {
         options.database,
         options.service.dataDir
     )
+    const onlineReader = new OnlineReaderService(options.database, providerService,
+        new PreviewCacheManager(path.join(options.cacheDir ?? options.service.dataDir, 'online-reader'), {
+            maxBytes: 256 * 1024 * 1024,
+            ttlMs: 24 * 60 * 60 * 1000
+        }))
     const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1'])
     if (
         !loopbackHosts.has(host) &&
@@ -619,6 +626,14 @@ export async function startLibraryServer(options: {
                 )
             }
             if (
+                url.pathname === '/api/v1/desktop/register-account' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.registerAccount)
+                    return json(response, 409, { error: '请在本地 Windows 版或 Android 中注册，Browser Lite 不接收账号凭据。' })
+                return json(response, 200, await options.desktop.registerAccount(await body(request)))
+            }
+            if (
                 url.pathname === '/api/v1/desktop/test-connection' &&
                 request.method === 'POST' &&
                 options.desktop
@@ -702,6 +717,7 @@ export async function startLibraryServer(options: {
             }
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
                 return json(response, 200, {
+                    application: 'Pica Library',
                     mode: 'connected',
                     version: PRODUCT_VERSION,
                     database: options.database.file,
@@ -1009,6 +1025,25 @@ export async function startLibraryServer(options: {
                 request.method === 'POST'
             )
                 return json(response, 200, previewService.clear())
+            const onlineChapters = url.pathname.match(/^\/api\/v1\/online-reader\/comics\/([^/]+)\/chapters$/)
+            if (onlineChapters && request.method === 'GET')
+                return json(response, 200, await onlineReader.chapters(decodeURIComponent(onlineChapters[1])))
+            const onlineChapter = url.pathname.match(/^\/api\/v1\/online-reader\/comics\/([^/]+)\/chapters\/([^/]+)$/)
+            if (onlineChapter && request.method === 'GET')
+                return json(response, 200, await onlineReader.chapter(decodeURIComponent(onlineChapter[1]), decodeURIComponent(onlineChapter[2])))
+            const onlinePage = url.pathname.match(/^\/api\/v1\/online-reader\/comics\/([^/]+)\/chapters\/([^/]+)\/pages\/(\d+)$/)
+            if (onlinePage && request.method === 'GET') {
+                const image = await onlineReader.picture(decodeURIComponent(onlinePage[1]), decodeURIComponent(onlinePage[2]), Number(onlinePage[3]))
+                response.writeHead(200, { 'content-type': image.contentType, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' })
+                return response.end(image.data)
+            }
+            if (url.pathname === '/api/v1/online-reader/progress') {
+                if (request.method === 'GET') return json(response, 200, onlineReader.recentProgress())
+                if (request.method === 'POST') {
+                    const input = await body(request)
+                    return json(response, 200, await onlineReader.saveProgress(String(input.comicId ?? ''), String(input.episodeId ?? ''), Number(input.pageIndex)))
+                }
+            }
             const readerChapters = url.pathname.match(
                 /^\/api\/v1\/reader\/comics\/([^/]+)\/chapters$/
             )

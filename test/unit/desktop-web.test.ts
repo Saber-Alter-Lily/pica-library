@@ -54,9 +54,9 @@ describe('desktop setup and settings UI contract', () => {
         expect(build).toContain('README-WINDOWS.txt')
         expect(build).toContain('README-WINDOWS.zh-CN.txt')
         expect(build).toContain('Text.UTF8Encoding($false)')
-        expect(build).toContain(
-            "$version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0')"
-        )
+        const version = JSON.parse(read('package.json')).version
+        expect(build).toMatch(/\$version -in @\([^)]*'0\.3\.0'/)
+        expect(build).toContain(`'${version}'`)
         expect(build).toContain("'src\\data\\registry-v3-final'")
         expect(build).toContain('Required Registry V3 runtime asset is missing')
         expect(build).toContain('git -C $root diff --quiet')

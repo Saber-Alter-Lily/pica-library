@@ -1,4 +1,6 @@
 import type { LibraryDatabase } from '../library/database'
+import { createHash, randomUUID } from 'node:crypto'
+import { removeRemoteCopies, selectedComicIds } from './remove-copies'
 import type { CredentialStore } from '../desktop/credentials'
 import type { StoredCredentials } from '../desktop/types'
 import { LibraryQueryService } from '../services/library-query-service'
@@ -22,6 +24,107 @@ export class RemoteStorageDesktopManager {
     private publicConfig: RemoteStoragePublicConfig | null
     private credentials: StoredCredentials | null
     private readonly query: LibraryQueryService
+    private mutationInFlight = false
+    private scopeId = randomUUID()
+
+    private exclusionsKey() {
+        return `remote-excluded-v1:${createHash('sha256')
+            .update(
+                JSON.stringify([
+                    this.publicConfig,
+                    this.credentials?.remoteStorageUsername ?? ''
+                ])
+            )
+            .digest('hex')}`
+    }
+    private exclusions() {
+        return this.database.getAppState<string[]>(this.exclusionsKey()) ?? []
+    }
+    private selected(input: Record<string, unknown>) {
+        const downloaded = this.query
+            .query({ scope: 'downloaded', limit: 5000, offset: 0 })
+            .items.map((item) => item.comicId)
+        if (input.comicIds !== undefined) {
+            const ids = selectedComicIds(input.comicIds)
+            if (ids.some((id) => !downloaded.includes(id)))
+                throw new Error('所选漫画没有本地下载，已停止上传')
+            return ids
+        }
+        const excluded = new Set(this.exclusions())
+        return downloaded.filter((id) => !excluded.has(id))
+    }
+
+    async inventory(input: Record<string, unknown>) {
+        if (input.remoteStorage)
+            throw new Error('请先保存网盘配置，再核验漫画副本状态')
+        if (this.mutationInFlight)
+            throw new Error('网盘操作进行中，请完成后刷新')
+        const scopeId = this.scopeId
+        const result = await this.syncService({}).inventory()
+        if (scopeId !== this.scopeId)
+            throw new Error('网盘配置已变化，请重新刷新')
+        const pending = new Set(
+            this.database.getAppState<string[]>(
+                `${this.exclusionsKey()}:pending`
+            ) ?? []
+        )
+        return {
+            ...result,
+            scopeId,
+            comics: result.comics.map((item) => ({
+                ...item,
+                excludedFromFullSync: this.exclusions().includes(item.comicId),
+                state: pending.has(item.comicId) ? 'delete-pending' : item.state
+            }))
+        }
+    }
+
+    async deleteCopies(input: Record<string, unknown>) {
+        if (this.mutationInFlight) throw new Error('已有网盘操作进行中')
+        if (input.confirmation !== 'DELETE_REMOTE_ONLY')
+            throw new Error('必须明确确认仅删除网盘副本')
+        if (
+            input.remoteScopeId !== this.scopeId ||
+            typeof input.expectedGeneration !== 'string'
+        )
+            throw new Error('网盘目标未核验或已经变化，请刷新后重新选择')
+        const ids = selectedComicIds(input.comicIds)
+        if (ids.some((id) => !this.database.getComic(id)))
+            throw new Error('所选漫画不在本地书库中')
+        this.mutationInFlight = true
+        try {
+            const { provider } = this.provider({})
+            const key = this.exclusionsKey()
+            const pendingKey = `${key}:pending`
+            const result = await removeRemoteCopies(
+                provider,
+                ids,
+                () => {
+                    this.database.setAppState(key, [
+                        ...new Set([...this.exclusions(), ...ids])
+                    ])
+                    this.database.setAppState(pendingKey, [
+                        ...new Set([
+                            ...(this.database.getAppState<string[]>(
+                                pendingKey
+                            ) ?? []),
+                            ...ids
+                        ])
+                    ])
+                },
+                input.expectedGeneration
+            )
+            this.database.setAppState(
+                pendingKey,
+                (this.database.getAppState<string[]>(pendingKey) ?? []).filter(
+                    (id) => !result.deletedComicIds.includes(id)
+                )
+            )
+            return result
+        } finally {
+            this.mutationInFlight = false
+        }
+    }
     private syncProgress: Record<string, unknown> = {
         phase: 'idle',
         updatedAt: new Date().toISOString()
@@ -33,7 +136,9 @@ export class RemoteStorageDesktopManager {
         credentials: StoredCredentials | null,
         private readonly database: LibraryDatabase,
         private readonly dataDir: string,
-        private readonly onCredentialsChanged: (value: StoredCredentials) => void
+        private readonly onCredentialsChanged: (
+            value: StoredCredentials
+        ) => void
     ) {
         this.credentials = credentials
         this.publicConfig = loadRemoteStorageConfig(configFile)
@@ -97,7 +202,9 @@ export class RemoteStorageDesktopManager {
         }
     }
 
-    async test(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+    async test(
+        input: Record<string, unknown>
+    ): Promise<Record<string, unknown>> {
         const { selected, provider } = this.provider(input)
         const result = await provider.test()
         return {
@@ -115,20 +222,26 @@ export class RemoteStorageDesktopManager {
             this.dataDir,
             provider,
             (progress) => {
-                this.syncProgress = progress as unknown as Record<string, unknown>
+                this.syncProgress = progress as unknown as Record<
+                    string,
+                    unknown
+                >
             }
         )
     }
 
-    async plan(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+    async plan(
+        input: Record<string, unknown>
+    ): Promise<Record<string, unknown>> {
         await this.test(input)
-        return (await this.syncService(input).plan()) as unknown as Record<
-            string,
-            unknown
-        >
+        return (await this.syncService(input).plan(
+            this.selected(input)
+        )) as unknown as Record<string, unknown>
     }
 
     save(input: Record<string, unknown>) {
+        if (this.mutationInFlight)
+            throw new Error('网盘操作期间不能更改存储配置')
         const selected = this.selection(input)
         const merged: StoredCredentials = {
             account: this.credentials?.account ?? '',
@@ -142,6 +255,7 @@ export class RemoteStorageDesktopManager {
         this.credentialStore.save(merged)
         this.publicConfig = selected.publicConfig
         this.credentials = merged
+        this.scopeId = randomUUID()
         this.onCredentialsChanged(merged)
         return { success: true, remoteStorage: this.status() }
     }
@@ -194,7 +308,9 @@ export class RemoteStorageDesktopManager {
         }
     }
 
-    private readingKey(entry: Pick<RemoteReadingEntry, 'comicId' | 'episodeId'>) {
+    private readingKey(
+        entry: Pick<RemoteReadingEntry, 'comicId' | 'episodeId'>
+    ) {
         return `${entry.comicId}\n${entry.episodeId}`
     }
 
@@ -268,7 +384,43 @@ export class RemoteStorageDesktopManager {
     }
 
     async sync(input: Record<string, unknown>) {
+        if (this.mutationInFlight) throw new Error('已有网盘操作进行中')
+        if (
+            input.comicIds !== undefined &&
+            (input.remoteStorage || input.remoteScopeId !== this.scopeId)
+        )
+            throw new Error('网盘目标未核验或已经变化，请刷新后重新选择')
+        // Reject empty/invalid explicit selections before any external write.
+        if (input.comicIds !== undefined) this.selected(input)
         this.save(input)
+        const ids = this.selected(input)
+        if (!ids.length) throw new Error('没有选中可上传漫画')
+        this.mutationInFlight = true
+        try {
+            const result = await this.syncSelected(input, ids)
+            if (input.comicIds !== undefined) {
+                const completed = ids.filter(
+                    (id) => !result.issues.some((issue) => issue.comicId === id)
+                )
+                this.database.setAppState(
+                    this.exclusionsKey(),
+                    this.exclusions().filter((id) => !completed.includes(id))
+                )
+                const pendingKey = `${this.exclusionsKey()}:pending`
+                this.database.setAppState(
+                    pendingKey,
+                    (
+                        this.database.getAppState<string[]>(pendingKey) ?? []
+                    ).filter((id) => !completed.includes(id))
+                )
+            }
+            return result
+        } finally {
+            this.mutationInFlight = false
+        }
+    }
+
+    private async syncSelected(input: Record<string, unknown>, ids: string[]) {
         await this.test(input)
         const { provider } = this.provider(input)
         // Portable metadata is small and independent from comic page upload.
@@ -280,9 +432,12 @@ export class RemoteStorageDesktopManager {
             this.dataDir,
             provider,
             (progress) => {
-                this.syncProgress = progress as unknown as Record<string, unknown>
+                this.syncProgress = progress as unknown as Record<
+                    string,
+                    unknown
+                >
             }
         )
-        return await service.sync()
+        return await service.sync(ids)
     }
 }

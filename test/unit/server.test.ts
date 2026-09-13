@@ -7,6 +7,7 @@ import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
 import { Pica } from '../../src/sdk'
+import { PRODUCT_VERSION } from '../../src/version'
 
 describe('local web server', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-server-'))
@@ -44,7 +45,8 @@ describe('local web server', () => {
         )
         expect(status).toMatchObject({
             mode: 'connected',
-            version: '0.3.0',
+            application: 'Pica Library',
+            version: PRODUCT_VERSION,
             summary: { comics: 0 }
         })
     })
@@ -54,7 +56,7 @@ describe('local web server', () => {
             (response) => response.json()
         )
         expect(capabilities).toMatchObject({
-            appVersion: '0.3.0',
+            appVersion: PRODUCT_VERSION,
             appApiVersion: 2,
             databaseSchemaVersion: 8,
             updateManifestVersion: 1

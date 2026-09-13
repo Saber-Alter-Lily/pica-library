@@ -7,7 +7,7 @@ import {
     scoreFeatureRow,
     stableDigest,
     stableRank
-} from '../../_validation/semantic-rebuild/ranker-validation-core'
+} from '../support/ranker-validation-core'
 
 describe('ranker validation matrix helpers', () => {
     it('keeps deterministic hashes, cache invalidation and tie breaking', () => {

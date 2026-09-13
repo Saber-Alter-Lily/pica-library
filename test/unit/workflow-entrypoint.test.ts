@@ -96,6 +96,27 @@ describe('built CLI entrypoint contract', () => {
                         /secrets\.PICA_(ACCOUNT|PASSWORD)/
                     )
                     expect(content, name).toContain('-SetupPersistence')
+                } else if (name === 'onboarding-candidate.yml') {
+                    // Distributable APKs are public build output, not provider/user data.
+                    // Signing material must remain in runner temp, never in the artifact.
+                    expect(content).toContain('contents: read')
+                    expect(content).toContain(
+                        'branches: [codex/account-onboarding-web-reader]'
+                    )
+                    expect(content).not.toMatch(/pull_request(?:_target)?:/)
+                    expect(content).toContain(
+                        'path: mobile/android-alpha2/candidate/'
+                    )
+                    expect(content).toContain('if-no-files-found: error')
+                    expect(content).toContain(
+                        'mktemp -d "$RUNNER_TEMP/pica-signing-XXXXXXXX"'
+                    )
+                    expect(content).toContain(
+                        '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+                    )
+                    expect(content).not.toMatch(
+                        /contents: write|gh release|git tag/
+                    )
                 } else {
                     expect(content, name).toContain(
                         'github.event.repository.private'

@@ -4,14 +4,21 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import AdmZip from 'adm-zip'
 import { createHash } from 'node:crypto'
+import assert from 'node:assert/strict'
 
 const root = path.resolve(import.meta.dirname, '..')
-const baseZip = path.join(
-    root,
-    'artifacts',
-    'Pica-Library-v0.2.0-windows-x64.zip'
-)
-const updateZip = path.join(root, 'artifacts', 'Pica-Library-v0.3.0-update.zip')
+const baseZip = process.argv[2]
+    ? path.resolve(process.argv[2])
+    : path.join(root, 'artifacts', 'Pica-Library-v0.2.0-windows-x64.zip')
+const updateZip = process.argv[3]
+    ? path.resolve(process.argv[3])
+    : path.join(root, 'artifacts', 'Pica-Library-v0.3.0-update.zip')
+const targetVersion = JSON.parse(
+    new AdmZip(updateZip).readAsText('update-manifest.json')
+).targetVersion
+const baseVersion = path
+    .basename(baseZip)
+    .match(/^Pica-Library-v(.+)-windows-x64\.zip$/)?.[1]
 const rootTemp = fs.mkdtempSync(
     path.join(os.tmpdir(), 'pica-v3-updater-process-')
 )
@@ -138,7 +145,14 @@ async function runScenario(broken: boolean) {
             detached: true,
             stdio: 'ignore',
             windowsHide: true,
-            env: { ...process.env, LOCALAPPDATA: local }
+            env: {
+                ...Object.fromEntries(
+                    Object.entries(process.env).filter(
+                        ([key]) => !key.toUpperCase().startsWith('PICA_')
+                    )
+                ),
+                LOCALAPPDATA: local
+            }
         }
     )
     child.unref()
@@ -153,17 +167,20 @@ async function runScenario(broken: boolean) {
     let recommendationCleanUpdate: boolean | null = null
     let version: string | null = null
     try {
-        const instance = JSON.parse(
-            fs.readFileSync(
-                path.join(
-                    local,
-                    'Pica Library',
-                    'runtime-state',
-                    'instance.json'
-                ),
-                'utf8'
-            )
-        ) as { url?: string }
+        const instancePath = path.join(
+            local,
+            'Pica Library',
+            'runtime-state',
+            'instance.json'
+        )
+        // The old helper records rollback failure immediately after launching
+        // the restored app. Wait for that launch; do not mistake it for a stopped process.
+        const instanceDeadline = Date.now() + 30_000
+        while (!fs.existsSync(instancePath) && Date.now() < instanceDeadline)
+            await wait(150)
+        const instance = JSON.parse(fs.readFileSync(instancePath, 'utf8')) as {
+            url?: string
+        }
         if (instance.url) {
             const status = (await fetch(
                 `${instance.url}/api/v1/desktop/status`
@@ -231,9 +248,27 @@ try {
     const success = await runScenario(false)
     const rollback = await runScenario(true)
     console.log(JSON.stringify({ success, rollback }, null, 2))
+    assert.equal(success.phase, 'complete')
+    assert.equal(success.version, targetVersion)
+    assert.equal(success.atlasCleanUpdate, true)
+    assert.equal(success.recommendationCleanUpdate, true)
+    assert.equal(success.userDataRetained, true)
+    assert.equal(rollback.phase, 'failed')
+    assert.equal(rollback.rollbackRestored, true)
+    assert.equal(rollback.version, baseVersion)
+    assert.equal(rollback.userDataRetained, true)
 } finally {
     await wait(1000)
     try {
+        const resolved = fs.realpathSync(rootTemp)
+        assert.equal(
+            path.dirname(resolved).toLowerCase(),
+            fs.realpathSync(os.tmpdir()).toLowerCase()
+        )
+        assert.ok(
+            path.basename(resolved).startsWith('pica-v3-updater-process-')
+        )
+        assert.equal(fs.lstatSync(rootTemp).isSymbolicLink(), false)
         fs.rmSync(rootTemp, {
             recursive: true,
             force: true,

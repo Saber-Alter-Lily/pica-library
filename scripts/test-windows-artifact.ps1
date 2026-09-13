@@ -11,6 +11,7 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ("pica-artifact-smoke-" + [guid]::N
 $extract = Join-Path $work 'extract'
 $local = Join-Path $work 'localappdata'
 $listener = $null
+$smokePassed = $false
 New-Item -ItemType Directory -Force -Path $extract,$local | Out-Null
 Copy-Item -LiteralPath $Zip -Destination (Join-Path $work 'candidate.zip')
 Expand-Archive -LiteralPath (Join-Path $work 'candidate.zip') -DestinationPath $extract
@@ -59,6 +60,13 @@ foreach ($license in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICE
 
 $originalPath = $env:PATH
 $originalLocal = $env:LOCALAPPDATA
+$originalPicaEnvironment = @{}
+foreach ($entry in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'PICA_*' })) {
+    $originalPicaEnvironment[$entry.Name] = $entry.Value
+    # Remove the variable, not merely set it to an empty string. Modern .NET
+    # preserves empty environment values, which are meaningful to nullish fallback.
+    Remove-Item -LiteralPath ('Env:' + $entry.Name)
+}
 $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
 $env:LOCALAPPDATA = $local
 try {
@@ -169,11 +177,14 @@ try {
         $relaunch='PASS'
     }
     [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
+    $smokePassed = $true
 } finally {
     if ($listener) { $listener.Stop() }
     $env:PATH = $originalPath
     $env:LOCALAPPDATA = $originalLocal
-    if (Test-Path -LiteralPath $work) {
+    foreach ($key in $originalPicaEnvironment.Keys) { [Environment]::SetEnvironmentVariable($key, $originalPicaEnvironment[$key], 'Process') }
+    if (-not $smokePassed) { Write-Warning "Failed smoke retained for isolated diagnosis: $work" }
+    if ($smokePassed -and (Test-Path -LiteralPath $work)) {
         $resolvedSmoke = (Resolve-Path -LiteralPath $work).Path
         $resolvedTemp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
         if (

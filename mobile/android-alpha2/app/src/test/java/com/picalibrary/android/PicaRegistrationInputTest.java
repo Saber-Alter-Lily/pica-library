@@ -25,16 +25,20 @@ public class PicaRegistrationInputTest {
         assertEquals(11, out.size());
     }
     @Test public void newUsernameAndPasswordRulesMatchProviderClients() {
-        Map<String,String> input = fixture();
-        input.put("email", "reader.01_"); input.put("password", "12345678"); input.put("confirmPassword", "12345678");
-        assertEquals("reader.01_", PicaRegistrationInput.validate(input, true, LocalDate.of(2026,9,13)).get("email"));
-        input.put("password", "1234567"); input.put("confirmPassword", "1234567");
-        assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(input, true, LocalDate.of(2026,9,13)));
-        input = fixture(); input.put("email", "reader-name");
-        Map<String,String> invalidSymbol = input;
+        Map<String,String> valid = fixture();
+        valid.put("email", "reader.01_"); valid.put("password", "12345678"); valid.put("confirmPassword", "12345678");
+        assertEquals("reader.01_", PicaRegistrationInput.validate(valid, true, LocalDate.of(2026,9,13)).get("email"));
+
+        Map<String,String> tooShort = fixture();
+        tooShort.put("password", "1234567"); tooShort.put("confirmPassword", "1234567");
+        assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(tooShort, true, LocalDate.of(2026,9,13)));
+
+        Map<String,String> invalidSymbol = fixture();
+        invalidSymbol.put("email", "reader-name");
         assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(invalidSymbol, true, LocalDate.of(2026,9,13)));
-        input = fixture(); input.put("email", "12345678901234567");
-        Map<String,String> tooLong = input;
+
+        Map<String,String> tooLong = fixture();
+        tooLong.put("email", "12345678901234567");
         assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(tooLong, true, LocalDate.of(2026,9,13)));
     }
     @Test public void rejectsMissingConsent() {

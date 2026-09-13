@@ -51,7 +51,7 @@ export function validatePicaRegistration(
     const username = text('email', 1, 16)
     if (!NEW_USERNAME.test(username))
         throw new Error('用户名应为 1–16 位字母、数字、点或下划线')
-    const password = text('password', 8, 128, false)
+    const password = text('password', 9, 128, false)
     if (input.confirmPassword !== password)
         throw new Error('两次输入的密码不一致')
     return {
@@ -92,7 +92,7 @@ const accountMessages: Record<PicaAccountCategory, string> = {
     INVALID_USERNAME:
         '用户名未被 Pica 接受。新用户名请使用 1–16 位字母、数字、点或下划线。',
     INVALID_PASSWORD:
-        '密码未被 Pica 接受。请使用至少 8 个字符的密码，并确认两次输入完全一致。',
+        '密码未被 Pica 接受。请使用至少 9 个字符的密码，并确认两次输入完全一致。',
     INVALID_BIRTHDAY:
         '出生日期未被 Pica 接受。请使用 YYYY-MM-DD 的有效日期，并确认已年满 18 岁。',
     INVALID_NICKNAME:

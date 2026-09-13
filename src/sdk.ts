@@ -91,8 +91,11 @@ export class Pica {
 
                 // Account responses can echo secrets even on rejection: never log them.
                 if (url === 'auth/sign-in' || url === 'auth/register') {
-                    if (!result || result.code !== 200)
-                        throw new PicaAccountError('REJECTED', res.status)
+                    if (!result || result.code !== 200) {
+                        const action = url === 'auth/register' ? 'register' : 'login'
+                        const status = Number(result?.code) || res.status
+                        throw accountHttpError(status, result, action)
+                    }
                     return result.data ?? {}
                 }
 
@@ -111,8 +114,12 @@ export class Pica {
             (error: AxiosError) => {
                 const { config, message, response } = error
 
-                if (config?.url === 'auth/sign-in' || config?.url === 'auth/register')
-                    return Promise.reject(accountHttpError(response?.status))
+                if (config?.url === 'auth/sign-in' || config?.url === 'auth/register') {
+                    const action = config.url === 'auth/register' ? 'register' : 'login'
+                    return Promise.reject(
+                        accountHttpError(response?.status, response?.data, action)
+                    )
+                }
 
                 // 哔咔禁止访问的资源
                 if (response?.status === 400) {

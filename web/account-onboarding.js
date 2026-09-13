@@ -29,8 +29,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                 element(
                     'p',
                     text(
-                        '没有账号：可在这里注册第三方 Pica 账号。网络超时请检查代理；注册不等于账号已获评论等额外权限。',
-                        'No account? Register with the third-party Pica service here. For timeouts, check your network/proxy. Registration does not guarantee additional privileges such as commenting.'
+                        '没有账号：可在这里注册第三方 Pica 账号。注册本身不强制使用代理；如果提示无法连接 Pica API，说明当前网络直连失败，请开启系统代理/加速器或配置 HTTP/HTTPS 代理。',
+                        'No account? Register with the third-party Pica service here. Registration does not inherently require a proxy. If the Pica API cannot be reached directly on this network, enable your system proxy/VPN or configure an HTTP/HTTPS proxy.'
                     )
                 )
             )
@@ -107,7 +107,15 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'text',
             50
         )
-        field('email', '新账号标识', 'New account identifier', 'text', 254)
+        fields.name.minLength = 2
+        field(
+            'email',
+            '用户名（1–16 位字母 / 数字 / . / _）',
+            'Username (1–16 letters, digits, . or _)',
+            'text',
+            16
+        )
+        fields.email.pattern = '[A-Za-z0-9._]{1,16}'
         field(
             'password',
             '密码（至少 9 位）',
@@ -115,6 +123,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'password',
             128
         )
+        fields.password.minLength = 9
         field(
             'confirmPassword',
             '确认密码',
@@ -122,6 +131,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'password',
             128
         )
+        fields.confirmPassword.minLength = 9
         field(
             'birthday',
             '真实出生日期（须年满 18 岁）',
@@ -212,18 +222,28 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                     )
                 document.getElementById(`${prefix}-account`).value =
                     payload.email
-                document.getElementById(`${prefix}-password`).value =
-                    payload.password
                 message.textContent = text(
-                    '注册成功。返回登录后测试连接并保存；注册不会自动同步或下载。',
-                    'Registered. Return to login, test and save. No automatic sync or download was started.'
+                    '注册成功。用户名已带回登录表单；请自行输入刚才设置的密码，测试连接并保存。',
+                    'Registered. The username was copied back to the login form; enter the password you just created, test the connection, and save.'
                 )
                 for (const input of Object.values(fields)) input.value = ''
+                accepted.checked = false
             } catch (error) {
-                message.textContent = `${error.message} ${text('若连接中断，账号可能已创建，请先返回尝试登录。', 'If the connection was interrupted, the account may already exist. Try logging in first.')}`
+                const reason = error instanceof Error ? error.message : String(error)
+                message.textContent = `${text('注册失败：', 'Registration failed: ')}${reason}`
+                const uncertain = /无法连接 Pica API|响应异常|尚未确认|not confirmed|network|timeout/i.test(reason)
+                if (!uncertain) {
+                    submitted = false
+                    submit.disabled = false
+                } else {
+                    message.textContent += text(
+                        ' 本次结果可能无法确认，请先返回登录尝试，不要立即重复注册。',
+                        ' The result may be uncertain; try logging in before registering again.'
+                    )
+                }
             } finally {
                 close.disabled = false
-                // Deliberate one-shot form: a timed-out registration may have succeeded.
+                // Registration values stay only in the live form; the request copy is erased.
                 for (const key of Object.keys(payload)) delete payload[key]
             }
         }

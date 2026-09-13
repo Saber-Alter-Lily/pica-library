@@ -31,9 +31,9 @@ public final class PicaRegisterActivity extends Activity {
         back = Ui.button(this,"‹ 返回登录",v->finish(),true);
         content.addView(back);
         content.addView(Ui.text(this,"注册 Pica 账号",24,Ui.TEXT,true));
-        content.addView(Ui.text(this,"这是第三方哔咔账号，不是 GitHub 账号。手机独立连接 Pica，无需电脑。请使用真实出生日期，并自行妥善保管安全答案。",14,Ui.MUTED,false));
+        content.addView(Ui.text(this,"这是第三方哔咔账号，不是 GitHub 账号。手机独立连接 Pica，无需电脑。注册本身不强制使用代理；如果提示无法连接 Pica API，说明当前网络直连失败，请开启系统代理或加速器后重试。",14,Ui.MUTED,false));
         field(content,"name","昵称（2–50 字）",false);
-        field(content,"email","新账号标识",false);
+        field(content,"email","用户名（1–16 位字母 / 数字 / . / _）",false);
         field(content,"password","密码（至少 9 位）",true);
         field(content,"confirmPassword","确认密码",true);
         field(content,"birthday","出生日期（YYYY-MM-DD，年满 18 岁）",false);
@@ -45,7 +45,7 @@ public final class PicaRegisterActivity extends Activity {
         consent.setText("我已年满 18 岁，了解并将遵守第三方 Pica 服务条款，仅访问合法授权内容。注册资料发送至 Pica，Pica Library 不保存安全答案。");
         consent.setTextColor(Ui.TEXT);
         content.addView(consent);
-        status = Ui.text(this,"注册成功后请返回登录；不会自动同步或下载。",13,Ui.MUTED,false);
+        status = Ui.text(this,"注册成功后请返回登录；失败时会保留当前表单，方便按具体原因修改。",13,Ui.MUTED,false);
         content.addView(status);
         submit = Ui.button(this,"确认并注册",v->register(),false);
         content.addView(submit);
@@ -70,7 +70,7 @@ public final class PicaRegisterActivity extends Activity {
         input.put("gender",new String[]{"","m","f","bot"}[gender.getSelectedItemPosition()]);
         final Map<String,String> payload;
         try { payload=PicaRegistrationInput.validate(input,consent.isChecked(),LocalDate.now(java.time.ZoneOffset.UTC)); }
-        catch(IllegalArgumentException error) { status.setText(error.getMessage()); return; }
+        catch(IllegalArgumentException error) { status.setText("注册失败："+error.getMessage()); return; }
         input.clear();
         busy=true;
         submit.setEnabled(false);
@@ -78,11 +78,31 @@ public final class PicaRegisterActivity extends Activity {
         status.setText("正在提交，请勿重复注册…");
         new Thread(()->{
             String message;
-            try { new PicaClient(this).register(payload); message="注册成功。请返回登录并输入新账号和密码。"; }
-            catch(Exception error) { message="注册未确认："+PicaAccountErrors.message(error)+" 若连接中断，账号可能已创建，请先尝试登录。"; }
-            finally { payload.clear(); }
+            boolean success=false;
+            boolean retrySafe=false;
+            try {
+                new PicaClient(this).register(payload);
+                success=true;
+                message="注册成功。请返回登录并输入新账号和密码。";
+            } catch(Exception error) {
+                retrySafe=PicaAccountErrors.retrySafe(error);
+                message="注册失败："+PicaAccountErrors.message(error)+(retrySafe?" 当前表单已保留，可修改后重新提交。":" 本次结果可能无法确认，请先返回登录尝试，不要立即重复注册。");
+            } finally { payload.clear(); }
             final String result=message;
-            runOnUiThread(()->{busy=false;back.setEnabled(true);status.setText(result);for(EditText field:fields.values())field.setText("");});
+            final boolean registered=success;
+            final boolean canRetry=retrySafe;
+            runOnUiThread(()->{
+                busy=false;
+                back.setEnabled(true);
+                status.setText(result);
+                if(registered) {
+                    for(EditText field:fields.values())field.setText("");
+                    gender.setSelection(0);
+                    consent.setChecked(false);
+                } else if(canRetry) {
+                    submit.setEnabled(true);
+                }
+            });
         },"pica-registration").start();
     }
     @Override public void onBackPressed() { if(!busy)super.onBackPressed(); }

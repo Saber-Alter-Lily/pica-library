@@ -19,13 +19,36 @@ const input = () => ({
     acceptedTerms: true
 })
 describe('Pica registration and account errors', () => {
-    it('accepts account identifiers without requiring an email and preserves secrets exactly', () => {
+    it('accepts Pica usernames without requiring an email and preserves secrets exactly', () => {
         const value = validatePicaRegistration(input())
         expect(value.email).toBe('example_reader')
         expect(value.password).toBe(' example-password ')
         expect(value.answer1).toBe(' private answer ')
         expect(value).not.toHaveProperty('confirmPassword')
         expect(value).not.toHaveProperty('acceptedTerms')
+    })
+    it('uses conservative provider-compatible username and password rules for new accounts', () => {
+        expect(() =>
+            validatePicaRegistration({
+                ...input(),
+                email: 'reader_01.',
+                password: '123456789',
+                confirmPassword: '123456789'
+            })
+        ).not.toThrow()
+        expect(() =>
+            validatePicaRegistration({
+                ...input(),
+                password: '12345678',
+                confirmPassword: '12345678'
+            })
+        ).toThrow()
+        expect(() =>
+            validatePicaRegistration({ ...input(), email: 'reader-name' })
+        ).toThrow()
+        expect(() =>
+            validatePicaRegistration({ ...input(), email: '12345678901234567' })
+        ).toThrow()
     })
     it('requires real age, valid date and explicit consent', () => {
         expect(() =>
@@ -88,6 +111,53 @@ describe('Pica registration and account errors', () => {
         expect(await client.register(input())).toEqual({ registered: true })
         expect(calls).toEqual(['auth/register'])
         expect(client.token).toBe('existing-private-session')
+    })
+    it('turns known provider validation responses into actionable safe categories', async () => {
+        const apiAdapter: AxiosAdapter = async (config) => {
+            throw new AxiosError(
+                'provider rejected request',
+                'ERR_BAD_RESPONSE',
+                config,
+                {},
+                {
+                    config,
+                    data: {
+                        code: 400,
+                        error: 1002,
+                        message: 'validation error',
+                        detail: 'birthday must be a valid date string'
+                    },
+                    status: 400,
+                    statusText: 'failure',
+                    headers: new AxiosHeaders()
+                }
+            )
+        }
+        await expect(new Pica({ apiAdapter }).register(input())).rejects.toMatchObject({
+            category: 'INVALID_BIRTHDAY'
+        })
+    })
+    it('recognizes a username collision without surfacing provider body text', async () => {
+        const apiAdapter: AxiosAdapter = async (config) => {
+            throw new AxiosError(
+                'SECRET request',
+                'ERR_BAD_RESPONSE',
+                config,
+                {},
+                {
+                    config,
+                    data: { message: 'email already exists SECRET' },
+                    status: 400,
+                    statusText: 'failure',
+                    headers: new AxiosHeaders()
+                }
+            )
+        }
+        const client = new Pica({ apiAdapter })
+        await expect(client.register(input())).rejects.toMatchObject({
+            category: 'USERNAME_TAKEN'
+        })
+        await expect(client.register(input())).rejects.not.toThrow('SECRET')
     })
     it.each([400, 401, 403, 429, 500])(
         'sanitizes HTTP %s without retrying registration',

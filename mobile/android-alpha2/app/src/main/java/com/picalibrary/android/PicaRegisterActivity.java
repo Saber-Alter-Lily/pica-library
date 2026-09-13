@@ -34,7 +34,7 @@ public final class PicaRegisterActivity extends Activity {
         content.addView(Ui.text(this,"这是第三方哔咔账号，不是 GitHub 账号。手机独立连接 Pica，无需电脑。注册本身不强制使用代理；如果提示无法连接 Pica API，说明当前网络直连失败，请开启系统代理或加速器后重试。",14,Ui.MUTED,false));
         field(content,"name","昵称（2–50 字）",false);
         field(content,"email","用户名（1–16 位字母 / 数字 / . / _）",false);
-        field(content,"password","密码（至少 8 位）",true);
+        field(content,"password","密码（至少 9 位）",true);
         field(content,"confirmPassword","确认密码",true);
         field(content,"birthday","出生日期（YYYY-MM-DD，年满 18 岁）",false);
         gender = new Spinner(this);

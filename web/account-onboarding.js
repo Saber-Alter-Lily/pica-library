@@ -118,12 +118,12 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
         fields.email.pattern = '[A-Za-z0-9._]{1,16}'
         field(
             'password',
-            '密码（至少 8 位）',
-            'Password (at least 8 characters)',
+            '密码（至少 9 位）',
+            'Password (at least 9 characters)',
             'password',
             128
         )
-        fields.password.minLength = 8
+        fields.password.minLength = 9
         field(
             'confirmPassword',
             '确认密码',
@@ -131,7 +131,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'password',
             128
         )
-        fields.confirmPassword.minLength = 8
+        fields.confirmPassword.minLength = 9
         field(
             'birthday',
             '真实出生日期（须年满 18 岁）',

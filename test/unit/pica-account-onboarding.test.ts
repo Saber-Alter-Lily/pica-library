@@ -27,20 +27,20 @@ describe('Pica registration and account errors', () => {
         expect(value).not.toHaveProperty('confirmPassword')
         expect(value).not.toHaveProperty('acceptedTerms')
     })
-    it('uses the provider-compatible username and password rules for new accounts', () => {
+    it('uses conservative provider-compatible username and password rules for new accounts', () => {
         expect(() =>
             validatePicaRegistration({
                 ...input(),
                 email: 'reader_01.',
-                password: '12345678',
-                confirmPassword: '12345678'
+                password: '123456789',
+                confirmPassword: '123456789'
             })
         ).not.toThrow()
         expect(() =>
             validatePicaRegistration({
                 ...input(),
-                password: '1234567',
-                confirmPassword: '1234567'
+                password: '12345678',
+                confirmPassword: '12345678'
             })
         ).toThrow()
         expect(() =>

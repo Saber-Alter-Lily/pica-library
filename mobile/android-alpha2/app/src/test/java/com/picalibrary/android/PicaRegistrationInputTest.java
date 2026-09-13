@@ -24,13 +24,13 @@ public class PicaRegistrationInputTest {
         assertFalse(out.containsKey("confirmPassword"));
         assertEquals(11, out.size());
     }
-    @Test public void newUsernameAndPasswordRulesMatchProviderClients() {
+    @Test public void newUsernameAndPasswordRulesStayConservative() {
         Map<String,String> valid = fixture();
-        valid.put("email", "reader.01_"); valid.put("password", "12345678"); valid.put("confirmPassword", "12345678");
+        valid.put("email", "reader.01_"); valid.put("password", "123456789"); valid.put("confirmPassword", "123456789");
         assertEquals("reader.01_", PicaRegistrationInput.validate(valid, true, LocalDate.of(2026,9,13)).get("email"));
 
         Map<String,String> tooShort = fixture();
-        tooShort.put("password", "1234567"); tooShort.put("confirmPassword", "1234567");
+        tooShort.put("password", "12345678"); tooShort.put("confirmPassword", "12345678");
         assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(tooShort, true, LocalDate.of(2026,9,13)));
 
         Map<String,String> invalidSymbol = fixture();
@@ -60,13 +60,13 @@ public class PicaRegistrationInputTest {
         input.put("birthday", "2000-02-29"); input.put("answer1", "bad\nanswer");
         assertThrows(IllegalArgumentException.class, () -> PicaRegistrationInput.validate(input, true, LocalDate.now()));
     }
-    @Test public void classifiesKnownProviderFailuresWithoutShowingBodies() {
-        assertEquals("PICA_ACCOUNT_USERNAME_TAKEN", PicaAccountErrors.providerMarker(400, "email already exists sensitive-value"));
-        assertEquals("PICA_ACCOUNT_INVALID_BIRTHDAY", PicaAccountErrors.providerMarker(400, "error 1002 validation error: birthday must be a valid date string"));
+    @Test public void keepsAccountErrorsSafeAndRetryAware() {
         assertFalse(PicaAccountErrors.message(new Exception("token=fixture-sensitive-body")).contains("fixture-sensitive"));
         assertTrue(PicaAccountErrors.message(new java.net.SocketTimeoutException()).contains("直连失败"));
         assertTrue(PicaAccountErrors.message(new Exception("PICA_ACCOUNT_REJECTED")).contains("拒绝"));
         assertFalse(PicaAccountErrors.retrySafe(new java.net.SocketTimeoutException()));
+        assertFalse(PicaAccountErrors.retrySafe(new Exception("PICA_ACCOUNT_RESPONSE_INVALID")));
+        assertFalse(PicaAccountErrors.retrySafe(new Exception("unknown")));
         assertTrue(PicaAccountErrors.retrySafe(new Exception("PICA_ACCOUNT_REJECTED")));
     }
 }

@@ -17,7 +17,7 @@ final class PicaRegistrationInput {
         String username = value(input,"email",1,16,true);
         if(!NEW_USERNAME.matcher(username).matches()) throw new IllegalArgumentException("用户名应为 1–16 位字母、数字、点或下划线");
         out.put("email", username);
-        String password = value(input,"password",8,128,false);
+        String password = value(input,"password",9,128,false);
         if (!password.equals(input.get("confirmPassword"))) throw new IllegalArgumentException("两次密码不一致");
         out.put("password",password);
         String birthday = value(input,"birthday",10,10,true);

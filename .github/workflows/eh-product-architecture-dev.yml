@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/dev/apply-product-source-architecture.mjs'
       - 'scripts/dev/run-product-source-architecture.mjs'
+      - 'scripts/dev/finalize-product-source-architecture.mjs'
       - '.github/workflows/eh-product-architecture-dev.yml'
 
 permissions:
@@ -33,7 +34,9 @@ jobs:
           version: '11.16.0'
       - run: pnpm install --frozen-lockfile
       - name: Apply product architecture patch
-        run: node scripts/dev/run-product-source-architecture.mjs
+        run: |
+          node scripts/dev/run-product-source-architecture.mjs
+          node scripts/dev/finalize-product-source-architecture.mjs
       - name: Validate Web and Desktop
         run: |
           pnpm type:check

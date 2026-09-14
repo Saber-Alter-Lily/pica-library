@@ -20,12 +20,38 @@ async function post(path, body) {
     })
 }
 
+function normalizedWebDavUrl(value) {
+    const raw = String(value || '').trim()
+    try {
+        const url = new URL(raw)
+        if (url.hostname.toLowerCase() === 'webdav.123pan.cn' && (url.pathname === '' || url.pathname === '/'))
+            url.pathname = '/webdav'
+        return url.toString().replace(/\/$/, '')
+    } catch {
+        return raw
+    }
+}
+
+function ensure123PanHint() {
+    const input = $('#remote-webdav-url')
+    const label = input?.closest('label')
+    if (!input || !label || $('#remote-123pan-hint')) return
+    input.placeholder = 'https://webdav.123pan.cn/webdav'
+    const hint = document.createElement('p')
+    hint.id = 'remote-123pan-hint'
+    hint.className = 'status wide'
+    hint.textContent = '123云盘：地址使用 https://webdav.123pan.cn/webdav；用户名填写123云盘账号，密码填写“第三方挂载”生成的应用密码，不是登录密码。只填 webdav.123pan.cn 时会自动补全 /webdav。'
+    label.insertAdjacentElement('afterend', hint)
+}
+
 function formValue(action) {
+    const normalized = normalizedWebDavUrl($('#remote-webdav-url').value)
+    $('#remote-webdav-url').value = normalized
     return {
         remoteStorageAction: action,
         remoteStorage: {
             kind: 'webdav',
-            baseUrl: $('#remote-webdav-url').value.trim(),
+            baseUrl: normalized,
             root: $('#remote-root').value.trim() || 'PicaLibrary',
             username: $('#remote-username').value.trim(),
             password: $('#remote-password').value
@@ -126,6 +152,7 @@ function renderPlan(plan) {
 
 async function load() {
     const panel = $('#settings-remote-storage'); if (!panel) return
+    ensure123PanHint()
     ensureProgressBox()
     try {
         desktop = await api('/api/v1/desktop/status')

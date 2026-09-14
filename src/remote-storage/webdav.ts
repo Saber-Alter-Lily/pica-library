@@ -13,6 +13,11 @@ function normalizeBaseUrl(value: string) {
         throw new Error('WebDAV URL must use HTTP or HTTPS')
     url.username = ''
     url.password = ''
+    if (
+        url.hostname.toLowerCase() === 'webdav.123pan.cn' &&
+        (url.pathname === '' || url.pathname === '/')
+    )
+        url.pathname = '/webdav'
     return url.toString().replace(/\/$/, '')
 }
 
@@ -293,15 +298,51 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
                 this.metadataTimeoutMs,
                 3
             )
+            const status = response.status
+            try {
+                await response.body?.cancel()
+            } catch {
+                // Best-effort cleanup before compatibility probing.
+            }
             if (
-                [201, 301, 405].includes(response.status) ||
-                (response.status >= 200 && response.status < 300)
+                status === 201 ||
+                status === 301 ||
+                (status >= 200 && status < 300)
             ) {
                 this.ensuredDirectories.add(current)
                 continue
             }
+            if (status === 405) {
+                // Many WebDAV servers return 405 when MKCOL targets an existing
+                // collection. Do not assume that is what happened: 123Pan and
+                // other partial implementations may also use 405 for unsupported
+                // MKCOL. Verify the collection with PROPFIND before continuing.
+                const verified = await this.fetchWithRetry(
+                    this.rawUrl(current),
+                    { method: 'PROPFIND', headers: { depth: '0' } },
+                    this.metadataTimeoutMs,
+                    2
+                )
+                const verifiedStatus = verified.status
+                try {
+                    await verified.body?.cancel()
+                } catch {
+                    // Best-effort connection cleanup.
+                }
+                if ([200, 207].includes(verifiedStatus)) {
+                    this.ensuredDirectories.add(current)
+                    continue
+                }
+                if (verifiedStatus === 404)
+                    throw new Error(
+                        `WebDAV cannot create directory ${current}: MKCOL returned HTTP 405 and the directory does not exist`
+                    )
+                throw new Error(
+                    `WebDAV MKCOL ${current} returned HTTP 405; directory verification failed: HTTP ${verifiedStatus}`
+                )
+            }
             throw new Error(
-                `WebDAV MKCOL ${current} failed: HTTP ${response.status}`
+                `WebDAV MKCOL ${current} failed: HTTP ${status}`
             )
         }
     }

@@ -30,6 +30,7 @@
         <activity android:name=".AccountSourcesActivity" android:exported="false" />
         <activity android:name=".PicaAccountActivity" android:exported="false" />
         <activity android:name=".EhAccountActivity" android:exported="false" />
+        <activity android:name=".EhWebLoginActivity" android:exported="false" />
         <activity android:name=".EhSessionActivity" android:exported="false" />
         <activity android:name=".PicaRegisterActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".DownloadsActivity" android:exported="false" />

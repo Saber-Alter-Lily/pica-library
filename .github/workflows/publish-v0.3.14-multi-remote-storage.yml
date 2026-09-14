@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  RELEASE_TARGET: '8c87c8322373a5fbe51f3c6a990c3d7e1dfb4b93'
+  RELEASE_TARGET: '1064d06dbe488dcd8ccb4be5647bc9e8e4b48739'
   DESKTOP_VERSION: '0.3.14'
   DESKTOP_BASE_VERSION: '0.3.13'
   DESKTOP_BASE_SHA256: '4575cc0c073d68baac4a6e34979d25c062b83086053f86a87bd0d4d847cf1c77'
@@ -21,11 +21,11 @@ jobs:
   windows:
     runs-on: windows-latest
     env:
-      PICA_LIBRARY_BUILD_PROVENANCE: '8c87c8322373a5fbe51f3c6a990c3d7e1dfb4b93'
+      PICA_LIBRARY_BUILD_PROVENANCE: '1064d06dbe488dcd8ccb4be5647bc9e8e4b48739'
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: '8c87c8322373a5fbe51f3c6a990c3d7e1dfb4b93'
+          ref: '1064d06dbe488dcd8ccb4be5647bc9e8e4b48739'
           fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
@@ -105,7 +105,7 @@ jobs:
             artifacts/Pica-Library-v0.3.14-update.zip
             artifacts/SHA256SUMS-Windows.txt
             artifacts/BUILD_TRANSPARENCY-Windows.json
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error
 
   android:
@@ -113,7 +113,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: '8c87c8322373a5fbe51f3c6a990c3d7e1dfb4b93'
+          ref: '1064d06dbe488dcd8ccb4be5647bc9e8e4b48739'
           fetch-depth: 1
       - uses: actions/setup-java@v5
         with:
@@ -188,7 +188,7 @@ jobs:
         with:
           name: Pica-Library-Android-v41
           path: mobile/android-alpha2/publish/
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error
 
   publish:
@@ -197,7 +197,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: '8c87c8322373a5fbe51f3c6a990c3d7e1dfb4b93'
+          ref: '1064d06dbe488dcd8ccb4be5647bc9e8e4b48739'
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
@@ -229,7 +229,7 @@ jobs:
           a=json.loads((p/'android/BUILD_TRANSPARENCY.json').read_text(encoding='utf-8'))
           out={
               'release':'v0.3.14',
-              'sourceSha':'8c87c8322373a5fbe51f3c6a990c3d7e1dfb4b93',
+              'sourceSha':'1064d06dbe488dcd8ccb4be5647bc9e8e4b48739',
               'desktop':w,
               'android':a,
           }

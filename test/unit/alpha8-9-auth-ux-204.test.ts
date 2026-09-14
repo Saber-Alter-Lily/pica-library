@@ -4,41 +4,13 @@ import { applicationFetchInternals } from '../../src/update/application-fetch'
 
 describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
     it('constructs GitHub successful 204 responses with a null body', () => {
-        const body = applicationFetchInternals.responseBody(
-            204,
-            'GET',
-            new ArrayBuffer(0)
-        )
+        const body = applicationFetchInternals.responseBody(204,'GET',new ArrayBuffer(0))
         expect(body).toBeNull()
         expect(() => new Response(body, { status: 204 })).not.toThrow()
-        expect(
-            applicationFetchInternals.responseBody(
-                205,
-                'GET',
-                new ArrayBuffer(0)
-            )
-        ).toBeNull()
-        expect(
-            applicationFetchInternals.responseBody(
-                304,
-                'GET',
-                new ArrayBuffer(0)
-            )
-        ).toBeNull()
-        expect(
-            applicationFetchInternals.responseBody(
-                200,
-                'HEAD',
-                new ArrayBuffer(0)
-            )
-        ).toBeNull()
-        expect(
-            applicationFetchInternals.responseBody(
-                200,
-                'GET',
-                new TextEncoder().encode('ok').buffer
-            )
-        ).not.toBeNull()
+        expect(applicationFetchInternals.responseBody(205,'GET',new ArrayBuffer(0))).toBeNull()
+        expect(applicationFetchInternals.responseBody(304,'GET',new ArrayBuffer(0))).toBeNull()
+        expect(applicationFetchInternals.responseBody(200,'HEAD',new ArrayBuffer(0))).toBeNull()
+        expect(applicationFetchInternals.responseBody(200,'GET',new TextEncoder().encode('ok').buffer)).not.toBeNull()
     })
 
     it('shows the Desktop device code before GitHub can be opened', () => {
@@ -51,7 +23,7 @@ describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
         expect(source.match(/window\.open\(flow\.verificationUri/g)?.length).toBe(1)
     })
 
-    it('keeps the Android code visible across the external-browser round trip', () => {
+    it('keeps the Android code visible across the external-browser round trip without permanent action rows', () => {
         const auth = fs.readFileSync(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/GitHubAccountAuth.java',
             'utf8'
@@ -62,9 +34,11 @@ describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
         )
         expect(auth).not.toContain('app.startActivity(browser)')
         expect(activity).toContain('!authInProgress')
+        expect(activity).toContain('showCodeDialog(userCode,uri)')
         expect(activity).toContain('复制验证码')
-        expect(activity).toContain('Button open=Ui.button(this,"打开 GitHub"')
+        expect(activity).toContain('setPositiveButton("打开 GitHub"')
         expect(activity).toContain('copyCode(userCode)')
+        expect(activity).not.toContain('Button open=Ui.button(this,"打开 GitHub"')
     })
 
     it('reserves Android system-bar insets on the disclaimer screen', () => {

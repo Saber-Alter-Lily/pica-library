@@ -1,12 +1,19 @@
 import { createHash } from 'node:crypto'
 import type { Pica } from '../sdk'
 import type { Comic, Episode, Picture } from '../types'
-import { trustedCoverUrl } from '../library/cover-url'
 import type { FavoriteRecord } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
+import { EhProvider } from '../providers/eh-provider'
+import { PicaProvider, picaComic } from '../providers/pica-provider'
+import {
+    providerComicToRecord,
+    type ComicProvider,
+    type ProviderId
+} from '../providers/types'
 
 export interface ProviderCapabilities {
     favoriteMutation: boolean
+    providers: Record<ProviderId, ComicProvider['capabilities']>
 }
 
 export type FavoritesSyncMode = 'quick' | 'full'
@@ -31,39 +38,40 @@ function fingerprint(ids: string[]) {
 }
 
 export function providerComicRecord(comic: Comic): FavoriteRecord {
-    return {
-        comicId: comic._id,
-        title: comic.title.trim(),
-        author: comic.author ?? '',
-        description: comic.description ?? '',
-        chineseTeam: comic.chineseTeam ?? '',
-        categories: comic.categories ?? [],
-        tags: comic.tags ?? [],
-        finished: Boolean(comic.finished),
-        createdAt: comic.created_at,
-        updatedAt: comic.updated_at,
-        totalLikes: comic.totalLikes ?? comic.likesCount ?? 0,
-        totalViews: comic.totalViews ?? comic.viewsCount ?? 0,
-        pagesCount: comic.pagesCount ?? 0,
-        epsCount: comic.epsCount ?? 0,
-        coverUrl: trustedCoverUrl(
-            comic.thumb?.fileServer && comic.thumb.path
-                ? `${comic.thumb.fileServer}/static/${comic.thumb.path}`
-                : undefined
-        )
-    }
+    return providerComicToRecord(picaComic(comic))
 }
 
 export class ProviderService {
-    readonly capabilities: ProviderCapabilities = { favoriteMutation: true }
+    readonly capabilities: ProviderCapabilities
+    private readonly picaProvider: PicaProvider
+    private readonly ehProvider: EhProvider
 
     constructor(
         private readonly connectProvider: () => Promise<Pica>,
-        private readonly database: LibraryDatabase
-    ) {}
+        private readonly database: LibraryDatabase,
+        ehProvider = new EhProvider()
+    ) {
+        this.picaProvider = new PicaProvider(connectProvider)
+        this.ehProvider = ehProvider
+        this.capabilities = {
+            favoriteMutation: true,
+            providers: {
+                pica: this.picaProvider.capabilities,
+                eh: this.ehProvider.capabilities
+            }
+        }
+    }
 
     private connect() {
         return this.connectProvider()
+    }
+
+    private providerForComic(comicId: string): ComicProvider {
+        return comicId.startsWith('eh:') ? this.ehProvider : this.picaProvider
+    }
+
+    providerStatus() {
+        return this.capabilities.providers
     }
 
     async syncFavorites(
@@ -216,40 +224,65 @@ export class ProviderService {
         }
     }
 
-    async search(keyword: string) {
-        const provider = await this.connect()
-        const comics = await provider.searchAll(keyword, provider.Order.loved)
-        const records = comics.map(providerComicRecord)
-        this.database.importCatalog(records, 'pica:discover')
-        return records
+    async search(keyword: string, providers: ProviderId[] = ['pica']) {
+        const uniqueProviders = [...new Set(providers)]
+        const settled = await Promise.allSettled(
+            uniqueProviders.map(async (providerId) => {
+                const provider =
+                    providerId === 'eh' ? this.ehProvider : this.picaProvider
+                const comics = await provider.search({ keyword, limit: 100 })
+                const records = comics.map(providerComicToRecord)
+                this.database.importCatalog(records, `${providerId}:discover`)
+                return records
+            })
+        )
+        const records = settled.flatMap((result) =>
+            result.status === 'fulfilled' ? result.value : []
+        )
+        if (!records.length) {
+            const firstError = settled.find(
+                (result): result is PromiseRejectedResult =>
+                    result.status === 'rejected'
+            )
+            if (firstError) throw firstError.reason
+        }
+        return [
+            ...new Map(records.map((record) => [record.comicId, record])).values()
+        ]
     }
 
     async getComicDetails(comicId: string) {
-        const provider = await this.connect()
-        const comic = await provider.comicInfo(comicId)
+        const provider = this.providerForComic(comicId)
+        const comic = await provider.details(comicId)
         this.database.importCatalog(
-            [providerComicRecord(comic)],
-            'pica:details'
+            [providerComicToRecord(comic)],
+            `${provider.id}:details`
         )
         return comic
     }
 
     async getEpisodes(comicId: string): Promise<Episode[]> {
-        return (await this.connect()).episodesAll(comicId)
+        return this.providerForComic(comicId).episodes(comicId)
     }
 
     async getEpisodePages(
         comicId: string,
         episode: Episode
     ): Promise<Picture[]> {
-        return (await this.connect()).picturesAll(comicId, episode)
+        return this.providerForComic(comicId).pages(comicId, episode)
     }
 
-    async fetchPage(url: string, maxBytes = 20 * 1024 * 1024) {
-        return (await this.connect()).fetchImage(url, maxBytes)
+    async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
+        return locator.startsWith('eh-page:')
+            ? this.ehProvider.fetchPage(locator, maxBytes)
+            : this.picaProvider.fetchPage(locator, maxBytes)
     }
 
     async setFavorite(comicId: string, desired: boolean) {
+        if (comicId.startsWith('eh:'))
+            throw new Error(
+                'E-H 云收藏尚未启用；当前版本只提供公共浏览、阅读和本地书库能力'
+            )
         const provider = await this.connect()
         const before = await provider.comicInfo(comicId)
         if (Boolean(before.isFavourite) === desired)

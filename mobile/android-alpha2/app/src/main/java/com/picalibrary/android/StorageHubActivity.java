@@ -7,7 +7,7 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
-/** Compact storage/download navigation hub. */
+/** Storage/download operations only. Cache/data maintenance remains a separate Settings destination. */
 public final class StorageHubActivity extends Activity {
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();}
     private void render(){
@@ -16,7 +16,6 @@ public final class StorageHubActivity extends Activity {
         ScrollView scroll=new ScrollView(this);LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,12),Ui.dp(this,14),Ui.dp(this,24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         content.addView(SettingsRow.row(this,"云端存储",RemoteConfigStore.load(this).configured()?"已配置":"未配置",v->startActivity(new Intent(this,RemoteStorageActivity.class))));
         content.addView(SettingsRow.row(this,"下载任务","",v->startActivity(new Intent(this,DownloadsActivity.class))));
-        content.addView(SettingsRow.row(this,"存储与缓存","",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
         setContentView(root);root.requestApplyInsets();
     }
 }

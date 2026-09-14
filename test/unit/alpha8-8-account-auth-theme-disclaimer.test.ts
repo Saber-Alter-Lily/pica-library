@@ -69,7 +69,7 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
         expect(sync).not.toContain('ThemePackStore.deactivate(c);else')
     })
 
-    it('keeps theme selection explicitly device-local in behavior and concise UI', () => {
+    it('keeps theme selection device-local while the normal UI stays quiet', () => {
         const source = fs.readFileSync(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java',
             'utf8'
@@ -78,8 +78,12 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackSync.java',
             'utf8'
         )
-        expect(source).toContain('只同步装扮包；本机主题独立选择')
-        expect(source).toContain('在本机使用')
+        expect(source).toContain('SettingsRow.row(this,"GitHub Star"')
+        expect(source).toContain('ThemePackStore.activate(this,pack.id)')
+        expect(source).toContain('"使用中"')
+        expect(source).toContain('showThemeActions(active)')
+        expect(source).not.toContain('只同步装扮包；本机主题独立选择')
+        expect(source).not.toContain('验证本人 GitHub 账号后解锁装扮')
         expect(sync).toContain('Deliberately ignore Desktop activeThemeId')
         expect(source).not.toContain('EditText username')
     })

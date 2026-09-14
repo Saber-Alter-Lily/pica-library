@@ -12,7 +12,7 @@ import {
 import { RemoteStorageDesktopManager } from '../../src/remote-storage/desktop-manager'
 
 const cleanup: Array<() => void> = []
-afterEach(() => cleanup.splice(0).forEach((fn) => fn()))
+afterEach(() => cleanup.splice(0).reverse().forEach((fn) => fn()))
 
 function tempRoot() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-remote-targets-'))

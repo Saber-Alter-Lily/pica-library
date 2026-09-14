@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import javax.crypto.Cipher;
@@ -24,11 +25,30 @@ final class RemoteConfigStore {
 
     static Config load(Context context){
         SharedPreferences p=context.getSharedPreferences(PREF,Context.MODE_PRIVATE);
-        return new Config(p.getString("baseUrl",""),p.getString("root","PicaLibrary"),decrypt(p.getString("username","")),decrypt(p.getString("password","")));
+        String stored=p.getString("baseUrl","");
+        return new Config(normalizeBaseUrl(stored),p.getString("root","PicaLibrary"),decrypt(p.getString("username","")),decrypt(p.getString("password","")));
+    }
+    private static String normalizeBaseUrl(String value){
+        String clean=value==null?"":value.trim().replaceAll("/+$","");
+        if(clean.isEmpty())return "";
+        try{
+            URI uri=new URI(clean);
+            String scheme=uri.getScheme()==null?"":uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+            if(!"https".equals(scheme)&&!"http".equals(scheme))throw new IllegalArgumentException("WebDAV 地址必须以 http:// 或 https:// 开头");
+            String host=uri.getHost()==null?"":uri.getHost().toLowerCase(java.util.Locale.ROOT);
+            String path=uri.getPath()==null?"":uri.getPath();
+            if("webdav.123pan.cn".equals(host)&&(path.isEmpty()||"/".equals(path))){
+                URI fixed=new URI(uri.getScheme(),null,uri.getHost(),uri.getPort(),"/webdav",null,null);
+                return fixed.toString();
+            }
+            URI safe=new URI(uri.getScheme(),null,uri.getHost(),uri.getPort(),path.isEmpty()?null:path,uri.getQuery(),null);
+            return safe.toString().replaceAll("/+$","");
+        }catch(IllegalArgumentException e){throw e;}
+        catch(Exception e){throw new IllegalArgumentException("WebDAV 地址格式无效",e);}
     }
     static Config candidate(String baseUrl,String root,String username,String password,Config fallback){
-        String clean=baseUrl==null?"":baseUrl.trim().replaceAll("/+$","");
-        if(!(clean.startsWith("https://")||clean.startsWith("http://")))throw new IllegalArgumentException("WebDAV 地址必须以 http:// 或 https:// 开头");
+        String clean=normalizeBaseUrl(baseUrl);
+        if(clean.isEmpty())throw new IllegalArgumentException("WebDAV 地址不能为空");
         String folder=(root==null?"PicaLibrary":root).trim().replace('\\','/').replaceAll("^/+|/+$","");
         if(folder.isEmpty())throw new IllegalArgumentException("根目录不能为空");
         String u=username==null||username.isEmpty()?(fallback==null?"":fallback.username):username;

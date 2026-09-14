@@ -24,6 +24,11 @@ export interface StoredCredentials {
     remoteStoragePassword?: string
     /** DPAPI-protected credentials keyed by RemoteStorageTarget.id. */
     remoteStorageCredentials?: Record<string, RemoteTargetStoredCredentials>
+    /** Optional E-Hentai cookie-session material. The whole credential object is DPAPI-protected. */
+    ehMemberId?: string
+    ehPassHash?: string
+    ehIgneous?: string
+    ehCfClearance?: string
 }
 
 export interface SetupInput {

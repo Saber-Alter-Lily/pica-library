@@ -946,6 +946,27 @@
                         role="status"
                     ></p>
                 </article>
+                <article id="settings-eh-account" class="panel">
+                    <h3>E-Hentai / ExHentai 账号</h3>
+                    <p>E-H 公共搜索、阅读和下载无需登录。账号仅用于云收藏与 ExH 访问探测；Pica Library 不保存 E-H 密码，只保存你从官方站点会话中导入的 cookie，并由 Windows DPAPI 加密。</p>
+                    <p id="eh-account-state" class="status"></p>
+                    <div class="settings-form">
+                        <label>ipb_member_id<input id="eh-member-id" autocomplete="off" /></label>
+                        <label>ipb_pass_hash<input id="eh-pass-hash" type="password" autocomplete="new-password" /></label>
+                        <label>igneous（可选）<input id="eh-igneous" type="password" autocomplete="new-password" /></label>
+                        <label>cf_clearance（仅遇到 Cloudflare 时可选）<input id="eh-cf-clearance" type="password" autocomplete="new-password" /></label>
+                    </div>
+                    <div class="actions">
+                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">打开官方登录页</a>
+                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Reg&amp;CODE=00" target="_blank" rel="noreferrer">打开官方注册页</a>
+                        <button id="eh-account-save" type="button" class="primary">保存并验证会话</button>
+                        <button id="eh-account-verify" type="button">重新验证</button>
+                        <button id="eh-exh-probe" type="button">探测 ExH</button>
+                        <button id="eh-favorites-sync" type="button">同步 E-H 云收藏</button>
+                        <button id="eh-account-clear" type="button">清除 E-H 会话</button>
+                    </div>
+                    <p id="eh-account-message" class="status" role="status"></p>
+                </article>
                 <article id="settings-remote-storage" class="panel">
                     <h3>远程存储 · WebDAV</h3>
                     <p>把电脑已经下载的漫画增量同步到远程存储。Alpha7 使用 <code>PicaLibrary/v1</code> generation 结构；手机之后可在电脑关机时直接读取。</p>
@@ -1043,5 +1064,6 @@
         <script type="module" src="./alpha8-theme-help.js"></script>
         <script type="module" src="./alpha8-connections.js"></script>
         <script type="module" src="./alpha8-star-access.js"></script>
+        <script type="module" src="./eh-account.js"></script>
     </body>
 </html>

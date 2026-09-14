@@ -6,6 +6,7 @@ on:
       - feature/eh-provider-v1
     paths:
       - 'scripts/dev/apply-eh-account-core.mjs'
+      - 'scripts/dev/run-eh-account-core.mjs'
       - '.github/workflows/eh-dev-apply.yml'
 
 permissions:
@@ -29,7 +30,7 @@ jobs:
           run_install: false
       - run: pnpm install --frozen-lockfile
       - name: Apply E-H account core patch
-        run: node scripts/dev/apply-eh-account-core.mjs
+        run: node scripts/dev/run-eh-account-core.mjs
       - name: Validate account core and desktop regression
         run: |
           set -euo pipefail

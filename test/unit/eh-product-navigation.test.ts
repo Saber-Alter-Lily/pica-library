@@ -31,7 +31,7 @@ describe('source-oriented product navigation', () => {
     expect(home).toContain('else if(current==2)onlineEntry()')
     expect(home).toContain('titleRow(p,"在线发现"')
     expect(home).toContain('"Pica / E-H / ExH"')
-    expect(home).toContain('"E-H 公共搜索、阅读和下载不要求 Pica 登录。"')
+    expect(home).toContain('E-H 公共搜索、阅读和下载不要求 Pica 登录。')
   })
 
   it('uses list dialogs instead of permanent rows of secondary Android buttons', () => {

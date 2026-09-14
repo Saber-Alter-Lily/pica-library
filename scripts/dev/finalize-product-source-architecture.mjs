@@ -18,4 +18,13 @@ fs.writeFileSync('test/unit/eh-cross-source-v3.test.ts',contract)
 
 fs.writeFileSync('test/unit/eh-product-navigation.test.ts',`import fs from 'node:fs'\nimport { describe, expect, it } from 'vitest'\n\ndescribe('source-oriented product navigation', () => {\n  it('keeps Desktop source/account choices collapsed until requested', () => {\n    const html = fs.readFileSync('web/index.html', 'utf8')\n    expect(html).toContain('<details class="source-picker">')\n    expect(html).toContain('id="search-provider"')\n    expect(html).toContain('<option value="exh">ExH（需 E-H 账号权限）</option>')\n    expect(html).toContain('<details class="wide account-disclosure">')\n    expect(html).toContain('<details class="account-advanced">')\n    expect(html).not.toContain('<button data-online-source="pica"')\n    expect(html).not.toContain('<button data-online-source="eh"')\n    expect(html).not.toContain('<button data-online-source="exh"')\n  })\n\n  it('uses list dialogs instead of a permanent row of source/account buttons on Android', () => {\n    const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')\n    const account = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhAccountActivity.java', 'utf8')\n    expect(browse).toContain('button("账号与来源"')\n    expect(browse).toContain('button("选择来源 ▾"')\n    expect(browse).toContain('setSingleChoiceItems(labels,checked')\n    expect(browse).toContain('"ExH"')\n    expect(browse).not.toContain('bar.addView(button("Pica 账号"')\n    expect(browse).not.toContain('bar.addView(button("E-H 账号"')\n    expect(account).toContain('button("导入 / 更新会话 ▾"')\n    expect(account).toContain('editor.setVisibility(android.view.View.GONE)')\n  })\n})\n`)
 
+// Android's native Pica model stores popularity counters as int. Unified cross-source
+// catalog values are long, so saturate rather than allowing overflow or a lossy cast.
+replaceOne(
+  'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java',
+  'entry.knownPictures,1,entry.totalLikes,entry.totalViews);}',
+  'entry.knownPictures,1,(int)Math.min(Integer.MAX_VALUE,Math.max(0L,entry.totalLikes)),(int)Math.min(Integer.MAX_VALUE,Math.max(0L,entry.totalViews)));}',
+  'Android catalog popularity saturation'
+)
+
 console.log('PRODUCT_SOURCE_FINAL_CONTRACTS=APPLIED')

@@ -35,6 +35,39 @@ jobs:
           gradle-version: '8.9'
       - name: Apply Android E-H account patch
         run: node scripts/dev/apply-eh-android-account.mjs
+      - name: Repair generated Java escaping
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          eh = Path('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhClient.java')
+          text = eh.read_text(encoding='utf-8')
+          replacements = [
+              (r'value.matches("^eh:\d+:[0-9a-fA-F]{10}$")', r'value.matches("^eh:\\d+:[0-9a-fA-F]{10}$")'),
+              (r'.replace("&quot;",""")', r'.replace("&quot;","\"")'),
+              (r'host.split("\.")', r'host.split("\\.")'),
+              (r'body.contains("name="UserName"")', r'body.contains("name=\"UserName\"")'),
+              (r'e-hentai\.org', r'e-hentai\\.org'),
+              (r'/(\d+)/', r'/(\\d+)/'),
+              (r'-\d+', r'-\\d+'),
+              (r'(?:\?|&amp;|&)next=(\d+)', r'(?:\\?|&amp;|&)next=(\\d+)'),
+              (r'/\d+-\d+$', r'/\\d+-\\d+$'),
+          ]
+          for before, after in replacements:
+              if before in text:
+                  text = text.replace(before, after)
+          eh.write_text(text, encoding='utf-8')
+
+          native = Path('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java')
+          text = native.read_text(encoding='utf-8')
+          start = text.find('String q=')
+          marker = ';List<EhClient.Comic> ehDocs='
+          end = text.find(marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('Native E-H author query anchor not found')
+          text = text[:start] + 'String q="AUTHOR".equals(route.type)?"artist:"+route.query:route.query' + text[end:]
+          native.write_text(text, encoding='utf-8')
+          PY
       - name: Validate Android account, favorite provenance and release build
         working-directory: mobile/android-alpha2
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace

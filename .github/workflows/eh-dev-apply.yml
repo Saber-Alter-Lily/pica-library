@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/providers/eh-provider.ts src/storage/sqlite/migrations.ts src/library/database.ts src/services/provider-service.ts src/library/service.ts src/services/online-reader-service.ts src/library/server.ts web/index.html web/app.js
+          git add src/providers/eh-provider.ts src/storage/sqlite/migrations.ts src/library/database.ts src/services/provider-service.ts src/library/service.ts src/services/online-reader-service.ts src/library/server.ts web/index.html web/app.js test/integration/migrations.test.ts test/unit/recommendation-v3-final.test.ts
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
           git commit -m 'feat: integrate E-H across desktop library flows'

@@ -12,6 +12,8 @@ import { PicaProvider, picaComic } from '../providers/pica-provider'
 import {
     providerComicToRecord,
     type ComicProvider,
+    type EhSurface,
+    type OnlineSource,
     type ProviderId,
     type SearchRequest
 } from '../providers/types'
@@ -73,6 +75,30 @@ export class ProviderService {
 
     private providerForComic(comicId: string): ComicProvider {
         return comicId.startsWith('eh:') ? this.ehProvider : this.picaProvider
+    }
+
+    private ehSurfaceForComic(comicId: string): EhSurface {
+        const metadata = this.database.getComic(comicId)?.providerMetadata ?? {}
+        return metadata.preferredSurface === 'exh' && this.ehProvider.hasSession()
+            ? 'exh'
+            : 'eh'
+    }
+
+    private recordForOnlineSource(comic: Parameters<typeof providerComicToRecord>[0], source: OnlineSource) {
+        const record = providerComicToRecord(comic)
+        if (source === 'pica') return record
+        const previous = this.database.getComic(record.comicId)?.providerMetadata ?? {}
+        const known = new Set<string>([
+            ...(Array.isArray(previous.knownSurfaces) ? previous.knownSurfaces.map(String) : []),
+            source
+        ])
+        record.providerMetadata = {
+            ...previous,
+            ...record.providerMetadata,
+            preferredSurface: source,
+            knownSurfaces: [...known].filter((item) => item === 'eh' || item === 'exh')
+        }
+        return record
     }
 
     providerStatus() {
@@ -253,19 +279,21 @@ export class ProviderService {
 
     async search(
         input: string | SearchRequest,
-        providers: ProviderId[] = ['pica'],
+        providers: OnlineSource[] = ['pica'],
         provenance: 'discover' | 'recommendations' = 'discover'
     ) {
         const request: SearchRequest =
             typeof input === 'string' ? { keyword: input, limit: 100 } : input
         const uniqueProviders = [...new Set(providers)]
         const settled = await Promise.allSettled(
-            uniqueProviders.map(async (providerId) => {
-                const provider =
-                    providerId === 'eh' ? this.ehProvider : this.picaProvider
-                const comics = await provider.search(request)
-                const records = comics.map(providerComicToRecord)
-                this.database.importCatalog(records, `${providerId}:${provenance}`)
+            uniqueProviders.map(async (source) => {
+                const provider = source === 'pica' ? this.picaProvider : this.ehProvider
+                const comics = await provider.search({
+                    ...request,
+                    ...(source === 'pica' ? {} : { surface: source })
+                })
+                const records = comics.map((comic) => this.recordForOnlineSource(comic, source))
+                this.database.importCatalog(records, `${source}:${provenance}`)
                 return records
             })
         )
@@ -285,24 +313,31 @@ export class ProviderService {
     }
 
     async getComicDetails(comicId: string) {
-        const provider = this.providerForComic(comicId)
-        const comic = await provider.details(comicId)
-        this.database.importCatalog(
-            [providerComicToRecord(comic)],
-            `${provider.id}:details`
-        )
+        if (comicId.startsWith('eh:')) {
+            const surface = this.ehSurfaceForComic(comicId)
+            const comic = await this.ehProvider.detailsOnSurface(comicId, surface)
+            const record = this.recordForOnlineSource(comic, surface)
+            this.database.importCatalog([record], `${surface}:details`)
+            return comic
+        }
+        const comic = await this.picaProvider.details(comicId)
+        this.database.importCatalog([providerComicToRecord(comic)], 'pica:details')
         return comic
     }
 
     async getEpisodes(comicId: string): Promise<Episode[]> {
-        return this.providerForComic(comicId).episodes(comicId)
+        return comicId.startsWith('eh:')
+            ? this.ehProvider.episodesOnSurface(comicId, this.ehSurfaceForComic(comicId))
+            : this.picaProvider.episodes(comicId)
     }
 
     async getEpisodePages(
         comicId: string,
         episode: Episode
     ): Promise<Picture[]> {
-        return this.providerForComic(comicId).pages(comicId, episode)
+        return comicId.startsWith('eh:')
+            ? this.ehProvider.pagesOnSurface(comicId, episode, this.ehSurfaceForComic(comicId))
+            : this.picaProvider.pages(comicId, episode)
     }
 
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {

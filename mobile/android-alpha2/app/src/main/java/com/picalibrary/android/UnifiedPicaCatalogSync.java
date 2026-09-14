@@ -22,7 +22,7 @@ final class UnifiedPicaCatalogSync {
         entry.totalLikes=Math.max(0,comic.totalLikes);entry.totalViews=Math.max(0,comic.totalViews);
         if(!comic.coverUrl.isEmpty())entry.picaCoverUrl=comic.coverUrl;
         if(!comic.tags.isEmpty()){entry.tags.clear();entry.tags.addAll(comic.tags);}if(!comic.categories.isEmpty()){entry.categories.clear();entry.categories.addAll(comic.categories);}
-        entry.finished=comic.finished;entry.knownPictures=Math.max(entry.knownPictures,comic.pagesCount);entry.picaAvailable=true;
+        entry.finished=comic.finished;entry.knownPictures=Math.max(entry.knownPictures,comic.pagesCount);entry.picaAvailable=true;if(!entry.sourceBindings.contains("pica"))entry.sourceBindings.add("pica");
         // Pica list/detail objects do not currently expose a reliable updated_at in the Android contract.
         // Keep the first-seen timestamp stable instead of rewriting it on every browse, otherwise cache
         // identities and “recently updated” sorting churn even when nothing changed.

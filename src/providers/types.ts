@@ -2,6 +2,8 @@ import type { Episode, Picture } from '../types'
 import type { FavoriteRecord } from '../library/types'
 
 export type ProviderId = 'pica' | 'eh'
+export type EhSurface = 'eh' | 'exh'
+export type OnlineSource = 'pica' | EhSurface
 export type CompletionStatus = 'FINISHED' | 'ONGOING' | 'UNKNOWN'
 
 export interface CanonicalTag {
@@ -64,6 +66,7 @@ export interface SearchRequest {
     tags?: string[]
     categories?: string[]
     limit?: number
+    surface?: EhSurface
 }
 
 export interface ComicProvider {

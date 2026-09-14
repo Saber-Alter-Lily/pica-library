@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import pLimit from 'p-limit'
 import { Pica } from '../sdk'
 import { EhProvider, type EhSession } from '../providers/eh-provider'
-import type { ProviderId } from '../providers/types'
+import type { OnlineSource } from '../providers/types'
 import type { Comic, Picture } from '../types'
 import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
@@ -92,7 +92,7 @@ export interface DiscoverQuery {
     categories?: string[]
     sort?: SortMode
     limit?: number
-    providers?: ProviderId[]
+    providers?: OnlineSource[]
 }
 
 export interface DownloadProgress {
@@ -274,9 +274,13 @@ export class LibraryService {
         const pica = await this.connect()
         const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
-        const favorites = catalog.filter((comic) => comic.isFavorite)
+        const readingIds = new Set(this.database.readingProgress().map((item) => item.comicId))
+        const explicitFavoriteIds = new Set(catalog.filter((comic) => comic.isFavorite).map((comic) => comic.comicId))
+        const favorites = catalog
+            .filter((comic) => comic.isFavorite || comic.inLibrary || comic.downloadedPictures > 0 || readingIds.has(comic.comicId))
+            .map((comic) => ({ ...comic, isFavorite: true }))
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-        const profile = buildFinalLifetimeProfileV3(catalog, { registry })
+        const profile = buildFinalLifetimeProfileV3(favorites, { registry })
         this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 6 }
         const history: IntentCycleHistory[] = this.database
             .listV3CandidatePools(50)
@@ -331,35 +335,35 @@ export class LibraryService {
                 [...primary, ...secondary].map((comic) => [comic.comicId, comic])
             ).values()
         ]
-        const ehCache = new Map<string, StoredComic[]>()
-        const ehMaxRequests = 4
-        let ehRequestCount = 0
-        const ehSearch = async (
+        const externalCache = new Map<string, StoredComic[]>()
+        const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }
+        const sourceRequests: Record<'eh' | 'exh', number> = { eh: 0, exh: 0 }
+        const exhAvailable = (await providerService.probeExHentai().catch(() => 'UNAVAILABLE')) === 'AVAILABLE'
+        const externalSearch = async (
             query: string,
-            kind: 'keyword' | 'author'
+            kind: 'keyword' | 'author',
+            source: 'eh' | 'exh'
         ): Promise<StoredComic[]> => {
+            if (source === 'exh' && !exhAvailable) return []
             const clean = query.trim()
             if (!clean) return []
-            const key = `${kind}:${clean.toLocaleLowerCase("und")}`
-            const cached = ehCache.get(key)
+            const key = `${source}:${kind}:${clean.toLocaleLowerCase("und")}`
+            const cached = externalCache.get(key)
             if (cached) return cached
-            if (ehRequestCount >= ehMaxRequests) return []
-            ehRequestCount += 1
-            const providerQuery =
-                kind === 'author'
-                    ? `artist:"${clean.replaceAll("\"", "")}"`
-                    : clean
+            if (sourceRequests[source] >= sourceBudget[source]) return []
+            sourceRequests[source] += 1
+            const providerQuery = kind === 'author' ? `artist:"${clean.replaceAll("\"", "")}"` : clean
             try {
                 const records = await providerService.search(
                     { keyword: providerQuery, limit: 40 },
-                    ['eh'],
+                    [source],
                     'recommendations'
                 )
                 const stored = storedRecords(records)
-                ehCache.set(key, stored)
+                externalCache.set(key, stored)
                 return stored
             } catch {
-                ehCache.set(key, [])
+                externalCache.set(key, [])
                 return []
             }
         }
@@ -377,17 +381,17 @@ export class LibraryService {
                             )
                         ).docs
                     )
-                    const ehResults =
-                        page === 1 ? await ehSearch(query, 'keyword') : []
-                    return mergeProviderResults(picaResults, ehResults)
+                    const ehResults = page === 1 ? await externalSearch(query, 'keyword', 'eh') : []
+                    const exhResults = page === 1 ? await externalSearch(query, 'keyword', 'exh') : []
+                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
                 },
                 author: async (query, page) => {
                     const picaResults = storePica(
                         (await pica.search(query, page, pica.Order.loved)).docs
                     )
-                    const ehResults =
-                        page === 1 ? await ehSearch(query, 'author') : []
-                    return mergeProviderResults(picaResults, ehResults)
+                    const ehResults = page === 1 ? await externalSearch(query, 'author', 'eh') : []
+                    const exhResults = page === 1 ? await externalSearch(query, 'author', 'exh') : []
+                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
                 },
                 related: async (comicId) =>
                     comicId.startsWith('eh:')
@@ -436,12 +440,20 @@ export class LibraryService {
                 ...retrieved.telemetry,
                 cycleId,
                 providerSources: {
-                    ehRequests: ehRequestCount,
+                    ehRequests: sourceRequests.eh,
+                    exhRequests: sourceRequests.exh,
+                    exhAvailable,
                     ehCandidates: retrieved.candidates.filter(
                         (item) =>
                             item.comic.providerId === 'eh' ||
                             item.comic.comicId.startsWith('eh:')
                     ).length,
+                    preferenceSignals: {
+                        explicitFavorites: explicitFavoriteIds.size,
+                        collectionSeeds: favorites.length,
+                        readingSeeds: readingIds.size,
+                        downloadedSeeds: favorites.filter((comic) => comic.downloadedPictures > 0).length
+                    },
                     picaCandidates: retrieved.candidates.filter(
                         (item) =>
                             item.comic.providerId !== 'eh' &&
@@ -589,7 +601,7 @@ export class LibraryService {
                 categories: query.categories,
                 limit: Math.min(query.limit ?? 100, 1000)
             },
-            query.providers?.length ? query.providers : ['pica', 'eh']
+            query.providers?.length ? query.providers : ['pica', 'eh', 'exh']
         )
         records = records.filter((comic) => {
             const comicTags = comic.tags.map(normalizeAuthorKey)

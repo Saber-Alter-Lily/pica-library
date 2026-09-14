@@ -4,6 +4,7 @@ import { safeRasterContentType, trustedCoverUrl } from '../library/cover-url'
 import type {
     CanonicalTag,
     ComicProvider,
+    EhSurface,
     ProviderComic,
     SearchRequest
 } from './types'
@@ -137,7 +138,7 @@ export function normalizeEhSession(session: EhSession): EhSession {
     }
 }
 
-export function ehMetadataToComic(value: EhMetadata): ProviderComic {
+export function ehMetadataToComic(value: EhMetadata, surface: EhSurface = 'eh'): ProviderComic {
     if (value.error) throw new Error(`E-H metadata error: ${value.error}`)
     const token = String(value.token ?? '').toLowerCase()
     if (!Number.isSafeInteger(value.gid) || !/^[0-9a-f]{10}$/.test(token))
@@ -192,6 +193,8 @@ export function ehMetadataToComic(value: EhMetadata): ProviderComic {
             torrentcount: Number(value.torrentcount ?? 0),
             torrents: value.torrents ?? [],
             rawTags: value.tags ?? [],
+            preferredSurface: surface,
+            knownSurfaces: [surface],
             lineage: {
                 parent: value.parent_gid
                     ? { gid: value.parent_gid, key: value.parent_key ?? '' }
@@ -220,7 +223,7 @@ function decodeLocator(locator: string) {
     const url = new URL(value)
     if (
         url.protocol !== 'https:' ||
-        url.hostname !== 'e-hentai.org' ||
+        !['e-hentai.org', 'exhentai.org'].includes(url.hostname) ||
         !/^\/s\/[0-9a-f]+\/\d+-\d+$/i.test(url.pathname)
     )
         throw new Error('Untrusted E-H page locator')
@@ -230,7 +233,7 @@ function decodeLocator(locator: string) {
 function galleryRefs(html: string) {
     const output: GalleryRef[] = []
     const seen = new Set<string>()
-    const pattern = /(?:https?:\/\/e-hentai\.org)?\/g\/(\d+)\/([0-9a-f]{10})\//gi
+    const pattern = /(?:https?:\/\/(?:e-hentai\.org|exhentai\.org))?\/g\/(\d+)\/([0-9a-f]{10})\//gi
     for (const match of html.matchAll(pattern)) {
         const key = `${match[1]}:${match[2].toLowerCase()}`
         if (seen.has(key)) continue
@@ -379,7 +382,7 @@ export class EhProvider implements ComicProvider {
         return text
     }
 
-    private async gdata(refs: GalleryRef[]) {
+    private async gdata(refs: GalleryRef[], surface: EhSurface = 'eh') {
         const output: EhMetadata[] = []
         for (let offset = 0; offset < refs.length; offset += MAX_GDATA_BATCH) {
             const chunk = refs.slice(offset, offset + MAX_GDATA_BATCH)
@@ -399,7 +402,7 @@ export class EhProvider implements ComicProvider {
             const body = (await response.json()) as { gmetadata?: EhMetadata[] }
             if (!Array.isArray(body.gmetadata))
                 throw new Error('E-H metadata response is malformed')
-            output.push(...body.gmetadata)
+            output.push(...body.gmetadata.map((item) => ({ ...item, __surface: surface } as EhMetadata & { __surface: EhSurface })))
             if (offset + MAX_GDATA_BATCH < refs.length) await delay(250)
         }
         return output
@@ -417,22 +420,32 @@ export class EhProvider implements ComicProvider {
     }
 
     async search(input: SearchRequest) {
+        const surface: EhSurface = input.surface ?? 'eh'
+        if (surface === 'exh') {
+            if (!this.session) throw new Error('E-H account session is required for ExH')
+            const capability = await this.probeExHentai()
+            if (capability !== 'AVAILABLE')
+                throw new Error(capability === 'NETWORK_ERROR' ? 'ExH availability check failed because of a network error' : 'This E-H account does not currently have ExH access')
+        }
         await this.paceSearch()
         const terms = [input.keyword?.trim() ?? '', ...(input.tags ?? [])]
             .map((value) => value.trim())
             .filter(Boolean)
-        const url = new URL('/', GALLERY_ORIGIN)
+        const origin = surface === 'exh' ? EXH_ORIGIN : GALLERY_ORIGIN
+        const url = new URL('/', origin)
         if (terms.length) url.searchParams.set('f_search', terms.join(' '))
-        const html = await this.text(url.toString())
+        const html = surface === 'exh'
+            ? await this.authenticatedText(url.toString())
+            : await this.text(url.toString())
         const refs = galleryRefs(html).slice(
             0,
             Math.max(1, Math.min(input.limit ?? 25, 100))
         )
         if (!refs.length) return []
         const categories = new Set((input.categories ?? []).map((item) => item.toLowerCase()))
-        return (await this.gdata(refs))
+        return (await this.gdata(refs, surface))
             .filter((item) => !item.error)
-            .map(ehMetadataToComic)
+            .map((item) => ehMetadataToComic(item, surface))
             .filter(
                 (comic) =>
                     !categories.size ||
@@ -468,7 +481,7 @@ export class EhProvider implements ComicProvider {
             next = token
         }
         const metadata = await this.gdata([...refs.values()])
-        return metadata.filter((item) => !item.error).map(ehMetadataToComic)
+        return metadata.filter((item) => !item.error).map((item) => ehMetadataToComic(item, 'eh'))
     }
 
     async setRemoteFavorite(
@@ -552,15 +565,19 @@ export class EhProvider implements ComicProvider {
         }
     }
 
-    async details(comicId: string) {
+    async detailsOnSurface(comicId: string, surface: EhSurface = 'eh') {
         const ref = parseEhComicId(comicId)
-        const values = await this.gdata([ref])
+        const values = await this.gdata([ref], surface)
         if (!values[0]) throw new Error('E-H gallery metadata was not returned')
-        return ehMetadataToComic(values[0])
+        return ehMetadataToComic(values[0], surface)
     }
 
-    async episodes(comicId: string): Promise<Episode[]> {
-        const comic = await this.details(comicId)
+    async details(comicId: string) {
+        return this.detailsOnSurface(comicId, 'eh')
+    }
+
+    async episodesOnSurface(comicId: string, surface: EhSurface = 'eh'): Promise<Episode[]> {
+        const comic = await this.detailsOnSurface(comicId, surface)
         const ref = parseEhComicId(comicId)
         return [
             {
@@ -572,24 +589,31 @@ export class EhProvider implements ComicProvider {
         ]
     }
 
-    async pages(comicId: string, episode: Episode): Promise<Picture[]> {
+    async episodes(comicId: string): Promise<Episode[]> {
+        return this.episodesOnSurface(comicId, 'eh')
+    }
+
+    async pagesOnSurface(comicId: string, episode: Episode, surface: EhSurface = 'eh'): Promise<Picture[]> {
         const ref = parseEhComicId(comicId)
         if (episode.id !== `eh-${ref.gid}`)
             throw new Error('E-H synthetic chapter does not match this gallery')
-        const comic = await this.details(comicId)
+        const comic = await this.detailsOnSurface(comicId, surface)
         const expected = Math.max(0, comic.pagesCount ?? 0)
+        const origin = surface === 'exh' ? EXH_ORIGIN : GALLERY_ORIGIN
         const pageUrls: string[] = []
         const seen = new Set<string>()
         for (let index = 0; index < MAX_GALLERY_INDEX_PAGES; index++) {
-            const url = `${GALLERY_ORIGIN}/g/${ref.gid}/${ref.token}/?p=${index}`
-            const html = await this.text(url)
+            const url = `${origin}/g/${ref.gid}/${ref.token}/?p=${index}`
+            const html = surface === 'exh'
+                ? await this.authenticatedText(url)
+                : await this.text(url)
             const pattern = new RegExp(
-                `(?:https?:\\/\\/e-hentai\\.org)?\\/s\\/[0-9a-f]+\\/${ref.gid}-\\d+`,
+                `(?:https?:\\/\\/(?:e-hentai\\.org|exhentai\\.org))?\\/s\\/[0-9a-f]+\\/${ref.gid}-\\d+`,
                 'gi'
             )
             let added = 0
             for (const match of html.matchAll(pattern)) {
-                const absolute = new URL(htmlDecode(match[0]), GALLERY_ORIGIN).toString()
+                const absolute = new URL(htmlDecode(match[0]), origin).toString()
                 if (seen.has(absolute)) continue
                 seen.add(absolute)
                 pageUrls.push(absolute)
@@ -621,6 +645,10 @@ export class EhProvider implements ComicProvider {
         })
     }
 
+    async pages(comicId: string, episode: Episode): Promise<Picture[]> {
+        return this.pagesOnSurface(comicId, episode, 'eh')
+    }
+
     async fetchCover(locator: string, maxBytes = 20 * 1024 * 1024) {
         const coverUrl = trustedCoverUrl(locator)
         if (!coverUrl) throw new Error('E-H cover URL was rejected as untrusted')
@@ -638,7 +666,9 @@ export class EhProvider implements ComicProvider {
 
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
         const pageUrl = decodeLocator(locator)
-        const html = await this.text(pageUrl)
+        const html = new URL(pageUrl).hostname === 'exhentai.org'
+            ? await this.authenticatedText(pageUrl)
+            : await this.text(pageUrl)
         const match =
             /<img[^>]+id=["']img["'][^>]+src=["']([^"']+)["']/i.exec(html) ??
             /<img[^>]+src=["']([^"']+)["'][^>]+id=["']img["']/i.exec(html)

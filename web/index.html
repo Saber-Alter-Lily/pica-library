@@ -284,7 +284,7 @@
                     <input id="filter-text" placeholder="标题或作者" />
                     <select id="filter-scope">
                         <option value="library" selected>漫画库</option>
-                        <option value="favorites">Pica 收藏</option>
+                        <option value="favorites">收藏（全部来源）</option>
                         <option value="downloaded">已下载</option>
                         <option value="catalog">全部缓存记录</option>
                     </select>
@@ -506,11 +506,15 @@
                     <div class="toolbar">
                         <input id="search-keyword" placeholder="关键词" />
                         <input id="search-tags" placeholder="标签，逗号分隔" />
-                        <select id="search-provider">
-                            <option value="all">Pica + E-H</option>
-                            <option value="pica">仅 Pica</option>
-                            <option value="eh">仅 E-H</option>
-                        </select>
+                        <details class="source-picker">
+                            <summary>来源：<span id="search-provider-label">全部可用来源</span></summary>
+                            <label>选择在线来源<select id="search-provider">
+                                <option value="all">全部可用来源</option>
+                                <option value="pica">Pica</option>
+                                <option value="eh">E-H 公共</option>
+                                <option value="exh">ExH（需 E-H 账号权限）</option>
+                            </select></label>
+                        </details>
                         <select id="search-sort">
                             <option value="likes">爱心数量</option>
                             <option value="views">浏览数量</option>
@@ -851,19 +855,13 @@
                     <span id="settings-version" class="mode"></span>
                 </div>
                 <form id="settings-form" class="settings-form panel">
-                    <label
-                        >Account<input
-                            id="settings-account"
-                            autocomplete="username"
-                            placeholder="Keep current account"
-                    /></label>
-                    <label
-                        >Change password<input
-                            id="settings-password"
-                            type="password"
-                            autocomplete="new-password"
-                            placeholder="Leave blank to keep current password"
-                    /></label>
+                                        <details class="wide account-disclosure">
+                        <summary><strong>Pica 账号</strong> · 点击展开修改</summary>
+                        <div class="settings-form">
+                            <label>Account<input id="settings-account" autocomplete="username" placeholder="Keep current account" /></label>
+                            <label>Change password<input id="settings-password" type="password" autocomplete="new-password" placeholder="Leave blank to keep current password" /></label>
+                        </div>
+                    </details>
                     <label class="wide"
                         >Library and download folder<span class="folder-row"
                             ><input id="settings-directory" required /><button
@@ -946,16 +944,19 @@
                         role="status"
                     ></p>
                 </article>
-                <article id="settings-eh-account" class="panel">
-                    <h3>E-Hentai / ExHentai 账号</h3>
+                <details id="settings-eh-account" class="panel account-disclosure">
+                    <summary><strong>E-Hentai / ExHentai 账号</strong> · 可选增强</summary>
                     <p>E-H 公共搜索、阅读和下载无需登录。账号仅用于云收藏与 ExH 访问探测；Pica Library 不保存 E-H 密码，只保存你从官方站点会话中导入的 cookie，并由 Windows DPAPI 加密。</p>
                     <p id="eh-account-state" class="status"></p>
-                    <div class="settings-form">
-                        <label>ipb_member_id<input id="eh-member-id" autocomplete="off" /></label>
-                        <label>ipb_pass_hash<input id="eh-pass-hash" type="password" autocomplete="new-password" /></label>
-                        <label>igneous（可选）<input id="eh-igneous" type="password" autocomplete="new-password" /></label>
-                        <label>cf_clearance（仅遇到 Cloudflare 时可选）<input id="eh-cf-clearance" type="password" autocomplete="new-password" /></label>
-                    </div>
+                    <details class="account-advanced">
+                        <summary>高级 · 手动导入官方站点会话</summary>
+                        <div class="settings-form">
+                            <label>ipb_member_id<input id="eh-member-id" autocomplete="off" /></label>
+                            <label>ipb_pass_hash<input id="eh-pass-hash" type="password" autocomplete="new-password" /></label>
+                            <label>igneous（可选）<input id="eh-igneous" type="password" autocomplete="new-password" /></label>
+                            <label>cf_clearance（仅遇到 Cloudflare 时可选）<input id="eh-cf-clearance" type="password" autocomplete="new-password" /></label>
+                        </div>
+                    </details>
                     <div class="actions">
                         <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">打开官方登录页</a>
                         <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Reg&amp;CODE=00" target="_blank" rel="noreferrer">打开官方注册页</a>
@@ -966,7 +967,7 @@
                         <button id="eh-account-clear" type="button">清除 E-H 会话</button>
                     </div>
                     <p id="eh-account-message" class="status" role="status"></p>
-                </article>
+                </details>
                 <article id="settings-remote-storage" class="panel">
                     <h3>远程存储 · WebDAV</h3>
                     <p>把电脑已经下载的漫画增量同步到远程存储。Alpha7 使用 <code>PicaLibrary/v1</code> generation 结构；手机之后可在电脑关机时直接读取。</p>

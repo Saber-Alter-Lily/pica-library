@@ -36,12 +36,39 @@ describe('E-H cross-source Recommendation V3', () => {
   it('wires both Desktop and Android V3 to bounded E-H recall without replacing Pica popularity', () => {
     const desktop = fs.readFileSync('src/library/service.ts', 'utf8')
     const mobile = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java', 'utf8')
-    expect(desktop).toContain('const ehMaxRequests = 4')
-    expect(desktop).toContain("['eh']")
-    expect(desktop).toContain("'recommendations'")
-    expect(mobile).toContain('EH_MAX_REQUESTS=4')
-    expect(mobile).toContain('new EhClient(app)')
-    expect(mobile).toContain('UnifiedEhCatalogSync.mergeAll')
-    expect(mobile).toContain('comic.pagesCount,1,0,0')
+    expect(desktop).toContain("const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }")
+    expect(desktop).toContain("externalSearch(query, 'keyword', 'eh')")
+    expect(desktop).toContain("externalSearch(query, 'keyword', 'exh')")
+    expect(desktop).toContain('preferenceSignals')
+    expect(desktop).toContain("comic.isFavorite || comic.inLibrary || comic.downloadedPictures > 0 || readingIds.has(comic.comicId)")
+    expect(mobile).toContain('EH_MAX_REQUESTS=4,EXH_MAX_REQUESTS=2')
+    expect(mobile).toContain('ehClient.search(q,"eh")')
+    expect(mobile).toContain('ehClient.search(q,"exh")')
+    expect(mobile).toContain('known.favorite||known.inShelf||known.phoneDownloaded||known.desktopDownloaded||known.remoteAvailable')
   })
+  it('routes ExH through the E-H provider while preserving canonical identity', async () => {
+    const db = database()
+    let observedSurface = ''
+    const fakeEh = { id: 'eh', capabilities: {}, search: async (input: { surface?: string }) => { observedSurface = String(input.surface || ''); return [{ providerId: 'eh', providerRemoteId: '234567:abcdef1234', comicId: 'eh:234567:abcdef1234', title: 'ExH Fixture', alternateTitles: [], author: 'Artist', authors: ['Artist'], circle: null, description: '', chineseTeam: '', categories: ['Doujinshi'], tags: ['tag'], canonicalTags: [], completionStatus: 'UNKNOWN', pagesCount: 10, epsCount: 1, rating: 4.8, providerMetadata: { rawTags: [] } }] }, details: async () => { throw new Error('unused') }, episodes: async () => [], pages: async () => [], fetchPage: async () => { throw new Error('unused') }, fetchCover: async () => { throw new Error('unused') } } as unknown as EhProvider
+    const service = new ProviderService(async () => ({} as Pica), db, fakeEh)
+    const records = await service.search({ keyword: 'tag', limit: 10 }, ['exh'], 'discover')
+    expect(observedSurface).toBe('exh')
+    expect(records[0]).toMatchObject({ comicId: 'eh:234567:abcdef1234', providerId: 'eh' })
+    expect(records[0].providerMetadata).toMatchObject({ preferredSurface: 'exh', knownSurfaces: ['exh'] })
+    db.close()
+  })
+
+  it('keeps successful sources when ExH is unavailable but fails an explicit ExH-only request', async () => {
+    const db = database()
+    const fakeEh = { id: 'eh', capabilities: {}, search: async (input: { surface?: string }) => {
+      if (input.surface === 'exh') throw new Error('ExH unavailable')
+      return [{ providerId: 'eh', providerRemoteId: '345678:abcdef1234', comicId: 'eh:345678:abcdef1234', title: 'Public Fixture', alternateTitles: [], author: 'Artist', authors: ['Artist'], circle: null, description: '', chineseTeam: '', categories: ['Manga'], tags: ['tag'], canonicalTags: [], completionStatus: 'UNKNOWN', pagesCount: 8, epsCount: 1, providerMetadata: { rawTags: [] } }]
+    }, details: async () => { throw new Error('unused') }, episodes: async () => [], pages: async () => [], fetchPage: async () => { throw new Error('unused') }, fetchCover: async () => { throw new Error('unused') } } as unknown as EhProvider
+    const service = new ProviderService(async () => ({} as Pica), db, fakeEh)
+    const mixed = await service.search({ keyword: 'tag', limit: 10 }, ['eh', 'exh'], 'discover')
+    expect(mixed.map((item) => item.comicId)).toEqual(['eh:345678:abcdef1234'])
+    await expect(service.search({ keyword: 'tag', limit: 10 }, ['exh'], 'discover')).rejects.toThrow('ExH unavailable')
+    db.close()
+  })
+
 })

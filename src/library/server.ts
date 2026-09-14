@@ -1326,8 +1326,8 @@ export async function startLibraryServer(options: {
                             : 'likes') as SortMode,
                         limit: Number(input.limit ?? 100),
                         providers: stringList(input.providers).filter(
-                            (value): value is 'pica' | 'eh' =>
-                                value === 'pica' || value === 'eh'
+                            (value): value is 'pica' | 'eh' | 'exh' =>
+                                value === 'pica' || value === 'eh' || value === 'exh'
                         )
                     })
                 )

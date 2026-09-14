@@ -23,6 +23,7 @@
         <activity android:name=".ThemePackActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".StorageHubActivity" android:exported="false" />
+        <activity android:name=".AboutActivity" android:exported="false" />
         <activity android:name=".StorageSettingsActivity" android:exported="false" />
         <activity android:name=".UpdateActivity" android:exported="false" />
         <activity android:name=".PicaBrowseActivity" android:exported="false" />

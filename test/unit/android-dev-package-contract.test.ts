@@ -14,17 +14,11 @@ describe('Android side-by-side Dev package contract', () => {
     expect(gradle).toContain("versionNameSuffix '-dev-pr35'")
     expect(manifest).toContain('android:label="${appLabel}"')
     expect(manifest).toContain('android:authorities="${applicationId}.files"')
-    expect(app).toContain('if(!BuildConfig.DEBUG)UpdateCheckJobs.schedule(this);')
+    expect(app).toContain('ApplicationInfo.FLAG_DEBUGGABLE')
+    expect(app).toContain('if(!debuggable)UpdateCheckJobs.schedule(this);')
   })
 
-  it('builds a signed CI artifact without publishing a release', () => {
-    const workflow = fs.readFileSync('.github/workflows/pr35-dev-apk.yml', 'utf8')
-
-    expect(workflow).toContain('Pica-Library-Dev-PR35.apk')
-    expect(workflow).toContain("package: name='com.picalibrary.android.dev'")
-    expect(workflow).toContain("application-label:'Pica Library Dev'")
-    expect(workflow).toContain('actions/upload-artifact@v4')
-    expect(workflow).not.toContain('softprops/action-gh-release')
-    expect(workflow).not.toContain('gh release')
+  it('does not add a public-repository signing workflow for the Dev package', () => {
+    expect(fs.existsSync('.github/workflows/pr35-dev-apk.yml')).toBe(false)
   })
 })

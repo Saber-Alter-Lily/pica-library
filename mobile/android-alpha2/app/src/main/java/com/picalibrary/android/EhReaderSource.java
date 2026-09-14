@@ -14,7 +14,7 @@ final class EhReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     EhReaderSource(Context context){this.context=context.getApplicationContext();this.client=new EhClient(this.context);}
     public String kind(){return "eh";}
-    public String scope(){return ReaderPolicy.hash("eh-public-v2-lazy-pages");}
+    public String scope(){return ReaderPolicy.hash("eh-public-v3-gallery-referer");}
 
     private static String episodeId(String comicId){String[] parts=comicId==null?new String[0]:comicId.split(":",3);return parts.length>=2?"eh-"+parts[1]:"eh-gallery";}
     private EhClient.Episode syntheticEpisode(String comicId,String title){return new EhClient.Episode(episodeId(comicId),title==null||title.isEmpty()?"E-H 画廊":title,1);}

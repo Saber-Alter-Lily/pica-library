@@ -117,6 +117,26 @@ describe('built CLI entrypoint contract', () => {
                     expect(content).not.toMatch(
                         /contents: write|gh release|git tag/
                     )
+                } else if (name === 'pr35-dev-apk.yml') {
+                    // Public manual-QA APK: isolated application ID, ordinary debug signing,
+                    // no provider credentials and no release/publishing privileges.
+                    expect(content).toContain('contents: read')
+                    expect(content).toContain(
+                        'branches: [feature/eh-provider-v1]'
+                    )
+                    expect(content).not.toMatch(/pull_request(?:_target)?:/)
+                    expect(content).toContain(
+                        'path: mobile/android-alpha2/candidate/'
+                    )
+                    expect(content).toContain('if-no-files-found: error')
+                    expect(content).toContain(':app:assembleDebug')
+                    expect(content).toContain(
+                        "package: name='com.picalibrary.android.dev'"
+                    )
+                    expect(content).not.toMatch(/secrets\./)
+                    expect(content).not.toMatch(
+                        /contents: write|gh release|git tag|assembleRelease/
+                    )
                 } else {
                     expect(content, name).toContain(
                         'github.event.repository.private'

@@ -1,15 +1,19 @@
-name: Validate and apply E-H Desktop account UI
+name: Validate and apply E-H Android account integration
 
 on:
   push:
     branches:
       - feature/eh-provider-v1
     paths:
-      - 'scripts/dev/apply-eh-desktop-account-ui.mjs'
+      - 'scripts/dev/apply-eh-android-account.mjs'
       - '.github/workflows/eh-dev-apply.yml'
 
 permissions:
   contents: write
+
+concurrency:
+  group: eh-dev-android-account
+  cancel-in-progress: true
 
 jobs:
   apply:
@@ -20,30 +24,38 @@ jobs:
         with:
           ref: feature/eh-provider-v1
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-java@v5
         with:
-          node-version: '24'
-      - uses: pnpm/action-setup@v4
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          version: '11.16.0'
-          run_install: false
-      - run: pnpm install --frozen-lockfile
-      - name: Apply Desktop E-H account UI patch
-        run: node scripts/dev/apply-eh-desktop-account-ui.mjs
-      - name: Validate Desktop account UI and regressions
-        run: |
-          set -euo pipefail
-          pnpm type:check
-          pnpm web:check
-          pnpm test
-          pnpm build
-      - name: Commit validated Desktop account UI
+          gradle-version: '8.9'
+      - name: Apply Android E-H account patch
+        run: node scripts/dev/apply-eh-android-account.mjs
+      - name: Validate Android account, favorite provenance and release build
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
+      - name: Commit validated Android account integration
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/desktop/types.ts src/desktop/main.ts web/index.html web/eh-account.js test/unit/eh-desktop-account-ui.test.ts
+          git add \
+            mobile/android-alpha2/app/src/main/AndroidManifest.xml \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhAccountStore.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhFavoriteStore.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhClient.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhAccountActivity.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedCatalogStore.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBootstrapWorker.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java \
+            mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java \
+            mobile/android-alpha2/app/src/test/java/com/picalibrary/android/EhFavoriteAggregationTest.java
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
-          git commit -m 'feat: add encrypted E-H account controls on Desktop'
+          git commit -m 'feat: add encrypted E-H account controls on Android'
           git push origin HEAD:feature/eh-provider-v1

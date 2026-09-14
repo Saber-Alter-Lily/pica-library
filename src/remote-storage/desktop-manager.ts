@@ -5,9 +5,10 @@ import type { CredentialStore } from '../desktop/credentials'
 import type { StoredCredentials } from '../desktop/types'
 import { LibraryQueryService } from '../services/library-query-service'
 import {
-    loadRemoteStorageConfig,
+    loadRemoteStorageRegistry,
     normalizeRemoteStorageConfig,
-    saveRemoteStorageConfig
+    REMOTE_STORAGE_PRESETS,
+    saveRemoteStorageRegistry
 } from './config'
 import { createRemoteStorageProvider } from './factory'
 import { remoteLayout } from './layout'
@@ -16,31 +17,165 @@ import type {
     RemoteFavoriteState,
     RemoteReadingEntry,
     RemoteReadingState,
+    RemoteStorageCredentials,
     RemoteStorageProvider,
-    RemoteStoragePublicConfig
+    RemoteStorageRegistry,
+    RemoteStorageTarget
 } from './types'
 
+interface SelectedRemoteTarget {
+    targetId: string
+    label: string
+    publicConfig: RemoteStorageTarget['config']
+    remoteCredentials: RemoteStorageCredentials
+    saved: boolean
+}
+
 export class RemoteStorageDesktopManager {
-    private publicConfig: RemoteStoragePublicConfig | null
+    private registry: RemoteStorageRegistry
     private credentials: StoredCredentials | null
     private readonly query: LibraryQueryService
     private mutationInFlight = false
-    private scopeId = randomUUID()
+    private readonly scopeIds = new Map<string, string>()
+    private syncProgress: Record<string, unknown> = {
+        phase: 'idle',
+        updatedAt: new Date().toISOString()
+    }
 
-    private exclusionsKey() {
-        return `remote-excluded-v1:${createHash('sha256')
+    constructor(
+        private readonly configFile: string,
+        private readonly credentialStore: CredentialStore,
+        credentials: StoredCredentials | null,
+        private readonly database: LibraryDatabase,
+        private readonly dataDir: string,
+        private readonly onCredentialsChanged: (value: StoredCredentials) => void
+    ) {
+        this.credentials = credentials
+        this.registry = loadRemoteStorageRegistry(configFile)
+        this.query = new LibraryQueryService(database)
+        for (const target of this.registry.targets)
+            this.scopeIds.set(target.id, randomUUID())
+    }
+
+    private scopeId(targetId: string) {
+        let value = this.scopeIds.get(targetId)
+        if (!value) {
+            value = randomUUID()
+            this.scopeIds.set(targetId, value)
+        }
+        return value
+    }
+
+    private targetCredentials(targetId: string): RemoteStorageCredentials {
+        const mapped = this.credentials?.remoteStorageCredentials?.[targetId]
+        if (mapped) return { ...mapped }
+        if (targetId === 'legacy-default')
+            return {
+                username: this.credentials?.remoteStorageUsername,
+                password: this.credentials?.remoteStoragePassword
+            }
+        return {}
+    }
+
+    private target(input: Record<string, unknown>) {
+        const requested = String(input.remoteTargetId ?? '').trim()
+        if (requested) {
+            const target = this.registry.targets.find((item) => item.id === requested)
+            if (!target) throw new Error('所选网盘配置不存在，请刷新后重试')
+            return target
+        }
+        if (!this.registry.targets.length) throw new Error('请先配置远程存储')
+        if (this.registry.targets.length > 1)
+            throw new Error('已配置多个网盘，请先选择目标网盘')
+        return this.registry.targets[0]
+    }
+
+    private selection(input: Record<string, unknown>): SelectedRemoteTarget {
+        const value =
+            typeof input.remoteStorage === 'object' && input.remoteStorage
+                ? (input.remoteStorage as Record<string, unknown>)
+                : null
+        if (!value) {
+            const target = this.target(input)
+            return {
+                targetId: target.id,
+                label: target.label,
+                publicConfig: target.config,
+                remoteCredentials: this.targetCredentials(target.id),
+                saved: true
+            }
+        }
+
+        const publicConfig = normalizeRemoteStorageConfig(value)
+        const requestedId = String(
+            input.remoteTargetId ?? value.id ?? value.targetId ?? ''
+        ).trim()
+        const existing = requestedId
+            ? this.registry.targets.find((item) => item.id === requestedId)
+            : undefined
+        const stored = existing ? this.targetCredentials(existing.id) : {}
+        const suppliedUsername = value.username
+        const suppliedPassword = value.password
+        const username =
+            suppliedUsername !== undefined && String(suppliedUsername).trim()
+                ? String(suppliedUsername).trim()
+                : stored.username
+        const password =
+            suppliedPassword !== undefined && String(suppliedPassword)
+                ? String(suppliedPassword)
+                : stored.password
+        const presetLabel =
+            REMOTE_STORAGE_PRESETS.find(
+                (preset) => preset.vendor === publicConfig.vendor
+            )?.label ?? 'WebDAV'
+        const label = String(value.label ?? existing?.label ?? presetLabel).trim()
+        if (!label || label.length > 80) throw new Error('网盘名称无效')
+        return {
+            targetId: existing?.id ?? requestedId,
+            label,
+            publicConfig,
+            remoteCredentials: {
+                username: username || undefined,
+                password: password || undefined
+            },
+            saved: Boolean(existing)
+        }
+    }
+
+    private providerFrom(selected: SelectedRemoteTarget) {
+        return createRemoteStorageProvider(
+            selected.publicConfig,
+            selected.remoteCredentials
+        )
+    }
+
+    private provider(input: Record<string, unknown>) {
+        const selected = this.selection(input)
+        return { selected, provider: this.providerFrom(selected) }
+    }
+
+    private exclusionsKey(selected: SelectedRemoteTarget) {
+        return `remote-excluded-v2:${createHash('sha256')
             .update(
                 JSON.stringify([
-                    this.publicConfig,
-                    this.credentials?.remoteStorageUsername ?? ''
+                    selected.targetId,
+                    selected.publicConfig,
+                    selected.remoteCredentials.username ?? ''
                 ])
             )
             .digest('hex')}`
     }
-    private exclusions() {
-        return this.database.getAppState<string[]>(this.exclusionsKey()) ?? []
+
+    private exclusions(selected: SelectedRemoteTarget) {
+        return (
+            this.database.getAppState<string[]>(this.exclusionsKey(selected)) ?? []
+        )
     }
-    private selected(input: Record<string, unknown>) {
+
+    private selectedComics(
+        input: Record<string, unknown>,
+        selectedTarget: SelectedRemoteTarget
+    ) {
         const downloaded = this.query
             .query({ scope: 'downloaded', limit: 5000, offset: 0 })
             .items.map((item) => item.comicId)
@@ -50,8 +185,152 @@ export class RemoteStorageDesktopManager {
                 throw new Error('所选漫画没有本地下载，已停止上传')
             return ids
         }
-        const excluded = new Set(this.exclusions())
+        const excluded = new Set(this.exclusions(selectedTarget))
         return downloaded.filter((id) => !excluded.has(id))
+    }
+
+    status() {
+        const targets = this.registry.targets.map((target) => {
+            const stored = this.targetCredentials(target.id)
+            return {
+                id: target.id,
+                label: target.label,
+                ...target.config,
+                credentialsConfigured: Boolean(stored.username || stored.password)
+            }
+        })
+        const common = {
+            configured: targets.length > 0,
+            targets,
+            presets: REMOTE_STORAGE_PRESETS,
+            syncProgress: this.syncProgress
+        }
+        return targets.length === 1 ? { ...common, ...targets[0] } : common
+    }
+
+    async test(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+        const { selected, provider } = this.provider(input)
+        const result = await provider.test()
+        return {
+            ...result,
+            targetId: selected.targetId || null,
+            label: selected.label,
+            kind: selected.publicConfig.kind,
+            vendor: selected.publicConfig.vendor,
+            baseUrl: selected.publicConfig.baseUrl,
+            root: selected.publicConfig.root
+        }
+    }
+
+    private syncService(
+        selected: SelectedRemoteTarget,
+        provider = this.providerFrom(selected)
+    ) {
+        return new RemoteLibrarySyncService(
+            this.database,
+            this.dataDir,
+            provider,
+            (progress) => {
+                this.syncProgress = {
+                    ...(progress as unknown as Record<string, unknown>),
+                    targetId: selected.targetId,
+                    targetLabel: selected.label
+                }
+            }
+        )
+    }
+
+    async plan(input: Record<string, unknown>): Promise<Record<string, unknown>> {
+        const selected = this.selection(input)
+        await this.providerFrom(selected).test()
+        return (await this.syncService(selected).plan(
+            this.selectedComics(input, selected)
+        )) as unknown as Record<string, unknown>
+    }
+
+    save(input: Record<string, unknown>) {
+        if (this.mutationInFlight)
+            throw new Error('网盘操作期间不能更改存储配置')
+        if (!input.remoteStorage || typeof input.remoteStorage !== 'object')
+            throw new Error('缺少网盘配置')
+        const selected = this.selection(input)
+        const targetId = selected.targetId || randomUUID()
+        if (!/^[a-zA-Z0-9_-]{1,96}$/.test(targetId))
+            throw new Error('网盘配置 ID 无效')
+        const target: RemoteStorageTarget = {
+            id: targetId,
+            label: selected.label,
+            config: selected.publicConfig
+        }
+        const existingIndex = this.registry.targets.findIndex(
+            (item) => item.id === targetId
+        )
+        const targets = [...this.registry.targets]
+        if (existingIndex >= 0) targets[existingIndex] = target
+        else targets.push(target)
+        this.registry = { schemaVersion: 2, targets }
+        saveRemoteStorageRegistry(this.configFile, this.registry)
+
+        const remoteStorageCredentials = {
+            ...(this.credentials?.remoteStorageCredentials ?? {}),
+            [targetId]: {
+                username: selected.remoteCredentials.username,
+                password: selected.remoteCredentials.password
+            }
+        }
+        const merged: StoredCredentials = {
+            account: this.credentials?.account ?? '',
+            password: this.credentials?.password ?? '',
+            proxyUsername: this.credentials?.proxyUsername,
+            proxyPassword: this.credentials?.proxyPassword,
+            remoteStorageUsername: this.credentials?.remoteStorageUsername,
+            remoteStoragePassword: this.credentials?.remoteStoragePassword,
+            remoteStorageCredentials
+        }
+        this.credentialStore.save(merged)
+        this.credentials = merged
+        this.scopeIds.set(targetId, randomUUID())
+        this.onCredentialsChanged(merged)
+        return {
+            success: true,
+            targetId,
+            remoteStorage: this.status()
+        }
+    }
+
+    removeTarget(input: Record<string, unknown>) {
+        if (this.mutationInFlight)
+            throw new Error('网盘操作期间不能更改存储配置')
+        const target = this.target(input)
+        this.registry = {
+            schemaVersion: 2,
+            targets: this.registry.targets.filter((item) => item.id !== target.id)
+        }
+        saveRemoteStorageRegistry(this.configFile, this.registry)
+        const credentialsMap = {
+            ...(this.credentials?.remoteStorageCredentials ?? {})
+        }
+        delete credentialsMap[target.id]
+        const merged: StoredCredentials = {
+            account: this.credentials?.account ?? '',
+            password: this.credentials?.password ?? '',
+            proxyUsername: this.credentials?.proxyUsername,
+            proxyPassword: this.credentials?.proxyPassword,
+            remoteStorageUsername:
+                target.id === 'legacy-default'
+                    ? undefined
+                    : this.credentials?.remoteStorageUsername,
+            remoteStoragePassword:
+                target.id === 'legacy-default'
+                    ? undefined
+                    : this.credentials?.remoteStoragePassword,
+            remoteStorageCredentials: credentialsMap
+        }
+        this.credentialStore.save(merged)
+        this.credentials = merged
+        this.scopeIds.delete(target.id)
+        this.onCredentialsChanged(merged)
+        return { success: true, remoteStorage: this.status() }
     }
 
     async inventory(input: Record<string, unknown>) {
@@ -59,22 +338,27 @@ export class RemoteStorageDesktopManager {
             throw new Error('请先保存网盘配置，再核验漫画副本状态')
         if (this.mutationInFlight)
             throw new Error('网盘操作进行中，请完成后刷新')
-        const scopeId = this.scopeId
-        const result = await this.syncService({}).inventory()
-        if (scopeId !== this.scopeId)
+        const selected = this.selection(input)
+        const scopeId = this.scopeId(selected.targetId)
+        const result = await this.syncService(selected).inventory()
+        if (scopeId !== this.scopeId(selected.targetId))
             throw new Error('网盘配置已变化，请重新刷新')
+        const key = this.exclusionsKey(selected)
         const pending = new Set(
-            this.database.getAppState<string[]>(
-                `${this.exclusionsKey()}:pending`
-            ) ?? []
+            this.database.getAppState<string[]>(`${key}:pending`) ?? []
         )
+        const excluded = this.exclusions(selected)
         return {
             ...result,
+            targetId: selected.targetId,
+            targetLabel: selected.label,
             scopeId,
             comics: result.comics.map((item) => ({
                 ...item,
-                excludedFromFullSync: this.exclusions().includes(item.comicId),
-                state: pending.has(item.comicId) ? 'delete-pending' : item.state
+                excludedFromFullSync: excluded.includes(item.comicId),
+                state: pending.has(item.comicId)
+                    ? 'delete-pending'
+                    : item.state
             }))
         }
     }
@@ -83,8 +367,9 @@ export class RemoteStorageDesktopManager {
         if (this.mutationInFlight) throw new Error('已有网盘操作进行中')
         if (input.confirmation !== 'DELETE_REMOTE_ONLY')
             throw new Error('必须明确确认仅删除网盘副本')
+        const selected = this.selection(input)
         if (
-            input.remoteScopeId !== this.scopeId ||
+            input.remoteScopeId !== this.scopeId(selected.targetId) ||
             typeof input.expectedGeneration !== 'string'
         )
             throw new Error('网盘目标未核验或已经变化，请刷新后重新选择')
@@ -93,21 +378,19 @@ export class RemoteStorageDesktopManager {
             throw new Error('所选漫画不在本地书库中')
         this.mutationInFlight = true
         try {
-            const { provider } = this.provider({})
-            const key = this.exclusionsKey()
+            const provider = this.providerFrom(selected)
+            const key = this.exclusionsKey(selected)
             const pendingKey = `${key}:pending`
             const result = await removeRemoteCopies(
                 provider,
                 ids,
                 () => {
                     this.database.setAppState(key, [
-                        ...new Set([...this.exclusions(), ...ids])
+                        ...new Set([...this.exclusions(selected), ...ids])
                     ])
                     this.database.setAppState(pendingKey, [
                         ...new Set([
-                            ...(this.database.getAppState<string[]>(
-                                pendingKey
-                            ) ?? []),
+                            ...(this.database.getAppState<string[]>(pendingKey) ?? []),
                             ...ids
                         ])
                     ])
@@ -120,144 +403,10 @@ export class RemoteStorageDesktopManager {
                     (id) => !result.deletedComicIds.includes(id)
                 )
             )
-            return result
+            return { ...result, targetId: selected.targetId }
         } finally {
             this.mutationInFlight = false
         }
-    }
-    private syncProgress: Record<string, unknown> = {
-        phase: 'idle',
-        updatedAt: new Date().toISOString()
-    }
-
-    constructor(
-        private readonly configFile: string,
-        private readonly credentialStore: CredentialStore,
-        credentials: StoredCredentials | null,
-        private readonly database: LibraryDatabase,
-        private readonly dataDir: string,
-        private readonly onCredentialsChanged: (
-            value: StoredCredentials
-        ) => void
-    ) {
-        this.credentials = credentials
-        this.publicConfig = loadRemoteStorageConfig(configFile)
-        this.query = new LibraryQueryService(database)
-    }
-
-    status() {
-        return this.publicConfig
-            ? {
-                  configured: true,
-                  ...this.publicConfig,
-                  credentialsConfigured: Boolean(
-                      this.credentials?.remoteStorageUsername ||
-                          this.credentials?.remoteStoragePassword
-                  ),
-                  syncProgress: this.syncProgress
-              }
-            : {
-                  configured: false,
-                  kind: 'webdav' as const,
-                  syncProgress: this.syncProgress
-              }
-    }
-
-    private selection(input: Record<string, unknown>) {
-        const value =
-            typeof input.remoteStorage === 'object' && input.remoteStorage
-                ? (input.remoteStorage as Record<string, unknown>)
-                : null
-        const publicConfig = value
-            ? normalizeRemoteStorageConfig(value)
-            : this.publicConfig
-        if (!publicConfig) throw new Error('Configure remote storage first')
-        const suppliedUsername = value?.username
-        const suppliedPassword = value?.password
-        const username =
-            suppliedUsername !== undefined && String(suppliedUsername).trim()
-                ? String(suppliedUsername).trim()
-                : this.credentials?.remoteStorageUsername
-        const password =
-            suppliedPassword !== undefined && String(suppliedPassword)
-                ? String(suppliedPassword)
-                : this.credentials?.remoteStoragePassword
-        return {
-            publicConfig,
-            remoteCredentials: {
-                username: username || undefined,
-                password: password || undefined
-            }
-        }
-    }
-
-    private provider(input: Record<string, unknown>) {
-        const selected = this.selection(input)
-        return {
-            selected,
-            provider: createRemoteStorageProvider(
-                selected.publicConfig,
-                selected.remoteCredentials
-            )
-        }
-    }
-
-    async test(
-        input: Record<string, unknown>
-    ): Promise<Record<string, unknown>> {
-        const { selected, provider } = this.provider(input)
-        const result = await provider.test()
-        return {
-            ...result,
-            kind: selected.publicConfig.kind,
-            baseUrl: selected.publicConfig.baseUrl,
-            root: selected.publicConfig.root
-        }
-    }
-
-    private syncService(input: Record<string, unknown>) {
-        const { provider } = this.provider(input)
-        return new RemoteLibrarySyncService(
-            this.database,
-            this.dataDir,
-            provider,
-            (progress) => {
-                this.syncProgress = progress as unknown as Record<
-                    string,
-                    unknown
-                >
-            }
-        )
-    }
-
-    async plan(
-        input: Record<string, unknown>
-    ): Promise<Record<string, unknown>> {
-        await this.test(input)
-        return (await this.syncService(input).plan(
-            this.selected(input)
-        )) as unknown as Record<string, unknown>
-    }
-
-    save(input: Record<string, unknown>) {
-        if (this.mutationInFlight)
-            throw new Error('网盘操作期间不能更改存储配置')
-        const selected = this.selection(input)
-        const merged: StoredCredentials = {
-            account: this.credentials?.account ?? '',
-            password: this.credentials?.password ?? '',
-            proxyUsername: this.credentials?.proxyUsername,
-            proxyPassword: this.credentials?.proxyPassword,
-            remoteStorageUsername: selected.remoteCredentials.username,
-            remoteStoragePassword: selected.remoteCredentials.password
-        }
-        saveRemoteStorageConfig(this.configFile, selected.publicConfig)
-        this.credentialStore.save(merged)
-        this.publicConfig = selected.publicConfig
-        this.credentials = merged
-        this.scopeId = randomUUID()
-        this.onCredentialsChanged(merged)
-        return { success: true, remoteStorage: this.status() }
     }
 
     private portableShelves() {
@@ -308,9 +457,7 @@ export class RemoteStorageDesktopManager {
         }
     }
 
-    private readingKey(
-        entry: Pick<RemoteReadingEntry, 'comicId' | 'episodeId'>
-    ) {
+    private readingKey(entry: Pick<RemoteReadingEntry, 'comicId' | 'episodeId'>) {
         return `${entry.comicId}\n${entry.episodeId}`
     }
 
@@ -385,59 +532,47 @@ export class RemoteStorageDesktopManager {
 
     async sync(input: Record<string, unknown>) {
         if (this.mutationInFlight) throw new Error('已有网盘操作进行中')
+        if (input.remoteStorage)
+            throw new Error('上传只能选择已保存的网盘配置，请先保存设置')
+        const selected = this.selection(input)
         if (
             input.comicIds !== undefined &&
-            (input.remoteStorage || input.remoteScopeId !== this.scopeId)
+            input.remoteScopeId !== this.scopeId(selected.targetId)
         )
             throw new Error('网盘目标未核验或已经变化，请刷新后重新选择')
-        // Reject empty/invalid explicit selections before any external write.
-        if (input.comicIds !== undefined) this.selected(input)
-        this.save(input)
-        const ids = this.selected(input)
+        const ids = this.selectedComics(input, selected)
         if (!ids.length) throw new Error('没有选中可上传漫画')
         this.mutationInFlight = true
         try {
-            const result = await this.syncSelected(input, ids)
+            const result = await this.syncSelected(selected, ids)
             if (input.comicIds !== undefined) {
                 const completed = ids.filter(
                     (id) => !result.issues.some((issue) => issue.comicId === id)
                 )
+                const key = this.exclusionsKey(selected)
                 this.database.setAppState(
-                    this.exclusionsKey(),
-                    this.exclusions().filter((id) => !completed.includes(id))
+                    key,
+                    this.exclusions(selected).filter((id) => !completed.includes(id))
                 )
-                const pendingKey = `${this.exclusionsKey()}:pending`
+                const pendingKey = `${key}:pending`
                 this.database.setAppState(
                     pendingKey,
-                    (
-                        this.database.getAppState<string[]>(pendingKey) ?? []
-                    ).filter((id) => !completed.includes(id))
+                    (this.database.getAppState<string[]>(pendingKey) ?? []).filter(
+                        (id) => !completed.includes(id)
+                    )
                 )
             }
-            return result
+            return { ...result, targetId: selected.targetId }
         } finally {
             this.mutationInFlight = false
         }
     }
 
-    private async syncSelected(input: Record<string, unknown>, ids: string[]) {
-        await this.test(input)
-        const { provider } = this.provider(input)
-        // Portable metadata is small and independent from comic page upload.
-        // Reading state uses optimistic concurrency so a Desktop sync cannot
-        // silently erase a newer Android progress write.
+    private async syncSelected(selected: SelectedRemoteTarget, ids: string[]) {
+        const provider = this.providerFrom(selected)
+        await provider.test()
         await this.publishPortableState(provider)
-        const service = new RemoteLibrarySyncService(
-            this.database,
-            this.dataDir,
-            provider,
-            (progress) => {
-                this.syncProgress = progress as unknown as Record<
-                    string,
-                    unknown
-                >
-            }
-        )
+        const service = this.syncService(selected, provider)
         return await service.sync(ids)
     }
 }

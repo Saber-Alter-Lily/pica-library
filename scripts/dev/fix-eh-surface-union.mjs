@@ -52,7 +52,7 @@ replaceOne(
         if (surfaceMerged.length)
             this.database.importCatalog(
                 surfaceMerged,
-                \`eh:surface-merge:${provenance}\`
+                'eh:surface-merge:' + provenance
             )
         return result`,
   'provider search surface union'

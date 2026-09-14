@@ -1,12 +1,11 @@
-name: Validate and apply E-H desktop integration patch
+name: Validate and apply E-H development patch
 
 on:
   push:
     branches:
       - feature/eh-provider-v1
     paths:
-      - 'scripts/dev/apply-eh-desktop-v1.mjs'
-      - 'scripts/dev/run-eh-desktop-v1.mjs'
+      - 'scripts/dev/apply-eh-v3-ui.mjs'
       - '.github/workflows/eh-dev-apply.yml'
 
 permissions:
@@ -29,22 +28,22 @@ jobs:
           version: '11.16.0'
           run_install: false
       - run: pnpm install --frozen-lockfile
-      - name: Apply isolated desktop patch
-        run: node scripts/dev/run-eh-desktop-v1.mjs
-      - name: Validate desktop and web
+      - name: Apply bounded cross-source V3 and UI patch
+        run: node scripts/dev/apply-eh-v3-ui.mjs
+      - name: Validate desktop, web and cross-source contracts
         run: |
           set -euo pipefail
           pnpm type:check
           pnpm web:check
           pnpm test
           pnpm build
-      - name: Commit validated patch to development branch
+      - name: Commit validated V3 patch to development branch
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/providers/eh-provider.ts src/storage/sqlite/migrations.ts src/library/database.ts src/services/provider-service.ts src/library/service.ts src/services/online-reader-service.ts src/library/server.ts web/index.html web/app.js test/integration/migrations.test.ts test/unit/recommendation-v3-final.test.ts
+          git add src/services/provider-service.ts src/library/service.ts src/library/database.ts web/app.js mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java test/unit/eh-cross-source-v3.test.ts
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
-          git commit -m 'feat: integrate E-H across desktop library flows'
+          git commit -m 'feat: add bounded E-H recall to recommendation V3'
           git push origin HEAD:feature/eh-provider-v1

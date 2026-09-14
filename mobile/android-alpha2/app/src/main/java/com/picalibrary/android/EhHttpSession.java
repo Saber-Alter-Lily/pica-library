@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.content.Context;
+import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import java.io.*;
 import java.net.*;
@@ -24,14 +25,21 @@ final class EhHttpSession {
         URL url=safePublicHttps(raw);HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setConnectTimeout(10000);c.setReadTimeout(page?15000:25000);c.setInstanceFollowRedirects(true);c.setRequestMethod(method);c.setRequestProperty("User-Agent",userAgent);c.setRequestProperty("Accept",accept);c.setRequestProperty("Accept-Language",ACCEPT_LANGUAGE);c.setRequestProperty("Cache-Control","no-cache");c.setRequestProperty("Pragma","no-cache");if(referer!=null&&!referer.trim().isEmpty())c.setRequestProperty("Referer",referer);String cookie=cookieHeader(url.getHost());if(!cookie.isEmpty())c.setRequestProperty("Cookie",cookie);c.setUseCaches(false);return c;
     }
 
-    String cookieHeader(String host){LinkedHashMap<String,String> values=parseCookies(EhAccountStore.cookieJar(context,host));String h=host==null?"":host.toLowerCase(Locale.ROOT);if(isGalleryHost(h)){EhAccountStore.Session s=EhAccountStore.load(context);values.put("nw","1");if(s.configured()){values.put("ipb_member_id",s.memberId);values.put("ipb_pass_hash",s.passHash);}if(!s.igneous.isEmpty())values.put("igneous",s.igneous);if(!s.cfClearance.isEmpty())values.put("cf_clearance",s.cfClearance);}return joinCookies(values);}
+    String cookieHeader(String host){
+        LinkedHashMap<String,String> values=parseCookies(EhAccountStore.cookieJar(context,host));merge(values,webViewCookies(host));String h=host==null?"":host.toLowerCase(Locale.ROOT);
+        if(isGalleryHost(h)){EhAccountStore.Session s=EhAccountStore.load(context);values.put("nw","1");if(s.configured()){values.put("ipb_member_id",s.memberId);values.put("ipb_pass_hash",s.passHash);}if(!s.igneous.isEmpty())values.put("igneous",s.igneous);if(!s.cfClearance.isEmpty())values.put("cf_clearance",s.cfClearance);}
+        String joined=joinCookies(values);if(isEhFamily(h)&&!joined.isEmpty())try{EhAccountStore.saveCookieJar(context,h,joined);}catch(Exception ignored){}return joined;
+    }
     int cookieCount(String host){return parseCookies(cookieHeader(host)).size();}
     boolean hasIdentity(){return EhAccountStore.load(context).configured();}
 
-    void absorbResponseCookies(HttpURLConnection c){if(c==null)return;try{URL url=c.getURL();String host=url==null?"":url.getHost();if(!isEhFamily(host))return;LinkedHashMap<String,String> values=parseCookies(EhAccountStore.cookieJar(context,host));Map<String,List<String>> headers=c.getHeaderFields();if(headers!=null)for(Map.Entry<String,List<String>> entry:headers.entrySet()){if(entry.getKey()==null||!"set-cookie".equalsIgnoreCase(entry.getKey())||entry.getValue()==null)continue;for(String raw:entry.getValue()){if(raw==null)continue;String first=raw.split(";",2)[0].trim();int at=first.indexOf('=');if(at<=0)continue;String name=first.substring(0,at).trim(),value=first.substring(at+1).trim();if(name.isEmpty())continue;if(value.isEmpty())values.remove(name);else values.put(name,value);}}EhAccountStore.saveCookieJar(context,host,joinCookies(values));}catch(Exception ignored){}
+    private String webViewCookies(String host){if(!isEhFamily(host))return "";String h=host==null?"":host.toLowerCase(Locale.ROOT),url=h.startsWith("forums.")?"https://forums.e-hentai.org/":h.contains("exhentai.org")?"https://exhentai.org/":"https://e-hentai.org/";try{String value=CookieManager.getInstance().getCookie(url);return value==null?"":value;}catch(Throwable ignored){return "";}}
+
+    void absorbResponseCookies(HttpURLConnection c){if(c==null)return;try{URL url=c.getURL();String host=url==null?"":url.getHost();if(!isEhFamily(host))return;LinkedHashMap<String,String> values=parseCookies(EhAccountStore.cookieJar(context,host));merge(values,webViewCookies(host));Map<String,List<String>> headers=c.getHeaderFields();if(headers!=null)for(Map.Entry<String,List<String>> entry:headers.entrySet()){if(entry.getKey()==null||!"set-cookie".equalsIgnoreCase(entry.getKey())||entry.getValue()==null)continue;for(String raw:entry.getValue()){if(raw==null)continue;String first=raw.split(";",2)[0].trim();int at=first.indexOf('=');if(at<=0)continue;String name=first.substring(0,at).trim(),value=first.substring(at+1).trim();if(name.isEmpty())continue;if(value.isEmpty())values.remove(name);else values.put(name,value);}}EhAccountStore.saveCookieJar(context,host,joinCookies(values));}catch(Exception ignored){}
     }
 
     static LinkedHashMap<String,String> parseCookies(String raw){LinkedHashMap<String,String> out=new LinkedHashMap<>();if(raw==null)return out;for(String part:raw.split(";")){String item=part.trim();int at=item.indexOf('=');if(at<=0)continue;String name=item.substring(0,at).trim(),value=item.substring(at+1).trim();if(!name.isEmpty()&&!value.isEmpty()&&!containsCtl(name)&&!containsCtl(value))out.put(name,value);}return out;}
+    private static void merge(Map<String,String> target,String raw){target.putAll(parseCookies(raw));}
     static String joinCookies(Map<String,String> values){StringBuilder out=new StringBuilder();for(Map.Entry<String,String> entry:values.entrySet()){if(entry.getKey()==null||entry.getValue()==null||entry.getKey().isEmpty()||entry.getValue().isEmpty())continue;if(out.length()>0)out.append("; ");out.append(entry.getKey()).append('=').append(entry.getValue());}return out.toString();}
     static boolean isEhFamily(String host){String h=host==null?"":host.toLowerCase(Locale.ROOT);return h.equals("e-hentai.org")||h.endsWith(".e-hentai.org")||h.equals("exhentai.org")||h.endsWith(".exhentai.org");}
     private static boolean isGalleryHost(String host){return host.equals("e-hentai.org")||host.endsWith(".e-hentai.org")||host.equals("exhentai.org")||host.endsWith(".exhentai.org");}

@@ -1,6 +1,9 @@
 const $ = (selector) => document.querySelector(selector)
 let desktop = null
 let progressTimer = null
+let selectedTargetId = ''
+let creatingTarget = false
+let remoteState = { targets: [], presets: [] }
 
 async function api(path, init = {}) {
     const response = await fetch(path, { cache: 'no-store', ...init })
@@ -18,45 +21,6 @@ async function post(path, body) {
         headers: { 'content-type': 'application/json', 'x-pica-csrf': desktop.csrfToken },
         body: JSON.stringify(body)
     })
-}
-
-function normalizedWebDavUrl(value) {
-    const raw = String(value || '').trim()
-    try {
-        const url = new URL(raw)
-        if (url.hostname.toLowerCase() === 'webdav.123pan.cn' && (url.pathname === '' || url.pathname === '/'))
-            url.pathname = '/webdav'
-        return url.toString().replace(/\/$/, '')
-    } catch {
-        return raw
-    }
-}
-
-function ensure123PanHint() {
-    const input = $('#remote-webdav-url')
-    const label = input?.closest('label')
-    if (!input || !label || $('#remote-123pan-hint')) return
-    input.placeholder = 'https://webdav.123pan.cn/webdav'
-    const hint = document.createElement('p')
-    hint.id = 'remote-123pan-hint'
-    hint.className = 'status wide'
-    hint.textContent = '123云盘：地址使用 https://webdav.123pan.cn/webdav；用户名填写123云盘账号，密码填写“第三方挂载”生成的应用密码，不是登录密码。只填 webdav.123pan.cn 时会自动补全 /webdav。'
-    label.insertAdjacentElement('afterend', hint)
-}
-
-function formValue(action) {
-    const normalized = normalizedWebDavUrl($('#remote-webdav-url').value)
-    $('#remote-webdav-url').value = normalized
-    return {
-        remoteStorageAction: action,
-        remoteStorage: {
-            kind: 'webdav',
-            baseUrl: normalized,
-            root: $('#remote-root').value.trim() || 'PicaLibrary',
-            username: $('#remote-username').value.trim(),
-            password: $('#remote-password').value
-        }
-    }
 }
 
 function bytes(value) {
@@ -83,6 +47,182 @@ function escapeHtml(value) {
 function percent(value, total) {
     const t = Number(total || 0)
     return t > 0 ? Math.max(0, Math.min(100, Math.round((Number(value || 0) / t) * 100))) : 0
+}
+
+function ensureTargetUi() {
+    const panel = $('#settings-remote-storage')
+    const form = panel?.querySelector('.settings-form')
+    if (!panel || !form || $('#remote-target-select')) return
+
+    const targetLabel = document.createElement('label')
+    targetLabel.textContent = '已配置网盘'
+    const targetSelect = document.createElement('select')
+    targetSelect.id = 'remote-target-select'
+    targetLabel.append(targetSelect)
+
+    const vendorLabel = document.createElement('label')
+    vendorLabel.textContent = '网盘类型'
+    const vendor = document.createElement('select')
+    vendor.id = 'remote-vendor'
+    vendorLabel.append(vendor)
+
+    const nameLabel = document.createElement('label')
+    nameLabel.textContent = '显示名称'
+    const name = document.createElement('input')
+    name.id = 'remote-label'
+    name.placeholder = '例如：我的 123 云盘'
+    nameLabel.append(name)
+
+    form.prepend(nameLabel)
+    form.prepend(vendorLabel)
+    form.prepend(targetLabel)
+
+    const providerNote = document.createElement('p')
+    providerNote.id = 'remote-provider-note'
+    providerNote.className = 'status'
+    form.insertAdjacentElement('afterend', providerNote)
+
+    const tools = document.createElement('div')
+    tools.id = 'remote-target-tools'
+    tools.className = 'actions'
+    const create = document.createElement('button')
+    create.type = 'button'
+    create.id = 'remote-new-target'
+    create.textContent = '新增网盘配置'
+    tools.append(create)
+    providerNote.insertAdjacentElement('afterend', tools)
+
+    targetSelect.addEventListener('change', () => {
+        selectedTargetId = targetSelect.value
+        creatingTarget = false
+        const target = remoteState.targets.find((item) => item.id === selectedTargetId)
+        if (target) fillTarget(target)
+        else clearTargetEditor()
+        $('#remote-sync-plan').hidden = true
+        message(selectedTargetId ? '' : '请选择本次扫描/上传使用的目标网盘。')
+    })
+    vendor.addEventListener('change', () => applyPreset(true))
+    create.addEventListener('click', () => beginNewTarget())
+}
+
+function renderPresetOptions() {
+    const select = $('#remote-vendor')
+    if (!select) return
+    const current = select.value
+    select.innerHTML = ''
+    for (const preset of remoteState.presets || []) {
+        const option = document.createElement('option')
+        option.value = preset.vendor
+        option.textContent = preset.label
+        select.append(option)
+    }
+    if ([...select.options].some((option) => option.value === current))
+        select.value = current
+}
+
+function renderTargetOptions() {
+    const select = $('#remote-target-select')
+    if (!select) return
+    select.innerHTML = ''
+    if (!remoteState.targets.length) {
+        const option = document.createElement('option')
+        option.value = ''
+        option.textContent = '尚未配置'
+        select.append(option)
+        selectedTargetId = ''
+        return
+    }
+    if (remoteState.targets.length > 1) {
+        const placeholder = document.createElement('option')
+        placeholder.value = ''
+        placeholder.textContent = '请选择目标网盘…'
+        select.append(placeholder)
+    }
+    for (const target of remoteState.targets) {
+        const option = document.createElement('option')
+        option.value = target.id
+        option.textContent = `${target.label} · ${target.vendor || 'generic'}`
+        select.append(option)
+    }
+    if (!remoteState.targets.some((item) => item.id === selectedTargetId))
+        selectedTargetId = remoteState.targets.length === 1 ? remoteState.targets[0].id : ''
+    select.value = selectedTargetId
+}
+
+function currentPreset() {
+    return (remoteState.presets || []).find(
+        (preset) => preset.vendor === ($('#remote-vendor')?.value || 'generic')
+    )
+}
+
+function applyPreset(forceUrl = false) {
+    const preset = currentPreset()
+    if (!preset) return
+    const url = $('#remote-webdav-url')
+    const user = $('#remote-username')
+    const password = $('#remote-password')
+    if (url) {
+        if (preset.defaultBaseUrl && (forceUrl || !url.value.trim()))
+            url.value = preset.defaultBaseUrl
+        url.placeholder = preset.urlHint || 'https://dav.example.com/path'
+    }
+    if (user) user.placeholder = `${preset.usernameHint || '用户名'} · 留空沿用已保存值`
+    if (password) password.placeholder = `${preset.passwordHint || '密码'} · 留空沿用已保存值`
+    const note = $('#remote-provider-note')
+    if (note) note.textContent = preset.note || ''
+}
+
+function fillTarget(target) {
+    if (!target) return
+    $('#remote-label').value = target.label || ''
+    $('#remote-vendor').value = target.vendor || 'generic'
+    $('#remote-webdav-url').value = target.baseUrl || ''
+    $('#remote-root').value = target.root || 'PicaLibrary'
+    $('#remote-username').value = ''
+    $('#remote-password').value = ''
+    applyPreset(false)
+}
+
+function clearTargetEditor() {
+    $('#remote-label').value = ''
+    $('#remote-vendor').value = 'generic'
+    $('#remote-webdav-url').value = ''
+    $('#remote-root').value = 'PicaLibrary'
+    $('#remote-username').value = ''
+    $('#remote-password').value = ''
+    applyPreset(false)
+}
+
+function beginNewTarget() {
+    creatingTarget = true
+    selectedTargetId = ''
+    $('#remote-target-select').value = ''
+    clearTargetEditor()
+    $('#remote-sync-plan').hidden = true
+    message('正在新增网盘配置。填写后先“测试连接”，确认无误再保存。')
+}
+
+function editableForm(action) {
+    return {
+        remoteStorageAction: action,
+        ...(selectedTargetId && !creatingTarget ? { remoteTargetId: selectedTargetId } : {}),
+        ...(creatingTarget ? { createNewTarget: true } : {}),
+        remoteStorage: {
+            kind: 'webdav',
+            vendor: $('#remote-vendor').value || 'generic',
+            label: $('#remote-label').value.trim(),
+            baseUrl: $('#remote-webdav-url').value.trim(),
+            root: $('#remote-root').value.trim() || 'PicaLibrary',
+            username: $('#remote-username').value.trim(),
+            password: $('#remote-password').value
+        }
+    }
+}
+
+function savedTargetRequest(action) {
+    if (creatingTarget || !selectedTargetId)
+        throw new Error('请先选择并保存本次操作使用的网盘配置')
+    return { remoteStorageAction: action, remoteTargetId: selectedTargetId }
 }
 
 function ensureProgressBox() {
@@ -115,7 +255,8 @@ function renderProgress(progress) {
     $('#remote-progress-overall-text').textContent = `${progress.completedComics || 0}/${progress.totalComics || 0} 本 · ${progress.completedPages || 0}/${progress.totalPages || 0} 页 · ${bytes(progress.uploadedBytes)}`
     $('#remote-progress-current-title').textContent = progress.currentComicTitle || '准备中'
     $('#remote-progress-current-text').textContent = progress.currentComicPages > 0 ? `${progress.currentComicCompletedPages || 0}/${progress.currentComicPages} 页` : (progress.message || '')
-    $('#remote-progress-phase').textContent = progress.message || progress.phase || ''
+    const target = progress.targetLabel ? ` · ${progress.targetLabel}` : ''
+    $('#remote-progress-phase').textContent = `${progress.message || progress.phase || ''}${target}`
 }
 
 async function pollProgress() {
@@ -150,48 +291,79 @@ function renderPlan(plan) {
     }
 }
 
-async function load() {
+async function load(preferredTargetId = '') {
     const panel = $('#settings-remote-storage'); if (!panel) return
-    ensure123PanHint()
+    ensureTargetUi()
     ensureProgressBox()
     try {
         desktop = await api('/api/v1/desktop/status')
-        const remote = desktop.remoteStorage || {}
-        $('#remote-webdav-url').value = remote.baseUrl || ''
-        $('#remote-root').value = remote.root || 'PicaLibrary'
-        $('#remote-username').value = ''; $('#remote-password').value = ''
-        $('#remote-storage-state').textContent = remote.configured ? `已配置 ${remote.kind || 'webdav'} · ${remote.root || 'PicaLibrary'}` : '尚未配置远程存储'
-        renderProgress(remote.syncProgress)
+        remoteState = desktop.remoteStorage || { targets: [], presets: [] }
+        if (preferredTargetId) selectedTargetId = preferredTargetId
+        renderPresetOptions()
+        renderTargetOptions()
+        if (remoteState.targets.length) {
+            creatingTarget = false
+            const target = remoteState.targets.find((item) => item.id === selectedTargetId)
+            if (target) fillTarget(target)
+            else clearTargetEditor()
+        } else {
+            beginNewTarget()
+        }
+        $('#remote-storage-state').textContent = remoteState.targets.length
+            ? `已配置 ${remoteState.targets.length} 个网盘 · 上传前请选择目标网盘`
+            : '尚未配置远程存储'
+        if (remoteState.targets.length > 1 && !selectedTargetId)
+            message('已配置多个网盘，请先选择本次扫描/上传使用的目标网盘。')
+        renderProgress(remoteState.syncProgress)
     } catch (error) { message(`无法读取远程存储状态：${error.message}`, true) }
 }
 
 $('#remote-test')?.addEventListener('click', async () => {
     message('正在测试 WebDAV…')
-    try { const result = await post('/api/v1/desktop/test-connection', formValue('test')); message(`连接成功 · HTTP ${result.status} · ${result.root}`) }
-    catch (error) { message(`连接失败：${error.message}`, true) }
-})
-$('#remote-save')?.addEventListener('click', async () => {
-    message('正在保存远程存储设置…')
-    try { await post('/api/v1/desktop/settings', formValue('save')); $('#remote-password').value = ''; message('远程存储设置已保存。密码已进入 Windows DPAPI 凭据存储。'); await load() }
-    catch (error) { message(`保存失败：${error.message}`, true) }
-})
-$('#remote-plan')?.addEventListener('click', async () => {
-    message('正在扫描本地漫画与云端目录…首次扫描会计算文件哈希。')
     try {
-        const result = await post('/api/v1/desktop/test-connection', formValue('plan')); renderPlan(result)
+        const result = await post('/api/v1/desktop/test-connection', editableForm('test'))
+        message(`连接成功 · ${result.label} · HTTP ${result.status} · ${result.root}`)
+    } catch (error) { message(`连接失败：${error.message}`, true) }
+})
+
+$('#remote-save')?.addEventListener('click', async () => {
+    message('正在保存网盘配置…')
+    try {
+        const result = await post('/api/v1/desktop/settings', editableForm('save'))
+        $('#remote-password').value = ''
+        selectedTargetId = result.targetId || selectedTargetId
+        creatingTarget = false
+        message('网盘配置已保存。密码已进入 Windows DPAPI 凭据存储。')
+        await load(selectedTargetId)
+    } catch (error) { message(`保存失败：${error.message}`, true) }
+})
+
+$('#remote-plan')?.addEventListener('click', async () => {
+    message('正在扫描本地漫画与所选网盘目录…首次扫描会计算文件哈希。')
+    try {
+        const result = await post('/api/v1/desktop/test-connection', savedTargetRequest('plan'))
+        renderPlan(result)
         const skipped = Number(result.skippedComicCount || 0)
-        message(`扫描完成：${result.uploadComicCount || 0} 部需要上传/更新，预计 ${bytes(result.uploadBytes)}${skipped ? `；${skipped} 部因本地文件不完整将跳过。` : '。'}`)
+        const target = remoteState.targets.find((item) => item.id === selectedTargetId)?.label || '所选网盘'
+        message(`${target} 扫描完成：${result.uploadComicCount || 0} 部需要上传/更新，预计 ${bytes(result.uploadBytes)}${skipped ? `；${skipped} 部因本地文件不完整将跳过。` : '。'}`)
     } catch (error) { message(`扫描失败：${error.message}`, true) }
 })
+
 $('#remote-sync')?.addEventListener('click', async () => {
-    if (!confirm('开始增量同步？首次同步会在每一本完整上传后发布一个可读 generation；不会暴露半本漫画。')) return
-    message('正在同步到网盘。页面会实时显示整库和当前漫画进度。')
+    let request
+    try { request = savedTargetRequest('sync') }
+    catch (error) { message(error.message, true); return }
+    const target = remoteState.targets.find((item) => item.id === selectedTargetId)?.label || '所选网盘'
+    if (!confirm(`把已下载漫画增量同步到「${target}」？不会上传到其他已配置网盘。`)) return
+    message(`正在同步到「${target}」。页面会实时显示整库和当前漫画进度。`)
     const button = $('#remote-sync'); button.disabled = true; startProgressPolling()
     try {
-        const result = await post('/api/v1/desktop/settings', formValue('sync')); $('#remote-password').value = ''; await pollProgress()
+        const result = await post('/api/v1/desktop/settings', request)
+        await pollProgress()
         const skipped = Number(result.skippedComicCount || 0)
-        message(`同步完成 · 云端 ${result.comicCount || 0} 部 · 上传 ${result.uploadedObjects || 0} 个对象 · ${bytes(result.uploadedBytes)}${skipped ? ` · 跳过 ${skipped} 部` : ''}。`)
-        $('#remote-sync-plan').hidden = true; await load()
+        message(`同步完成 · ${target} · 云端 ${result.comicCount || 0} 部 · 上传 ${result.uploadedObjects || 0} 个对象 · ${bytes(result.uploadedBytes)}${skipped ? ` · 跳过 ${skipped} 部` : ''}。`)
+        $('#remote-sync-plan').hidden = true
+        await load(selectedTargetId)
     } catch (error) { await pollProgress(); message(`同步失败：${error.message}`, true) }
     finally { stopProgressPolling(); button.disabled = false }
 })

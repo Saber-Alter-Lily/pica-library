@@ -7,25 +7,88 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
         busy = false,
         checked = false,
         scopeId = null,
-        generation = null
+        generation = null,
+        remoteTargetId = ''
     const text = (zh, en) => (getLanguage() === 'en' ? en : zh)
     const panel = document.createElement('article')
     panel.className = 'notice panel downloaded-cloud-panel'
     const actions = document.createElement('div')
     actions.className = 'actions'
+    const targetSelect = document.createElement('select')
+    targetSelect.setAttribute('aria-label', text('上传目标网盘', 'Remote storage target'))
     const message = document.createElement('p')
     message.setAttribute('role', 'status')
     const note = document.createElement('p')
     const updateNote = () => {
         note.textContent = text(
-            '此处只管理网盘副本。删除网盘不会删除本地下载；删除过的副本不会在默认整库同步中自动上传。',
-            'These actions affect cloud copies only. Deleting a cloud copy keeps the local download and excludes it from default full sync.'
+            '此处只管理所选网盘的副本。删除网盘不会删除本地下载；删除过的副本不会在该网盘默认整库同步中自动上传。',
+            'These actions affect copies on the selected remote target only. Deleting a cloud copy keeps the local download and excludes it from that target’s default full sync.'
         )
+        targetSelect.setAttribute('aria-label', text('上传目标网盘', 'Remote storage target'))
     }
     updateNote()
     const buttonLabels = []
+    actions.append(targetSelect)
     panel.append(note, actions, message)
     root.querySelector('.page-heading')?.after(panel)
+
+    function targets() {
+        return getDesktop()?.remoteStorage?.targets || []
+    }
+    function renderTargets() {
+        const list = targets()
+        targetSelect.innerHTML = ''
+        if (!list.length) {
+            const option = document.createElement('option')
+            option.value = ''
+            option.textContent = text('未配置网盘', 'No remote configured')
+            targetSelect.append(option)
+            remoteTargetId = ''
+            return
+        }
+        if (list.length > 1) {
+            const placeholder = document.createElement('option')
+            placeholder.value = ''
+            placeholder.textContent = text('选择目标网盘…', 'Choose remote target…')
+            targetSelect.append(placeholder)
+        }
+        for (const target of list) {
+            const option = document.createElement('option')
+            option.value = target.id
+            option.textContent = target.label || target.baseUrl || target.id
+            targetSelect.append(option)
+        }
+        if (list.length === 1) remoteTargetId = list[0].id
+        else if (!list.some((target) => target.id === remoteTargetId)) remoteTargetId = ''
+        targetSelect.value = remoteTargetId
+    }
+    function selectedTarget() {
+        return targets().find((target) => target.id === remoteTargetId)
+    }
+    function requireTarget() {
+        const target = selectedTarget()
+        if (!target) {
+            message.textContent = text(
+                '请先选择本次操作使用的网盘。',
+                'Choose the remote target for this operation first.'
+            )
+            return null
+        }
+        return target
+    }
+    targetSelect.onchange = () => {
+        remoteTargetId = targetSelect.value
+        inventory.clear()
+        checked = false
+        scopeId = null
+        generation = null
+        selected.clear()
+        message.textContent = remoteTargetId
+            ? text('已切换网盘，请刷新该网盘状态。', 'Remote changed. Refresh its cloud status.')
+            : text('请选择目标网盘。', 'Choose a remote target.')
+        badges()
+    }
+
     function button(zh, en, handler) {
         const value = document.createElement('button')
         value.type = 'button'
@@ -37,6 +100,7 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
     }
     button('刷新网盘标志', 'Refresh cloud status', () => refresh())
     button('选中未上传', 'Select not uploaded', () => {
+        if (!requireTarget()) return
         selected.clear()
         for (const record of records)
             if (inventory.get(record.comicId)?.state === 'not-uploaded')
@@ -53,6 +117,7 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
     actions.append(count)
     document.addEventListener('pica-language-change', () => {
         updateNote()
+        renderTargets()
         for (const { value, zh, en } of buttonLabels)
             value.textContent = text(zh, en)
         badges()
@@ -82,7 +147,7 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
             const checkbox = document.createElement('input')
             checkbox.type = 'checkbox'
             checkbox.checked = selected.has(id)
-            checkbox.disabled = busy
+            checkbox.disabled = busy || !remoteTargetId
             checkbox.setAttribute(
                 'aria-label',
                 text('选择网盘操作', 'Select for cloud action')
@@ -104,25 +169,23 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
         )
         for (const action of actions.querySelectorAll('button'))
             action.disabled = busy
+        targetSelect.disabled = busy
     }
     async function refresh() {
         if (busy) return
-        if (!getDesktop()?.remoteStorage?.configured) {
-            message.textContent = text(
-                '请先在设置 → 连接与同步配置网盘。',
-                'Configure WebDAV in Settings → Connections first.'
-            )
-            return
-        }
+        renderTargets()
+        const target = requireTarget()
+        if (!target) return
         busy = true
         badges()
         message.textContent = text(
-            '正在读取网盘目录…',
-            'Reading cloud catalog…'
+            `正在读取「${target.label}」目录…`,
+            `Reading catalog from “${target.label}”…`
         )
         try {
             const result = await post('/api/v1/desktop/test-connection', {
-                remoteStorageAction: 'inventory'
+                remoteStorageAction: 'inventory',
+                remoteTargetId
             })
             inventory = new Map(
                 result.comics.map((item) => [item.comicId, item])
@@ -131,8 +194,8 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
             scopeId = result.scopeId
             generation = result.generation
             message.textContent = text(
-                '网盘状态已核验。“已有副本”表示目录中存在，不代表逐字节校验。',
-                'Cloud status checked. “Copy present” means listed in the catalog, not byte-for-byte verification.'
+                `「${target.label}」状态已核验。“已有副本”表示目录中存在，不代表逐字节校验。`,
+                `“${target.label}” checked. “Copy present” means listed in the catalog, not byte-for-byte verification.`
             )
         } catch {
             inventory.clear()
@@ -150,6 +213,8 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
     }
     async function mutate(action) {
         if (busy || !selected.size) return
+        const target = requireTarget()
+        if (!target) return
         const ids = [...selected]
         if (
             action === 'delete-remote' &&
@@ -169,33 +234,40 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
             )
             return
         }
+        if (action === 'sync' && !checked) {
+            message.textContent = text(
+                '上传前请先刷新所选网盘状态，确认当前目标。',
+                'Refresh the selected remote before uploading so the target is verified.'
+            )
+            return
+        }
         const prompt =
             action === 'sync'
                 ? text(
-                      `上传所选 ${ids.length} 本到网盘？不会上传其他漫画。`,
-                      `Upload only these ${ids.length} comics?`
+                      `上传所选 ${ids.length} 本到「${target.label}」？不会上传到其他网盘。`,
+                      `Upload only these ${ids.length} comics to “${target.label}”? Other remotes are untouched.`
                   )
                 : text(
-                      `永久删除所选 ${ids.length} 本的网盘副本？本地下载全部保留。网盘文件未必可恢复。`,
-                      `Permanently delete ${ids.length} cloud copies? All local downloads stay intact. Remote files may not be recoverable.`
+                      `永久删除「${target.label}」中所选 ${ids.length} 本的网盘副本？本地下载全部保留。网盘文件未必可恢复。`,
+                      `Permanently delete ${ids.length} copies from “${target.label}”? All local downloads stay intact. Remote files may not be recoverable.`
                   )
         if (!window.confirm(prompt)) return
         busy = true
         badges()
         message.textContent = text(
-            '操作进行中，请勿重复提交…',
-            'Working. Do not submit again…'
+            `正在操作「${target.label}」，请勿重复提交…`,
+            `Working on “${target.label}”. Do not submit again…`
         )
         let resultMessage
         try {
             const result = await post('/api/v1/desktop/settings', {
                 remoteStorageAction: action,
+                remoteTargetId,
                 comicIds: ids,
                 remoteScopeId: scopeId,
                 ...(action === 'delete-remote'
                     ? {
                           confirmation: 'DELETE_REMOTE_ONLY',
-                          remoteScopeId: scopeId,
                           expectedGeneration: generation
                       }
                     : {})
@@ -206,8 +278,8 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
             resultMessage =
                 action === 'sync' && result.skippedComicCount > 0
                     ? text(
-                          `有 ${result.skippedComicCount} 本因本地文件问题未上传，已保留选中；请先修复后重试。`,
-                          `${result.skippedComicCount} comics were not uploaded because local files need repair. They remain selected.`
+                          `有 ${result.skippedComicCount} 本因本地文件问题未上传到「${target.label}」，已保留选中；请先修复后重试。`,
+                          `${result.skippedComicCount} comics were not uploaded to “${target.label}” because local files need repair. They remain selected.`
                       )
                     : result.success === false
                       ? text(
@@ -215,8 +287,8 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
                             'Some remote files still need cleanup. Retry the warning items. Local files were not deleted.'
                         )
                       : text(
-                            '操作完成，本地下载未删除。',
-                            'Completed. Local downloads were not deleted.'
+                            `「${target.label}」操作完成，本地下载未删除。`,
+                            `Completed on “${target.label}”. Local downloads were not deleted.`
                         )
         } catch {
             resultMessage = text(
@@ -230,14 +302,22 @@ export function createDownloadedCloud({ post, getDesktop, getLanguage }) {
             badges()
         }
     }
+    renderTargets()
     return {
         mount(items) {
             records = items
+            renderTargets()
             for (const id of selected)
                 if (!items.some((item) => item.comicId === id))
                     selected.delete(id)
             badges()
-            if (!checked && !busy && getDesktop()?.remoteStorage?.configured)
+            const remote = getDesktop()?.remoteStorage
+            if (
+                !checked &&
+                !busy &&
+                remote?.configured &&
+                remoteTargetId
+            )
                 void refresh()
         }
     }

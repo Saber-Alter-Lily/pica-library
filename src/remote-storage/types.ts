@@ -1,11 +1,37 @@
 export const REMOTE_LIBRARY_SCHEMA_VERSION = 1 as const
 
 export type RemoteStorageKind = 'webdav'
+export type RemoteStorageVendor =
+    | 'generic'
+    | '123pan'
+    | 'jianguoyun'
+    | 'pcloud-us'
+    | 'pcloud-eu'
+    | 'koofr'
+    | 'yandex'
+    | 'infinicloud'
+    | 'nextcloud'
+    | 'owncloud'
+    | 'openlist'
+    | 'opendrive'
+    | 'synology'
 
 export interface RemoteStoragePublicConfig {
     kind: RemoteStorageKind
+    vendor?: RemoteStorageVendor
     baseUrl: string
     root: string
+}
+
+export interface RemoteStorageTarget {
+    id: string
+    label: string
+    config: RemoteStoragePublicConfig
+}
+
+export interface RemoteStorageRegistry {
+    schemaVersion: 2
+    targets: RemoteStorageTarget[]
 }
 
 export interface RemoteStorageCredentials {

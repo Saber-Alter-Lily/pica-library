@@ -17,6 +17,10 @@ android {
         targetSdk 35
         versionCode 41
         versionName '0.1.0-alpha8.14-multi-remote-storage'
+        manifestPlaceholders = [
+                appLabel  : 'Pica Library',
+                pairScheme: 'picalibrary'
+        ]
     }
 
     signingConfigs {
@@ -33,11 +37,30 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Side-by-side manual QA build. It must never replace the formal Preview app.
+            applicationIdSuffix '.dev'
+            versionNameSuffix '-dev-pr35'
+            debuggable true
+            manifestPlaceholders = [
+                    appLabel  : 'Pica Library Dev',
+                    pairScheme: 'picalibrary'
+            ]
+            // CI candidate builds reuse the fixed Preview signing identity so future Dev APKs
+            // can upgrade the previous Dev installation without shipping a private key.
+            if (previewSigningConfigured) {
+                signingConfig signingConfigs.preview
+            }
+        }
         release {
             minifyEnabled true
             shrinkResources true
             debuggable false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            manifestPlaceholders = [
+                    appLabel  : 'Pica Library',
+                    pairScheme: 'picalibrary'
+            ]
             if (previewSigningConfigured) {
                 signingConfig signingConfigs.preview
             }

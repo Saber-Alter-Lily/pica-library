@@ -7,11 +7,13 @@ import static org.junit.Assert.*;
 /** Product-level regression gates for the Alpha8.x convergence. */
 public class Alpha8ProductContractTest {
     @Test public void unifiedShellKeepsSourcesBehindComicFirstUi() {
-        assertArrayEquals(new String[]{"书库","推荐","在线","连接"}, ShellPolicy.bottomTabs());
+        assertArrayEquals(new String[]{"书库","推荐","在线","设置"}, ShellPolicy.bottomTabs());
         for (String tab : ShellPolicy.bottomTabs()) {
             assertNotEquals("电脑", tab);
             assertNotEquals("云端", tab);
             assertNotEquals("Pica", tab);
+            assertNotEquals("E-H", tab);
+            assertNotEquals("ExH", tab);
             assertNotEquals("图鉴", tab);
             assertNotEquals("历史", tab);
         }

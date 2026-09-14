@@ -30,8 +30,17 @@ describe('123Pan WebDAV compatibility', () => {
     })
 
     it('tests the normalized 123Pan endpoint rather than the host root', async () => {
-        const fetcher = vi.fn(async () => new Response(null, { status: 207 }))
-        vi.stubGlobal('fetch', fetcher)
+        const calls: Array<{ url: string; method: string }> = []
+        vi.stubGlobal(
+            'fetch',
+            async (url: string | URL | Request, init?: RequestInit) => {
+                calls.push({
+                    url: String(url),
+                    method: String(init?.method ?? 'GET')
+                })
+                return new Response(null, { status: 207 })
+            }
+        )
         const provider = new WebDavStorageProvider({
             kind: 'webdav',
             baseUrl: 'https://webdav.123pan.cn',
@@ -42,11 +51,12 @@ describe('123Pan WebDAV compatibility', () => {
             success: true,
             status: 207
         })
-        expect(fetcher).toHaveBeenCalledTimes(1)
-        expect(fetcher.mock.calls[0][0]).toBe(
-            'https://webdav.123pan.cn/webdav'
-        )
-        expect(fetcher.mock.calls[0][1]?.method).toBe('PROPFIND')
+        expect(calls).toEqual([
+            {
+                url: 'https://webdav.123pan.cn/webdav',
+                method: 'PROPFIND'
+            }
+        ])
     })
 
     it('accepts MKCOL 405 only after PROPFIND confirms the directory exists', async () => {

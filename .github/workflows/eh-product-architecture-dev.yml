@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src web mobile/android-alpha2/app/src/main mobile/android-alpha2/app/src/test
+          git add src web test mobile/android-alpha2/app/src/main mobile/android-alpha2/app/src/test
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
           git commit -m 'feat: consolidate online sources accounts and library presentation'

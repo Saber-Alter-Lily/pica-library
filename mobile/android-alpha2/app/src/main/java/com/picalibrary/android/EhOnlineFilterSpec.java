@@ -17,7 +17,7 @@ final class EhOnlineFilterSpec {
     EhOnlineFilterSpec copy(){EhOnlineFilterSpec s=new EhOnlineFilterSpec();s.mode=mode;s.includeCategories=includeCategories;s.includeTags.addAll(includeTags);s.excludeTags.addAll(excludeTags);s.language=language;s.freeText=freeText;s.minRating=minRating;s.pageFrom=pageFrom;s.pageTo=pageTo;s.favoriteSlot=favoriteSlot;s.toplist=toplist;return s;}
     boolean hasAdvanced(){return includeCategories!=ALL||!includeTags.isEmpty()||!excludeTags.isEmpty()||!language.isEmpty()||minRating>0||pageFrom>0||pageTo>0;}
 
-    String canonicalQuery(){ArrayList<String> parts=new ArrayList<>();if(freeText!=null&&!freeText.trim().isEmpty())parts.add(freeText.trim());for(String tag:includeTags)if(validCanonical(tag))parts.add(exact(tag));for(String tag:excludeTags)if(validCanonical(tag))parts.add("-"+exact(tag));if(language!=null&&!language.trim().isEmpty()){String value=language.trim().toLowerCase(Locale.ROOT);parts.add("language:\""+escape(value)+"$\"");}return String.join(" ",parts);}
+    String canonicalQuery(){ArrayList<String> parts=new ArrayList<>();if(freeText!=null&&!freeText.trim().isEmpty())parts.add(freeText.trim());for(String tag:includeTags)if(validCanonical(tag))parts.add(exactCanonical(tag));for(String tag:excludeTags)if(validCanonical(tag))parts.add("-"+exactCanonical(tag));if(language!=null&&!language.trim().isEmpty()){String value=language.trim().toLowerCase(Locale.ROOT);parts.add("language:\""+escape(value)+"$\"");}return String.join(" ",parts);}
 
     String buildUrl(String surface) throws Exception {
         String origin="exh".equals(surface)?EhClient.EXH_ORIGIN:EhClient.ORIGIN;
@@ -33,7 +33,7 @@ final class EhOnlineFilterSpec {
     static String categoryLabel(int bit){switch(bit){case DOUJINSHI:return "同人志";case MANGA:return "漫画";case ARTIST_CG:return "画师 CG";case GAME_CG:return "游戏 CG";case IMAGE_SET:return "图片集";case COSPLAY:return "Cosplay";case ASIAN_PORN:return "亚洲色情";case NON_H:return "非 H";case WESTERN:return "西方作品";case MISC:return "其他";default:return "";}}
     static int[] categoryBits(){return new int[]{DOUJINSHI,MANGA,ARTIST_CG,GAME_CG,IMAGE_SET,COSPLAY,ASIAN_PORN,NON_H,WESTERN,MISC};}
     static boolean validCanonical(String value){return value!=null&&value.matches("^[a-zA-Z0-9 _.-]+:[^\\r\\n\"]+$");}
-    private static String exact(String canonical){int at=canonical.indexOf(':');String value=canonical.substring(at+1);if(value.endsWith("$"))value=value.substring(0,value.length()-1);return canonical.substring(0,at+1)+"\""+escape(value)+"$\"";}
+    static String exactCanonical(String canonical){if(!validCanonical(canonical))return canonical==null?"":canonical;int at=canonical.indexOf(':');String value=canonical.substring(at+1);if(value.endsWith("$"))value=value.substring(0,value.length()-1);return canonical.substring(0,at+1)+"\""+escape(value)+"$\"";}
     private static String escape(String value){return value.replace("\\","\\\\").replace("\"","\\\"");}
     private static String enc(String value) throws Exception{return URLEncoder.encode(value,"UTF-8").replace("+","%20");}
     private static boolean validToplist(String value){return "11".equals(value)||"12".equals(value)||"13".equals(value)||"15".equals(value);}

@@ -1,14 +1,27 @@
 package com.picalibrary.android;
 
-import android.app.*;
-import android.content.*;
+import android.app.Activity;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.view.*;
-import android.webkit.*;
-import android.widget.*;
-import java.net.*;
-import java.util.*;
+import android.view.Gravity;
+import android.view.View;
+import android.webkit.CookieManager;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import javax.net.ssl.SSLException;
 
 /** Official E-H web login in an app-owned WebView; credentials stay on the official site. */

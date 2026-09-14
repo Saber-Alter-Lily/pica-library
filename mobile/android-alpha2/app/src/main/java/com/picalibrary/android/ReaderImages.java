@@ -6,13 +6,14 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.widget.Toast;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Persistent encoded-page cache shared by Desktop/WebDAV/Pica. Explicit phone downloads are decoded in place. */
+/** Persistent encoded-page cache shared by Desktop/WebDAV/Pica/E-H. Explicit phone downloads are decoded in place. */
 final class ReaderImages implements AutoCloseable {
     interface Callback { void complete(Bitmap bitmap); void failed(); }
     static final class Request {
@@ -38,7 +39,7 @@ final class ReaderImages implements AutoCloseable {
         request.future=workers.submit(()->{
             if(isLocal(path)){
                 try{Bitmap bitmap=decodeLocal(path,width);if(bitmap==null)throw new IOException("decode failed");if(request.cancelled||closed){bitmap.recycle();return;}main.post(()->{if(!request.cancelled&&!closed)callback.complete(bitmap);else bitmap.recycle();});}
-                catch(Exception|OutOfMemoryError e){main.post(()->{if(!request.cancelled&&!closed)callback.failed();});}
+                catch(Exception|OutOfMemoryError e){String reason=failureReason(e);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,"图片读取失败 · "+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
                 return;
             }
             File target=new File(cache,ReaderPolicy.hash(path));File partial=null;
@@ -46,7 +47,7 @@ final class ReaderImages implements AutoCloseable {
                 if(!target.isFile()){partial=fetchNetworkToPartial(path,request);validateImage(partial);synchronized(ReaderImages.class){if(!target.exists()&&!partial.renameTo(target))throw new IOException("cache rename failed");}}
                 if(request.cancelled||closed)return;
                 Bitmap bitmap=decodeFile(target,width);if(bitmap==null){target.delete();throw new IOException("decode failed");}target.setLastModified(System.currentTimeMillis());main.post(()->{if(!request.cancelled&&!closed)callback.complete(bitmap);else bitmap.recycle();});trim(target);
-            }catch(Exception|OutOfMemoryError e){main.post(()->{if(!request.cancelled&&!closed)callback.failed();});}
+            }catch(Exception|OutOfMemoryError e){String reason=failureReason(e);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,"图片读取失败 · "+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
             finally{if(partial!=null)partial.delete();}
         });
         return request;
@@ -85,6 +86,24 @@ final class ReaderImages implements AutoCloseable {
     private static boolean isLocal(String value){return value!=null&&(value.startsWith("content://")||value.startsWith("file://"));}
     private void copy(InputStream in,OutputStream out,Request request) throws Exception {byte[] buffer=new byte[32768];int n;long bytes=0;while((n=in.read(buffer))!=-1){if(request.cancelled||closed||Thread.currentThread().isInterrupted())throw new IOException("cancelled");bytes+=n;if(bytes>64L*1024*1024)throw new IOException("page too large");out.write(buffer,0,n);}}
     private static void validateImage(File file) throws IOException {BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("invalid image");}
+
+    private static String failureReason(Throwable error){
+        if(error instanceof OutOfMemoryError)return "图片过大或内存不足";
+        String value=error==null||error.getMessage()==null?"":error.getMessage().trim();String lower=value.toLowerCase(Locale.ROOT);
+        if(value.contains("HTTP 509"))return "请求过于频繁";
+        if(value.contains("HTTP 403"))return "站点拒绝图片请求";
+        if(value.contains("HTTP 404"))return "图片地址已失效";
+        if(value.contains("HTTP 429"))return "请求过于频繁";
+        if(value.contains("第 ")&&value.contains("页定位失败"))return value;
+        if(value.contains("图片页没有可读取图片"))return "图片页解析失败";
+        if(value.contains("异常跳转"))return "E-H 页面发生异常跳转";
+        if(lower.contains("timed out")||lower.contains("timeout"))return "网络请求超时";
+        if(lower.contains("unknownhost")||lower.contains("unable to resolve host"))return "无法解析图片服务器";
+        if("invalid image".equals(lower)||"decode failed".equals(lower))return "服务器返回的内容不是有效图片";
+        if("page too large".equals(lower))return "图片文件过大";
+        if(value.startsWith("E-H HTTP "))return value;
+        return "暂时无法读取";
+    }
 
     private synchronized void trim(File active){File root=cache.getParentFile();File[] scopes=root==null?null:root.listFiles(File::isDirectory);if(scopes==null)return;ArrayList<File> files=new ArrayList<>();for(File scope:scopes){File[] nested=scope.listFiles(file->file.isFile()&&!file.getName().endsWith(".part"));if(nested!=null)files.addAll(Arrays.asList(nested));}files.sort(Comparator.comparingLong(File::lastModified));long total=0;for(File file:files)total+=file.length();long limit=StorageSettings.pageLimitBytes(context);for(File file:files)if(limit!=Long.MAX_VALUE&&total>limit&&!file.equals(active)){long n=file.length();if(file.delete())total-=n;}}
     static long cacheBytes(Context context){return bytes(new File(MobileStoragePaths.cacheRoot(context),ROOT));}

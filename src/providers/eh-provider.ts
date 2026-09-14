@@ -10,11 +10,25 @@ import type {
 
 const API_URL = 'https://api.e-hentai.org/api.php'
 const GALLERY_ORIGIN = 'https://e-hentai.org'
+const EXH_ORIGIN = 'https://exhentai.org'
 const USER_AGENT = 'Pica-Library/0.3 (+https://github.com/Saber-Alter-Lily/pica-library)'
 const SEARCH_MIN_INTERVAL_MS = 3100
 const REQUEST_TIMEOUT_MS = 15000
 const MAX_GDATA_BATCH = 25
 const MAX_GALLERY_INDEX_PAGES = 100
+const MAX_FAVORITE_PAGES = 2500
+
+export interface EhSession {
+    memberId: string
+    passHash: string
+    igneous?: string
+    cfClearance?: string
+}
+
+export type ExHentaiCapability =
+    | 'AVAILABLE'
+    | 'UNAVAILABLE'
+    | 'NETWORK_ERROR'
 
 interface EhTorrent {
     hash?: string
@@ -100,6 +114,27 @@ export function parseEhTag(raw: string): CanonicalTag {
 
 function unique(values: string[]) {
     return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+}
+
+function safeCookieValue(value: unknown, label: string, required = false) {
+    const text = String(value ?? '').trim()
+    if (!text) {
+        if (required) throw new Error(`E-H ${label} is required`)
+        return ''
+    }
+    if (text.length > 512 || /[;\r\n]/.test(text))
+        throw new Error(`E-H ${label} is invalid`)
+    return text
+}
+
+export function normalizeEhSession(session: EhSession): EhSession {
+    return {
+        memberId: safeCookieValue(session.memberId, 'member cookie', true),
+        passHash: safeCookieValue(session.passHash, 'pass cookie', true),
+        igneous: safeCookieValue(session.igneous, 'igneous cookie') || undefined,
+        cfClearance:
+            safeCookieValue(session.cfClearance, 'Cloudflare cookie') || undefined
+    }
 }
 
 export function ehMetadataToComic(value: EhMetadata): ProviderComic {
@@ -192,6 +227,42 @@ function decodeLocator(locator: string) {
     return url.toString()
 }
 
+function galleryRefs(html: string) {
+    const output: GalleryRef[] = []
+    const seen = new Set<string>()
+    const pattern = /(?:https?:\/\/e-hentai\.org)?\/g\/(\d+)\/([0-9a-f]{10})\//gi
+    for (const match of html.matchAll(pattern)) {
+        const key = `${match[1]}:${match[2].toLowerCase()}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        output.push({ gid: Number(match[1]), token: match[2].toLowerCase() })
+    }
+    return output
+}
+
+function nextFavoriteToken(html: string, used: Set<string>) {
+    const pattern = /href=["']([^"']*favorites\.php\?[^"']*(?:&amp;|&)next=(\d+)[^"']*)["']/gi
+    for (const match of html.matchAll(pattern)) {
+        const token = match[2]
+        if (!used.has(token)) return token
+    }
+    return null
+}
+
+function accountRejected(response: Response, html: string) {
+    if (response.status === 401 || response.status === 403) return true
+    let finalUrl: URL | null = null
+    try {
+        finalUrl = new URL(response.url)
+    } catch {
+        // Ignore malformed diagnostic URLs from test doubles.
+    }
+    if (finalUrl?.hostname === 'forums.e-hentai.org') return true
+    return /(?:act=Login|you are not logged in|valid user session is required|please log in)/i.test(
+        html
+    )
+}
+
 export class EhProvider implements ComicProvider {
     readonly id = 'eh' as const
     readonly capabilities = {
@@ -201,34 +272,77 @@ export class EhProvider implements ComicProvider {
         chapters: true,
         pages: true,
         imageFetch: true,
-        remoteFavoritesRead: false,
-        remoteFavoritesWrite: false,
-        account: false,
-        exHentai: false
+        remoteFavoritesRead: true,
+        remoteFavoritesWrite: true,
+        account: true,
+        exHentai: true
     } as const
 
     private lastSearchAt = 0
     private searchGate: Promise<void> = Promise.resolve()
+    private session: EhSession | null = null
+
+    constructor(
+        session?: EhSession | null,
+        private readonly fetchImpl: typeof fetch = fetch
+    ) {
+        if (session) this.session = normalizeEhSession(session)
+    }
+
+    setSession(session?: EhSession | null) {
+        this.session = session ? normalizeEhSession(session) : null
+    }
+
+    hasSession() {
+        return Boolean(this.session)
+    }
+
+    private cookieHeader() {
+        if (!this.session) throw new Error('E-H account session is not configured')
+        const pairs = [
+            `ipb_member_id=${this.session.memberId}`,
+            `ipb_pass_hash=${this.session.passHash}`,
+            'nw=1'
+        ]
+        if (this.session.igneous) pairs.push(`igneous=${this.session.igneous}`)
+        if (this.session.cfClearance)
+            pairs.push(`cf_clearance=${this.session.cfClearance}`)
+        return pairs.join('; ')
+    }
 
     private async request(
         url: string,
         init: RequestInit = {},
-        maxBytes = 8 * 1024 * 1024
+        maxBytes = 8 * 1024 * 1024,
+        options: {
+            authenticated?: boolean
+            allowHttpErrors?: boolean
+            redirect?: RequestRedirect
+        } = {}
     ) {
+        const target = new URL(url)
+        if (target.protocol !== 'https:') throw new Error('E-H requires HTTPS')
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
         try {
-            const response = await fetch(url, {
+            const headers = new Headers(init.headers)
+            headers.set('user-agent', USER_AGENT)
+            if (!headers.has('accept')) headers.set('accept', '*/*')
+            if (options.authenticated) {
+                if (
+                    target.hostname !== 'e-hentai.org' &&
+                    target.hostname !== 'exhentai.org'
+                )
+                    throw new Error('E-H session cookies cannot be sent to this host')
+                headers.set('cookie', this.cookieHeader())
+            }
+            const response = await this.fetchImpl(url, {
                 ...init,
-                redirect: 'follow',
+                redirect: options.redirect ?? 'follow',
                 signal: controller.signal,
-                headers: {
-                    'user-agent': USER_AGENT,
-                    accept: '*/*',
-                    ...(init.headers ?? {})
-                }
+                headers
             })
-            if (!response.ok)
+            if (!response.ok && !options.allowHttpErrors)
                 throw new Error(`E-H request failed with HTTP ${response.status}`)
             const length = Number(response.headers.get('content-length') ?? 0)
             if (Number.isFinite(length) && length > maxBytes)
@@ -239,11 +353,29 @@ export class EhProvider implements ComicProvider {
         }
     }
 
-    private async text(url: string, maxBytes = 8 * 1024 * 1024) {
-        const response = await this.request(url, {}, maxBytes)
+    private async responseText(response: Response, maxBytes: number) {
         const text = await response.text()
         if (Buffer.byteLength(text, 'utf8') > maxBytes)
             throw new Error('E-H response exceeds the configured size limit')
+        return text
+    }
+
+    private async text(url: string, maxBytes = 8 * 1024 * 1024) {
+        return this.responseText(await this.request(url, {}, maxBytes), maxBytes)
+    }
+
+    private async authenticatedText(url: string, maxBytes = 8 * 1024 * 1024) {
+        const response = await this.request(
+            url,
+            {},
+            maxBytes,
+            { authenticated: true, allowHttpErrors: true }
+        )
+        const text = await this.responseText(response, maxBytes)
+        if (accountRejected(response, text))
+            throw new Error('E-H account session is not valid')
+        if (!response.ok)
+            throw new Error(`E-H account request failed with HTTP ${response.status}`)
         return text
     }
 
@@ -292,16 +424,10 @@ export class EhProvider implements ComicProvider {
         const url = new URL('/', GALLERY_ORIGIN)
         if (terms.length) url.searchParams.set('f_search', terms.join(' '))
         const html = await this.text(url.toString())
-        const refs: GalleryRef[] = []
-        const seen = new Set<string>()
-        const pattern = /(?:https?:\/\/e-hentai\.org)?\/g\/(\d+)\/([0-9a-f]{10})\//gi
-        for (const match of html.matchAll(pattern)) {
-            const key = `${match[1]}:${match[2].toLowerCase()}`
-            if (seen.has(key)) continue
-            seen.add(key)
-            refs.push({ gid: Number(match[1]), token: match[2].toLowerCase() })
-            if (refs.length >= Math.max(1, Math.min(input.limit ?? 25, 100))) break
-        }
+        const refs = galleryRefs(html).slice(
+            0,
+            Math.max(1, Math.min(input.limit ?? 25, 100))
+        )
         if (!refs.length) return []
         const categories = new Set((input.categories ?? []).map((item) => item.toLowerCase()))
         return (await this.gdata(refs))
@@ -314,6 +440,116 @@ export class EhProvider implements ComicProvider {
                         categories.has(category.toLowerCase())
                     )
             )
+    }
+
+    async verifyAccount() {
+        const html = await this.authenticatedText(
+            `${GALLERY_ORIGIN}/favorites.php?favcat=all`,
+            4 * 1024 * 1024
+        )
+        return { authenticated: true, visibleFavorites: galleryRefs(html).length }
+    }
+
+    async favoritesAll() {
+        if (!this.session) throw new Error('E-H account session is not configured')
+        const refs = new Map<string, GalleryRef>()
+        const usedNext = new Set<string>()
+        let next: string | null = null
+        for (let page = 0; page < MAX_FAVORITE_PAGES; page++) {
+            const url = new URL('/favorites.php', GALLERY_ORIGIN)
+            url.searchParams.set('favcat', 'all')
+            if (next) url.searchParams.set('next', next)
+            const html = await this.authenticatedText(url.toString(), 8 * 1024 * 1024)
+            for (const ref of galleryRefs(html))
+                refs.set(`${ref.gid}:${ref.token}`, ref)
+            const token = nextFavoriteToken(html, usedNext)
+            if (!token) break
+            usedNext.add(token)
+            next = token
+        }
+        const metadata = await this.gdata([...refs.values()])
+        return metadata.filter((item) => !item.error).map(ehMetadataToComic)
+    }
+
+    async setRemoteFavorite(
+        comicId: string,
+        desired: boolean,
+        category = 0,
+        note = ''
+    ) {
+        if (!this.session) throw new Error('E-H account session is not configured')
+        if (!Number.isInteger(category) || category < 0 || category > 9)
+            throw new Error('E-H favorite category must be between 0 and 9')
+        if (Buffer.byteLength(note, 'utf8') > 200)
+            throw new Error('E-H favorite note exceeds 200 bytes')
+        const ref = parseEhComicId(comicId)
+        const url = new URL('/gallerypopups.php', GALLERY_ORIGIN)
+        url.searchParams.set('gid', String(ref.gid))
+        url.searchParams.set('t', ref.token)
+        url.searchParams.set('act', 'addfav')
+        const form = new URLSearchParams({
+            favcat: desired ? String(category) : 'favdel',
+            favnote: note,
+            apply: 'Apply Changes',
+            update: '1'
+        })
+        const response = await this.request(
+            url.toString(),
+            {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/x-www-form-urlencoded',
+                    accept: 'text/html,*/*;q=0.8'
+                },
+                body: form.toString()
+            },
+            4 * 1024 * 1024,
+            { authenticated: true, allowHttpErrors: true }
+        )
+        const html = await this.responseText(response, 4 * 1024 * 1024)
+        if (accountRejected(response, html))
+            throw new Error('E-H account session is not valid')
+        if (!response.ok)
+            throw new Error(`E-H favorite request failed with HTTP ${response.status}`)
+        const successText = desired
+            ? /(?:added|updated|saved)[^<]{0,80}favorite/i.test(html)
+            : /(?:removed|deleted)[^<]{0,80}favorite/i.test(html)
+        if (!successText) {
+            const verify = await this.authenticatedText(url.toString(), 4 * 1024 * 1024)
+            const removalControl = /value=["']favdel["']/i.test(verify)
+            if (removalControl !== desired)
+                throw new Error('E-H favorite state could not be confirmed')
+        }
+        return { changed: true, isFavorite: desired, category, note }
+    }
+
+    async probeExHentai(): Promise<ExHentaiCapability> {
+        if (!this.session) return 'UNAVAILABLE'
+        try {
+            const response = await this.request(
+                `${EXH_ORIGIN}/uconfig.php`,
+                { headers: { accept: 'text/html,*/*;q=0.8' } },
+                4 * 1024 * 1024,
+                { authenticated: true, allowHttpErrors: true }
+            )
+            if (response.status === 401 || response.status === 403)
+                return 'UNAVAILABLE'
+            const html = await this.responseText(response, 4 * 1024 * 1024)
+            if (
+                !response.ok ||
+                accountRejected(response, html) ||
+                /sad\s*panda/i.test(html)
+            )
+                return 'UNAVAILABLE'
+            return 'AVAILABLE'
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                /session is not configured|session is not valid/i.test(error.message)
+            )
+                return 'UNAVAILABLE'
+            return 'NETWORK_ERROR'
+        }
     }
 
     async details(comicId: string) {

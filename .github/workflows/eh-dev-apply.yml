@@ -6,6 +6,7 @@ on:
       - feature/eh-provider-v1
     paths:
       - 'scripts/dev/apply-eh-desktop-v1.mjs'
+      - 'scripts/dev/run-eh-desktop-v1.mjs'
       - '.github/workflows/eh-dev-apply.yml'
 
 permissions:
@@ -29,7 +30,7 @@ jobs:
           run_install: false
       - run: pnpm install --frozen-lockfile
       - name: Apply isolated desktop patch
-        run: node scripts/dev/apply-eh-desktop-v1.mjs
+        run: node scripts/dev/run-eh-desktop-v1.mjs
       - name: Validate desktop and web
         run: |
           set -euo pipefail

@@ -70,5 +70,5 @@ jobs:
         with:
           name: Pica-Library-Dev-PR35
           path: mobile/android-alpha2/candidate/
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error

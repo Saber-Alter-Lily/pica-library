@@ -14,7 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * One cover cache for Desktop/WebDAV/Pica. A version key includes the comic identity,
+ * One cover cache for Desktop/WebDAV/Pica/E-H. A version key includes the comic identity,
  * current provider locators and stable catalog timestamp, so metadata/cover changes do
  * not reuse an older bitmap forever while unchanged sources still share one copy.
  */
@@ -29,7 +29,7 @@ final class CoverRepository {
 
     private static File dir(Context context){return MobileStoragePaths.cacheDir(context,ROOT);}
     private static String value(String s){return s==null?"":s;}
-    private static String key(UnifiedCatalogStore.Entry entry){return ReaderPolicy.hash(value(entry.id)+"\n"+value(entry.desktopCoverPath)+"\n"+value(entry.remoteCoverPath)+"\n"+value(entry.picaCoverUrl)+"\n"+value(entry.updatedAt));}
+    private static String key(UnifiedCatalogStore.Entry entry){return ReaderPolicy.hash(value(entry.id)+"\n"+value(entry.desktopCoverPath)+"\n"+value(entry.remoteCoverPath)+"\n"+value(entry.picaCoverUrl)+"\n"+value(entry.ehCoverUrl)+"\n"+value(entry.updatedAt));}
     private static File disk(Context context,String cacheKey){return new File(dir(context),cacheKey);}
     private static Bitmap memory(String cacheKey){synchronized(MEMORY){return MEMORY.get(cacheKey);}}
     private static void remember(String cacheKey,Bitmap bitmap){if(cacheKey==null||cacheKey.isEmpty()||bitmap==null)return;synchronized(MEMORY){MEMORY.put(cacheKey,bitmap);}}
@@ -44,10 +44,16 @@ final class CoverRepository {
         if(bitmap==null&&entry.remoteCoverPath!=null&&!entry.remoteCoverPath.isEmpty()&&RemoteConfigStore.load(context).configured()){
             HttpURLConnection c=null;try{c=new RemoteLibraryClient(context).open(entry.remoteCoverPath,"image/*");bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
+        if(bitmap==null&&entry.ehCoverUrl!=null&&!entry.ehCoverUrl.isEmpty()){
+            HttpURLConnection c=null;try{c=new EhClient(context).thumbnail(entry.ehCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
+        }
         if(bitmap==null&&entry.picaCoverUrl!=null&&!entry.picaCoverUrl.isEmpty()){
             HttpURLConnection c=null;try{c=new PicaClient(context).media(entry.picaCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
-        if(bitmap==null&&PicaAccountStore.load(context).configured()){
+        if(bitmap==null&&EhClient.isEhId(entry.id)){
+            try{EhClient client=new EhClient(context);EhClient.Comic comic=client.comic(entry.id);UnifiedCatalogStore.Entry refreshed=UnifiedEhCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.thumbnail(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}catch(Exception ignored){}
+        }
+        if(bitmap==null&&!EhClient.isEhId(entry.id)&&PicaAccountStore.load(context).configured()){
             try{PicaClient client=new PicaClient(context);PicaClient.Comic comic=client.comic(entry.id);if(comic!=null&&!comic.id.isEmpty()){UnifiedCatalogStore.Entry refreshed=UnifiedPicaCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.media(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}}catch(Exception ignored){}
         }
         if(bitmap!=null){remember(cacheKey,bitmap);save(context,cacheKey,bitmap);}return bitmap;
@@ -65,7 +71,7 @@ final class CoverRepository {
 
     static void prefetch(Context context,UnifiedCatalogStore.Entry entry){if(entry==null||entry.id==null||entry.id.isEmpty())return;String cacheKey=key(entry);if(memory(cacheKey)!=null||disk(context,cacheKey).isFile())return;POOL.submit(()->cacheNow(context.getApplicationContext(),entry));}
 
-    private static Bitmap decode(HttpURLConnection c,long limit) throws Exception {int status=c.getResponseCode();if(status<200||status>=300)throw new IOException("cover HTTP "+status);try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))>0){if(out.size()+n>limit)throw new IOException("cover too large");out.write(b,0,n);}byte[] data=out.toByteArray();Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length);if(bitmap==null)throw new IOException("invalid cover");return bitmap;}}
+    private static Bitmap decode(HttpURLConnection c,long limit) throws Exception {int status=c.getResponseCode();if(status<200||status>=300)throw new IOException("cover HTTP "+status);String type=String.valueOf(c.getContentType()).toLowerCase(Locale.ROOT);if(!type.startsWith("image/"))throw new IOException("cover is not an image");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))>0){if(out.size()+n>limit)throw new IOException("cover too large");out.write(b,0,n);}byte[] data=out.toByteArray();Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length);if(bitmap==null)throw new IOException("invalid cover");return bitmap;}}
     private static void save(Context context,String cacheKey,Bitmap bitmap){File target=disk(context,cacheKey),tmp=null;try{tmp=File.createTempFile("cover-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){if(!bitmap.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("compress failed");}if(target.exists()&&!target.delete())throw new IOException("replace failed");if(!tmp.renameTo(target))throw new IOException("rename failed");trim(context,target);}catch(Exception ignored){if(tmp!=null)tmp.delete();}}
     private static synchronized void trim(Context context,File active){File[] files=dir(context).listFiles();if(files==null)return;Arrays.sort(files,Comparator.comparingLong(File::lastModified));long total=0;for(File f:files)if(f.isFile())total+=f.length();long limit=StorageSettings.coverLimitBytes(context);if(limit==Long.MAX_VALUE)return;for(File f:files)if(total>limit&&f.isFile()&&!f.equals(active)){long n=f.length();if(f.delete())total-=n;}}
     static long diskBytes(Context context){File[] files=dir(context).listFiles();long total=0;if(files!=null)for(File f:files)if(f.isFile())total+=f.length();return total;}

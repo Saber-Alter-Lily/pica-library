@@ -64,7 +64,13 @@ final class RemoteLibraryClient {
     }
 
     String scope(){try{byte[] raw=MessageDigest.getInstance("SHA-256").digest((config.baseUrl+"\n"+config.root+"\n"+config.username).getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder();for(byte b:raw)out.append(String.format(Locale.ROOT,"%02x",b));return out.toString();}catch(Exception e){return ReaderPolicy.hash(config.baseUrl+"/"+config.root);}}
-    private URL url(String path) throws Exception {String p=path==null?"":path.replaceAll("^/+","");return new URL(config.baseUrl+"/"+config.root+"/"+p);}
+    private boolean flatObjectMode(){try{return "webdav.123pan.cn".equalsIgnoreCase(new URI(config.baseUrl).getHost());}catch(Exception e){return false;}}
+    private String physicalPath(String path) throws Exception {
+        String p=path==null?"":path.replaceAll("^/+","");String logical=config.root+(p.isEmpty()?"":"/"+p);
+        if(!flatObjectMode())return logical;
+        byte[] raw=MessageDigest.getInstance("SHA-256").digest(logical.getBytes(StandardCharsets.UTF_8));StringBuilder hex=new StringBuilder();for(byte b:raw)hex.append(String.format(Locale.ROOT,"%02x",b&255));return "pica-library-"+hex+".bin";
+    }
+    private URL url(String path) throws Exception {return new URL(config.baseUrl.replaceAll("/+$","")+"/"+physicalPath(path));}
     HttpURLConnection open(String path,String accept) throws Exception {
         HttpURLConnection c=(HttpURLConnection)url(path).openConnection();c.setConnectTimeout(9000);c.setReadTimeout(30000);c.setUseCaches(false);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept",accept);
         if(!config.username.isEmpty()||!config.password.isEmpty())c.setRequestProperty("Authorization","Basic "+Base64.encodeToString((config.username+":"+config.password).getBytes(StandardCharsets.UTF_8),Base64.NO_WRAP));return c;
@@ -79,6 +85,7 @@ final class RemoteLibraryClient {
         try{
             c=open(path,"application/json");int status=c.getResponseCode();
             if(status==401||status==403)throw new IllegalStateException("WebDAV 认证失败 · HTTP "+status);
+            if(status==404&&"v1/control/current.json".equals(path))throw new IllegalStateException("WebDAV 已连接，但云端尚未初始化 Pica Library；请先在新版电脑端完成一次云同步");
             if(status==404)throw new IllegalStateException("WebDAV HTTP 404");
             if(status>=400)throw new IOException("WebDAV HTTP "+status);
             try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))>0)out.write(b,0,n);byte[] data=out.toByteArray();writeFile(cached,data);return new String(data,StandardCharsets.UTF_8);}

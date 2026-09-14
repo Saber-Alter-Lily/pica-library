@@ -32,7 +32,7 @@ function read(f){return fs.readFileSync(f,'utf8')}function write(f,t){fs.writeFi
             : null
     )
 `
- let count=0;while(text.includes(serviceAnchor)){text=text.replace(serviceAnchor,serviceReplacement);count++}if(count<2)throw new Error('expected both LibraryService construction sites')
+ const serviceParts=text.split(serviceAnchor);if(serviceParts.length!==3)throw new Error(`expected exactly two LibraryService construction sites, got ${serviceParts.length-1}`);text=serviceParts.join(serviceReplacement)
  text=rep(text,
 `            remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
             personalization: {

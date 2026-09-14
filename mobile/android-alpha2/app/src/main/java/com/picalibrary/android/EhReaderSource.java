@@ -8,13 +8,13 @@ import java.util.*;
 final class EhReaderSource implements ReaderSource {
     private final Context context;
     private final EhClient client;
-    private final EhReaderResolver resolver=new EhReaderResolver();
+    private final EhReaderResolver resolver;
     private final Map<String,EhClient.Episode> episodes=new HashMap<>();
     private final Map<String,BridgeClient.ChapterItem> knownChapters=new HashMap<>();
     private String comicTitle="",author="";
-    EhReaderSource(Context context){this.context=context.getApplicationContext();this.client=new EhClient(this.context);}
+    EhReaderSource(Context context){this.context=context.getApplicationContext();this.client=new EhClient(this.context);this.resolver=new EhReaderResolver(this.context);}
     public String kind(){return "eh";}
-    public String scope(){return ReaderPolicy.hash("eh-public-v3-gallery-referer");}
+    public String scope(){return ReaderPolicy.hash("eh-public-v4-shared-session");}
 
     private static String episodeId(String comicId){String[] parts=comicId==null?new String[0]:comicId.split(":",3);return parts.length>=2?"eh-"+parts[1]:"eh-gallery";}
     private EhClient.Episode syntheticEpisode(String comicId,String title){return new EhClient.Episode(episodeId(comicId),title==null||title.isEmpty()?"E-H 画廊":title,1);}
@@ -35,5 +35,6 @@ final class EhReaderSource implements ReaderSource {
     }
     public String recentChapter(String comicId){return "";}
     public HttpURLConnection image(String path) throws Exception {return EhReaderResolver.handles(path)?resolver.openImage(path):client.image(path);}
+    String diagnose(String path){return EhReaderResolver.handles(path)?resolver.diagnose(path):"E-H 诊断不可用于该页面";}
     public void saveProgress(String comicId,String episodeId,int pageIndex){if(!RemoteConfigStore.load(context).configured())return;BridgeClient.ChapterItem chapter=knownChapters.get(episodeId);try{new RemoteLibraryClient(context).saveReadingProgress(DeviceIdentity.id(context),comicId,episodeId,pageIndex,comicTitle,author,chapter==null?"":chapter.title,chapter==null?0:chapter.order);}catch(Exception e){throw new IllegalStateException("E-H 阅读进度云端同步失败",e);}}
 }

@@ -1,52 +1,34 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-describe('Alpha8.6 Star personalization contracts after Alpha8.8 migration', () => {
-    it('keeps the official mobile navigation and compact header actions', () => {
-        const home = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java',
-            'utf8'
-        )
-        const ui = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/Ui.java',
-            'utf8'
-        )
-        expect(home).toContain('书库')
-        expect(home).toContain('推荐')
-        expect(home).toContain('在线')
-        expect(home).toContain('连接')
+describe('Alpha8.6 Star personalization contracts after source/settings convergence', () => {
+    it('keeps the four-destination mobile shell while Online owns account actions', () => {
+        const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java','utf8')
+        const shell = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ShellPolicy.java','utf8')
+        const online = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java','utf8')
+        const ui = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/Ui.java','utf8')
+        expect(shell).toContain('{"书库","推荐","在线","设置"}')
+        expect(home).toContain('PicaBrowseActivity.class')
+        expect(home).toContain('SettingsActivity.class')
         expect(home).toContain('R.drawable.ic_refresh_24')
-        expect(home).toContain('R.drawable.ic_person_24')
+        expect(online).toContain('R.drawable.ic_person_24')
+        expect(online).toContain('AccountSourcesActivity.class')
         expect(ui).toContain('static ImageButton iconButton')
     })
 
     it('keeps GitHub Star as the theme gate but now requires authenticated account proof', () => {
-        const service = fs.readFileSync(
-            'src/services/personalization-service.ts',
-            'utf8'
-        )
-        const store = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackStore.java',
-            'utf8'
-        )
-        const sync = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackSync.java',
-            'utf8'
-        )
-        const appearance = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AppearanceActivity.java',
-            'utf8'
-        )
-        const activity = fs.readFileSync(
-            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java',
-            'utf8'
-        )
+        const service = fs.readFileSync('src/services/personalization-service.ts','utf8')
+        const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackStore.java','utf8')
+        const sync = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackSync.java','utf8')
+        const appearance = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AppearanceActivity.java','utf8')
+        const activity = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java','utf8')
         expect(service).toContain('installAuthenticatedStarProof')
         expect(service).toContain('github-star-proof-v2.json')
         expect(service).toContain('github-account-device-flow')
         expect(store).toContain('StarAccessStore.enabled(c)')
         expect(sync).toContain('/mobile/v1/star-access')
         expect(appearance).toContain('StarAccessStore.enabled(this)')
+        expect(appearance).toContain('"GitHub Star"')
         expect(activity).toContain('StarAccessStore.enabled(this)')
         expect(activity).toContain('GitHubAccountAuth.start')
         expect(activity).toContain('从电脑同步已验证账号')
@@ -66,15 +48,7 @@ describe('Alpha8.6 Star personalization contracts after Alpha8.8 migration', () 
     it('ships the fixed brand icon and full Pica Violet Star theme', () => {
         expect(fs.existsSync('web/pica-library-icon.webp')).toBe(true)
         expect(fs.existsSync('web/pica-violet-default.pica-theme')).toBe(true)
-        expect(
-            fs.existsSync(
-                'mobile/android-alpha2/app/src/main/res/drawable-nodpi/pica_launcher.webp'
-            )
-        ).toBe(true)
-        expect(
-            fs.existsSync(
-                'mobile/android-alpha2/app/src/main/assets/pica-violet-default.pica-theme'
-            )
-        ).toBe(true)
+        expect(fs.existsSync('mobile/android-alpha2/app/src/main/res/drawable-nodpi/pica_launcher.webp')).toBe(true)
+        expect(fs.existsSync('mobile/android-alpha2/app/src/main/assets/pica-violet-default.pica-theme')).toBe(true)
     })
 })

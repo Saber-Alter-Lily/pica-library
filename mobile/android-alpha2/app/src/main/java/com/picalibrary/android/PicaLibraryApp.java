@@ -23,7 +23,8 @@ public final class PicaLibraryApp extends Application {
             @Override public void onActivitySaveInstanceState(Activity activity,Bundle state){}
             @Override public void onActivityDestroyed(Activity activity){}
         });
-        UpdateCheckJobs.schedule(this);
+        // Side-by-side Dev builds are manual QA artifacts and must not consume the formal OTA channel.
+        if(!BuildConfig.DEBUG)UpdateCheckJobs.schedule(this);
         if(PicaAccountStore.load(this).configured())PicaBootstrapJobs.enqueue(this);
         SupporterSyncJobs.enqueue(this);
         StoragePolicy.maintain(this);

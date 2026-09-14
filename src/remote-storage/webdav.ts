@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type {
     RemoteJsonVersion,
     RemoteObject,
@@ -51,6 +52,7 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     private readonly baseUrl: string
     private readonly root: string
     private readonly authorization?: string
+    private readonly flatObjectMode: boolean
     private readonly ensuredDirectories = new Set<string>()
     private readonly metadataTimeoutMs: number
     private readonly uploadTimeoutMs: number
@@ -66,15 +68,28 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         this.baseUrl = normalizeBaseUrl(config.baseUrl)
         this.root = normalizeRoot(config.root)
         this.authorization = basicAuthorization(credentials)
+        this.flatObjectMode =
+            new URL(this.baseUrl).hostname.toLowerCase() === 'webdav.123pan.cn'
         this.metadataTimeoutMs = Math.max(15_000, timeoutMs)
         this.uploadTimeoutMs = Math.max(120_000, timeoutMs)
     }
 
-    private url(path = '') {
-        const suffix = [this.root, path.replace(/^\/+/, '')]
+    private logicalPath(path = '') {
+        return [this.root, path.replace(/^\/+/, '')]
             .filter(Boolean)
             .join('/')
-        return suffix ? `${this.baseUrl}/${suffix}` : this.baseUrl
+    }
+
+    private url(path = '') {
+        const logical = this.logicalPath(path)
+        if (!logical) return this.baseUrl
+        if (this.flatObjectMode) {
+            const hash = createHash('sha256')
+                .update(logical, 'utf8')
+                .digest('hex')
+            return `${this.baseUrl}/pica-library-${hash}.bin`
+        }
+        return `${this.baseUrl}/${logical}`
     }
 
     private rawUrl(path = '') {
@@ -137,6 +152,10 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     }
 
     async withExclusiveLibraryWrite<T>(work: () => Promise<T>): Promise<T> {
+        if (this.flatObjectMode)
+            throw new Error(
+                '123云盘兼容模式暂不支持安全的远程单本删除；不会删除任何云端文件'
+            )
         if (this.libraryLockToken) throw new Error('已有网盘删除操作进行中')
         const response = await this.fetchWithRetry(
             this.url('v1'),
@@ -246,6 +265,10 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         // No general-purpose remote DELETE endpoint: only an owned comic subtree.
         if (!/^[a-zA-Z0-9_-]{1,128}$/.test(comicId))
             throw new Error('Unsafe remote comic ID')
+        if (this.flatObjectMode)
+            throw new Error(
+                '123云盘兼容模式暂不支持安全的远程单本删除'
+            )
         if (!this.libraryLockToken)
             throw new Error(
                 'Remote deletion requires an exclusive library lock'
@@ -279,6 +302,11 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
     }
 
     async ensureDirectory(path: string) {
+        // 123Pan currently exposes a file-capable WebDAV endpoint but rejects
+        // MKCOL in normal client flows. Its compatibility mode stores every
+        // logical Pica Library object as a deterministic flat file instead.
+        if (this.flatObjectMode) return
+
         // WebDAV MKCOL is comparatively expensive on many hosted providers.
         // Cache every confirmed collection for the lifetime of this provider so
         // a large page sync does not recreate/check the same parent path.
@@ -314,9 +342,9 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
             }
             if (status === 405) {
                 // Many WebDAV servers return 405 when MKCOL targets an existing
-                // collection. Do not assume that is what happened: 123Pan and
-                // other partial implementations may also use 405 for unsupported
-                // MKCOL. Verify the collection with PROPFIND before continuing.
+                // collection. Do not assume that is what happened: some partial
+                // implementations also use 405 for unsupported MKCOL. Verify
+                // the collection with PROPFIND before continuing.
                 const verified = await this.fetchWithRetry(
                     this.rawUrl(current),
                     { method: 'PROPFIND', headers: { depth: '0' } },

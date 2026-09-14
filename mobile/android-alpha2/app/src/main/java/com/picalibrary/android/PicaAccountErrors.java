@@ -15,9 +15,8 @@ final class PicaAccountErrors {
     static IOException registrationResponse(int status,String text) {
         if(status==429)return new IOException("PICA_ACCOUNT_RATE_LIMIT");
         if(status>=500)return new IOException("PICA_ACCOUNT_UNAVAILABLE");
-        String diagnostic=extractDiagnostic(text).toLowerCase(Locale.ROOT);
-        String raw=(text==null?"":text).toLowerCase(Locale.ROOT);
-        String all=diagnostic+" "+raw;
+        String all=extractDiagnostic(text).toLowerCase(Locale.ROOT);
+        if(all.isEmpty())return status>=400&&status<500?new RegistrationException("","Pica 已拒绝本次注册请求，但没有返回可识别的具体字段",true):new IOException("PICA_ACCOUNT_RESPONSE_INVALID");
 
         String missing=missingField(all);
         if(!missing.isEmpty())return new RegistrationException(missing,missingMessage(missing),true);
@@ -33,17 +32,15 @@ final class PicaAccountErrors {
             return new RegistrationException("birthday","出生日期不符合要求",true);
         }
         if(has(all,"gender","性别"))return new RegistrationException("gender","请选择有效的性别选项",true);
-        if(has(all,"nickname","display name","name","昵称"))return new RegistrationException("name","昵称不符合要求，请使用 2–50 个字符",true);
+        if(has(all,"nickname","display name","昵称")||matchesStandaloneName(all))return new RegistrationException("name","昵称不符合要求，请使用 2–50 个字符",true);
         for(int i=1;i<=3;i++){
             if(has(all,"question"+i,"安全问题"+i,"安全问题 "+i))return new RegistrationException("question"+i,"请检查安全问题 "+i,true);
             if(has(all,"answer"+i,"安全答案"+i,"安全答案 "+i))return new RegistrationException("answer"+i,"请检查安全答案 "+i,true);
         }
-        if(status>=400&&status<500)return new RegistrationException("","Pica 已拒绝本次注册请求，但没有返回可识别的具体字段",true);
-        return new IOException("PICA_ACCOUNT_RESPONSE_INVALID");
+        return status>=400&&status<500?new RegistrationException("","Pica 已拒绝本次注册请求，但没有返回可识别的具体字段",true):new IOException("PICA_ACCOUNT_RESPONSE_INVALID");
     }
 
     static String field(Exception error){return error instanceof RegistrationException?((RegistrationException)error).field:"";}
-
     static String message(Exception error) {
         if(error instanceof RegistrationException)return ((RegistrationException)error).userMessage;
         if(isNetwork(error))return "无法连接 Pica API，请检查网络或代理后重试";
@@ -54,7 +51,6 @@ final class PicaAccountErrors {
         if("PICA_ACCOUNT_RESPONSE_INVALID".equals(value))return "Pica 返回了无法识别的账号响应，结果尚未确认";
         return "账号请求未能确认";
     }
-
     static boolean retrySafe(Exception error) {
         if(error instanceof RegistrationException)return ((RegistrationException)error).retrySafe;
         if(isNetwork(error))return false;
@@ -65,34 +61,16 @@ final class PicaAccountErrors {
     private static String extractDiagnostic(String text){
         if(text==null||text.trim().isEmpty())return "";
         try{
-            JSONObject root=new JSONObject(text);
-            StringBuilder out=new StringBuilder();
+            JSONObject root=new JSONObject(text);StringBuilder out=new StringBuilder();
             append(out,root.optString("message",""));append(out,root.optString("error",""));append(out,root.optString("detail",""));
             Object data=root.opt("data");if(data instanceof JSONObject){JSONObject o=(JSONObject)data;append(out,o.optString("message",""));append(out,o.optString("error",""));append(out,o.optString("field",""));}
             return out.toString();
         }catch(Exception ignored){return "";}
     }
+    private static boolean matchesStandaloneName(String value){return value.matches("(?s).*(?:^|[^a-z])name(?:[^a-z]|$).*");}
     private static void append(StringBuilder out,String value){if(value==null||value.trim().isEmpty())return;if(out.length()>0)out.append(' ');out.append(value.trim());}
     private static boolean has(String value,String...terms){for(String term:terms)if(value.contains(term.toLowerCase(Locale.ROOT)))return true;return false;}
-    private static String missingField(String value){
-        String[] fields={"name","email","password","birthday","gender","question1","question2","question3","answer1","answer2","answer3"};
-        if(!has(value,"missing","required","empty","缺少","必填","不能为空"))return "";
-        for(String field:fields)if(value.contains(field))return field;
-        return "";
-    }
-    private static String missingMessage(String field){
-        if("name".equals(field))return "请输入昵称";
-        if("email".equals(field))return "请输入登录账号";
-        if("password".equals(field))return "请输入密码";
-        if("birthday".equals(field))return "请选择出生日期";
-        if("gender".equals(field))return "请选择性别";
-        if(field.startsWith("question"))return "请填写安全问题 "+field.substring(8);
-        if(field.startsWith("answer"))return "请填写安全答案 "+field.substring(6);
-        return "请填写必填项";
-    }
-
-    private static boolean isNetwork(Throwable error) {
-        for(Throwable current=error;current!=null;current=current.getCause())if(current instanceof java.net.SocketTimeoutException||current instanceof java.net.ConnectException||current instanceof java.net.UnknownHostException||current instanceof javax.net.ssl.SSLException)return true;
-        return false;
-    }
+    private static String missingField(String value){String[] fields={"email","password","birthday","gender","question1","question2","question3","answer1","answer2","answer3","name"};if(!has(value,"missing","required","empty","缺少","必填","不能为空"))return "";for(String field:fields)if(value.matches("(?s).*(?:^|[^a-z0-9])"+field+"(?:[^a-z0-9]|$).*") )return field;return "";}
+    private static String missingMessage(String field){if("name".equals(field))return "请输入昵称";if("email".equals(field))return "请输入登录账号";if("password".equals(field))return "请输入密码";if("birthday".equals(field))return "请选择出生日期";if("gender".equals(field))return "请选择性别";if(field.startsWith("question"))return "请填写安全问题 "+field.substring(8);if(field.startsWith("answer"))return "请填写安全答案 "+field.substring(6);return "请填写必填项";}
+    private static boolean isNetwork(Throwable error){for(Throwable current=error;current!=null;current=current.getCause())if(current instanceof java.net.SocketTimeoutException||current instanceof java.net.ConnectException||current instanceof java.net.UnknownHostException||current instanceof javax.net.ssl.SSLException)return true;return false;}
 }

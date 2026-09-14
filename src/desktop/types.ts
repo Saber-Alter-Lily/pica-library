@@ -9,13 +9,21 @@ export interface DesktopConfig {
     proxyUrl?: string
 }
 
+export interface RemoteTargetStoredCredentials {
+    username?: string
+    password?: string
+}
+
 export interface StoredCredentials {
     account: string
     password: string
     proxyUsername?: string
     proxyPassword?: string
+    /** Legacy single-target fields retained for seamless migration. */
     remoteStorageUsername?: string
     remoteStoragePassword?: string
+    /** DPAPI-protected credentials keyed by RemoteStorageTarget.id. */
+    remoteStorageCredentials?: Record<string, RemoteTargetStoredCredentials>
 }
 
 export interface SetupInput {

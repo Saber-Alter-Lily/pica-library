@@ -12,7 +12,8 @@ import java.util.regex.*;
  *
  * The catalog knows the gallery page count already. Reader pages therefore use stable logical
  * locators and resolve only the gallery batch that contains the page currently being displayed.
- * This avoids enumerating every /s/ URL before a large gallery can open.
+ * Gallery image pages are requested with their parent gallery as Referer, matching current
+ * E-H clients and normal browser navigation.
  */
 final class EhReaderResolver {
     private static final String ORIGIN="https://e-hentai.org";
@@ -35,8 +36,8 @@ final class EhReaderResolver {
 
     HttpURLConnection openImage(String locator) throws Exception {
         Matcher parsed=LOCATOR.matcher(locator==null?"":locator);if(!parsed.matches())throw new IllegalArgumentException("无效的 E-H 阅读页");
-        int position=Integer.parseInt(parsed.group(1));String comicId=parsed.group(2);String pageUrl=resolvePageUrl(comicId,position);
-        String html=html(pageUrl);String imageRaw=parseImageUrl(html);if(imageRaw.isEmpty())throw new IOException("E-H 图片页没有可读取图片");
+        int position=Integer.parseInt(parsed.group(1));String comicId=parsed.group(2);String galleryReferer=galleryUrl(comicId);String pageUrl=resolvePageUrl(comicId,position);
+        String html=html(pageUrl,galleryReferer);String imageRaw=parseImageUrl(html);if(imageRaw.isEmpty())throw new IOException("E-H 图片页没有可读取图片");
         URL image=safeHttps(new URL(new URL(pageUrl),decodeHtml(imageRaw)).toString());
         HttpURLConnection c=(HttpURLConnection)image.openConnection();c.setConnectTimeout(8000);c.setReadTimeout(20000);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept","image/*");c.setRequestProperty("Referer",pageUrl);c.setRequestProperty("User-Agent",UA);c.setUseCaches(false);return c;
     }
@@ -51,9 +52,11 @@ final class EhReaderResolver {
     }
 
     private void loadGalleryBatch(String comicId,long gid,String token,int galleryPage) throws Exception {
-        if(galleryPage<0)return;String url=ORIGIN+"/g/"+gid+"/"+token+"/?p="+galleryPage;String body=html(url);
+        if(galleryPage<0)return;String gallery=ORIGIN+"/g/"+gid+"/"+token+"/";String url=gallery+"?p="+galleryPage;String body=html(url,gallery);
         Map<Integer,String> links=parsePageLinks(body,ORIGIN,gid);for(Map.Entry<Integer,String> e:links.entrySet())pageUrlCache.putIfAbsent(comicId+"#"+e.getKey(),e.getValue());
     }
+
+    private static String galleryUrl(String comicId){Matcher id=COMIC_ID.matcher(comicId==null?"":comicId);if(!id.matches())throw new IllegalArgumentException("无效的 E-H 画廊标识");return ORIGIN+"/g/"+id.group(1)+"/"+id.group(2).toLowerCase(Locale.ROOT)+"/";}
 
     static Map<Integer,String> parsePageLinks(String html,String origin,long expectedGid) throws Exception {
         LinkedHashMap<Integer,String> out=new LinkedHashMap<>();String decoded=decodeHtml(html==null?"":html);Matcher m=PAGE_LINK.matcher(decoded);URL base=new URL(origin);
@@ -70,9 +73,11 @@ final class EhReaderResolver {
 
     private static String decodeHtml(String s){return s.replace("&amp;","&").replace("&quot;","\"").replace("&#39;","'").replace("&apos;","'").replace("&lt;","<").replace("&gt;",">");}
 
-    private String html(String raw) throws Exception {
+    private String html(String raw,String referer) throws Exception {
         URL url=safeHttps(raw);String host=url.getHost()==null?"":url.getHost().toLowerCase(Locale.ROOT);if(!"e-hentai.org".equals(host))throw new SecurityException("无效的 E-H 页面地址");
-        HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setConnectTimeout(8000);c.setReadTimeout(15000);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept","text/html,*/*;q=0.8");c.setRequestProperty("Cookie","nw=1");c.setRequestProperty("User-Agent",UA);c.setUseCaches(false);
+        HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setConnectTimeout(8000);c.setReadTimeout(15000);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept","text/html,*/*;q=0.8");c.setRequestProperty("Cookie","nw=1");c.setRequestProperty("User-Agent",UA);
+        if(referer!=null&&!referer.isEmpty()){URL r=safeHttps(referer);if(!"e-hentai.org".equalsIgnoreCase(r.getHost()))throw new SecurityException("无效的 E-H Referer");c.setRequestProperty("Referer",r.toString());}
+        c.setUseCaches(false);
         try{int status=c.getResponseCode();URL end=c.getURL();if(status<200||status>=300)throw new IOException("E-H HTTP "+status);if(end==null||!"e-hentai.org".equalsIgnoreCase(end.getHost()))throw new IOException("E-H 页面发生异常跳转");return new String(read(c.getInputStream(),8*1024*1024),StandardCharsets.UTF_8);}finally{c.disconnect();}
     }
 

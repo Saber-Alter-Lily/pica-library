@@ -14,16 +14,17 @@ final class EhReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     EhReaderSource(Context context){this.context=context.getApplicationContext();this.client=new EhClient(this.context);this.resolver=new EhReaderResolver(this.context);}
     public String kind(){return "eh";}
-    public String scope(){return ReaderPolicy.hash("eh-public-v4-shared-session");}
+    public String scope(){return ReaderPolicy.hash("eh-public-v5-mutable-chapters");}
 
     private static String episodeId(String comicId){String[] parts=comicId==null?new String[0]:comicId.split(":",3);return parts.length>=2?"eh-"+parts[1]:"eh-gallery";}
     private EhClient.Episode syntheticEpisode(String comicId,String title){return new EhClient.Episode(episodeId(comicId),title==null||title.isEmpty()?"E-H 画廊":title,1);}
     private BridgeClient.ChapterItem remember(EhClient.Episode episode,int pages){episodes.put(episode.id,episode);BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(episode.id,episode.title,episode.order,Math.max(1,pages));knownChapters.put(item.id,item);return item;}
+    private static List<BridgeClient.ChapterItem> mutableSingle(BridgeClient.ChapterItem item){ArrayList<BridgeClient.ChapterItem> out=new ArrayList<>(1);out.add(item);return out;}
 
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
         episodes.clear();knownChapters.clear();UnifiedCatalogStore.Entry cached=UnifiedCatalogStore.load(context).byId.get(comicId);
-        if(cached!=null&&cached.knownPictures>0){comicTitle=cached.title;author=cached.displayAuthor();EhClient.Episode episode=syntheticEpisode(comicId,cached.title);return Collections.singletonList(remember(episode,cached.knownPictures));}
-        EhClient.Comic comic=client.comic(comicId);comicTitle=comic.title;author=comic.author;UnifiedEhCatalogSync.merge(context,comic);EhClient.Episode episode=syntheticEpisode(comicId,comic.title);return Collections.singletonList(remember(episode,comic.pagesCount));
+        if(cached!=null&&cached.knownPictures>0){comicTitle=cached.title;author=cached.displayAuthor();EhClient.Episode episode=syntheticEpisode(comicId,cached.title);return mutableSingle(remember(episode,cached.knownPictures));}
+        EhClient.Comic comic=client.comic(comicId);comicTitle=comic.title;author=comic.author;UnifiedEhCatalogSync.merge(context,comic);EhClient.Episode episode=syntheticEpisode(comicId,comic.title);return mutableSingle(remember(episode,comic.pagesCount));
     }
 
     public BridgeClient.ChapterData chapter(String comicId,String episodeId) throws Exception {

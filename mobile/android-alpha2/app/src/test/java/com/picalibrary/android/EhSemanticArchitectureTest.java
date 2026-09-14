@@ -7,7 +7,9 @@ import static org.junit.Assert.*;
 public class EhSemanticArchitectureTest {
     @Test public void canonicalTagKeepsNamespace(){EhSemanticStore.Tag tag=new EhSemanticStore.Tag("Female","Big   Breasts");assertEquals("female",tag.namespace);assertEquals("big breasts",tag.value);assertEquals("female:big breasts",tag.canonical);}
 
-    @Test public void chinesePresentationDoesNotChangeCanonicalQuery() throws Exception {EhOnlineFilterSpec spec=new EhOnlineFilterSpec();spec.includeTags.add("female:big breasts");spec.includeTags.add("character:tatsumaki");String q=spec.canonicalQuery();assertTrue(q.contains("female:\"big breasts\""));assertTrue(q.contains("character:\"tatsumaki\""));assertFalse(q.contains("巨乳"));}
+    @Test public void chinesePresentationDoesNotChangeCanonicalQuery() throws Exception {EhOnlineFilterSpec spec=new EhOnlineFilterSpec();spec.includeTags.add("female:big breasts");spec.includeTags.add("character:tatsumaki");String q=spec.canonicalQuery();assertTrue(q.contains("female:\"big breasts$\""));assertTrue(q.contains("character:\"tatsumaki$\""));assertFalse(q.contains("巨乳"));}
+
+    @Test public void languageFilterIsExactCanonicalTag() throws Exception {EhOnlineFilterSpec spec=new EhOnlineFilterSpec();spec.language="chinese";assertTrue(spec.canonicalQuery().contains("language:\"chinese$\""));}
 
     @Test public void categoryMaskUsesEhExcludedCategoriesContract() throws Exception {EhOnlineFilterSpec spec=new EhOnlineFilterSpec();spec.includeCategories=EhOnlineFilterSpec.MANGA|EhOnlineFilterSpec.DOUJINSHI;String url=spec.buildUrl("eh");int expected=(~spec.includeCategories)&EhOnlineFilterSpec.ALL;assertTrue(url.contains("f_cats="+expected));}
 

@@ -23,9 +23,10 @@ describe('source-oriented product navigation', () => {
     expect(script).toContain("$('#recommend-next-batch')?.classList.add('primary')")
   })
 
-  it('uses list dialogs instead of a permanent row of source/account buttons on Android', () => {
+  it('uses list dialogs instead of permanent rows of secondary Android buttons', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
     const account = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhAccountActivity.java', 'utf8')
+    const detail = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java', 'utf8')
     expect(browse).toContain('button("账号与来源"')
     expect(browse).toContain('button("选择来源 ▾"')
     expect(browse).toContain('setSingleChoiceItems(labels,checked')
@@ -47,6 +48,9 @@ describe('source-oriented product navigation', () => {
     expect(account).toContain('Button save=button("保存并验证"')
     expect(account).toContain('compactParams()')
     expect(account).not.toContain('links.addView(button("官方登录页"')
+    expect(detail).toContain('content.addView(sourceDetails,new LinearLayout.LayoutParams(-2,-2))')
+    expect(detail).toContain('rows.add("切换当前网盘 · "+active.label)')
+    expect(detail).not.toContain('content.addView(switchRemote)')
   })
 
   it('keeps Android touch targets while reducing default button chrome', () => {

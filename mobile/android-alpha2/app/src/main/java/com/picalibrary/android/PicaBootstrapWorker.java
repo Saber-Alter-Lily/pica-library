@@ -18,7 +18,7 @@ public final class PicaBootstrapWorker extends Worker {
             setProgressAsync(new Data.Builder().putString(KEY_PHASE,"正在导入 Pica 收藏元数据").build());
             PicaClient client=new PicaClient(app);List<PicaClient.Comic> favorites=client.favoritesAll();
             if(isStopped()||!PicaAccountStore.load(app).configured())return Result.failure();
-            UnifiedPicaCatalogSync.mergeAll(app,favorites);List<BridgeClient.ComicItem> items=new ArrayList<>();for(PicaClient.Comic comic:favorites)items.add(new BridgeClient.ComicItem(comic.id,comic.title,comic.author,"",0));FavoriteCacheStore.save(app,items,false);UnifiedCatalogStore.reconcileLocalReferences(app);NativeRecommendationStore.invalidateIfFavoriteFingerprintChanged(app,favoriteFingerprint(favorites));
+            UnifiedPicaCatalogSync.mergeAll(app,favorites);EhFavoriteStore.captureLegacyEhLocals(app,FavoriteCacheStore.load(app).items);List<BridgeClient.ComicItem> items=new ArrayList<>();for(PicaClient.Comic comic:favorites)items.add(new BridgeClient.ComicItem(comic.id,comic.title,comic.author,"",0));FavoriteCacheStore.save(app,items,false);UnifiedCatalogStore.reconcileLocalReferences(app);NativeRecommendationStore.invalidateIfFavoriteFingerprintChanged(app,favoriteFingerprint(favorites));
             return Result.success(new Data.Builder().putString(KEY_PHASE,"Pica 收藏元数据已导入").putInt(KEY_TOTAL,favorites.size()).build());
         }catch(Exception e){if(isStopped()||!PicaAccountStore.load(getApplicationContext()).configured())return Result.failure();if(getRunAttemptCount()<2)return Result.retry();return Result.failure(new Data.Builder().putString(KEY_PHASE,e.getMessage()==null?"Pica 收藏导入失败":e.getMessage()).build());}
     }

@@ -14,6 +14,9 @@ const fixes=[
   ]
 ]
 for(const [before,after] of fixes){if(!text.includes(before))throw new Error('wrapper anchor not found');text=text.replace(before,after)}
+const marker="console.log('PRODUCT_SOURCE_ARCHITECTURE_PATCH=APPLIED')"
+if(!text.includes(marker))throw new Error('patch completion marker not found')
+text=text.replace(marker,"once('src/providers/eh-provider.ts', '.map(ehMetadataToComic)', \".map((item) => ehMetadataToComic(item, 'eh'))\", 'E-H metadata mapper callback')\n\n"+marker)
 const temp='scripts/dev/.run-product-source-architecture.mjs'
 fs.writeFileSync(temp,text)
 try{await import(pathToFileURL(process.cwd()+'/'+temp).href+'?v='+Date.now())}finally{fs.rmSync(temp,{force:true})}

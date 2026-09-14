@@ -1,12 +1,11 @@
-name: Validate and apply E-H account core
+name: Validate and apply E-H Desktop account UI
 
 on:
   push:
     branches:
       - feature/eh-provider-v1
     paths:
-      - 'scripts/dev/apply-eh-account-core.mjs'
-      - 'scripts/dev/run-eh-account-core.mjs'
+      - 'scripts/dev/apply-eh-desktop-account-ui.mjs'
       - '.github/workflows/eh-dev-apply.yml'
 
 permissions:
@@ -29,22 +28,22 @@ jobs:
           version: '11.16.0'
           run_install: false
       - run: pnpm install --frozen-lockfile
-      - name: Apply E-H account core patch
-        run: node scripts/dev/run-eh-account-core.mjs
-      - name: Validate account core and desktop regression
+      - name: Apply Desktop E-H account UI patch
+        run: node scripts/dev/apply-eh-desktop-account-ui.mjs
+      - name: Validate Desktop account UI and regressions
         run: |
           set -euo pipefail
           pnpm type:check
           pnpm web:check
           pnpm test
           pnpm build
-      - name: Commit validated account core
+      - name: Commit validated Desktop account UI
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/library/database.ts src/services/provider-service.ts src/library/service.ts src/library/server.ts test/unit/eh-account-core.test.ts
+          git add src/desktop/types.ts src/desktop/main.ts web/index.html web/eh-account.js test/unit/eh-desktop-account-ui.test.ts
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
-          git commit -m 'feat: add E-H account core and favorite aggregation'
+          git commit -m 'feat: add encrypted E-H account controls on Desktop'
           git push origin HEAD:feature/eh-provider-v1

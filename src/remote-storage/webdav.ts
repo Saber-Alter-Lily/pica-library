@@ -402,7 +402,7 @@ export class WebDavStorageProvider implements RemoteStorageProvider {
         const object = await this.get(path)
         if (!object) return { value: null, exists: false }
         return {
-            value: JSON.parse(value.data.toString('utf8')) as T,
+            value: JSON.parse(object.data.toString('utf8')) as T,
             exists: true,
             etag: object.etag,
             lastModified: object.lastModified

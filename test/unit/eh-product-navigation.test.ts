@@ -14,12 +14,14 @@ describe('source-oriented product navigation', () => {
     expect(html).not.toContain('<button data-online-source="exh"')
   })
 
-  it('progressively discloses Desktop filters, account actions and batch actions', () => {
+  it('progressively discloses Desktop filters, account, batch and card actions', () => {
     const script = fs.readFileSync('web/eh-account.js', 'utf8')
     expect(script).toContain("summary.textContent = '筛选 ▾'")
     expect(script).toContain("disclosure('官方账号 ▾'")
     expect(script).toContain("disclosure('账号功能 ▾'")
     expect(script).toContain("disclosure('批量操作 ▾'")
+    expect(script).toContain("disclosure('更多 ▾', [download, favorite], 'result-action-menu')")
+    expect(script).toContain('observeResultCardActions()')
     expect(script).toContain("$('#recommend-next-batch')?.classList.add('primary')")
   })
 

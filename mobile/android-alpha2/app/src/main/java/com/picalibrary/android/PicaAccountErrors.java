@@ -2,10 +2,13 @@ package com.picalibrary.android;
 
 import java.io.IOException;
 import java.util.Locale;
-import org.json.JSONObject;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Allowlisted account diagnostics. Provider response bodies and headers are never surfaced directly. */
 final class PicaAccountErrors {
+    private static final Pattern SAFE_JSON_STRING=Pattern.compile("\\\"(?:message|error|detail|field)\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"\\\\])*)\\\"",Pattern.CASE_INSENSITIVE);
+
     static final class RegistrationException extends IOException {
         final String field,userMessage;
         final boolean retrySafe;
@@ -60,12 +63,21 @@ final class PicaAccountErrors {
 
     private static String extractDiagnostic(String text){
         if(text==null||text.trim().isEmpty())return "";
-        try{
-            JSONObject root=new JSONObject(text);StringBuilder out=new StringBuilder();
-            append(out,root.optString("message",""));append(out,root.optString("error",""));append(out,root.optString("detail",""));
-            Object data=root.opt("data");if(data instanceof JSONObject){JSONObject o=(JSONObject)data;append(out,o.optString("message",""));append(out,o.optString("error",""));append(out,o.optString("field",""));}
-            return out.toString();
-        }catch(Exception ignored){return "";}
+        StringBuilder out=new StringBuilder();Matcher matcher=SAFE_JSON_STRING.matcher(text);
+        while(matcher.find())append(out,unescapeJsonString(matcher.group(1)));
+        return out.toString();
+    }
+    private static String unescapeJsonString(String value){
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<value.length();i++){
+            char c=value.charAt(i);if(c!='\\'||i+1>=value.length()){out.append(c);continue;}
+            char n=value.charAt(++i);
+            if(n=='u'&&i+4<value.length()){
+                String hex=value.substring(i+1,i+5);try{out.append((char)Integer.parseInt(hex,16));i+=4;continue;}catch(NumberFormatException ignored){out.append('\\').append(n);continue;}
+            }
+            switch(n){case '\"':out.append('\"');break;case '\\':out.append('\\');break;case '/':out.append('/');break;case 'b':out.append(' ');break;case 'f':out.append(' ');break;case 'n':out.append(' ');break;case 'r':out.append(' ');break;case 't':out.append(' ');break;default:out.append(n);}
+        }
+        return out.toString();
     }
     private static boolean matchesStandaloneName(String value){return value.matches("(?s).*(?:^|[^a-z])name(?:[^a-z]|$).*");}
     private static void append(StringBuilder out,String value){if(value==null||value.trim().isEmpty())return;if(out.length()>0)out.append(' ');out.append(value.trim());}

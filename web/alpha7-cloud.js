@@ -95,9 +95,11 @@ function ensureTargetUi() {
     targetSelect.addEventListener('change', () => {
         selectedTargetId = targetSelect.value
         creatingTarget = false
-        fillTarget(remoteState.targets.find((item) => item.id === selectedTargetId))
+        const target = remoteState.targets.find((item) => item.id === selectedTargetId)
+        if (target) fillTarget(target)
+        else clearTargetEditor()
         $('#remote-sync-plan').hidden = true
-        message('')
+        message(selectedTargetId ? '' : '请选择本次扫描/上传使用的目标网盘。')
     })
     vendor.addEventListener('change', () => applyPreset(true))
     create.addEventListener('click', () => beginNewTarget())
@@ -127,7 +129,14 @@ function renderTargetOptions() {
         option.value = ''
         option.textContent = '尚未配置'
         select.append(option)
+        selectedTargetId = ''
         return
+    }
+    if (remoteState.targets.length > 1) {
+        const placeholder = document.createElement('option')
+        placeholder.value = ''
+        placeholder.textContent = '请选择目标网盘…'
+        select.append(placeholder)
     }
     for (const target of remoteState.targets) {
         const option = document.createElement('option')
@@ -136,7 +145,7 @@ function renderTargetOptions() {
         select.append(option)
     }
     if (!remoteState.targets.some((item) => item.id === selectedTargetId))
-        selectedTargetId = remoteState.targets[0].id
+        selectedTargetId = remoteState.targets.length === 1 ? remoteState.targets[0].id : ''
     select.value = selectedTargetId
 }
 
@@ -174,10 +183,7 @@ function fillTarget(target) {
     applyPreset(false)
 }
 
-function beginNewTarget() {
-    creatingTarget = true
-    selectedTargetId = ''
-    $('#remote-target-select').value = ''
+function clearTargetEditor() {
     $('#remote-label').value = ''
     $('#remote-vendor').value = 'generic'
     $('#remote-webdav-url').value = ''
@@ -185,6 +191,13 @@ function beginNewTarget() {
     $('#remote-username').value = ''
     $('#remote-password').value = ''
     applyPreset(false)
+}
+
+function beginNewTarget() {
+    creatingTarget = true
+    selectedTargetId = ''
+    $('#remote-target-select').value = ''
+    clearTargetEditor()
     $('#remote-sync-plan').hidden = true
     message('正在新增网盘配置。填写后先“测试连接”，确认无误再保存。')
 }
@@ -208,7 +221,7 @@ function editableForm(action) {
 
 function savedTargetRequest(action) {
     if (creatingTarget || !selectedTargetId)
-        throw new Error('请先保存当前网盘配置，再执行扫描或上传')
+        throw new Error('请先选择并保存本次操作使用的网盘配置')
     return { remoteStorageAction: action, remoteTargetId: selectedTargetId }
 }
 
@@ -290,13 +303,17 @@ async function load(preferredTargetId = '') {
         renderTargetOptions()
         if (remoteState.targets.length) {
             creatingTarget = false
-            fillTarget(remoteState.targets.find((item) => item.id === selectedTargetId))
+            const target = remoteState.targets.find((item) => item.id === selectedTargetId)
+            if (target) fillTarget(target)
+            else clearTargetEditor()
         } else {
             beginNewTarget()
         }
         $('#remote-storage-state').textContent = remoteState.targets.length
             ? `已配置 ${remoteState.targets.length} 个网盘 · 上传前请选择目标网盘`
             : '尚未配置远程存储'
+        if (remoteState.targets.length > 1 && !selectedTargetId)
+            message('已配置多个网盘，请先选择本次扫描/上传使用的目标网盘。')
         renderProgress(remoteState.syncProgress)
     } catch (error) { message(`无法读取远程存储状态：${error.message}`, true) }
 }

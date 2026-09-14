@@ -52,6 +52,7 @@ jobs:
               (r'-\d+', r'-\\d+'),
               (r'(?:\?|&amp;|&)next=(\d+)', r'(?:\\?|&amp;|&)next=(\\d+)'),
               (r'/\d+-\d+$', r'/\\d+-\\d+$'),
+              (r'/\d+-\\d+$', r'/\\d+-\\d+$'),
           ]
           for before, after in replacements:
               if before in text:

@@ -70,11 +70,17 @@ describe('source-oriented product navigation', () => {
     expect(session).toContain('"官网登录"')
   })
 
-  it('splits Online and Settings out of the Home shell and keeps Settings list-based', () => {
+  it('splits Online and Settings out of Home while sharing one top-level bottom navigator', () => {
     const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java', 'utf8')
+    const online = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
     const settings = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsActivity.java', 'utf8')
-    expect(home).toContain('if(tab==2){startActivity(new Intent(this,PicaBrowseActivity.class));return;}')
-    expect(home).toContain('if(tab==3){startActivity(new Intent(this,SettingsActivity.class));return;}')
+    const nav = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ShellNavigation.java', 'utf8')
+    expect(home).toContain('ShellNavigation.build(this,current)')
+    expect(online).toContain('ShellNavigation.build(this,2)')
+    expect(settings).toContain('ShellNavigation.build(this,3)')
+    expect(nav).toContain('HomeActivity.class')
+    expect(nav).toContain('PicaBrowseActivity.class')
+    expect(nav).toContain('SettingsActivity.class')
     expect(home).not.toContain('private void connections()')
     expect(home).not.toContain('private void online()')
     for (const row of ['账号与来源','连接电脑','存储与下载','个性化','数据与缓存','软件更新','关于']) expect(settings).toContain(`"${row}"`)

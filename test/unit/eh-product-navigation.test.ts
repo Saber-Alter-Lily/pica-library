@@ -70,6 +70,18 @@ describe('source-oriented product navigation', () => {
     expect(session).toContain('"官网登录"')
   })
 
+  it('splits Online and Settings out of the Home shell and keeps Settings list-based', () => {
+    const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java', 'utf8')
+    const settings = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsActivity.java', 'utf8')
+    expect(home).toContain('if(tab==2){startActivity(new Intent(this,PicaBrowseActivity.class));return;}')
+    expect(home).toContain('if(tab==3){startActivity(new Intent(this,SettingsActivity.class));return;}')
+    expect(home).not.toContain('private void connections()')
+    expect(home).not.toContain('private void online()')
+    for (const row of ['账号与来源','连接电脑','存储与下载','个性化','数据与缓存','软件更新','关于']) expect(settings).toContain(`"${row}"`)
+    expect(settings).not.toContain('Ui.card(')
+    expect(settings).not.toContain('感谢你使用')
+  })
+
   it('keeps Android secondary actions collapsed and settings named as a top-level destination', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
     const detail = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java', 'utf8')

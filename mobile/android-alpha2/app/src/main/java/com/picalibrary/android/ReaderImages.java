@@ -71,7 +71,7 @@ final class ReaderImages implements AutoCloseable {
         File partial=File.createTempFile("page-",".part",cache);
         try{
             HttpURLConnection connection=source.image(path);request.connection=connection;
-            try{if(request.cancelled||closed)throw new IOException("cancelled");int status=connection.getResponseCode();if(status!=200)throw new IOException("HTTP "+status);String type=connection.getContentType();if(type!=null&&!type.toLowerCase(Locale.ROOT).startsWith("image/")&&source instanceof EhReaderSource)throw new IOException("图片节点返回 "+type.split(";",2)[0]);try(InputStream in=connection.getInputStream();OutputStream out=new FileOutputStream(partial)){copy(in,out,request);}return partial;}
+            try{if(request.cancelled||closed)throw new IOException("cancelled");int status=connection.getResponseCode();if(status!=200)throw new IOException("HTTP "+status);try(InputStream in=connection.getInputStream();OutputStream out=new FileOutputStream(partial)){copy(in,out,request);}return partial;}
             finally{connection.disconnect();request.connection=null;}
         }catch(Exception e){partial.delete();throw e;}
     }
@@ -100,7 +100,6 @@ final class ReaderImages implements AutoCloseable {
         if(value.contains("HTTP 429"))return "请求过于频繁";
         if(value.contains("第 ")&&value.contains("页定位失败"))return value;
         if(value.contains("图片页没有可读取图片"))return "图片页解析失败";
-        if(value.contains("图片节点返回 "))return value;
         if(value.contains("异常跳转"))return "E-H 页面发生异常跳转";
         if(lower.contains("timed out")||lower.contains("timeout"))return "网络请求超时";
         if(lower.contains("unknownhost")||lower.contains("unable to resolve host"))return "无法解析图片服务器";

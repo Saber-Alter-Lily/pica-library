@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import pLimit from 'p-limit'
 import { Pica } from '../sdk'
+import { EhProvider, type EhSession } from '../providers/eh-provider'
 import type { ProviderId } from '../providers/types'
 import type { Comic, Picture } from '../types'
 import { LibraryDatabase } from './database'
@@ -163,6 +164,7 @@ function sortCode(pica: Pica, sort: SortMode | undefined) {
 
 export class LibraryService {
     private pica: Pica | null = null
+    private readonly ehProvider: EhProvider
     private acceptingLocalDownloads = true
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
@@ -178,9 +180,11 @@ export class LibraryService {
     constructor(
         readonly database: LibraryDatabase,
         readonly dataDir: string,
-        provider?: Pica
+        provider?: Pica,
+        ehProvider?: EhProvider
     ) {
         this.pica = provider ?? null
+        this.ehProvider = ehProvider ?? new EhProvider()
         fs.mkdirSync(dataDir, { recursive: true })
     }
 
@@ -197,6 +201,34 @@ export class LibraryService {
         await pica.login(account, password)
         this.pica = pica
         return pica
+    }
+
+    providerService() {
+        return new ProviderService(
+            () => this.connect(),
+            this.database,
+            this.ehProvider
+        )
+    }
+
+    setEhSession(session?: EhSession | null) {
+        this.ehProvider.setSession(session)
+    }
+
+    ehAccountStatus() {
+        return this.providerService().ehAccountStatus()
+    }
+
+    verifyEhAccount() {
+        return this.providerService().verifyEhAccount()
+    }
+
+    probeExHentai() {
+        return this.providerService().probeExHentai()
+    }
+
+    syncEhFavorites() {
+        return this.providerService().syncEhFavorites()
     }
 
     async cover(comicId: string) {
@@ -222,10 +254,7 @@ export class LibraryService {
             // A partial or stale cache entry is safely replaced below.
         }
 
-        const providerService = new ProviderService(
-            () => this.connect(),
-            this.database
-        )
+        const providerService = this.providerService()
         const image = await providerService.fetchCover(comicId, comic.coverUrl)
         await fs.promises.mkdir(cacheDir, { recursive: true })
         const imagePartial = `${imageFile}.part`
@@ -243,10 +272,7 @@ export class LibraryService {
     async buildFinalRecommendationCycleV3(cycleId: string) {
         this.recommendationProgress = { state: 'running', phase: 'profile', done: 0, total: 6 }
         const pica = await this.connect()
-        const providerService = new ProviderService(
-            () => this.connect(),
-            this.database
-        )
+        const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
         const favorites = catalog.filter((comic) => comic.isFavorite)
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
@@ -504,10 +530,7 @@ export class LibraryService {
     async syncFavorites(mode: FavoritesSyncMode = 'quick') {
         this.favoritesProgress = { phase: 'reading' }
         try {
-            const provider = new ProviderService(
-                () => this.connect(),
-                this.database
-            )
+            const provider = this.providerService()
             const result = await provider.syncFavorites(mode, (progress) => {
                 this.favoritesProgress = {
                     ...progress
@@ -556,10 +579,7 @@ export class LibraryService {
     }
 
     async discover(query: DiscoverQuery) {
-        const providerService = new ProviderService(
-            () => this.connect(),
-            this.database
-        )
+        const providerService = this.providerService()
         const tags = (query.tags ?? []).map(normalizeAuthorKey)
         const categories = (query.categories ?? []).map(normalizeAuthorKey)
         let records = await providerService.search(
@@ -1068,10 +1088,7 @@ export class LibraryService {
     }
 
     async checkUpdates(comicIds?: string[]) {
-        const providerService = new ProviderService(
-            () => this.connect(),
-            this.database
-        )
+        const providerService = this.providerService()
         const ids = comicIds?.length
             ? comicIds
             : this.database
@@ -1438,10 +1455,7 @@ export class LibraryService {
     ): Promise<DownloadResult> {
         if (!comicId.startsWith('eh:'))
             return this.downloadPicaComicNow(comicId, options)
-        const providerService = new ProviderService(
-            () => this.connect(),
-            this.database
-        )
+        const providerService = this.providerService()
         const comic = await providerService.getComicDetails(comicId)
         if (
             comic.providerId === 'pica' &&

@@ -838,10 +838,10 @@ export class LibraryDatabase {
         try {
             this.db.exec('BEGIN IMMEDIATE')
             if (completeSnapshot && markFavorite) {
-                this.db.exec('UPDATE comics SET is_favorite = 0')
                 this.db.exec(
                     "DELETE FROM library_membership WHERE reason = 'pica-favorite'"
                 )
+                this.recomputeFavoriteState()
             }
             for (const record of uniqueRecords) {
                 const existed = Boolean(
@@ -1372,54 +1372,121 @@ export class LibraryDatabase {
         return this.listComics({ comicId, limit: 1 })[0]
     }
 
-    setFavoriteState(comicId: string, isFavorite: boolean) {
-        const result = this.db
-            .prepare(
-                'UPDATE comics SET is_favorite = ?, last_seen_at = ? WHERE id = ?'
+    private recomputeFavoriteState(comicId?: string) {
+        const favoriteReasons = "'pica-favorite','eh-favorite','local-favorite'"
+        if (comicId)
+            this.db
+                .prepare(
+                    `UPDATE comics SET is_favorite = CASE WHEN EXISTS(
+                        SELECT 1 FROM library_membership lm
+                        WHERE lm.comic_id = comics.id
+                          AND lm.reason IN (${favoriteReasons})
+                    ) THEN 1 ELSE 0 END,
+                    last_seen_at = ? WHERE id = ?`
+                )
+                .run(new Date().toISOString(), comicId)
+        else
+            this.db.exec(
+                `UPDATE comics SET is_favorite = CASE WHEN EXISTS(
+                    SELECT 1 FROM library_membership lm
+                    WHERE lm.comic_id = comics.id
+                      AND lm.reason IN (${favoriteReasons})
+                ) THEN 1 ELSE 0 END`
             )
-            .run(isFavorite ? 1 : 0, new Date().toISOString(), comicId)
-        if (result.changes !== 1) throw new Error(`Comic not found: ${comicId}`)
+    }
+
+    private setFavoriteMembershipState(
+        comicId: string,
+        reason: 'pica-favorite' | 'eh-favorite' | 'local-favorite',
+        isFavorite: boolean
+    ) {
+        const exists = this.db
+            .prepare('SELECT 1 AS found FROM comics WHERE id = ?')
+            .get(comicId) as SqlRow | undefined
+        if (!exists) throw new Error(`Comic not found: ${comicId}`)
         const now = new Date().toISOString()
         if (isFavorite)
             this.db
                 .prepare(
                     `INSERT INTO library_membership(comic_id, reason, created_at, updated_at)
-                     VALUES (?, 'pica-favorite', ?, ?)
+                     VALUES (?, ?, ?, ?)
                      ON CONFLICT(comic_id, reason) DO UPDATE SET updated_at = excluded.updated_at`
                 )
-                .run(comicId, now, now)
+                .run(comicId, reason, now, now)
         else
             this.db
                 .prepare(
-                    "DELETE FROM library_membership WHERE comic_id = ? AND reason = 'pica-favorite'"
+                    'DELETE FROM library_membership WHERE comic_id = ? AND reason = ?'
                 )
-                .run(comicId)
+                .run(comicId, reason)
+        this.recomputeFavoriteState(comicId)
         return this.getComic(comicId)
     }
 
+    hasFavoriteMembership(
+        comicId: string,
+        reason: 'pica-favorite' | 'eh-favorite' | 'local-favorite'
+    ) {
+        return Boolean(
+            this.db
+                .prepare(
+                    'SELECT 1 AS found FROM library_membership WHERE comic_id = ? AND reason = ?'
+                )
+                .get(comicId, reason) as SqlRow | undefined
+        )
+    }
+
+    setFavoriteState(comicId: string, isFavorite: boolean) {
+        return this.setFavoriteMembershipState(
+            comicId,
+            'pica-favorite',
+            isFavorite
+        )
+    }
+
     setLocalFavoriteState(comicId: string, isFavorite: boolean) {
-        const result = this.db
-            .prepare(
-                'UPDATE comics SET is_favorite = ?, last_seen_at = ? WHERE id = ?'
-            )
-            .run(isFavorite ? 1 : 0, new Date().toISOString(), comicId)
-        if (result.changes !== 1) throw new Error(`Comic not found: ${comicId}`)
+        return this.setFavoriteMembershipState(
+            comicId,
+            'local-favorite',
+            isFavorite
+        )
+    }
+
+    setEhFavoriteState(comicId: string, isFavorite: boolean) {
+        return this.setFavoriteMembershipState(
+            comicId,
+            'eh-favorite',
+            isFavorite
+        )
+    }
+
+    syncEhFavorites(records: FavoriteRecord[]) {
+        const imported = this.importCatalog(records, 'eh:favorites')
         const now = new Date().toISOString()
-        if (isFavorite)
-            this.db
-                .prepare(
-                    `INSERT INTO library_membership(comic_id, reason, created_at, updated_at)
-                     VALUES (?, 'local-favorite', ?, ?)
-                     ON CONFLICT(comic_id, reason) DO UPDATE SET updated_at = excluded.updated_at`
-                )
-                .run(comicId, now, now)
-        else
-            this.db
-                .prepare(
-                    "DELETE FROM library_membership WHERE comic_id = ? AND reason = 'local-favorite'"
-                )
-                .run(comicId)
-        return this.getComic(comicId)
+        const uniqueIds = [
+            ...new Set(
+                records
+                    .map((record) => record.comicId?.trim())
+                    .filter((value): value is string => Boolean(value))
+            )
+        ]
+        this.db.exec('BEGIN IMMEDIATE')
+        try {
+            this.db.exec(
+                "DELETE FROM library_membership WHERE reason = 'eh-favorite'"
+            )
+            const insert = this.db.prepare(
+                `INSERT INTO library_membership(comic_id, reason, created_at, updated_at)
+                 VALUES (?, 'eh-favorite', ?, ?)`
+            )
+            for (const comicId of uniqueIds) insert.run(comicId, now, now)
+            this.recomputeFavoriteState()
+            this.db.exec('COMMIT')
+        } catch (error) {
+            this.db.exec('ROLLBACK')
+            throw error
+        }
+        return { ...imported, remoteFavoriteCount: uniqueIds.length }
     }
 
     favoriteIds() {

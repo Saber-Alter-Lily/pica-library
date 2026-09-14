@@ -3,7 +3,11 @@ import type { Pica } from '../sdk'
 import type { Comic, Episode, Picture } from '../types'
 import type { FavoriteRecord } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
-import { EhProvider } from '../providers/eh-provider'
+import {
+    EhProvider,
+    type EhSession,
+    type ExHentaiCapability
+} from '../providers/eh-provider'
 import { PicaProvider, picaComic } from '../providers/pica-provider'
 import {
     providerComicToRecord,
@@ -73,6 +77,28 @@ export class ProviderService {
 
     providerStatus() {
         return this.capabilities.providers
+    }
+
+    setEhSession(session?: EhSession | null) {
+        this.ehProvider.setSession(session)
+    }
+
+    ehAccountStatus() {
+        return { configured: this.ehProvider.hasSession() }
+    }
+
+    verifyEhAccount() {
+        return this.ehProvider.verifyAccount()
+    }
+
+    probeExHentai(): Promise<ExHentaiCapability> {
+        return this.ehProvider.probeExHentai()
+    }
+
+    async syncEhFavorites() {
+        const comics = await this.ehProvider.favoritesAll()
+        const records = comics.map(providerComicToRecord)
+        return this.database.syncEhFavorites(records)
     }
 
     async syncFavorites(
@@ -295,10 +321,45 @@ export class ProviderService {
         if (comicId.startsWith('eh:')) {
             const before = this.database.getComic(comicId)
             if (!before) throw new Error('E-H 漫画尚未加入本地目录')
-            if (before.isFavorite === desired)
-                return { changed: false, isFavorite: desired, already: true, remote: false }
-            this.database.setLocalFavoriteState(comicId, desired)
-            return { changed: true, isFavorite: desired, already: false, remote: false }
+            if (this.ehProvider.hasSession()) {
+                const beforeRemote = this.database.hasFavoriteMembership(
+                    comicId,
+                    'eh-favorite'
+                )
+                if (beforeRemote === desired)
+                    return {
+                        changed: false,
+                        isFavorite: before.isFavorite,
+                        already: true,
+                        remote: true
+                    }
+                await this.ehProvider.setRemoteFavorite(comicId, desired)
+                const after = this.database.setEhFavoriteState(comicId, desired)
+                return {
+                    changed: true,
+                    isFavorite: Boolean(after?.isFavorite),
+                    already: false,
+                    remote: true
+                }
+            }
+            const beforeLocal = this.database.hasFavoriteMembership(
+                comicId,
+                'local-favorite'
+            )
+            if (beforeLocal === desired)
+                return {
+                    changed: false,
+                    isFavorite: before.isFavorite,
+                    already: true,
+                    remote: false
+                }
+            const after = this.database.setLocalFavoriteState(comicId, desired)
+            return {
+                changed: true,
+                isFavorite: Boolean(after?.isFavorite),
+                already: false,
+                remote: false
+            }
         }
         const provider = await this.connect()
         const before = await provider.comicInfo(comicId)

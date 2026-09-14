@@ -217,10 +217,7 @@ export async function startLibraryServer(options: {
     const root = webRoot()
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
-    const providerService = new ProviderService(
-        () => options.service.connect(),
-        options.database
-    )
+    const providerService = options.service.providerService()
     const libraryQueries = new LibraryQueryService(options.database)
     const shelfService = new ShelfService(options.database, libraryQueries)
     const recommendationService = new RecommendationService(

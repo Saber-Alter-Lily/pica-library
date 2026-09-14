@@ -16,7 +16,10 @@ final class UnifiedPicaCatalogSync {
 
     private static UnifiedCatalogStore.Entry apply(UnifiedCatalogStore.Snapshot snapshot,PicaClient.Comic comic){
         UnifiedCatalogStore.Entry entry=snapshot.byId.get(comic.id);if(entry==null){entry=new UnifiedCatalogStore.Entry(comic.id,comic.title,comic.author);snapshot.byId.put(comic.id,entry);}
+        entry.providerId="pica";entry.providerRemoteId=comic.id;entry.completionStatus=comic.finished?"FINISHED":"ONGOING";
         if(!comic.title.isEmpty())entry.title=comic.title;if(!comic.author.isEmpty())entry.author=comic.author;
+        entry.description=comic.description==null?"":comic.description;entry.chineseTeam=comic.chineseTeam==null?"":comic.chineseTeam;
+        entry.totalLikes=Math.max(0,comic.totalLikes);entry.totalViews=Math.max(0,comic.totalViews);
         if(!comic.coverUrl.isEmpty())entry.picaCoverUrl=comic.coverUrl;
         if(!comic.tags.isEmpty()){entry.tags.clear();entry.tags.addAll(comic.tags);}if(!comic.categories.isEmpty()){entry.categories.clear();entry.categories.addAll(comic.categories);}
         entry.finished=comic.finished;entry.knownPictures=Math.max(entry.knownPictures,comic.pagesCount);entry.picaAvailable=true;

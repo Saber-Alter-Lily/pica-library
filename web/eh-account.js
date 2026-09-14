@@ -77,6 +77,36 @@ function compactBatchActions() {
     $('#recommend-next-batch')?.classList.add('primary')
 }
 
+function compactResultCardActions(root = document) {
+    const actionRows = root.matches?.('.detail-actions')
+        ? [root]
+        : [...(root.querySelectorAll?.('.detail-actions') || [])]
+    for (const actions of actionRows) {
+        if (actions.dataset.compactActions === 'true') continue
+        const detail = actions.querySelector('[data-result-detail]')
+        const download = actions.querySelector('[data-result-download]')
+        const favorite = actions.querySelector('[data-result-favorite]')
+        if (!detail || (!download && !favorite)) continue
+        detail.classList.add('primary')
+        actions.append(disclosure('更多 ▾', [download, favorite], 'result-action-menu'))
+        actions.dataset.compactActions = 'true'
+    }
+}
+
+function observeResultCardActions() {
+    const roots = ['#search-results', '#recommend-results']
+        .map((selector) => $(selector))
+        .filter(Boolean)
+    for (const root of roots) compactResultCardActions(root)
+    if (!roots.length || typeof MutationObserver === 'undefined') return
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations)
+            for (const node of mutation.addedNodes)
+                if (node instanceof Element) compactResultCardActions(node)
+    })
+    for (const root of roots) observer.observe(root, { childList: true, subtree: true })
+}
+
 async function status() {
     const response = await fetch('/api/v1/desktop/status', { cache: 'no-store' })
     if (!response.ok) throw new Error('Desktop status unavailable')
@@ -121,6 +151,7 @@ function clearInputs() {
 compactEhAccountActions()
 compactOnlineToolbar()
 compactBatchActions()
+observeResultCardActions()
 
 $('#eh-account-save')?.addEventListener('click', async () => {
     const message = $('#eh-account-message')

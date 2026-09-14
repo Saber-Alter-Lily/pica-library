@@ -16,22 +16,25 @@ describe('Alpha8.10 release readiness baseline', () => {
         expect(windows).toContain('Pica-Library-v0.3.9-windows-x64.zip')
     })
 
-    it('removes teaser microcopy and redundant release helper copy', () => {
+    it('removes teaser microcopy and keeps normal settings/personalization screens quiet', () => {
         const product = fs.readFileSync('web/alpha8-product.js', 'utf8')
         const hub = fs.readFileSync('web/alpha8-7-desktop-hub.js', 'utf8')
         const star = fs.readFileSync('web/alpha8-star-access.js', 'utf8')
         const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java', 'utf8')
+        const settings = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsActivity.java', 'utf8')
         const appearance = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AppearanceActivity.java', 'utf8')
         const themes = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java', 'utf8')
 
-        for (const source of [product, home]) expect(source).not.toContain('GitHub 收藏项目有小惊喜')
+        for (const source of [product, home, settings]) expect(source).not.toContain('GitHub 收藏项目有小惊喜')
         expect(product).not.toContain('基础明暗模式永久免费')
         expect(product).not.toContain('<p class="eyebrow">支持者功能</p>')
         expect(star).not.toContain('<p class="eyebrow">GitHub Account</p>')
         expect(hub).not.toContain('账号、连接、外观、存储、维护和软件更新统一在这里管理。')
         expect(appearance).not.toContain('不会再通过公开用户名直接验证')
         expect(themes).not.toContain('不再通过公开用户名判断 Star')
-        expect(home).toContain('感谢你使用 Pica Library。')
+        expect(home).not.toContain('感谢你使用 Pica Library。')
+        expect(settings).not.toContain('感谢你使用 Pica Library。')
+        expect(appearance).not.toContain('验证 GitHub Star 后解锁')
     })
 
     it('requires authenticated GitHub account proof before Desktop themes unlock', () => {

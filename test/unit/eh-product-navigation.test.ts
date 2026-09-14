@@ -25,6 +25,15 @@ describe('source-oriented product navigation', () => {
     expect(script).toContain("$('#recommend-next-batch')?.classList.add('primary')")
   })
 
+  it('routes the real Android Home online tab into unified discovery', () => {
+    const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java', 'utf8')
+    expect(home).toContain('if(tab==2){startActivity(new Intent(this,PicaBrowseActivity.class));return;}')
+    expect(home).toContain('else if(current==2)onlineEntry()')
+    expect(home).toContain('titleRow(p,"在线发现"')
+    expect(home).toContain('"Pica / E-H / ExH"')
+    expect(home).toContain('"E-H 公共搜索、阅读和下载不要求 Pica 登录。"')
+  })
+
   it('uses list dialogs instead of permanent rows of secondary Android buttons', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
     const account = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhAccountActivity.java', 'utf8')

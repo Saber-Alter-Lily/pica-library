@@ -9,7 +9,7 @@
         android:roundIcon="@drawable/pica_launcher"
         android:name=".PicaLibraryApp"
         android:allowBackup="true"
-        android:label="Pica Library"
+        android:label="${appLabel}"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.files" android:exported="false" android:grantUriPermissions="true">
@@ -37,7 +37,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="picalibrary" android:host="pair" />
+                <data android:scheme="${pairScheme}" android:host="pair" />
             </intent-filter>
         </activity>
         <activity android:name=".DisclaimerActivity" android:exported="true">

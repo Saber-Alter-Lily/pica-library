@@ -110,9 +110,18 @@ export class RemoteStorageDesktopManager {
         const requestedId = String(
             input.remoteTargetId ?? value.id ?? value.targetId ?? ''
         ).trim()
-        const existing = requestedId
+        const createNew = input.createNewTarget === true
+        let existing = requestedId
             ? this.registry.targets.find((item) => item.id === requestedId)
             : undefined
+        if (requestedId && !existing)
+            throw new Error('所选网盘配置不存在，请刷新后重试')
+        if (!requestedId && !createNew) {
+            if (this.registry.targets.length === 1)
+                existing = this.registry.targets[0]
+            else if (this.registry.targets.length > 1)
+                throw new Error('已配置多个网盘，请先选择要编辑的网盘')
+        }
         const stored = existing ? this.targetCredentials(existing.id) : {}
         const suppliedUsername = value.username
         const suppliedPassword = value.password

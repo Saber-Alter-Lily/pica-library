@@ -1013,12 +1013,41 @@ function renderAuthors() {
     }
 }
 
+function providerIdForComic(comic) {
+    return comic?.providerId ||
+        (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : 'pica')
+}
+
+function providerLabelForComic(comic) {
+    return providerIdForComic(comic) === 'eh' ? 'E-H' : 'Pica'
+}
+
+function providerPopularityForComic(comic) {
+    if (providerIdForComic(comic) === 'eh') {
+        const rating = Number(comic?.rating)
+        return Number.isFinite(rating) && rating > 0
+            ? `★ ${rating.toFixed(2)}`
+            : t('provider.publicMetadata')
+    }
+    return t('message.popularity', {
+        likes: Number(comic?.totalLikes || 0).toLocaleString(),
+        views: Number(comic?.totalViews || 0).toLocaleString()
+    })
+}
+
+function providerFavoriteLabel(comic) {
+    return providerIdForComic(comic) === 'eh' ? t('provider.localFavorite') : t('result.favorite')
+}
+
 function renderResultCards(records, target, recommendation = false) {
     const tagFrequencies = buildTagFrequencyIndex(state.records)
     const context = recommendation ? 'recommendation' : 'search'
     $(target).innerHTML = (records || [])
         .map((item, rank) => {
             const comic = item.comic || item
+            const providerMeta = recommendation
+                ? providerLabelForComic(comic)
+                : providerLabelForComic(comic) + ' · ' + providerPopularityForComic(comic)
             return `<article class="result" data-comic-id="${escapeHtml(comic.comicId)}" data-result-rank="${rank}">
                 <div class="cover-shell">
                     ${state.coversEnabled && (state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl)) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement?.classList.add('cover-missing');this.remove()" />` : ''}
@@ -1030,8 +1059,8 @@ function renderResultCards(records, target, recommendation = false) {
                 <div>${selectDisplayTags(comic, tagFrequencies)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</div>
-                ${recommendation ? '' : `<p>${t('message.popularity', { likes: Number(comic.totalLikes || 0).toLocaleString(), views: Number(comic.totalViews || 0).toLocaleString() })}</p>`}
-                <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">${t('result.details')}</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">${t('result.favorite')}</button>` : ''}</div>
+                <p class="comic-meta">${escapeHtml(providerMeta)}</p>
+                <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">${t('result.details')}</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">${escapeHtml(providerFavoriteLabel(comic))}</button>` : ''}</div>
                 </div>
             </article>`
         })

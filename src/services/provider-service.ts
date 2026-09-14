@@ -227,7 +227,8 @@ export class ProviderService {
 
     async search(
         input: string | SearchRequest,
-        providers: ProviderId[] = ['pica']
+        providers: ProviderId[] = ['pica'],
+        provenance: 'discover' | 'recommendations' = 'discover'
     ) {
         const request: SearchRequest =
             typeof input === 'string' ? { keyword: input, limit: 100 } : input
@@ -238,7 +239,7 @@ export class ProviderService {
                     providerId === 'eh' ? this.ehProvider : this.picaProvider
                 const comics = await provider.search(request)
                 const records = comics.map(providerComicToRecord)
-                this.database.importCatalog(records, `${providerId}:discover`)
+                this.database.importCatalog(records, `${providerId}:${provenance}`)
                 return records
             })
         )

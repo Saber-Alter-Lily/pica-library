@@ -73,8 +73,12 @@ function jsonObject(value: unknown): Record<string, unknown> {
 
 function provenanceGroup(source: string) {
     if (source.startsWith('pica:favorites')) return 'favorites sync'
-    if (source === 'pica:discover') return 'search'
-    if (source === 'pica:recommendations') return 'recommendation'
+    if (source === 'pica:discover' || source === 'eh:discover') return 'search'
+    if (
+        source === 'pica:recommendations' ||
+        source === 'eh:recommendations'
+    )
+        return 'recommendation'
     if (source === 'eh:discover') return 'E-H search'
     if (source.startsWith('eh:')) return 'E-H provider'
     if (source.startsWith('download:enqueue')) return 'download enqueue'
@@ -1205,6 +1209,9 @@ export class LibraryDatabase {
         const rows = this.db
             .prepare(
                 `SELECT c.*, a.canonical_name,
+                        pm.provider_id, pm.provider_remote_id,
+                        pm.alternate_titles_json, pm.completion_status,
+                        pm.rating, pm.provider_metadata_json,
                         EXISTS(SELECT 1 FROM library_membership lm
                                WHERE lm.comic_id = c.id) AS in_library,
                         (SELECT COUNT(*) FROM episodes e WHERE e.comic_id = c.id)

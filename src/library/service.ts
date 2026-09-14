@@ -12,7 +12,8 @@ import type {
     FavoriteRecord,
     RecommendationCandidate,
     RecallRoute,
-    SortMode
+    SortMode,
+    StoredComic
 } from './types'
 import {
     mergeRecallCandidates,
@@ -242,6 +243,10 @@ export class LibraryService {
     async buildFinalRecommendationCycleV3(cycleId: string) {
         this.recommendationProgress = { state: 'running', phase: 'profile', done: 0, total: 6 }
         const pica = await this.connect()
+        const providerService = new ProviderService(
+            () => this.connect(),
+            this.database
+        )
         const catalog = this.database.listComics({ limit: 10000 })
         const favorites = catalog.filter((comic) => comic.isFavorite)
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
@@ -279,7 +284,7 @@ export class LibraryService {
         })
         this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 6 }
         const routes = translateIntentPlanV3(intents)
-        const store = (comics: Comic[]) => {
+        const storePica = (comics: Comic[]) => {
             const records = comics.map(comicToRecord)
             this.database.importCatalog(records, 'pica:recommendations')
             return records.flatMap((record) => {
@@ -287,11 +292,56 @@ export class LibraryService {
                 return stored ? [stored] : []
             })
         }
+        const storedRecords = (records: FavoriteRecord[]): StoredComic[] =>
+            records.flatMap((record) => {
+                const stored = this.database.getComic(record.comicId)
+                return stored ? [stored] : []
+            })
+        const mergeProviderResults = (
+            primary: StoredComic[],
+            secondary: StoredComic[]
+        ) => [
+            ...new Map(
+                [...primary, ...secondary].map((comic) => [comic.comicId, comic])
+            ).values()
+        ]
+        const ehCache = new Map<string, StoredComic[]>()
+        const ehMaxRequests = 4
+        let ehRequestCount = 0
+        const ehSearch = async (
+            query: string,
+            kind: 'keyword' | 'author'
+        ): Promise<StoredComic[]> => {
+            const clean = query.trim()
+            if (!clean) return []
+            const key = `${kind}:${clean.toLocaleLowerCase("und")}`
+            const cached = ehCache.get(key)
+            if (cached) return cached
+            if (ehRequestCount >= ehMaxRequests) return []
+            ehRequestCount += 1
+            const providerQuery =
+                kind === 'author'
+                    ? `artist:"${clean.replaceAll("\"", "")}"`
+                    : clean
+            try {
+                const records = await providerService.search(
+                    { keyword: providerQuery, limit: 40 },
+                    ['eh'],
+                    'recommendations'
+                )
+                const stored = storedRecords(records)
+                ehCache.set(key, stored)
+                return stored
+            } catch {
+                ehCache.set(key, [])
+                return []
+            }
+        }
         this.recommendationProgress = { state: 'running', phase: 'retrieve', done: 3, total: 6 }
         const retrieved = await retrieveCandidatesV3({
             provider: {
-                keyword: async (query, page) =>
-                    store(
+                keyword: async (query, page) => {
+                    const picaResults = storePica(
                         (
                             await pica.comicsPage(
                                 '',
@@ -300,12 +350,23 @@ export class LibraryService {
                                 page
                             )
                         ).docs
-                    ),
-                author: async (query, page) =>
-                    store(
+                    )
+                    const ehResults =
+                        page === 1 ? await ehSearch(query, 'keyword') : []
+                    return mergeProviderResults(picaResults, ehResults)
+                },
+                author: async (query, page) => {
+                    const picaResults = storePica(
                         (await pica.search(query, page, pica.Order.loved)).docs
-                    ),
-                related: async (comicId) => store(await pica.related(comicId))
+                    )
+                    const ehResults =
+                        page === 1 ? await ehSearch(query, 'author') : []
+                    return mergeProviderResults(picaResults, ehResults)
+                },
+                related: async (comicId) =>
+                    comicId.startsWith('eh:')
+                        ? []
+                        : storePica(await pica.related(comicId))
             },
             routes,
             intents,
@@ -345,7 +406,23 @@ export class LibraryService {
             routes,
             ranked,
             readiness: retrieved.readiness,
-            telemetry: { ...retrieved.telemetry, cycleId },
+            telemetry: {
+                ...retrieved.telemetry,
+                cycleId,
+                providerSources: {
+                    ehRequests: ehRequestCount,
+                    ehCandidates: retrieved.candidates.filter(
+                        (item) =>
+                            item.comic.providerId === 'eh' ||
+                            item.comic.comicId.startsWith('eh:')
+                    ).length,
+                    picaCandidates: retrieved.candidates.filter(
+                        (item) =>
+                            item.comic.providerId !== 'eh' &&
+                            !item.comic.comicId.startsWith('eh:')
+                    ).length
+                }
+            },
             versions: {
                 profileVersion: FINAL_PROFILE_VERSION,
                 registryVersion: profile.registryVersion,

@@ -291,10 +291,14 @@ export class ProviderService {
     }
 
     async setFavorite(comicId: string, desired: boolean) {
-        if (comicId.startsWith('eh:'))
-            throw new Error(
-                'E-H 云收藏尚未启用；当前版本只提供公共浏览、阅读和本地书库能力'
-            )
+        if (comicId.startsWith('eh:')) {
+            const before = this.database.getComic(comicId)
+            if (!before) throw new Error('E-H 漫画尚未加入本地目录')
+            if (before.isFavorite === desired)
+                return { changed: false, isFavorite: desired, already: true, remote: false }
+            this.database.setLocalFavoriteState(comicId, desired)
+            return { changed: true, isFavorite: desired, already: false, remote: false }
+        }
         const provider = await this.connect()
         const before = await provider.comicInfo(comicId)
         if (Boolean(before.isFavourite) === desired)

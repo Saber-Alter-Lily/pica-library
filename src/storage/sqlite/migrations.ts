@@ -450,6 +450,34 @@ export const migrations: Migration[] = [
             );
             CREATE INDEX IF NOT EXISTS idx_recommendation_v3_batches_cycle ON recommendation_v3_batches(recommendation_cycle_id, batch_index);
         `
+    },
+    {
+        version: 9,
+        name: 'provider_identity_metadata',
+        up: `
+            CREATE TABLE IF NOT EXISTS comic_provider_metadata (
+                comic_id TEXT PRIMARY KEY REFERENCES comics(id) ON DELETE CASCADE,
+                provider_id TEXT NOT NULL,
+                provider_remote_id TEXT NOT NULL,
+                alternate_titles_json TEXT NOT NULL DEFAULT '[]',
+                completion_status TEXT NOT NULL DEFAULT 'UNKNOWN',
+                rating REAL,
+                provider_metadata_json TEXT NOT NULL DEFAULT '{}',
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_comic_provider_identity
+                ON comic_provider_metadata(provider_id, provider_remote_id);
+            INSERT OR IGNORE INTO comic_provider_metadata(
+                comic_id, provider_id, provider_remote_id,
+                alternate_titles_json, completion_status,
+                provider_metadata_json, first_seen_at, last_seen_at
+            )
+            SELECT id, 'pica', id, '[]',
+                   CASE WHEN finished = 1 THEN 'FINISHED' ELSE 'ONGOING' END,
+                   '{}', first_seen_at, last_seen_at
+            FROM comics;
+        `
     }
 ]
 

@@ -499,13 +499,18 @@
                 <div id="search" class="tab">
                     <div class="page-heading">
                         <div>
-                            <h2>站内搜索</h2>
-                            <p>按关键词和标签查找并排序。</p>
+                            <h2>在线发现</h2>
+                            <p>Pica 与 E-H 共用本地书库；E-H 公共搜索无需额外账号。</p>
                         </div>
                     </div>
                     <div class="toolbar">
                         <input id="search-keyword" placeholder="关键词" />
                         <input id="search-tags" placeholder="标签，逗号分隔" />
+                        <select id="search-provider">
+                            <option value="all">Pica + E-H</option>
+                            <option value="pica">仅 Pica</option>
+                            <option value="eh">仅 E-H</option>
+                        </select>
                         <select id="search-sort">
                             <option value="likes">爱心数量</option>
                             <option value="views">浏览数量</option>

@@ -34,7 +34,7 @@ describe('SQLite migrations', () => {
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>
         expect(versions.map((row) => row.version)).toEqual([
-            1, 2, 3, 4, 5, 6, 7, 8
+            1, 2, 3, 4, 5, 6, 7, 8, 9
         ])
         expect(
             database
@@ -78,7 +78,7 @@ describe('SQLite migrations', () => {
             database
                 .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
                 .get()
-        ).toMatchObject({ count: 8 })
+        ).toMatchObject({ count: 9 })
         database.close()
     })
 
@@ -123,7 +123,7 @@ describe('SQLite migrations', () => {
         const library = new LibraryDatabase(databaseFile)
         library.close()
 
-        const backup = `${databaseFile}.pre-migration-v8.bak`
+        const backup = `${databaseFile}.pre-migration-v9.bak`
         expect(fs.existsSync(backup)).toBe(true)
         const backedUp = new DatabaseSync(backup)
         expect(
@@ -344,7 +344,7 @@ describe('SQLite migrations', () => {
                     'SELECT MAX(version) AS version FROM schema_migrations'
                 )
                 .get()
-        ).toMatchObject({ version: 8 })
+        ).toMatchObject({ version: 9 })
         verified.close()
     })
 })

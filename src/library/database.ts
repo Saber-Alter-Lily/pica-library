@@ -60,10 +60,23 @@ function numberValue(value: unknown): number {
     return Number.isFinite(number) ? number : 0
 }
 
+function jsonObject(value: unknown): Record<string, unknown> {
+    try {
+        const parsed = JSON.parse(String(value ?? '{}'))
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : {}
+    } catch {
+        return {}
+    }
+}
+
 function provenanceGroup(source: string) {
     if (source.startsWith('pica:favorites')) return 'favorites sync'
     if (source === 'pica:discover') return 'search'
     if (source === 'pica:recommendations') return 'recommendation'
+    if (source === 'eh:discover') return 'E-H search'
+    if (source.startsWith('eh:')) return 'E-H provider'
     if (source.startsWith('download:enqueue')) return 'download enqueue'
     if (source === 'download:completion') return 'download completion'
     if (source.startsWith('pica:download')) return 'metadata hydration'
@@ -769,6 +782,21 @@ export class LibraryDatabase {
                 END,
                 last_seen_at = excluded.last_seen_at
         `)
+        const providerMetaUpsert = this.db.prepare(`
+            INSERT INTO comic_provider_metadata(
+                comic_id, provider_id, provider_remote_id,
+                alternate_titles_json, completion_status, rating,
+                provider_metadata_json, first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(comic_id) DO UPDATE SET
+                provider_id = excluded.provider_id,
+                provider_remote_id = excluded.provider_remote_id,
+                alternate_titles_json = excluded.alternate_titles_json,
+                completion_status = excluded.completion_status,
+                rating = excluded.rating,
+                provider_metadata_json = excluded.provider_metadata_json,
+                last_seen_at = excluded.last_seen_at
+        `)
         const linkUpsert = this.db.prepare(`
             INSERT INTO comic_authors(
                 comic_id, author_id, raw_value, circle, confidence,
@@ -864,6 +892,26 @@ export class LibraryDatabase {
                     record.epsCount ?? 0,
                     trustedCoverUrl(record.coverUrl) ?? null,
                     markFavorite ? 1 : 0,
+                    now,
+                    now
+                )
+                const providerId =
+                    record.providerId ??
+                    (record.comicId.startsWith('eh:') ? 'eh' : 'pica')
+                const providerRemoteId =
+                    record.providerRemoteId ??
+                    (providerId === 'eh'
+                        ? record.comicId.slice(3)
+                        : record.comicId)
+                providerMetaUpsert.run(
+                    record.comicId,
+                    providerId,
+                    providerRemoteId,
+                    JSON.stringify(record.alternateTitles ?? []),
+                    record.completionStatus ??
+                        (record.finished ? 'FINISHED' : 'ONGOING'),
+                    record.rating ?? null,
+                    JSON.stringify(record.providerMetadata ?? {}),
                     now,
                     now
                 )
@@ -1000,7 +1048,18 @@ export class LibraryDatabase {
                 'SELECT COUNT(DISTINCT id) AS count FROM comics'
             ),
             distinctProviderRawIds: count(
-                'SELECT COUNT(DISTINCT id) AS count FROM comics'
+                `SELECT COUNT(DISTINCT
+                    COALESCE(
+                        pm.provider_id,
+                        CASE WHEN c.id LIKE 'eh:%' THEN 'eh' ELSE 'pica' END
+                    ) || char(31) ||
+                    COALESCE(
+                        pm.provider_remote_id,
+                        CASE WHEN c.id LIKE 'eh:%' THEN substr(c.id, 4) ELSE c.id END
+                    )
+                ) AS count
+                 FROM comics c
+                 LEFT JOIN comic_provider_metadata pm ON pm.comic_id = c.id`
             ),
             duplicateCanonicalIds: count(
                 `SELECT COUNT(*) AS count FROM (
@@ -1156,7 +1215,8 @@ export class LibraryDatabase {
                          WHERE p.comic_id = c.id AND p.status = 'completed')
                             AS downloaded_pictures
                  FROM comics c
-                 LEFT JOIN authors a ON a.id = c.canonical_author_id`
+                 LEFT JOIN authors a ON a.id = c.canonical_author_id
+                 LEFT JOIN comic_provider_metadata pm ON pm.comic_id = c.id`
             )
             .all() as SqlRow[]
         const text = query.text?.toLocaleLowerCase('und').trim()
@@ -1175,6 +1235,30 @@ export class LibraryDatabase {
                     : null
                 return {
                     comicId: String(row.id),
+                    providerId: row.provider_id
+                        ? (String(row.provider_id) as 'pica' | 'eh')
+                        : String(row.id).startsWith('eh:')
+                          ? 'eh'
+                          : 'pica',
+                    providerRemoteId: row.provider_remote_id
+                        ? String(row.provider_remote_id)
+                        : String(row.id).startsWith('eh:')
+                          ? String(row.id).slice(3)
+                          : String(row.id),
+                    alternateTitles: jsonArray(row.alternate_titles_json),
+                    completionStatus: row.completion_status
+                        ? (String(row.completion_status) as
+                              | 'FINISHED'
+                              | 'ONGOING'
+                              | 'UNKNOWN')
+                        : Boolean(row.finished)
+                          ? 'FINISHED'
+                          : 'ONGOING',
+                    rating:
+                        row.rating === null || row.rating === undefined
+                            ? undefined
+                            : numberValue(row.rating),
+                    providerMetadata: jsonObject(row.provider_metadata_json),
                     title: String(row.title),
                     author: String(row.raw_author),
                     description: String(row.description ?? ''),
@@ -1301,6 +1385,31 @@ export class LibraryDatabase {
             this.db
                 .prepare(
                     "DELETE FROM library_membership WHERE comic_id = ? AND reason = 'pica-favorite'"
+                )
+                .run(comicId)
+        return this.getComic(comicId)
+    }
+
+    setLocalFavoriteState(comicId: string, isFavorite: boolean) {
+        const result = this.db
+            .prepare(
+                'UPDATE comics SET is_favorite = ?, last_seen_at = ? WHERE id = ?'
+            )
+            .run(isFavorite ? 1 : 0, new Date().toISOString(), comicId)
+        if (result.changes !== 1) throw new Error(`Comic not found: ${comicId}`)
+        const now = new Date().toISOString()
+        if (isFavorite)
+            this.db
+                .prepare(
+                    `INSERT INTO library_membership(comic_id, reason, created_at, updated_at)
+                     VALUES (?, 'local-favorite', ?, ?)
+                     ON CONFLICT(comic_id, reason) DO UPDATE SET updated_at = excluded.updated_at`
+                )
+                .run(comicId, now, now)
+        else
+            this.db
+                .prepare(
+                    "DELETE FROM library_membership WHERE comic_id = ? AND reason = 'local-favorite'"
                 )
                 .run(comicId)
         return this.getComic(comicId)

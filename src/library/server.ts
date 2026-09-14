@@ -330,13 +330,12 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/capabilities' &&
                 request.method === 'GET'
             ) {
-                return json(
-                    response,
-                    200,
-                    appCapabilities(
+                return json(response, 200, {
+                    ...appCapabilities(
                         providerService.capabilities.favoriteMutation
-                    )
-                )
+                    ),
+                    providers: providerService.providerStatus()
+                })
             }
             if (
                 url.pathname === '/api/v1/recommendation-events' &&
@@ -1328,7 +1327,11 @@ export async function startLibraryServer(options: {
                         sort: (input.sort
                             ? String(input.sort)
                             : 'likes') as SortMode,
-                        limit: Number(input.limit ?? 100)
+                        limit: Number(input.limit ?? 100),
+                        providers: stringList(input.providers).filter(
+                            (value): value is 'pica' | 'eh' =>
+                                value === 'pica' || value === 'eh'
+                        )
                     })
                 )
             }

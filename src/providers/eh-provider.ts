@@ -208,6 +208,7 @@ export class EhProvider implements ComicProvider {
     } as const
 
     private lastSearchAt = 0
+    private searchGate: Promise<void> = Promise.resolve()
 
     private async request(
         url: string,
@@ -272,10 +273,15 @@ export class EhProvider implements ComicProvider {
         return output
     }
 
-    private async paceSearch() {
-        const remaining = SEARCH_MIN_INTERVAL_MS - (Date.now() - this.lastSearchAt)
-        if (remaining > 0) await delay(remaining)
-        this.lastSearchAt = Date.now()
+    private paceSearch() {
+        const run = this.searchGate.then(async () => {
+            const remaining =
+                SEARCH_MIN_INTERVAL_MS - (Date.now() - this.lastSearchAt)
+            if (remaining > 0) await delay(remaining)
+            this.lastSearchAt = Date.now()
+        })
+        this.searchGate = run.catch(() => undefined)
+        return run
     }
 
     async search(input: SearchRequest) {
@@ -377,6 +383,21 @@ export class EhProvider implements ComicProvider {
                 }
             }
         })
+    }
+
+    async fetchCover(locator: string, maxBytes = 20 * 1024 * 1024) {
+        const coverUrl = trustedCoverUrl(locator)
+        if (!coverUrl) throw new Error('E-H cover URL was rejected as untrusted')
+        const response = await this.request(
+            coverUrl,
+            { headers: { referer: `${GALLERY_ORIGIN}/`, accept: 'image/*' } },
+            maxBytes
+        )
+        const contentType = safeRasterContentType(response.headers.get('content-type'))
+        if (!contentType) throw new Error('E-H returned an unsupported cover type')
+        const data = Buffer.from(await response.arrayBuffer())
+        if (data.byteLength > maxBytes) throw new Error('E-H cover exceeds the size limit')
+        return { data, contentType }
     }
 
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {

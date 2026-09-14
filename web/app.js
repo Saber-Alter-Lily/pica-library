@@ -2547,9 +2547,16 @@ $('#search-button').onclick = async () => {
                 tags: splitList($('#search-tags').value)
             }
         })
+        const providerChoice = $('#search-provider').value
         const records = await post('/api/v1/search', {
             keyword: $('#search-keyword').value,
             tags: splitList($('#search-tags').value),
+            providers:
+                providerChoice === 'pica'
+                    ? ['pica']
+                    : providerChoice === 'eh'
+                      ? ['eh']
+                      : ['pica', 'eh'],
             sort: $('#search-sort').value,
             limit: 100
         })

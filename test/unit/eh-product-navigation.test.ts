@@ -48,7 +48,7 @@ describe('source-oriented product navigation', () => {
     expect(hub).toContain('SettingsRow.panel(this')
     expect(hub).toContain('"E-H 账号",eh?"已登录":"未登录"')
     expect(hub).toContain('"ExH 权限"')
-    expect(hub).toContain('eh?"检查中":"需登录"')
+    expect(hub).toContain('eh?"检查中":"需 E-H 登录"')
     expect(hub).not.toContain('ExHAccountActivity')
     expect(manifest).toContain('.AccountSourcesActivity')
     expect(manifest).toContain('.EhWebLoginActivity')

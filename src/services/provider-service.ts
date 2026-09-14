@@ -8,7 +8,8 @@ import { PicaProvider, picaComic } from '../providers/pica-provider'
 import {
     providerComicToRecord,
     type ComicProvider,
-    type ProviderId
+    type ProviderId,
+    type SearchRequest
 } from '../providers/types'
 
 export interface ProviderCapabilities {
@@ -224,13 +225,18 @@ export class ProviderService {
         }
     }
 
-    async search(keyword: string, providers: ProviderId[] = ['pica']) {
+    async search(
+        input: string | SearchRequest,
+        providers: ProviderId[] = ['pica']
+    ) {
+        const request: SearchRequest =
+            typeof input === 'string' ? { keyword: input, limit: 100 } : input
         const uniqueProviders = [...new Set(providers)]
         const settled = await Promise.allSettled(
             uniqueProviders.map(async (providerId) => {
                 const provider =
                     providerId === 'eh' ? this.ehProvider : this.picaProvider
-                const comics = await provider.search({ keyword, limit: 100 })
+                const comics = await provider.search(request)
                 const records = comics.map(providerComicToRecord)
                 this.database.importCatalog(records, `${providerId}:discover`)
                 return records
@@ -275,6 +281,12 @@ export class ProviderService {
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
         return locator.startsWith('eh-page:')
             ? this.ehProvider.fetchPage(locator, maxBytes)
+            : this.picaProvider.fetchPage(locator, maxBytes)
+    }
+
+    async fetchCover(comicId: string, locator: string, maxBytes = 20 * 1024 * 1024) {
+        return comicId.startsWith('eh:')
+            ? this.ehProvider.fetchCover(locator, maxBytes)
             : this.picaProvider.fetchPage(locator, maxBytes)
     }
 

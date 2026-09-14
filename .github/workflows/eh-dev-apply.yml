@@ -1,11 +1,11 @@
-name: Validate and apply E-H Android V3 fix
+name: Validate and apply E-H account core
 
 on:
   push:
     branches:
       - feature/eh-provider-v1
     paths:
-      - 'scripts/dev/fix-eh-android-v3.mjs'
+      - 'scripts/dev/apply-eh-account-core.mjs'
       - '.github/workflows/eh-dev-apply.yml'
 
 permissions:
@@ -20,27 +20,30 @@ jobs:
         with:
           ref: feature/eh-provider-v1
           fetch-depth: 0
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-node@v4
         with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
-      - uses: gradle/actions/setup-gradle@v4
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
         with:
-          gradle-version: '8.9'
-      - name: Apply Android V3 quote fix
-        run: node scripts/dev/fix-eh-android-v3.mjs
-      - name: Validate Android
-        working-directory: mobile/android-alpha2
-        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
-      - name: Commit validated Android fix
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Apply E-H account core patch
+        run: node scripts/dev/apply-eh-account-core.mjs
+      - name: Validate account core and desktop regression
+        run: |
+          set -euo pipefail
+          pnpm type:check
+          pnpm web:check
+          pnpm test
+          pnpm build
+      - name: Commit validated account core
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java
+          git add src/library/database.ts src/services/provider-service.ts src/library/service.ts src/library/server.ts test/unit/eh-account-core.test.ts
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
-          git commit -m 'fix: compile Android E-H recommendation query'
+          git commit -m 'feat: add E-H account core and favorite aggregation'
           git push origin HEAD:feature/eh-provider-v1

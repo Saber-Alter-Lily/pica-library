@@ -1,12 +1,11 @@
-name: Validate and apply E-H development patch
+name: Validate and apply E-H Android V3 fix
 
 on:
   push:
     branches:
       - feature/eh-provider-v1
     paths:
-      - 'scripts/dev/apply-eh-v3-ui.mjs'
-      - 'scripts/dev/run-eh-v3-ui.mjs'
+      - 'scripts/dev/fix-eh-android-v3.mjs'
       - '.github/workflows/eh-dev-apply.yml'
 
 permissions:
@@ -21,30 +20,27 @@ jobs:
         with:
           ref: feature/eh-provider-v1
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-java@v5
         with:
-          node-version: '24'
-      - uses: pnpm/action-setup@v4
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          version: '11.16.0'
-          run_install: false
-      - run: pnpm install --frozen-lockfile
-      - name: Apply bounded cross-source V3 and UI patch
-        run: node scripts/dev/run-eh-v3-ui.mjs
-      - name: Validate desktop, web and cross-source contracts
-        run: |
-          set -euo pipefail
-          pnpm type:check
-          pnpm web:check
-          pnpm test
-          pnpm build
-      - name: Commit validated V3 patch to development branch
+          gradle-version: '8.9'
+      - name: Apply Android V3 quote fix
+        run: node scripts/dev/fix-eh-android-v3.mjs
+      - name: Validate Android
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --stacktrace
+      - name: Commit validated Android fix
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/services/provider-service.ts src/library/service.ts src/library/database.ts web/app.js web/i18n.js mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java test/unit/eh-cross-source-v3.test.ts
+          git add mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java
           git diff --cached --check
           test -n "$(git diff --cached --name-only)"
-          git commit -m 'feat: add bounded E-H recall to recommendation V3'
+          git commit -m 'fix: compile Android E-H recommendation query'
           git push origin HEAD:feature/eh-provider-v1

@@ -22,6 +22,12 @@ public class EhReaderResolverTest {
         assertEquals(1,links.size());assertTrue(links.containsKey(1));
     }
 
+    @Test public void mainImageIdWinsOverEarlierStyledAdvertisement() {
+        String html="<img src='https://ads.example/banner.jpg' style='width:100%'>"+
+            "<div><img id='img' src='https://images.example/content.jpg'></div>";
+        assertEquals("https://images.example/content.jpg",EhReaderResolver.parseImageUrl(html));
+    }
+
     @Test public void parsesCurrentEhViewerStyleImageWithoutId() {
         String html="<div><img src=\"https://example.org/001.jpg\" style=\"max-width:100%\"></div>";
         assertEquals("https://example.org/001.jpg",EhReaderResolver.parseImageUrl(html));

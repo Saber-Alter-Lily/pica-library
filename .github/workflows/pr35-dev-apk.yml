@@ -1,0 +1,57 @@
+name: PR35 Dev APK (no publication)
+
+on:
+  push:
+    branches: [feature/eh-provider-v1]
+    paths:
+      - 'mobile/android-alpha2/**'
+      - 'test/unit/android-dev-package-contract.test.ts'
+      - 'test/unit/workflow-entrypoint.test.ts'
+      - '.github/workflows/pr35-dev-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  dev-apk:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test, lint and build isolated Dev APK
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+      - name: Verify side-by-side Dev identity
+        working-directory: mobile/android-alpha2
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pica-dev-cert.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/pica-dev-package.txt"
+          grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/pica-dev-package.txt"
+          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/pica-dev-package.txt"
+
+          mkdir -p candidate
+          cp "$apk" candidate/Pica-Library-Dev-PR35.apk
+          cp "$RUNNER_TEMP/pica-dev-package.txt" candidate/PACKAGE_INFO.txt
+          sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-dev-cert.txt" > candidate/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate/SOURCE_SHA.txt
+          printf '%s\n' 'UNRELEASED DEV BUILD: separate package/data; manual QA only; formal OTA disabled; debug signing.' > candidate/STATUS.txt
+          (cd candidate && sha256sum Pica-Library-Dev-PR35.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Dev-PR35
+          path: mobile/android-alpha2/candidate/
+          retention-days: 1
+          if-no-files-found: error

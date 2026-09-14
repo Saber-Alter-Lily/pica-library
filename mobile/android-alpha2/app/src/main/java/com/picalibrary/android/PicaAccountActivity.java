@@ -1,35 +1,26 @@
 package com.picalibrary.android;
 
-import android.app.Activity;
+import android.app.*;
+import android.content.*;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.TextView;
+import android.view.View;
+import android.widget.*;
 
-/** Native Pica account setup. */
+/** Compact Pica account management. */
 public final class PicaAccountActivity extends Activity {
-    private EditText account,password;
-    private TextView status;
-    private boolean busy;
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();onboarding();}
-    private void onboarding() {
-        LinearLayout p=(LinearLayout)account.getParent();
-        LinearLayout guide=new LinearLayout(this);
-        guide.setOrientation(LinearLayout.VERTICAL);
-        guide.addView(Ui.text(this,"第一次使用 Pica？",20,Ui.TEXT,true));
-        guide.addView(Ui.text(this,"已有账号：填写哔咔的账号标识和密码，不是 GitHub 账号，也不是昵称。原账号不一定是邮箱。",14,Ui.MUTED,false));
-        guide.addView(button("没有账号？注册 Pica",v->{if(!busy)startActivity(new android.content.Intent(this,PicaRegisterActivity.class));}));
-        guide.addView(Ui.text(this,"没有账号可在手机独立注册，无需先连接电脑。登录超时请检查网络或设备代理；注册不代表已获评论等额外权限。",13,Ui.MUTED,false));
-        guide.addView(button("暂不登录，返回使用本地 / LAN / WebDAV",v->{if(!busy)finish();}));
-        p.addView(guide,0);
-        password.setSaveEnabled(false);
-    }
-    private Button button(String label,android.view.View.OnClickListener action){return Ui.button(this,label,action,false);}
-    private void render(){PicaAccountStore.Session session=PicaAccountStore.load(this);LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"Pica 账号",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setPadding(Ui.dp(this,18),Ui.dp(this,16),Ui.dp(this,18),Ui.dp(this,24));scroll.addView(p);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));p.addView(Ui.text(this,"账号 / 邮箱",13,Ui.TEXT,true));account=new EditText(this);account.setSingleLine(true);account.setText(session.account);Ui.styleField(account,this);p.addView(account);Ui.gap(p,this,10);p.addView(Ui.text(this,"密码",13,Ui.TEXT,true));password=new EditText(this);password.setSingleLine(true);password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);password.setHint(session.password.isEmpty()?"Pica 密码":"留空则保留已保存密码");Ui.styleField(password,this);p.addView(password);status=Ui.text(this,session.signedIn()?"已登录":"尚未登录",13,Ui.MUTED,false);status.setPadding(0,Ui.dp(this,10),0,Ui.dp(this,8));p.addView(status);LinearLayout row=new LinearLayout(this);row.addView(button("登录",v->login()),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(row,this,8);row.addView(button("退出登录",v->logout()),new LinearLayout.LayoutParams(0,-2,1));p.addView(row);p.addView(Ui.text(this,"账号信息仅保存在本机。",12,Ui.MUTED,false));setContentView(root);root.requestApplyInsets();}
-    private void login(){if(busy)return;String a=account.getText().toString().trim();String entered=password.getText().toString();PicaAccountStore.Session old=PicaAccountStore.load(this);String p=entered.isEmpty()&&a.equals(old.account)?old.password:entered;if(a.isEmpty()||p.isEmpty()){status.setText("请填写账号和密码");return;}busy=true;status.setText("正在登录…");new Thread(()->{try{new PicaClient(this).login(a,p);PicaBootstrapJobs.enqueue(this);runOnUiThread(()->{busy=false;password.setText("");status.setText("登录成功，可前往在线浏览或查看收藏。");});}catch(Exception e){runOnUiThread(()->{busy=false;status.setText("登录失败："+PicaAccountErrors.message(e));});}}).start();}
-    private void logout(){if(busy)return;PicaBootstrapJobs.cancel(this);PicaAccountStore.clear(this);UnifiedPicaCatalogSync.clearAvailability(this);account.setText("");password.setText("");status.setText("已退出登录");}
+    private LinearLayout content;private EditText account,password;private TextView feedback;private boolean busy,editing;
+    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);renderShell();}
+    @Override protected void onResume(){super.onResume();renderContent();}
+    private Button compact(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}
+
+    private void renderShell(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));bar.addView(compact("‹ 返回",v->finish()));bar.addView(Ui.text(this,"Pica",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,12),Ui.dp(this,14),Ui.dp(this,24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();renderContent();}
+    private void renderContent(){if(content==null)return;content.removeAllViews();PicaAccountStore.Session session=PicaAccountStore.load(this);boolean signed=session.signedIn();content.addView(SettingsRow.row(this,"Pica 账号",signed?"已登录":"未登录",null));feedback=Ui.text(this,"",13,Ui.BAD,false);feedback.setVisibility(View.GONE);feedback.setPadding(Ui.dp(this,4),Ui.dp(this,4),Ui.dp(this,4),Ui.dp(this,8));content.addView(feedback);if(signed&&!editing){LinearLayout accountRow=SettingsRow.statusLine(this,"账号",session.account);content.addView(accountRow);Button sync=Ui.button(this,"同步",v->{PicaBootstrapJobs.enqueue(this);Toast.makeText(this,"同步已开始",Toast.LENGTH_SHORT).show();},false);content.addView(sync,new LinearLayout.LayoutParams(-1,-2));Ui.gap(content,this,8);content.addView(compact("账号操作 ▾",v->showAccountActions()),new LinearLayout.LayoutParams(-2,-2));return;}renderLoginForm(session,signed);}
+    private void renderLoginForm(PicaAccountStore.Session session,boolean signed){content.addView(Ui.text(this,"账号 / 邮箱",13,Ui.TEXT,true));account=new EditText(this);account.setSingleLine(true);account.setText(session.account);Ui.styleField(account,this);content.addView(account);Ui.gap(content,this,10);content.addView(Ui.text(this,"密码",13,Ui.TEXT,true));password=new EditText(this);password.setSingleLine(true);password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);password.setHint(session.password.isEmpty()?"密码":"已保存；留空则保留");password.setSaveEnabled(false);Ui.styleField(password,this);content.addView(password);Button login=Ui.button(this,signed?"重新登录":"登录",v->login(),false);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,Ui.dp(this,10),0,0);content.addView(login,lp);LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);actions.setPadding(0,Ui.dp(this,8),0,0);actions.addView(compact("注册账号",v->startActivity(new Intent(this,PicaRegisterActivity.class))));if(signed){Ui.gap(actions,this,8);actions.addView(compact("取消",v->{editing=false;renderContent();}));}content.addView(actions);}
+    private void showAccountActions(){String[] labels={"重新登录","注册账号","退出登录"};new AlertDialog.Builder(this).setTitle("账号操作").setItems(labels,(d,w)->{if(w==0){editing=true;renderContent();}else if(w==1)startActivity(new Intent(this,PicaRegisterActivity.class));else confirmLogout();}).setNegativeButton("取消",null).show();}
+    private void confirmLogout(){new AlertDialog.Builder(this).setTitle("退出 Pica？").setNegativeButton("取消",null).setPositiveButton("退出",(d,w)->logout()).show();}
+    private void login(){if(busy)return;String a=account.getText().toString().trim(),entered=password.getText().toString();PicaAccountStore.Session old=PicaAccountStore.load(this);String p=entered.isEmpty()&&a.equals(old.account)?old.password:entered;if(a.isEmpty()){account.setError("请输入账号");return;}if(p.isEmpty()){password.setError("请输入密码");return;}busy=true;showFeedback("正在登录…",Ui.MUTED);new Thread(()->{try{new PicaClient(this).login(a,p);PicaBootstrapJobs.enqueue(this);runOnUiThread(()->{busy=false;editing=false;Toast.makeText(this,"Pica 已登录",Toast.LENGTH_SHORT).show();renderContent();});}catch(Exception e){runOnUiThread(()->{busy=false;showFeedback("登录失败："+PicaAccountErrors.message(e),Ui.BAD);});}}).start();}
+    private void logout(){if(busy)return;PicaBootstrapJobs.cancel(this);PicaAccountStore.clear(this);UnifiedPicaCatalogSync.clearAvailability(this);editing=false;Toast.makeText(this,"已退出 Pica",Toast.LENGTH_SHORT).show();renderContent();}
+    private void showFeedback(String text,int color){if(feedback==null)return;feedback.setText(text);feedback.setTextColor(color);feedback.setVisibility(View.VISIBLE);}
 }

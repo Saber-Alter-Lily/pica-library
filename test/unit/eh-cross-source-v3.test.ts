@@ -71,4 +71,17 @@ describe('E-H cross-source Recommendation V3', () => {
     db.close()
   })
 
+  it('unions E-H and ExH bindings when both surfaces return the same canonical gallery', async () => {
+    const db = database()
+    const fakeEh = { id: 'eh', capabilities: {}, search: async (input: { surface?: string }) => [{ providerId: 'eh', providerRemoteId: '456789:abcdef1234', comicId: 'eh:456789:abcdef1234', title: 'Shared Gallery', alternateTitles: [], author: 'Artist', authors: ['Artist'], circle: null, description: '', chineseTeam: '', categories: ['Manga'], tags: ['tag'], canonicalTags: [], completionStatus: 'UNKNOWN', pagesCount: 12, epsCount: 1, rating: 4.9, providerMetadata: { rawTags: [], preferredSurface: input.surface, knownSurfaces: [input.surface] } }], details: async () => { throw new Error('unused') }, episodes: async () => [], pages: async () => [], fetchPage: async () => { throw new Error('unused') }, fetchCover: async () => { throw new Error('unused') } } as unknown as EhProvider
+    const service = new ProviderService(async () => ({} as Pica), db, fakeEh)
+    const records = await service.search({ keyword: 'tag', limit: 10 }, ['eh', 'exh'], 'discover')
+    expect(records).toHaveLength(1)
+    expect([...(records[0].providerMetadata?.knownSurfaces as string[])].sort()).toEqual(['eh', 'exh'])
+    const stored = db.getComic('eh:456789:abcdef1234')
+    expect([...(stored?.providerMetadata?.knownSurfaces as string[])].sort()).toEqual(['eh', 'exh'])
+    expect(stored?.providerId).toBe('eh')
+    db.close()
+  })
+
 })

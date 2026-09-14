@@ -307,9 +307,54 @@ export class ProviderService {
             )
             if (firstError) throw firstError.reason
         }
-        return [
-            ...new Map(records.map((record) => [record.comicId, record])).values()
-        ]
+        const consolidated = new Map<string, FavoriteRecord>()
+        for (const record of records) {
+            const previous = consolidated.get(record.comicId)
+            if (!previous) {
+                consolidated.set(record.comicId, record)
+                continue
+            }
+            if (previous.providerId === 'eh' && record.providerId === 'eh') {
+                const previousMetadata = previous.providerMetadata ?? {}
+                const nextMetadata = record.providerMetadata ?? {}
+                const knownSurfaces = new Set<string>([
+                    ...(Array.isArray(previousMetadata.knownSurfaces)
+                        ? previousMetadata.knownSurfaces.map(String)
+                        : []),
+                    ...(Array.isArray(nextMetadata.knownSurfaces)
+                        ? nextMetadata.knownSurfaces.map(String)
+                        : []),
+                    String(previousMetadata.preferredSurface ?? ''),
+                    String(nextMetadata.preferredSurface ?? '')
+                ])
+                consolidated.set(record.comicId, {
+                    ...previous,
+                    ...record,
+                    providerMetadata: {
+                        ...previousMetadata,
+                        ...nextMetadata,
+                        knownSurfaces: [...knownSurfaces].filter(
+                            (surface) => surface === 'eh' || surface === 'exh'
+                        )
+                    }
+                })
+                continue
+            }
+            consolidated.set(record.comicId, record)
+        }
+        const result = [...consolidated.values()]
+        const surfaceMerged = result.filter(
+            (record) =>
+                record.providerId === 'eh' &&
+                Array.isArray(record.providerMetadata?.knownSurfaces) &&
+                record.providerMetadata.knownSurfaces.length > 1
+        )
+        if (surfaceMerged.length)
+            this.database.importCatalog(
+                surfaceMerged,
+                'eh:surface-merge:' + provenance
+            )
+        return result
     }
 
     async getComicDetails(comicId: string) {

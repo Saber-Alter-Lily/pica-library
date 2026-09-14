@@ -60,26 +60,22 @@ public class RemoteStorageActivity extends Activity {
         updateStatus();
     }
 
-    private void fill(RemoteConfigStore.Config c){
-        creating=false;selectedId=c.id;label.setText(c.label);url.setText(c.baseUrl);root.setText(c.root);user.setText("");password.setText("");selectVendor(c.vendor);applyPreset(false);
-    }
+    private void fill(RemoteConfigStore.Config c){creating=false;selectedId=c.id;label.setText(c.label);url.setText(c.baseUrl);root.setText(c.root);user.setText("");password.setText("");selectVendor(c.vendor);applyPreset(false);}
     private void selectVendor(String vendor){for(int i=0;i<presets.size();i++)if(presets.get(i).vendor.equals(vendor)){vendorSpinner.setSelection(i,false);return;}vendorSpinner.setSelection(0,false);}
     private RemoteConfigStore.Preset currentPreset(){int i=vendorSpinner.getSelectedItemPosition();return i>=0&&i<presets.size()?presets.get(i):RemoteConfigStore.preset("generic");}
     private void applyPreset(boolean forceUrl){RemoteConfigStore.Preset preset=currentPreset();if(forceUrl&&!preset.defaultBaseUrl.isEmpty())url.setText(preset.defaultBaseUrl);url.setHint(preset.urlHint);user.setHint(preset.usernameHint+" · 留空沿用已保存值");password.setHint(preset.passwordHint+" · 留空沿用已保存值");providerNote.setText(preset.note);if(creating&&label.getText().toString().trim().isEmpty())label.setText(preset.label);}
 
-    private void beginNew(){binding=true;beginNewInternal();binding=false;status.setText("正在新增网盘配置；保存成功后才会切换当前来源。 ");}
+    private void beginNew(){binding=true;beginNewInternal();binding=false;status.setText("正在新增网盘配置；保存成功后才会切换当前来源。");}
     private void beginNewInternal(){creating=true;selectedId="";label.setText("");url.setText("");root.setText("PicaLibrary");user.setText("");password.setText("");selectVendor("generic");applyPreset(false);}
 
-    private void switchTarget(RemoteConfigStore.Config target){
-        try{RemoteConfigStore.setActive(this,target.id);fill(target);updateStatus();status.setText("已切换到“"+target.label+"”，正在刷新云端目录…");refreshPortableState();}catch(Exception e){status.setText("切换失败："+message(e));}
-    }
+    private void switchTarget(RemoteConfigStore.Config target){try{RemoteConfigStore.setActive(this,target.id);fill(target);updateStatus();status.setText("已切换到“"+target.label+"”，正在刷新云端目录…");refreshPortableState();}catch(Exception e){status.setText("切换失败："+message(e));}}
 
     private RemoteConfigStore.Config formCandidate(){RemoteConfigStore.Config fallback=creating?null:RemoteConfigStore.find(this,selectedId);RemoteConfigStore.Preset preset=currentPreset();return RemoteConfigStore.candidate(selectedId,label.getText().toString(),preset.vendor,url.getText().toString(),root.getText().toString(),user.getText().toString(),password.getText().toString(),fallback);}
 
     private void test(boolean save){
-        status.setText(save?"正在保存并连接…":"正在测试…");new Thread(()->{try{
+        final boolean createRequest=creating;final String currentId=selectedId;status.setText(save?"正在保存并连接…":"正在测试…");new Thread(()->{try{
             RemoteConfigStore.Config candidate=formCandidate();boolean ok=new RemoteLibraryClient(candidate).test();RemoteConfigStore.Config saved=candidate;
-            if(save&&ok){saved=RemoteConfigStore.saveTarget(this,selectedId,candidate.label,candidate.vendor,candidate.baseUrl,candidate.root,candidate.username,candidate.password);try{cachePortableState();}catch(Exception ignored){}}
+            if(save&&ok){String saveId=createRequest?"remote-"+UUID.randomUUID().toString().replace("-","").substring(0,16):currentId;saved=RemoteConfigStore.saveTarget(this,saveId,candidate.label,candidate.vendor,candidate.baseUrl,candidate.root,candidate.username,candidate.password);try{cachePortableState();}catch(Exception ignored){}}
             RemoteConfigStore.Config finalSaved=saved;runOnUiThread(()->{url.setText(finalSaved.baseUrl);status.setText(ok?(save?"已保存并连接成功 · 当前："+finalSaved.label:"连接成功 · "+finalSaved.label):"连接不可用");if(save&&ok){password.setText("");user.setText("");loadUi(finalSaved.id);}});
         }catch(Exception e){runOnUiThread(()->status.setText("连接失败："+message(e)));}}).start();
     }
@@ -87,7 +83,7 @@ public class RemoteStorageActivity extends Activity {
     private void deleteCurrent(){
         if(creating||selectedId.isEmpty()){beginNew();return;}RemoteConfigStore.Config target=RemoteConfigStore.find(this,selectedId);if(target==null)return;
         new AlertDialog.Builder(this).setTitle("删除网盘配置？").setMessage("只删除手机上的“"+target.label+"”连接信息，不会删除网盘里的漫画文件。")
-            .setNegativeButton("取消",null).setPositiveButton("删除",(d,w)->{RemoteConfigStore.deleteTarget(this,target.id);loadUi(RemoteConfigStore.activeTargetId(this));status.setText("已删除手机端网盘配置；云端文件未删除。 ");}).show();
+            .setNegativeButton("取消",null).setPositiveButton("删除",(d,w)->{RemoteConfigStore.deleteTarget(this,target.id);loadUi(RemoteConfigStore.activeTargetId(this));status.setText("已删除手机端网盘配置；云端文件未删除。");}).show();
     }
 
     private void cachePortableState() throws Exception {
@@ -96,9 +92,7 @@ public class RemoteStorageActivity extends Activity {
         try{ReaderSettingsStore.reconcile(this);}catch(Exception ignored){}UnifiedCatalogStore.reconcileLocalReferences(this);StoragePolicy.maintain(this);
     }
 
-    private void refreshPortableState(){
-        RemoteConfigStore.Config active=RemoteConfigStore.load(this);if(!active.configured()){status.setText("请先保存一个网盘配置");return;}status.setText("正在刷新“"+active.label+"”…");new Thread(()->{try{cachePortableState();runOnUiThread(()->{updateStatus();status.setText("“"+RemoteConfigStore.load(this).label+"”云端状态已刷新");});}catch(Exception e){runOnUiThread(()->status.setText("刷新失败："+message(e)));}}).start();
-    }
+    private void refreshPortableState(){RemoteConfigStore.Config active=RemoteConfigStore.load(this);if(!active.configured()){status.setText("请先保存一个网盘配置");return;}status.setText("正在刷新“"+active.label+"”…");new Thread(()->{try{cachePortableState();runOnUiThread(()->{updateStatus();status.setText("“"+RemoteConfigStore.load(this).label+"”云端状态已刷新");});}catch(Exception e){runOnUiThread(()->status.setText("刷新失败："+message(e)));}}).start();}
 
     private void updateStatus(){RemoteConfigStore.Config active=RemoteConfigStore.load(this);int count=RemoteConfigStore.targets(this).size();status.setText(active.configured()?"已配置 "+count+" 个网盘 · 当前："+active.label:"尚未配置远程存储");}
     private String message(Exception e){return e.getMessage()==null?"请检查配置":e.getMessage();}

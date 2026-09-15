@@ -1,0 +1,33 @@
+name: Apply v0.4 packaging patch
+
+on:
+  push:
+    branches: [feature/eh-provider-v1]
+    paths:
+      - '.github/workflows/v040-packaging-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/eh-provider-v1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/apply-v040-packaging-patch.mjs
+      - name: Commit packaging changes and remove temporary tooling
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/providers/eh-provider.ts scripts/build-windows-package.ps1
+          git rm scripts/apply-v040-packaging-patch.mjs .github/workflows/v040-packaging-patch.yml
+          git diff --cached --quiet && { echo 'No patch changes'; exit 1; }
+          git commit -m 'build: prepare v0.4.0 incremental packaging from v0.3.14'
+          git push origin HEAD:feature/eh-provider-v1

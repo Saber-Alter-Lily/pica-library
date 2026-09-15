@@ -3,6 +3,7 @@ package com.picalibrary.android;
 import android.content.Context;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.text.Normalizer;
 import java.util.*;
 
 /** Derived, auditable creator concepts over the unified catalog and lossless E-H semantics. */
@@ -64,6 +65,6 @@ final class AuthorConceptStore {
     private static boolean generic(String value){String key=norm(value);return key.isEmpty()||key.equals("unknown")||key.equals("未知作者")||key.equals("various")||key.equals("multiple")||key.equals("不明")||key.equals("よろず");}
     private static String conceptId(String type,String name){try{byte[] digest=MessageDigest.getInstance("SHA-1").digest((type+"\n"+norm(name)).getBytes(StandardCharsets.UTF_8));StringBuilder out=new StringBuilder(type).append('_');for(int i=0;i<8;i++)out.append(String.format(Locale.ROOT,"%02x",digest[i]&255));return out.toString();}catch(Exception e){return type+'_'+Integer.toHexString(norm(name).hashCode());}}
     private static String canonicalValue(String canonical){int at=canonical==null?-1:canonical.indexOf(':');return at>=0?canonical.substring(at+1):safe(canonical);}
-    private static String norm(String value){return safe(value).normalize(java.text.Normalizer.Form.NFKC).replaceAll("\\s+"," ").trim().toLowerCase(Locale.ROOT);}
+    private static String norm(String value){return Normalizer.normalize(safe(value),Normalizer.Form.NFKC).replaceAll("\\s+"," ").trim().toLowerCase(Locale.ROOT);}
     private static String safe(String value){return value==null?"":value;}
 }

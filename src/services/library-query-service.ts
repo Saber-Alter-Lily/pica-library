@@ -29,6 +29,9 @@ export class LibraryQueryService {
                 ...new Set((input.tags ?? []).map((item) => item.trim()))
             ].filter(Boolean),
             tagMode: input.tagMode ?? 'all',
+            providerIds: [...new Set(input.providerIds ?? [])].filter(
+                (value): value is 'pica' | 'eh' => value === 'pica' || value === 'eh'
+            ),
             finished: input.finished,
             download: input.download,
             sort: input.sort ?? 'latest',
@@ -40,6 +43,7 @@ export class LibraryQueryService {
         const text = normalizeAuthorKey(query.text ?? '')
         const tags = (query.tags ?? []).map(normalizeAuthorKey)
         const selectedAuthors = new Set(query.authorIds ?? [])
+        const selectedProviders = new Set(query.providerIds ?? [])
         const items = this.database
             .listComics({ limit: 5000 })
             .filter((comic) => {
@@ -50,6 +54,8 @@ export class LibraryQueryService {
                     query.scope === 'downloaded' &&
                     comic.downloadedPictures === 0
                 )
+                    return false
+                if (selectedProviders.size && !selectedProviders.has(comic.providerId ?? 'pica'))
                     return false
                 // `catalog` is the explicit advanced scope. `all` remains a
                 // compatibility alias for older Browser/CLI callers.

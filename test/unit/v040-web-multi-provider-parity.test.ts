@@ -44,7 +44,7 @@ describe('v0.4 Web/Desktop parity', () => {
     expect(web).toContain('EhTagTranslation/DatabaseReleases')
     expect(web).toContain('db.text.json')
     expect(web).toContain('parityState.translations')
-    expect(web).toContain('data.rawValue = raw')
+    expect(web).toContain('tag.dataset.rawValue = raw')
     expect(web).toContain('canonical')
   })
 

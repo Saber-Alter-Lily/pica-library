@@ -200,3 +200,4 @@ $('#eh-account-clear')?.addEventListener('click', async () => {
 })
 
 void status().catch(() => {})
+void import('./v040-parity.js').catch(() => {})

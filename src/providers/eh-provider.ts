@@ -431,9 +431,9 @@ export class EhProvider implements ComicProvider {
         const exactTerm = (raw: string) => {
             const value = raw.trim()
             const colon = value.indexOf(':')
-            if (colon <= 0 || /[\"']/u.test(value)) return value
+            if (colon <= 0 || /["']/u.test(value)) return value
             const namespace = value.slice(0, colon).trim()
-            const tag = value.slice(colon + 1).trim().replace(/\"/g, '')
+            const tag = value.slice(colon + 1).trim().replace(/"/g, '')
             return namespace && tag ? `${namespace}:"${tag}$"` : value
         }
         const matchesFilters = (comic: ProviderComic) => {
@@ -547,167 +547,83 @@ export class EhProvider implements ComicProvider {
         if (accountRejected(response, html))
             throw new Error('E-H account session is not valid')
         if (!response.ok)
-            throw new Error(`E-H favorite request failed with HTTP ${response.status}`)
-        const successText = desired
-            ? /(?:added|updated|saved)[^<]{0,80}favorite/i.test(html)
-            : /(?:removed|deleted)[^<]{0,80}favorite/i.test(html)
-        if (!successText) {
-            const verify = await this.authenticatedText(url.toString(), 4 * 1024 * 1024)
-            const removalControl = /value=["']favdel["']/i.test(verify)
-            if (removalControl !== desired)
-                throw new Error('E-H favorite state could not be confirmed')
-        }
-        return { changed: true, isFavorite: desired, category, note }
+            throw new Error(`E-H favorite update failed with HTTP ${response.status}`)
+        return { changed: true, desired, category: desired ? category : null }
     }
 
-    async probeExHentai(): Promise<ExHentaiCapability> {
-        if (!this.session) return 'UNAVAILABLE'
-        try {
-            const response = await this.request(
-                `${EXH_ORIGIN}/uconfig.php`,
-                { headers: { accept: 'text/html,*/*;q=0.8' } },
-                4 * 1024 * 1024,
-                { authenticated: true, allowHttpErrors: true }
-            )
-            if (response.status === 401 || response.status === 403)
-                return 'UNAVAILABLE'
-            const html = await this.responseText(response, 4 * 1024 * 1024)
-            if (
-                !response.ok ||
-                accountRejected(response, html) ||
-                /sad\s*panda/i.test(html)
-            )
-                return 'UNAVAILABLE'
-            return 'AVAILABLE'
-        } catch (error) {
-            if (
-                error instanceof Error &&
-                /session is not configured|session is not valid/i.test(error.message)
-            )
-                return 'UNAVAILABLE'
-            return 'NETWORK_ERROR'
-        }
-    }
-
-    async detailsOnSurface(comicId: string, surface: EhSurface = 'eh') {
+    async episodes(comicId: string): Promise<Episode[]> {
         const ref = parseEhComicId(comicId)
-        const values = await this.gdata([ref], surface)
-        if (!values[0]) throw new Error('E-H gallery metadata was not returned')
-        return ehMetadataToComic(values[0], surface)
-    }
-
-    async details(comicId: string) {
-        return this.detailsOnSurface(comicId, 'eh')
-    }
-
-    async episodesOnSurface(comicId: string, surface: EhSurface = 'eh'): Promise<Episode[]> {
-        const comic = await this.detailsOnSurface(comicId, surface)
-        const ref = parseEhComicId(comicId)
+        const metadata = (await this.gdata([ref]))[0]
+        const comic = ehMetadataToComic(metadata)
         return [
             {
+                _id: `eh-${ref.gid}`,
                 id: `eh-${ref.gid}`,
-                title: comic.title,
+                title: 'Gallery',
                 order: 1,
-                updated_at: comic.createdAt ?? ''
+                updated_at: comic.createdAt ?? new Date(0).toISOString()
             }
         ]
     }
 
-    async episodes(comicId: string): Promise<Episode[]> {
-        return this.episodesOnSurface(comicId, 'eh')
-    }
-
-    async pagesOnSurface(comicId: string, episode: Episode, surface: EhSurface = 'eh'): Promise<Picture[]> {
+    async pages(comicId: string, _episode: Episode): Promise<Picture[]> {
         const ref = parseEhComicId(comicId)
-        if (episode.id !== `eh-${ref.gid}`)
-            throw new Error('E-H synthetic chapter does not match this gallery')
-        const comic = await this.detailsOnSurface(comicId, surface)
-        const expected = Math.max(0, comic.pagesCount ?? 0)
-        const origin = surface === 'exh' ? EXH_ORIGIN : GALLERY_ORIGIN
-        const pageUrls: string[] = []
+        const metadata = (await this.gdata([ref]))[0]
+        const count = Math.max(0, Number(metadata.filecount ?? 0))
+        if (!count) return []
+        const pictureLinks: string[] = []
         const seen = new Set<string>()
-        for (let index = 0; index < MAX_GALLERY_INDEX_PAGES; index++) {
-            const url = `${origin}/g/${ref.gid}/${ref.token}/?p=${index}`
-            const html = surface === 'exh'
-                ? await this.authenticatedText(url)
-                : await this.text(url)
-            const pattern = new RegExp(
-                `(?:https?:\\/\\/(?:e-hentai\\.org|exhentai\\.org))?\\/s\\/[0-9a-f]+\\/${ref.gid}-\\d+`,
-                'gi'
-            )
-            let added = 0
+        const pageCount = Math.ceil(count / 40)
+        if (pageCount > MAX_GALLERY_INDEX_PAGES)
+            throw new Error('E-H gallery is too large to enumerate safely')
+        for (let page = 0; page < pageCount; page++) {
+            const url = new URL(`/g/${ref.gid}/${ref.token}/`, GALLERY_ORIGIN)
+            url.searchParams.set('p', String(page))
+            const html = await this.text(url.toString())
+            const pattern = /(?:https?:\/\/(?:e-hentai\.org|exhentai\.org))?\/s\/[0-9a-f]+\/\d+-\d+/gi
             for (const match of html.matchAll(pattern)) {
-                const absolute = new URL(htmlDecode(match[0]), origin).toString()
-                if (seen.has(absolute)) continue
-                seen.add(absolute)
-                pageUrls.push(absolute)
-                added += 1
-            }
-            if ((expected > 0 && pageUrls.length >= expected) || added === 0) break
-            await delay(100)
-        }
-        if (expected > 0 && pageUrls.length < expected)
-            throw new Error(
-                `E-H gallery page list is incomplete (${pageUrls.length}/${expected})`
-            )
-        return pageUrls.slice(0, expected || pageUrls.length).map((url, index) => {
-            const position = index + 1
-            const name = `${String(position).padStart(4, '0')}.jpg`
-            return {
-                id: `eh-${ref.gid}-${position}`,
-                name,
-                path: url,
-                fileServer: GALLERY_ORIGIN,
-                url: encodeLocator(url),
-                epTitle: episode.title,
-                media: {
-                    originalName: name,
-                    path: url,
-                    fileServer: GALLERY_ORIGIN
+                const absolute = new URL(match[0], GALLERY_ORIGIN).toString()
+                if (!seen.has(absolute)) {
+                    seen.add(absolute)
+                    pictureLinks.push(absolute)
                 }
             }
-        })
+            if (pictureLinks.length >= count) break
+            if (page + 1 < pageCount) await delay(250)
+        }
+        return pictureLinks.slice(0, count).map((link, index) => ({
+            _id: `eh-${ref.gid}-${index + 1}`,
+            url: encodeLocator(link),
+            media: { originalName: `${String(index + 1).padStart(4, '0')}.jpg` }
+        }))
     }
 
-    async pages(comicId: string, episode: Episode): Promise<Picture[]> {
-        return this.pagesOnSurface(comicId, episode, 'eh')
-    }
-
-    async fetchCover(locator: string, maxBytes = 20 * 1024 * 1024) {
-        const coverUrl = trustedCoverUrl(locator)
-        if (!coverUrl) throw new Error('E-H cover URL was rejected as untrusted')
-        const response = await this.request(
-            coverUrl,
-            { headers: { referer: `${GALLERY_ORIGIN}/`, accept: 'image/*' } },
-            maxBytes
-        )
-        const contentType = safeRasterContentType(response.headers.get('content-type'))
-        if (!contentType) throw new Error('E-H returned an unsupported cover type')
-        const data = Buffer.from(await response.arrayBuffer())
-        if (data.byteLength > maxBytes) throw new Error('E-H cover exceeds the size limit')
-        return { data, contentType }
-    }
-
-    async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
+    async fetchPage(locator: string) {
         const pageUrl = decodeLocator(locator)
-        const html = new URL(pageUrl).hostname === 'exhentai.org'
-            ? await this.authenticatedText(pageUrl)
-            : await this.text(pageUrl)
-        const match =
-            /<img[^>]+id=["']img["'][^>]+src=["']([^"']+)["']/i.exec(html) ??
-            /<img[^>]+src=["']([^"']+)["'][^>]+id=["']img["']/i.exec(html)
-        if (!match) throw new Error('E-H image page did not contain a readable image URL')
-        const imageUrl = trustedCoverUrl(htmlDecode(match[1]))
-        if (!imageUrl) throw new Error('E-H image URL was rejected as untrusted')
+        const pageHtml = await this.text(pageUrl)
+        const imageMatch = pageHtml.match(
+            /<img[^>]+id=["']img["'][^>]+src=["']([^"']+)["']/i
+        ) ?? pageHtml.match(
+            /<img[^>]+src=["']([^"']+)["'][^>]+id=["']img["']/i
+        )
+        if (!imageMatch) throw new Error('E-H image URL was not found')
+        const imageUrl = htmlDecode(imageMatch[1])
+        const target = new URL(imageUrl)
+        if (target.protocol !== 'https:') throw new Error('E-H image URL is not HTTPS')
         const response = await this.request(
-            imageUrl,
-            { headers: { referer: pageUrl, accept: 'image/*' } },
-            maxBytes
+            target.toString(),
+            {
+                headers: {
+                    referer: pageUrl,
+                    accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+                }
+            },
+            64 * 1024 * 1024
         )
         const contentType = safeRasterContentType(response.headers.get('content-type'))
-        if (!contentType) throw new Error('E-H returned an unsupported image type')
         const data = Buffer.from(await response.arrayBuffer())
-        if (data.byteLength > maxBytes) throw new Error('E-H image exceeds the size limit')
+        if (data.byteLength > 64 * 1024 * 1024)
+            throw new Error('E-H image exceeds the configured size limit')
         return { data, contentType }
     }
 }

@@ -15,8 +15,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 41
-        versionName '0.1.0-alpha8.14-multi-remote-storage'
+        versionCode 42
+        versionName '0.1.0-alpha8.15-multi-provider'
         manifestPlaceholders = [
                 appLabel  : 'Pica Library',
                 pairScheme: 'picalibrary'
@@ -38,7 +38,7 @@ android {
 
     buildTypes {
         debug {
-            // Side-by-side manual QA build. It must never replace the formal Preview app.
+            // Side-by-side manual QA build. It must never replace the formal app.
             applicationIdSuffix '.dev'
             versionNameSuffix '-dev-pr35'
             debuggable true
@@ -46,7 +46,7 @@ android {
                     appLabel  : 'Pica Library Dev',
                     pairScheme: 'picalibrary'
             ]
-            // CI candidate builds reuse the fixed Preview signing identity so future Dev APKs
+            // CI candidate builds reuse the fixed official signing identity when configured so future Dev APKs
             // can upgrade the previous Dev installation without shipping a private key.
             if (previewSigningConfigured) {
                 signingConfig signingConfigs.preview

@@ -6,6 +6,7 @@ on:
     paths:
       - 'mobile/android-alpha2/**'
       - 'test/unit/android-dev-package-contract.test.ts'
+      - 'test/unit/android-library-author-history-v2.test.ts'
       - 'test/unit/workflow-entrypoint.test.ts'
       - '.github/workflows/pr35-dev-apk.yml'
 

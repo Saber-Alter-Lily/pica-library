@@ -28,7 +28,7 @@ final class EhAccountStore {
     private EhAccountStore(){}
 
     static Session load(Context context){SharedPreferences p=context.getSharedPreferences(PREF,Context.MODE_PRIVATE);return new Session(decrypt(p.getString("memberId","")),decrypt(p.getString("passHash","")),decrypt(p.getString("igneous","")),decrypt(p.getString("cfClearance","")));}
-    static void save(Context context,Session value) throws Exception {context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putString("memberId",encrypt(value.memberId)).putString("passHash",encrypt(value.passHash)).putString("igneous",encrypt(value.igneous)).putString("cfClearance",encrypt(value.cfClearance)).apply();}
+    static void save(Context context,Session value) throws Exception {context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putString("memberId",encrypt(value.memberId)).putString("passHash",encrypt(value.passHash)).putString("igneous",encrypt(value.igneous)).putString("cfClearance",encrypt(value.cfClearance)).apply();EhCapabilityStore.invalidate(context);}
 
     static void saveCookieJars(Context context,String forums,String eh,String exh) throws Exception {
         context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit()
@@ -36,6 +36,7 @@ final class EhAccountStore {
             .putString(COOKIE_EH,encrypt(cleanCookieHeader(eh)))
             .putString(COOKIE_EXH,encrypt(cleanCookieHeader(exh)))
             .apply();
+        EhCapabilityStore.invalidate(context);
     }
     static String cookieJar(Context context,String host){
         String key=cookieKey(host);if(key.isEmpty())return "";
@@ -45,8 +46,8 @@ final class EhAccountStore {
         String key=cookieKey(host);if(key.isEmpty())return;
         context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().putString(key,encrypt(cleanCookieHeader(raw))).apply();
     }
-    static void clearCookieJars(Context context){context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().remove(COOKIE_FORUMS).remove(COOKIE_EH).remove(COOKIE_EXH).apply();}
-    static void clear(Context context){context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().clear().apply();}
+    static void clearCookieJars(Context context){context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().remove(COOKIE_FORUMS).remove(COOKIE_EH).remove(COOKIE_EXH).apply();EhCapabilityStore.invalidate(context);}
+    static void clear(Context context){context.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().clear().apply();EhCapabilityStore.clear(context);}
 
     private static String cookieKey(String host){String h=host==null?"":host.toLowerCase(Locale.ROOT);if(h.equals("forums.e-hentai.org")||h.endsWith(".forums.e-hentai.org"))return COOKIE_FORUMS;if(h.equals("e-hentai.org")||h.endsWith(".e-hentai.org"))return COOKIE_EH;if(h.equals("exhentai.org")||h.endsWith(".exhentai.org"))return COOKIE_EXH;return "";}
     private static String cleanCookieHeader(String raw){if(raw==null||raw.trim().isEmpty())return "";StringBuilder out=new StringBuilder();for(String part:raw.split(";")){String item=part.trim();int at=item.indexOf('=');if(at<=0)continue;String name=item.substring(0,at).trim(),value=item.substring(at+1).trim();if(name.isEmpty()||value.isEmpty()||containsCtl(name)||containsCtl(value))continue;if(out.length()>0)out.append("; ");out.append(name).append('=').append(value);}return out.toString();}

@@ -5,6 +5,7 @@ export type ProviderId = 'pica' | 'eh'
 export type EhSurface = 'eh' | 'exh'
 export type OnlineSource = 'pica' | EhSurface
 export type CompletionStatus = 'FINISHED' | 'ONGOING' | 'UNKNOWN'
+export type EhBrowseMode = 'latest' | 'popular' | 'favorites' | 'watched' | 'toplist'
 
 export interface CanonicalTag {
     raw: string
@@ -67,6 +68,13 @@ export interface SearchRequest {
     categories?: string[]
     limit?: number
     surface?: EhSurface
+    ehMode?: EhBrowseMode
+    ehToplist?: string
+    ehLanguage?: string
+    ehExcludeTags?: string[]
+    ehMinRating?: number
+    ehPageFrom?: number
+    ehPageTo?: number
 }
 
 export interface ComicProvider {

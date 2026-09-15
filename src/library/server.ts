@@ -1321,6 +1321,13 @@ export async function startLibraryServer(options: {
                             : undefined,
                         tags: stringList(input.tags),
                         categories: stringList(input.categories),
+                        ehMode: ['latest','popular','favorites','watched','toplist'].includes(String(input.ehMode ?? '')) ? String(input.ehMode) as 'latest' | 'popular' | 'favorites' | 'watched' | 'toplist' : undefined,
+                        ehToplist: input.ehToplist ? String(input.ehToplist) : undefined,
+                        ehLanguage: input.ehLanguage ? String(input.ehLanguage) : undefined,
+                        ehExcludeTags: stringList(input.ehExcludeTags),
+                        ehMinRating: Number(input.ehMinRating ?? 0),
+                        ehPageFrom: Number(input.ehPageFrom ?? 0),
+                        ehPageTo: Number(input.ehPageTo ?? 0),
                         sort: (input.sort
                             ? String(input.sort)
                             : 'likes') as SortMode,

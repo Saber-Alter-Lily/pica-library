@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import pLimit from 'p-limit'
 import { Pica } from '../sdk'
 import { EhProvider, type EhSession } from '../providers/eh-provider'
-import type { OnlineSource } from '../providers/types'
+import type { EhBrowseMode, OnlineSource } from '../providers/types'
 import type { Comic, Picture } from '../types'
 import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
@@ -93,6 +93,13 @@ export interface DiscoverQuery {
     sort?: SortMode
     limit?: number
     providers?: OnlineSource[]
+    ehMode?: EhBrowseMode
+    ehToplist?: string
+    ehLanguage?: string
+    ehExcludeTags?: string[]
+    ehMinRating?: number
+    ehPageFrom?: number
+    ehPageTo?: number
 }
 
 export interface DownloadProgress {
@@ -599,6 +606,13 @@ export class LibraryService {
                 keyword: query.keyword?.trim(),
                 tags: query.tags,
                 categories: query.categories,
+                ehMode: query.ehMode,
+                ehToplist: query.ehToplist,
+                ehLanguage: query.ehLanguage,
+                ehExcludeTags: query.ehExcludeTags,
+                ehMinRating: query.ehMinRating,
+                ehPageFrom: query.ehPageFrom,
+                ehPageTo: query.ehPageTo,
                 limit: Math.min(query.limit ?? 100, 1000)
             },
             query.providers?.length ? query.providers : ['pica', 'eh', 'exh']

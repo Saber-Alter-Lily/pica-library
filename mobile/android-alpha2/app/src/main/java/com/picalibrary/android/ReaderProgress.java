@@ -19,7 +19,7 @@ final class ReaderProgress {
     private final ReaderSource source;
     private final String prefix;
     private boolean syncing;
-    private String historySessionId="",historyDay="",historyStartedAt="";
+    private String historySessionId="",historyDay="",historyChapterId="",historyStartedAt="";
 
     ReaderProgress(Context context, ReaderSource source) {
         this.context=context.getApplicationContext();
@@ -97,7 +97,7 @@ final class ReaderProgress {
         } catch (Exception e) { throw new IllegalStateException("无法保存阅读进度", e); }
     }
 
-    private void recordHistory(String comic,String chapter,int page,String now){LocalDate day=ReadingHistoryStore.localDay(now);String dayKey=day==null?now.substring(0,Math.min(10,now.length())):day.toString();if(historySessionId.isEmpty()||!dayKey.equals(historyDay)){historySessionId=UUID.randomUUID().toString();historyDay=dayKey;historyStartedAt=now;}UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(context).byId.get(comic);String title=entry==null?"漫画":entry.title,author=entry==null?"未知作者":entry.displayAuthor(),provider=entry==null?(EhClient.isEhId(comic)?"eh":("pica".equals(source.kind())?"pica":"")):entry.providerId;ReadingHistoryStore.record(context,historySessionId,comic,chapter,title,author,"章节",provider,source.kind(),page,historyStartedAt,now);}
+    private void recordHistory(String comic,String chapter,int page,String now){LocalDate day=ReadingHistoryStore.localDay(now);String dayKey=day==null?now.substring(0,Math.min(10,now.length())):day.toString();if(historySessionId.isEmpty()||!dayKey.equals(historyDay)||!chapter.equals(historyChapterId)){historySessionId=UUID.randomUUID().toString();historyDay=dayKey;historyChapterId=chapter;historyStartedAt=now;}UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(context).byId.get(comic);String title=entry==null?"漫画":entry.title,author=entry==null?"未知作者":entry.displayAuthor(),provider=entry==null?(EhClient.isEhId(comic)?"eh":("pica".equals(source.kind())?"pica":"")):entry.providerId;ReadingHistoryStore.record(context,historySessionId,comic,chapter,title,author,"章节",provider,source.kind(),page,historyStartedAt,now);}
 
     synchronized void sync() {
         if (syncing) return;

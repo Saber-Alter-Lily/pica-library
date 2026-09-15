@@ -431,7 +431,12 @@ export class EhProvider implements ComicProvider {
         const exactTerm = (raw: string) => {
             const value = raw.trim()
             const colon = value.indexOf(':')
-            if (colon <= 0 || /["']/u.test(value)) return value
+            if (
+                colon <= 0 ||
+                value.includes('\\') ||
+                value.includes('"') ||
+                value.includes("'")
+            ) return value
             const namespace = value.slice(0, colon).trim()
             const tag = value.slice(colon + 1).trim().replace(/"/g, '')
             return namespace && tag ? `${namespace}:"${tag}$"` : value
@@ -597,7 +602,6 @@ export class EhProvider implements ComicProvider {
             media: { originalName: `${String(index + 1).padStart(4, '0')}.jpg` }
         }))
     }
-
     async fetchPage(locator: string) {
         const pageUrl = decodeLocator(locator)
         const pageHtml = await this.text(pageUrl)

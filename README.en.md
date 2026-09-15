@@ -2,98 +2,157 @@
 
 # Pica Library
 
-**Organize collections · Discover personally · Incremental downloads · Local reading · Cross-device access**
+Pica Library is a local-first manga library, discovery, download, and reading application for long-lived collections.
 
-Pica Library is a local-first manga library manager for long-lived collections. Use Windows to organize, search, discover, download, and read; pair Android to access comics already downloaded on the PC.
+Windows provides full management and downloading. Android provides mobile reading, online discovery, and remote access. Web/Desktop and Android share the same source model, preference semantics, recommendation logic, and reading model while adapting interaction layout to each screen.
 
-**Windows 10/11 x64 · Android Preview · Open source · Free**
+## v0.4.0 highlights
 
-[Windows v0.3.12](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.12) · [Android Preview v39](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview) · [Issues](https://github.com/Saber-Alter-Lily/pica-library/issues)
+- **Online → Sources**: adds E-Hentai; ExHentai remains an optional capability under the E-H account/session.
+- **Online → E-H Browse**: Latest, Popular, Favorites, Watched, Categories, Toplists, and advanced filters.
+- **Tags**: uses EhTagTranslation for Chinese presentation while retaining canonical E-H tags as identity.
+- **Recommendations**: Pica and E-H favorites jointly build the preference profile; ExH only expands recall when available.
+- **Comic Details → Author**: adds normalized author directory and cross-source author works.
+- **Library → History**: restores reading history with time ranges, exact dates, and resume.
+- **Library → Filters**: separates storage location from content provider and keeps sorting independent.
+- **Desktop / Web**: aligns the new multi-source, author, history, and E-H interaction logic with Android.
 
-> The Android build is **not published in any app store**. Download the APK only from this repository's GitHub Release.
+See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
-## What it does
+## Main capabilities
 
-- **Library and collection management** — sync favorites and organize by author, tag, category, shelf, and other local metadata.
-- **Search, discovery, and recommendations** — search local/online content and generate personalized recommendations from your collection profile.
-- **Persistent download queue** — retain task state across restarts, recover failures, and collapse finished history by default.
-- **Local reading** — manage downloaded comics and open them directly from the local library.
-- **Desktop ↔ Android** — a paired phone can read comics already downloaded by Desktop without downloading the same files again.
-- **WebDAV fallback** — optional backup access path for mobile use when Desktop is unavailable.
-- **Personalization** — `.pica-theme` packs can be created or imported on Desktop and synced to Android; each device keeps its own active theme.
-- **Verified updates** — Desktop supports in-app incremental updates; Android verifies version, SHA-256, package name, and fixed signing identity.
+### Library
 
-## Desktop / Web
+- **Library → Search**: title, author, tag, and category search.
+- **Library → Filters**: local phone/PC, WebDAV, online availability, and provider filters.
+- **Library → Author / Tag / Category**: unified facets without duplicating one work per source.
+- **Library → Shelves**: local organization; deleting a shelf never deletes comic files or remote favorites.
+- **Library → Reading History**: Today, 7 days, 30 days, All, or an exact date.
+- **Library → Display**: list and multiple grid densities.
 
-![Pica Library Desktop / Web overview](https://raw.githubusercontent.com/Saber-Alter-Lily/pica-library/c55c4f39171874a7fa800803a5a3cf979defd0ab/docs/assets/desktop-overview-final.png)
+### Online
 
-Desktop provides the full Library, Shelves, Discover, Favorite Atlas, Downloads, Downloaded, and unified Settings experience. Mobile pairing, WebDAV, themes, storage, maintenance, and updates live under Settings.
+- **Online → All Sources**: Pica and E-H discovery together; ExH is added only when available.
+- **Online → Pica**: search, favorites, ranking, and categories.
+- **Online → E-Hentai**: public Gallery search and reading works without an account.
+- **Online → E-H Browse**: Latest, Popular, cloud Favorites, Watched, Categories, and Toplists.
+- **Online → E-H Filters**: category, language, include/exclude tags, rating, and page count.
+- **Online → ExHentai**: entry and capability monitoring remain available; failure never blocks E-H or recommendations.
 
-**[Desktop / Web detailed guide →](docs/desktop-guide.en.md)**
+### Chinese tags and semantics
 
-## Android
+- **E-H tag display**: EhTagTranslation provides Chinese presentation and reverse lookup.
+- **E-H identity**: `namespace:value` canonical tags remain the stored identity.
+- **Cross-source semantics**: Pica tags and E-H namespaced tags map into a shared interest concept only when the mapping is defensible.
+- **Provider recall**: Pica keeps its own query language; E-H uses exact namespaced tag queries.
 
-![Pica Library Android guide](https://raw.githubusercontent.com/Saber-Alter-Lily/pica-library/c55c4f39171874a7fa800803a5a3cf979defd0ab/docs/assets/android-overview-final.png)
+### Recommendations
 
-Android uses four primary tabs: **Library / Recommend / Online / Connect**. After pairing with Desktop, it can read local comics stored on the PC and also manage WebDAV, Pica account settings, appearance, and app updates.
+- **Recommend → Profile**: Pica cloud favorites and E-H cloud favorites jointly form the long-term preference profile.
+- **Recommend → Candidates**: Pica and E-H recall independently; ExH adds candidates only when available.
+- **Recommend → Ranking**: preserves explainable intent, source evidence, and ranker constraints.
+- **Recommend → Batches**: previous/next batches and seen-cycle state are tracked explicitly.
 
-**[Android detailed guide →](docs/android-guide.en.md)**
+### Comic details and authors
 
-## Cross-device model
+- **Details → Favorites**: Pica favorites; E-H local favorites plus ten native E-H cloud favorite slots.
+- **Details → Shelves**: add or remove a comic from one or more shelves.
+- **Details → Sources & Replicas**: inspect online source bindings and phone/Desktop/WebDAV copies.
+- **Details → Author**: author directory first, then the normalized author's cross-source works.
+- **Author normalization**: canonical name, aliases, circle, and provider bindings are retained; E-H `artist:` and `group:` are not blindly merged.
 
-| Capability | Desktop / Web | Android |
+### Reading
+
+- **Reader → Sources**: phone download, Desktop download, WebDAV, Pica online, and E-H online.
+- **Reader → Modes**: left-to-right, right-to-left, and vertical continuous reading.
+- **Reader → Progress**: local-first bookmark, then portable sync when Desktop/WebDAV is available.
+- **Reader → History**: session-based reading history instead of treating the latest bookmark as full history.
+- **History → Resume**: restores chapter and page; falls back to Details when the original source is unavailable.
+
+### Downloads and storage
+
+- **Downloads**: persistent queue, bounded concurrency, retry/recovery, and completed-task management.
+- **Android downloads**: local mobile downloads plus direct reading of Desktop-downloaded content.
+- **WebDAV**: remote catalog, selected upload, remote deletion, and mobile fallback access.
+- **Multiple WebDAV targets**: save several remote targets and switch the active target.
+- **Cache & preload**: Reader cache and prefetch are independently configurable.
+
+### Accounts and sources
+
+- **Pica account**: login, registration, and favorite synchronization.
+- **E-H account**: official web login is the normal path; manual cookie/session import is an advanced fallback.
+- **E-H session security**: Windows uses DPAPI; Android uses Android Keystore AES-GCM.
+- **ExH state**: Available, Currently unavailable, Unable to confirm, or Pending check; one failed probe is never treated as a permanent permission verdict.
+
+### Cross-device and personalization
+
+- **Desktop ↔ Android**: a paired phone can read comics already downloaded on the PC.
+- **Theme packs**: create/import `.pica-theme` packs and sync them across devices.
+- **Active theme**: selected independently on Desktop and Android.
+- **Settings → Storage & Downloads**: local folders, WebDAV, cache, and download policies.
+- **Settings → Software Update**: Windows supports official incremental and local ZIP updates; Android uses official APK update metadata.
+
+## Platform capability matrix
+
+| Capability | Windows / Web | Android |
 | --- | --- | --- |
-| Library and favorites | ✅ | ✅ |
-| Recommendations / online browsing | ✅ | ✅ |
-| Download management | ✅ primary download side | ✅ mobile tasks / app updates |
-| Read Desktop-downloaded comics | Local | ✅ after pairing |
-| WebDAV | ✅ configure / expose info | ✅ fallback access |
-| Theme packs | ✅ create / import / sync | ✅ receive / use |
-| Active theme | Device-local | Device-local |
+| Unified library, filters, shelves | Yes | Yes |
+| Pica online | Yes | Yes |
+| E-Hentai online | Yes | Yes |
+| Optional ExH capability | Yes | Yes |
+| Dual-source preference profile | Yes | Yes |
+| Author normalization and works navigation | Yes | Yes |
+| Reading history | Yes | Yes |
+| Online reader | Yes | Yes |
+| Local downloads | Primary download side | Yes |
+| Read Desktop-downloaded content | Local | Direct after pairing |
+| WebDAV | Configure, sync, manage | Read, switch, fallback |
+| Theme packs | Create, import, sync | Receive, use |
+| In-app updates | Incremental ZIP | Official APK |
 
-Theme packs can sync across devices, but **Desktop and Android do not have to use the same active theme**.
+## Install and update
 
-## Downloads and updates
+Official builds are published through [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases).
 
 ### Windows
 
-- [v0.3.12 full package](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.12/Pica-Library-v0.3.12-windows-x64.zip)
-- [v0.3.12 incremental update](https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.12/Pica-Library-v0.3.12-update.zip)
+Extract the full ZIP and run the app. User data is stored separately from application files, so program updates do not replace the personal database.
 
-The official **v0.3.11 → v0.3.12** incremental upgrade and failure rollback have been tested.
+Existing users should prefer:
 
-For v0.3.0–v0.3.10, first manually apply the [v0.3.11 update](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.3.11), then check for updates, or back up data and use the v0.3.12 full package. The v0.3.12 incremental package does not directly support those older versions.
+`Settings → Software Update → Check and update`
 
-New: account onboarding and explicit registration on both clients, Web online reading, and selected cloud upload/deletion with local files retained. Live registration and individual WebDAV services remain unvalidated; remote deletion fails closed when server-enforced locking is unavailable.
-
-Prefer **Settings → Software Update** on Desktop.
+The official `Pica-Library-vX.Y.Z-update.zip` can also be dropped into the local update area.
 
 ### Android
 
-Download `Pica-Library-Android-Preview.apk` from the [Android Preview release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/android-preview).
+The Android APK is not distributed through app stores. Download it only from this repository's official Release.
 
-The Preview is **not distributed through app stores**. Avoid unofficial mirrors and re-uploaded APKs.
+Official APK updates verify version, package name, SHA-256, and the fixed signing certificate identity.
 
 ## Local-first and security
 
-- User data stays local by default.
-- Windows credentials are protected with DPAPI for the current Windows user.
-- Official releases publish SHA-256 and build-transparency metadata.
-- Android Preview uses a fixed official signing identity.
-- GitHub OAuth access tokens are not persisted.
-- Theme packs are data/image-only and do not execute arbitrary scripts or binaries.
+- Library data, shelves, history, and settings stay local or in the user-selected WebDAV target.
+- Windows secrets are protected with the current Windows user's DPAPI.
+- Android E-H sessions are protected with Android Keystore AES-GCM.
+- E-H canonical tags are separate from the Chinese presentation layer; translation updates never rewrite content identity.
+- Theme packs contain controlled data and images only; they do not execute arbitrary code.
+- Official releases publish SHA-256, signing identity, and build-transparency metadata.
 
-## Usage notice
+## Usage boundary
 
-Pica Library is an open-source, local-first personal digital-content management tool. It does not sell, host, or redistribute manga content. Users are responsible for ensuring that account use, access, downloading, storage, reading, and backups comply with applicable law, platform terms, copyright, and other permissions.
+Pica Library is an open-source, local-first personal digital-content management tool. It does not sell, host, or redistribute manga content.
 
-See [DISCLAIMER.md](DISCLAIMER.md) for the full notice.
+Users are responsible for ensuring that account use, access, downloading, storage, reading, and backups comply with applicable law, platform terms, and authorization scope.
 
-## Get started
+See [DISCLAIMER.md](DISCLAIMER.md).
 
+## Documentation
+
+- [Project version log](PROJECT_LOG.md)
+- [Quick start](docs/quick-start.en.md)
 - [Desktop / Web guide](docs/desktop-guide.en.md)
 - [Android guide](docs/android-guide.en.md)
-- [Quick start](docs/quick-start.en.md)
 - [Windows distribution](docs/windows-distribution.md)
 - [Architecture](docs/architecture.md)
 
@@ -101,17 +160,18 @@ See [DISCLAIMER.md](DISCLAIMER.md) for the full notice.
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm type:check
 pnpm web:check
+pnpm test
 pnpm build
-pnpm test:unit
 ```
 
-The Android project lives under `mobile/android-alpha2`. Official Android release signing private keys are not stored in the repository.
+The Android project is under `mobile/android-alpha2`. Official Android release signing private keys are not stored in the repository.
 
 ## Credits
 
-Pica Library continues to build on upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
+CLI capabilities continue to build on upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
 
 ---
 
-**Only download and store content you are authorized to access. Do not redistribute comic files.**
+Only download and store content you are authorized to access. Do not redistribute comic files.

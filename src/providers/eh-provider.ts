@@ -12,7 +12,7 @@ import type {
 const API_URL = 'https://api.e-hentai.org/api.php'
 const GALLERY_ORIGIN = 'https://e-hentai.org'
 const EXH_ORIGIN = 'https://exhentai.org'
-const USER_AGENT = 'Pica-Library/0.3 (+https://github.com/Saber-Alter-Lily/pica-library)'
+const USER_AGENT = 'Pica-Library/0.4 (+https://github.com/Saber-Alter-Lily/pica-library)'
 const SEARCH_MIN_INTERVAL_MS = 3100
 const REQUEST_TIMEOUT_MS = 15000
 const MAX_GDATA_BATCH = 25

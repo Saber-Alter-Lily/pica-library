@@ -23,6 +23,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # setup-android@v3 defaults to the removed legacy "tools" package; request only current platform-tools.
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools

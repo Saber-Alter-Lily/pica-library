@@ -76,6 +76,7 @@ export interface LibraryFacetQuery {
     authorIds?: string[]
     tags?: string[]
     tagMode?: TagMatchMode
+    providerIds?: Array<'pica' | 'eh'>
     finished?: boolean
     download?: DownloadFacet
     sort?: SortMode

@@ -1,0 +1,243 @@
+name: v0.4.0 Formal Release Gate
+
+on:
+  push:
+    branches: [release/v0.4.0-gate]
+    paths:
+      - '.github/workflows/v040-release-gate.yml'
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TARGET: '04bace9c820fb8f353a57e1b40ad1f68ac6ff212'
+  DESKTOP_VERSION: '0.4.0'
+  DESKTOP_BASE_VERSION: '0.3.14'
+  DESKTOP_BASE_SHA256: '211bc7d7d4f384af0389288439e38a645a7e8a458e56d947d005cd179848cb56'
+  ANDROID_VERSION_CODE: '42'
+  ANDROID_VERSION_NAME: '0.1.0-alpha8.15-multi-provider'
+  EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+
+jobs:
+  windows-upgrade:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: '04bace9c820fb8f353a57e1b40ad1f68ac6ff212'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '04bace9c820fb8f353a57e1b40ad1f68ac6ff212'
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Re-run Desktop product gates
+        shell: pwsh
+        run: |
+          pnpm type:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download and verify official v0.3.14 base
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts\release-base | Out-Null
+          $base='artifacts\release-base\Pica-Library-v0.3.14-windows-x64.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.14/Pica-Library-v0.3.14-windows-x64.zip' -OutFile $base
+          $actual=(Get-FileHash -Algorithm SHA256 $base).Hash.ToLowerInvariant()
+          if($actual -ne $env:DESKTOP_BASE_SHA256){ throw "v0.3.14 base SHA-256 mismatch: $actual" }
+          Write-Host 'OFFICIAL_V0_3_14_BASE_SHA256=PASS'
+      - name: Build v0.4.0 full and incremental packages
+        shell: pwsh
+        run: |
+          pnpm build:windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec tsx scripts/build-local-update-package.ts artifacts/release-base/Pica-Library-v0.3.14-windows-x64.zip artifacts/Pica-Library-v0.4.0-windows-x64.zip artifacts/Pica-Library-v0.4.0-update.zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify v0.3.14 to v0.4.0 manifest contract
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive=[IO.Compression.ZipFile]::OpenRead('artifacts\Pica-Library-v0.4.0-update.zip')
+          try {
+            $entry=$archive.GetEntry('update-manifest.json')
+            if(-not $entry){ throw 'update-manifest.json missing' }
+            $reader=New-Object IO.StreamReader($entry.Open())
+            try { $manifest=($reader.ReadToEnd() | ConvertFrom-Json) } finally { $reader.Dispose() }
+            if($manifest.sourceVersionRange -ne '=0.3.14'){ throw "unexpected source range: $($manifest.sourceVersionRange)" }
+            if($manifest.targetVersion -ne '0.4.0'){ throw "unexpected target: $($manifest.targetVersion)" }
+            if($manifest.targetSourceSha -ne $env:RELEASE_TARGET){ throw "unexpected target source: $($manifest.targetSourceSha)" }
+            if($manifest.requiresFullInstall){ throw 'incremental update unexpectedly requires full install' }
+            $protected=@('Pica Library.exe','app/updater.js','runtime/node.exe')
+            foreach($item in @($manifest.files)){ if($protected -contains [string]$item.path){ throw "protected replacement in update: $($item.path)" } }
+            foreach($item in @($manifest.deletions)){ if($protected -contains [string]$item){ throw "protected deletion in update: $item" } }
+          } finally { $archive.Dispose() }
+          Write-Host 'V0314_TO_V040_MANIFEST=PASS'
+      - name: Apply with official v0.3.14 updater and verify the resulting install
+        shell: pwsh
+        run: |
+          $appRoot=Join-Path $env:RUNNER_TEMP 'pica-upgrade-v0314'
+          $targetRoot=Join-Path $env:RUNNER_TEMP 'pica-target-v040'
+          $stagingRoot=Join-Path $env:RUNNER_TEMP 'pica-update-staging'
+          $stateRoot=Join-Path $env:RUNNER_TEMP 'pica-user-state'
+          $backupRoot=Join-Path $stateRoot 'upgrade-backup'
+          foreach($p in @($appRoot,$targetRoot,$stagingRoot,$stateRoot)){ New-Item -ItemType Directory -Force -Path $p | Out-Null }
+          Expand-Archive -LiteralPath 'artifacts\release-base\Pica-Library-v0.3.14-windows-x64.zip' -DestinationPath $appRoot
+          Expand-Archive -LiteralPath 'artifacts\Pica-Library-v0.4.0-windows-x64.zip' -DestinationPath $targetRoot
+          Expand-Archive -LiteralPath 'artifacts\Pica-Library-v0.4.0-update.zip' -DestinationPath $stagingRoot
+          New-Item -ItemType Directory -Force -Path (Join-Path $stateRoot 'data'),(Join-Path $stateRoot 'runtime-state') | Out-Null
+          Set-Content -LiteralPath (Join-Path $stateRoot 'data\upgrade-sentinel.txt') -Value 'keep-user-data' -Encoding ascii
+          $manifest=Get-Content -Raw -LiteralPath (Join-Path $stagingRoot 'update-manifest.json') | ConvertFrom-Json
+          $instruction=[ordered]@{
+            parentPid=99999999
+            applicationRoot=$appRoot
+            stagingRoot=$stagingRoot
+            backupRoot=$backupRoot
+            manifest=$manifest
+            launcherPath=(Join-Path $appRoot 'Pica Library.exe')
+            runtimePath=(Join-Path $appRoot 'runtime\node.exe')
+            desktopEntryPath=(Join-Path $appRoot 'app\desktop.js')
+            instanceFile=(Join-Path $stateRoot 'runtime-state\instance.json')
+            progressFile=(Join-Path $stateRoot 'runtime-state\update-progress.json')
+            healthTimeoutMs=30000
+          }
+          $instructionFile=Join-Path $stateRoot 'runtime-state\instruction.json'
+          $instruction | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $instructionFile -Encoding utf8
+          $env:PICA_LIBRARY_DESKTOP_HOME=$stateRoot
+          & (Join-Path $appRoot 'runtime\node.exe') (Join-Path $appRoot 'app\updater.js') $instructionFile
+          if($LASTEXITCODE -ne 0){ throw "official v0.3.14 updater exited with $LASTEXITCODE" }
+          $progress=Get-Content -Raw -LiteralPath (Join-Path $stateRoot 'runtime-state\update-progress.json') | ConvertFrom-Json
+          if($progress.phase -ne 'complete' -or $progress.targetVersion -ne '0.4.0'){ throw "updater did not complete: $($progress | ConvertTo-Json -Compress)" }
+          if((Get-Content -Raw -LiteralPath (Join-Path $stateRoot 'data\upgrade-sentinel.txt')).Trim() -ne 'keep-user-data'){ throw 'user-data sentinel changed during update' }
+          $instance=Get-Content -Raw -LiteralPath (Join-Path $stateRoot 'runtime-state\instance.json') | ConvertFrom-Json
+          $status=Invoke-RestMethod -Uri "$($instance.url)/api/v1/status" -TimeoutSec 5
+          $caps=Invoke-RestMethod -Uri "$($instance.url)/api/v1/capabilities" -TimeoutSec 5
+          if($status.version -ne '0.4.0'){ throw "updated status version mismatch: $($status.version)" }
+          if($caps.appVersion -ne '0.4.0'){ throw "updated capabilities version mismatch: $($caps.appVersion)" }
+          Stop-Process -Id ([int]$instance.pid) -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Milliseconds 500
+          $exclude=@('DISCLAIMER.md')
+          $targetFiles=Get-ChildItem -LiteralPath $targetRoot -Recurse -File
+          foreach($file in $targetFiles){
+            $rel=[IO.Path]::GetRelativePath($targetRoot,$file.FullName).Replace('\','/')
+            if($exclude -contains $rel){ continue }
+            $actual=Join-Path $appRoot $rel
+            if(-not (Test-Path -LiteralPath $actual)){ throw "updated install missing target file: $rel" }
+            $a=(Get-FileHash -Algorithm SHA256 -LiteralPath $actual).Hash
+            $b=(Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash
+            if($a -ne $b){ throw "updated install differs from target: $rel" }
+          }
+          $targetSet=@{}
+          foreach($file in $targetFiles){ $rel=[IO.Path]::GetRelativePath($targetRoot,$file.FullName).Replace('\','/'); if(-not ($exclude -contains $rel)){ $targetSet[$rel]=$true } }
+          foreach($file in Get-ChildItem -LiteralPath $appRoot -Recurse -File){
+            $rel=[IO.Path]::GetRelativePath($appRoot,$file.FullName).Replace('\','/')
+            if($exclude -contains $rel){ continue }
+            if(-not $targetSet.ContainsKey($rel)){ throw "updated install retained unexpected file: $rel" }
+          }
+          Write-Host 'V0314_OFFICIAL_UPDATER_TO_V040=PASS'
+          Write-Host 'V040_UPDATED_APP_HEALTH=PASS'
+          Write-Host 'USER_DATA_PRESERVATION=PASS'
+      - name: Write Windows candidate evidence
+        shell: pwsh
+        run: |
+          $full='artifacts\Pica-Library-v0.4.0-windows-x64.zip'
+          $update='artifacts\Pica-Library-v0.4.0-update.zip'
+          $fullHash=(Get-FileHash -Algorithm SHA256 $full).Hash.ToLowerInvariant()
+          $updateHash=(Get-FileHash -Algorithm SHA256 $update).Hash.ToLowerInvariant()
+          "$fullHash  Pica-Library-v0.4.0-windows-x64.zip`n$updateHash  Pica-Library-v0.4.0-update.zip" | Set-Content -Encoding ascii artifacts\SHA256SUMS-Windows.txt
+          [ordered]@{
+            release='v0.4.0-candidate'; sourceSha=$env:RELEASE_TARGET; baseVersion='0.3.14'; baseSha256=$env:DESKTOP_BASE_SHA256; fullSha256=$fullHash; updateSha256=$updateHash;
+            upgradeValidation=@('official-v0.3.14-base-sha256','manifest-source-range','official-v0.3.14-updater-apply','v0.4.0-health-check','application-tree-match','user-data-preserved')
+          } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 artifacts\BUILD_TRANSPARENCY-Windows.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-v0.4.0-Windows-candidate
+          path: |
+            artifacts/Pica-Library-v0.4.0-windows-x64.zip
+            artifacts/Pica-Library-v0.4.0-update.zip
+            artifacts/SHA256SUMS-Windows.txt
+            artifacts/BUILD_TRANSPARENCY-Windows.json
+          retention-days: 1
+          if-no-files-found: error
+
+  android-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '04bace9c820fb8f353a57e1b40ad1f68ac6ff212'
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test and lint before signing
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Build formal v42 and verify upgrade identity from official v41
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
+          test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
+          curl -fL --retry 3 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.14/Pica-Library-Android-v41.apk' -o "$RUNNER_TEMP/Pica-Library-Android-v41.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/Pica-Library-Android-v41.apk" > "$RUNNER_TEMP/v41-cert.txt"
+          oldcert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/v41-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$oldcert" = "$EXPECTED_CERT"
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleRelease --no-daemon
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$RUNNER_TEMP/Pica-Library-Android-v41.apk" > "$RUNNER_TEMP/v41-package.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/v42-package.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='41'" "$RUNNER_TEMP/v41-package.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='42' versionName='0.1.0-alpha8.15-multi-provider'" "$RUNNER_TEMP/v42-package.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/v42-cert.txt"
+          newcert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/v42-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$newcert" = "$EXPECTED_CERT"
+          test "$newcert" = "$oldcert"
+          mkdir -p publish
+          cp "$apk" publish/Pica-Library-Android-v42.apk
+          sha=$(sha256sum publish/Pica-Library-Android-v42.apk | awk '{print $1}')
+          printf '%s\n' "$newcert" > publish/CERTIFICATE_SHA256.txt
+          printf '%s  %s\n' "$sha" 'Pica-Library-Android-v42.apk' > publish/SHA256SUMS-Android.txt
+          python - "$sha" "$newcert" "$RELEASE_TARGET" <<'PY'
+          import json,sys
+          sha,cert,source=sys.argv[1:]
+          out={'release':'v0.4.0-candidate','versionCode':42,'versionName':'0.1.0-alpha8.15-multi-provider','sourceSha':source,'apkSha256':sha,'signerCertificateSha256':cert,'upgradeFromVersionCode':41,'upgradeValidation':['same-package-id','strictly-higher-version-code','same-signing-certificate','unit-tests','lint','R8-release-build']}
+          with open('publish/BUILD_TRANSPARENCY-Android.json','w',encoding='utf-8') as f: json.dump(out,f,ensure_ascii=False,indent=2)
+          PY
+          unset ANDROID_PREVIEW_KEYSTORE_PASSWORD
+          echo 'ANDROID_V41_TO_V42_IDENTITY=PASS'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-v0.4.0-Android-v42-candidate
+          path: mobile/android-alpha2/publish/
+          retention-days: 1
+          if-no-files-found: error

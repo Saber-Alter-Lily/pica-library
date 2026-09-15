@@ -6,7 +6,7 @@ describe('source-oriented product navigation', () => {
     const html = fs.readFileSync('web/index.html', 'utf8')
     expect(html).toContain('<details class="source-picker">')
     expect(html).toContain('id="search-provider"')
-    expect(html).toContain('<option value="exh">ExH（需 E-H 账号权限）</option>')
+    expect(html).toContain('<option value="exh">')
     expect(html).toContain('<details class="wide account-disclosure">')
     expect(html).toContain('<details class="account-advanced">')
     expect(html).not.toContain('<button data-online-source="pica"')
@@ -24,13 +24,14 @@ describe('source-oriented product navigation', () => {
     expect(script).toContain('observeResultCardActions()')
   })
 
-  it('uses one Android source capability authority instead of source-specific button leakage', () => {
+  it('uses one Android source capability authority and classifies ExH as optional under E-H', () => {
     const caps = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SourceCapabilities.java', 'utf8')
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
-    expect(caps).toContain('ALL=new Source("all","全部来源",false')
-    expect(caps).toContain('PICA=new Source("pica","Pica",true')
-    expect(caps).toContain('EH=new Source("eh","E-Hentai",true')
-    expect(caps).toContain('EXH=new Source("exh","ExHentai",true')
+    expect(caps).toContain('enum Tier { AGGREGATE, CORE, OPTIONAL_CAPABILITY }')
+    expect(caps).toContain('PICA=new Source("pica","Pica","",Tier.CORE')
+    expect(caps).toContain('EH=new Source("eh","E-Hentai","",Tier.CORE')
+    expect(caps).toContain('EXH=new Source("exh","ExHentai","eh",Tier.OPTIONAL_CAPABILITY')
+    expect(caps).toContain('baseRecommendationSource')
     expect(browse).toContain('SourceCapabilities.byId(sourceMode)')
     expect(browse).toContain('if(source().supportsBrowse)')
     expect(browse).toContain('button("浏览 ▾"')
@@ -38,7 +39,7 @@ describe('source-oriented product navigation', () => {
     expect(browse).not.toContain('全部来源 · E-H 公共浏览无需账号')
   })
 
-  it('routes Android account management through a unified hub while keeping ExH under E-H', () => {
+  it('routes Android account management through a unified hub while keeping ExH monitored under E-H', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
     const hub = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AccountSourcesActivity.java', 'utf8')
     const manifest = fs.readFileSync('mobile/android-alpha2/app/src/main/AndroidManifest.xml', 'utf8')
@@ -47,8 +48,10 @@ describe('source-oriented product navigation', () => {
     expect(hub).toContain('"E-Hentai / ExHentai"')
     expect(hub).toContain('SettingsRow.panel(this')
     expect(hub).toContain('"E-H 账号",eh?"已登录":"未登录"')
-    expect(hub).toContain('"ExH 权限"')
-    expect(hub).toContain('eh?"检查中":"需 E-H 登录"')
+    expect(hub).toContain('"ExH 扩展"')
+    expect(hub).toContain('EhCapabilityStore.load(this)')
+    expect(hub).toContain('EhCapabilityStore.refreshAsync(this,false')
+    expect(hub).not.toContain('"ExH 权限"')
     expect(hub).not.toContain('ExHAccountActivity')
     expect(manifest).toContain('.AccountSourcesActivity')
     expect(manifest).toContain('.EhWebLoginActivity')
@@ -81,6 +84,7 @@ describe('source-oriented product navigation', () => {
     expect(eh).toContain('"账号管理 ▾"')
     expect(eh).toContain('"其他方式 ▾"')
     expect(eh).toContain('EhSessionActivity.class')
+    expect(eh).toContain('"重新检查 ExH"')
     expect(eh).not.toContain('公共 E-H 搜索、阅读、下载无需账号')
     expect(eh).not.toContain('Android Keystore AES-GCM')
     expect(session).toContain('"手动导入会话"')
@@ -108,14 +112,16 @@ describe('source-oriented product navigation', () => {
     expect(settings).not.toContain('感谢你使用')
   })
 
-  it('keeps Android secondary actions collapsed and settings named as a top-level destination', () => {
+  it('keeps Android secondary actions collapsed and ExH failure scoped to its optional surface', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
     const detail = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java', 'utf8')
     const shell = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ShellPolicy.java', 'utf8')
     expect(browse).toContain('setSingleChoiceItems(labels,checked')
     expect(browse).toContain('primaryButton("搜索"')
     expect(browse).toContain('showPicaUnavailable()')
-    expect(browse).toContain('showExhUnavailable()')
+    expect(browse).toContain('showExhProblem(EhCapabilityStore.Snapshot capability)')
+    expect(browse).toContain('"ExHentai · 可选扩展"')
+    expect(browse).toContain('"部分核心来源不可用"')
     expect(detail).toContain('content.addView(sourceDetails,new LinearLayout.LayoutParams(-2,-2))')
     expect(detail).toContain('rows.add("切换当前网盘 · "+active.label)')
     expect(detail).not.toContain('content.addView(switchRemote)')

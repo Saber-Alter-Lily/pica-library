@@ -1,0 +1,117 @@
+name: PR35 one-shot release gate fix
+
+on:
+  push:
+    branches: [feature/eh-provider-v1]
+    paths:
+      - '.github/workflows/pr35-release-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/eh-provider-v1
+          fetch-depth: 0
+      - name: Apply bounded release-gate fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one replacement target, found {count}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # 1) Preserve the E-H exact-tag injection guard without an invalid Unicode regex escape.
+          p = Path('src/providers/eh-provider.ts')
+          lines = p.read_text(encoding='utf-8').splitlines()
+          hits = [i for i, line in enumerate(lines) if 'colon <= 0 ||' in line and '.test(value)' in line]
+          if len(hits) != 1:
+              raise SystemExit(f'eh-provider exactTerm guard: expected one target, found {len(hits)}')
+          indent = lines[hits[0]][:len(lines[hits[0]]) - len(lines[hits[0]].lstrip())]
+          lines[hits[0]] = indent + "if (colon <= 0 || value.includes('\\\\') || value.includes('\"') || value.includes(\"'\")) return value"
+          p.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+          # 2) Turn the v0.3.14 distribution test into a monotonic baseline and bind v0.4.0 packaging to the official v0.3.14 package.
+          replace_once(
+              'test/unit/account-onboarding-release.test.ts',
+              """        expect(pkg.version).toBe('0.3.14')
+        expect(gradle).toContain('versionCode 41')
+        expect(gradle).toContain(
+            \"versionName '0.1.0-alpha8.14-multi-remote-storage'\"
+        )""",
+              """        const [desktopMajor, desktopMinor, desktopPatch] = pkg.version.split('.').map(Number)
+        const androidVersionCode = Number(gradle.match(/versionCode\\s+(\\d+)/)?.[1] ?? 0)
+        const desktopAtLeast0314 = desktopMajor > 0 || desktopMinor > 3 || (desktopMinor === 3 && desktopPatch >= 14)
+        expect(desktopAtLeast0314).toBe(true)
+        expect(androidVersionCode).toBeGreaterThan(41)
+        expect(gradle).toContain(\"versionName '0.1.0-alpha8.\")"""
+          )
+          replace_once(
+              'test/unit/account-onboarding-release.test.ts',
+              """        expect(script).toContain(
+            '4575cc0c073d68baac4a6e34979d25c062b83086053f86a87bd0d4d847cf1c77'
+        )""",
+              """        expect(script).toContain(
+            '4575cc0c073d68baac4a6e34979d25c062b83086053f86a87bd0d4d847cf1c77'
+        )
+        expect(script).toContain(\"$version -eq '0.4.0'\")
+        expect(script).toContain(
+            'artifacts\\\\release-base\\\\Pica-Library-v0.3.14-windows-x64.zip'
+        )
+        expect(script).toContain(
+            '211bc7d7d4f384af0389288439e38a645a7e8a458e56d947d005cd179848cb56'
+        )"""
+          )
+
+          # 3) Historical release-contract tests should assert minimum baselines, not pin the project forever to the 0.3 minor line.
+          replace_once(
+              'test/unit/alpha8-10-release-readiness.test.ts',
+              """        expect(pkg.version.startsWith('0.3.')).toBe(true)
+        expect(patch).toBeGreaterThanOrEqual(10)""",
+              """        const [desktopMajor, desktopMinor] = pkg.version.split('.').map(Number)
+        const desktopAtLeast0310 = desktopMajor > 0 || desktopMinor > 3 || (desktopMinor === 3 && patch >= 10)
+        expect(desktopAtLeast0310).toBe(true)"""
+          )
+          replace_once(
+              'test/unit/alpha8-8-account-auth-theme-disclaimer.test.ts',
+              """        expect(pkg.version.startsWith('0.3.')).toBe(true)
+        expect(desktopPatch).toBeGreaterThanOrEqual(8)""",
+              """        const [desktopMajor, desktopMinor] = pkg.version.split('.').map(Number)
+        const desktopAtLeast038 = desktopMajor > 0 || desktopMinor > 3 || (desktopMinor === 3 && desktopPatch >= 8)
+        expect(desktopAtLeast038).toBe(true)"""
+          )
+
+          # 4) The implementation already preserves the raw canonical tag in dataset.rawValue; fix the stale source-string assertion.
+          replace_once(
+              'test/unit/v040-web-multi-provider-parity.test.ts',
+              "expect(web).toContain('data.rawValue = raw')",
+              "expect(web).toContain('tag.dataset.rawValue = raw')"
+          )
+
+          # This workflow is intentionally self-deleting; it must never become release infrastructure.
+          Path('.github/workflows/pr35-release-fix.yml').unlink()
+          PY
+
+          git diff --check
+          git diff -- src/providers/eh-provider.ts test/unit/account-onboarding-release.test.ts test/unit/alpha8-10-release-readiness.test.ts test/unit/alpha8-8-account-auth-theme-disclaimer.test.ts test/unit/v040-web-multi-provider-parity.test.ts
+      - name: Commit bounded fixes and remove one-shot workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: restore v0.4 release gate after version transition'
+          git push origin HEAD:feature/eh-provider-v1

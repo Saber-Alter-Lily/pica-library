@@ -4,26 +4,28 @@ import java.util.*;
 
 /** Pure, local filtering/faceting for the unified mobile library. */
 final class UnifiedLibraryFilter {
-    enum Source { PHONE, DESKTOP, WEBDAV, PICA }
+    enum Location { PHONE, DESKTOP, WEBDAV, ONLINE }
+    enum Provider { PICA, EH, EXH }
     enum TagMode { ANY, ALL }
     enum Sort { LATEST, TITLE, AUTHOR }
 
     static final class Spec {
         String text="";
-        final Set<Source> sources=new LinkedHashSet<>();
+        final Set<Location> locations=new LinkedHashSet<>();
+        final Set<Provider> providers=new LinkedHashSet<>();
         final Set<String> authors=new LinkedHashSet<>();
         final Set<String> tags=new LinkedHashSet<>();
         final Set<String> categories=new LinkedHashSet<>();
-        /** Legacy persistence field. Alpha8.1 library membership is already favorite-only. */
+        /** Legacy persistence field. Current library membership is already favorite-centric. */
         boolean favoriteOnly;
         boolean shelfOnly;
         Boolean finished;
         TagMode tagMode=TagMode.ANY;
         Sort sort=Sort.LATEST;
 
-        Spec copy(){Spec next=new Spec();next.text=text;next.sources.addAll(sources);next.authors.addAll(authors);next.tags.addAll(tags);next.categories.addAll(categories);next.favoriteOnly=false;next.shelfOnly=shelfOnly;next.finished=finished;next.tagMode=tagMode;next.sort=sort;return next;}
-        int activeCount(){int count=sources.isEmpty()?0:1;if(shelfOnly)count++;if(finished!=null)count++;if(!authors.isEmpty())count++;if(!tags.isEmpty())count++;if(!categories.isEmpty())count++;if(sort!=Sort.LATEST)count++;return count;}
-        void clear(){sources.clear();authors.clear();tags.clear();categories.clear();favoriteOnly=false;shelfOnly=false;finished=null;tagMode=TagMode.ANY;sort=Sort.LATEST;}
+        Spec copy(){Spec next=new Spec();next.text=text;next.locations.addAll(locations);next.providers.addAll(providers);next.authors.addAll(authors);next.tags.addAll(tags);next.categories.addAll(categories);next.favoriteOnly=false;next.shelfOnly=shelfOnly;next.finished=finished;next.tagMode=tagMode;next.sort=sort;return next;}
+        int activeCount(){int count=locations.isEmpty()?0:1;if(!providers.isEmpty())count++;if(shelfOnly)count++;if(finished!=null)count++;if(!authors.isEmpty())count++;if(!tags.isEmpty())count++;if(!categories.isEmpty())count++;return count;}
+        void clear(){locations.clear();providers.clear();authors.clear();tags.clear();categories.clear();favoriteOnly=false;shelfOnly=false;finished=null;tagMode=TagMode.ANY;}
     }
 
     static final class Facet {final String value;final int count;Facet(String value,int count){this.value=value;this.count=count;}}
@@ -35,7 +37,8 @@ final class UnifiedLibraryFilter {
         ArrayList<UnifiedCatalogStore.Entry> out=new ArrayList<>();String text=norm(spec.text);
         for(UnifiedCatalogStore.Entry item:source){
             if(!text.isEmpty()&&!contains(item,text))continue;
-            if(!spec.sources.isEmpty()&&!sourceMatch(item,spec.sources))continue;
+            if(!spec.locations.isEmpty()&&!locationMatch(item,spec.locations))continue;
+            if(!spec.providers.isEmpty()&&!providerMatch(item,spec.providers))continue;
             if(spec.favoriteOnly&&!item.favorite)continue;
             if(spec.shelfOnly&&!item.inShelf)continue;
             if(spec.finished!=null&&item.finished!=spec.finished.booleanValue())continue;
@@ -49,7 +52,10 @@ final class UnifiedLibraryFilter {
 
     static Facets facets(List<UnifiedCatalogStore.Entry> items){Map<String,Integer> authors=new HashMap<>(),tags=new HashMap<>(),categories=new HashMap<>();for(UnifiedCatalogStore.Entry item:items){add(authors,author(item));for(String value:item.tags)add(tags,value);for(String value:item.categories)add(categories,value);}return new Facets(facetList(authors),facetList(tags),facetList(categories));}
 
-    private static boolean sourceMatch(UnifiedCatalogStore.Entry item,Set<Source> selected){for(Source source:selected){if(source==Source.PHONE&&item.phoneDownloaded)return true;if(source==Source.DESKTOP&&item.desktopDownloaded)return true;if(source==Source.WEBDAV&&item.remoteAvailable)return true;if(source==Source.PICA&&item.picaAvailable)return true;}return false;}
+    static String sortLabel(Sort sort){if(sort==Sort.TITLE)return "标题";if(sort==Sort.AUTHOR)return "作者";return "最近更新";}
+    private static boolean locationMatch(UnifiedCatalogStore.Entry item,Set<Location> selected){for(Location source:selected){if(source==Location.PHONE&&item.phoneDownloaded)return true;if(source==Location.DESKTOP&&item.desktopDownloaded)return true;if(source==Location.WEBDAV&&item.remoteAvailable)return true;if(source==Location.ONLINE&&online(item))return true;}return false;}
+    private static boolean online(UnifiedCatalogStore.Entry item){return item.picaAvailable||item.ehAvailable||item.sourceBindings.contains("pica")||item.sourceBindings.contains("eh")||item.sourceBindings.contains("exh");}
+    private static boolean providerMatch(UnifiedCatalogStore.Entry item,Set<Provider> selected){for(Provider provider:selected){if(provider==Provider.PICA&&(item.picaAvailable||item.sourceBindings.contains("pica")))return true;if(provider==Provider.EH&&(item.sourceBindings.contains("eh")||(item.ehAvailable&&!item.sourceBindings.contains("exh"))))return true;if(provider==Provider.EXH&&item.sourceBindings.contains("exh"))return true;}return false;}
     private static boolean contains(UnifiedCatalogStore.Entry item,String text){if(norm(item.title).contains(text)||norm(item.author).contains(text)||norm(item.canonicalAuthor).contains(text))return true;for(String value:item.tags)if(norm(value).contains(text))return true;for(String value:item.categories)if(norm(value).contains(text))return true;return false;}
     private static boolean matches(List<String> actual,Set<String> wanted,TagMode mode){if(wanted.isEmpty())return true;Set<String> values=new HashSet<>(actual);if(mode==TagMode.ALL)return values.containsAll(wanted);for(String value:wanted)if(values.contains(value))return true;return false;}
     private static String author(UnifiedCatalogStore.Entry item){return safe(item.canonicalAuthor).isEmpty()?safe(item.author):item.canonicalAuthor;}

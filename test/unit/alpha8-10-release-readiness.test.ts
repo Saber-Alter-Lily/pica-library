@@ -1,15 +1,26 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+function versionAtLeast(version: string, floor: [number, number, number]) {
+    const parts = version.split('.').map(Number)
+    const current: [number, number, number] = [
+        parts[0] ?? 0,
+        parts[1] ?? 0,
+        parts[2] ?? 0
+    ]
+    for (let index = 0; index < 3; index++) {
+        if (current[index] !== floor[index]) return current[index] > floor[index]
+    }
+    return true
+}
+
 describe('Alpha8.10 release readiness baseline', () => {
     it('keeps the Alpha8.10 release train and packaging support in later releases', () => {
         const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string }
         const gradle = fs.readFileSync('mobile/android-alpha2/app/build.gradle', 'utf8')
         const windows = fs.readFileSync('scripts/build-windows-package.ps1', 'utf8')
-        const patch = Number(pkg.version.split('.')[2] || 0)
         const versionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1] || 0)
-        expect(pkg.version.startsWith('0.3.')).toBe(true)
-        expect(patch).toBeGreaterThanOrEqual(10)
+        expect(versionAtLeast(pkg.version, [0, 3, 10])).toBe(true)
         expect(versionCode).toBeGreaterThanOrEqual(37)
         expect(gradle).toContain("versionName '0.1.0-alpha8.")
         expect(windows).toContain("$version -eq '0.3.10'")

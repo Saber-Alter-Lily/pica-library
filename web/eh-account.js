@@ -107,6 +107,14 @@ function observeResultCardActions() {
     for (const root of roots) observer.observe(root, { childList: true, subtree: true })
 }
 
+function exhLabel(value, configured = true) {
+    if (!configured) return '需 E-H 登录'
+    if (value === 'AVAILABLE') return '当前可用'
+    if (value === 'NETWORK_ERROR') return '暂无法确认'
+    if (value === 'UNAVAILABLE') return '当前不可访问'
+    return '待检查'
+}
+
 async function status() {
     const response = await fetch('/api/v1/desktop/status', { cache: 'no-store' })
     if (!response.ok) throw new Error('Desktop status unavailable')
@@ -122,8 +130,8 @@ function render(value) {
         state.textContent = configured
             ? 'E-H 会话已加密保存；公共模式仍可独立使用。'
             : '未配置 E-H 会话；公共 E-H 功能可正常使用。'
-    if (value.exHentai && $('#eh-account-message'))
-        $('#eh-account-message').textContent = 'ExH: ' + value.exHentai
+    if ($('#eh-account-message'))
+        $('#eh-account-message').textContent = 'ExH 扩展：' + exhLabel(value.exHentai, configured)
 }
 
 async function action(payload) {
@@ -177,7 +185,7 @@ $('#eh-account-verify')?.addEventListener('click', async () => {
 })
 $('#eh-exh-probe')?.addEventListener('click', async () => {
     const message = $('#eh-account-message')
-    try { const value = await action({ ehAccountAction: 'probe-exh' }); message.textContent = 'ExH: ' + value.ehAccount.exHentai }
+    try { const value = await action({ ehAccountAction: 'probe-exh' }); message.textContent = 'ExH 扩展：' + exhLabel(value.ehAccount.exHentai, Boolean(value.ehAccount.configured)) }
     catch (error) { message.textContent = error instanceof Error ? error.message : String(error) }
 })
 $('#eh-favorites-sync')?.addEventListener('click', async () => {

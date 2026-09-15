@@ -1,0 +1,70 @@
+import fs from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+describe('Android Library / Author / History V2 contracts', () => {
+  it('separates replica location from online provider and keeps sorting outside active filters', () => {
+    const filter = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedLibraryFilter.java','utf8')
+    const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedFilterStore.java','utf8')
+    const dialog = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedLibraryFilterDialog.java','utf8')
+    expect(filter).toContain('enum Location { PHONE, DESKTOP, WEBDAV, ONLINE }')
+    expect(filter).toContain('enum Provider { PICA, EH, EXH }')
+    expect(filter).not.toContain('enum Source {')
+    expect(store).toContain('legacy.contains("PICA")')
+    expect(store).toContain('Location.ONLINE')
+    expect(store).toContain('Provider.PICA')
+    expect(dialog).toContain('"更多筛选"')
+    expect(dialog).not.toContain('section(root,activity,"排序")')
+  })
+
+  it('keeps library chrome compact and restores history outside bottom navigation', () => {
+    const home = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java','utf8')
+    const shell = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ShellPolicy.java','utf8')
+    const manifest = fs.readFileSync('mobile/android-alpha2/app/src/main/AndroidManifest.xml','utf8')
+    expect(home).toContain('compact("历史",v->startActivity(new Intent(this,HistoryActivity.class)))')
+    expect(home).toContain('compact("⋮",v->showLibraryMenu())')
+    expect(home).toContain('UnifiedLibraryFilter.sortLabel(librarySpec.sort)+" ▾"')
+    expect(home).toContain('private void chooseLibrarySort()')
+    expect(shell).toContain('{"书库","推荐","在线","设置"}')
+    expect(shell).not.toContain('历史')
+    expect(manifest).toContain('.HistoryActivity')
+  })
+
+  it('uses an auditable creator concept and two-stage creator navigation', () => {
+    const concepts = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AuthorConceptStore.java','utf8')
+    const detail = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java','utf8')
+    const directory = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AuthorDirectoryActivity.java','utf8')
+    const works = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AuthorWorksActivity.java','utf8')
+    expect(concepts).toContain('final class AuthorConceptStore')
+    expect(concepts).toContain('"artist:"+name,"artist"')
+    expect(concepts).toContain('"group:"+name,"group"')
+    expect(detail).toContain('AuthorDirectoryActivity.class')
+    expect(directory).toContain('AuthorWorksActivity.class')
+    expect(directory).toContain('"本作作者"')
+    expect(works).toContain('AuthorConceptStore.queryForPica(concept)')
+    expect(works).toContain('AuthorConceptStore.queryForEh(concept)')
+    expect(works).toContain('EhCapabilityStore.refresh(this,false)')
+  })
+
+  it('records session history separately from bookmarks and supports exact-date resume', () => {
+    const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
+    const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')
+    const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
+    expect(progress).toContain('ReadingHistoryStore.record(')
+    expect(progress).toContain('historyChapterId')
+    expect(progress).toContain('seedOneShotPosition')
+    expect(store).toContain('enum Range { TODAY, DAYS_7, DAYS_30, ALL }')
+    expect(store).toContain('legacySnapshot')
+    expect(history).toContain('new DatePickerDialog(')
+    expect(history).toContain('ReadingHistoryStore.Range.DAYS_30')
+    expect(history).toContain('ReaderProgress.seedOneShotPosition(this,row.comicId,row.chapterId,row.lastPage)')
+  })
+
+  it('keeps E-H browse and filter compact actions in one row', () => {
+    const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java','utf8')
+    expect(browse).toContain('Button browse=button("浏览"')
+    expect(browse).toContain('Button filter=button(filterLabel()')
+    expect(browse).toContain('browse.setSingleLine(true)')
+    expect(browse).toContain('filter.setSingleLine(true)')
+    expect(browse).not.toContain('LinearLayout filterRow=')
+  })
+})

@@ -1,12 +1,12 @@
 {
   "name": "pica-library",
-  "version": "0.3.14",
+  "version": "0.4.0",
   "private": true,
   "author": "Saber-Alter-Lily",
   "contributors": [
     "Neo (justorez) - upstream pica-cli author"
   ],
-  "description": "Collection-centric Pica library manager, explainable discovery engine and shared local/GitHub downloader",
+  "description": "Local-first multi-provider manga library, discovery, recommendation and reader",
   "packageManager": "pnpm@11.16.0",
   "type": "module",
   "bin": {
@@ -42,6 +42,7 @@
   },
   "keywords": [
     "pica",
+    "e-hentai",
     "comic-library",
     "downloader",
     "metadata",

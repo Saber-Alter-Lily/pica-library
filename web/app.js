@@ -892,6 +892,29 @@ document.addEventListener('click', (event) => {
     if (button && state.mode === 'connected') void openReaderComic(button.dataset.onlineComic, true)
 })
 
+function librarySourceBindings(comic) {
+    const values = []
+    if ((comic?.providerId || '').toLowerCase() === 'pica' || (!comic?.providerId && !String(comic?.comicId || '').startsWith('eh:'))) values.push('Pica')
+    const known = Array.isArray(comic?.providerMetadata?.knownSurfaces) ? comic.providerMetadata.knownSurfaces : []
+    if ((comic?.providerId === 'eh' || String(comic?.comicId || '').startsWith('eh:')) && !known.length) values.push('E-H')
+    if (known.includes('eh')) values.push('E-H')
+    if (known.includes('exh')) values.push('ExH')
+    return [...new Set(values)]
+}
+
+function libraryReplicaLabels(comic) {
+    const values = []
+    if (Number(comic?.downloadedPictures || 0) > 0) values.push(t('library.replica.windows'))
+    return values
+}
+
+function libraryDetails(comic) {
+    const sources = librarySourceBindings(comic)
+    const replicas = libraryReplicaLabels(comic)
+    const status = comic?.completionStatus === 'UNKNOWN' ? t('library.status.unknown') : comic?.completionStatus === 'FINISHED' ? t('library.status.finished') : t('library.status.ongoing')
+    return `<details class="comic-bindings"><summary>${escapeHtml(t('library.bindings.summary'))}</summary><p><strong>${escapeHtml(t('library.bindings.version'))}</strong> · ${escapeHtml(status)}</p><p><strong>${escapeHtml(t('library.bindings.online'))}</strong> · ${escapeHtml(sources.join(' / ') || t('library.bindings.noneSource'))}</p><p><strong>${escapeHtml(t('library.bindings.replicas'))}</strong> · ${escapeHtml(replicas.join(' / ') || t('library.bindings.noneReplica'))}</p></details>`
+}
+
 function renderComics(records = state.records) {
     const query = normalize($('#filter-text').value)
     const tags = splitList($('#filter-tag').value).map(normalize)
@@ -958,6 +981,7 @@ function renderComics(records = state.records) {
                         )
                         .join('')}</div>
                     <p class="comic-meta">${t('message.comicProgress', { likes: Number(comic.totalLikes || 0).toLocaleString(), downloaded: Number(comic.downloadedPictures || 0), total: Number(comic.knownPictures || 0) })}</p>
+                    ${libraryDetails(comic)}
                 </div>
             </article>`
         )
@@ -1013,12 +1037,41 @@ function renderAuthors() {
     }
 }
 
+function providerIdForComic(comic) {
+    return comic?.providerId ||
+        (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : 'pica')
+}
+
+function providerLabelForComic(comic) {
+    return providerIdForComic(comic) === 'eh' ? 'E-H' : 'Pica'
+}
+
+function providerPopularityForComic(comic) {
+    if (providerIdForComic(comic) === 'eh') {
+        const rating = Number(comic?.rating)
+        return Number.isFinite(rating) && rating > 0
+            ? `★ ${rating.toFixed(2)}`
+            : t('provider.publicMetadata')
+    }
+    return t('message.popularity', {
+        likes: Number(comic?.totalLikes || 0).toLocaleString(),
+        views: Number(comic?.totalViews || 0).toLocaleString()
+    })
+}
+
+function providerFavoriteLabel(comic) {
+    return providerIdForComic(comic) === 'eh' ? t('provider.localFavorite') : t('result.favorite')
+}
+
 function renderResultCards(records, target, recommendation = false) {
     const tagFrequencies = buildTagFrequencyIndex(state.records)
     const context = recommendation ? 'recommendation' : 'search'
     $(target).innerHTML = (records || [])
         .map((item, rank) => {
             const comic = item.comic || item
+            const providerMeta = recommendation
+                ? providerLabelForComic(comic)
+                : providerLabelForComic(comic) + ' · ' + providerPopularityForComic(comic)
             return `<article class="result" data-comic-id="${escapeHtml(comic.comicId)}" data-result-rank="${rank}">
                 <div class="cover-shell">
                     ${state.coversEnabled && (state.mode === 'connected' || trustedBrowserCoverUrl(comic.coverUrl)) ? `<img src="${escapeHtml(state.mode === 'connected' ? `/api/v1/covers/${encodeURIComponent(comic.comicId)}` : trustedBrowserCoverUrl(comic.coverUrl))}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentElement?.classList.add('cover-missing');this.remove()" />` : ''}
@@ -1030,8 +1083,8 @@ function renderResultCards(records, target, recommendation = false) {
                 <div>${selectDisplayTags(comic, tagFrequencies)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
                     .join('')}</div>
-                ${recommendation ? '' : `<p>${t('message.popularity', { likes: Number(comic.totalLikes || 0).toLocaleString(), views: Number(comic.totalViews || 0).toLocaleString() })}</p>`}
-                <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">${t('result.details')}</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">${t('result.favorite')}</button>` : ''}</div>
+                <p class="comic-meta">${escapeHtml(providerMeta)}</p>
+                <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">${t('result.details')}</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">${escapeHtml(providerFavoriteLabel(comic))}</button>` : ''}</div>
                 </div>
             </article>`
         })
@@ -2547,9 +2600,21 @@ $('#search-button').onclick = async () => {
                 tags: splitList($('#search-tags').value)
             }
         })
+        const providerChoice = $('#search-provider').value
+        const providerLabels = { all: t('online.source.all'), pica: t('online.source.pica'), eh: t('online.source.eh'), exh: t('online.source.exh') }
+        const providerLabel = $('#search-provider-label')
+        if (providerLabel) providerLabel.textContent = providerLabels[providerChoice] || providerChoice
         const records = await post('/api/v1/search', {
             keyword: $('#search-keyword').value,
             tags: splitList($('#search-tags').value),
+            providers:
+                providerChoice === 'pica'
+                    ? ['pica']
+                    : providerChoice === 'eh'
+                      ? ['eh']
+                      : providerChoice === 'exh'
+                        ? ['exh']
+                        : ['pica', 'eh', 'exh'],
             sort: $('#search-sort').value,
             limit: 100
         })

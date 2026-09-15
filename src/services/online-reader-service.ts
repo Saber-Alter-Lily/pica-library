@@ -26,20 +26,29 @@ export class OnlineReaderService {
         private readonly cache: PreviewCacheManager
     ) {}
 
-    private id(value: string) {
+    private comicId(value: string) {
+        if (
+            !/^[a-zA-Z0-9_-]{1,128}$/.test(value) &&
+            !/^eh:\d+:[0-9a-f]{10}$/i.test(value)
+        )
+            throw new Error('无效的漫画标识')
+        return value
+    }
+
+    private episodeId(value: string) {
         if (!/^[a-zA-Z0-9_-]{1,128}$/.test(value))
-            throw new Error('无效的漫画或章节标识')
+            throw new Error('无效的章节标识')
         return value
     }
 
     async chapters(comicId: string) {
-        this.id(comicId)
+        this.comicId(comicId)
         let episodes = this.albums.get(comicId)
         if (!episodes) {
             episodes = await this.provider.getEpisodes(comicId)
             episodes = episodes.map((episode) => ({
                 ...episode,
-                id: this.id(episode.id || episode._id || '')
+                id: this.episodeId(episode.id || episode._id || '')
             }))
             if (this.albums.size >= 20)
                 this.albums.delete(this.albums.keys().next().value!)
@@ -54,8 +63,8 @@ export class OnlineReaderService {
     }
 
     private async metadata(comicId: string, episodeId: string) {
-        this.id(comicId)
-        this.id(episodeId)
+        this.comicId(comicId)
+        this.episodeId(episodeId)
         const key = `${comicId}:${episodeId}`
         let value = this.chaptersCache.get(key)
         if (!value) {

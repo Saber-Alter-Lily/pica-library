@@ -2,6 +2,7 @@ package com.picalibrary.android;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
 
@@ -23,7 +24,9 @@ public final class PicaLibraryApp extends Application {
             @Override public void onActivitySaveInstanceState(Activity activity,Bundle state){}
             @Override public void onActivityDestroyed(Activity activity){}
         });
-        UpdateCheckJobs.schedule(this);
+        // Side-by-side Dev builds are manual QA artifacts and must not consume the formal OTA channel.
+        boolean debuggable=(getApplicationInfo().flags&ApplicationInfo.FLAG_DEBUGGABLE)!=0;
+        if(!debuggable)UpdateCheckJobs.schedule(this);
         if(PicaAccountStore.load(this).configured())PicaBootstrapJobs.enqueue(this);
         SupporterSyncJobs.enqueue(this);
         StoragePolicy.maintain(this);

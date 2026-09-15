@@ -1,30 +1,88 @@
 package com.picalibrary.android;
 
-/** Allowlisted account diagnostics. Never surface provider response bodies or headers. */
+import java.io.IOException;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Allowlisted account diagnostics. Provider response bodies and headers are never surfaced directly. */
 final class PicaAccountErrors {
-    static String message(Exception error) {
-        if(isNetwork(error))
-            return "无法连接 Pica API。注册本身不强制使用代理，但当前网络直连失败；请开启系统代理或加速器后重试。若请求在提交途中断开，请先尝试登录。";
-        String value=error.getMessage();
-        if("PICA_ACCOUNT_RATE_LIMIT".equals(value))return "Pica 请求过于频繁，请稍后再试，不要连续重复提交。";
-        if("PICA_ACCOUNT_REJECTED".equals(value))return "Pica 已拒绝本次注册请求。请检查用户名、昵称、生日、密码以及 3 组安全问题和答案后重试。";
-        if("PICA_ACCOUNT_UNAVAILABLE".equals(value))return "Pica 账号服务暂时不可用，请稍后再试。";
-        if("PICA_ACCOUNT_RESPONSE_INVALID".equals(value))return "Pica 返回了无法识别的账号响应，结果尚未确认。请先尝试登录，不要重复注册。";
-        return "账号请求未能确认。请先检查网络；如果刚提交过注册，请先尝试登录，不要立即重复创建。";
+    private static final Pattern SAFE_JSON_STRING=Pattern.compile("\\\"(?:message|error|detail|field)\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"\\\\])*)\\\"",Pattern.CASE_INSENSITIVE);
+
+    static final class RegistrationException extends IOException {
+        final String field,userMessage;
+        final boolean retrySafe;
+        RegistrationException(String field,String userMessage,boolean retrySafe){super("PICA_REGISTER_REJECTED");this.field=field==null?"":field;this.userMessage=userMessage;this.retrySafe=retrySafe;}
     }
 
+    static IOException registrationResponse(int status,String text) {
+        if(status==429)return new IOException("PICA_ACCOUNT_RATE_LIMIT");
+        if(status>=500)return new IOException("PICA_ACCOUNT_UNAVAILABLE");
+        String all=extractDiagnostic(text).toLowerCase(Locale.ROOT);
+        if(all.isEmpty())return status>=400&&status<500?new RegistrationException("","Pica 已拒绝本次注册请求，但没有返回可识别的具体字段",true):new IOException("PICA_ACCOUNT_RESPONSE_INVALID");
+
+        String missing=missingField(all);
+        if(!missing.isEmpty())return new RegistrationException(missing,missingMessage(missing),true);
+        if(has(all,"email","username","account","账号","用户名")){
+            if(has(all,"exist","already","taken","duplicate","used","registered","存在","已注册","已使用","占用"))return new RegistrationException("email","该登录账号已被使用，请更换一个",true);
+            if(has(all,"invalid","format","character","lowercase","wrong","非法","格式","字符"))return new RegistrationException("email","登录账号只能使用小写字母、数字和下划线",true);
+        }
+        if(has(all,"password","密码")){
+            if(has(all,"short","length","8","invalid","weak","长度","至少","格式"))return new RegistrationException("password","密码至少 8 位，请检查后重试",true);
+        }
+        if(has(all,"birthday","birth","生日","age","年龄")){
+            if(has(all,"18","adult","young","underage","age","年龄","成年"))return new RegistrationException("birthday","注册用户必须年满 18 岁",true);
+            return new RegistrationException("birthday","出生日期不符合要求",true);
+        }
+        if(has(all,"gender","性别"))return new RegistrationException("gender","请选择有效的性别选项",true);
+        if(has(all,"nickname","display name","昵称")||matchesStandaloneName(all))return new RegistrationException("name","昵称不符合要求，请使用 2–50 个字符",true);
+        for(int i=1;i<=3;i++){
+            if(has(all,"question"+i,"安全问题"+i,"安全问题 "+i))return new RegistrationException("question"+i,"请检查安全问题 "+i,true);
+            if(has(all,"answer"+i,"安全答案"+i,"安全答案 "+i))return new RegistrationException("answer"+i,"请检查安全答案 "+i,true);
+        }
+        return status>=400&&status<500?new RegistrationException("","Pica 已拒绝本次注册请求，但没有返回可识别的具体字段",true):new IOException("PICA_ACCOUNT_RESPONSE_INVALID");
+    }
+
+    static String field(Exception error){return error instanceof RegistrationException?((RegistrationException)error).field:"";}
+    static String message(Exception error) {
+        if(error instanceof RegistrationException)return ((RegistrationException)error).userMessage;
+        if(isNetwork(error))return "无法连接 Pica API，请检查网络或代理后重试";
+        String value=error.getMessage();
+        if("PICA_ACCOUNT_RATE_LIMIT".equals(value))return "Pica 请求过于频繁，请稍后再试";
+        if("PICA_ACCOUNT_REJECTED".equals(value))return "Pica 已拒绝本次账号请求";
+        if("PICA_ACCOUNT_UNAVAILABLE".equals(value))return "Pica 账号服务暂时不可用，请稍后再试";
+        if("PICA_ACCOUNT_RESPONSE_INVALID".equals(value))return "Pica 返回了无法识别的账号响应，结果尚未确认";
+        return "账号请求未能确认";
+    }
     static boolean retrySafe(Exception error) {
+        if(error instanceof RegistrationException)return ((RegistrationException)error).retrySafe;
         if(isNetwork(error))return false;
         String value=error.getMessage();
-        return "PICA_ACCOUNT_REJECTED".equals(value)
-                || "PICA_ACCOUNT_RATE_LIMIT".equals(value)
-                || "PICA_ACCOUNT_UNAVAILABLE".equals(value);
+        return "PICA_ACCOUNT_REJECTED".equals(value)||"PICA_ACCOUNT_RATE_LIMIT".equals(value)||"PICA_ACCOUNT_UNAVAILABLE".equals(value);
     }
 
-    private static boolean isNetwork(Throwable error) {
-        for(Throwable current=error;current!=null;current=current.getCause()) {
-            if(current instanceof java.net.SocketTimeoutException || current instanceof java.net.ConnectException || current instanceof java.net.UnknownHostException || current instanceof javax.net.ssl.SSLException)return true;
-        }
-        return false;
+    private static String extractDiagnostic(String text){
+        if(text==null||text.trim().isEmpty())return "";
+        StringBuilder out=new StringBuilder();Matcher matcher=SAFE_JSON_STRING.matcher(text);
+        while(matcher.find())append(out,unescapeJsonString(matcher.group(1)));
+        return out.toString();
     }
+    private static String unescapeJsonString(String value){
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<value.length();i++){
+            char c=value.charAt(i);if(c!='\\'||i+1>=value.length()){out.append(c);continue;}
+            char n=value.charAt(++i);
+            if(n=='u'&&i+4<value.length()){
+                String hex=value.substring(i+1,i+5);try{out.append((char)Integer.parseInt(hex,16));i+=4;continue;}catch(NumberFormatException ignored){out.append('\\').append(n);continue;}
+            }
+            switch(n){case '\"':out.append('\"');break;case '\\':out.append('\\');break;case '/':out.append('/');break;case 'b':out.append(' ');break;case 'f':out.append(' ');break;case 'n':out.append(' ');break;case 'r':out.append(' ');break;case 't':out.append(' ');break;default:out.append(n);}
+        }
+        return out.toString();
+    }
+    private static boolean matchesStandaloneName(String value){return value.matches("(?s).*(?:^|[^a-z])name(?:[^a-z]|$).*");}
+    private static void append(StringBuilder out,String value){if(value==null||value.trim().isEmpty())return;if(out.length()>0)out.append(' ');out.append(value.trim());}
+    private static boolean has(String value,String...terms){for(String term:terms)if(value.contains(term.toLowerCase(Locale.ROOT)))return true;return false;}
+    private static String missingField(String value){String[] fields={"email","password","birthday","gender","question1","question2","question3","answer1","answer2","answer3","name"};if(!has(value,"missing","required","empty","缺少","必填","不能为空"))return "";for(String field:fields)if(value.matches("(?s).*(?:^|[^a-z0-9])"+field+"(?:[^a-z0-9]|$).*") )return field;return "";}
+    private static String missingMessage(String field){if("name".equals(field))return "请输入昵称";if("email".equals(field))return "请输入登录账号";if("password".equals(field))return "请输入密码";if("birthday".equals(field))return "请选择出生日期";if("gender".equals(field))return "请选择性别";if(field.startsWith("question"))return "请填写安全问题 "+field.substring(8);if(field.startsWith("answer"))return "请填写安全答案 "+field.substring(6);return "请填写必填项";}
+    private static boolean isNetwork(Throwable error){for(Throwable current=error;current!=null;current=current.getCause())if(current instanceof java.net.SocketTimeoutException||current instanceof java.net.ConnectException||current instanceof java.net.UnknownHostException||current instanceof javax.net.ssl.SSLException)return true;return false;}
 }

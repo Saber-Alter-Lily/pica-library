@@ -1,12 +1,26 @@
 import { createHash } from 'node:crypto'
 import type { Pica } from '../sdk'
 import type { Comic, Episode, Picture } from '../types'
-import { trustedCoverUrl } from '../library/cover-url'
 import type { FavoriteRecord } from '../library/types'
 import type { LibraryDatabase } from '../library/database'
+import {
+    EhProvider,
+    type EhSession,
+    type ExHentaiCapability
+} from '../providers/eh-provider'
+import { PicaProvider, picaComic } from '../providers/pica-provider'
+import {
+    providerComicToRecord,
+    type ComicProvider,
+    type EhSurface,
+    type OnlineSource,
+    type ProviderId,
+    type SearchRequest
+} from '../providers/types'
 
 export interface ProviderCapabilities {
     favoriteMutation: boolean
+    providers: Record<ProviderId, ComicProvider['capabilities']>
 }
 
 export type FavoritesSyncMode = 'quick' | 'full'
@@ -31,39 +45,86 @@ function fingerprint(ids: string[]) {
 }
 
 export function providerComicRecord(comic: Comic): FavoriteRecord {
-    return {
-        comicId: comic._id,
-        title: comic.title.trim(),
-        author: comic.author ?? '',
-        description: comic.description ?? '',
-        chineseTeam: comic.chineseTeam ?? '',
-        categories: comic.categories ?? [],
-        tags: comic.tags ?? [],
-        finished: Boolean(comic.finished),
-        createdAt: comic.created_at,
-        updatedAt: comic.updated_at,
-        totalLikes: comic.totalLikes ?? comic.likesCount ?? 0,
-        totalViews: comic.totalViews ?? comic.viewsCount ?? 0,
-        pagesCount: comic.pagesCount ?? 0,
-        epsCount: comic.epsCount ?? 0,
-        coverUrl: trustedCoverUrl(
-            comic.thumb?.fileServer && comic.thumb.path
-                ? `${comic.thumb.fileServer}/static/${comic.thumb.path}`
-                : undefined
-        )
-    }
+    return providerComicToRecord(picaComic(comic))
 }
 
 export class ProviderService {
-    readonly capabilities: ProviderCapabilities = { favoriteMutation: true }
+    readonly capabilities: ProviderCapabilities
+    private readonly picaProvider: PicaProvider
+    private readonly ehProvider: EhProvider
 
     constructor(
         private readonly connectProvider: () => Promise<Pica>,
-        private readonly database: LibraryDatabase
-    ) {}
+        private readonly database: LibraryDatabase,
+        ehProvider = new EhProvider()
+    ) {
+        this.picaProvider = new PicaProvider(connectProvider)
+        this.ehProvider = ehProvider
+        this.capabilities = {
+            favoriteMutation: true,
+            providers: {
+                pica: this.picaProvider.capabilities,
+                eh: this.ehProvider.capabilities
+            }
+        }
+    }
 
     private connect() {
         return this.connectProvider()
+    }
+
+    private providerForComic(comicId: string): ComicProvider {
+        return comicId.startsWith('eh:') ? this.ehProvider : this.picaProvider
+    }
+
+    private ehSurfaceForComic(comicId: string): EhSurface {
+        const metadata = this.database.getComic(comicId)?.providerMetadata ?? {}
+        return metadata.preferredSurface === 'exh' && this.ehProvider.hasSession()
+            ? 'exh'
+            : 'eh'
+    }
+
+    private recordForOnlineSource(comic: Parameters<typeof providerComicToRecord>[0], source: OnlineSource) {
+        const record = providerComicToRecord(comic)
+        if (source === 'pica') return record
+        const previous = this.database.getComic(record.comicId)?.providerMetadata ?? {}
+        const known = new Set<string>([
+            ...(Array.isArray(previous.knownSurfaces) ? previous.knownSurfaces.map(String) : []),
+            source
+        ])
+        record.providerMetadata = {
+            ...previous,
+            ...record.providerMetadata,
+            preferredSurface: source,
+            knownSurfaces: [...known].filter((item) => item === 'eh' || item === 'exh')
+        }
+        return record
+    }
+
+    providerStatus() {
+        return this.capabilities.providers
+    }
+
+    setEhSession(session?: EhSession | null) {
+        this.ehProvider.setSession(session)
+    }
+
+    ehAccountStatus() {
+        return { configured: this.ehProvider.hasSession() }
+    }
+
+    verifyEhAccount() {
+        return this.ehProvider.verifyAccount()
+    }
+
+    probeExHentai(): Promise<ExHentaiCapability> {
+        return this.ehProvider.probeExHentai()
+    }
+
+    async syncEhFavorites() {
+        const comics = await this.ehProvider.favoritesAll()
+        const records = comics.map(providerComicToRecord)
+        return this.database.syncEhFavorites(records)
     }
 
     async syncFavorites(
@@ -216,40 +277,170 @@ export class ProviderService {
         }
     }
 
-    async search(keyword: string) {
-        const provider = await this.connect()
-        const comics = await provider.searchAll(keyword, provider.Order.loved)
-        const records = comics.map(providerComicRecord)
-        this.database.importCatalog(records, 'pica:discover')
-        return records
+    async search(
+        input: string | SearchRequest,
+        providers: OnlineSource[] = ['pica'],
+        provenance: 'discover' | 'recommendations' = 'discover'
+    ) {
+        const request: SearchRequest =
+            typeof input === 'string' ? { keyword: input, limit: 100 } : input
+        const uniqueProviders = [...new Set(providers)]
+        const settled = await Promise.allSettled(
+            uniqueProviders.map(async (source) => {
+                const provider = source === 'pica' ? this.picaProvider : this.ehProvider
+                const comics = await provider.search({
+                    ...request,
+                    ...(source === 'pica' ? {} : { surface: source })
+                })
+                const records = comics.map((comic) => this.recordForOnlineSource(comic, source))
+                this.database.importCatalog(records, `${source}:${provenance}`)
+                return records
+            })
+        )
+        const records = settled.flatMap((result) =>
+            result.status === 'fulfilled' ? result.value : []
+        )
+        if (!records.length) {
+            const firstError = settled.find(
+                (result): result is PromiseRejectedResult =>
+                    result.status === 'rejected'
+            )
+            if (firstError) throw firstError.reason
+        }
+        const consolidated = new Map<string, FavoriteRecord>()
+        for (const record of records) {
+            const previous = consolidated.get(record.comicId)
+            if (!previous) {
+                consolidated.set(record.comicId, record)
+                continue
+            }
+            if (previous.providerId === 'eh' && record.providerId === 'eh') {
+                const previousMetadata = previous.providerMetadata ?? {}
+                const nextMetadata = record.providerMetadata ?? {}
+                const knownSurfaces = new Set<string>([
+                    ...(Array.isArray(previousMetadata.knownSurfaces)
+                        ? previousMetadata.knownSurfaces.map(String)
+                        : []),
+                    ...(Array.isArray(nextMetadata.knownSurfaces)
+                        ? nextMetadata.knownSurfaces.map(String)
+                        : []),
+                    String(previousMetadata.preferredSurface ?? ''),
+                    String(nextMetadata.preferredSurface ?? '')
+                ])
+                consolidated.set(record.comicId, {
+                    ...previous,
+                    ...record,
+                    providerMetadata: {
+                        ...previousMetadata,
+                        ...nextMetadata,
+                        knownSurfaces: [...knownSurfaces].filter(
+                            (surface) => surface === 'eh' || surface === 'exh'
+                        )
+                    }
+                })
+                continue
+            }
+            consolidated.set(record.comicId, record)
+        }
+        const result = [...consolidated.values()]
+        const surfaceMerged = result.filter(
+            (record) =>
+                record.providerId === 'eh' &&
+                Array.isArray(record.providerMetadata?.knownSurfaces) &&
+                record.providerMetadata.knownSurfaces.length > 1
+        )
+        if (surfaceMerged.length)
+            this.database.importCatalog(
+                surfaceMerged,
+                'eh:surface-merge:' + provenance
+            )
+        return result
     }
 
     async getComicDetails(comicId: string) {
-        const provider = await this.connect()
-        const comic = await provider.comicInfo(comicId)
-        this.database.importCatalog(
-            [providerComicRecord(comic)],
-            'pica:details'
-        )
+        if (comicId.startsWith('eh:')) {
+            const surface = this.ehSurfaceForComic(comicId)
+            const comic = await this.ehProvider.detailsOnSurface(comicId, surface)
+            const record = this.recordForOnlineSource(comic, surface)
+            this.database.importCatalog([record], `${surface}:details`)
+            return comic
+        }
+        const comic = await this.picaProvider.details(comicId)
+        this.database.importCatalog([providerComicToRecord(comic)], 'pica:details')
         return comic
     }
 
     async getEpisodes(comicId: string): Promise<Episode[]> {
-        return (await this.connect()).episodesAll(comicId)
+        return comicId.startsWith('eh:')
+            ? this.ehProvider.episodesOnSurface(comicId, this.ehSurfaceForComic(comicId))
+            : this.picaProvider.episodes(comicId)
     }
 
     async getEpisodePages(
         comicId: string,
         episode: Episode
     ): Promise<Picture[]> {
-        return (await this.connect()).picturesAll(comicId, episode)
+        return comicId.startsWith('eh:')
+            ? this.ehProvider.pagesOnSurface(comicId, episode, this.ehSurfaceForComic(comicId))
+            : this.picaProvider.pages(comicId, episode)
     }
 
-    async fetchPage(url: string, maxBytes = 20 * 1024 * 1024) {
-        return (await this.connect()).fetchImage(url, maxBytes)
+    async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
+        return locator.startsWith('eh-page:')
+            ? this.ehProvider.fetchPage(locator, maxBytes)
+            : this.picaProvider.fetchPage(locator, maxBytes)
+    }
+
+    async fetchCover(comicId: string, locator: string, maxBytes = 20 * 1024 * 1024) {
+        return comicId.startsWith('eh:')
+            ? this.ehProvider.fetchCover(locator, maxBytes)
+            : this.picaProvider.fetchPage(locator, maxBytes)
     }
 
     async setFavorite(comicId: string, desired: boolean) {
+        if (comicId.startsWith('eh:')) {
+            const before = this.database.getComic(comicId)
+            if (!before) throw new Error('E-H 漫画尚未加入本地目录')
+            if (this.ehProvider.hasSession()) {
+                const beforeRemote = this.database.hasFavoriteMembership(
+                    comicId,
+                    'eh-favorite'
+                )
+                if (beforeRemote === desired)
+                    return {
+                        changed: false,
+                        isFavorite: before.isFavorite,
+                        already: true,
+                        remote: true
+                    }
+                await this.ehProvider.setRemoteFavorite(comicId, desired)
+                const after = this.database.setEhFavoriteState(comicId, desired)
+                return {
+                    changed: true,
+                    isFavorite: Boolean(after?.isFavorite),
+                    already: false,
+                    remote: true
+                }
+            }
+            const beforeLocal = this.database.hasFavoriteMembership(
+                comicId,
+                'local-favorite'
+            )
+            if (beforeLocal === desired)
+                return {
+                    changed: false,
+                    isFavorite: before.isFavorite,
+                    already: true,
+                    remote: false
+                }
+            const after = this.database.setLocalFavoriteState(comicId, desired)
+            return {
+                changed: true,
+                isFavorite: Boolean(after?.isFavorite),
+                already: false,
+                remote: false
+            }
+        }
         const provider = await this.connect()
         const before = await provider.comicInfo(comicId)
         if (Boolean(before.isFavourite) === desired)

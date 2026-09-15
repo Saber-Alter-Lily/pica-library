@@ -9,6 +9,19 @@ afterEach(() => {
     for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
 })
 
+function versionAtLeast(version: string, floor: [number, number, number]) {
+    const parts = version.split('.').map(Number)
+    const current: [number, number, number] = [
+        parts[0] ?? 0,
+        parts[1] ?? 0,
+        parts[2] ?? 0
+    ]
+    for (let index = 0; index < 3; index++) {
+        if (current[index] !== floor[index]) return current[index] > floor[index]
+    }
+    return true
+}
+
 describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
     it('binds a Star proof to authenticated GitHub account id and never upgrades legacy proof implicitly', () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-alpha88-proof-'))
@@ -69,7 +82,7 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
         expect(sync).not.toContain('ThemePackStore.deactivate(c);else')
     })
 
-    it('keeps theme selection explicitly device-local in behavior and concise UI', () => {
+    it('keeps theme selection device-local while the normal UI stays quiet', () => {
         const source = fs.readFileSync(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackActivity.java',
             'utf8'
@@ -78,8 +91,12 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ThemePackSync.java',
             'utf8'
         )
-        expect(source).toContain('只同步装扮包；本机主题独立选择')
-        expect(source).toContain('在本机使用')
+        expect(source).toContain('SettingsRow.row(this,"GitHub Star"')
+        expect(source).toContain('ThemePackStore.activate(this,pack.id)')
+        expect(source).toContain('"使用中"')
+        expect(source).toContain('showThemeActions(active)')
+        expect(source).not.toContain('只同步装扮包；本机主题独立选择')
+        expect(source).not.toContain('验证本人 GitHub 账号后解锁装扮')
         expect(sync).toContain('Deliberately ignore Desktop activeThemeId')
         expect(source).not.toContain('EditText username')
     })
@@ -118,10 +135,8 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
         const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string }
         const gradle = fs.readFileSync('mobile/android-alpha2/app/build.gradle', 'utf8')
         const windows = fs.readFileSync('scripts/build-windows-package.ps1', 'utf8')
-        const desktopPatch = Number(pkg.version.split('.')[2] ?? 0)
         const androidVersionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1] ?? 0)
-        expect(pkg.version.startsWith('0.3.')).toBe(true)
-        expect(desktopPatch).toBeGreaterThanOrEqual(8)
+        expect(versionAtLeast(pkg.version, [0, 3, 8])).toBe(true)
         expect(androidVersionCode).toBeGreaterThanOrEqual(35)
         expect(gradle).toContain("versionName '0.1.0-alpha8.")
         expect(windows).toContain("'DISCLAIMER.md'")

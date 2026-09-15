@@ -9,7 +9,7 @@
         android:roundIcon="@drawable/pica_launcher"
         android:name=".PicaLibraryApp"
         android:allowBackup="true"
-        android:label="Pica Library"
+        android:label="${appLabel}"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.files" android:exported="false" android:grantUriPermissions="true">
@@ -18,13 +18,23 @@
         <service android:name="androidx.work.impl.foreground.SystemForegroundService" android:foregroundServiceType="dataSync" tools:node="merge" />
         <activity android:name=".ReaderActivity" android:screenOrientation="unspecified" />
         <activity android:name=".UnifiedComicDetailActivity" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".AuthorDirectoryActivity" android:exported="false" />
+        <activity android:name=".AuthorWorksActivity" android:exported="false" />
+        <activity android:name=".HistoryActivity" android:exported="false" />
         <activity android:name=".ComicDetailActivity" android:exported="false" />
         <activity android:name=".AppearanceActivity" android:exported="false" />
         <activity android:name=".ThemePackActivity" android:exported="false" />
+        <activity android:name=".SettingsActivity" android:exported="false" />
+        <activity android:name=".StorageHubActivity" android:exported="false" />
+        <activity android:name=".AboutActivity" android:exported="false" />
         <activity android:name=".StorageSettingsActivity" android:exported="false" />
         <activity android:name=".UpdateActivity" android:exported="false" />
         <activity android:name=".PicaBrowseActivity" android:exported="false" />
+        <activity android:name=".AccountSourcesActivity" android:exported="false" />
         <activity android:name=".PicaAccountActivity" android:exported="false" />
+        <activity android:name=".EhAccountActivity" android:exported="false" />
+        <activity android:name=".EhWebLoginActivity" android:exported="false" />
+        <activity android:name=".EhSessionActivity" android:exported="false" />
         <activity android:name=".PicaRegisterActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".DownloadsActivity" android:exported="false" />
         <activity android:name=".TaskCenterActivity" android:exported="false" />
@@ -36,7 +46,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="picalibrary" android:host="pair" />
+                <data android:scheme="${pairScheme}" android:host="pair" />
             </intent-filter>
         </activity>
         <activity android:name=".DisclaimerActivity" android:exported="true">

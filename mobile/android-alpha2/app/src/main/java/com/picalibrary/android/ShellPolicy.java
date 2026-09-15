@@ -1,7 +1,7 @@
 package com.picalibrary.android;
 
 final class ShellPolicy {
-    private static final String[] BOTTOM_TABS={"书库","推荐","在线","连接"};
+    private static final String[] BOTTOM_TABS={"书库","推荐","在线","设置"};
 
     private ShellPolicy(){}
 

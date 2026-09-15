@@ -3,6 +3,8 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import pLimit from 'p-limit'
 import { Pica } from '../sdk'
+import { EhProvider, type EhSession } from '../providers/eh-provider'
+import type { EhBrowseMode, OnlineSource } from '../providers/types'
 import type { Comic, Picture } from '../types'
 import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
@@ -11,7 +13,8 @@ import type {
     FavoriteRecord,
     RecommendationCandidate,
     RecallRoute,
-    SortMode
+    SortMode,
+    StoredComic
 } from './types'
 import {
     mergeRecallCandidates,
@@ -89,6 +92,14 @@ export interface DiscoverQuery {
     categories?: string[]
     sort?: SortMode
     limit?: number
+    providers?: OnlineSource[]
+    ehMode?: EhBrowseMode
+    ehToplist?: string
+    ehLanguage?: string
+    ehExcludeTags?: string[]
+    ehMinRating?: number
+    ehPageFrom?: number
+    ehPageTo?: number
 }
 
 export interface DownloadProgress {
@@ -160,6 +171,7 @@ function sortCode(pica: Pica, sort: SortMode | undefined) {
 
 export class LibraryService {
     private pica: Pica | null = null
+    private readonly ehProvider: EhProvider
     private acceptingLocalDownloads = true
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
@@ -175,9 +187,11 @@ export class LibraryService {
     constructor(
         readonly database: LibraryDatabase,
         readonly dataDir: string,
-        provider?: Pica
+        provider?: Pica,
+        ehProvider?: EhProvider
     ) {
         this.pica = provider ?? null
+        this.ehProvider = ehProvider ?? new EhProvider()
         fs.mkdirSync(dataDir, { recursive: true })
     }
 
@@ -194,6 +208,34 @@ export class LibraryService {
         await pica.login(account, password)
         this.pica = pica
         return pica
+    }
+
+    providerService() {
+        return new ProviderService(
+            () => this.connect(),
+            this.database,
+            this.ehProvider
+        )
+    }
+
+    setEhSession(session?: EhSession | null) {
+        this.ehProvider.setSession(session)
+    }
+
+    ehAccountStatus() {
+        return this.providerService().ehAccountStatus()
+    }
+
+    verifyEhAccount() {
+        return this.providerService().verifyEhAccount()
+    }
+
+    probeExHentai() {
+        return this.providerService().probeExHentai()
+    }
+
+    syncEhFavorites() {
+        return this.providerService().syncEhFavorites()
     }
 
     async cover(comicId: string) {
@@ -219,8 +261,8 @@ export class LibraryService {
             // A partial or stale cache entry is safely replaced below.
         }
 
-        const pica = await this.connect()
-        const image = await pica.fetchImage(comic.coverUrl)
+        const providerService = this.providerService()
+        const image = await providerService.fetchCover(comicId, comic.coverUrl)
         await fs.promises.mkdir(cacheDir, { recursive: true })
         const imagePartial = `${imageFile}.part`
         const metadataPartial = `${metadataFile}.part`
@@ -237,10 +279,15 @@ export class LibraryService {
     async buildFinalRecommendationCycleV3(cycleId: string) {
         this.recommendationProgress = { state: 'running', phase: 'profile', done: 0, total: 6 }
         const pica = await this.connect()
+        const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
-        const favorites = catalog.filter((comic) => comic.isFavorite)
+        const readingIds = new Set(this.database.readingProgress().map((item) => item.comicId))
+        const explicitFavoriteIds = new Set(catalog.filter((comic) => comic.isFavorite).map((comic) => comic.comicId))
+        const favorites = catalog
+            .filter((comic) => comic.isFavorite || comic.inLibrary || comic.downloadedPictures > 0 || readingIds.has(comic.comicId))
+            .map((comic) => ({ ...comic, isFavorite: true }))
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-        const profile = buildFinalLifetimeProfileV3(catalog, { registry })
+        const profile = buildFinalLifetimeProfileV3(favorites, { registry })
         this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 6 }
         const history: IntentCycleHistory[] = this.database
             .listV3CandidatePools(50)
@@ -274,7 +321,7 @@ export class LibraryService {
         })
         this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 6 }
         const routes = translateIntentPlanV3(intents)
-        const store = (comics: Comic[]) => {
+        const storePica = (comics: Comic[]) => {
             const records = comics.map(comicToRecord)
             this.database.importCatalog(records, 'pica:recommendations')
             return records.flatMap((record) => {
@@ -282,11 +329,56 @@ export class LibraryService {
                 return stored ? [stored] : []
             })
         }
+        const storedRecords = (records: FavoriteRecord[]): StoredComic[] =>
+            records.flatMap((record) => {
+                const stored = this.database.getComic(record.comicId)
+                return stored ? [stored] : []
+            })
+        const mergeProviderResults = (
+            primary: StoredComic[],
+            secondary: StoredComic[]
+        ) => [
+            ...new Map(
+                [...primary, ...secondary].map((comic) => [comic.comicId, comic])
+            ).values()
+        ]
+        const externalCache = new Map<string, StoredComic[]>()
+        const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }
+        const sourceRequests: Record<'eh' | 'exh', number> = { eh: 0, exh: 0 }
+        const exhAvailable = (await providerService.probeExHentai().catch(() => 'UNAVAILABLE')) === 'AVAILABLE'
+        const externalSearch = async (
+            query: string,
+            kind: 'keyword' | 'author',
+            source: 'eh' | 'exh'
+        ): Promise<StoredComic[]> => {
+            if (source === 'exh' && !exhAvailable) return []
+            const clean = query.trim()
+            if (!clean) return []
+            const key = `${source}:${kind}:${clean.toLocaleLowerCase("und")}`
+            const cached = externalCache.get(key)
+            if (cached) return cached
+            if (sourceRequests[source] >= sourceBudget[source]) return []
+            sourceRequests[source] += 1
+            const providerQuery = kind === 'author' ? `artist:"${clean.replaceAll("\"", "")}"` : clean
+            try {
+                const records = await providerService.search(
+                    { keyword: providerQuery, limit: 40 },
+                    [source],
+                    'recommendations'
+                )
+                const stored = storedRecords(records)
+                externalCache.set(key, stored)
+                return stored
+            } catch {
+                externalCache.set(key, [])
+                return []
+            }
+        }
         this.recommendationProgress = { state: 'running', phase: 'retrieve', done: 3, total: 6 }
         const retrieved = await retrieveCandidatesV3({
             provider: {
-                keyword: async (query, page) =>
-                    store(
+                keyword: async (query, page) => {
+                    const picaResults = storePica(
                         (
                             await pica.comicsPage(
                                 '',
@@ -295,12 +387,23 @@ export class LibraryService {
                                 page
                             )
                         ).docs
-                    ),
-                author: async (query, page) =>
-                    store(
+                    )
+                    const ehResults = page === 1 ? await externalSearch(query, 'keyword', 'eh') : []
+                    const exhResults = page === 1 ? await externalSearch(query, 'keyword', 'exh') : []
+                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
+                },
+                author: async (query, page) => {
+                    const picaResults = storePica(
                         (await pica.search(query, page, pica.Order.loved)).docs
-                    ),
-                related: async (comicId) => store(await pica.related(comicId))
+                    )
+                    const ehResults = page === 1 ? await externalSearch(query, 'author', 'eh') : []
+                    const exhResults = page === 1 ? await externalSearch(query, 'author', 'exh') : []
+                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
+                },
+                related: async (comicId) =>
+                    comicId.startsWith('eh:')
+                        ? []
+                        : storePica(await pica.related(comicId))
             },
             routes,
             intents,
@@ -340,7 +443,31 @@ export class LibraryService {
             routes,
             ranked,
             readiness: retrieved.readiness,
-            telemetry: { ...retrieved.telemetry, cycleId },
+            telemetry: {
+                ...retrieved.telemetry,
+                cycleId,
+                providerSources: {
+                    ehRequests: sourceRequests.eh,
+                    exhRequests: sourceRequests.exh,
+                    exhAvailable,
+                    ehCandidates: retrieved.candidates.filter(
+                        (item) =>
+                            item.comic.providerId === 'eh' ||
+                            item.comic.comicId.startsWith('eh:')
+                    ).length,
+                    preferenceSignals: {
+                        explicitFavorites: explicitFavoriteIds.size,
+                        collectionSeeds: favorites.length,
+                        readingSeeds: readingIds.size,
+                        downloadedSeeds: favorites.filter((comic) => comic.downloadedPictures > 0).length
+                    },
+                    picaCandidates: retrieved.candidates.filter(
+                        (item) =>
+                            item.comic.providerId !== 'eh' &&
+                            !item.comic.comicId.startsWith('eh:')
+                    ).length
+                }
+            },
             versions: {
                 profileVersion: FINAL_PROFILE_VERSION,
                 registryVersion: profile.registryVersion,
@@ -422,10 +549,7 @@ export class LibraryService {
     async syncFavorites(mode: FavoritesSyncMode = 'quick') {
         this.favoritesProgress = { phase: 'reading' }
         try {
-            const provider = new ProviderService(
-                () => this.connect(),
-                this.database
-            )
+            const provider = this.providerService()
             const result = await provider.syncFavorites(mode, (progress) => {
                 this.favoritesProgress = {
                     ...progress
@@ -474,26 +598,26 @@ export class LibraryService {
     }
 
     async discover(query: DiscoverQuery) {
-        const pica = await this.connect()
-        const order = sortCode(pica, query.sort)
-        let comics: Comic[]
-        if (query.keyword?.trim()) {
-            comics = await pica.searchAll(
-                query.keyword.trim(),
-                order,
-                query.categories ?? []
-            )
-        } else {
-            comics = await pica.comicsAll(
-                query.categories?.[0] ?? '',
-                query.tags?.[0] ?? '',
-                order
-            )
-        }
-
+        const providerService = this.providerService()
         const tags = (query.tags ?? []).map(normalizeAuthorKey)
         const categories = (query.categories ?? []).map(normalizeAuthorKey)
-        let records = comics.map(comicToRecord).filter((comic) => {
+        let records = await providerService.search(
+            {
+                keyword: query.keyword?.trim(),
+                tags: query.tags,
+                categories: query.categories,
+                ehMode: query.ehMode,
+                ehToplist: query.ehToplist,
+                ehLanguage: query.ehLanguage,
+                ehExcludeTags: query.ehExcludeTags,
+                ehMinRating: query.ehMinRating,
+                ehPageFrom: query.ehPageFrom,
+                ehPageTo: query.ehPageTo,
+                limit: Math.min(query.limit ?? 100, 1000)
+            },
+            query.providers?.length ? query.providers : ['pica', 'eh', 'exh']
+        )
+        records = records.filter((comic) => {
             const comicTags = comic.tags.map(normalizeAuthorKey)
             const comicCategories = comic.categories.map(normalizeAuthorKey)
             return (
@@ -503,24 +627,37 @@ export class LibraryService {
                 )
             )
         })
-
         if (query.sort === 'title') {
-            records = records.sort((a, b) => a.title.localeCompare(b.title))
+            records.sort((a, b) => a.title.localeCompare(b.title))
+        } else if (query.sort === 'latest') {
+            records.sort((a, b) =>
+                String(b.updatedAt ?? b.createdAt ?? '').localeCompare(
+                    String(a.updatedAt ?? a.createdAt ?? '')
+                )
+            )
+        } else if (query.sort === 'views') {
+            records.sort(
+                (a, b) => (b.totalViews ?? 0) - (a.totalViews ?? 0)
+            )
         } else if (query.sort === 'recommended') {
-            records = records.sort((a, b) => {
+            records.sort((a, b) => {
                 const score = (comic: FavoriteRecord) =>
                     Math.log10(1 + (comic.totalLikes ?? 0)) * 3 +
                     Math.log10(1 + (comic.totalViews ?? 0)) +
+                    (comic.rating ?? 0) +
                     tags.filter((tag) =>
                         comic.tags.map(normalizeAuthorKey).includes(tag)
-                    ).length *
-                        5
+                    ).length * 5
                 return score(b) - score(a)
             })
+        } else {
+            records.sort((a, b) => {
+                if (a.providerId === 'eh' && b.providerId === 'eh')
+                    return (b.rating ?? 0) - (a.rating ?? 0)
+                return (b.totalLikes ?? 0) - (a.totalLikes ?? 0)
+            })
         }
-        records = records.slice(0, Math.min(query.limit ?? 100, 1000))
-        this.database.importCatalog(records, 'pica:discover')
-        return records
+        return records.slice(0, Math.min(query.limit ?? 100, 1000))
     }
 
     async recommendations(
@@ -977,7 +1114,7 @@ export class LibraryService {
     }
 
     async checkUpdates(comicIds?: string[]) {
-        const pica = await this.connect()
+        const providerService = this.providerService()
         const ids = comicIds?.length
             ? comicIds
             : this.database
@@ -991,19 +1128,14 @@ export class LibraryService {
                     this.database,
                     {
                         episodes: async (id) =>
-                            (await pica.episodesAll(id)).flatMap((episode) => {
-                                const episodeId = episode.id || episode._id
-                                return episodeId
-                                    ? [
-                                          {
-                                              id: episodeId,
-                                              order: episode.order,
-                                              title: episode.title,
-                                              updatedAt: episode.updated_at
-                                          }
-                                      ]
-                                    : []
-                            })
+                            (await providerService.getEpisodes(id)).map(
+                                (episode) => ({
+                                    id: episode.id || episode._id || '',
+                                    order: episode.order,
+                                    title: episode.title,
+                                    updatedAt: episode.updated_at
+                                })
+                            ).filter((episode) => episode.id)
                     },
                     comicId
                 )
@@ -1143,7 +1275,7 @@ export class LibraryService {
         }
     }
 
-    private async downloadComicNow(
+    private async downloadPicaComicNow(
         comicId: string,
         options: {
             episodeOrders?: number[]
@@ -1337,6 +1469,213 @@ export class LibraryService {
         if (failure) throw failure.reason
         return result
     }
+
+    private async downloadComicNow(
+        comicId: string,
+        options: {
+            episodeOrders?: number[]
+            mediaGate: MediaRequestGate
+            onProgress?: (progress: DownloadProgress) => void
+            shouldStop?: () => boolean
+        }
+    ): Promise<DownloadResult> {
+        if (!comicId.startsWith('eh:'))
+            return this.downloadPicaComicNow(comicId, options)
+        const providerService = this.providerService()
+        const comic = await providerService.getComicDetails(comicId)
+        if (
+            comic.providerId === 'pica' &&
+            comic.providerMetadata.allowDownload === false
+        )
+            throw new Error('The site reports that this comic is not downloadable')
+        const observedEpisodes = await providerService.getEpisodes(comicId)
+        for (const episode of observedEpisodes) {
+            const episodeId = episode.id || episode._id
+            if (!episodeId)
+                throw new Error('Episode response did not include an id')
+            this.database.upsertEpisode({
+                id: episodeId,
+                comicId,
+                title: episode.title,
+                order: episode.order,
+                updatedAt: episode.updated_at
+            })
+        }
+        let episodes = observedEpisodes
+        if (options.episodeOrders?.length) {
+            const allowed = new Set(options.episodeOrders)
+            episodes = episodes.filter((episode) => allowed.has(episode.order))
+        }
+        const result: DownloadResult = {
+            comicId,
+            title: comic.title.trim(),
+            episodes: episodes.length,
+            pictures: 0,
+            downloaded: 0,
+            skipped: 0,
+            completed: 0,
+            bytes: 0
+        }
+        const work: Array<{
+            picture: Picture
+            pictureId: string
+            episodeId: string
+            episodeTitle: string
+            file: string
+        }> = []
+        for (const episode of episodes) {
+            const episodeId = episode.id || episode._id
+            if (!episodeId)
+                throw new Error('Episode response did not include an id')
+            const pictures = await providerService.getEpisodePages(comicId, episode)
+            const stored = this.database.getComic(comicId)
+            const episodeDir = renderLibraryPath(
+                path.join(this.dataDir, 'library'),
+                process.env.PICA_LIBRARY_PATH_TEMPLATE ?? defaultLibraryTemplate,
+                {
+                    author:
+                        stored?.canonicalAuthor ?? comic.author ?? 'Unknown author',
+                    title: comic.title,
+                    comic_id: comicId,
+                    chapter_order: String(episode.order).padStart(4, '0'),
+                    chapter: episode.title || episodeId
+                }
+            )
+            pictures.forEach((picture, index) => {
+                const pictureId =
+                    picture.id ||
+                    String((picture as Picture & { _id?: string })._id ?? '')
+                if (!pictureId)
+                    throw new Error('Picture response did not include an id')
+                this.database.upsertPicture({
+                    id: pictureId,
+                    comicId,
+                    episodeId,
+                    position: index + 1,
+                    originalName: picture.media.originalName,
+                    mediaPath: picture.media.path,
+                    fileServer: picture.media.fileServer
+                })
+                work.push({
+                    picture,
+                    pictureId,
+                    episodeId,
+                    episodeTitle: episode.title,
+                    file: path.join(
+                        episodeDir,
+                        safePathSegment(picture.name, `${index + 1}.jpg`)
+                    )
+                })
+            })
+        }
+        const validExisting = new Map<string, string>()
+        for (const item of work) {
+            const previous = this.database.pictureDownloadState(item.pictureId)
+            const existing =
+                previous?.status === 'completed' &&
+                previous.localPath &&
+                fs.existsSync(previous.localPath)
+                    ? previous.localPath
+                    : fs.existsSync(item.file)
+                      ? item.file
+                      : null
+            if (existing && fs.statSync(existing).size > 0)
+                validExisting.set(item.pictureId, existing)
+        }
+        let completed = validExisting.size
+        const completedPictureIds = new Set(validExisting.keys())
+        let cumulativeBytes = [...validExisting.keys()].reduce(
+            (total, pictureId) =>
+                total + (this.database.pictureDownloadState(pictureId)?.byteSize ?? 0),
+            0
+        )
+        result.skipped = completed
+        result.pictures = work.length
+        let attemptFailed = false
+        const settled = await Promise.allSettled(
+            work.map(async (item) => {
+                if (options.shouldStop?.()) return
+                const existing = validExisting.get(item.pictureId)
+                if (existing) {
+                    const data = fs.readFileSync(existing)
+                    this.database.markPictureDownloaded(
+                        item.pictureId,
+                        existing,
+                        data.byteLength,
+                        createHash('sha256').update(data).digest('hex')
+                    )
+                    return
+                }
+                await options.mediaGate.run(async () => {
+                    if (attemptFailed || options.shouldStop?.()) return
+                    try {
+                        const image = await providerService.fetchPage(
+                            item.picture.url,
+                            64 * 1024 * 1024
+                        )
+                        const extension =
+                            image.contentType === 'image/png'
+                                ? '.png'
+                                : image.contentType === 'image/webp'
+                                  ? '.webp'
+                                  : image.contentType === 'image/gif'
+                                    ? '.gif'
+                                    : image.contentType === 'image/avif'
+                                      ? '.avif'
+                                      : '.jpg'
+                        const target =
+                            comic.providerId === 'eh'
+                                ? item.file.replace(/.[^.]+$/, extension)
+                                : item.file
+                        await fs.promises.mkdir(path.dirname(target), {
+                            recursive: true
+                        })
+                        const partial = `${target}.part`
+                        await fs.promises.writeFile(partial, image.data)
+                        await fs.promises.rename(partial, target)
+                        const sha256 = createHash('sha256')
+                            .update(image.data)
+                            .digest('hex')
+                        this.database.markPictureDownloaded(
+                            item.pictureId,
+                            target,
+                            image.data.byteLength,
+                            sha256
+                        )
+                        result.downloaded += 1
+                        completedPictureIds.add(item.pictureId)
+                        cumulativeBytes += image.data.byteLength
+                        completed += 1
+                        options.onProgress?.({
+                            comicId,
+                            comicTitle: comic.title,
+                            episodeId: item.episodeId,
+                            episodeTitle: item.episodeTitle,
+                            completed,
+                            total: work.length,
+                            bytes: cumulativeBytes,
+                            file: target
+                        })
+                    } catch (error) {
+                        attemptFailed = true
+                        throw error
+                    }
+                })
+            })
+        )
+        result.completed = completedPictureIds.size
+        result.bytes = [...completedPictureIds].reduce(
+            (total, pictureId) =>
+                total + (this.database.pictureDownloadState(pictureId)?.byteSize ?? 0),
+            0
+        )
+        const failure = settled.find(
+            (item): item is PromiseRejectedResult => item.status === 'rejected'
+        )
+        if (failure) throw failure.reason
+        return result
+    }
+
 }
 
 export function parseEpisodeSelection(input: string | undefined): number[] {

@@ -217,10 +217,7 @@ export async function startLibraryServer(options: {
     const root = webRoot()
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
-    const providerService = new ProviderService(
-        () => options.service.connect(),
-        options.database
-    )
+    const providerService = options.service.providerService()
     const libraryQueries = new LibraryQueryService(options.database)
     const shelfService = new ShelfService(options.database, libraryQueries)
     const recommendationService = new RecommendationService(
@@ -330,13 +327,12 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/capabilities' &&
                 request.method === 'GET'
             ) {
-                return json(
-                    response,
-                    200,
-                    appCapabilities(
+                return json(response, 200, {
+                    ...appCapabilities(
                         providerService.capabilities.favoriteMutation
-                    )
-                )
+                    ),
+                    providers: providerService.providerStatus()
+                })
             }
             if (
                 url.pathname === '/api/v1/recommendation-events' &&
@@ -1325,10 +1321,21 @@ export async function startLibraryServer(options: {
                             : undefined,
                         tags: stringList(input.tags),
                         categories: stringList(input.categories),
+                        ehMode: ['latest','popular','favorites','watched','toplist'].includes(String(input.ehMode ?? '')) ? String(input.ehMode) as 'latest' | 'popular' | 'favorites' | 'watched' | 'toplist' : undefined,
+                        ehToplist: input.ehToplist ? String(input.ehToplist) : undefined,
+                        ehLanguage: input.ehLanguage ? String(input.ehLanguage) : undefined,
+                        ehExcludeTags: stringList(input.ehExcludeTags),
+                        ehMinRating: Number(input.ehMinRating ?? 0),
+                        ehPageFrom: Number(input.ehPageFrom ?? 0),
+                        ehPageTo: Number(input.ehPageTo ?? 0),
                         sort: (input.sort
                             ? String(input.sort)
                             : 'likes') as SortMode,
-                        limit: Number(input.limit ?? 100)
+                        limit: Number(input.limit ?? 100),
+                        providers: stringList(input.providers).filter(
+                            (value): value is 'pica' | 'eh' | 'exh' =>
+                                value === 'pica' || value === 'eh' || value === 'exh'
+                        )
                     })
                 )
             }

@@ -1,0 +1,45 @@
+package com.picalibrary.android;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import org.json.*;
+
+/** Append/update session ledger. ReaderProgress remains the latest-bookmark authority. */
+final class ReadingHistoryStore {
+    static final int MAX_SESSIONS=5000;
+    static final class Session {
+        final String sessionId;String comicId="",chapterId="",title="",author="",chapterTitle="",providerId="",sourceKind="",startedAt="",lastReadAt="",deviceId="";int firstPage,lastPage;boolean legacySnapshot;
+        Session(String sessionId){this.sessionId=sessionId;}
+    }
+    static final class Legacy {
+        final String sourceKey,comicId,chapterId,title,author,chapterTitle,providerId,sourceKind,updatedAt,deviceId;final int page;
+        Legacy(String sourceKey,String comicId,String chapterId,String title,String author,String chapterTitle,String providerId,String sourceKind,int page,String updatedAt,String deviceId){this.sourceKey=safe(sourceKey);this.comicId=safe(comicId);this.chapterId=safe(chapterId);this.title=safe(title);this.author=safe(author);this.chapterTitle=safe(chapterTitle);this.providerId=safe(providerId);this.sourceKind=safe(sourceKind);this.page=Math.max(0,page);this.updatedAt=safe(updatedAt);this.deviceId=safe(deviceId);}
+    }
+    static final class Snapshot {final LinkedHashMap<String,Session> byId=new LinkedHashMap<>();List<Session> sorted(){ArrayList<Session> out=new ArrayList<>(byId.values());out.sort((a,b)->safe(b.lastReadAt).compareTo(safe(a.lastReadAt)));return out;}}
+    enum Range { TODAY, DAYS_7, DAYS_30, ALL }
+    private static final String FILE="reading-history-v1.json",MIGRATION_PREF="reading-history-v1",LOCAL_IMPORTED="local-bookmarks-imported";
+    private ReadingHistoryStore(){}
+    private static File file(Context context){return MobileStoragePaths.dataFile(context,FILE);}
+
+    static Snapshot load(Context context){Snapshot s=new Snapshot();File source=file(context);if(!source.isFile())return s;try(InputStream in=new FileInputStream(source);ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))>0)out.write(b,0,n);JSONObject root=new JSONObject(out.toString("UTF-8"));JSONArray rows=root.optJSONArray("sessions");if(rows!=null)for(int i=0;i<rows.length();i++){JSONObject o=rows.optJSONObject(i);if(o==null)continue;String id=o.optString("sessionId","");if(id.isEmpty())continue;Session v=new Session(id);v.comicId=o.optString("comicId","");v.chapterId=o.optString("chapterId","");v.title=o.optString("title","");v.author=o.optString("author","");v.chapterTitle=o.optString("chapterTitle","");v.providerId=o.optString("providerId","");v.sourceKind=o.optString("sourceKind","");v.firstPage=Math.max(0,o.optInt("firstPage",0));v.lastPage=Math.max(0,o.optInt("lastPage",v.firstPage));v.startedAt=o.optString("startedAt","");v.lastReadAt=o.optString("lastReadAt",v.startedAt);v.deviceId=o.optString("deviceId","");v.legacySnapshot=o.optBoolean("legacySnapshot",false);if(!v.comicId.isEmpty()&&!v.lastReadAt.isEmpty())s.byId.put(id,v);}return s;}catch(Exception ignored){return new Snapshot();}}
+
+    static synchronized void record(Context context,String sessionId,String comicId,String chapterId,String title,String author,String chapterTitle,String providerId,String sourceKind,int page,String startedAt,String lastReadAt){if(sessionId==null||sessionId.isEmpty()||comicId==null||comicId.isEmpty()||lastReadAt==null||lastReadAt.isEmpty())return;Snapshot s=load(context);Session v=s.byId.get(sessionId);if(v==null){v=new Session(sessionId);v.firstPage=Math.max(0,page);v.startedAt=safe(startedAt).isEmpty()?lastReadAt:startedAt;v.deviceId=DeviceIdentity.id(context);s.byId.put(sessionId,v);}v.comicId=comicId;v.chapterId=safe(chapterId);v.title=nonEmpty(title,v.title,"漫画");v.author=nonEmpty(author,v.author,"未知作者");v.chapterTitle=nonEmpty(chapterTitle,v.chapterTitle,"章节");v.providerId=safe(providerId);v.sourceKind=safe(sourceKind);v.lastPage=Math.max(0,page);v.lastReadAt=lastReadAt;v.legacySnapshot=false;save(context,s);}
+
+    static synchronized void importLegacy(Context context,List<Legacy> values){if(values==null||values.isEmpty())return;Snapshot s=load(context);for(Legacy row:values){if(row.comicId.isEmpty()||row.updatedAt.isEmpty())continue;String id="legacy_"+ReaderPolicy.hash(row.sourceKey+"\n"+row.comicId+"\n"+row.chapterId+"\n"+row.updatedAt);if(s.byId.containsKey(id))continue;Session v=new Session(id);v.comicId=row.comicId;v.chapterId=row.chapterId;v.title=nonEmpty(row.title,"","漫画");v.author=nonEmpty(row.author,"","未知作者");v.chapterTitle=nonEmpty(row.chapterTitle,"","章节");v.providerId=row.providerId;v.sourceKind=row.sourceKind;v.firstPage=v.lastPage=row.page;v.startedAt=v.lastReadAt=row.updatedAt;v.deviceId=row.deviceId;v.legacySnapshot=true;s.byId.put(id,v);}save(context,s);}
+
+    static synchronized void importLocalBookmarksOnce(Context context){SharedPreferences marker=context.getSharedPreferences(MIGRATION_PREF,Context.MODE_PRIVATE);if(marker.getBoolean(LOCAL_IMPORTED,false))return;SharedPreferences bookmarks=context.getSharedPreferences("reader-bookmarks-v1",Context.MODE_PRIVATE);UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(context);ArrayList<Legacy> rows=new ArrayList<>();for(Map.Entry<String,?> item:bookmarks.getAll().entrySet()){if(item.getKey().startsWith("recent:")||!(item.getValue() instanceof String))continue;try{JSONObject o=new JSONObject((String)item.getValue());String comic=o.optString("comic",""),chapter=o.optString("chapter","");String updated=o.optString("updatedAt","");if(comic.isEmpty()||chapter.isEmpty()||updated.isEmpty())continue;UnifiedCatalogStore.Entry e=catalog.byId.get(comic);String title=e==null?"漫画":e.title,author=e==null?"未知作者":e.displayAuthor(),provider=e==null?(EhClient.isEhId(comic)?"eh":""):e.providerId;rows.add(new Legacy("android-bookmark",comic,chapter,title,author,"章节",provider,"legacy",o.optInt("page",0),updated,DeviceIdentity.id(context)));}catch(Exception ignored){}}importLegacy(context,rows);marker.edit().putBoolean(LOCAL_IMPORTED,true).apply();}
+
+    static List<Session> filter(Snapshot snapshot,Range range,LocalDate exactDate,ZoneId zone){LocalDate today=LocalDate.now(zone);ArrayList<Session> out=new ArrayList<>();for(Session session:snapshot.sorted()){LocalDate day=localDay(session.lastReadAt,zone);if(day==null)continue;if(exactDate!=null){if(!day.equals(exactDate))continue;}else if(range==Range.TODAY&&!day.equals(today))continue;else if(range==Range.DAYS_7&&day.isBefore(today.minusDays(6)))continue;else if(range==Range.DAYS_30&&day.isBefore(today.minusDays(29)))continue;out.add(session);}return out;}
+    static LocalDate localDay(String stamp){return localDay(stamp,ZoneId.systemDefault());}
+    static LocalDate localDay(String stamp,ZoneId zone){try{return Instant.parse(stamp).atZone(zone).toLocalDate();}catch(Exception e){try{return OffsetDateTime.parse(stamp).atZoneSameInstant(zone).toLocalDate();}catch(Exception ignored){return null;}}}
+    static String timeLabel(String stamp,ZoneId zone){try{return DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(stamp).atZone(zone));}catch(Exception e){return "";}}
+
+    private static void save(Context context,Snapshot snapshot){try{List<Session> rows=snapshot.sorted();if(rows.size()>MAX_SESSIONS)rows=rows.subList(0,MAX_SESSIONS);JSONObject root=new JSONObject();root.put("schemaVersion",1);root.put("updatedAt",Instant.now().toString());JSONArray arr=new JSONArray();for(Session v:rows){JSONObject o=new JSONObject();o.put("sessionId",v.sessionId);o.put("comicId",v.comicId);o.put("chapterId",v.chapterId);o.put("title",v.title);o.put("author",v.author);o.put("chapterTitle",v.chapterTitle);o.put("providerId",v.providerId);o.put("sourceKind",v.sourceKind);o.put("firstPage",v.firstPage);o.put("lastPage",v.lastPage);o.put("startedAt",v.startedAt);o.put("lastReadAt",v.lastReadAt);o.put("deviceId",v.deviceId);o.put("legacySnapshot",v.legacySnapshot);arr.put(o);}root.put("sessions",arr);File target=file(context);target.getParentFile().mkdirs();File tmp=new File(target.getParentFile(),target.getName()+".tmp");try(OutputStream out=new FileOutputStream(tmp)){out.write(root.toString().getBytes(StandardCharsets.UTF_8));}if(target.exists()&&!target.delete())throw new IOException("history replace failed");if(!tmp.renameTo(target))throw new IOException("history rename failed");}catch(Exception e){throw new IllegalStateException("无法保存阅读历史",e);}}
+    private static String nonEmpty(String first,String second,String fallback){if(first!=null&&!first.trim().isEmpty())return first;if(second!=null&&!second.trim().isEmpty())return second;return fallback;}
+    private static String safe(String value){return value==null?"":value;}
+}

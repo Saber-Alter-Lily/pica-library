@@ -401,6 +401,16 @@ async function startEngine(preferredPort: number) {
     fs.mkdirSync(dataDir, { recursive: true })
     database = new LibraryDatabase(path.join(dataDir, 'library.db'))
     service = new LibraryService(database, dataDir)
+    service.setEhSession(
+        credentials?.ehMemberId && credentials?.ehPassHash
+            ? {
+                  memberId: credentials.ehMemberId,
+                  passHash: credentials.ehPassHash,
+                  igneous: credentials.ehIgneous,
+                  cfClearance: credentials.ehCfClearance
+              }
+            : null
+    )
     remoteStorageManager = new RemoteStorageDesktopManager(
         paths.remoteStorageConfig,
         credentialsStore,
@@ -425,6 +435,11 @@ async function startEngine(preferredPort: number) {
             browserLiteExportProgress,
             mobileBridge: mobileBridge?.status() ?? null,
             remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
+            ehAccount: {
+                configured: Boolean(
+                    credentials?.ehMemberId && credentials?.ehPassHash
+                )
+            },
             personalization: {
                 ...personalization.status(),
                 themePacks: personalization.listThemePacks()
@@ -443,6 +458,95 @@ async function startEngine(preferredPort: number) {
             }
         },
         save: async (input) => {
+            const ehAccountAction = String(input.ehAccountAction ?? '')
+            if (ehAccountAction) {
+                if (!service) throw new Error('Library is not ready')
+                if (ehAccountAction === 'save-session') {
+                    const candidate = {
+                        memberId: String(input.memberId ?? '').trim(),
+                        passHash: String(input.passHash ?? '').trim(),
+                        igneous: String(input.igneous ?? '').trim() || undefined,
+                        cfClearance:
+                            String(input.cfClearance ?? '').trim() || undefined
+                    }
+                    const previousSession =
+                        credentials?.ehMemberId && credentials?.ehPassHash
+                            ? {
+                                  memberId: credentials.ehMemberId,
+                                  passHash: credentials.ehPassHash,
+                                  igneous: credentials.ehIgneous,
+                                  cfClearance: credentials.ehCfClearance
+                              }
+                            : null
+                    service.setEhSession(candidate)
+                    try {
+                        await service.verifyEhAccount()
+                    } catch (error) {
+                        service.setEhSession(previousSession)
+                        throw error
+                    }
+                    const next = {
+                        ...(credentials ?? { account: '', password: '' }),
+                        ehMemberId: candidate.memberId,
+                        ehPassHash: candidate.passHash,
+                        ehIgneous: candidate.igneous,
+                        ehCfClearance: candidate.cfClearance
+                    }
+                    credentialsStore.save(next)
+                    credentials = next
+                    return {
+                        success: true,
+                        ehAccount: {
+                            configured: true,
+                            verified: true,
+                            exHentai: await service.probeExHentai()
+                        }
+                    }
+                }
+                if (ehAccountAction === 'clear-session') {
+                    const next = {
+                        ...(credentials ?? { account: '', password: '' }),
+                        ehMemberId: undefined,
+                        ehPassHash: undefined,
+                        ehIgneous: undefined,
+                        ehCfClearance: undefined
+                    }
+                    credentialsStore.save(next)
+                    credentials = next
+                    service.setEhSession(null)
+                    return {
+                        success: true,
+                        ehAccount: { configured: false, exHentai: 'UNAVAILABLE' }
+                    }
+                }
+                if (ehAccountAction === 'verify-session')
+                    return {
+                        success: true,
+                        ehAccount: {
+                            configured: service.ehAccountStatus().configured,
+                            verified: true,
+                            ...(await service.verifyEhAccount()),
+                            exHentai: await service.probeExHentai()
+                        }
+                    }
+                if (ehAccountAction === 'probe-exh')
+                    return {
+                        success: true,
+                        ehAccount: {
+                            configured: service.ehAccountStatus().configured,
+                            exHentai: await service.probeExHentai()
+                        }
+                    }
+                if (ehAccountAction === 'sync-favorites')
+                    return {
+                        success: true,
+                        ehAccount: {
+                            configured: service.ehAccountStatus().configured,
+                            sync: await service.syncEhFavorites()
+                        }
+                    }
+                throw new Error('Unknown E-H account action')
+            }
             const themeAction = String(input.personalizationAction ?? '')
             if (themeAction === 'export-theme-creator-kit') {
                 const kit = personalization.createThemeCreatorKit({
@@ -559,6 +663,10 @@ async function startEngine(preferredPort: number) {
             }
             built.credentials.remoteStorageUsername = previousCredentials?.remoteStorageUsername
             built.credentials.remoteStoragePassword = previousCredentials?.remoteStoragePassword
+            built.credentials.ehMemberId = previousCredentials?.ehMemberId
+            built.credentials.ehPassHash = previousCredentials?.ehPassHash
+            built.credentials.ehIgneous = previousCredentials?.ehIgneous
+            built.credentials.ehCfClearance = previousCredentials?.ehCfClearance
             credentialsStore.save(built.credentials)
             saveConfig(paths.config, built.config)
             config = built.config
@@ -662,6 +770,16 @@ async function startEngine(preferredPort: number) {
         database.close()
         database = new LibraryDatabase(path.join(dataDir, 'library.db'))
         service = new LibraryService(database, dataDir)
+    service.setEhSession(
+        credentials?.ehMemberId && credentials?.ehPassHash
+            ? {
+                  memberId: credentials.ehMemberId,
+                  passHash: credentials.ehPassHash,
+                  igneous: credentials.ehIgneous,
+                  cfClearance: credentials.ehCfClearance
+              }
+            : null
+    )
         remoteStorageManager = new RemoteStorageDesktopManager(
             paths.remoteStorageConfig, credentialsStore, credentials, database, dataDir,
             (value) => { credentials = value }

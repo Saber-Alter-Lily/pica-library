@@ -51,16 +51,19 @@ final class PicaClient {
         String clean=path.replaceAll("^/+|/+$","");HttpURLConnection c=(HttpURLConnection)new URL(API+clean).openConnection();c.setRequestMethod(method);c.setConnectTimeout(7000);c.setReadTimeout(20000);c.setUseCaches(false);c.setRequestProperty("api-key",API_KEY);c.setRequestProperty("accept","application/vnd.picacomic.com.v1+json");c.setRequestProperty("app-channel","2");c.setRequestProperty("nonce",NONCE);c.setRequestProperty("app-version","2.2.1.2.3.3");c.setRequestProperty("app-uuid","defaultUuid");c.setRequestProperty("app-platform","android");c.setRequestProperty("app-build-version","45");c.setRequestProperty("Content-Type","application/json; charset=UTF-8");c.setRequestProperty("User-Agent","okhttp/3.8.1");c.setRequestProperty("image-quality","original");String time=String.valueOf(System.currentTimeMillis()/1000L);c.setRequestProperty("time",time);c.setRequestProperty("signature",signature(clean,time,method));if(auth!=null&&!auth.isEmpty())c.setRequestProperty("authorization",auth);
         if(body!=null&&(method.equals("POST")||method.equals("PUT")||method.equals("PATCH"))){c.setDoOutput(true);byte[] bytes=body.toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=c.getOutputStream()){out.write(bytes);}}
         int status=c.getResponseCode();InputStream stream=status>=400?c.getErrorStream():c.getInputStream();String text=read(stream);c.disconnect();
-        if(clean.equals("auth/register") || clean.equals("auth/sign-in")) {
+        if(clean.equals("auth/register")){
+            if(status<200||status>=300)throw PicaAccountErrors.registrationResponse(status,text);
+            try{
+                JSONObject root=new JSONObject(text);
+                if(root.optInt("code",0)!=200)throw PicaAccountErrors.registrationResponse(400,text);
+                JSONObject data=root.optJSONObject("data");return data==null?new JSONObject():data;
+            }catch(org.json.JSONException error){throw new IOException("PICA_ACCOUNT_RESPONSE_INVALID");}
+        }
+        if(clean.equals("auth/sign-in")){
             if(status==429)throw new IOException("PICA_ACCOUNT_RATE_LIMIT");
             if(status>=500)throw new IOException("PICA_ACCOUNT_UNAVAILABLE");
             if(status<200||status>=300)throw new IOException("PICA_ACCOUNT_REJECTED");
-            try {
-                JSONObject root=new JSONObject(text);
-                if(root.optInt("code",0)!=200)throw new IOException("PICA_ACCOUNT_REJECTED");
-                JSONObject data=root.optJSONObject("data");
-                return data==null?new JSONObject():data;
-            } catch(org.json.JSONException error) { throw new IOException("PICA_ACCOUNT_RESPONSE_INVALID"); }
+            try{JSONObject root=new JSONObject(text);if(root.optInt("code",0)!=200)throw new IOException("PICA_ACCOUNT_REJECTED");JSONObject data=root.optJSONObject("data");return data==null?new JSONObject():data;}catch(org.json.JSONException error){throw new IOException("PICA_ACCOUNT_RESPONSE_INVALID");}
         }
         if(status==401||status==403)throw new AuthException();if(status<200||status>=300)throw new IOException("Pica HTTP "+status+(text.isEmpty()?"":" · "+shortText(text)));JSONObject root=new JSONObject(text);if(root.optInt("code",200)!=200)throw new IOException(root.optString("message",root.optString("error","Pica 请求失败")));JSONObject data=root.optJSONObject("data");return data==null?new JSONObject():data;
     }

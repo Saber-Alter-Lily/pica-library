@@ -52,6 +52,8 @@ export interface RankedCandidateWithEvidenceV3 extends V3Recommendation {
     rawRank: number
     comic: StoredComic
     evidence: RetrievedCandidateV3['evidence']
+    feedbackAdjustment?: number
+    visual?: unknown
 }
 
 export function rankCandidatesWithFrozenRankerV3(input: {

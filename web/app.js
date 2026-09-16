@@ -9,6 +9,7 @@ import {
 import { deriveLiteAuthors } from './author-state.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
+import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
 import {
     applyTranslations,
     localizeAuthorEvidence,
@@ -35,6 +36,11 @@ const state = {
     recommendationBatchId: null,
     recommendationManagedV3: false,
     recommendationPending: false,
+    recommendationFeedback: {},
+    recommendationFeedbackReasonsEnabled:
+        localStorage.getItem('pica-recommend-feedback-reasons') === 'true',
+    visualIndexRunning: false,
+    visualIndexStopRequested: false,
     searchContextId: null,
     visible: [],
     libraryPage: 1,
@@ -132,7 +138,7 @@ function applyLanguage(nextLanguage, persist = false) {
             })
         }
         if (activeView === 'downloaded') void loadDownloaded()
-        if (activeView === 'settings') void loadPreviewCacheStats()
+        if (activeView === 'settings') { void loadPreviewCacheStats(); void loadVisualStatus() }
         if (activeView === 'reader') {
             $('#reader .eyebrow').textContent = t(state.reader.online ? 'reader.online' : 'reader.eyebrow')
             renderReaderChapterHeading()
@@ -1085,10 +1091,73 @@ function renderResultCards(records, target, recommendation = false) {
                     .join('')}</div>
                 <p class="comic-meta">${escapeHtml(providerMeta)}</p>
                 <div class="detail-actions"><button data-result-detail="${escapeHtml(comic.comicId)}" data-result-context="${context}">${t('result.details')}</button><button data-result-download="${escapeHtml(comic.comicId)}">${t('action.download')}</button>${state.mode === 'connected' && state.capabilities?.features?.providerFavoriteMutation ? `<button data-result-favorite="${escapeHtml(comic.comicId)}">${escapeHtml(providerFavoriteLabel(comic))}</button>` : ''}</div>
+                ${recommendation && state.mode === 'connected' ? `<div class="recommend-feedback" aria-label="${escapeHtml(t('recommend.feedbackLabel'))}"><button type="button" data-recommend-feedback="like" class="${state.recommendationFeedback[comic.comicId]?.sentiment === 'like' ? 'active' : ''}">👍 ${escapeHtml(t('recommend.like'))}</button><button type="button" data-recommend-feedback="dislike" class="${state.recommendationFeedback[comic.comicId]?.sentiment === 'dislike' ? 'active' : ''}">👎 ${escapeHtml(t('recommend.dislike'))}</button></div>` : ''}
                 </div>
             </article>`
         })
         .join('')
+}
+
+async function loadRecommendationFeedback() {
+    if (state.mode !== 'connected') return
+    try {
+        const rows = await api('/api/v1/recommendation-feedback')
+        state.recommendationFeedback = Object.fromEntries(
+            (rows || []).map((item) => [item.comicId, item])
+        )
+    } catch {
+        state.recommendationFeedback = {}
+    }
+}
+
+let pendingRecommendationFeedback = null
+async function submitRecommendationFeedback(button, sentiment) {
+    if (state.mode !== 'connected') return
+    const card = button.closest('.result')
+    const comicId = card?.dataset.comicId
+    if (!comicId || !['like', 'dislike'].includes(sentiment)) return
+    const current = state.recommendationFeedback[comicId]
+    if (current?.sentiment === sentiment) return
+    const value = await post('/api/v1/recommendation-events', {
+        eventType: sentiment === 'like' ? 'recommend_like' : 'recommend_dislike',
+        comicId,
+        source: 'recommendation_feedback',
+        appSessionId: state.appSessionId,
+        contextId: state.recommendationContextId,
+        recommendationCycleId: state.recommendationCycleId,
+        recommendationSessionId: String(state.recommendationSessionNo || ''),
+        recommendationBatchIndex: state.recommendationBatch,
+        rankPosition: Number(card.dataset.resultRank || 0)
+    })
+    state.recommendationFeedback[comicId] = {
+        comicId,
+        sentiment,
+        feedbackEventId: value.id,
+        occurredAt: value.occurredAt,
+        reasons: [],
+        reasonEventId: null
+    }
+    card.querySelectorAll('[data-recommend-feedback]').forEach((item) =>
+        item.classList.toggle(
+            'active',
+            item.dataset.recommendFeedback === sentiment
+        )
+    )
+    if (state.recommendationFeedbackReasonsEnabled) {
+        pendingRecommendationFeedback = {
+            comicId,
+            sentiment,
+            feedbackEventId: value.id
+        }
+        $('#recommend-feedback-dialog-title').textContent =
+            sentiment === 'like'
+                ? t('recommend.whyLike')
+                : t('recommend.whyDislike')
+        $$('#recommend-feedback-dialog input[type="checkbox"]').forEach(
+            (input) => (input.checked = false)
+        )
+        $('#recommend-feedback-dialog').showModal()
+    }
 }
 
 function renderPreparedRecommendations() {
@@ -1644,6 +1713,13 @@ function openRecommendationDetail(comicId, context = 'recommendation') {
         button.textContent = t('reader.online')
         $('#recommend-detail-content .detail-actions').prepend(button)
     }
+    if (state.mode === 'connected') {
+        const styleButton = document.createElement('button')
+        styleButton.type = 'button'
+        styleButton.dataset.detailSimilarStyle = 'true'
+        styleButton.textContent = t('visual.similarStyle')
+        $('#recommend-detail-content .detail-actions').append(styleButton)
+    }
     dialog.showModal()
     recordRecommendationEvent(
         context === 'search' ? 'search_result_open' : 'recommend_detail_open',
@@ -1714,7 +1790,29 @@ $('#recommend-detail-dialog').onclick = async (event) => {
         dialog.close()
         await openReaderComic(comicId, true)
     }
-    else if (event.target.dataset.detailPreview) await loadRecommendationPreview(0)
+    else if (event.target.dataset.detailPreview)
+        await loadRecommendationPreview(0)
+    else if (event.target.dataset.detailSimilarStyle) {
+        try {
+            const rows = await api(
+                `/api/v1/visual/similar/${encodeURIComponent(comicId)}?limit=12`
+            )
+            $('#recommend-preview-message').textContent = rows.length
+                ? t('visual.similarFound', { count: rows.length })
+                : t('visual.similarEmpty')
+            $('#recommend-preview').innerHTML = rows
+                .map(
+                    (item) =>
+                        `<article class="visual-similar-item"><strong>${escapeHtml(item.comic.title)}</strong><span>${escapeHtml(item.comic.canonicalAuthor || item.comic.author || '')}</span></article>`
+                )
+                .join('')
+        } catch (error) {
+            $('#recommend-preview-message').textContent = localizeError(
+                language,
+                error
+            )
+        }
+    }
     else if (event.target.dataset.detailPreviewMore)
         await loadRecommendationPreview(
             Number(dialog.dataset.previewOffset || 0)
@@ -2705,6 +2803,17 @@ $('#recommend-restart').onclick = async () => {
                 detailId,
                 event.target.dataset.resultContext
             )
+        const feedback = event.target.dataset.recommendFeedback
+        if (feedback) {
+            try {
+                await submitRecommendationFeedback(event.target, feedback)
+            } catch (error) {
+                $('#recommend-message').textContent = localizeError(
+                    language,
+                    error
+                )
+            }
+        }
         const favoriteId = event.target.dataset.resultFavorite
         if (favoriteId) {
             try {
@@ -2723,6 +2832,178 @@ $('#recommend-restart').onclick = async () => {
         }
     }
 })
+$('#recommend-feedback-dialog-skip').onclick = () => {
+    pendingRecommendationFeedback = null
+    $('#recommend-feedback-dialog').close()
+}
+$('#recommend-feedback-dialog-save').onclick = async () => {
+    if (!pendingRecommendationFeedback)
+        return $('#recommend-feedback-dialog').close()
+    const reasons = $$(
+        '#recommend-feedback-dialog input[type="checkbox"]:checked'
+    ).map((input) => input.value)
+    if (reasons.length) {
+        try {
+            await post('/api/v1/recommendation-events', {
+                eventType: 'recommend_feedback_reason',
+                comicId: pendingRecommendationFeedback.comicId,
+                source: 'recommendation_feedback',
+                appSessionId: state.appSessionId,
+                contextId: state.recommendationContextId,
+                recommendationCycleId: state.recommendationCycleId,
+                recommendationBatchIndex: state.recommendationBatch,
+                metadata: {
+                    parentFeedbackId:
+                        pendingRecommendationFeedback.feedbackEventId,
+                    sentiment: pendingRecommendationFeedback.sentiment,
+                    reasons
+                }
+            })
+            state.recommendationFeedback[
+                pendingRecommendationFeedback.comicId
+            ].reasons = reasons
+        } catch (error) {
+            $('#recommend-message').textContent = localizeError(language, error)
+        }
+    }
+    pendingRecommendationFeedback = null
+    $('#recommend-feedback-dialog').close()
+}
+
+async function loadVisualStatus() {
+    if (state.mode !== 'connected') return null
+    try {
+        const value = await api('/api/v1/visual/status')
+        $('#visual-enabled').checked = Boolean(value.settings?.enabled)
+        $('#visual-sampling-mode').value =
+            value.settings?.samplingMode || 'local_only'
+        $('#visual-rerank-mode').value =
+            value.settings?.rerankMode || 'SHADOW'
+        $('#visual-index-status').textContent = t('visual.indexStatus', {
+            indexed: value.indexedCount || 0,
+            target: value.targetCount || 0,
+            pending: value.pendingComicIds?.length || 0
+        })
+        return value
+    } catch (error) {
+        $('#visual-index-status').textContent = localizeError(language, error)
+        return null
+    }
+}
+
+async function saveVisualSettings() {
+    if (state.mode !== 'connected') return
+    await post('/api/v1/visual/settings', {
+        enabled: $('#visual-enabled').checked,
+        samplingMode: $('#visual-sampling-mode').value,
+        rerankMode: $('#visual-rerank-mode').value
+    })
+    await loadVisualStatus()
+}
+
+async function buildVisualIndex() {
+    if (state.mode !== 'connected' || state.visualIndexRunning) return
+    state.visualIndexRunning = true
+    state.visualIndexStopRequested = false
+    $('#visual-index-build').disabled = true
+    $('#visual-index-stop').hidden = false
+    try {
+        await saveVisualSettings()
+        let status = await loadVisualStatus()
+        const pending = [...(status?.pendingComicIds || [])]
+        const total = pending.length
+        for (let index = 0; index < pending.length; index++) {
+            if (state.visualIndexStopRequested) break
+            const comicId = pending[index]
+            $('#visual-index-progress').hidden = false
+            $('#visual-index-progress').max = Math.max(1, total)
+            $('#visual-index-progress').value = index
+            $('#visual-index-message').textContent = t('visual.processing', {
+                current: index + 1,
+                total
+            })
+            try {
+                const prepared = await post('/api/v1/visual/prepare', {
+                    comicId,
+                    mode: $('#visual-sampling-mode').value,
+                    limit: 6
+                })
+                if (!prepared.samples?.length) continue
+                const result = await analyzeVisualSamples(
+                    prepared.samples,
+                    (progress) => {
+                        if (progress.phase === 'page')
+                            $('#visual-index-message').textContent = t(
+                                'visual.processingPage',
+                                {
+                                    current: index + 1,
+                                    total,
+                                    page: progress.current,
+                                    pages: progress.total
+                                }
+                            )
+                        else if (progress.phase === 'model')
+                            $('#visual-index-message').textContent = t(
+                                'visual.loadingModel'
+                            )
+                    }
+                )
+                await post('/api/v1/visual/embedding', {
+                    comicId,
+                    ...result,
+                    embeddingKind:
+                        prepared.sourceKind === 'COVER_ONLY' ? 'cover' : 'body',
+                    sourceKind: prepared.sourceKind,
+                    confidence:
+                        prepared.sourceKind === 'LOCAL_PAGES'
+                            ? 1
+                            : prepared.sourceKind === 'REMOTE_PAGES'
+                              ? 0.85
+                              : 0.5,
+                    metadata: {
+                        sampleIds: prepared.samples.map((item) => item.sampleId)
+                    }
+                })
+            } catch (error) {
+                $('#visual-index-message').textContent = t(
+                    'visual.itemFailed',
+                    {
+                        current: index + 1,
+                        total,
+                        error: localizeError(language, error)
+                    }
+                )
+            }
+        }
+        $('#visual-index-progress').value = total
+        status = await loadVisualStatus()
+        $('#visual-index-message').textContent = state.visualIndexStopRequested
+            ? t('visual.stopped')
+            : t('visual.finished', { indexed: status?.indexedCount || 0 })
+    } finally {
+        state.visualIndexRunning = false
+        $('#visual-index-build').disabled = false
+        $('#visual-index-stop').hidden = true
+    }
+}
+
+$('#visual-enabled').onchange = () => void saveVisualSettings()
+$('#visual-sampling-mode').onchange = () => void saveVisualSettings()
+$('#visual-rerank-mode').onchange = () => void saveVisualSettings()
+$('#visual-index-build').onclick = () => void buildVisualIndex()
+$('#visual-index-stop').onclick = () => {
+    state.visualIndexStopRequested = true
+}
+$('#recommend-feedback-reasons-toggle').checked =
+    state.recommendationFeedbackReasonsEnabled
+$('#recommend-feedback-reasons-toggle').onchange = (event) => {
+    state.recommendationFeedbackReasonsEnabled = event.target.checked
+    localStorage.setItem(
+        'pica-recommend-feedback-reasons',
+        String(event.target.checked)
+    )
+}
+
 $('#refresh-jobs').onclick = loadJobs
 $('#performance-profile').onchange = () => {
     $('#custom-performance').hidden =
@@ -3420,6 +3701,7 @@ async function detect() {
     try {
         const status = await api('/api/v1/status')
         state.mode = 'connected'
+        await loadRecommendationFeedback()
         $('#mode').textContent = t('mode.connected')
         state.records = await api('/api/v1/comics?limit=5000')
         state.authors = await api('/api/v1/authors')

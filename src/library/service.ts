@@ -82,6 +82,20 @@ import {
 } from '../recommendation-v3/ranker-adapter-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import {
+    buildVisualPreferenceProfile,
+    cosineSimilarity,
+    metadataFeedbackAdjustment,
+    rerankWithVisualStyle,
+    VISUAL_MODEL_ID,
+    VISUAL_MODEL_VERSION,
+    VISUAL_PROFILE_VERSION,
+    VISUAL_RERANK_VERSION,
+    VISUAL_SAMPLING_POLICY_VERSION,
+    type VisualEmbeddingRecord,
+    type VisualRerankMode,
+    type VisualSamplingMode
+} from '../recommendation-v4/visual-style'
+import {
     loadTagRegistryV3,
     resolveTagV3
 } from '../recommendation-v3/tag-resolution-v3'
@@ -184,6 +198,173 @@ export class LibraryService {
         return this.database.recordUserEvent(input)
     }
 
+    visualSettings() {
+        const stored = this.database.getAppState<{
+            enabled?: boolean
+            samplingMode?: VisualSamplingMode
+            rerankMode?: VisualRerankMode
+        }>('recommendation.visualSettings.v1')
+        const samplingMode: VisualSamplingMode = [
+            'local_only',
+            'standard',
+            'cover_only'
+        ].includes(String(stored?.samplingMode ?? ''))
+            ? (stored!.samplingMode as VisualSamplingMode)
+            : 'local_only'
+        const rerankMode: VisualRerankMode = ['OFF', 'SHADOW', 'LIVE'].includes(
+            String(stored?.rerankMode ?? '')
+        )
+            ? (stored!.rerankMode as VisualRerankMode)
+            : 'SHADOW'
+        return {
+            enabled: Boolean(stored?.enabled),
+            samplingMode,
+            rerankMode
+        }
+    }
+
+    updateVisualSettings(input: {
+        enabled?: unknown
+        samplingMode?: unknown
+        rerankMode?: unknown
+    }) {
+        const previous = this.visualSettings()
+        const samplingMode = ['local_only', 'standard', 'cover_only'].includes(
+            String(input.samplingMode ?? '')
+        )
+            ? (String(input.samplingMode) as VisualSamplingMode)
+            : previous.samplingMode
+        const rerankMode = ['OFF', 'SHADOW', 'LIVE'].includes(
+            String(input.rerankMode ?? '')
+        )
+            ? (String(input.rerankMode) as VisualRerankMode)
+            : previous.rerankMode
+        const next = {
+            enabled:
+                input.enabled === undefined
+                    ? previous.enabled
+                    : Boolean(input.enabled),
+            samplingMode,
+            rerankMode
+        }
+        this.database.setAppState('recommendation.visualSettings.v1', next)
+        return next
+    }
+
+    saveVisualEmbedding(
+        input: Omit<VisualEmbeddingRecord, 'generatedAt'> & {
+            generatedAt?: string
+        }
+    ) {
+        if (!this.database.getComic(input.comicId)) throw new Error('Unknown comic')
+        if (
+            input.modelId !== VISUAL_MODEL_ID ||
+            input.modelVersion !== VISUAL_MODEL_VERSION
+        )
+            throw new Error('Unsupported visual embedding model')
+        if (input.samplingPolicyVersion !== VISUAL_SAMPLING_POLICY_VERSION)
+            throw new Error('Unsupported visual sampling policy')
+        return this.database.saveVisualEmbedding({
+            ...input,
+            generatedAt: input.generatedAt ?? new Date().toISOString()
+        })
+    }
+
+    visualPreferenceProfile() {
+        const catalog = this.database.listComics({ limit: 10000 })
+        const favorites = new Set(
+            catalog
+                .filter((comic) => comic.isFavorite)
+                .map((comic) => comic.comicId)
+        )
+        const feedback = this.database.recommendationFeedback()
+        return buildVisualPreferenceProfile({
+            embeddings: this.database.listVisualEmbeddings(),
+            favoriteComicIds: favorites,
+            feedback,
+            catalogSize: Math.max(
+                1,
+                favorites.size +
+                    feedback.filter((item) => item.sentiment === 'like').length
+            )
+        })
+    }
+
+    visualIndexStatus() {
+        const settings = this.visualSettings()
+        const catalog = this.database.listComics({ limit: 10000 })
+        const feedback = this.database.recommendationFeedback()
+        const targetIds = new Set([
+            ...catalog
+                .filter((comic) => comic.isFavorite)
+                .map((comic) => comic.comicId),
+            ...feedback.map((item) => item.comicId)
+        ])
+        const embeddings = this.database.listVisualEmbeddings()
+        const current = embeddings.filter(
+            (item) =>
+                item.modelId === VISUAL_MODEL_ID &&
+                item.modelVersion === VISUAL_MODEL_VERSION
+        )
+        const indexedIds = new Set(current.map((item) => item.comicId))
+        const pendingComicIds = [...targetIds]
+            .filter((id) => !indexedIds.has(id))
+            .sort()
+        return {
+            settings,
+            modelId: VISUAL_MODEL_ID,
+            modelVersion: VISUAL_MODEL_VERSION,
+            samplingPolicyVersion: VISUAL_SAMPLING_POLICY_VERSION,
+            profileVersion: VISUAL_PROFILE_VERSION,
+            rerankVersion: VISUAL_RERANK_VERSION,
+            targetCount: targetIds.size,
+            indexedCount: [...targetIds].filter((id) => indexedIds.has(id)).length,
+            bodyCount: current.filter((item) => item.embeddingKind === 'body').length,
+            coverCount: current.filter((item) => item.embeddingKind === 'cover').length,
+            pendingComicIds,
+            profile: this.visualPreferenceProfile()
+        }
+    }
+
+    similarVisualStyle(comicId: string, limit = 20) {
+        const embeddings = this.database.listVisualEmbeddings()
+        const preferred = new Map<string, VisualEmbeddingRecord>()
+        for (const item of embeddings) {
+            if (
+                item.modelId !== VISUAL_MODEL_ID ||
+                item.modelVersion !== VISUAL_MODEL_VERSION
+            )
+                continue
+            const previous = preferred.get(item.comicId)
+            if (
+                !previous ||
+                (previous.embeddingKind === 'cover' && item.embeddingKind === 'body')
+            )
+                preferred.set(item.comicId, item)
+        }
+        const source = preferred.get(comicId)
+        if (!source) return []
+        return [...preferred.values()]
+            .filter(
+                (item) =>
+                    item.comicId !== comicId &&
+                    item.vector.length === source.vector.length
+            )
+            .map((item) => ({
+                comic: this.database.getComic(item.comicId),
+                similarity: cosineSimilarity(source.vector, item.vector),
+                sourceKind: item.sourceKind,
+                confidence: item.confidence
+            }))
+            .filter((item) => item.comic)
+            .sort(
+                (a, b) =>
+                    b.similarity - a.similarity ||
+                    a.comic!.comicId.localeCompare(b.comic!.comicId)
+            )
+            .slice(0, Math.max(1, Math.min(50, Math.floor(limit))))
+    }
+
     constructor(
         readonly database: LibraryDatabase,
         readonly dataDir: string,
@@ -277,18 +458,44 @@ export class LibraryService {
     }
 
     async buildFinalRecommendationCycleV3(cycleId: string) {
-        this.recommendationProgress = { state: 'running', phase: 'profile', done: 0, total: 6 }
+        this.recommendationProgress = { state: 'running', phase: 'profile', done: 0, total: 7 }
         const pica = await this.connect()
         const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
         const readingIds = new Set(this.database.readingProgress().map((item) => item.comicId))
-        const explicitFavoriteIds = new Set(catalog.filter((comic) => comic.isFavorite).map((comic) => comic.comicId))
+        const explicitFavoriteIds = new Set(
+            catalog
+                .filter((comic) => comic.isFavorite)
+                .map((comic) => comic.comicId)
+        )
+        const recommendationFeedback = this.database.recommendationFeedback()
+        const latestFeedback = new Map(
+            recommendationFeedback.map((item) => [item.comicId, item])
+        )
+        const dislikedIds = new Set(
+            recommendationFeedback
+                .filter((item) => item.sentiment === 'dislike')
+                .map((item) => item.comicId)
+        )
+        const likedIds = new Set(
+            recommendationFeedback
+                .filter((item) => item.sentiment === 'like')
+                .map((item) => item.comicId)
+        )
         const favorites = catalog
-            .filter((comic) => comic.isFavorite || comic.inLibrary || comic.downloadedPictures > 0 || readingIds.has(comic.comicId))
+            .filter(
+                (comic) =>
+                    !dislikedIds.has(comic.comicId) &&
+                    (comic.isFavorite ||
+                        comic.inLibrary ||
+                        comic.downloadedPictures > 0 ||
+                        readingIds.has(comic.comicId) ||
+                        likedIds.has(comic.comicId))
+            )
             .map((comic) => ({ ...comic, isFavorite: true }))
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
         const profile = buildFinalLifetimeProfileV3(favorites, { registry })
-        this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 6 }
+        this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 7 }
         const history: IntentCycleHistory[] = this.database
             .listV3CandidatePools(50)
             .flatMap((pool) => {
@@ -319,7 +526,7 @@ export class LibraryService {
             favorites,
             history
         })
-        this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 6 }
+        this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 7 }
         const routes = translateIntentPlanV3(intents)
         const storePica = (comics: Comic[]) => {
             const records = comics.map(comicToRecord)
@@ -374,7 +581,7 @@ export class LibraryService {
                 return []
             }
         }
-        this.recommendationProgress = { state: 'running', phase: 'retrieve', done: 3, total: 6 }
+        this.recommendationProgress = { state: 'running', phase: 'retrieve', done: 3, total: 7 }
         const retrieved = await retrieveCandidatesV3({
             provider: {
                 keyword: async (query, page) => {
@@ -425,7 +632,7 @@ export class LibraryService {
                         : []
                 })
         })
-        this.recommendationProgress = { state: 'running', phase: 'rank', done: 4, total: 6 }
+        this.recommendationProgress = { state: 'running', phase: 'rank', done: 4, total: 7 }
         const ranked = rankCandidatesWithFrozenRankerV3({
             candidates: retrieved.candidates,
             favorites,
@@ -436,16 +643,101 @@ export class LibraryService {
                 observationCount: edge.observationCount
             }))
         })
-        this.recommendationProgress = { state: 'complete', phase: 'complete', done: 6, total: 6 }
+        const catalogById = new Map(
+            catalog.map((comic) => [comic.comicId, comic])
+        )
+        const feedbackAdjusted = ranked
+            .filter((candidate) => !latestFeedback.has(candidate.comicId))
+            .map((candidate, index) => {
+                const feedbackAdjustment = metadataFeedbackAdjustment({
+                    candidate: candidate.comic,
+                    feedback: recommendationFeedback,
+                    catalogById
+                })
+                const baselinePercentile =
+                    ranked.length <= 1 ? 1 : 1 - index / (ranked.length - 1)
+                return {
+                    ...candidate,
+                    feedbackAdjustment,
+                    __feedbackRankScore:
+                        baselinePercentile + feedbackAdjustment
+                }
+            })
+            .sort(
+                (a, b) =>
+                    b.__feedbackRankScore - a.__feedbackRankScore ||
+                    a.rawRank - b.rawRank ||
+                    a.comicId.localeCompare(b.comicId)
+            )
+            .map(({ __feedbackRankScore: _score, ...candidate }) => candidate)
+        this.recommendationProgress = {
+            state: 'running',
+            phase: 'visual',
+            done: 5,
+            total: 7
+        }
+        const visualSettings = this.visualSettings()
+        const visualEmbeddings = this.database.listVisualEmbeddings()
+        const visualProfile = buildVisualPreferenceProfile({
+            embeddings: visualEmbeddings,
+            favoriteComicIds: explicitFavoriteIds,
+            feedback: recommendationFeedback,
+            catalogSize: Math.max(1, explicitFavoriteIds.size + likedIds.size)
+        })
+        const reranked = rerankWithVisualStyle({
+            ranked: feedbackAdjusted,
+            embeddings: visualEmbeddings,
+            profile: visualProfile,
+            mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF'
+        })
+        this.recommendationProgress = {
+            state: 'complete',
+            phase: 'complete',
+            done: 7,
+            total: 7
+        }
         return {
             profile,
             intents,
             routes,
-            ranked,
+            ranked: reranked,
             readiness: retrieved.readiness,
             telemetry: {
                 ...retrieved.telemetry,
                 cycleId,
+                recommendationV4: {
+                    feedbackCount: recommendationFeedback.length,
+                    likedCount: likedIds.size,
+                    dislikedCount: dislikedIds.size,
+                    exactFeedbackItemsSuppressed:
+                        ranked.length - feedbackAdjusted.length,
+                    visual: {
+                        settings: visualSettings,
+                        profileAvailable: Boolean(visualProfile),
+                        profileCoverage: visualProfile?.coverage ?? 0,
+                        positivePrototypeCount:
+                            visualProfile?.positivePrototypes.length ?? 0,
+                        negativePrototypeCount:
+                            visualProfile?.negativePrototypes.length ?? 0,
+                        candidateEmbeddingCount: reranked.filter((item) =>
+                            Boolean(
+                                item.visual &&
+                                    typeof item.visual === 'object' &&
+                                    (item.visual as { available?: boolean })
+                                        .available
+                            )
+                        ).length,
+                        shadowMoveCount: reranked.filter((item) => {
+                            const visual = item.visual as
+                                | { shadowRank?: number | null }
+                                | undefined
+                            return Boolean(
+                                visual?.shadowRank &&
+                                    visual.shadowRank !== item.rawRank
+                            )
+                        }).length
+                    }
+                },
                 providerSources: {
                     ehRequests: sourceRequests.eh,
                     exhRequests: sourceRequests.exh,
@@ -471,7 +763,7 @@ export class LibraryService {
             versions: {
                 profileVersion: FINAL_PROFILE_VERSION,
                 registryVersion: profile.registryVersion,
-                rankerModelVersion: RANKER_ADAPTER_VERSION,
+                rankerModelVersion: `${RANKER_ADAPTER_VERSION}/${VISUAL_RERANK_VERSION}`,
                 candidatePoolVersion: `${INTENT_PLANNER_VERSION}/${QUERY_TRANSLATOR_VERSION}/${RETRIEVER_VERSION}`,
                 allocatorVersion: BATCH_ALLOCATOR_VERSION
             }

@@ -37,6 +37,10 @@ import {
 import type { UpdateFinding } from '../maintenance/updates'
 import { trustedCoverUrl } from './cover-url'
 import type { UserEvent, UserEventInput } from '../recommendation-v3/types'
+import type {
+    RecommendationFeedbackState,
+    VisualEmbeddingRecord
+} from '../recommendation-v4/visual-style'
 
 type SqlRow = Record<string, unknown>
 
@@ -276,6 +280,153 @@ export class LibraryDatabase {
             )
             .all(...args, limit) as SqlRow[]
         return rows.map((row) => this.recordFromRow(row))
+    }
+
+    recommendationFeedback(): RecommendationFeedbackState[] {
+        const rows = this.db
+            .prepare(
+                `SELECT id, occurred_at, event_type, comic_id, metadata_json, created_at
+                 FROM user_events
+                 WHERE comic_id IS NOT NULL
+                   AND event_type IN ('recommend_like','recommend_dislike','recommend_feedback_reason')
+                 ORDER BY occurred_at ASC, created_at ASC, id ASC`
+            )
+            .all() as SqlRow[]
+        const latest = new Map<string, RecommendationFeedbackState>()
+        for (const row of rows) {
+            const comicId = String(row.comic_id ?? '')
+            if (!comicId) continue
+            const eventType = String(row.event_type ?? '')
+            if (eventType === 'recommend_like' || eventType === 'recommend_dislike') {
+                latest.set(comicId, {
+                    comicId,
+                    sentiment: eventType === 'recommend_like' ? 'like' : 'dislike',
+                    feedbackEventId: String(row.id),
+                    occurredAt: String(row.occurred_at),
+                    reasons: [],
+                    reasonEventId: null
+                })
+                continue
+            }
+            const current = latest.get(comicId)
+            if (!current) continue
+            const metadata = jsonObject(row.metadata_json)
+            if (String(metadata.sentiment ?? '') !== current.sentiment) continue
+            if (
+                metadata.parentFeedbackId &&
+                String(metadata.parentFeedbackId) !== current.feedbackEventId
+            )
+                continue
+            const reasons = Array.isArray(metadata.reasons)
+                ? [
+                      ...new Set(
+                          metadata.reasons
+                              .map(String)
+                              .map((value) => value.trim())
+                              .filter(Boolean)
+                      )
+                  ]
+                : []
+            current.reasons = reasons
+            current.reasonEventId = String(row.id)
+        }
+        return [...latest.values()].sort(
+            (a, b) =>
+                b.occurredAt.localeCompare(a.occurredAt) ||
+                a.comicId.localeCompare(b.comicId)
+        )
+    }
+
+    saveVisualEmbedding(input: VisualEmbeddingRecord): VisualEmbeddingRecord {
+        const vector = input.vector.map(Number)
+        if (
+            !vector.length ||
+            vector.length !== Number(input.dimension) ||
+            vector.length > 4096 ||
+            vector.some((value) => !Number.isFinite(value))
+        )
+            throw new Error('Visual embedding is invalid')
+        const norm = Math.sqrt(
+            vector.reduce((sum, value) => sum + value * value, 0)
+        )
+        if (!Number.isFinite(norm) || norm < 1e-8)
+            throw new Error('Visual embedding has zero magnitude')
+        const normalized = vector.map((value) => value / norm)
+        const confidence = Math.max(0, Math.min(1, Number(input.confidence)))
+        const generatedAt = input.generatedAt || new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO visual_embeddings(
+                    comic_id, model_id, model_version, sampling_policy_version,
+                    embedding_kind, vector_json, dimension, source_kind, sample_count,
+                    confidence, generated_at, metadata_json
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(comic_id, model_id, model_version, sampling_policy_version, embedding_kind)
+                 DO UPDATE SET vector_json = excluded.vector_json,
+                               dimension = excluded.dimension,
+                               source_kind = excluded.source_kind,
+                               sample_count = excluded.sample_count,
+                               confidence = excluded.confidence,
+                               generated_at = excluded.generated_at,
+                               metadata_json = excluded.metadata_json`
+            )
+            .run(
+                input.comicId,
+                input.modelId,
+                input.modelVersion,
+                input.samplingPolicyVersion,
+                input.embeddingKind,
+                JSON.stringify(normalized),
+                normalized.length,
+                input.sourceKind,
+                Math.max(1, Math.floor(Number(input.sampleCount) || 1)),
+                confidence,
+                generatedAt,
+                JSON.stringify(input.metadata ?? {})
+            )
+        return {
+            ...input,
+            vector: normalized,
+            dimension: normalized.length,
+            confidence,
+            generatedAt
+        }
+    }
+
+    listVisualEmbeddings(comicIds?: string[]): VisualEmbeddingRecord[] {
+        const requested = comicIds?.filter(Boolean) ?? []
+        if (comicIds && !requested.length) return []
+        const rows = requested.length
+            ? (this.db
+                  .prepare(
+                      `SELECT * FROM visual_embeddings WHERE comic_id IN (${requested.map(() => '?').join(',')})`
+                  )
+                  .all(...requested) as SqlRow[])
+            : (this.db.prepare('SELECT * FROM visual_embeddings').all() as SqlRow[])
+        return rows.flatMap((row) => {
+            try {
+                const vector = JSON.parse(String(row.vector_json ?? '[]')) as unknown
+                if (!Array.isArray(vector)) return []
+                return [
+                    {
+                        comicId: String(row.comic_id),
+                        modelId: String(row.model_id),
+                        modelVersion: String(row.model_version),
+                        samplingPolicyVersion: String(row.sampling_policy_version),
+                        embeddingKind: String(row.embedding_kind) as 'body' | 'cover',
+                        vector: vector.map(Number),
+                        dimension: Number(row.dimension),
+                        sourceKind: String(row.source_kind) as VisualEmbeddingRecord['sourceKind'],
+                        sampleCount: Number(row.sample_count),
+                        confidence: Number(row.confidence),
+                        generatedAt: String(row.generated_at),
+                        metadata: jsonObject(row.metadata_json)
+                    }
+                ]
+            } catch {
+                return []
+            }
+        })
     }
 
     recordRecommendationEdge(input: {

@@ -3017,3 +3017,11 @@ select:focus {
     height: 100%;
     display: block;
 }
+
+.recommend-feedback { display:flex; gap:.45rem; margin-top:.65rem; flex-wrap:wrap; }
+.recommend-feedback button { min-width:5.5rem; }
+.recommend-feedback button.active { outline:2px solid currentColor; font-weight:700; }
+.feedback-reasons { display:grid; gap:.55rem; margin:1rem 0; }
+.toggle-row { display:flex; align-items:center; gap:.55rem; }
+#settings-recommendation-v4 progress { width:100%; }
+.visual-similar-item { display:flex; flex-direction:column; gap:.2rem; padding:.7rem; border:1px solid var(--border, #ddd); border-radius:.6rem; }

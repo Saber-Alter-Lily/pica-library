@@ -16,15 +16,8 @@ jobs:
         with:
           ref: feature/recommendation-v4-visual-feedback
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Harden patch anchors
-        run: node scripts/fix-recommendation-v4-apply.mjs
-      - name: Apply Recommendation V4
-        run: node scripts/apply-recommendation-v4-visual-feedback-dev.mjs
-      - name: Apply post-pass
-        run: node scripts/post-recommendation-v4-apply.mjs
+      - name: Apply Recommendation V4 safely
+        run: python3 scripts/apply_recommendation_v4.py
       - name: Commit integrated source
         run: |
           git config user.name "github-actions[bot]"

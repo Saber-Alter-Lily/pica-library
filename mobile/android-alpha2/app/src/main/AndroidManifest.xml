@@ -25,6 +25,7 @@
         <activity android:name=".AppearanceActivity" android:exported="false" />
         <activity android:name=".ThemePackActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
+        <activity android:name=".RecommendationStyleActivity" android:exported="false" />
         <activity android:name=".StorageHubActivity" android:exported="false" />
         <activity android:name=".AboutActivity" android:exported="false" />
         <activity android:name=".StorageSettingsActivity" android:exported="false" />

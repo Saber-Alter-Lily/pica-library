@@ -1,5 +1,6 @@
 const $ = (selector) => document.querySelector(selector)
 let csrf = ''
+let webLoginPoll = null
 
 function disclosure(summaryText, nodes, className) {
     const details = document.createElement('details')
@@ -149,6 +150,82 @@ async function action(payload) {
     return value
 }
 
+async function desktopLoginRequest(path, method = 'GET') {
+    if (!csrf) await status()
+    const response = await fetch(path, {
+        method,
+        headers: method === 'POST' ? { 'x-pica-csrf': csrf } : undefined,
+        cache: 'no-store'
+    })
+    const value = await response.json()
+    if (!response.ok) throw new Error(value.error || 'E-H 网页登录失败')
+    return value
+}
+
+function stopWebLoginPoll() {
+    if (webLoginPoll) clearInterval(webLoginPoll)
+    webLoginPoll = null
+}
+
+function renderWebLoginState(value) {
+    const message = $('#eh-account-message')
+    const start = $('#eh-web-login-start')
+    const cancel = $('#eh-web-login-cancel')
+    const active = ['opening', 'waiting', 'verifying'].includes(value?.state)
+    if (start) start.disabled = active
+    if (cancel) cancel.hidden = !active
+    if (message && value?.message) message.textContent = value.message
+    if (value?.state === 'complete') {
+        stopWebLoginPoll()
+        void status().then(() => {
+            if (message) message.textContent = 'E-H 登录成功，会话已自动验证并加密保存。'
+        })
+    } else if (value?.state === 'failed' || value?.state === 'cancelled') {
+        stopWebLoginPoll()
+    }
+}
+
+async function pollWebLogin() {
+    try {
+        renderWebLoginState(
+            await desktopLoginRequest('/api/v1/desktop/eh-web-login/status')
+        )
+    } catch (error) {
+        stopWebLoginPoll()
+        const message = $('#eh-account-message')
+        if (message)
+            message.textContent = error instanceof Error ? error.message : String(error)
+    }
+}
+
+async function startWebLogin() {
+    const message = $('#eh-account-message')
+    try {
+        if (message) message.textContent = '正在打开 E-H 官方登录窗口…'
+        renderWebLoginState(
+            await desktopLoginRequest('/api/v1/desktop/eh-web-login/start', 'POST')
+        )
+        stopWebLoginPoll()
+        webLoginPoll = setInterval(() => void pollWebLogin(), 900)
+        void pollWebLogin()
+    } catch (error) {
+        if (message)
+            message.textContent = error instanceof Error ? error.message : String(error)
+    }
+}
+
+async function cancelWebLogin() {
+    try {
+        renderWebLoginState(
+            await desktopLoginRequest('/api/v1/desktop/eh-web-login/cancel', 'POST')
+        )
+    } catch (error) {
+        const message = $('#eh-account-message')
+        if (message)
+            message.textContent = error instanceof Error ? error.message : String(error)
+    }
+}
+
 function clearInputs() {
     for (const id of ['#eh-member-id','#eh-pass-hash','#eh-igneous','#eh-cf-clearance']) {
         const input = $(id)
@@ -161,6 +238,8 @@ compactOnlineToolbar()
 compactBatchActions()
 observeResultCardActions()
 
+$('#eh-web-login-start')?.addEventListener('click', () => void startWebLogin())
+$('#eh-web-login-cancel')?.addEventListener('click', () => void cancelWebLogin())
 $('#eh-account-save')?.addEventListener('click', async () => {
     const message = $('#eh-account-message')
     try {
@@ -199,5 +278,5 @@ $('#eh-account-clear')?.addEventListener('click', async () => {
     catch (error) { message.textContent = error instanceof Error ? error.message : String(error) }
 })
 
-void status().catch(() => {})
+void status().then(() => pollWebLogin()).catch(() => {})
 void import('./v040-parity.js').catch(() => {})

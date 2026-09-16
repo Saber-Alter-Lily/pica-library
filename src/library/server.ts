@@ -39,6 +39,9 @@ export interface DesktopServerController {
     registerAccount?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     configured: () => boolean
     status: () => Record<string, unknown>
+    startEhWebLogin?: () => Promise<Record<string, unknown>>
+    ehWebLoginStatus?: () => Record<string, unknown>
+    cancelEhWebLogin?: () => Promise<Record<string, unknown>>
     importThemePack?: (name: string, value: Buffer) => Promise<Record<string, unknown>>
     save: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     testConnection: (
@@ -784,6 +787,30 @@ export async function startLibraryServer(options: {
                         await binaryBody(request, 24 * 1024 * 1024)
                     )
                 )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/eh-web-login/status' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop?.ehWebLoginStatus)
+                    return json(response, 409, { error: '受控 E-H 网页登录不可用' })
+                return json(response, 200, options.desktop.ehWebLoginStatus())
+            }
+            if (
+                url.pathname === '/api/v1/desktop/eh-web-login/start' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.startEhWebLogin)
+                    return json(response, 409, { error: '受控 E-H 网页登录不可用' })
+                return json(response, 200, await options.desktop.startEhWebLogin())
+            }
+            if (
+                url.pathname === '/api/v1/desktop/eh-web-login/cancel' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.cancelEhWebLogin)
+                    return json(response, 409, { error: '受控 E-H 网页登录不可用' })
+                return json(response, 200, await options.desktop.cancelEhWebLogin())
             }
             if (
                 url.pathname === '/api/v1/desktop/settings' &&

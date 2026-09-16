@@ -30,6 +30,12 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 - Pica setup remains available, but it is no longer the UI gate to E-H / ExH account access.
 - The desktop settings hub must expose dedicated `账号与来源 / Accounts & Providers` and `推荐与画风 / Recommendations & Visual Style` sections. The runtime hub must move `settings-eh-account` and `settings-recommendation-v4` into those visible sections before hiding the legacy Settings container.
 
+## Account and mobile UX corrections
+
+- Desktop General settings now contains both Pica and E-H / ExH account controls; there is no separate E-H-only account section in the settings sidebar.
+- Recommended Desktop E-H login uses an isolated Microsoft Edge profile controlled by the local Desktop process. Official credentials are entered only on E-H pages; Pica Library captures only the resulting E-H session cookies, verifies them, stores the accepted session through DPAPI, then removes the temporary browser profile.
+- Android now exposes a visible `推荐与画风` settings screen. Android keeps feedback-reason preferences locally and, when paired, reads/controls the Desktop visual index and OFF/SHADOW/LIVE mode through the authenticated Mobile Bridge. Android still does not run DINOv2 locally.
+
 ## Beta validation gates
 
 The branch is not considered test-build ready until all of these gates pass:

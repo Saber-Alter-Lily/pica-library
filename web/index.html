@@ -968,7 +968,7 @@
                 </article>
                 <details id="settings-eh-account" class="panel account-disclosure">
                     <summary><strong>E-Hentai / ExHentai 账号</strong> · 可选增强</summary>
-                    <p>E-H 公共搜索、阅读和下载无需登录。账号仅用于云收藏与 ExH 访问探测；Pica Library 不保存 E-H 密码，只保存你从官方站点会话中导入的 cookie，并由 Windows DPAPI 加密。</p>
+                    <p>E-H 公共搜索、阅读和下载无需登录。推荐使用“网页登录”：Pica Library 会打开独立的 E-H 官方登录窗口，登录成功后自动检测、验证并加密保存会话；账号密码始终只提交给 E-H 官方页面。手动 Cookie 导入仅作为高级兜底。</p>
                     <p id="eh-account-state" class="status"></p>
                     <details class="account-advanced">
                         <summary>高级 · 手动导入官方站点会话</summary>
@@ -980,7 +980,9 @@
                         </div>
                     </details>
                     <div class="actions">
-                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">打开官方登录页</a>
+                        <button id="eh-web-login-start" type="button" class="primary">网页登录（推荐）</button>
+                        <button id="eh-web-login-cancel" type="button" hidden>取消网页登录</button>
+                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">默认浏览器打开官方登录页（手动）</a>
                         <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Reg&amp;CODE=00" target="_blank" rel="noreferrer">打开官方注册页</a>
                         <button id="eh-account-save" type="button" class="primary">保存并验证会话</button>
                         <button id="eh-account-verify" type="button">重新验证</button>

@@ -17,6 +17,7 @@ import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
 import { UpdateManager } from '../update/manager'
 import { PersonalizationService } from '../services/personalization-service'
 import { GitHubAccountAuthService } from '../services/github-account-auth'
+import { DesktopEhWebLogin, type EhCapturedSession } from './eh-web-login'
 import {
     buildConfig,
     connectionProxy,
@@ -92,6 +93,7 @@ let mobileBridge: MobileBridgeController | null = null
 let database: LibraryDatabase | null = null
 let service: LibraryService | null = null
 let remoteStorageManager: RemoteStorageDesktopManager | null = null
+let ehWebLogin: DesktopEhWebLogin | null = null
 let stopping = false
 let currentUrl = ''
 let lastBrowserLiteExportDirectory: string | null = null
@@ -172,6 +174,8 @@ async function waitForHealth(url: string, timeoutMs = 30_000) {
 async function closeEngine() {
     await mobileBridge?.close()
     mobileBridge = null
+    await ehWebLogin?.cancel()
+    ehWebLogin = null
     await service?.quiesceLocalDownloads()
     if (server) {
         const closing = server
@@ -396,11 +400,51 @@ function openDirectory(kind: string) {
     return Promise.resolve()
 }
 
+async function persistEhSession(candidate: EhCapturedSession) {
+    if (!service) throw new Error('Library is not ready')
+    if (!candidate.memberId || !candidate.passHash)
+        throw new Error('E-H 登录会话不完整')
+    const previousSession =
+        credentials?.ehMemberId && credentials?.ehPassHash
+            ? {
+                  memberId: credentials.ehMemberId,
+                  passHash: credentials.ehPassHash,
+                  igneous: credentials.ehIgneous,
+                  cfClearance: credentials.ehCfClearance
+              }
+            : null
+    service.setEhSession(candidate)
+    try {
+        await service.verifyEhAccount()
+    } catch (error) {
+        service.setEhSession(previousSession)
+        throw error
+    }
+    const next: StoredCredentials = {
+        ...(credentials ?? { account: '', password: '' }),
+        ehMemberId: candidate.memberId,
+        ehPassHash: candidate.passHash,
+        ehIgneous: candidate.igneous,
+        ehCfClearance: candidate.cfClearance
+    }
+    credentialsStore.save(next)
+    credentials = next
+    return {
+        configured: true,
+        verified: true,
+        exHentai: await service.probeExHentai()
+    }
+}
+
 async function startEngine(preferredPort: number) {
     const dataDir = config?.libraryDirectory ?? paths.data
     fs.mkdirSync(dataDir, { recursive: true })
     database = new LibraryDatabase(path.join(dataDir, 'library.db'))
     service = new LibraryService(database, dataDir)
+    ehWebLogin = new DesktopEhWebLogin(
+        path.join(paths.runtimeState, 'eh-web-login'),
+        async (candidate) => { await persistEhSession(candidate) }
+    )
     service.setEhSession(
         credentials?.ehMemberId && credentials?.ehPassHash
             ? {
@@ -422,6 +466,19 @@ async function startEngine(preferredPort: number) {
     const csrfToken = randomBytes(32).toString('base64url')
     const desktop: DesktopServerController = {
         csrfToken,
+        startEhWebLogin: async () => {
+            if (!ehWebLogin) throw new Error('E-H 网页登录不可用')
+            return await ehWebLogin.start()
+        },
+        ehWebLoginStatus: () =>
+            ehWebLogin?.status() ?? {
+                state: 'idle',
+                message: '尚未开始网页登录'
+            },
+        cancelEhWebLogin: async () =>
+            ehWebLogin
+                ? await ehWebLogin.cancel()
+                : { state: 'cancelled', message: '网页登录已取消' },
         configured: () => Boolean(config && credentials),
         status: () => ({
             profile: config?.profile ?? 'balanced',
@@ -462,45 +519,16 @@ async function startEngine(preferredPort: number) {
             if (ehAccountAction) {
                 if (!service) throw new Error('Library is not ready')
                 if (ehAccountAction === 'save-session') {
-                    const candidate = {
+                    const candidate: EhCapturedSession = {
                         memberId: String(input.memberId ?? '').trim(),
                         passHash: String(input.passHash ?? '').trim(),
                         igneous: String(input.igneous ?? '').trim() || undefined,
                         cfClearance:
                             String(input.cfClearance ?? '').trim() || undefined
                     }
-                    const previousSession =
-                        credentials?.ehMemberId && credentials?.ehPassHash
-                            ? {
-                                  memberId: credentials.ehMemberId,
-                                  passHash: credentials.ehPassHash,
-                                  igneous: credentials.ehIgneous,
-                                  cfClearance: credentials.ehCfClearance
-                              }
-                            : null
-                    service.setEhSession(candidate)
-                    try {
-                        await service.verifyEhAccount()
-                    } catch (error) {
-                        service.setEhSession(previousSession)
-                        throw error
-                    }
-                    const next = {
-                        ...(credentials ?? { account: '', password: '' }),
-                        ehMemberId: candidate.memberId,
-                        ehPassHash: candidate.passHash,
-                        ehIgneous: candidate.igneous,
-                        ehCfClearance: candidate.cfClearance
-                    }
-                    credentialsStore.save(next)
-                    credentials = next
                     return {
                         success: true,
-                        ehAccount: {
-                            configured: true,
-                            verified: true,
-                            exHentai: await service.probeExHentai()
-                        }
+                        ehAccount: await persistEhSession(candidate)
                     }
                 }
                 if (ehAccountAction === 'clear-session') {

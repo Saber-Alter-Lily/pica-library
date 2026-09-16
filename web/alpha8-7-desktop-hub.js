@@ -6,7 +6,6 @@ const copy = {
         title: '连接与设置',
         subtitle: '',
         general: '基本设置',
-        accounts: '账号与来源',
         recommendations: '推荐与画风',
         connections: '连接与同步',
         appearance: '外观与个性化',
@@ -25,7 +24,6 @@ const copy = {
         title: 'Connections & Settings',
         subtitle: '',
         general: 'General',
-        accounts: 'Accounts & Providers',
         recommendations: 'Recommendations & Visual Style',
         connections: 'Connections & Sync',
         appearance: 'Appearance',
@@ -181,7 +179,6 @@ function installDownloadHistoryControl() {
 
 const panelDefinitions = [
     ['general', 'general'],
-    ['accounts', 'accounts'],
     ['recommendations', 'recommendations'],
     ['connections', 'connections'],
     ['appearance', 'appearance'],
@@ -306,7 +303,7 @@ function buildSettingsHub() {
     const ehAccount = hub$('#settings-eh-account')
     if (ehAccount) {
         ehAccount.open = true
-        panels.get('accounts').appendChild(ehAccount)
+        panels.get('general').appendChild(ehAccount)
     }
 
     const recommendationV4 = hub$('#settings-recommendation-v4')
@@ -388,7 +385,7 @@ function bootstrap() {
     buildSettingsHub()
     installDownloadHistoryControl()
     installObservers()
-    hub$('#setup-open-eh')?.addEventListener('click', () => setTimeout(() => openSettingsHubPanel('accounts'), 0))
+    hub$('#setup-open-eh')?.addEventListener('click', () => setTimeout(() => { openSettingsHubPanel('general'); const panel = hub$('#settings-eh-account'); if (panel) { panel.open = true; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }) } }, 0))
     hub$('#setup-open-settings')?.addEventListener('click', () => setTimeout(() => openSettingsHubPanel('general'), 0))
     hub$('#language-select')?.addEventListener('change', () => setTimeout(refreshHubLabels, 0))
     setTimeout(() => {

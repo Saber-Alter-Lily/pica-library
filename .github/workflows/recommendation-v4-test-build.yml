@@ -1,0 +1,120 @@
+name: Recommendation V4 Beta Test Builds (unpublished)
+
+on:
+  push:
+    branches: [feature/recommendation-v4-visual-feedback]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-beta:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - name: Validate Web and Desktop before packaging
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm type:check
+          pnpm web:check
+          pnpm test
+      - name: Fetch checksum-pinned official v0.3.14 package base
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $target = 'artifacts/release-base/Pica-Library-v0.3.14-windows-x64.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.3.14/Pica-Library-v0.3.14-windows-x64.zip' -OutFile $target
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $target).Hash.ToLowerInvariant()
+          if ($hash -ne '211bc7d7d4f384af0389288439e38a645a7e8a458e56d947d005cd179848cb56') {
+            throw "Official v0.3.14 package checksum mismatch: $hash"
+          }
+      - name: Build standalone Windows beta package
+        shell: pwsh
+        env:
+          PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+        run: |
+          ./scripts/build-windows-package.ps1
+          $source = 'artifacts/Pica-Library-v0.4.0-windows-x64.zip'
+          if (-not (Test-Path -LiteralPath $source)) { throw 'Windows package was not created' }
+          $work = Join-Path $env:RUNNER_TEMP 'pica-v4-windows'
+          $out = 'candidate/recommendation-v4-windows'
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work,$out
+          New-Item -ItemType Directory -Force -Path $work,$out | Out-Null
+          Expand-Archive -LiteralPath $source -DestinationPath $work
+          $root = @(Get-ChildItem -LiteralPath $work -Directory)[0]
+          if (-not $root) { throw 'Packaged Windows root was not found' }
+          $betaRoot = Join-Path $work 'Pica-Library-Recommendation-V4-Beta-Windows'
+          Move-Item -LiteralPath $root.FullName -Destination $betaRoot
+          @"
+          UNPUBLISHED RECOMMENDATION V4 BETA
+          Manual QA build only. Not a GitHub Release and not an update-channel build.
+          Branch: feature/recommendation-v4-visual-feedback
+          Source SHA: $env:GITHUB_SHA
+          Internal product version remains 0.4.0 intentionally.
+          "@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $betaRoot 'TEST_BUILD.txt')
+          $zip = Join-Path $out 'Pica-Library-Recommendation-V4-Beta-Windows.zip'
+          Compress-Archive -Path $betaRoot -DestinationPath $zip -CompressionLevel Optimal
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          "$sha  Pica-Library-Recommendation-V4-Beta-Windows.zip" | Set-Content -Encoding ascii -LiteralPath (Join-Path $out 'SHA256SUMS.txt')
+          $env:GITHUB_SHA | Set-Content -Encoding ascii -LiteralPath (Join-Path $out 'SOURCE_SHA.txt')
+          'UNPUBLISHED RECOMMENDATION V4 BETA - standalone manual-QA Windows package; no release/update publication.' | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $out 'STATUS.txt')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Recommendation-V4-Beta-Windows
+          path: candidate/recommendation-v4-windows/
+          retention-days: 1
+          if-no-files-found: error
+
+  android-beta:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test, lint and build isolated Android beta APK
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+      - name: Verify isolated Android beta identity
+        working-directory: mobile/android-alpha2
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pica-v4-dev-cert.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/pica-v4-dev-package.txt"
+          grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/pica-v4-dev-package.txt"
+          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/pica-v4-dev-package.txt"
+          mkdir -p candidate-v4
+          cp "$apk" candidate-v4/Pica-Library-Recommendation-V4-Beta-Android.apk
+          cp "$RUNNER_TEMP/pica-v4-dev-package.txt" candidate-v4/PACKAGE_INFO.txt
+          sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-v4-dev-cert.txt" > candidate-v4/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate-v4/SOURCE_SHA.txt
+          printf '%s\n' 'UNPUBLISHED RECOMMENDATION V4 BETA - isolated package/data; manual QA only; debug signing; no release/update publication.' > candidate-v4/STATUS.txt
+          (cd candidate-v4 && sha256sum Pica-Library-Recommendation-V4-Beta-Android.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Recommendation-V4-Beta-Android
+          path: mobile/android-alpha2/candidate-v4/
+          retention-days: 1
+          if-no-files-found: error

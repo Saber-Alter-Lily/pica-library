@@ -6,6 +6,8 @@ const copy = {
         title: '连接与设置',
         subtitle: '',
         general: '基本设置',
+        accounts: '账号与来源',
+        recommendations: '推荐与画风',
         connections: '连接与同步',
         appearance: '外观与个性化',
         storage: '下载与存储',
@@ -23,6 +25,8 @@ const copy = {
         title: 'Connections & Settings',
         subtitle: '',
         general: 'General',
+        accounts: 'Accounts & Providers',
+        recommendations: 'Recommendations & Visual Style',
         connections: 'Connections & Sync',
         appearance: 'Appearance',
         storage: 'Downloads & Storage',
@@ -177,6 +181,8 @@ function installDownloadHistoryControl() {
 
 const panelDefinitions = [
     ['general', 'general'],
+    ['accounts', 'accounts'],
+    ['recommendations', 'recommendations'],
     ['connections', 'connections'],
     ['appearance', 'appearance'],
     ['storage', 'storage'],
@@ -201,6 +207,12 @@ function activateHubPanel(id) {
     localStorage.setItem('pica-settings-section', id)
     if (id === 'storage') void refreshPreviewStats()
     movePersonalization()
+}
+
+function openSettingsHubPanel(id) {
+    const navButton = hub$('nav button[data-view="maintenance"]')
+    navButton?.click()
+    activateHubPanel(id)
 }
 
 function movePersonalization() {
@@ -291,6 +303,15 @@ function buildSettingsHub() {
     const settingsForm = hub$('#settings-form')
     if (settingsForm) panels.get('general').appendChild(settingsForm)
 
+    const ehAccount = hub$('#settings-eh-account')
+    if (ehAccount) {
+        ehAccount.open = true
+        panels.get('accounts').appendChild(ehAccount)
+    }
+
+    const recommendationV4 = hub$('#settings-recommendation-v4')
+    if (recommendationV4) panels.get('recommendations').appendChild(recommendationV4)
+
     for (const id of ['settings-mobile-bridge', 'settings-remote-storage', 'settings-browser-lite']) {
         const node = hub$(`#${id}`)
         if (node) panels.get('connections').appendChild(node)
@@ -367,6 +388,8 @@ function bootstrap() {
     buildSettingsHub()
     installDownloadHistoryControl()
     installObservers()
+    hub$('#setup-open-eh')?.addEventListener('click', () => setTimeout(() => openSettingsHubPanel('accounts'), 0))
+    hub$('#setup-open-settings')?.addEventListener('click', () => setTimeout(() => openSettingsHubPanel('general'), 0))
     hub$('#language-select')?.addEventListener('change', () => setTimeout(refreshHubLabels, 0))
     setTimeout(() => {
         buildSettingsHub()

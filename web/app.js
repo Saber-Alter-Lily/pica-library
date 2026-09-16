@@ -290,7 +290,9 @@ async function loadDesktop() {
         renderMobileBridge()
         if (!desktop.configured) {
             document.body.classList.add('onboarding')
-            document.querySelector('nav').hidden = true
+            // Multi-provider onboarding must not hide E-H / ExH account access.
+            // Pica setup remains available, but is no longer the gate to Settings.
+            document.querySelector('nav').hidden = false
             activateView('setup')
         } else {
             document.body.classList.remove('onboarding')
@@ -598,6 +600,13 @@ async function testDesktop(prefix) {
 $('#setup-folder').onclick = () => chooseFolder('setup')
 $('#settings-folder').onclick = () => chooseFolder('settings')
 installAccountOnboarding({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
+$('#setup-open-settings').onclick = () => activateView('settings')
+$('#setup-open-eh').onclick = () => {
+    activateView('settings')
+    const panel = $('#settings-eh-account')
+    panel.open = true
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 const downloadedCloud = createDownloadedCloud({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
 $('#setup-test').onclick = () => testDesktop('setup')
 $('#settings-test').onclick = () => testDesktop('settings')

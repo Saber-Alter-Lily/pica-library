@@ -57,7 +57,7 @@ jobs:
           foreach ($child in $children) {
             Move-Item -LiteralPath $child.FullName -Destination $betaRoot
           }
-          foreach ($required in @('Pica Library Launcher.exe','node.exe','app','web')) {
+          foreach ($required in @('Pica Library.exe','runtime/node.exe','app','web')) {
             if (-not (Test-Path -LiteralPath (Join-Path $betaRoot $required))) {
               throw "Complete Windows package is missing required entry: $required"
             }

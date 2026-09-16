@@ -57,10 +57,18 @@ jobs:
           foreach ($child in $children) {
             Move-Item -LiteralPath $child.FullName -Destination $betaRoot
           }
-          foreach ($required in @('Pica Library.exe','runtime/node.exe','app','web')) {
+          foreach ($required in @('runtime/node.exe','app','web')) {
             if (-not (Test-Path -LiteralPath (Join-Path $betaRoot $required))) {
               throw "Complete Windows package is missing required entry: $required"
             }
+          }
+          $launcher = Join-Path $betaRoot 'Pica Library.exe'
+          Remove-Item -Force -LiteralPath $launcher
+          $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework compiler is unavailable' }
+          & $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll "/out:$launcher" 'packaging\windows\BetaLauncher.cs'
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $launcher)) {
+            throw 'Isolated Recommendation V4 beta launcher compilation failed'
           }
           @"
           UNPUBLISHED RECOMMENDATION V4 BETA
@@ -68,13 +76,14 @@ jobs:
           Branch: feature/recommendation-v4-visual-feedback
           Source SHA: $env:GITHUB_SHA
           Internal product version remains 0.4.0 intentionally.
+          Windows beta data is isolated at %LOCALAPPDATA%\Pica Library V4 Beta.
           "@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $betaRoot 'TEST_BUILD.txt')
           $zip = Join-Path $out 'Pica-Library-Recommendation-V4-Beta-Windows.zip'
           Compress-Archive -Path $betaRoot -DestinationPath $zip -CompressionLevel Optimal
           $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
           "$sha  Pica-Library-Recommendation-V4-Beta-Windows.zip" | Set-Content -Encoding ascii -LiteralPath (Join-Path $out 'SHA256SUMS.txt')
           $env:GITHUB_SHA | Set-Content -Encoding ascii -LiteralPath (Join-Path $out 'SOURCE_SHA.txt')
-          'UNPUBLISHED RECOMMENDATION V4 BETA - standalone manual-QA Windows package; no release/update publication.' | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $out 'STATUS.txt')
+          'UNPUBLISHED RECOMMENDATION V4 BETA - isolated Windows data; standalone manual-QA package; no release/update publication.' | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $out 'STATUS.txt')
       - uses: actions/upload-artifact@v4
         with:
           name: Pica-Library-Recommendation-V4-Beta-Windows

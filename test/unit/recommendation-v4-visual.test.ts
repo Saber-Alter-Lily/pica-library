@@ -93,7 +93,7 @@ function candidate(comicId: string, rawRank: number): RankedCandidateWithEvidenc
             conjunctionEvidence: [],
             primaryFamily: 'EXPLORATION'
         }
-    }
+    } as unknown as RankedCandidateWithEvidenceV3
 }
 
 describe('Recommendation V4 visual style core', () => {

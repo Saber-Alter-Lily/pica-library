@@ -143,7 +143,7 @@ export class CycleCoordinatorV3 {
                         reasons: item.reasons,
                         evidence: item.evidence,
                         feedbackAdjustment: item.feedbackAdjustment,
-                        visual: item.visual
+                        visual: (item as { visual?: unknown }).visual
                     })),
                     readiness: built.readiness,
                     versions: built.versions,

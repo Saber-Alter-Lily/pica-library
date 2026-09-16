@@ -177,16 +177,20 @@ describe('Recommendation V4 visual style core', () => {
             favoriteComicIds: new Set(['fav']),
             feedback: []
         })!
-        const ranked = [candidate('weak', 1), candidate('strong', 2), candidate('other', 3)]
+        const ranked = [
+            ...Array.from({ length: 5 }, (_, index) => candidate(`lead-${index}`, index + 1)),
+            candidate('weak', 6),
+            candidate('strong', 7),
+            ...Array.from({ length: 5 }, (_, index) => candidate(`tail-${index}`, index + 8))
+        ]
         const embeddings = [
             embedding('fav', [1, 0]),
             embedding('weak', [0, 1]),
-            embedding('strong', [1, 0]),
-            embedding('other', [0.5, 0.5], 'COVER_ONLY', 'cover')
+            embedding('strong', [1, 0])
         ]
         const shadow = rerankWithVisualStyle({ ranked, embeddings, profile, mode: 'SHADOW' })
         const live = rerankWithVisualStyle({ ranked, embeddings, profile, mode: 'LIVE' })
-        expect(shadow.map((item) => item.comicId)).toEqual(['weak', 'strong', 'other'])
+        expect(shadow.map((item) => item.comicId)).toEqual(ranked.map((item) => item.comicId))
         expect(live.findIndex((item) => item.comicId === 'strong')).toBeLessThan(
             live.findIndex((item) => item.comicId === 'weak')
         )

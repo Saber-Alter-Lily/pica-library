@@ -133,9 +133,13 @@ export function aggregatePageEmbeddings(input: readonly number[][]) {
     const similarities = normalized.map((vector) =>
         cosineSimilarity(vector, firstCenter)
     )
-    const sorted = [...similarities].sort((a, b) => a - b)
-    const cutoff = sorted[Math.max(0, Math.floor(sorted.length * 0.2) - 1)] ?? -1
-    const retained = normalized.filter((_, index) => similarities[index] >= cutoff)
+    const dropCount = Math.max(1, Math.floor(normalized.length * 0.2))
+    const keepCount = Math.max(2, normalized.length - dropCount)
+    const retained = normalized
+        .map((vector, index) => ({ vector, similarity: similarities[index], index }))
+        .sort((a, b) => b.similarity - a.similarity || a.index - b.index)
+        .slice(0, keepCount)
+        .map((item) => item.vector)
     return meanVector(retained.length >= 2 ? retained : normalized)
 }
 

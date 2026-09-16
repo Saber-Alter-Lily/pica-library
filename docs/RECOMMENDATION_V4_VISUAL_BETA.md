@@ -4,10 +4,11 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 
 ## Feedback contract
 
-- Like/dislike is committed immediately as an append-only event.
-- Optional reasons are a separate event and may be disabled entirely.
+- Like/dislike is committed immediately as an append-only event on Web/Desktop and as latest-wins local feedback on Android.
+- Optional reasons are a separate event/state and may be disabled entirely.
 - Latest sentiment wins for a comic.
 - `already_seen`, `topic`, `author` and `character` do not become strong negative visual-style signals. `style` does.
+- Android mirrors the same immediate-feedback / optional-reason interaction contract. Feedbacked items are suppressed from current and future native recommendation batches; likes can seed later native interest profiles.
 
 ## Visual contract
 
@@ -19,6 +20,7 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 - Missing visual data is neutral: candidates are not penalized.
 - Modes: OFF, SHADOW (audit only), LIVE (bounded low-weight reranking).
 - Visual vectors also power Similar Style browsing.
+- The beta visual encoder runs on Web/Desktop only; Android consumes feedback semantics without downloading or running the visual model.
 
 ## Beta validation gates
 
@@ -26,7 +28,7 @@ The branch is not considered test-build ready until all of these gates pass:
 
 1. Web/Desktop type check, web syntax check, unit/integration tests and production build are green.
 2. Existing Android unit tests, lint and release build stay green.
-3. Like/dislike remains usable when optional reasons are disabled or skipped.
+3. Like/dislike remains usable when optional reasons are disabled or skipped on both clients.
 4. Visual SHADOW mode preserves visible baseline order while retaining auditable shadow ranks.
 5. LIVE mode never penalizes a candidate merely because no visual embedding exists.
 6. Local, bounded remote and cover-only sampling all persist source/confidence provenance.
@@ -34,4 +36,4 @@ The branch is not considered test-build ready until all of these gates pass:
 
 ## Safety / release
 
-This branch must not publish releases or tags. A test artifact is produced only after CI is green.
+The formal product version remains `0.4.0` on this unpublished feature branch; the eventual Actions artifact is labeled separately as a Recommendation V4 beta test build. This branch must not publish releases or tags. A test artifact is produced only after CI is green.

@@ -46,14 +46,22 @@ jobs:
           $source = 'artifacts/Pica-Library-v0.4.0-windows-x64.zip'
           if (-not (Test-Path -LiteralPath $source)) { throw 'Windows package was not created' }
           $work = Join-Path $env:RUNNER_TEMP 'pica-v4-windows'
+          $extract = Join-Path $work 'extracted'
+          $betaRoot = Join-Path $work 'Pica-Library-Recommendation-V4-Beta-Windows'
           $out = 'candidate/recommendation-v4-windows'
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work,$out
-          New-Item -ItemType Directory -Force -Path $work,$out | Out-Null
-          Expand-Archive -LiteralPath $source -DestinationPath $work
-          $root = @(Get-ChildItem -LiteralPath $work -Directory)[0]
-          if (-not $root) { throw 'Packaged Windows root was not found' }
-          $betaRoot = Join-Path $work 'Pica-Library-Recommendation-V4-Beta-Windows'
-          Move-Item -LiteralPath $root.FullName -Destination $betaRoot
+          New-Item -ItemType Directory -Force -Path $extract,$betaRoot,$out | Out-Null
+          Expand-Archive -LiteralPath $source -DestinationPath $extract
+          $children = @(Get-ChildItem -LiteralPath $extract -Force)
+          if (-not $children.Count) { throw 'Packaged Windows tree was empty' }
+          foreach ($child in $children) {
+            Move-Item -LiteralPath $child.FullName -Destination $betaRoot
+          }
+          foreach ($required in @('Pica Library Launcher.exe','node.exe','app','web')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $betaRoot $required))) {
+              throw "Complete Windows package is missing required entry: $required"
+            }
+          }
           @"
           UNPUBLISHED RECOMMENDATION V4 BETA
           Manual QA build only. Not a GitHub Release and not an update-channel build.

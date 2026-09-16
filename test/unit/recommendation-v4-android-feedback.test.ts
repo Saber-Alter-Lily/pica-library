@@ -9,6 +9,7 @@ describe('Recommendation V4 Android feedback parity',()=>{
     const store=read('RecommendationFeedbackStore.java')
     const home=read('HomeActivity.java')
     const settings=read('SettingsActivity.java')
+    const visualSettings=read('RecommendationStyleActivity.java')
     expect(store).toContain('setSentiment(Context context,String comicId,String sentiment)')
     expect(store).toContain('remove(REASONS+id)')
     expect(store).toContain('askReasons(Context context)')
@@ -17,8 +18,10 @@ describe('Recommendation V4 Android feedback parity',()=>{
     expect(method.indexOf('RecommendationFeedbackStore.setSentiment')).toBeGreaterThanOrEqual(0)
     expect(method.indexOf('RecommendationFeedbackStore.setSentiment')).toBeLessThan(method.indexOf('RecommendationFeedbackStore.askReasons'))
     expect(method).toContain('setNegativeButton("跳过"')
-    expect(settings).toContain('"推荐反馈原因"')
-    expect(settings).toContain('RecommendationFeedbackStore.setAskReasons')
+    expect(settings).toContain('"推荐与画风"')
+    expect(settings).toContain('RecommendationStyleActivity.class')
+    expect(visualSettings).toContain('"反馈原因"')
+    expect(visualSettings).toContain('RecommendationFeedbackStore.setAskReasons')
   })
 
   it('uses likes as native seeds and suppresses every explicitly feedbacked item',()=>{

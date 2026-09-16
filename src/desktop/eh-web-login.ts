@@ -66,29 +66,26 @@ export function ehSessionFromCdpCookies(
         if (
             name === 'ipb_member_id' ||
             name === 'ipb_pass_hash' ||
-            name === 'igneous' ||
-            name === 'cf_clearance'
+            name === 'igneous'
         )
             values.set(name, value)
     }
     const memberId = values.get('ipb_member_id') ?? ''
     const passHash = values.get('ipb_pass_hash') ?? ''
     if (!memberId || !passHash) return null
+    // cf_clearance is intentionally not promoted from the Edge login profile.
+    // Cloudflare clearance is browser-environment bound; replaying it from the
+    // Node provider with a different user agent/fingerprint can invalidate an
+    // otherwise valid E-H identity session.
     return {
         memberId,
         passHash,
-        igneous: values.get('igneous') || undefined,
-        cfClearance: values.get('cf_clearance') || undefined
+        igneous: values.get('igneous') || undefined
     }
 }
 
 function sessionSignature(value: EhCapturedSession) {
-    return [
-        value.memberId,
-        value.passHash,
-        value.igneous ?? '',
-        value.cfClearance ?? ''
-    ].join('|')
+    return [value.memberId, value.passHash, value.igneous ?? ''].join('|')
 }
 
 function findEdgeExecutable() {

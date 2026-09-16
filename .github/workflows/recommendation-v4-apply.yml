@@ -1,0 +1,35 @@
+name: Recommendation V4 Integration Apply
+
+on:
+  push:
+    branches: [feature/recommendation-v4-visual-feedback]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v4-visual-feedback
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Harden patch anchors
+        run: node scripts/fix-recommendation-v4-apply.mjs
+      - name: Apply Recommendation V4
+        run: node scripts/apply-recommendation-v4-visual-feedback-dev.mjs
+      - name: Apply post-pass
+        run: node scripts/post-recommendation-v4-apply.mjs
+      - name: Commit integrated source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat: integrate recommendation feedback and visual style beta"
+          git push origin HEAD:feature/recommendation-v4-visual-feedback

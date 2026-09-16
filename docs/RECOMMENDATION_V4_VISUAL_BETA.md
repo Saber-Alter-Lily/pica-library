@@ -34,6 +34,7 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 
 - Desktop General settings now contains both Pica and E-H / ExH account controls; there is no separate E-H-only account section in the settings sidebar.
 - Recommended Desktop E-H login uses an isolated Microsoft Edge profile controlled by the local Desktop process. Official credentials are entered only on E-H pages; Pica Library captures the stable E-H identity cookies (`ipb_member_id`, `ipb_pass_hash`) plus `igneous` when available, deliberately discards browser-bound `cf_clearance`, verifies the accepted session, stores it through DPAPI, then removes the temporary browser profile.
+- A regression test includes an intentionally oversized `cf_clearance` value and requires controlled Desktop login to ignore it while preserving the stable E-H identity cookies.
 - Android now exposes a visible `推荐与画风` settings screen. Android keeps feedback-reason preferences locally and, when paired, reads/controls the Desktop visual index and OFF/SHADOW/LIVE mode through the authenticated Mobile Bridge. Android still does not run DINOv2 locally.
 
 ## Beta validation gates

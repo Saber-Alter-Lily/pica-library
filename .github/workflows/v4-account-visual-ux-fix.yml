@@ -1,0 +1,34 @@
+name: Recommendation V4 account and visual UX fix
+
+on:
+  push:
+    branches: [feature/recommendation-v4-visual-feedback]
+    paths:
+      - scripts/apply-v4-account-visual-ux-fix.py
+      - .github/workflows/v4-account-visual-ux-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v4-visual-feedback
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply deterministic integration patch
+        run: python scripts/apply-v4-account-visual-ux-fix.py
+      - name: Remove one-shot patch files
+        run: rm scripts/apply-v4-account-visual-ux-fix.py .github/workflows/v4-account-visual-ux-fix.yml
+      - name: Commit integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: close desktop E-H login and mobile visual UX gaps'
+          git push origin HEAD:feature/recommendation-v4-visual-feedback

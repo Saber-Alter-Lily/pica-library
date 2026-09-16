@@ -22,6 +22,13 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 - Visual vectors also power Similar Style browsing.
 - The beta visual encoder runs on Web/Desktop only; Android consumes feedback semantics without downloading or running the visual model.
 
+## Multi-provider first-run onboarding
+
+- First-run Web/Desktop onboarding must not hide the whole navigation merely because Pica credentials are not configured yet.
+- The Setup screen explicitly states that E-H public search, reading and download do not require login.
+- A visible `配置 E-H / ExH` action opens the existing E-H / ExH account panel directly during first run.
+- Pica setup remains available, but it is no longer the UI gate to E-H / ExH account access.
+
 ## Beta validation gates
 
 The branch is not considered test-build ready until all of these gates pass:
@@ -32,7 +39,8 @@ The branch is not considered test-build ready until all of these gates pass:
 4. Visual SHADOW mode preserves visible baseline order while retaining auditable shadow ranks.
 5. LIVE mode never penalizes a candidate merely because no visual embedding exists.
 6. Local, bounded remote and cover-only sampling all persist source/confidence provenance.
-7. The test artifact workflow creates only ephemeral CI artifacts; it must not create tags or GitHub Releases.
+7. First-run onboarding exposes E-H / ExH account access without requiring Pica configuration first.
+8. The test artifact workflow creates only ephemeral CI artifacts; it must not create tags or GitHub Releases.
 
 ## Safety / release
 

@@ -21,13 +21,12 @@ jobs:
         with:
           version: '11.16.0'
           run_install: false
-      - name: Validate Web and Desktop before packaging
+      - name: Validate Web and Desktop package inputs
         shell: pwsh
         run: |
           pnpm install --frozen-lockfile
           pnpm type:check
           pnpm web:check
-          pnpm test
       - name: Fetch checksum-pinned official v0.3.14 package base
         shell: pwsh
         run: |

@@ -1,0 +1,51 @@
+name: Recommendation V4 Diagnostic
+
+on:
+  push:
+    branches: [feature/recommendation-v4-visual-feedback]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v4-visual-feedback
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Run diagnostics
+        shell: bash
+        run: |
+          set +e
+          : > ci-debug.txt
+          echo '=== npm ci ===' >> ci-debug.txt
+          npm ci >> ci-debug.txt 2>&1
+          echo "EXIT=$?" >> ci-debug.txt
+          echo '=== npm run type:check ===' >> ci-debug.txt
+          npm run type:check >> ci-debug.txt 2>&1
+          echo "EXIT=$?" >> ci-debug.txt
+          echo '=== npm run check:web ===' >> ci-debug.txt
+          npm run check:web >> ci-debug.txt 2>&1
+          echo "EXIT=$?" >> ci-debug.txt
+          echo '=== npm test ===' >> ci-debug.txt
+          npm test -- --runInBand >> ci-debug.txt 2>&1
+          echo "EXIT=$?" >> ci-debug.txt
+          echo '=== npm run build ===' >> ci-debug.txt
+          npm run build >> ci-debug.txt 2>&1
+          echo "EXIT=$?" >> ci-debug.txt
+      - name: Commit diagnostic output
+        shell: bash
+        run: |
+          rm -f .github/workflows/v4-diagnose.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A ci-debug.txt .github/workflows/v4-diagnose.yml
+          git commit -m "chore: capture v4 ci diagnostics"
+          git push origin HEAD:feature/recommendation-v4-visual-feedback

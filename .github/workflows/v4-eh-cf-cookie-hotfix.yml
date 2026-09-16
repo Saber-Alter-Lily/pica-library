@@ -1,0 +1,79 @@
+name: Recommendation V4 E-H browser-cookie hotfix
+
+on:
+  push:
+    branches:
+      - feature/recommendation-v4-visual-feedback
+    paths:
+      - .github/workflows/v4-eh-cf-cookie-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v4-visual-feedback
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+          run_install: false
+      - name: Apply Cloudflare-cookie isolation fix
+        shell: python
+        run: |
+          from pathlib import Path
+
+          source = Path('src/desktop/eh-web-login.ts')
+          text = source.read_text(encoding='utf-8')
+          old = """        if (\n            name === 'ipb_member_id' ||\n            name === 'ipb_pass_hash' ||\n            name === 'igneous' ||\n            name === 'cf_clearance'\n        )\n            values.set(name, value)\n"""
+          new = """        if (\n            name === 'ipb_member_id' ||\n            name === 'ipb_pass_hash' ||\n            name === 'igneous'\n        )\n            values.set(name, value)\n"""
+          if old not in text:
+              raise SystemExit('cookie allow-list anchor not found')
+          text = text.replace(old, new, 1)
+          old = """    return {\n        memberId,\n        passHash,\n        igneous: values.get('igneous') || undefined,\n        cfClearance: values.get('cf_clearance') || undefined\n    }\n"""
+          new = """    // cf_clearance is intentionally not promoted from the Edge login profile.\n    // Cloudflare clearance is browser-environment bound; replaying it from the\n    // Node provider with a different user agent/fingerprint can invalidate an\n    // otherwise valid E-H identity session.\n    return {\n        memberId,\n        passHash,\n        igneous: values.get('igneous') || undefined\n    }\n"""
+          if old not in text:
+              raise SystemExit('session return anchor not found')
+          text = text.replace(old, new, 1)
+          old = """    return [\n        value.memberId,\n        value.passHash,\n        value.igneous ?? '',\n        value.cfClearance ?? ''\n    ].join('|')\n"""
+          new = """    return [value.memberId, value.passHash, value.igneous ?? ''].join('|')\n"""
+          if old not in text:
+              raise SystemExit('session signature anchor not found')
+          text = text.replace(old, new, 1)
+          source.write_text(text, encoding='utf-8')
+
+          test = Path('test/unit/desktop-eh-web-login.test.ts')
+          value = test.read_text(encoding='utf-8')
+          value = value.replace("                { name: 'cf_clearance', value: 'cf-value', domain: '.e-hentai.org' }", "                { name: 'cf_clearance', value: 'x'.repeat(2048), domain: '.e-hentai.org' }")
+          value = value.replace("            igneous: 'igneous-value',\n            cfClearance: 'cf-value'", "            igneous: 'igneous-value'")
+          value = value.replace("    it('extracts the official E-H cookie session and ignores unrelated cookies'", "    it('extracts stable E-H identity cookies and ignores browser-bound Cloudflare clearance'")
+          test.write_text(value, encoding='utf-8')
+
+          docs = Path('docs/RECOMMENDATION_V4_VISUAL_BETA.md')
+          d = docs.read_text(encoding='utf-8')
+          marker = '- Recommended Desktop E-H login uses an isolated Microsoft Edge profile controlled by the local Desktop process. Official credentials are entered only on E-H pages; Pica Library captures only the resulting E-H session cookies, verifies them, stores the accepted session through DPAPI, then removes the temporary browser profile.\n'
+          replacement = '- Recommended Desktop E-H login uses an isolated Microsoft Edge profile controlled by the local Desktop process. Official credentials are entered only on E-H pages; Pica Library captures the stable E-H identity cookies (`ipb_member_id`, `ipb_pass_hash`) plus `igneous` when available, deliberately discards browser-bound `cf_clearance`, verifies the accepted session, stores it through DPAPI, then removes the temporary browser profile.\n'
+          if marker not in d:
+              raise SystemExit('documentation anchor not found')
+          docs.write_text(d.replace(marker, replacement, 1), encoding='utf-8')
+      - name: Validate hotfix
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm type:check
+          pnpm web:check
+          pnpm vitest run test/unit/desktop-eh-web-login.test.ts test/unit/eh-account-core.test.ts test/unit/eh-desktop-account-ui.test.ts
+      - name: Remove one-shot workflow and commit
+        shell: bash
+        run: |
+          rm -f .github/workflows/v4-eh-cf-cookie-hotfix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/desktop/eh-web-login.ts test/unit/desktop-eh-web-login.test.ts docs/RECOMMENDATION_V4_VISUAL_BETA.md .github/workflows/v4-eh-cf-cookie-hotfix.yml
+          git commit -m 'fix: isolate browser-bound Cloudflare clearance from E-H session'
+          git push origin HEAD:feature/recommendation-v4-visual-feedback

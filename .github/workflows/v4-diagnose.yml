@@ -19,26 +19,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
       - name: Run diagnostics
         shell: bash
         run: |
           set +e
           : > ci-debug.txt
-          echo '=== npm ci ===' >> ci-debug.txt
-          npm ci >> ci-debug.txt 2>&1
+          echo '=== pnpm install --frozen-lockfile ===' >> ci-debug.txt
+          pnpm install --frozen-lockfile >> ci-debug.txt 2>&1
           echo "EXIT=$?" >> ci-debug.txt
-          echo '=== npm run type:check ===' >> ci-debug.txt
-          npm run type:check >> ci-debug.txt 2>&1
+          echo '=== pnpm type:check ===' >> ci-debug.txt
+          pnpm type:check >> ci-debug.txt 2>&1
           echo "EXIT=$?" >> ci-debug.txt
-          echo '=== npm run check:web ===' >> ci-debug.txt
-          npm run check:web >> ci-debug.txt 2>&1
+          echo '=== pnpm web:check ===' >> ci-debug.txt
+          pnpm web:check >> ci-debug.txt 2>&1
           echo "EXIT=$?" >> ci-debug.txt
-          echo '=== npm test ===' >> ci-debug.txt
-          npm test -- --runInBand >> ci-debug.txt 2>&1
+          echo '=== pnpm test ===' >> ci-debug.txt
+          pnpm test >> ci-debug.txt 2>&1
           echo "EXIT=$?" >> ci-debug.txt
-          echo '=== npm run build ===' >> ci-debug.txt
-          npm run build >> ci-debug.txt 2>&1
+          echo '=== pnpm build ===' >> ci-debug.txt
+          pnpm build >> ci-debug.txt 2>&1
           echo "EXIT=$?" >> ci-debug.txt
       - name: Commit diagnostic output
         shell: bash

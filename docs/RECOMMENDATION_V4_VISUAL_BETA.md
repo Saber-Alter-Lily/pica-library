@@ -20,6 +20,18 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 - Modes: OFF, SHADOW (audit only), LIVE (bounded low-weight reranking).
 - Visual vectors also power Similar Style browsing.
 
+## Beta validation gates
+
+The branch is not considered test-build ready until all of these gates pass:
+
+1. Web/Desktop type check, web syntax check, unit/integration tests and production build are green.
+2. Existing Android unit tests, lint and release build stay green.
+3. Like/dislike remains usable when optional reasons are disabled or skipped.
+4. Visual SHADOW mode preserves visible baseline order while retaining auditable shadow ranks.
+5. LIVE mode never penalizes a candidate merely because no visual embedding exists.
+6. Local, bounded remote and cover-only sampling all persist source/confidence provenance.
+7. The test artifact workflow creates only ephemeral CI artifacts; it must not create tags or GitHub Releases.
+
 ## Safety / release
 
 This branch must not publish releases or tags. A test artifact is produced only after CI is green.

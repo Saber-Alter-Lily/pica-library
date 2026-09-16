@@ -26,9 +26,9 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 
 - First-run Web/Desktop onboarding must not hide the whole navigation merely because Pica credentials are not configured yet.
 - The Setup screen explicitly states that E-H public search, reading and download do not require login.
-- A visible `配置 E-H / ExH` action opens the existing E-H / ExH account panel directly during first run.
+- A visible `配置 E-H / ExH` action opens the existing E-H / ExH account controls directly during first run.
 - Pica setup remains available, but it is no longer the UI gate to E-H / ExH account access.
-- The desktop settings hub must expose dedicated `账号与来源 / Accounts & Providers` and `推荐与画风 / Recommendations & Visual Style` sections. The runtime hub must move `settings-eh-account` and `settings-recommendation-v4` into those visible sections before hiding the legacy Settings container.
+- Desktop General settings contains both Pica and E-H / ExH account controls. Recommendation V4 remains a separate visible `推荐与画风 / Recommendations & Visual Style` section.
 
 ## Account and mobile UX corrections
 
@@ -47,8 +47,9 @@ The branch is not considered test-build ready until all of these gates pass:
 5. LIVE mode never penalizes a candidate merely because no visual embedding exists.
 6. Local, bounded remote and cover-only sampling all persist source/confidence provenance.
 7. First-run onboarding exposes E-H / ExH account access without requiring Pica configuration first.
-8. Desktop Settings visibly exposes both E-H / ExH account controls and Recommendation V4 visual controls through dedicated settings-hub navigation sections.
-9. The test artifact workflow creates only ephemeral CI artifacts; it must not create tags or GitHub Releases.
+8. Desktop General visibly contains both Pica and E-H / ExH account controls, while Recommendation V4 is reachable from its own visible settings-hub section.
+9. Android Settings visibly exposes `推荐与画风`; paired Android can read/control Desktop visual status without running the visual encoder locally.
+10. The test artifact workflow creates only ephemeral CI artifacts; it must not create tags or GitHub Releases.
 
 ## Safety / release
 

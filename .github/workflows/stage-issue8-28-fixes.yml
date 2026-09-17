@@ -23,17 +23,20 @@ jobs:
           node-version: 24
       - uses: pnpm/action-setup@v4
       - name: Apply staged fixes
-        run: python3 scripts/stage-issue8-28.py
+        run: |
+          python3 scripts/stage-issue8-28.py
+          python3 scripts/stage-issue8-28-followup.py
       - name: Validate staged fixes
         run: |
           pnpm install --frozen-lockfile
           pnpm type:check
           pnpm web:check
-          pnpm test -- --run test/unit/download-large-queue.test.ts test/unit/issue8-28-contract.test.ts test/unit/download-scheduler.test.ts test/integration/migrations.test.ts
+          pnpm exec vitest run test/unit/download-large-queue.test.ts test/unit/issue8-28-contract.test.ts test/unit/download-scheduler.test.ts test/integration/migrations.test.ts test/unit/i18n.test.ts test/unit/recommendation-v4-integration.test.ts test/unit/v040-web-multi-provider-parity.test.ts
       - name: Commit staged fixes and remove one-shot helpers
         run: |
           rm .github/workflows/stage-issue8-28-fixes.yml
           rm scripts/stage-issue8-28.py
+          rm scripts/stage-issue8-28-followup.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A

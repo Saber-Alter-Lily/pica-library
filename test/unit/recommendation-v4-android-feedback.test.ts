@@ -27,9 +27,13 @@ describe('Recommendation V4 Android feedback parity',()=>{
   it('uses likes as native seeds and suppresses every explicitly feedbacked item',()=>{
     const engine=read('NativeRecommendationEngine.java')
     const home=read('HomeActivity.java')
+    const portablePolicy=read('RecommendationPolicyStore.java')
     expect(engine).toContain('RecommendationFeedbackStore.isLiked(app,known.id)')
     expect(engine).toContain('!RecommendationFeedbackStore.isDisliked(app,known.id)')
     expect(engine).toContain('allFavoriteIds.addAll(RecommendationFeedbackStore.feedbackIds(app))')
-    expect(home).toContain('if(RecommendationFeedbackStore.hasFeedback(this,item.comicId))continue;')
+    // V5 moves display-time suppression into the shared portable-policy filter so
+    // cached Desktop batches and offline Android batches use exactly one rule.
+    expect(home).toContain('RecommendationPolicyStore.applyCachedPolicy')
+    expect(portablePolicy).toContain('RecommendationFeedbackStore.hasFeedback(c,item.comicId)')
   })
 })

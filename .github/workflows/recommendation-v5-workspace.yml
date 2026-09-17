@@ -33,6 +33,7 @@ jobs:
           python scripts/apply-recommendation-v5-followup.py
           python scripts/apply-recommendation-v5-testfix.py
           python scripts/apply-recommendation-v5-testfix2.py
+          python scripts/apply-recommendation-v5-testfix3.py
       - name: Validate Web and Desktop implementation
         run: |
           set -euo pipefail

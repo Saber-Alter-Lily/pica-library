@@ -21,8 +21,8 @@ jobs:
           from pathlib import Path
           path = Path('scripts/v5-mobile-portable-completion.py')
           text = path.read_text(encoding='utf-8')
-          old = r"r'    static final class RecommendationItem \\{.*?\\n    \\}\\n    static final class RecommendationBatch'"
-          new = r"r'    static final class RecommendationItem \\{.*?\\}\\n    static final class RecommendationBatch'"
+          old = r"r'    static final class RecommendationItem \{.*?\n    \}\n    static final class RecommendationBatch'"
+          new = r"r'    static final class RecommendationItem \{.*?\}\n    static final class RecommendationBatch'"
           if old not in text:
               raise SystemExit('BridgeClient RecommendationItem regex anchor was not found')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')

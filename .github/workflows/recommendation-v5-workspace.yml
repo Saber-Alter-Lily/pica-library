@@ -31,6 +31,7 @@ jobs:
           set -euo pipefail
           python scripts/apply-recommendation-v5-portable-policy.py
           python scripts/apply-recommendation-v5-followup.py
+          python scripts/apply-recommendation-v5-testfix.py
       - name: Validate Web and Desktop implementation
         run: |
           set -euo pipefail

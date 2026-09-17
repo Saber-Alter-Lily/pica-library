@@ -62,7 +62,6 @@ describe('built CLI entrypoint contract', () => {
     })
 
     it('keeps retired provider workflows absent and current CI read-only', () => {
-        // Current main intentionally ships validation CI, not the former private census/download runners.
         for (const file of [
             'download.yml',
             'private-download.yml',
@@ -97,8 +96,6 @@ describe('built CLI entrypoint contract', () => {
                     )
                     expect(content, name).toContain('-SetupPersistence')
                 } else if (name === 'onboarding-candidate.yml') {
-                    // Distributable APKs are public build output, not provider/user data.
-                    // Signing material must remain in runner temp, never in the artifact.
                     expect(content).toContain('contents: read')
                     expect(content).toContain(
                         'branches: [codex/account-onboarding-web-reader]'
@@ -118,8 +115,6 @@ describe('built CLI entrypoint contract', () => {
                         /contents: write|gh release|git tag/
                     )
                 } else if (name === 'pr35-dev-apk.yml') {
-                    // Public manual-QA APK: isolated application ID, ordinary debug signing,
-                    // no provider credentials and no release/publishing privileges.
                     expect(content).toContain('contents: read')
                     expect(content).toContain(
                         'branches: [feature/eh-provider-v1]'
@@ -136,6 +131,25 @@ describe('built CLI entrypoint contract', () => {
                     expect(content).not.toMatch(/secrets\./)
                     expect(content).not.toMatch(
                         /contents: write|gh release|git tag|assembleRelease/
+                    )
+                } else if (name === 'recommendation-v4-test-build.yml') {
+                    // Public one-day manual-QA artifacts for this exact feature branch.
+                    // They use read-only repo permission, isolated Android debug identity,
+                    // and have no tag/release/update-channel publishing path.
+                    expect(content).toContain('contents: read')
+                    expect(content).toContain(
+                        'branches: [feature/recommendation-v4-visual-feedback]'
+                    )
+                    expect(content).not.toMatch(/pull_request(?:_target)?:/)
+                    expect(content).toContain(':app:assembleDebug')
+                    expect(content).toContain(
+                        "package: name='com.picalibrary.android.dev'"
+                    )
+                    expect(content).toContain('UNPUBLISHED RECOMMENDATION V4 BETA')
+                    expect(content).toContain('if-no-files-found: error')
+                    expect(content).not.toMatch(/secrets\./)
+                    expect(content).not.toMatch(
+                        /contents: write|gh release|git tag|assembleRelease|android-preview/
                     )
                 } else {
                     expect(content, name).toContain(

@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite'
 import { LibraryDatabase } from '../../src/library/database'
-import { migrations, runMigrations } from '../../src/storage/sqlite/migrations'
+import { latestMigrationVersion, migrations, runMigrations } from '../../src/storage/sqlite/migrations'
 
 const { DatabaseSync } = createRequire(import.meta.url)(
     'node:sqlite'
@@ -33,9 +33,9 @@ describe('SQLite migrations', () => {
         const versions = database
             .prepare('SELECT version FROM schema_migrations ORDER BY version')
             .all() as Array<{ version: number }>
-        expect(versions.map((row) => row.version)).toEqual([
-            1, 2, 3, 4, 5, 6, 7, 8, 9
-        ])
+        expect(versions.map((row) => row.version)).toEqual(
+            migrations.map((migration) => migration.version)
+        )
         expect(
             database
                 .prepare(
@@ -78,7 +78,7 @@ describe('SQLite migrations', () => {
             database
                 .prepare('SELECT COUNT(*) AS count FROM schema_migrations')
                 .get()
-        ).toMatchObject({ count: 9 })
+        ).toMatchObject({ count: latestMigrationVersion })
         database.close()
     })
 
@@ -123,7 +123,7 @@ describe('SQLite migrations', () => {
         const library = new LibraryDatabase(databaseFile)
         library.close()
 
-        const backup = `${databaseFile}.pre-migration-v9.bak`
+        const backup = `${databaseFile}.pre-migration-v${latestMigrationVersion}.bak`
         expect(fs.existsSync(backup)).toBe(true)
         const backedUp = new DatabaseSync(backup)
         expect(
@@ -344,7 +344,7 @@ describe('SQLite migrations', () => {
                     'SELECT MAX(version) AS version FROM schema_migrations'
                 )
                 .get()
-        ).toMatchObject({ version: 9 })
+        ).toMatchObject({ version: latestMigrationVersion })
         verified.close()
     })
 })

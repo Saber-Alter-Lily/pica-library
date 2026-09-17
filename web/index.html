@@ -64,6 +64,14 @@
                             <p>Your library stays on this computer.</p>
                         </div>
                     </div>
+                    <article class="notice setup-provider-entry">
+                        <strong>多来源模式 / Multi-provider</strong>
+                        <p>Pica 可以稍后配置。E-H 公共搜索、阅读和下载无需登录；如需同步 E-H 云收藏或访问 ExH，可直接配置 E-H / ExH 会话。</p>
+                        <div class="actions">
+                            <button id="setup-open-eh" type="button" class="primary">配置 E-H / ExH</button>
+                            <button id="setup-open-settings" type="button">打开账号与来源设置</button>
+                        </div>
+                    </article>
                     <form id="setup-form" class="settings-form">
                         <label
                             >Account<input
@@ -913,6 +921,20 @@
                         </button>
                     </div>
                 </form>
+                <article id="settings-recommendation-v4" class="panel">
+                    <h3>推荐反馈与画风推荐 · Beta</h3>
+                    <p>喜欢/不喜欢会立即记录。反馈原因始终可选；关闭后不会弹出原因面板。</p>
+                    <label class="toggle-row"><input id="recommend-feedback-reasons-toggle" type="checkbox" /> 喜欢/不喜欢后询问可选原因</label>
+                    <hr />
+                    <label class="toggle-row"><input id="visual-enabled" type="checkbox" /> 启用画风信号</label>
+                    <label>画风取样来源<select id="visual-sampling-mode"><option value="local_only">仅本地已下载正文</option><option value="standard">本地 + 在线收藏少量正文</option><option value="cover_only">仅封面（低置信度）</option></select></label>
+                    <label>推荐接入模式<select id="visual-rerank-mode"><option value="OFF">关闭排序影响</option><option value="SHADOW">Shadow：只计算不改排序</option><option value="LIVE">Live：低权重参与排序</option></select></label>
+                    <p class="status">视觉模型在本机浏览器运行；首次使用会下载 Transformers.js 与 DINOv2 Small 模型。漫画页面仅从本机 Pica Library 服务读取，不上传给模型服务。</p>
+                    <p id="visual-index-status" class="status">尚未读取画风索引。</p>
+                    <progress id="visual-index-progress" max="1" value="0" hidden></progress>
+                    <p id="visual-index-message" class="status" aria-live="polite"></p>
+                    <div class="actions"><button id="visual-index-build" type="button" class="primary">建立 / 补全画风索引</button><button id="visual-index-stop" type="button" hidden>停止</button></div>
+                </article>
                 <article id="settings-browser-lite" class="panel export-panel">
                     <h3>Browser Lite</h3>
                     <p>
@@ -946,7 +968,7 @@
                 </article>
                 <details id="settings-eh-account" class="panel account-disclosure">
                     <summary><strong>E-Hentai / ExHentai 账号</strong> · 可选增强</summary>
-                    <p>E-H 公共搜索、阅读和下载无需登录。账号仅用于云收藏与 ExH 访问探测；Pica Library 不保存 E-H 密码，只保存你从官方站点会话中导入的 cookie，并由 Windows DPAPI 加密。</p>
+                    <p>E-H 公共搜索、阅读和下载无需登录。推荐使用“网页登录”：Pica Library 会打开独立的 E-H 官方登录窗口，登录成功后自动检测、验证并加密保存会话；账号密码始终只提交给 E-H 官方页面。手动 Cookie 导入仅作为高级兜底。</p>
                     <p id="eh-account-state" class="status"></p>
                     <details class="account-advanced">
                         <summary>高级 · 手动导入官方站点会话</summary>
@@ -958,7 +980,9 @@
                         </div>
                     </details>
                     <div class="actions">
-                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">打开官方登录页</a>
+                        <button id="eh-web-login-start" type="button" class="primary">网页登录（推荐）</button>
+                        <button id="eh-web-login-cancel" type="button" hidden>取消网页登录</button>
+                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">默认浏览器打开官方登录页（手动）</a>
                         <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Reg&amp;CODE=00" target="_blank" rel="noreferrer">打开官方注册页</a>
                         <button id="eh-account-save" type="button" class="primary">保存并验证会话</button>
                         <button id="eh-account-verify" type="button">重新验证</button>
@@ -1035,6 +1059,21 @@
                     </button>
                 </div>
             </form>
+        </dialog>
+        <dialog id="recommend-feedback-dialog" class="app-dialog">
+            <div>
+                <h3 id="recommend-feedback-dialog-title">可选反馈原因</h3>
+                <p>不选择也没关系：喜欢/不喜欢已经记录。</p>
+                <div class="feedback-reasons">
+                    <label><input type="checkbox" value="style" /> 画风</label>
+                    <label><input type="checkbox" value="topic" /> 题材 / 标签</label>
+                    <label><input type="checkbox" value="author" /> 作者</label>
+                    <label><input type="checkbox" value="character" /> 角色 / IP</label>
+                    <label><input type="checkbox" value="already_seen" /> 已经看过</label>
+                    <label><input type="checkbox" value="repetitive" /> 推荐太重复</label>
+                </div>
+                <div class="actions"><button id="recommend-feedback-dialog-skip" type="button">跳过</button><button id="recommend-feedback-dialog-save" class="primary" type="button">保存原因</button></div>
+            </div>
         </dialog>
         <dialog id="recommend-detail-dialog" class="app-dialog detail-dialog">
             <button id="recommend-detail-close" class="dialog-close">

@@ -478,6 +478,41 @@ export const migrations: Migration[] = [
                    '{}', first_seen_at, last_seen_at
             FROM comics;
         `
+    },
+    {
+        version: 10,
+        name: 'recommendation_v4_visual_style',
+        up: `
+            CREATE TABLE IF NOT EXISTS visual_embeddings (
+                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
+                model_id TEXT NOT NULL,
+                model_version TEXT NOT NULL,
+                sampling_policy_version TEXT NOT NULL,
+                embedding_kind TEXT NOT NULL CHECK (embedding_kind IN ('body','cover')),
+                vector_json TEXT NOT NULL,
+                dimension INTEGER NOT NULL,
+                source_kind TEXT NOT NULL CHECK (source_kind IN ('LOCAL_PAGES','REMOTE_PAGES','COVER_ONLY')),
+                sample_count INTEGER NOT NULL DEFAULT 1,
+                confidence REAL NOT NULL DEFAULT 0,
+                generated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (comic_id, model_id, model_version, sampling_policy_version, embedding_kind)
+            );
+            CREATE INDEX IF NOT EXISTS idx_visual_embeddings_model
+                ON visual_embeddings(model_id, model_version, embedding_kind, generated_at);
+            CREATE INDEX IF NOT EXISTS idx_visual_embeddings_comic
+                ON visual_embeddings(comic_id, embedding_kind);
+        `
+    },
+    {
+        version: 11,
+        name: 'download_queue_scale_indexes',
+        up: `
+            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_runner_priority_created
+                ON download_jobs(status, runner, priority DESC, created_at);
+            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_created
+                ON download_jobs(status, created_at DESC);
+        `
     }
 ]
 

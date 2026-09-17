@@ -18,6 +18,13 @@ import { RecommendationService } from '../services/recommendation-service'
 import { AdaptiveRecommendationSession } from '../recommendation-v3/adaptive-session'
 import { PreviewCacheManager } from '../services/preview-cache-manager'
 import { PreviewService } from '../services/preview-service'
+import { VisualStyleService } from '../services/visual-style-service'
+import {
+    VISUAL_MODEL_ID,
+    VISUAL_MODEL_VERSION,
+    VISUAL_SAMPLING_POLICY_VERSION,
+    type VisualSamplingMode
+} from '../recommendation-v4/visual-style'
 import { ReaderService } from '../services/reader-service'
 import { OnlineReaderService } from '../services/online-reader-service'
 import type { UserEventInput, V3EventType } from '../recommendation-v3/types'
@@ -32,6 +39,9 @@ export interface DesktopServerController {
     registerAccount?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     configured: () => boolean
     status: () => Record<string, unknown>
+    startEhWebLogin?: () => Promise<Record<string, unknown>>
+    ehWebLoginStatus?: () => Record<string, unknown>
+    cancelEhWebLogin?: () => Promise<Record<string, unknown>>
     importThemePack?: (name: string, value: Buffer) => Promise<Record<string, unknown>>
     save: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     testConnection: (
@@ -257,6 +267,17 @@ export async function startLibraryServer(options: {
         providerService,
         previewCache
     )
+    const visualStyleService = new VisualStyleService(
+        options.database,
+        providerService,
+        new PreviewCacheManager(
+            path.join(
+                options.cacheDir ?? options.service.dataDir,
+                'visual-samples'
+            ),
+            { maxBytes: 192 * 1024 * 1024, ttlMs: 6 * 60 * 60 * 1000 }
+        )
+    )
     const readerService = new ReaderService(
         options.database,
         options.service.dataDir
@@ -345,6 +366,9 @@ export async function startLibraryServer(options: {
                     'recommend_batch_presented',
                     'recommend_impression',
                     'recommend_detail_open',
+                    'recommend_like',
+                    'recommend_dislike',
+                    'recommend_feedback_reason',
                     'preview_open',
                     'preview_more',
                     'shelf_add',
@@ -382,6 +406,30 @@ export async function startLibraryServer(options: {
                     return json(response, 400, {
                         error: 'Batch presentation requires cycle and batch context'
                     })
+                if (
+                    (eventType === 'recommend_like' ||
+                        eventType === 'recommend_dislike' ||
+                        eventType === 'recommend_feedback_reason') &&
+                    !comicId
+                )
+                    return json(response, 400, {
+                        error: 'Recommendation feedback requires a comic'
+                    })
+                if (eventType === 'recommend_feedback_reason') {
+                    const metadata =
+                        typeof input.metadata === 'object' && input.metadata
+                            ? (input.metadata as Record<string, unknown>)
+                            : {}
+                    if (
+                        !['like', 'dislike'].includes(
+                            String(metadata.sentiment ?? '')
+                        ) ||
+                        !Array.isArray(metadata.reasons)
+                    )
+                        return json(response, 400, {
+                            error: 'Feedback reasons require sentiment and reasons'
+                        })
+                }
                 if (
                     eventType === 'recommend_impression' &&
                     (!cycleId ||
@@ -434,6 +482,136 @@ export async function startLibraryServer(options: {
                     } satisfies UserEventInput)
                 )
             }
+            if (
+                url.pathname === '/api/v1/recommendation-feedback' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.database.recommendationFeedback()
+                )
+            if (
+                url.pathname === '/api/v1/visual/status' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, options.service.visualIndexStatus())
+            if (
+                url.pathname === '/api/v1/visual/settings' &&
+                request.method === 'POST'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.updateVisualSettings(await body(request))
+                )
+            if (
+                url.pathname === '/api/v1/visual/prepare' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const mode = [
+                    'local_only',
+                    'standard',
+                    'cover_only'
+                ].includes(String(input.mode ?? ''))
+                    ? (String(input.mode) as VisualSamplingMode)
+                    : options.service.visualSettings().samplingMode
+                return json(
+                    response,
+                    200,
+                    await visualStyleService.prepare(
+                        String(input.comicId ?? ''),
+                        mode,
+                        Number(input.limit ?? 6)
+                    )
+                )
+            }
+            if (
+                url.pathname === '/api/v1/visual/embedding' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const vector = Array.isArray(input.vector)
+                    ? input.vector.map(Number)
+                    : []
+                const sourceKind = String(input.sourceKind ?? '')
+                if (
+                    ![
+                        'LOCAL_PAGES',
+                        'REMOTE_PAGES',
+                        'COVER_ONLY'
+                    ].includes(sourceKind)
+                )
+                    return json(response, 400, {
+                        error: 'Invalid visual embedding source'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.saveVisualEmbedding({
+                        comicId: String(input.comicId ?? ''),
+                        modelId: String(input.modelId ?? VISUAL_MODEL_ID),
+                        modelVersion: String(
+                            input.modelVersion ?? VISUAL_MODEL_VERSION
+                        ),
+                        samplingPolicyVersion: String(
+                            input.samplingPolicyVersion ??
+                                VISUAL_SAMPLING_POLICY_VERSION
+                        ),
+                        embeddingKind:
+                            input.embeddingKind === 'cover' ? 'cover' : 'body',
+                        vector,
+                        dimension: Number(input.dimension ?? vector.length),
+                        sourceKind: sourceKind as
+                            | 'LOCAL_PAGES'
+                            | 'REMOTE_PAGES'
+                            | 'COVER_ONLY',
+                        sampleCount: Number(input.sampleCount ?? 1),
+                        confidence: Number(
+                            input.confidence ??
+                                (sourceKind === 'COVER_ONLY' ? 0.5 : 1)
+                        ),
+                        metadata:
+                            typeof input.metadata === 'object' && input.metadata
+                                ? (input.metadata as Record<string, unknown>)
+                                : {}
+                    })
+                )
+            }
+            const visualSimilar = url.pathname.match(
+                /^\/api\/v1\/visual\/similar\/([^/]+)$/
+            )
+            if (visualSimilar && request.method === 'GET')
+                return json(
+                    response,
+                    200,
+                    options.service.similarVisualStyle(
+                        decodeURIComponent(visualSimilar[1]),
+                        Number(url.searchParams.get('limit') ?? 20)
+                    )
+                )
+            const visualSample = url.pathname.match(
+                /^\/api\/v1\/visual\/samples\/([^/]+)$/
+            )
+            if (visualSample && request.method === 'GET') {
+                const image = visualStyleService.page(
+                    decodeURIComponent(visualSample[1])
+                )
+                response.writeHead(200, {
+                    'content-type': image.contentType,
+                    'content-length': String(image.data.byteLength),
+                    'cache-control': 'private, no-store',
+                    'x-content-type-options': 'nosniff'
+                })
+                response.end(image.data)
+                return
+            }
+            if (
+                url.pathname === '/api/v1/visual/cache/clear' &&
+                request.method === 'POST'
+            )
+                return json(response, 200, visualStyleService.clear())
             if (
                 url.pathname === '/api/v1/update/check' &&
                 request.method === 'GET' &&
@@ -609,6 +787,30 @@ export async function startLibraryServer(options: {
                         await binaryBody(request, 24 * 1024 * 1024)
                     )
                 )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/eh-web-login/status' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop?.ehWebLoginStatus)
+                    return json(response, 409, { error: '受控 E-H 网页登录不可用' })
+                return json(response, 200, options.desktop.ehWebLoginStatus())
+            }
+            if (
+                url.pathname === '/api/v1/desktop/eh-web-login/start' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.startEhWebLogin)
+                    return json(response, 409, { error: '受控 E-H 网页登录不可用' })
+                return json(response, 200, await options.desktop.startEhWebLogin())
+            }
+            if (
+                url.pathname === '/api/v1/desktop/eh-web-login/cancel' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.cancelEhWebLogin)
+                    return json(response, 409, { error: '受控 E-H 网页登录不可用' })
+                return json(response, 200, await options.desktop.cancelEhWebLogin())
             }
             if (
                 url.pathname === '/api/v1/desktop/settings' &&
@@ -1209,6 +1411,15 @@ export async function startLibraryServer(options: {
             ) {
                 return json(response, 200, options.database.listAuthors())
             }
+            const authorRefresh = url.pathname.match(
+                /^\/api\/v1\/authors\/([^/]+)\/refresh$/
+            )
+            if (authorRefresh && request.method === 'POST')
+                return json(
+                    response,
+                    200,
+                    await options.service.refreshAuthorWorks(decodeURIComponent(authorRefresh[1]))
+                )
             if (
                 url.pathname === '/api/v1/authors/merge' &&
                 request.method === 'POST'
@@ -1440,6 +1651,32 @@ export async function startLibraryServer(options: {
                     response,
                     200,
                     jobs.map((job) => options.database.getDownloadJob(job.id))
+                )
+            }
+            if (
+                url.pathname === '/api/v1/downloads/summary' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, options.database.downloadJobSummary())
+            if (
+                url.pathname === '/api/v1/downloads/page' &&
+                request.method === 'GET'
+            ) {
+                const rawView = String(url.searchParams.get('view') ?? 'active')
+                const view = rawView === 'finished' || rawView === 'all' ? rawView : 'active'
+                return json(
+                    response,
+                    200,
+                    options.database.listDownloadJobsPage({
+                        view,
+                        limit: Number(url.searchParams.get('limit') ?? 100),
+                        offset: Number(url.searchParams.get('offset') ?? 0),
+                        runner: url.searchParams.get('runner') === 'GITHUB'
+                            ? 'GITHUB'
+                            : url.searchParams.get('runner') === 'LOCAL'
+                              ? 'LOCAL'
+                              : undefined
+                    })
                 )
             }
             if (

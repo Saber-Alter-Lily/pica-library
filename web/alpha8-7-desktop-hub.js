@@ -6,6 +6,7 @@ const copy = {
         title: '连接与设置',
         subtitle: '',
         general: '基本设置',
+        recommendations: '推荐与画风',
         connections: '连接与同步',
         appearance: '外观与个性化',
         storage: '下载与存储',
@@ -23,6 +24,7 @@ const copy = {
         title: 'Connections & Settings',
         subtitle: '',
         general: 'General',
+        recommendations: 'Recommendations & Visual Style',
         connections: 'Connections & Sync',
         appearance: 'Appearance',
         storage: 'Downloads & Storage',
@@ -129,8 +131,15 @@ function wrapDownloadFetch() {
             const source = input instanceof Request ? input.url : String(input)
             const url = new URL(source, location.href)
             const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
-            if (url.origin !== location.origin || url.pathname !== '/api/v1/downloads' || method !== 'GET' || !response.ok)
+            if (url.origin !== location.origin || method !== 'GET' || !response.ok)
                 return response
+            if (url.pathname === '/api/v1/downloads/summary') {
+                const summary = await response.clone().json()
+                lastFinishedCount = Number(summary?.finished || 0)
+                queueMicrotask(updateFinishedControl)
+                return response
+            }
+            if (url.pathname !== '/api/v1/downloads') return response
             const jobs = await response.clone().json()
             if (!Array.isArray(jobs)) return response
             lastFinishedCount = jobs.filter((job) => terminalForTaskPage(String(job?.status || ''))).length
@@ -177,6 +186,7 @@ function installDownloadHistoryControl() {
 
 const panelDefinitions = [
     ['general', 'general'],
+    ['recommendations', 'recommendations'],
     ['connections', 'connections'],
     ['appearance', 'appearance'],
     ['storage', 'storage'],
@@ -201,6 +211,12 @@ function activateHubPanel(id) {
     localStorage.setItem('pica-settings-section', id)
     if (id === 'storage') void refreshPreviewStats()
     movePersonalization()
+}
+
+function openSettingsHubPanel(id) {
+    const navButton = hub$('nav button[data-view="maintenance"]')
+    navButton?.click()
+    activateHubPanel(id)
 }
 
 function movePersonalization() {
@@ -291,6 +307,15 @@ function buildSettingsHub() {
     const settingsForm = hub$('#settings-form')
     if (settingsForm) panels.get('general').appendChild(settingsForm)
 
+    const ehAccount = hub$('#settings-eh-account')
+    if (ehAccount) {
+        ehAccount.open = true
+        panels.get('general').appendChild(ehAccount)
+    }
+
+    const recommendationV4 = hub$('#settings-recommendation-v4')
+    if (recommendationV4) panels.get('recommendations').appendChild(recommendationV4)
+
     for (const id of ['settings-mobile-bridge', 'settings-remote-storage', 'settings-browser-lite']) {
         const node = hub$(`#${id}`)
         if (node) panels.get('connections').appendChild(node)
@@ -367,6 +392,8 @@ function bootstrap() {
     buildSettingsHub()
     installDownloadHistoryControl()
     installObservers()
+    hub$('#setup-open-eh')?.addEventListener('click', () => setTimeout(() => { openSettingsHubPanel('general'); const panel = hub$('#settings-eh-account'); if (panel) { panel.open = true; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }) } }, 0))
+    hub$('#setup-open-settings')?.addEventListener('click', () => setTimeout(() => openSettingsHubPanel('general'), 0))
     hub$('#language-select')?.addEventListener('change', () => setTimeout(refreshHubLabels, 0))
     setTimeout(() => {
         buildSettingsHub()

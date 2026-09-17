@@ -336,6 +336,25 @@ export async function startMobileBridge(options: {
                     error: 'Mobile device is not paired'
                 })
 
+            if (
+                url.pathname === '/mobile/v1/visual/status' &&
+                request.method === 'GET'
+            ) {
+                return json(response, 200, options.service.visualIndexStatus())
+            }
+
+            if (
+                url.pathname === '/mobile/v1/visual/settings' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                options.service.updateVisualSettings({
+                    enabled: input.enabled,
+                    rerankMode: input.rerankMode
+                })
+                return json(response, 200, options.service.visualIndexStatus())
+            }
+
             if (url.pathname === '/mobile/v1/star-access' && request.method === 'GET') {
                 const proof = personalization.starProof()
                 return json(response, 200, proof ?? { unlocked: false, githubUser: '', verifiedAt: '' })

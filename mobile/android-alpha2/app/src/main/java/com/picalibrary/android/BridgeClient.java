@@ -74,6 +74,8 @@ final class BridgeClient {
 
     static List<RecommendationItem> recommendations(Context c,int limit) throws Exception {return recommendationBatch(c,limit).items;}
     static RecommendationBatch recommendationBatch(Context c,int limit) throws Exception {JSONObject root=new JSONObject(get(c,"/mobile/v1/recommendations?limit="+limit));JSONArray arr=root.optJSONArray("recommendations"); List<RecommendationItem> out=new ArrayList<>();if(arr!=null) for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i); if(o==null)continue;JSONObject comic=o.optJSONObject("comic"); if(comic==null)comic=o;JSONArray reasons=o.optJSONArray("reasons"); String reason="为你推荐";if(reasons!=null&&reasons.length()>0)reason=reasons.optString(0,reason);out.add(new RecommendationItem(comic.optString("comicId"),comic.optString("title","未命名漫画"),comic.optString("author","未知作者"),reason));}return new RecommendationBatch(out,root.optString("source",""),root.optBoolean("cached",false),root.optInt("batchIndex",-1),root.optInt("maxVisibleBatches",0));}
+    static JSONObject visualStatus(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/visual/status"));}
+    static JSONObject updateVisualSettings(Context c,Boolean enabled,String rerankMode) throws Exception {JSONObject body=new JSONObject();if(enabled!=null)body.put("enabled",enabled.booleanValue());if(rerankMode!=null&&!rerankMode.isEmpty())body.put("rerankMode",rerankMode);return new JSONObject(post(c,"/mobile/v1/visual/settings",body));}
     static JSONObject atlas(Context c) throws Exception { return new JSONObject(get(c,"/mobile/v1/atlas")); }
     private static String enc(String value) throws Exception { return java.net.URLEncoder.encode(value==null?"":value,"UTF-8").replace("+","%20"); }
 }

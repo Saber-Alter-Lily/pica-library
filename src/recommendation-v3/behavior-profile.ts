@@ -9,6 +9,7 @@ export const BEHAVIOR_CONFIG = {
     engagement: {
         recommend_impression: 0.05,
         recommend_detail_open: 0.2,
+        recommend_like: 0.9,
         search_result_open: 0.2,
         preview_open: 0.35,
         preview_more: 0.5,
@@ -23,7 +24,8 @@ export const BEHAVIOR_CONFIG = {
     negative: {
         favorite_remove: 1,
         shelf_remove: 0.35,
-        download_cancel: 0.25
+        download_cancel: 0.25,
+        recommend_dislike: 1
     } satisfies Partial<Record<V3EventType, number>>
 } as const
 

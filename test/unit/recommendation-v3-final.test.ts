@@ -458,7 +458,7 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v3-final-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
         try {
-            expect(latestMigrationVersion).toBe(9)
+            expect(latestMigrationVersion).toBeGreaterThanOrEqual(9)
             const comics = Array.from({ length: 30 }, (_, index) =>
                 comic(`c${index}`)
             )

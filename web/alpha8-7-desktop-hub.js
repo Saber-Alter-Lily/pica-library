@@ -131,8 +131,15 @@ function wrapDownloadFetch() {
             const source = input instanceof Request ? input.url : String(input)
             const url = new URL(source, location.href)
             const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
-            if (url.origin !== location.origin || url.pathname !== '/api/v1/downloads' || method !== 'GET' || !response.ok)
+            if (url.origin !== location.origin || method !== 'GET' || !response.ok)
                 return response
+            if (url.pathname === '/api/v1/downloads/summary') {
+                const summary = await response.clone().json()
+                lastFinishedCount = Number(summary?.finished || 0)
+                queueMicrotask(updateFinishedControl)
+                return response
+            }
+            if (url.pathname !== '/api/v1/downloads') return response
             const jobs = await response.clone().json()
             if (!Array.isArray(jobs)) return response
             lastFinishedCount = jobs.filter((job) => terminalForTaskPage(String(job?.status || ''))).length

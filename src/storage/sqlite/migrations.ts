@@ -503,6 +503,16 @@ export const migrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_visual_embeddings_comic
                 ON visual_embeddings(comic_id, embedding_kind);
         `
+    },
+    {
+        version: 11,
+        name: 'download_queue_scale_indexes',
+        up: `
+            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_runner_priority_created
+                ON download_jobs(status, runner, priority DESC, created_at);
+            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_created
+                ON download_jobs(status, created_at DESC);
+        `
     }
 ]
 

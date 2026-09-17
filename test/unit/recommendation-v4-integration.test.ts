@@ -14,8 +14,8 @@ const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('Recommendation V4 integration', () => {
-    it('adds additive schema 10 visual storage', () => {
-        expect(latestMigrationVersion).toBe(10)
+    it('keeps schema 10 visual storage while later additive migrations advance the database', () => {
+        expect(latestMigrationVersion).toBe(11)
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v4-'))
         const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
         expect(

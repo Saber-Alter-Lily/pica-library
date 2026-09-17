@@ -1576,74 +1576,49 @@ async function loadJobs() {
     downloadPollBusy = true
     try {
         if (state.mode === 'lite') {
-            $('#job-list').innerHTML =
-                state.queue
-                    .map(
-                        (job) =>
-                            `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · ${t('message.litePlan')}</p></div></article>`
-                    )
-                    .join('') ||
-                `<article class="notice">${t('message.emptyPlan')}</article>`
+            $('#job-list').innerHTML = state.queue.map((job) =>
+                `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · ${t('message.litePlan')}</p></div></article>`
+            ).join('') || `<article class="notice">${t('message.emptyPlan')}</article>`
             return
         }
-        const jobs = await api('/api/v1/downloads')
-        const counts = {
-            RUNNING: 0,
-            PREPARING: 0,
-            QUEUED: 0,
-            RETRY_WAIT: 0,
-            PAUSED: 0,
-            FAILED: 0,
-            COMPLETED: 0
-        }
-        jobs.forEach((job) => {
-            if (counts[job.status] !== undefined) counts[job.status] += 1
-        })
+        const showFinished = localStorage.getItem('pica-show-finished-downloads') === 'true'
+        const visibleLimit = Math.max(100, Number(state.downloadVisibleLimit || 100))
+        const [summary, page] = await Promise.all([
+            api('/api/v1/downloads/summary'),
+            api(`/api/v1/downloads/page?view=${showFinished ? 'all' : 'active'}&limit=${visibleLimit}&offset=0`)
+        ])
+        const jobs = Array.isArray(page.items) ? page.items : []
+        const counts = summary.counts || {}
         $('#download-summary').innerHTML = [
-            [t('downloads.inProgress'), counts.RUNNING + counts.PREPARING],
-            [t('downloads.waiting'), counts.QUEUED + counts.RETRY_WAIT],
-            [t('downloads.paused'), counts.PAUSED],
-            [t('downloads.failed'), counts.FAILED],
-            [t('downloads.completed'), counts.COMPLETED]
-        ]
-            .map(
-                ([label, count]) =>
-                    `<div class="metric"><span>${label}</span><strong>${count}</strong></div>`
-            )
-            .join('')
-        $('#job-list').innerHTML =
-            jobs
-                .map((job) => {
-                    const percent = job.progressTotal
-                        ? Math.round(
-                              (job.progressCompleted / job.progressTotal) * 100
-                          )
-                        : 0
-                    const title =
-                        job.comicTitle || t('downloads.placeholderTitle')
-                    const chapter =
-                        job.chapterTitle || t('downloads.placeholderChapter')
-                    const speed = job.bytesPerSecond
-                        ? `${formatBytes(job.bytesPerSecond)}/s`
-                        : '—'
-                    const eta =
-                        job.bytesPerSecond && job.expectedBytes > job.bytes
-                            ? `${Math.ceil((job.expectedBytes - job.bytes) / job.bytesPerSecond)}s`
-                            : '—'
-                    return `<article class="list-item download-job-card" data-job-status="${job.status}">
-                    <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ETA ${eta} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
-                    <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">${t('action.pause')}</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">${t('action.resume')}</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">${t('action.retry')}</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">${t('action.cancel')}</button>` : ''}</div>
-                </article>`
-                })
-                .join('') ||
-            `<article class="notice">${t('message.emptyQueue')}</article>`
-        if (
-            jobs.some((job) =>
-                ['QUEUED', 'PREPARING', 'RUNNING', 'RETRY_WAIT'].includes(
-                    job.status
-                )
-            )
-        ) {
+            [t('downloads.inProgress'), Number(counts.RUNNING || 0) + Number(counts.PREPARING || 0)],
+            [t('downloads.waiting'), Number(counts.QUEUED || 0) + Number(counts.RETRY_WAIT || 0)],
+            [t('downloads.paused'), Number(counts.PAUSED || 0)],
+            [t('downloads.failed'), Number(counts.FAILED || 0)],
+            [t('downloads.completed'), Number(counts.COMPLETED || 0)]
+        ].map(([label, count]) =>
+            `<div class="metric"><span>${label}</span><strong>${count}</strong></div>`
+        ).join('')
+        const cards = jobs.map((job) => {
+            const percent = job.progressTotal ? Math.round((job.progressCompleted / job.progressTotal) * 100) : 0
+            const title = job.comicTitle || t('downloads.placeholderTitle')
+            const chapter = job.chapterTitle || t('downloads.placeholderChapter')
+            const speed = job.bytesPerSecond ? `${formatBytes(job.bytesPerSecond)}/s` : '—'
+            const eta = job.bytesPerSecond && job.expectedBytes > job.bytes
+                ? `${Math.ceil((job.expectedBytes - job.bytes) / job.bytesPerSecond)}s` : '—'
+            return `<article class="list-item download-job-card" data-job-status="${job.status}">
+                <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ETA ${eta} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
+                <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">${t('action.pause')}</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">${t('action.resume')}</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">${t('action.retry')}</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">${t('action.cancel')}</button>` : ''}</div>
+            </article>`
+        }).join('')
+        $('#job-list').innerHTML = cards || `<article class="notice">${t('message.emptyQueue')}</article>`
+        if (Number(page.total || 0) > jobs.length) {
+            $('#job-list').insertAdjacentHTML('beforeend', `<button type="button" id="download-load-more">${t('library.loadMore')}（${jobs.length} / ${Number(page.total || 0)}）</button>`)
+            $('#download-load-more').onclick = () => {
+                state.downloadVisibleLimit = visibleLimit + 100
+                void loadJobs()
+            }
+        }
+        if (Number(summary.active || 0) > 0) {
             if (!downloadPoll && activeView === 'downloads')
                 downloadPoll = setInterval(() => void loadJobs(), 1000)
         } else if (downloadPoll) {

@@ -53,7 +53,8 @@ describe('v0.4 Web/Desktop parity', () => {
     expect(web).toContain("showAuthorWorks(dialog")
     expect(web).toContain("scope:'catalog'")
     expect(web).toContain('authorIds:[authorId]')
-    expect(web).toContain('默认合并 Pica 与 E-H')
+    expect(web).toContain('/api/v1/authors/${encodeURIComponent(authorId)}/refresh')
+    expect(web).toContain('正在联网补全 Pica / E-H 作者作品')
   })
 
   it('restores history outside primary navigation with time filters and exact-page resume', () => {

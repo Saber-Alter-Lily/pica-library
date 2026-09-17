@@ -399,6 +399,52 @@ export class LibraryService {
         )
     }
 
+    async refreshAuthorWorks(authorId: string) {
+        const author = this.database.listAuthors().find((item) => item.id === authorId)
+        if (!author) throw new Error('作者身份不存在或已经变化')
+        const catalog = this.database.listComics({ limit: 10000 })
+        const knownWorks = catalog.filter((comic) => comic.authorId === authorId)
+        const identityKeys = new Set(
+            [author.canonicalName, ...author.aliases].map(normalizeAuthorKey).filter(Boolean)
+        )
+        const picaQuery =
+            knownWorks.find((comic) =>
+                comic.providerId === 'pica' && identityKeys.has(normalizeAuthorKey(comic.author))
+            )?.author || author.canonicalName
+        const ehQueryName =
+            knownWorks.find((comic) =>
+                comic.providerId === 'eh' && identityKeys.has(normalizeAuthorKey(comic.author))
+            )?.author || author.canonicalName
+        const provider = this.providerService()
+        const sources: Record<string, { count: number; error?: string }> = {}
+        const run = async (source: 'pica' | 'eh' | 'exh', keyword: string) => {
+            try {
+                const records = await provider.search({ keyword, limit: 100 }, [source], 'discover')
+                sources[source] = { count: records.length }
+            } catch (error) {
+                sources[source] = { count: 0, error: error instanceof Error ? error.message : String(error) }
+            }
+        }
+        if (picaQuery.trim()) await run('pica', picaQuery.trim())
+        const cleanEh = ehQueryName.replaceAll('"', '').trim()
+        if (cleanEh) await run('eh', `artist:"${cleanEh}"`)
+        if (cleanEh && this.ehProvider.hasSession()) {
+            const capability = await this.probeExHentai().catch(() => 'NETWORK_ERROR')
+            if (capability === 'AVAILABLE') await run('exh', `artist:"${cleanEh}"`)
+            else sources.exh = { count: 0, error: capability }
+        }
+        const refreshedWorks = this.database
+            .listComics({ limit: 10000 })
+            .filter((comic) => comic.authorId === authorId)
+        return {
+            authorId,
+            canonicalName: author.canonicalName,
+            knownBefore: knownWorks.length,
+            knownAfter: refreshedWorks.length,
+            sources
+        }
+    }
+
     setEhSession(session?: EhSession | null) {
         this.ehProvider.setSession(session)
     }
@@ -1524,10 +1570,7 @@ export class LibraryService {
     }
 
     hasActiveLocalDownloads() {
-        const active = new Set(['QUEUED', 'PREPARING', 'RUNNING', 'RETRY_WAIT'])
-        return this.database
-            .listDownloadJobs()
-            .some((job) => job.runner === 'LOCAL' && active.has(job.status))
+        return this.database.hasActiveDownloadJobs('LOCAL')
     }
 
     async quiesceLocalDownloads(timeoutMs = 30_000) {
@@ -1629,9 +1672,7 @@ export class LibraryService {
                 throw new Error('Episode response did not include an id')
             const pictures = await pica.picturesAll(comicId, episode)
             result.pictures += pictures.length
-            const stored = this.database
-                .listComics({ limit: 5000 })
-                .find((item) => item.comicId === comicId)
+            const stored = this.database.getComic(comicId)
             const episodeDir = renderLibraryPath(
                 path.join(this.dataDir, 'library'),
                 process.env.PICA_LIBRARY_PATH_TEMPLATE ??

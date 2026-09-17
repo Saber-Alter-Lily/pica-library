@@ -2516,6 +2516,72 @@ export class LibraryDatabase {
         return rows.map(downloadJob)
     }
 
+    downloadJobSummary() {
+        const rows = this.db
+            .prepare(
+                `SELECT status, COUNT(*) AS count
+                 FROM download_jobs GROUP BY status`
+            )
+            .all() as SqlRow[]
+        const counts: Partial<Record<DownloadStatus, number>> = {}
+        for (const row of rows)
+            counts[String(row.status) as DownloadStatus] = numberValue(row.count)
+        const total = rows.reduce((sum, row) => sum + numberValue(row.count), 0)
+        const finished = (counts.COMPLETED ?? 0) + (counts.CANCELLED ?? 0)
+        return { total, active: total - finished, finished, counts }
+    }
+
+    listDownloadJobsPage(input: {
+        view?: 'active' | 'finished' | 'all'
+        limit?: number
+        offset?: number
+        runner?: DownloadJob['runner']
+    } = {}) {
+        const view: 'active' | 'finished' | 'all' =
+            input.view === 'finished' || input.view === 'all' ? input.view : 'active'
+        const limit = Math.max(1, Math.min(500, Math.floor(input.limit ?? 100)))
+        const offset = Math.max(0, Math.floor(input.offset ?? 0))
+        const clauses: string[] = []
+        const params: Array<string | number> = []
+        if (view === 'active')
+            clauses.push("j.status NOT IN ('COMPLETED','CANCELLED')")
+        else if (view === 'finished')
+            clauses.push("j.status IN ('COMPLETED','CANCELLED')")
+        if (input.runner) {
+            clauses.push('j.runner = ?')
+            params.push(input.runner)
+        }
+        const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+        const order = view === 'finished'
+            ? 'ORDER BY COALESCE(j.finished_at, j.created_at) DESC'
+            : `ORDER BY CASE j.status
+                   WHEN 'RUNNING' THEN 0 WHEN 'PREPARING' THEN 1
+                   WHEN 'RETRY_WAIT' THEN 2 WHEN 'QUEUED' THEN 3
+                   WHEN 'PAUSED' THEN 4 WHEN 'FAILED' THEN 5 ELSE 6 END,
+                   j.priority DESC, j.created_at DESC`
+        const rows = this.db
+            .prepare(`${downloadJobSelect} ${where} ${order} LIMIT ? OFFSET ?`)
+            .all(...params, limit, offset) as SqlRow[]
+        const count = this.db
+            .prepare(`SELECT COUNT(*) AS count FROM download_jobs j ${where}`)
+            .get(...params) as SqlRow
+        return { items: rows.map(downloadJob), total: numberValue(count.count), limit, offset, view }
+    }
+
+    hasActiveDownloadJobs(runner?: DownloadJob['runner']) {
+        const row = runner
+            ? (this.db.prepare(
+                  `SELECT 1 AS found FROM download_jobs
+                   WHERE runner = ? AND status IN ('QUEUED','PREPARING','RUNNING','RETRY_WAIT')
+                   LIMIT 1`
+              ).get(runner) as SqlRow | undefined)
+            : (this.db.prepare(
+                  `SELECT 1 AS found FROM download_jobs
+                   WHERE status IN ('QUEUED','PREPARING','RUNNING','RETRY_WAIT') LIMIT 1`
+              ).get() as SqlRow | undefined)
+        return Boolean(row)
+    }
+
     nextDownloadJobs(limit: number, runner?: DownloadJob['runner']) {
         const rows = runner
             ? (this.db

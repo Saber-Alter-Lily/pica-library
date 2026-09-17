@@ -1411,6 +1411,15 @@ export async function startLibraryServer(options: {
             ) {
                 return json(response, 200, options.database.listAuthors())
             }
+            const authorRefresh = url.pathname.match(
+                /^\/api\/v1\/authors\/([^/]+)\/refresh$/
+            )
+            if (authorRefresh && request.method === 'POST')
+                return json(
+                    response,
+                    200,
+                    await options.service.refreshAuthorWorks(decodeURIComponent(authorRefresh[1]))
+                )
             if (
                 url.pathname === '/api/v1/authors/merge' &&
                 request.method === 'POST'
@@ -1642,6 +1651,32 @@ export async function startLibraryServer(options: {
                     response,
                     200,
                     jobs.map((job) => options.database.getDownloadJob(job.id))
+                )
+            }
+            if (
+                url.pathname === '/api/v1/downloads/summary' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, options.database.downloadJobSummary())
+            if (
+                url.pathname === '/api/v1/downloads/page' &&
+                request.method === 'GET'
+            ) {
+                const rawView = String(url.searchParams.get('view') ?? 'active')
+                const view = rawView === 'finished' || rawView === 'all' ? rawView : 'active'
+                return json(
+                    response,
+                    200,
+                    options.database.listDownloadJobsPage({
+                        view,
+                        limit: Number(url.searchParams.get('limit') ?? 100),
+                        offset: Number(url.searchParams.get('offset') ?? 0),
+                        runner: url.searchParams.get('runner') === 'GITHUB'
+                            ? 'GITHUB'
+                            : url.searchParams.get('runner') === 'LOCAL'
+                              ? 'LOCAL'
+                              : undefined
+                    })
                 )
             }
             if (

@@ -22,8 +22,6 @@ jobs:
         with:
           node-version: 24
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10.15.1
       - name: Apply staged fixes
         run: python3 scripts/stage-issue8-28.py
       - name: Validate staged fixes

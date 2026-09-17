@@ -15,8 +15,12 @@ jobs:
         with:
           ref: feature/recommendation-v5-portable-policy
           fetch-depth: 0
-      - name: Validate and apply patch script
+      - name: Apply and commit portable mobile recommendation patch
         run: |
+          if grep -q "DESKTOP_SYNCED_V5_PORTABLE" mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java; then
+            echo "V5 mobile portable patch already applied; nothing to do."
+            exit 0
+          fi
           python - <<'PY'
           from pathlib import Path
           path = Path('scripts/v5-mobile-portable-completion.py')
@@ -30,11 +34,8 @@ jobs:
           python -m py_compile scripts/v5-mobile-portable-completion.py
           python scripts/v5-mobile-portable-completion.py
           git diff --check
-      - name: Commit patch and self-clean
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/v5-mobile-portable-runner.yml scripts/v5-mobile-portable-completion.py .v5-mobile-portable-trigger
           git add mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java \
                   mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationStore.java \
                   mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java \

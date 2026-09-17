@@ -17,6 +17,16 @@ jobs:
           fetch-depth: 0
       - name: Validate and apply patch script
         run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/v5-mobile-portable-completion.py')
+          text = path.read_text(encoding='utf-8')
+          old = r"r'    static final class RecommendationItem \\{.*?\\n    \\}\\n    static final class RecommendationBatch'"
+          new = r"r'    static final class RecommendationItem \\{.*?\\}\\n    static final class RecommendationBatch'"
+          if old not in text:
+              raise SystemExit('BridgeClient RecommendationItem regex anchor was not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
           python -m py_compile scripts/v5-mobile-portable-completion.py
           python scripts/v5-mobile-portable-completion.py
           git diff --check
@@ -24,7 +34,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/v5-mobile-portable-runner.yml scripts/v5-mobile-portable-completion.py
+          git rm .github/workflows/v5-mobile-portable-runner.yml scripts/v5-mobile-portable-completion.py .v5-mobile-portable-trigger
           git add mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java \
                   mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationStore.java \
                   mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java \

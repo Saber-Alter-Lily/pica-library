@@ -1,0 +1,39 @@
+name: Recommendation V5 isolated workspace
+on:
+  push:
+    branches: [feature/recommendation-v5-portable-policy]
+    paths: [.github/workflows/recommendation-v5-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  source-workspace:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - name: Install lockfile dependencies and record baseline
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm type:check
+          pnpm web:check
+          mkdir -p workspace-artifact
+          git rev-parse HEAD > workspace-artifact/SOURCE_SHA.txt
+          git archive HEAD | tar -x -C workspace-artifact
+          tar -czf workspace-artifact/node-dependencies.tgz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recommendation-v5-source-workspace
+          path: workspace-artifact/
+          include-hidden-files: true
+          retention-days: 3
+          if-no-files-found: error

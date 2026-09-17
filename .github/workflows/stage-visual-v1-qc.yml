@@ -1,0 +1,44 @@
+name: Stage Visual V1 QC fixes
+
+on:
+  push:
+    branches: [tmp-visual-qc-stage]
+    paths:
+      - scripts/stage-visual-v1-qc.py
+
+permissions:
+  contents: write
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp-visual-qc-stage
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - name: Apply Visual V1 QC patch
+        run: python3 scripts/stage-visual-v1-qc.py
+      - name: Validate
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm type:check
+          pnpm web:check
+          pnpm test:unit
+      - name: Commit staged fixes and remove one-shot staging files
+        run: |
+          rm -f scripts/stage-visual-v1-qc.py .github/workflows/stage-visual-v1-qc.yml
+          git config user.name 'Saber-Alter-Lily'
+          git config user.email '3178088154@qq.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'feat: add Visual V1 QC and failure diagnostics'
+          git push origin HEAD:tmp-visual-qc-stage

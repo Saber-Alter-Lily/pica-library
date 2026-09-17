@@ -33,7 +33,7 @@ describe('Recommendation V4 Android feedback parity',()=>{
     expect(engine).toContain('allFavoriteIds.addAll(RecommendationFeedbackStore.feedbackIds(app))')
     // V5 moves display-time suppression into the shared portable-policy filter so
     // cached Desktop batches and offline Android batches use exactly one rule.
-    expect(home).toContain('RecommendationPolicyStore.applyCachedPolicy')
+    expect(home).toContain('RecommendationPolicyStore.applyLocalPolicy')
     expect(portablePolicy).toContain('RecommendationFeedbackStore.hasFeedback(c,item.comicId)')
   })
 })

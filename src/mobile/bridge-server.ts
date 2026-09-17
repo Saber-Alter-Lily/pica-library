@@ -386,6 +386,23 @@ export async function startMobileBridge(options: {
             }
 
             if (
+                url.pathname === '/mobile/v1/recommendations/cache' &&
+                request.method === 'GET'
+            ) {
+                const limit = boundedInt(
+                    url.searchParams.get('limit'),
+                    72,
+                    1,
+                    120
+                )
+                return json(
+                    response,
+                    200,
+                    finalRecommendationCoordinator.portable(limit)
+                )
+            }
+
+            if (
                 url.pathname === '/mobile/v1/visual/status' &&
                 request.method === 'GET'
             ) {

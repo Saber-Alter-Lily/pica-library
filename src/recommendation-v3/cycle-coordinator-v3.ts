@@ -381,6 +381,33 @@ export class CycleCoordinatorV3 {
         return this.responseForBatch(batch)
     }
 
+    portable(limit = FINAL_BATCH_SIZE * MAX_VISIBLE_BATCHES_PER_CYCLE) {
+        const state = this.state()
+        if (!state.activeCycleId)
+            return { ...this.status(), items: [], source: 'final-v3-portable-cache', cached: true }
+        const pool = this.pool(state.activeCycleId)
+        if (!pool)
+            return { ...this.status(), items: [], source: 'final-v3-portable-cache', cached: true }
+        const telemetry = pool.telemetry as { rankedCandidates?: Array<Omit<RankedCandidateWithEvidenceV3, 'comic'>> }
+        const catalog = this.database.listComics({ limit: 10000 })
+        const byId = new Map(catalog.map((comic) => [comic.comicId, comic]))
+        const ranked = (telemetry.rankedCandidates ?? []).flatMap((item) => {
+            const comic = byId.get(item.comicId)
+            return comic ? [{ ...item, comic }] : []
+        })
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const serving = filterCandidatesAgainstOwnedV5(ranked, catalog, policy)
+        const bounded = Math.max(1, Math.min(120, Math.floor(limit)))
+        return {
+            ...this.status(),
+            cycleId: state.activeCycleId,
+            items: serving.rows.slice(0, bounded),
+            source: 'final-v3-portable-cache',
+            cached: true,
+            servingFilterTelemetry: serving.telemetry
+        }
+    }
+
     current() {
         return this.allocate('CURRENT', false)
     }

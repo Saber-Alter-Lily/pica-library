@@ -5,6 +5,7 @@ on:
     branches: [tmp-visual-qc-r2-stage]
     paths:
       - scripts/stage-visual-v1-qc-r2.py
+      - .github/workflows/stage-visual-v1-qc-r2.yml
 
 permissions:
   contents: write

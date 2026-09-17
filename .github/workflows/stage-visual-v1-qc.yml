@@ -5,6 +5,7 @@ on:
     branches: [tmp-visual-qc-stage]
     paths:
       - scripts/stage-visual-v1-qc.py
+      - .visual-qc-trigger
 
 permissions:
   contents: write
@@ -35,7 +36,12 @@ jobs:
           pnpm test:unit
       - name: Commit staged fixes and remove one-shot staging files
         run: |
-          rm -f scripts/stage-visual-v1-qc.py .github/workflows/stage-visual-v1-qc.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('docs/RECOMMENDATION_V4_VISUAL_BETA.md')
+          path.write_text(path.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
+          PY
+          rm -f scripts/stage-visual-v1-qc.py .github/workflows/stage-visual-v1-qc.yml .visual-qc-trigger
           git config user.name 'Saber-Alter-Lily'
           git config user.email '3178088154@qq.com'
           git add -A

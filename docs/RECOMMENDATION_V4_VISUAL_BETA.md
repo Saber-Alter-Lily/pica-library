@@ -66,3 +66,13 @@ The branch is not considered test-build ready until all of these gates pass:
 ## Safety / release
 
 The formal product version remains `0.4.0` on this unpublished feature branch; the eventual Actions artifact is labeled separately as a Recommendation V4 beta test build. This branch must not publish releases or tags. A test artifact is produced only after CI is green.
+
+## Visual V1 frozen-index QC
+
+- The first frozen Visual V1 user dataset is treated as an immutable analysis asset during QC: 1,808 / 1,827 target comics indexed (98.96%), 19 pending at freeze time.
+- Cross-version persistence was manually verified before this QC surface was added. The QC UI reads existing embeddings and never rebuilds them on page load.
+- Similar-style retrieval now filters by model + model version + sampling-policy version and ranks vectors before fetching comic metadata, avoiding the former per-vector metadata-query hot path.
+- The beta settings surface exposes an indexed-anchor Visual V1 QC panel with Top-12 cosine similarity, source/confidence/sample-count provenance, 0/1/2 human ratings, confound labels and JSON export.
+- Pending diagnostics are explicitly separate from indexing. They may read a bounded set of body pages to classify retryability, but they do not save or overwrite embeddings.
+- Pending/failure categories distinguish retryable preparation, transient network/provider problems, missing body pages, image errors, model inference, database/save failures and unknown errors, with user-facing retry guidance.
+- Library, Downloaded and Shelf cards gain an additive unified detail entry so users can reach visual comparison from their actual collection instead of relying on recommendation/search candidates.

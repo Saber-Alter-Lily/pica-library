@@ -304,7 +304,8 @@ export class LibraryService {
         const current = embeddings.filter(
             (item) =>
                 item.modelId === VISUAL_MODEL_ID &&
-                item.modelVersion === VISUAL_MODEL_VERSION
+                item.modelVersion === VISUAL_MODEL_VERSION &&
+                item.samplingPolicyVersion === VISUAL_SAMPLING_POLICY_VERSION
         )
         const indexedIds = new Set(current.map((item) => item.comicId))
         const pendingComicIds = [...targetIds]
@@ -332,7 +333,8 @@ export class LibraryService {
         for (const item of embeddings) {
             if (
                 item.modelId !== VISUAL_MODEL_ID ||
-                item.modelVersion !== VISUAL_MODEL_VERSION
+                item.modelVersion !== VISUAL_MODEL_VERSION ||
+                item.samplingPolicyVersion !== VISUAL_SAMPLING_POLICY_VERSION
             )
                 continue
             const previous = preferred.get(item.comicId)
@@ -344,25 +346,33 @@ export class LibraryService {
         }
         const source = preferred.get(comicId)
         if (!source) return []
-        return [...preferred.values()]
+        const maxResults = Math.max(1, Math.min(50, Math.floor(limit)))
+        const nearest = [...preferred.values()]
             .filter(
                 (item) =>
                     item.comicId !== comicId &&
                     item.vector.length === source.vector.length
             )
-            .map((item) => ({
-                comic: this.database.getComic(item.comicId),
-                similarity: cosineSimilarity(source.vector, item.vector),
-                sourceKind: item.sourceKind,
-                confidence: item.confidence
+            .map((embedding) => ({
+                embedding,
+                similarity: cosineSimilarity(source.vector, embedding.vector)
             }))
-            .filter((item) => item.comic)
             .sort(
                 (a, b) =>
                     b.similarity - a.similarity ||
-                    a.comic!.comicId.localeCompare(b.comic!.comicId)
+                    a.embedding.comicId.localeCompare(b.embedding.comicId)
             )
-            .slice(0, Math.max(1, Math.min(50, Math.floor(limit))))
+            .slice(0, maxResults)
+        return nearest
+            .map((item) => ({
+                comic: this.database.getComic(item.embedding.comicId),
+                similarity: item.similarity,
+                sourceKind: item.embedding.sourceKind,
+                confidence: item.embedding.confidence,
+                sampleCount: item.embedding.sampleCount,
+                embeddingKind: item.embedding.embeddingKind
+            }))
+            .filter((item) => item.comic)
     }
 
     constructor(

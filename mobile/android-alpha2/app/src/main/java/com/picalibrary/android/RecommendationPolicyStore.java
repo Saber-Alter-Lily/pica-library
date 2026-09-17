@@ -10,12 +10,13 @@ import org.json.JSONObject;
 
 /**
  * Portable Recommendation V5 state cached from Desktop.
- * Desktop remains the heavy-compute authority. Android keeps the same explicit
- * controls, can re-rank a synced cache offline, and queues mutations for pairing.
+ * Desktop remains the heavy-compute authority. Android applies only the delta
+ * between the policy baked into a cached ranking and current local mutations.
  */
 final class RecommendationPolicyStore {
     private static final String PREFS="recommendation-policy-v5";
     private static final String SNAPSHOT="snapshot";
+    private static final String CACHE_BASELINE="cacheBaseline";
     private static final String DIRTY_CONTROLS="dirtyControls";
     private static final String DIRTY_SESSION="dirtySessionIntent";
     private static final String DIRTY_SUPPRESS="dirtySuppress";
@@ -35,6 +36,9 @@ final class RecommendationPolicyStore {
     static int revision(Context c){return snapshot(c).optInt("revision",0);}
     static JSONArray inferred(Context c){JSONArray arr=snapshot(c).optJSONArray("inferred");return arr==null?new JSONArray():arr;}
     static JSONArray controls(Context c){JSONArray arr=snapshot(c).optJSONArray("controls");return arr==null?new JSONArray():arr;}
+    static JSONObject cacheBaseline(Context c){String raw=prefs(c).getString(CACHE_BASELINE,"");return raw==null||raw.isEmpty()?snapshot(c):parseObject(raw);}
+    static void saveCacheBaseline(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(CACHE_BASELINE,value.toString()).apply();}
+    static void markCacheBaseline(Context c){saveCacheBaseline(c,snapshot(c));}
 
     private static boolean matches(PicaClient.Comic comic,String type,String key){
         String wanted=norm(key);if(wanted.isEmpty()||comic==null)return false;
@@ -77,15 +81,22 @@ final class RecommendationPolicyStore {
         return Math.max(-0.30,Math.min(0.30,score));
     }
 
-    /** Apply only cheap portable policy operations. It never performs provider recall or visual inference. */
+    /**
+     * Cheap offline V5 operation only. Source order is the Desktop/native heavy ranking.
+     * We convert that baked order to a percentile baseline and apply only policy delta,
+     * so a synced MORE/LESS/TARGET is not counted for a second time on Android.
+     */
     static NativeRecommendationStore.Snapshot applyLocalPolicy(Context c,NativeRecommendationStore.Snapshot source){
         NativeRecommendationStore.Snapshot out=new NativeRecommendationStore.Snapshot();if(source==null)return out;
         out.cycleId=source.cycleId;out.generatedAt=source.generatedAt;out.favoriteFingerprint=source.favoriteFingerprint;out.registryFingerprint=source.registryFingerprint;out.readiness=source.readiness;out.favoriteCount=source.favoriteCount;out.displayedIds.addAll(source.displayedIds);out.cooldownIds.addAll(source.cooldownIds);
-        JSONObject state=snapshot(c);final class RankedItem{final NativeRecommendationStore.Item item;final double adjusted;final int order;RankedItem(NativeRecommendationStore.Item item,double adjusted,int order){this.item=item;this.adjusted=adjusted;this.order=order;}}
-        LinkedHashMap<String,RankedItem> unique=new LinkedHashMap<>();int order=0;for(List<NativeRecommendationStore.Item> batch:source.batches)for(NativeRecommendationStore.Item item:batch){if(item==null||item.comicId.isEmpty()){order++;continue;}if(RecommendationFeedbackStore.hasFeedback(c,item.comicId)||blocked(state,item)){order++;continue;}if(!unique.containsKey(item.comicId))unique.put(item.comicId,new RankedItem(item,item.score+adjustment(state,item),order));order++;}
+        JSONObject current=snapshot(c),baseline=cacheBaseline(c);int sourceCount=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)sourceCount+=sourceBatch.size();
+        final class RankedItem{final NativeRecommendationStore.Item item;final double adjusted;final int order;RankedItem(NativeRecommendationStore.Item item,double adjusted,int order){this.item=item;this.adjusted=adjusted;this.order=order;}}
+        LinkedHashMap<String,RankedItem> unique=new LinkedHashMap<>();int order=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)for(NativeRecommendationStore.Item item:sourceBatch){if(item==null||item.comicId.isEmpty()){order++;continue;}if(RecommendationFeedbackStore.hasFeedback(c,item.comicId)||blocked(current,item)){order++;continue;}double baked=sourceCount<=1?1d:1d-(double)order/(double)(sourceCount-1);double delta=adjustment(current,item)-adjustment(baseline,item);if(!unique.containsKey(item.comicId))unique.put(item.comicId,new RankedItem(item,baked+delta,order));order++;}
         List<RankedItem> rows=new ArrayList<>(unique.values());rows.sort((a,b)->{int byScore=Double.compare(b.adjusted,a.adjusted);return byScore!=0?byScore:Integer.compare(a.order,b.order);});
-        List<NativeRecommendationStore.Item> batch=new ArrayList<>();for(RankedItem row:rows){batch.add(row.item);if(batch.size()>=NativeRecommendationPolicy.BATCH_SIZE){out.batches.add(batch);batch=new ArrayList<>();}}if(!batch.isEmpty())out.batches.add(batch);out.candidateCount=rows.size();out.batchIndex=out.batches.isEmpty()?0:Math.min(Math.max(0,source.batchIndex),out.batches.size()-1);return out;
+        List<NativeRecommendationStore.Item> batch=new ArrayList<>();for(RankedItem row:rows){batch.add(row.item);if(batch.size()>=NativeRecommendationPolicy.BATCH_SIZE){out.batches.add(batch);batch=new ArrayList<>();}}if(!batch.isEmpty())out.batches.add(batch);out.candidateCount=rows.size();out.batchIndex=out.batches.isEmpty()?0:Math.floorMod(source.batchIndex,out.batches.size());return out;
     }
+
+    static void moveVisibleBatch(Context c,int delta){NativeRecommendationStore.Snapshot source=NativeRecommendationStore.load(c),visible=applyLocalPolicy(c,source);int count=visible.batches.size();if(count<=0||delta==0)return;source.batchIndex=Math.floorMod(visible.batchIndex+delta,count);NativeRecommendationStore.save(c,source);}
 
     static void setLocalControl(Context c,String targetType,String key,String label,String direction,String scope){
         String type=targetType==null?"":targetType.trim().toUpperCase(Locale.ROOT),cleanKey=norm(key),dir=direction==null?"DEFAULT":direction.trim().toUpperCase(Locale.ROOT);if(cleanKey.isEmpty())return;

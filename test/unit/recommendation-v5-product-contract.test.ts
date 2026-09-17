@@ -15,6 +15,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).toContain('portable(limit =')
         expect(client).toContain('syncRecommendationState')
         expect(client).toContain('DESKTOP_SYNCED_V5_PORTABLE')
+        expect(client).toContain('policyBaseline')
+        expect(coordinator).toContain('portableBaseline')
     })
 
     it('exposes user-steerable persistent and session policy on Desktop and Android', () => {
@@ -47,6 +49,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(home).toContain('RecommendationPolicyStore.applyLocalPolicy')
         expect(home).toContain('桌面完整计算结果 · 手机离线轻量重排')
         expect(store).toContain('applyLocalPolicy')
+        expect(store).toContain('adjustment(current,item)-adjustment(baseline,item)')
+        expect(store).toContain('moveVisibleBatch')
         expect(cache).toContain('final List<String> tags,categories')
     })
 

@@ -398,10 +398,19 @@ export class CycleCoordinatorV3 {
         const policy = new RecommendationPolicyStoreV5(this.database).state()
         const serving = filterCandidatesAgainstOwnedV5(ranked, catalog, policy)
         const bounded = Math.max(1, Math.min(120, Math.floor(limit)))
+        const buildTelemetry = pool.telemetry.telemetry as
+            | {
+                  recommendationV5?: {
+                      portableBaseline?: unknown
+                  }
+              }
+            | undefined
         return {
             ...this.status(),
             cycleId: state.activeCycleId,
             items: serving.rows.slice(0, bounded),
+            policyBaseline:
+                buildTelemetry?.recommendationV5?.portableBaseline ?? null,
             source: 'final-v3-portable-cache',
             cached: true,
             servingFilterTelemetry: serving.telemetry

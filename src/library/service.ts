@@ -844,6 +844,15 @@ export class LibraryService {
                     controlCount: recommendationV5State.controls.length,
                     hardSuppressCount:
                         recommendationV5State.hardSuppressComicIds.length,
+                    portableBaseline: {
+                        schemaVersion: recommendationV5State.schemaVersion,
+                        policyVersion: recommendationV5State.policyVersion,
+                        revision: recommendationV5State.revision,
+                        controls: recommendationV5State.controls,
+                        sessionIntent: recommendationV5State.sessionIntent,
+                        hardSuppressComicIds:
+                            recommendationV5State.hardSuppressComicIds
+                    },
                     ownedOrDuplicateRemoved:
                         v5Filtered.telemetry.exactOrOwnedRemoved +
                         v5Filtered.telemetry.workDuplicateRemoved,

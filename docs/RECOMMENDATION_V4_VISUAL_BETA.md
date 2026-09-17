@@ -37,6 +37,15 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 - A regression test includes an intentionally oversized `cf_clearance` value and requires controlled Desktop login to ignore it while preserving the stable E-H identity cookies.
 - Android now exposes a visible `推荐与画风` settings screen. Android keeps feedback-reason preferences locally and, when paired, reads/controls the Desktop visual index and OFF/SHADOW/LIVE mode through the authenticated Mobile Bridge. Android still does not run DINOv2 locally.
 
+## User-feedback fixes staged with this beta
+
+These fixes are intentionally staged on the same unpublished beta branch and must not be released independently before the visual-style review is complete.
+
+- Issue #8 / large download queues: Web/Desktop uses SQL status summaries plus bounded queue pages instead of transferring and rebuilding the entire historical download queue every second. Active-state checks use SQL existence queries, queue indexes are additive schema 11, and a 1,500-job regression fixture validates a 350-finished / 1,150-active queue with a 100-row visible page.
+- Issue #28 / author works: Web/Desktop keeps the two-step normalized-author flow, shows known local works immediately, then refreshes the selected author against Pica and E-H and optionally ExH when available. Users do not need to type the Japanese author name manually.
+- The legacy full `/api/v1/downloads` route remains available for compatibility; the interactive Web download page uses the bounded summary/page contract.
+- These items remain beta validation items until tested in a packaged Windows build; GitHub Issues must not be closed solely on the basis of unit tests.
+
 ## Beta validation gates
 
 The branch is not considered test-build ready until all of these gates pass:
@@ -50,7 +59,9 @@ The branch is not considered test-build ready until all of these gates pass:
 7. First-run onboarding exposes E-H / ExH account access without requiring Pica configuration first.
 8. Desktop General visibly contains both Pica and E-H / ExH account controls, while Recommendation V4 is reachable from its own visible settings-hub section.
 9. Android Settings visibly exposes `推荐与画风`; paired Android can read/control Desktop visual status without running the visual encoder locally.
-10. The test artifact workflow creates only ephemeral CI artifacts; it must not create tags or GitHub Releases.
+10. A 1,500-job queue fixture keeps the interactive queue query bounded and preserves summary counts.
+11. Web author navigation can refresh Pica/E-H and optional ExH works from the selected normalized author identity without manual text entry.
+12. The test artifact workflow creates only ephemeral CI artifacts; it must not create tags or GitHub Releases.
 
 ## Safety / release
 

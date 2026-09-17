@@ -1,0 +1,39 @@
+name: Apply Recommendation V5 mobile portable completion
+
+on:
+  push:
+    branches: [feature/recommendation-v5-portable-policy]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v5-portable-policy
+          fetch-depth: 0
+      - name: Validate and apply patch script
+        run: |
+          python -m py_compile scripts/v5-mobile-portable-completion.py
+          python scripts/v5-mobile-portable-completion.py
+          git diff --check
+      - name: Commit patch and self-clean
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/v5-mobile-portable-runner.yml scripts/v5-mobile-portable-completion.py
+          git add mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java \
+                  mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationStore.java \
+                  mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java \
+                  mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java \
+                  mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java \
+                  mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java \
+                  src/recommendation-v3/cycle-coordinator-v3.ts \
+                  src/mobile/bridge-server.ts \
+                  test/unit/recommendation-v5-product-contract.test.ts
+          git diff --cached --check
+          git commit -m "fix: complete V5 mobile portable recommendation loop"
+          git push origin HEAD:feature/recommendation-v5-portable-policy

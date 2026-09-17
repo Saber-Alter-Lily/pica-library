@@ -1,19 +1,22 @@
-name: Recommendation V5 isolated workspace
+name: Recommendation V5 integration staging
+
 on:
   push:
     branches: [feature/recommendation-v5-portable-policy]
     paths: [.github/workflows/recommendation-v5-workspace.yml]
+
 permissions:
-  contents: read
+  contents: write
+
 jobs:
-  source-workspace:
+  integrate:
     if: github.repository == 'Saber-Alter-Lily/pica-library'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -21,19 +24,29 @@ jobs:
         with:
           version: '11.16.0'
           run_install: false
-      - name: Install lockfile dependencies and record baseline
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply Recommendation V5 integration
         run: |
-          pnpm install --frozen-lockfile
+          set -euo pipefail
+          python scripts/apply-recommendation-v5-portable-policy.py
+          python scripts/apply-recommendation-v5-followup.py
+      - name: Validate Web and Desktop implementation
+        run: |
+          set -euo pipefail
           pnpm type:check
           pnpm web:check
-          mkdir -p workspace-artifact
-          git rev-parse HEAD > workspace-artifact/SOURCE_SHA.txt
-          git archive HEAD | tar -x -C workspace-artifact
-          tar -czf workspace-artifact/node-dependencies.tgz node_modules
-      - uses: actions/upload-artifact@v4
-        with:
-          name: recommendation-v5-source-workspace
-          path: workspace-artifact/
-          include-hidden-files: true
-          retention-days: 3
-          if-no-files-found: error
+          pnpm test
+          pnpm build
+      - name: Commit validated implementation
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No validated changes to commit.'
+            exit 0
+          fi
+          git commit -m 'feat: integrate portable recommendation policy and pairing sync'
+          git push origin HEAD:feature/recommendation-v5-portable-policy

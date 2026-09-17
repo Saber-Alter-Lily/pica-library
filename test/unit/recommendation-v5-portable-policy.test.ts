@@ -18,6 +18,7 @@ import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-
 
 function comic(input: Partial<StoredComic> & Pick<StoredComic, 'comicId' | 'title'>): StoredComic {
     return {
+        ...input,
         comicId: input.comicId,
         title: input.title,
         author: input.author ?? '',
@@ -34,8 +35,7 @@ function comic(input: Partial<StoredComic> & Pick<StoredComic, 'comicId' | 'titl
         knownPictures: input.knownPictures ?? input.pagesCount ?? 0,
         downloadedPictures: input.downloadedPictures ?? 0,
         pagesCount: input.pagesCount ?? 0,
-        inLibrary: input.inLibrary ?? false,
-        ...input
+        inLibrary: input.inLibrary ?? false
     } as StoredComic
 }
 
@@ -134,8 +134,8 @@ describe('Recommendation V5 portable policy', () => {
             comic({ comicId: 'a', title: 'A', author: 'Artist', tags: ['T'], categories: ['C'], isFavorite: true }),
             comic({ comicId: 'b', title: 'B', author: 'Artist', tags: ['T'], categories: ['D'], inLibrary: true })
         ])
-        expect(signals.find((item) => item.targetType === 'AUTHOR')?.supportCount).toBe(2)
-        expect(signals.find((item) => item.targetType === 'TAG' && item.key === 't')?.supportCount).toBe(2)
+        expect(signals.find((item) => item.targetType === 'AUTHOR')?.supportCount).toBe(1)
+        expect(signals.find((item) => item.targetType === 'TAG' && item.key === 't')?.supportCount).toBe(1)
     })
 
     it('persists controls and merges dirty mobile feedback using server-side events', () => {

@@ -508,6 +508,16 @@ export function metadataFeedbackAdjustment(input: {
         if (!source || feedback.comicId === input.candidate.comicId) continue
         const reasons = new Set(feedback.reasons)
         if (reasons.has('style') && reasons.size === 1) continue
+        const hasTasteReason = ['style', 'topic', 'author', 'character'].some(
+            (reason) => reasons.has(reason)
+        )
+        if (
+            !hasTasteReason &&
+            ['already_seen', 'already_owned', 'duplicate', 'repetitive', 'temporary'].some(
+                (reason) => reasons.has(reason)
+            )
+        )
+            continue
         const sign = feedback.sentiment === 'like' ? 1 : -1
         const strength = feedback.sentiment === 'like' ? 0.03 : 0.04
         const sourceAuthor = normalize(source.canonicalAuthor ?? source.author)

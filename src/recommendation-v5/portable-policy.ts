@@ -320,7 +320,7 @@ export function filterCandidatesAgainstOwnedV5<T extends { comic: StoredComic }>
 }
 
 export function portableInferredSignalsV5(catalog: StoredComic[], limit = 120): PortablePreferenceSignalV5[] {
-    const positives = catalog.filter((comic) => comic.isFavorite || comic.inLibrary || comic.downloadedPictures > 0)
+    const positives = catalog.filter((comic) => comic.isFavorite)
     const total = Math.max(1, positives.length)
     const groups = new Map<string, { targetType: PortablePreferenceSignalV5['targetType']; key: string; label: string; ids: Set<string> }>()
     const add = (targetType: PortablePreferenceSignalV5['targetType'], raw: string, comicId: string) => {

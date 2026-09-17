@@ -37,15 +37,8 @@ function ensurePanel() {
             <button id="v5-policy-rebuild" type="button" class="primary">按当前策略重新生成推荐</button>
         </div>
         <hr />
-        <label>本次推荐意图
-            <select id="v5-session-mode">
-                <option value="DEFAULT">默认 · 长期画像</option>
-                <option value="FAMILIAR">熟悉口味</option>
-                <option value="EXPLORE">多探索一点</option>
-                <option value="RECENT">更看重近期</option>
-            </select>
-        </label>
-        <p class="status">“本次意图”只影响当前会话；标签/作者的多一点、少一点默认持续有效，随时可恢复系统判断。</p>
+        <div class="actions"><button id="v5-session-reset" type="button">清除本次意图</button><span id="v5-session-status" class="status"></span></div>
+        <p class="status">在下面某个标签、作者或分类上点“本次想看”，只影响当前会话；多一点、少一点默认持续有效，随时可恢复系统判断。</p>
         <hr />
         <label>查找标签 / 作者 / 分类<input id="v5-policy-search" placeholder="输入名称，例如作者或标签" /></label>
         <div id="v5-inferred-list" class="list"></div>
@@ -59,9 +52,9 @@ function ensurePanel() {
         if (button) button.click()
         document.querySelector('[data-view="discover"]')?.click()
     })
-    panel.querySelector('#v5-session-mode').addEventListener('change', async (event) => {
+    panel.querySelector('#v5-session-reset').addEventListener('click', async () => {
         try {
-            await post('/api/v1/recommendation-v5/session', { mode: event.target.value })
+            await post('/api/v1/recommendation-v5/session', { mode: 'DEFAULT' })
             await loadPolicy()
         } catch (error) {
             showStatus(error.message, true)
@@ -112,6 +105,7 @@ function signalRow(signal) {
             <button type="button" data-v5-direction="DEFAULT">默认</button>
             <button type="button" data-v5-direction="MORE">多一点</button>
             <button type="button" data-v5-direction="BLOCK">屏蔽</button>
+            <button type="button" data-v5-session-target="true">本次想看</button>
         </div>
     </article>`
 }
@@ -121,8 +115,13 @@ function renderPolicy() {
     if (!V5.snapshot) return
     const counts = V5.snapshot.counts || {}
     showStatus(`策略版本 ${V5.snapshot.policyVersion || 'V5'} · rev ${Number(V5.snapshot.revision || 0)} · 已有 ${Number(counts.owned || 0)} · 手动调整 ${Number(counts.controls || 0)} · 硬屏蔽 ${Number(counts.hardSuppressed || 0)}`)
-    const mode = document.querySelector('#v5-session-mode')
-    if (mode) mode.value = V5.snapshot.sessionIntent?.mode || 'DEFAULT'
+    const sessionLabel = document.querySelector('#v5-session-status')
+    if (sessionLabel) {
+        const intent = V5.snapshot.sessionIntent || {}
+        sessionLabel.textContent = intent.mode === 'TARGET'
+            ? `本次想看：${intent.label || intent.key || ''}`
+            : '本次意图：默认'
+    }
     const inferred = Array.isArray(V5.snapshot.inferred) ? V5.snapshot.inferred : []
     const filtered = inferred
         .filter((item) => !V5.search || `${item.label} ${item.key} ${item.targetType}`.toLocaleLowerCase().includes(V5.search))
@@ -143,6 +142,26 @@ function renderPolicy() {
             const key = rest.join(':')
             const signal = inferred.find((item) => item.targetType === targetType && item.key === key)
             if (signal) void setControl(signal, button.dataset.v5Direction)
+        })
+    })
+    document.querySelectorAll('[data-v5-session-target]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const holder = button.closest('[data-v5-signal]')
+            const [targetType, ...rest] = holder.dataset.v5Signal.split(':')
+            const key = rest.join(':')
+            const signal = inferred.find((item) => item.targetType === targetType && item.key === key)
+            if (!signal) return
+            try {
+                V5.snapshot = await post('/api/v1/recommendation-v5/session', {
+                    mode: 'TARGET',
+                    targetType: signal.targetType,
+                    key: signal.key,
+                    label: signal.label
+                })
+                renderPolicy()
+            } catch (error) {
+                showStatus(error.message, true)
+            }
         })
     })
     document.querySelectorAll('[data-v5-reset]').forEach((button) => {

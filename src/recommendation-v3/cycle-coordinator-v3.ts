@@ -10,6 +10,8 @@ import {
     BATCH_ALLOCATOR_VERSION,
     FINAL_BATCH_SIZE
 } from './batch-allocator-v3'
+import { RecommendationPolicyStoreV5 } from '../recommendation-v5/policy-store'
+import { filterCandidatesAgainstOwnedV5 } from '../recommendation-v5/portable-policy'
 
 export const CYCLE_COORDINATOR_VERSION = '3.2.0-schema8-visible-cap'
 export const MAX_VISIBLE_BATCHES_PER_CYCLE = 6
@@ -252,8 +254,15 @@ export class CycleCoordinatorV3 {
     ) {
         const state = this.state()
         const pool = this.database.getV3CandidatePool(batch.poolId)
+        const catalog = this.database.listComics({ limit: 10000 })
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const serving = filterCandidatesAgainstOwnedV5(
+            this.database.recommendationRecords(batch.itemIds),
+            catalog,
+            policy
+        )
         const exhausted =
-            batch.itemIds.length === 0 || pool?.telemetry.state === 'EXHAUSTED'
+            serving.rows.length === 0 || pool?.telemetry.state === 'EXHAUSTED'
         return {
             ...this.status(),
             cycleId: batch.cycleId,
@@ -263,7 +272,10 @@ export class CycleCoordinatorV3 {
             contextId: batch.contextId,
             batchSize: FINAL_BATCH_SIZE,
             maxVisibleBatches: MAX_VISIBLE_BATCHES_PER_CYCLE,
-            recommendations: this.database.recommendationRecords(batch.itemIds),
+            recommendations: serving.rows,
+            servingFilteredCount:
+                batch.itemIds.length - serving.rows.length,
+            servingFilterTelemetry: serving.telemetry,
             evidence: batch.evidence,
             exhausted,
             cycleState: exhausted ? 'EXHAUSTED' : 'ACTIVE',
@@ -326,8 +338,14 @@ export class CycleCoordinatorV3 {
                 .filter((comic) => comic.isFavorite)
                 .map((comic) => comic.comicId)
         )
-        const allocated = allocateRecommendationBatchV3({
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const eligibleRanked = filterCandidatesAgainstOwnedV5(
             ranked,
+            [...catalog.values()],
+            policy
+        ).rows
+        const allocated = allocateRecommendationBatchV3({
+            ranked: eligibleRanked,
             intents: telemetry.intentPlan ?? [],
             alreadyAllocated: new Set(
                 this.database.recommendationSeen(state.activeCycleId)

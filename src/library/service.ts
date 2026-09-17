@@ -99,6 +99,15 @@ import {
     loadTagRegistryV3,
     resolveTagV3
 } from '../recommendation-v3/tag-resolution-v3'
+import {
+    RecommendationPolicyStoreV5,
+    type MobileRecommendationSyncV5
+} from '../recommendation-v5/policy-store'
+import {
+    filterCandidatesAgainstOwnedV5,
+    preferenceAdjustmentV5
+} from '../recommendation-v5/portable-policy'
+import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -196,6 +205,42 @@ export class LibraryService {
 
     recordRecommendationEvent(input: UserEventInput) {
         return this.database.recordUserEvent(input)
+    }
+
+    recommendationV5Snapshot() {
+        return new RecommendationPolicyStoreV5(this.database).snapshot()
+    }
+
+    updateRecommendationV5Control(input: Record<string, unknown>) {
+        return new RecommendationPolicyStoreV5(this.database).setControl({
+            targetType: input.targetType,
+            key: input.key,
+            label: input.label,
+            direction: input.direction,
+            scope: input.scope,
+            source: 'DESKTOP'
+        })
+    }
+
+    updateRecommendationV5Session(input: Record<string, unknown>) {
+        return new RecommendationPolicyStoreV5(this.database).setSessionIntent({
+            mode: input.mode,
+            targetType: input.targetType,
+            key: input.key,
+            label: input.label,
+            source: 'DESKTOP'
+        })
+    }
+
+    suppressRecommendationV5Comic(input: Record<string, unknown>) {
+        return new RecommendationPolicyStoreV5(this.database).suppressComic(
+            String(input.comicId ?? ''),
+            input.suppressed !== false
+        )
+    }
+
+    mergeMobileRecommendationV5(input: MobileRecommendationSyncV5) {
+        return new RecommendationPolicyStoreV5(this.database).mergeMobile(input)
     }
 
     visualSettings() {
@@ -518,6 +563,8 @@ export class LibraryService {
         const pica = await this.connect()
         const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
+        const recommendationV5Store = new RecommendationPolicyStoreV5(this.database)
+        const recommendationV5State = recommendationV5Store.state()
         const readingIds = new Set(this.database.readingProgress().map((item) => item.comicId))
         const explicitFavoriteIds = new Set(
             catalog
@@ -542,11 +589,7 @@ export class LibraryService {
             .filter(
                 (comic) =>
                     !dislikedIds.has(comic.comicId) &&
-                    (comic.isFavorite ||
-                        comic.inLibrary ||
-                        comic.downloadedPictures > 0 ||
-                        readingIds.has(comic.comicId) ||
-                        likedIds.has(comic.comicId))
+                    (comic.isFavorite || likedIds.has(comic.comicId))
             )
             .map((comic) => ({ ...comic, isFavorite: true }))
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
@@ -577,11 +620,15 @@ export class LibraryService {
                       ]
                     : []
             })
-        const intents = buildRecommendationIntentsV3({
+        const baseIntents = buildRecommendationIntentsV3({
             profile,
             favorites,
             history
         })
+        const intents = applyIntentPolicyV5(
+            baseIntents,
+            recommendationV5State
+        )
         this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 7 }
         const routes = translateIntentPlanV3(intents)
         const storePica = (comics: Comic[]) => {
@@ -689,8 +736,13 @@ export class LibraryService {
                 })
         })
         this.recommendationProgress = { state: 'running', phase: 'rank', done: 4, total: 7 }
+        const v5Filtered = filterCandidatesAgainstOwnedV5(
+            retrieved.candidates,
+            catalog,
+            recommendationV5State
+        )
         const ranked = rankCandidatesWithFrozenRankerV3({
-            candidates: retrieved.candidates,
+            candidates: v5Filtered.rows,
             favorites,
             graphEdges: this.database.listRecommendationEdges().map((edge) => ({
                 sourceComicId: edge.sourceComicId,
@@ -726,6 +778,31 @@ export class LibraryService {
                     a.comicId.localeCompare(b.comicId)
             )
             .map(({ __feedbackRankScore: _score, ...candidate }) => candidate)
+        const policyAdjusted = feedbackAdjusted
+            .map((candidate, index) => {
+                const policy = preferenceAdjustmentV5(
+                    candidate.comic,
+                    recommendationV5State
+                )
+                const baselinePercentile =
+                    feedbackAdjusted.length <= 1
+                        ? 1
+                        : 1 - index / (feedbackAdjusted.length - 1)
+                return {
+                    ...candidate,
+                    v5Adjustment: policy.adjustment,
+                    v5Reasons: policy.reasons,
+                    __v5RankScore: baselinePercentile + policy.adjustment
+                }
+            })
+            .filter((candidate) => !preferenceAdjustmentV5(candidate.comic, recommendationV5State).blocked)
+            .sort(
+                (a, b) =>
+                    b.__v5RankScore - a.__v5RankScore ||
+                    a.rawRank - b.rawRank ||
+                    a.comicId.localeCompare(b.comicId)
+            )
+            .map(({ __v5RankScore: _score, ...candidate }) => candidate)
         this.recommendationProgress = {
             state: 'running',
             phase: 'visual',
@@ -741,7 +818,7 @@ export class LibraryService {
             catalogSize: Math.max(1, explicitFavoriteIds.size + likedIds.size)
         })
         const reranked = rerankWithVisualStyle({
-            ranked: feedbackAdjusted,
+            ranked: policyAdjusted,
             embeddings: visualEmbeddings,
             profile: visualProfile,
             mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF'
@@ -761,6 +838,27 @@ export class LibraryService {
             telemetry: {
                 ...retrieved.telemetry,
                 cycleId,
+                recommendationV5: {
+                    policyVersion: recommendationV5State.policyVersion,
+                    revision: recommendationV5State.revision,
+                    controlCount: recommendationV5State.controls.length,
+                    hardSuppressCount:
+                        recommendationV5State.hardSuppressComicIds.length,
+                    ownedOrDuplicateRemoved:
+                        v5Filtered.telemetry.exactOrOwnedRemoved +
+                        v5Filtered.telemetry.workDuplicateRemoved,
+                    workDuplicateRemoved:
+                        v5Filtered.telemetry.workDuplicateRemoved,
+                    hardBlockedRemoved:
+                        v5Filtered.telemetry.hardBlockedRemoved,
+                    policyAdjustedCount: policyAdjusted.filter(
+                        (item) =>
+                            Number(
+                                (item as { v5Adjustment?: number })
+                                    .v5Adjustment ?? 0
+                            ) !== 0
+                    ).length
+                },
                 recommendationV4: {
                     feedbackCount: recommendationFeedback.length,
                     likedCount: likedIds.size,

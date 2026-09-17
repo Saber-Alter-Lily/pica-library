@@ -356,6 +356,48 @@ export async function startLibraryServer(options: {
                 })
             }
             if (
+                url.pathname === '/api/v1/recommendation-v5' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, options.service.recommendationV5Snapshot())
+
+            if (
+                url.pathname === '/api/v1/recommendation-v5/control' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.updateRecommendationV5Control(input)
+                )
+            }
+
+            if (
+                url.pathname === '/api/v1/recommendation-v5/session' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.updateRecommendationV5Session(input)
+                )
+            }
+
+            if (
+                url.pathname === '/api/v1/recommendation-v5/suppress' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.suppressRecommendationV5Comic(input)
+                )
+            }
+
+            if (
                 url.pathname === '/api/v1/recommendation-events' &&
                 request.method === 'POST'
             ) {

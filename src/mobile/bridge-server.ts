@@ -337,6 +337,55 @@ export async function startMobileBridge(options: {
                 })
 
             if (
+                url.pathname === '/mobile/v1/recommendation/v5/snapshot' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5Snapshot()
+                )
+
+            if (
+                url.pathname === '/mobile/v1/recommendation/v5/sync' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request, 512 * 1024)
+                const merged = options.service.mergeMobileRecommendationV5(input)
+                let recommendationRefresh: Record<string, unknown> = {
+                    requested: false
+                }
+                if (input.recompute === true) {
+                    try {
+                        const deviceId = String(input.deviceId ?? 'android')
+                        const mutationId = String(input.mutationId ?? Date.now())
+                        finalRecommendationCoordinator.forceNew(
+                            `mobile-pair:${deviceId}:${mutationId}`
+                        )
+                        await finalRecommendationCoordinator.waitForBuild()
+                        recommendationRefresh = {
+                            requested: true,
+                            completed: true,
+                            status: finalRecommendationCoordinator.status()
+                        }
+                    } catch (error) {
+                        recommendationRefresh = {
+                            requested: true,
+                            completed: false,
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : String(error)
+                        }
+                    }
+                }
+                return json(response, 200, {
+                    ...merged,
+                    recommendationRefresh
+                })
+            }
+
+            if (
                 url.pathname === '/mobile/v1/visual/status' &&
                 request.method === 'GET'
             ) {

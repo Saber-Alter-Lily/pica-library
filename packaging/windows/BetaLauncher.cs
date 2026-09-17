@@ -15,7 +15,7 @@ internal static class BetaLauncher
             string runtime = Path.Combine(root, "runtime", "node.exe");
             string entry = Path.Combine(root, "app", "desktop.js");
             if (!File.Exists(runtime) || !File.Exists(entry))
-                throw new FileNotFoundException("The beta runtime is incomplete. Extract the entire ZIP before starting Pica Library V4 Beta.");
+                throw new FileNotFoundException("The beta runtime is incomplete. Extract the entire ZIP before starting Pica Library V5 Beta.");
 
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (String.IsNullOrWhiteSpace(localAppData))
@@ -33,16 +33,16 @@ internal static class BetaLauncher
                 WindowStyle = ProcessWindowStyle.Hidden
             };
             info.EnvironmentVariables["PICA_LIBRARY_DESKTOP_HOME"] = betaHome;
-            info.EnvironmentVariables["PICA_LIBRARY_TEST_BUILD"] = "recommendation-v4-beta";
+            info.EnvironmentVariables["PICA_LIBRARY_TEST_BUILD"] = "recommendation-v5-beta";
             Process.Start(info);
             return 0;
         }
         catch (Exception error)
         {
             MessageBox.Show(
-                "Pica Library V4 Beta could not start.\n\n" + error.Message +
+                "Pica Library V5 Beta could not start.\n\n" + error.Message +
                 "\n\nExtract the complete beta ZIP and try again.",
-                "Pica Library V4 Beta",
+                "Pica Library V5 Beta",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             return 1;

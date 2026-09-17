@@ -2,7 +2,13 @@
 
 # Pica Library
 
-Pica Library 是一个面向长期漫画收藏的本地优先管理、发现、下载与阅读工具。
+**Open-source manga library manager, reader and downloader for Windows & Android.**
+
+Pica Library 是一个本地优先的漫画库管理、发现、下载与阅读工具，支持 **PicACG / Pica、E-Hentai / ExHentai、WebDAV**，以及 **Desktop ↔ Android** 跨端阅读与访问。
+
+**[下载最新版](https://github.com/Saber-Alter-Lily/pica-library/releases/latest)** · [快速开始](docs/quick-start.zh-CN.md) · [Android 使用说明](docs/android-guide.zh-CN.md) · [项目版本日志](PROJECT_LOG.md)
+
+Windows 10/11 x64 · Android · Local-first · Open Source
 
 Windows 负责完整管理与下载。Android 负责移动阅读、在线发现和远程访问。Web/Desktop 与 Android 使用一致的内容来源、收藏画像、推荐语义和阅读逻辑，但按各自屏幕重新组织交互。
 

@@ -1,0 +1,40 @@
+name: Fix Android V5 refresh button type
+
+on:
+  push:
+    branches: [feature/recommendation-v5-portable-policy]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v5-portable-policy
+          fetch-depth: 0
+      - name: Patch ImageButton declaration
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java')
+          text = p.read_text(encoding='utf-8')
+          old = 'Button refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新推荐",v->refreshRecommendations(progress));'
+          new = 'ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新推荐",v->refreshRecommendations(progress));'
+          if old not in text:
+              print('Refresh button declaration already fixed; no source commit needed.')
+              raise SystemExit(0)
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          if git diff --quiet -- mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java; then
+            exit 0
+          fi
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java
+          git commit -m "fix: type Android recommendation refresh button correctly"
+          git push origin HEAD:feature/recommendation-v5-portable-policy

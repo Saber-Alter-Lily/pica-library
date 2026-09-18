@@ -468,6 +468,9 @@ export class LibraryService {
                 hygienicCandidateCount: hygiene.outputCandidateCount,
                 rankedCandidateCount: ranking.candidateCount,
                 providerRouteSummary: plan.summary,
+                sessionMode: plan.sourceSessionMode,
+                sessionModePolicy:
+                    plan.sourceSessionModePolicy,
                 providerBudgets: plan.sourceProviderBudgets,
                 retrievalTelemetry: result.telemetry,
                 hygieneTelemetry: hygiene.telemetry,

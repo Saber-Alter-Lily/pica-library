@@ -601,7 +601,7 @@ async function evalRunShadow() {
 
 function evalInstall() {
     if (!evalEnsurePanel()) return
-    void evalLoad()
+    evalStatus('评估尚未运行。点击“刷新评估”后才会读取 P3 / P4 / P5 数据；打开设置页不会自动执行重计算。')
 }
 
 evalInstall()

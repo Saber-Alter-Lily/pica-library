@@ -5,6 +5,7 @@ import pLimit from 'p-limit'
 import { Pica } from '../sdk'
 import {
     EhProvider,
+    parseEhTag,
     type EhSession
 } from '../providers/eh-provider'
 import type { EhBrowseMode, OnlineSource } from '../providers/types'
@@ -116,6 +117,10 @@ import {
 import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
 import { executeShadowRetrievalV5 } from '../recommendation-v5/shadow-retrieval'
 import { rankShadowCandidatesV5 } from '../recommendation-v5/relevance-ranker'
+import {
+    diversifyShadowBatchV5,
+    type CandidateSemanticDiversityV5
+} from '../recommendation-v5/batch-diversity'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -358,6 +363,86 @@ export class LibraryService {
             state,
             catalog
         )
+        const semanticDiversity: Record<
+            string,
+            CandidateSemanticDiversityV5
+        > = {}
+        let registry:
+            | ReturnType<typeof loadTagRegistryV3>
+            | null = null
+        try {
+            registry = loadTagRegistryV3(
+                runtimeRegistryDirectory()
+            )
+        } catch {
+            registry = null
+        }
+        for (const row of ranking.rows) {
+            const fandomKeys = new Set<string>()
+            const tagKeys = new Set<string>()
+            if (registry)
+                for (const rawTag of row.comic.tags) {
+                    const resolved = resolveTagV3(
+                        rawTag,
+                        registry
+                    )
+                    if (
+                        resolved.resolutionStatus !== 'RESOLVED' ||
+                        resolved.resolutionType === 'SAFETY' ||
+                        !resolved.recommendationEligible
+                    )
+                        continue
+                    if (resolved.facet === 'FANDOM_IP')
+                        fandomKeys.add(resolved.canonicalKey)
+                    else if (
+                        resolved.facet &&
+                        resolved.facet !== 'CREATOR_ENTITY'
+                    )
+                        tagKeys.add(
+                            `${resolved.facet}:${resolved.canonicalKey}`
+                        )
+                }
+            const rawEhTags = Array.isArray(
+                row.comic.providerMetadata?.rawTags
+            )
+                ? row.comic.providerMetadata.rawTags.map(String)
+                : []
+            for (const rawTag of rawEhTags) {
+                const parsed = parseEhTag(rawTag)
+                const value = normalizePreferenceKey(parsed.value)
+                if (!value || !parsed.namespace) continue
+                if (parsed.facet === 'FANDOM_IP')
+                    fandomKeys.add(value)
+                else if (
+                    parsed.facet &&
+                    ![
+                        'CREATOR_ENTITY',
+                        'LANGUAGE',
+                        'FANDOM_IP'
+                    ].includes(parsed.facet)
+                )
+                    tagKeys.add(
+                        `${parsed.facet}:${value}`
+                    )
+            }
+            semanticDiversity[
+                normalizePreferenceKey(row.comic.comicId)
+            ] = {
+                fandomKeys: [...fandomKeys].sort(),
+                tagKeys: [...tagKeys].sort()
+            }
+        }
+        const diversity = diversifyShadowBatchV5(
+            ranking.rows,
+            semanticDiversity,
+            Math.max(
+                1,
+                Math.min(
+                    50,
+                    Math.floor(Number(input.batchSize) || 12)
+                )
+            )
+        )
         const cycleId = `v5-shadow:${randomUUID()}`
         const modelVersion = [
             'v5-shadow',
@@ -365,7 +450,8 @@ export class LibraryService {
             plan.compilerVersion,
             result.retrievalVersion,
             hygiene.hygieneVersion,
-            ranking.rankerVersion
+            ranking.rankerVersion,
+            diversity.allocatorVersion
         ].join('/')
         const audit = this.database.saveV3CandidatePool({
             appSessionId,
@@ -389,6 +475,21 @@ export class LibraryService {
                 retrievalTelemetry: result.telemetry,
                 hygieneTelemetry: hygiene.telemetry,
                 rankingTelemetry: ranking.telemetry,
+                diversityTelemetry: diversity.telemetry,
+                diversifiedBatch: diversity.rows.map(
+                    (row) => ({
+                        comicId: row.comic.comicId,
+                        batchRank: row.batchRank,
+                        relevanceRank: row.relevanceRank,
+                        score: row.score,
+                        allocationPass: row.allocationPass,
+                        diversityPenalty: row.diversityPenalty,
+                        providerBalanceBonus:
+                            row.providerBalanceBonus,
+                        diversityReasons:
+                            row.diversityReasons
+                    })
+                ),
                 rankedEvidence: ranking.rows
                     .slice(0, 100)
                     .map((row) => ({
@@ -407,6 +508,7 @@ export class LibraryService {
             rawCandidateCount: result.candidateCount,
             hygiene,
             ranking,
+            diversity,
             executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
             trigger: 'EXPLICIT_CONFIRMATION' as const,
             providerRouteSummary: plan.summary,

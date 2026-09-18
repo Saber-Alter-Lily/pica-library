@@ -174,9 +174,12 @@ function basePriority(
 
 function desiredProviderAllocations(
     family: CandidateChannelFamilyV5,
-    providerEligibility: Required<
-        CandidateChannelPlannerInputV5['providerEligibility']
-    >
+    anchors: CandidateChannelAnchorV5[],
+    providerEligibility: {
+        pica: boolean
+        eh: boolean
+        exh: boolean
+    }
 ): CandidateProviderAllocationV5[] {
     const allocation = (
         surface: 'pica' | 'eh' | 'exh',
@@ -221,8 +224,10 @@ function desiredProviderAllocations(
             }
         ]
 
+    const targetAnchor = anchors[0]
     const strategy: CandidateProviderAllocationV5['strategy'] =
-        family === 'AUTHOR'
+        family === 'AUTHOR' ||
+        (family === 'TARGET' && targetAnchor?.targetType === 'AUTHOR')
             ? 'AUTHOR'
             : family === 'RELATED'
               ? 'RELATED'
@@ -437,6 +442,7 @@ export function buildCandidateChannelPlanV5(
             reasonCode,
             providerAllocations: desiredProviderAllocations(
                 family,
+                normalizedAnchors,
                 providerEligibility
             ),
             ...(options.localCandidateIds

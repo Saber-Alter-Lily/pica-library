@@ -526,6 +526,36 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('compiles shadow channels into provider-native query plans without executing them', () => {
+        const compiler = read(
+            'src/recommendation-v5/channel-query-compiler.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const provider = read('src/services/provider-service.ts')
+        const retriever = read(
+            'src/recommendation-v3/retriever-v3.ts'
+        )
+        expect(compiler).toContain(
+            "CHANNEL_QUERY_COMPILER_VERSION ="
+        )
+        expect(compiler).toContain("mode: 'PLAN_ONLY'")
+        expect(compiler).toContain('executionEnabled: false')
+        expect(compiler).toContain('persistenceEnabled: false')
+        expect(compiler).toContain("persist: false")
+        expect(compiler).toContain("'artist:'")
+        expect(compiler).toContain("'parody:'")
+        expect(service).toContain(
+            'recommendationV5CandidateQueryPlan'
+        )
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/candidate-query-plan'
+        )
+        expect(provider).toContain('options: { persist?: boolean }')
+        expect(provider).toContain('options.persist !== false')
+        expect(retriever).not.toContain('channel-query-compiler')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

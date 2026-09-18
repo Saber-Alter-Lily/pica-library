@@ -242,9 +242,7 @@ function desiredProviderAllocations(
             ? 'AUTHOR'
             : family === 'RELATED'
               ? 'RELATED'
-              : family === 'EXPLORATION'
-                ? 'POPULAR'
-                : 'KEYWORD'
+              : 'KEYWORD'
 
     // Related lookup currently has a provider-native implementation only on
     // the Pica path. E-H / ExH stay isolated and disabled for this family

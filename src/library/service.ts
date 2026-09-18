@@ -135,6 +135,7 @@ import { auditShadowCorrectnessV5 } from '../recommendation-v5/correctness-audit
 import { buildRetrospectiveBenchmarkV5 } from '../recommendation-v5/retrospective-benchmark'
 import { evaluateSteerabilityV5 } from '../recommendation-v5/steerability-audit'
 import { buildEvaluationFrameworkV5 } from '../recommendation-v5/evaluation-framework'
+import { compareRetrospectiveBenchmarksV5 } from '../recommendation-v5/benchmark-comparison'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -558,6 +559,117 @@ export class LibraryService {
                 candidateIdCount: audit.candidateIds.length
             }
         }
+    }
+
+    recommendationV5BenchmarkVersions(limit = 1000) {
+        const bounded = Math.max(
+            1,
+            Math.min(5000, Math.floor(limit))
+        )
+        const currentModelVersion = shadowPipelineModelVersionV5()
+        const pools = this.database.listCandidatePoolsByModelVersionPrefix(
+            'v5-shadow/',
+            bounded
+        )
+        const grouped = new Map<
+            string,
+            {
+                runCount: number
+                firstGeneratedAt: string
+                lastGeneratedAt: string
+            }
+        >()
+        for (const pool of pools) {
+            const version = String(pool.modelVersion || '').trim()
+            if (!version) continue
+            const current = grouped.get(version)
+            if (!current) {
+                grouped.set(version, {
+                    runCount: 1,
+                    firstGeneratedAt: pool.generatedAt,
+                    lastGeneratedAt: pool.generatedAt
+                })
+                continue
+            }
+            current.runCount += 1
+            if (pool.generatedAt < current.firstGeneratedAt)
+                current.firstGeneratedAt = pool.generatedAt
+            if (pool.generatedAt > current.lastGeneratedAt)
+                current.lastGeneratedAt = pool.generatedAt
+        }
+        return {
+            mode: 'READ_ONLY' as const,
+            currentModelVersion,
+            versions: [...grouped.entries()]
+                .map(([modelVersion, value]) => ({
+                    modelVersion,
+                    current: modelVersion === currentModelVersion,
+                    ...value
+                }))
+                .sort(
+                    (a, b) =>
+                        Number(b.current) - Number(a.current) ||
+                        b.lastGeneratedAt.localeCompare(
+                            a.lastGeneratedAt
+                        ) ||
+                        a.modelVersion.localeCompare(b.modelVersion)
+                )
+        }
+    }
+
+    recommendationV5BenchmarkComparison(
+        baselineVersion: string,
+        candidateVersion: string,
+        limit = 1000,
+        horizonDays = 30
+    ) {
+        const baseline = String(baselineVersion ?? '').trim()
+        const candidate = String(candidateVersion ?? '').trim()
+        if (!baseline || !candidate)
+            throw new Error(
+                'Both baselineVersion and candidateVersion are required'
+            )
+        if (
+            baseline.length > 240 ||
+            candidate.length > 240 ||
+            !baseline.startsWith('v5-shadow/') ||
+            !candidate.startsWith('v5-shadow/')
+        )
+            throw new Error('Invalid shadow model version')
+
+        const bounded = Math.max(
+            1,
+            Math.min(5000, Math.floor(limit))
+        )
+        const pools = this.database
+            .listCandidatePoolsByModelVersionPrefix(
+                'v5-shadow/',
+                bounded
+            )
+            .map((pool) => ({
+                modelVersion: pool.modelVersion,
+                generatedAt: pool.generatedAt,
+                candidateIds: pool.candidateIds,
+                telemetry: pool.telemetry
+            }))
+        const events = this.database.listUserEvents({
+            limit: 5000
+        })
+        const catalogSize = this.database.listComics({
+            limit: 10000
+        }).length
+        const build = (modelVersion: string) =>
+            buildRetrospectiveBenchmarkV5({
+                runs: pools,
+                events,
+                currentModelVersion: modelVersion,
+                catalogSize,
+                horizonDays
+            })
+        return compareRetrospectiveBenchmarksV5({
+            baseline: build(baseline),
+            candidate: build(candidate)
+        })
     }
 
     recommendationV5EvaluationSummary(

@@ -29,6 +29,7 @@
 - P3A-1 启动 multi-channel candidate planner：将 Session / Recent / Lifetime / Explicit 分别映射到 AUTHOR / FANDOM / TAG / CATEGORY / RELATED / EXPLORATION / REDISCOVERY / TARGET 通道，并为 Pica / E-H / ExH 分配独立请求预算；Provider failure isolation、BLOCK/LESS 语义和本地 rediscovery 均进入计划层，Visual 通道继续禁用。当前 `mode=SHADOW`、`servingImpact=false`，尚未接管 V3 retriever。
 - P3A-2 增加 provider query compiler：按现有 Provider 契约将 channel 编译为 Pica native keyword/tag/category、E-H/ExH exact canonical tag 或 keyword fallback、Pica related、本地 rediscovery；E-H canonical binding 仅从本地真实 `rawTags` 的唯一观测映射提升，namespace 冲突或不合法 canonical 自动降级，E-H category/related 等未实现能力不伪造。当前 `executionEnabled=false`，只读输出 provider routes。
 - P3A-3 增加 provider-isolated shadow retrieval：Pica 新增可选 bounded page seam，ProviderService 支持 `persist:false` 与 non-persisting Pica related；shadow executor 按 Provider 隔离失败、同 Provider 顺序执行、跨 route/provider 去重并记录 yield/latency/failure telemetry。真实网络执行仅开放 Desktop CSRF + 显式 confirmation 的手动入口，`persistCandidates=false`、`servingImpact=false`，结果不进入 V3 ranker。
+- P3A-4 增加 shadow run audit history：复用现有 candidate-pool 存储，以 `v5-shadow/<planner>/<compiler>/<retrieval>` model version 保存候选 ID 与聚合 telemetry，不持久化 shadow 候选元数据；支持按版本前缀读取历史运行，为后续 channel/provider benchmark 提供基线。同步将 E-H / ExH shadow 请求上限收敛到已验证的 4 / 2，Pica 保持 8。
 
 ## v0.4.0 — 多来源与统一语义
 

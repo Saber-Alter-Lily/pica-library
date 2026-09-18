@@ -318,6 +318,9 @@ describe('Recommendation V5 portable product contract', () => {
         const shadow = read(
             'src/recommendation-v5/shadow-retrieval.ts'
         )
+        const pipeline = read(
+            'src/recommendation-v5/shadow-pipeline.ts'
+        )
         const provider = read('src/services/provider-service.ts')
         const service = read('src/library/service.ts')
         const server = read('src/library/server.ts')
@@ -362,7 +365,7 @@ describe('Recommendation V5 portable product contract', () => {
         )
         expect(database).toContain('modelVersion:')
         expect(service).toContain("cycleId = `v5-shadow:")
-        expect(service).toContain("'v5-shadow'")
+        expect(pipeline).toContain("'v5-shadow'")
         expect(service).toContain('saveV3CandidatePool')
         expect(service).toContain('candidateIds: ranking.rows.map')
         expect(service).toContain(
@@ -481,9 +484,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(channels).toContain('EXPLORE')
         expect(channels).toContain('TARGET')
         expect(channels).toContain('sessionModePolicy')
-        expect(ranker).toContain(
-            'Session mode affects channel planning, not these weights'
-        )
+        expect(ranker).not.toContain('sessionIntent.mode')
+        expect(ranker).not.toContain('SESSION_MODE_POLICY_V5')
         expect(web).not.toContain(
             'data-v5-session-mode="FAMILIAR"'
         )

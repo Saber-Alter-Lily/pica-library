@@ -125,6 +125,7 @@ import {
     shadowPipelineModelVersionV5,
     shadowPipelineVersionsV5
 } from '../recommendation-v5/shadow-pipeline'
+import { evaluateP3PromotionGateV5 } from '../recommendation-v5/promotion-gate'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -519,6 +520,29 @@ export class LibraryService {
                 generatedAt: audit.generatedAt,
                 candidateIdCount: audit.candidateIds.length
             }
+        }
+    }
+
+    recommendationV5P3PromotionGate(limit = 100) {
+        const modelVersion = shadowPipelineModelVersionV5()
+        const runs = this.database
+            .listCandidatePoolsByModelVersionPrefix(
+                modelVersion,
+                Math.max(1, Math.min(500, Math.floor(limit)))
+            )
+            .filter((pool) => pool.modelVersion === modelVersion)
+            .map((pool) => ({
+                modelVersion: pool.modelVersion,
+                generatedAt: pool.generatedAt,
+                candidateIds: pool.candidateIds,
+                telemetry: pool.telemetry
+            }))
+        return {
+            ...evaluateP3PromotionGateV5(
+                runs,
+                modelVersion
+            ),
+            pipelineVersions: shadowPipelineVersionsV5()
         }
     }
 

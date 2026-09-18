@@ -37,7 +37,7 @@ jobs:
         with:
           name: web-browser-smoke-${{ github.run_id }}-${{ github.job }}
           path: test-results/
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: ignore
 
   android:

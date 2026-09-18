@@ -5,6 +5,7 @@ const UX_COPY = {
     'zh-CN': {
         moreFilters: '更多筛选',
         bulkOrganize: '批量与整理',
+        libraryMaintenance: '导入与完整校验',
         sourceFilters: '来源与筛选',
         downloadAdvanced: '性能与导出（高级）',
         visualAdvanced: '画风推荐高级设置',
@@ -22,6 +23,7 @@ const UX_COPY = {
     en: {
         moreFilters: 'More filters',
         bulkOrganize: 'Batch & organize',
+        libraryMaintenance: 'Import & full verification',
         sourceFilters: 'Sources & filters',
         downloadAdvanced: 'Performance & export (advanced)',
         visualAdvanced: 'Visual recommendation settings',
@@ -76,6 +78,27 @@ function installLibraryToolbar() {
     const toolbar = ux$('#library .toolbar[data-control-scope="library"]')
     if (!toolbar || toolbar.dataset.uxPolished) return
     toolbar.dataset.uxPolished = '1'
+
+    const headingActions = ux$('#library .page-heading .actions')
+    const syncButton = ux$('#sync-button')
+    if (headingActions && syncButton) {
+        syncButton.classList.add('primary')
+        if (syncButton.parentElement !== headingActions)
+            headingActions.appendChild(syncButton)
+        if (!ux$('#ux-library-maintenance')) {
+            const maintenance = makeDetails(
+                'ux-library-maintenance',
+                'libraryMaintenance'
+            )
+            moveNodes(maintenance.querySelector('.ux-more-body'), [
+                ux$('#import-file'),
+                ux$('#import-file-label'),
+                ux$('#import-button'),
+                ux$('#full-sync-button')
+            ])
+            headingActions.insertAdjacentElement('afterend', maintenance)
+        }
+    }
     toolbar.classList.add('ux-toolbar-shell')
     toolbar.classList.remove('toolbar', 'responsive-toolbar')
 

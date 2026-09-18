@@ -361,6 +361,8 @@ export function compileCandidateProviderRoutesV5(
         mode: 'SHADOW' as const,
         compilerVersion: PROVIDER_QUERY_COMPILER_V5_VERSION,
         sourcePlannerVersion: plan.plannerVersion,
+        sourceSessionMode: plan.sessionMode,
+        sourceSessionModePolicy: plan.sessionModePolicy,
         sourceProviderBudgets: plan.providerBudgets,
         executionEnabled: false,
         servingImpact: false,

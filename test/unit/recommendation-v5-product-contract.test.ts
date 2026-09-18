@@ -696,6 +696,64 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('adds a fixed read-only evaluation framework before any advanced learning decision', () => {
+        const metrics = read(
+            'src/recommendation-v5/evaluation-metrics.ts'
+        )
+        const correctness = read(
+            'src/recommendation-v5/correctness-audit.ts'
+        )
+        const retrospective = read(
+            'src/recommendation-v5/retrospective-benchmark.ts'
+        )
+        const steerability = read(
+            'src/recommendation-v5/steerability-audit.ts'
+        )
+        const framework = read(
+            'src/recommendation-v5/evaluation-framework.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(metrics).toContain('precision12')
+        expect(metrics).toContain('recall12')
+        expect(metrics).toContain('ndcg12')
+        expect(metrics).toContain('hit12')
+        expect(correctness).toContain(
+            'CORRECTNESS_AUDIT_V5_VERSION'
+        )
+        expect(retrospective).toContain(
+            'FUTURE_LIKE_FAVORITE_OR_READER_COMPLETE'
+        )
+        expect(retrospective).toContain(
+            'NOT_YET_IDENTIFIABLE_WITH_CURRENT_LOGS'
+        )
+        expect(steerability).toContain(
+            'STEERABILITY_AUDIT_V5_VERSION'
+        )
+        expect(steerability).toContain('blockLeakage')
+        expect(framework).toContain(
+            'BASELINE_EVALUATION_READY'
+        )
+        expect(framework).toContain('BASELINE_BUILDING')
+        expect(framework).toContain('autoPromotion: false')
+        expect(framework).toContain(
+            'modelEscalationEnabled: false'
+        )
+        expect(framework).toContain('learningToRank: false')
+        expect(framework).toContain(
+            'contextualBandit: false'
+        )
+        expect(service).toContain(
+            'recommendationV5EvaluationSummary'
+        )
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/summary'
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/promote'
+        )
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

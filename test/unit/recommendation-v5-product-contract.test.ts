@@ -250,6 +250,36 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).not.toContain('preference-timescales')
     })
 
+    it('adds a shadow multi-channel candidate planner with provider-isolated budgets', () => {
+        const channels = read(
+            'src/recommendation-v5/candidate-channels.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const retriever = read(
+            'src/recommendation-v3/retriever-v3.ts'
+        )
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(channels).toContain(
+            "CANDIDATE_CHANNEL_PLANNER_VERSION ="
+        )
+        expect(channels).toContain("mode: 'SHADOW'")
+        expect(channels).toContain('servingImpact: false')
+        expect(channels).toContain('providerFailureIsolation: true')
+        expect(channels).toContain("'REDISCOVERY'")
+        expect(channels).toContain("'EXPLORATION'")
+        expect(channels).toContain("'VISUAL'")
+        expect(channels).toContain('globalRequestCaps')
+        expect(service).toContain('recommendationV5CandidateChannels')
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/candidate-channels'
+        )
+        expect(retriever).not.toContain('candidate-channels')
+        expect(coordinator).not.toContain('candidate-channels')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

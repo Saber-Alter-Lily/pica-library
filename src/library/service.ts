@@ -110,6 +110,7 @@ import {
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 import {
     buildWorkIdentityAuditV5,
+    buildWorkIdentityMaterializationPlanV5,
     buildWorkIdentityMaterializationPreviewV5,
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../recommendation-v5/work-identity-foundation'
@@ -350,6 +351,20 @@ export class LibraryService {
             undecidedCount: rows.filter((item) => !item.decision).length,
             materializationPreview,
             automaticBinding: false
+        }
+    }
+
+    recommendationV5WorkIdentityMaterializationPlan() {
+        const catalog = this.database.listComics({ limit: 10000 })
+        const decisions = this.database.listWorkIdentityDecisions(5000)
+        const existingBindings = this.database.listWorkIdentityBindings(10000)
+        return {
+            ...buildWorkIdentityMaterializationPlanV5(
+                catalog,
+                decisions,
+                existingBindings
+            ),
+            storage: this.database.workIdentityStorageStatus()
         }
     }
 

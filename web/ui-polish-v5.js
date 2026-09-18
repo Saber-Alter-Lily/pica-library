@@ -1,18 +1,64 @@
 const ux$ = (selector, root = document) => root.querySelector(selector)
-const ux$$ = (selector, root = document) => [...root.querySelectorAll(selector)]
+const ux$ = (selector, root = document) => [...root.querySelectorAll(selector)]
+
+const UX_COPY = {
+    'zh-CN': {
+        moreFilters: '更多筛选',
+        bulkOrganize: '批量与整理',
+        sourceFilters: '来源与筛选',
+        downloadAdvanced: 'downloadAdvanced',
+        visualAdvanced: 'visualAdvanced',
+        settingsUtilities: 'settingsUtilities',
+        localUpdate: 'localUpdate',
+        experimentTools: '实验与诊断（高级）',
+        experimentIntro:
+            '这里用于影子推荐、Visual QC 和作品身份审计。正常使用不需要操作；所有重计算仍需手动点击。',
+        readerSettings: '阅读设置',
+        readerEsc: 'Esc 退出',
+        remoteFlow:
+            '建议顺序：1 测试连接 → 2 保存设置 → 3 扫描同步计划 → 4 开始同步。',
+        clearLite: '清除 Browser Lite 本地数据'
+    },
+    en: {
+        moreFilters: 'More filters',
+        bulkOrganize: 'Batch & organize',
+        sourceFilters: 'Sources & filters',
+        downloadAdvanced: 'Performance & export (advanced)',
+        visualAdvanced: 'Visual recommendation settings',
+        settingsUtilities: 'Files, logs & exit',
+        localUpdate: 'Use a local update ZIP',
+        experimentTools: 'Experiments & diagnostics (advanced)',
+        experimentIntro:
+            'Shadow recommendations, Visual QC and work-identity review live here. Normal use does not require these tools; heavy work still runs only after explicit action.',
+        readerSettings: 'Reader settings',
+        readerEsc: 'Esc to exit',
+        remoteFlow:
+            'Recommended order: 1 Test → 2 Save → 3 Scan plan → 4 Sync.',
+        clearLite: 'Clear Browser Lite local data'
+    }
+}
+
+function uxLanguage() {
+    return ux$('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
+}
+
+function uxText(key) {
+    return UX_COPY[uxLanguage()]?.[key] || UX_COPY['zh-CN'][key] || key
+}
 
 function moveNodes(target, nodes) {
     for (const node of nodes) if (node) target.appendChild(node)
 }
 
-function makeDetails(id, summary, className = 'ux-more') {
+function makeDetails(id, copyKey, className = 'ux-more') {
     let details = ux$('#' + id)
     if (details) return details
     details = document.createElement('details')
     details.id = id
     details.className = className
     const head = document.createElement('summary')
-    head.textContent = summary
+    head.dataset.uxCopy = copyKey
+    head.textContent = uxText(copyKey)
     const body = document.createElement('div')
     body.className = 'ux-more-body'
     details.append(head, body)
@@ -45,7 +91,7 @@ function installLibraryToolbar() {
         ux$('#apply-filter')
     ])
 
-    const filters = makeDetails('ux-library-filters', '更多筛选')
+    const filters = makeDetails('ux-library-filters', 'moreFilters')
     moveNodes(filters.querySelector('.ux-more-body'), [
         ux$('#filter-author-input')?.closest('label'),
         ux$('#filter-tag')?.closest('label'),
@@ -53,7 +99,7 @@ function installLibraryToolbar() {
         ux$('#sort-mode')
     ])
 
-    const bulk = makeDetails('ux-library-bulk', '批量与整理')
+    const bulk = makeDetails('ux-library-bulk', 'bulkOrganize')
     moveNodes(bulk.querySelector('.ux-more-body'), [
         ux$('#queue-selected'),
         ux$('#library-add-shelf'),
@@ -158,7 +204,7 @@ function installSearchToolbar() {
     const primary = document.createElement('div')
     primary.className = 'ux-search-primary'
     moveNodes(primary, [keyword, button])
-    const more = makeDetails('ux-search-filters', '来源与筛选')
+    const more = makeDetails('ux-search-filters', 'sourceFilters')
     moveNodes(more.querySelector('.ux-more-body'), [tags, source, sort])
     toolbar.replaceChildren(primary, more)
 
@@ -300,8 +346,8 @@ function installRemoteStorageFlow() {
     if (!panel || !actions || panel.querySelector('.ux-flow-hint')) return
     const hint = document.createElement('p')
     hint.className = 'status ux-flow-hint'
-    hint.textContent =
-        '建议顺序：1 测试连接 → 2 保存设置 → 3 扫描同步计划 → 4 开始同步。'
+    hint.dataset.uxCopy = 'remoteFlow'
+    hint.textContent = uxText('remoteFlow')
     actions.insertAdjacentElement('beforebegin', hint)
 }
 
@@ -320,14 +366,16 @@ function installReaderHeader() {
     const options = document.createElement('details')
     options.className = 'reader-options'
     const summary = document.createElement('summary')
-    summary.textContent = '阅读设置'
+    summary.dataset.uxCopy = 'readerSettings'
+    summary.textContent = uxText('readerSettings')
     options.append(summary, controls)
     essential.append(exit, options)
     header.appendChild(essential)
 
     const hint = document.createElement('span')
     hint.className = 'reader-key-hint'
-    hint.textContent = 'Esc 退出'
+    hint.dataset.uxCopy = 'readerEsc'
+    hint.textContent = uxText('readerEsc')
     essential.appendChild(hint)
 
     if ('ResizeObserver' in window) {
@@ -349,11 +397,12 @@ function installExperimentHub() {
         details = document.createElement('details')
         details.id = 'v5-experiment-tools'
         const summary = document.createElement('summary')
-        summary.textContent = '实验与诊断（高级）'
+        summary.dataset.uxCopy = 'experimentTools'
+        summary.textContent = uxText('experimentTools')
         const intro = document.createElement('p')
         intro.className = 'ux-experiment-intro'
-        intro.textContent =
-            '这里用于影子推荐、Visual QC 和作品身份审计。正常使用不需要操作；所有重计算仍需手动点击。'
+        intro.dataset.uxCopy = 'experimentIntro'
+        intro.textContent = uxText('experimentIntro')
         const body = document.createElement('div')
         body.className = 'ux-experiment-body'
         details.append(summary, intro, body)
@@ -374,8 +423,8 @@ function normalizeDangerAndStatus() {
     const clear = ux$('#clear-lite-state')
     if (clear) {
         clear.classList.add('danger-action')
-        if (/清空本地数据/.test(clear.textContent || ''))
-            clear.textContent = '清除 Browser Lite 本地数据'
+        clear.dataset.uxCopy = 'clearLite'
+        clear.textContent = uxText('clearLite')
     }
     for (const node of ux$$('.status'))
         if (!node.hasAttribute('aria-live')) node.setAttribute('aria-live', 'polite')
@@ -389,6 +438,11 @@ function installDialogBehavior() {
             if (event.target === dialog) dialog.close()
         })
     }
+}
+
+function refreshUxCopy() {
+    for (const node of ux$('[data-ux-copy]'))
+        node.textContent = uxText(node.dataset.uxCopy)
 }
 
 function installObservers() {
@@ -434,6 +488,10 @@ function installUxPolish() {
     installDialogBehavior()
     installObservers()
 }
+
+document.addEventListener('pica-language-change', () => {
+    refreshUxCopy()
+})
 
 if (document.readyState === 'loading')
     document.addEventListener('DOMContentLoaded', installUxPolish, { once: true })

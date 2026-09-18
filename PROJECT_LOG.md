@@ -45,6 +45,7 @@
 - P5C-1 增加 Steerability audit：围绕每个 inferred 标签/作者/分类/IP 的系统 baseline 模拟 ±3 档和 BLOCK，验证匹配候选 adjustment 单调变化、非匹配候选 0 collateral、BLOCK 0 leakage；当前仅验证 control-plane monotonicity，不冒充线上因果 A/B。
 - P5D-1 增加统一 Evaluation Framework：汇总 P3 engineering gate、P4 Visual gate、retrospective benchmark 与 steerability，证据充分时最多标记 `BASELINE_EVALUATION_READY`，否则 `BASELINE_BUILDING`；始终 `autoPromotion=false`、`modelEscalationEnabled=false`，LTR / Contextual Bandit / Active Learning 均保持 deferred，直到存在固定基线对照证据。
 - P5E-1 增加 Recommendation Evaluation Dashboard：Web/Desktop 统一展示 P3 engineering gate、P4 Visual gate、P5 baseline 状态、future-outcome Precision/Recall/NDCG/Hit/MRR、correctness leakage、作者/IP/标签集中度、catalog coverage、Steerability 与最近 shadow runs；页面加载只读 GET 评估数据，Shadow benchmark 仅能用户手动点击并通过 Desktop CSRF + 显式 confirmation 触发。Advanced Learning 继续显示 deferred，不新增 promote/activate 入口。
+- P5F-1 增加 exact modelVersion baseline comparison：可显式选择 baseline 与 candidate 两个 shadow modelVersion，在相同 retrospective benchmark / future horizon 下比较 Precision@12、Recall@12、NDCG@12、Hit@12、MRR、correctness leakage、作者/IP/标签集中度、catalog coverage 与 EXPLORE hit；双方至少各有 3 个 exact runs、3 个 future-evaluable runs 和 3 个 correctness audits 才标记 `COMPARISON_READY`。始终 `winner=null`、`automaticWinnerSelection=false`、`modelEscalationEnabled=false`，Dashboard 仅在用户点击“比较版本”后执行比较。
 
 ## v0.4.0 — 多来源与统一语义
 

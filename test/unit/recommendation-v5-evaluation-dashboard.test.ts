@@ -96,8 +96,8 @@ describe('Recommendation V5 evaluation dashboard', () => {
         expect(dashboard).toContain(
             'servingMutationEnabled=false'
         )
-        expect(dashboard).not.toContain('训练模型')
-        expect(dashboard).not.toContain('开始训练')
+        expect(dashboard).not.toContain('data-v5-train')
+        expect(dashboard).not.toContain('/recommendation-v5/train')
     })
 
 })

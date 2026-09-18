@@ -630,6 +630,36 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('audits Visual coverage for shadow candidates without persisting or generating embeddings', () => {
+        const coverage = read(
+            'src/recommendation-v5/visual-candidate-coverage.ts'
+        )
+        const service = read('src/library/service.ts')
+        expect(coverage).toContain(
+            "VISUAL_CANDIDATE_COVERAGE_V5_VERSION ="
+        )
+        expect(coverage).toContain("mode: 'PLAN_ONLY'")
+        expect(coverage).toContain('servingImpact: false')
+        expect(coverage).toContain(
+            'embeddingGenerationEnabled: false'
+        )
+        expect(coverage).toContain(
+            'candidatePersistenceEnabled: false'
+        )
+        expect(coverage).toContain(
+            "'SHADOW_CANDIDATE_NOT_PERSISTED'"
+        )
+        expect(coverage).toContain("'DIVERSIFIED_BATCH'")
+        expect(service).toContain(
+            'buildVisualCandidateCoverageV5'
+        )
+        expect(service).toContain('visualCandidateCoverage')
+        expect(service).toContain('visualCoverage')
+        expect(service).not.toContain(
+            'visualCoverage.selectedForAnalysis.forEach'
+        )
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

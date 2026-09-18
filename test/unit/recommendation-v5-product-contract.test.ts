@@ -754,6 +754,41 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('adds a manual V5 evaluation dashboard without auto-running providers', () => {
+        const dashboard = read(
+            'web/recommendation-v5-evaluation.js'
+        )
+        const beta = read('web/recommendation-v5-beta.js')
+        const server = read('src/library/server.ts')
+        expect(dashboard).toContain(
+            '推荐系统评估 · V5 Development'
+        )
+        expect(dashboard).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/summary'
+        )
+        expect(dashboard).toContain(
+            '/api/v1/desktop/recommendation-v5/shadow-runs'
+        )
+        expect(dashboard).toContain(
+            '/api/v1/desktop/recommendation-v5/shadow-retrieval'
+        )
+        expect(dashboard).toContain(
+            'RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL'
+        )
+        expect(dashboard).toContain("'x-pica-csrf'")
+        expect(dashboard).toContain('Advanced Learning')
+        expect(dashboard).toContain('evalInstall()')
+        expect(dashboard).not.toContain(
+            'void evalRunShadow()'
+        )
+        expect(beta).toContain(
+            "import('./recommendation-v5-evaluation.js')"
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/promote'
+        )
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

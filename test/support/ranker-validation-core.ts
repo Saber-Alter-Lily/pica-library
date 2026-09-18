@@ -1,4 +1,11 @@
 import crypto from 'node:crypto'
+import {
+    rankingMetrics,
+    type RankingMetricSet
+} from '../../src/recommendation-v5/evaluation-metrics'
+
+export { rankingMetrics }
+export type { RankingMetricSet }
 
 export const FEATURE_SCHEMA_VERSION = 'ranker-matrix-v1'
 
@@ -23,19 +30,6 @@ export const FEATURE_NAMES = [
 export type FeatureName = (typeof FEATURE_NAMES)[number]
 export type FeatureRow = Record<FeatureName, number>
 export type WeightVector = Record<FeatureName, number>
-
-export interface RankingMetricSet {
-    recall5: number
-    recall12: number
-    recall20: number
-    recall50: number
-    ndcg5: number
-    ndcg12: number
-    ndcg20: number
-    mrr: number
-    meanRank: number
-    medianRank: number
-}
 
 export function stableDigest(value: unknown) {
     return crypto
@@ -67,45 +61,6 @@ export function stableRank(
                 right.score - left.score ||
                 left.comicId.localeCompare(right.comicId)
         )
-}
-
-export function rankingMetrics(
-    rankedIds: string[],
-    positiveIds: string[]
-): RankingMetricSet {
-    const relevant = new Set(positiveIds)
-    const recall = (limit: number) =>
-        rankedIds.slice(0, limit).filter((id) => relevant.has(id)).length /
-        Math.max(1, relevant.size)
-    const dcg = (limit: number) =>
-        rankedIds.slice(0, limit).reduce<number>(
-            (sum, id, index) =>
-                sum + (relevant.has(id) ? 1 / Math.log2(index + 2) : 0),
-            0
-        )
-    const ideal = (limit: number) =>
-        Array.from({ length: Math.min(limit, relevant.size) }).reduce<number>(
-            (sum, _, index) => sum + 1 / Math.log2(index + 2),
-            0
-        )
-    const ranks = rankedIds
-        .map((id, index) => (relevant.has(id) ? index + 1 : 0))
-        .filter(Boolean)
-        .sort((a, b) => a - b)
-    return {
-        recall5: recall(5),
-        recall12: recall(12),
-        recall20: recall(20),
-        recall50: recall(50),
-        ndcg5: dcg(5) / Math.max(Number.EPSILON, ideal(5)),
-        ndcg12: dcg(12) / Math.max(Number.EPSILON, ideal(12)),
-        ndcg20: dcg(20) / Math.max(Number.EPSILON, ideal(20)),
-        mrr: ranks.length ? 1 / ranks[0] : 0,
-        meanRank: ranks.length
-            ? ranks.reduce((sum, value) => sum + value, 0) / ranks.length
-            : 0,
-        medianRank: ranks.length ? ranks[Math.floor(ranks.length / 2)] : 0
-    }
 }
 
 export function pairedBootstrap(

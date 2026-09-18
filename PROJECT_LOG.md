@@ -35,6 +35,7 @@
 - P3D-1 增加 deterministic batch diversity shadow：在 relevance ranking 之后使用 greedy saturation 选择批次，作者 / FANDOM-IP / 语义标签采用 A→B→C 分阶段上限与软惩罚，Provider 仅使用小幅 balance bonus；记录 raw-top 与 selected concentration、relevance delta 和 pass 分布。Visual style diversity 继续关闭，`servingImpact=false`。
 - P3E-1 固化 session mode shadow policy：将 DEFAULT / FAMILIAR / RECENT / EXPLORE / TARGET 的差异版本化为 channel/source priority policy；模式改变召回来源与预算竞争，不改 relevance ranker 权重。当前仅在 shadow pipeline 生效，正式 Web/Android 模式入口暂不开放，等待 benchmark 与 serving promotion。
 - P3F-1 增加 promotion review gate：仅使用当前 exact composite modelVersion 的重复 DEFAULT shadow runs 评估候选池规模、Provider route failure、hygiene removal、完整 batch、作者/IP/标签集中度、diversity relevance loss 与 shadow safety invariants；通过时最多返回 `READY_FOR_MANUAL_REVIEW`，从不自动 promotion，`servingMutationEnabled=false`，无 promote/activate 写入口。
+- P4A-1 启动 Visual V1 representation QC：只读取冻结的 DINOv2-small embedding，按同作者 vs 异作者、同 IP 不同作者、同作者同/跨 Provider、同/混合 source kind、近/远页数差异计算 cosine 分布，并以 deterministic k-NN 统计作者与 IP Top-K 命中及 Provider/source nuisance proxy；同时报告 catalog/favorite/provider/source coverage。当前 `mode=READ_ONLY`、`rebuildPerformed=false`、`servingImpact=false`，不重建向量、不启用 Visual recall。
 
 ## v0.4.0 — 多来源与统一语义
 

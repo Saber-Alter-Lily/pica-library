@@ -132,6 +132,7 @@ import { buildVisualStyleFamiliesV5 } from '../recommendation-v5/visual-style-fa
 import { buildVisualCandidateCoverageV5 } from '../recommendation-v5/visual-candidate-coverage'
 import { evaluateVisualActivationGateV5 } from '../recommendation-v5/visual-activation-gate'
 import { auditShadowCorrectnessV5 } from '../recommendation-v5/correctness-audit'
+import { buildRetrospectiveBenchmarkV5 } from '../recommendation-v5/retrospective-benchmark'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -555,6 +556,38 @@ export class LibraryService {
                 candidateIdCount: audit.candidateIds.length
             }
         }
+    }
+
+    recommendationV5RetrospectiveBenchmark(
+        limit = 200,
+        horizonDays = 30
+    ) {
+        const modelVersion = shadowPipelineModelVersionV5()
+        const runs = this.database
+            .listCandidatePoolsByModelVersionPrefix(
+                modelVersion,
+                Math.max(1, Math.min(1000, Math.floor(limit)))
+            )
+            .filter((pool) => pool.modelVersion === modelVersion)
+            .map((pool) => ({
+                modelVersion: pool.modelVersion,
+                generatedAt: pool.generatedAt,
+                candidateIds: pool.candidateIds,
+                telemetry: pool.telemetry
+            }))
+        const events = this.database.listUserEvents({
+            limit: 5000
+        })
+        const catalogSize = this.database.listComics({
+            limit: 10000
+        }).length
+        return buildRetrospectiveBenchmarkV5({
+            runs,
+            events,
+            currentModelVersion: modelVersion,
+            catalogSize,
+            horizonDays
+        })
     }
 
     recommendationV5VisualActivationGate(limit = 100) {

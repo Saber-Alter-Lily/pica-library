@@ -358,12 +358,17 @@ export class LibraryService {
         const catalog = this.database.listComics({ limit: 10000 })
         const decisions = this.database.listWorkIdentityDecisions(5000)
         const existingBindings = this.database.listWorkIdentityBindings(10000)
+        const plan = buildWorkIdentityMaterializationPlanV5(
+            catalog,
+            decisions,
+            existingBindings
+        )
+        const planDigest = createHash('sha256')
+            .update(JSON.stringify(plan))
+            .digest('hex')
         return {
-            ...buildWorkIdentityMaterializationPlanV5(
-                catalog,
-                decisions,
-                existingBindings
-            ),
+            ...plan,
+            planDigest,
             storage: this.database.workIdentityStorageStatus()
         }
     }

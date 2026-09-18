@@ -483,6 +483,25 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/shadow-retrieval' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    await options.service.runRecommendationV5ShadowRetrieval(
+                        input
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
                     '/api/v1/desktop/recommendation-v5/work-identity/materialization/runs' &&
                 request.method === 'GET'
             ) {

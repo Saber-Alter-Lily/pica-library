@@ -417,6 +417,17 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/materialization-plan' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityMaterializationPlan()
+                )
+
+            if (
+                url.pathname ===
                     '/api/v1/recommendation-v5/work-identity/decision' &&
                 request.method === 'POST'
             ) {

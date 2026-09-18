@@ -161,22 +161,21 @@ $('#mobile-bridge-refresh')?.addEventListener('click', async () => {
         $('#mobile-bridge-state').textContent = localizeError(language, error)
     }
 })
-async function copyMobileBridgeValue(selector, successMessage) {
+async function copyMobileBridgeValue(selector, successKey) {
     const value = $(selector)?.textContent?.trim()
     if (!value) return
     try {
         await navigator.clipboard.writeText(value)
-        $('#mobile-bridge-state').textContent = successMessage
+        $('#mobile-bridge-state').textContent = t(successKey)
     } catch {
-        $('#mobile-bridge-state').textContent =
-            '复制失败，请手动选中并复制。'
+        $('#mobile-bridge-state').textContent = t('mobile.copyFailed')
     }
 }
 $('#mobile-bridge-copy-address')?.addEventListener('click', () =>
-    void copyMobileBridgeValue('#mobile-bridge-address', '电脑地址已复制。')
+    void copyMobileBridgeValue('#mobile-bridge-address', 'mobile.copiedAddress')
 )
 $('#mobile-bridge-copy-code')?.addEventListener('click', () =>
-    void copyMobileBridgeValue('#mobile-bridge-code', '配对码已复制。')
+    void copyMobileBridgeValue('#mobile-bridge-code', 'mobile.copiedCode')
 )
 applyLanguage(language)
 

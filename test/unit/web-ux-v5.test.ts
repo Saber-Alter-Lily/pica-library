@@ -226,6 +226,65 @@ describe('V5 Web UX audit contract', () => {
         expect(hub).toContain('sectionsLabel')
     })
 
+    it('lets main app own scroll restoration and reduces theme polling', () => {
+        const theme = read('web/alpha8-theme-help.js')
+        expect(theme).not.toContain('const viewScroll = new Map()')
+        expect(theme).not.toContain('lastActiveView')
+        expect(theme).toContain('function scheduleThemeDecoration()')
+        expect(theme).toContain(
+            'progressTimer = setInterval(scheduleThemeDecoration, 2500)'
+        )
+        expect(theme).toContain(
+            "attributeFilter: ['class', 'hidden', 'style', 'value']"
+        )
+    })
+
+    it('coalesces Visual QC and Settings Hub global DOM observers', () => {
+        const visual = read('web/visual-qc-beta.js')
+        const hub = read('web/alpha8-7-desktop-hub.js')
+        expect(visual).toContain('let queued = false')
+        expect(visual).toContain('const observer = new MutationObserver(schedule)')
+        expect(visual).toContain('requestAnimationFrame(() => {')
+        expect(hub).toContain('let queued = false')
+        expect(hub).toContain('const observer = new MutationObserver(schedule)')
+        expect(hub).toContain('requestAnimationFrame(() => {')
+    })
+
+    it('uses one-step import and guards long Desktop operations', () => {
+        const index = read('web/index.html')
+        const i18n = read('web/i18n.js')
+        const app = read('web/app.js')
+        expect(index).toContain('id="import-button" class="primary" hidden')
+        expect(i18n).toContain(
+            "'library.selectFile': '选择并导入数据文件'"
+        )
+        expect(i18n).toContain(
+            "'library.selectFile': 'Choose & import data file'"
+        )
+        expect(app).toContain('let importPending = false')
+        expect(app).toContain('if (importPending) return')
+        expect(app).toContain('async function withBusyButton(')
+        expect(app).toContain("$('#update-check').onclick = async (event)")
+        expect(app).toContain(
+            "$('#settings-detect-proxy').onclick = async (event)"
+        )
+        expect(app).toContain(
+            "$('#export-browser-lite').onclick = async (event)"
+        )
+    })
+
+    it('gives settings utilities explicit feedback and safe exit confirmation', () => {
+        const app = read('web/app.js')
+        const i18n = read('web/i18n.js')
+        expect(app).toContain('async function openDesktopDirectory(')
+        expect(app).toContain("askConfirm(t('settings.exitConfirm'))")
+        expect(app).toContain(
+            "$('#preview-cache-clear').onclick = async (event)"
+        )
+        expect(i18n).toContain("'settings.exitConfirm'")
+        expect(i18n).toContain("'preview.cacheCleared'")
+    })
+
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'

@@ -660,6 +660,42 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('adds a read-only Visual activation gate that can only authorize shadow review', () => {
+        const gate = read(
+            'src/recommendation-v5/visual-activation-gate.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(gate).toContain(
+            "VISUAL_ACTIVATION_GATE_V5_VERSION ="
+        )
+        expect(gate).toContain(
+            "'READY_FOR_SHADOW_REVIEW'"
+        )
+        expect(gate).toContain("'NOT_READY'")
+        expect(gate).toContain('autoActivation: false')
+        expect(gate).toContain('servingMutationEnabled: false')
+        expect(gate).toContain('embeddingGenerationEnabled: false')
+        expect(gate).toContain(
+            'visualRecallActivationEnabled: false'
+        )
+        expect(gate).toContain(
+            'styleDiversityActivationEnabled: false'
+        )
+        expect(service).toContain(
+            'recommendationV5VisualActivationGate'
+        )
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/visual-activation-gate'
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/visual-activate'
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/visual-promote'
+        )
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

@@ -75,6 +75,37 @@ export interface VisualRerankedCandidate extends RankedCandidateWithEvidenceV3 {
     visual?: VisualCandidateSignal
 }
 
+export function selectPreferredVisualEmbeddings(
+    embeddings: VisualEmbeddingRecord[],
+    input: {
+        modelId?: string
+        modelVersion?: string
+        samplingPolicyVersion?: string
+    } = {}
+) {
+    const modelId = input.modelId ?? VISUAL_MODEL_ID
+    const modelVersion = input.modelVersion ?? VISUAL_MODEL_VERSION
+    const samplingPolicyVersion =
+        input.samplingPolicyVersion ?? VISUAL_SAMPLING_POLICY_VERSION
+    const preferred = new Map<string, VisualEmbeddingRecord>()
+    for (const item of embeddings) {
+        if (
+            item.modelId !== modelId ||
+            item.modelVersion !== modelVersion ||
+            item.samplingPolicyVersion !== samplingPolicyVersion
+        )
+            continue
+        const previous = preferred.get(item.comicId)
+        if (
+            !previous ||
+            (previous.embeddingKind === 'cover' &&
+                item.embeddingKind === 'body')
+        )
+            preferred.set(item.comicId, item)
+    }
+    return preferred
+}
+
 const clamp = (value: number, min = 0, max = 1) =>
     Math.max(min, Math.min(max, value))
 
@@ -270,21 +301,7 @@ export function buildVisualPreferenceProfile(input: {
     catalogSize?: number
     now?: Date
 }): VisualPreferenceProfile | null {
-    const body = input.embeddings.filter(
-        (item) =>
-            item.modelId === VISUAL_MODEL_ID &&
-            item.modelVersion === VISUAL_MODEL_VERSION &&
-            item.embeddingKind === 'body'
-    )
-    const cover = input.embeddings.filter(
-        (item) =>
-            item.modelId === VISUAL_MODEL_ID &&
-            item.modelVersion === VISUAL_MODEL_VERSION &&
-            item.embeddingKind === 'cover'
-    )
-    const preferred = new Map<string, VisualEmbeddingRecord>()
-    for (const item of cover) preferred.set(item.comicId, item)
-    for (const item of body) preferred.set(item.comicId, item)
+    const preferred = selectPreferredVisualEmbeddings(input.embeddings)
     const feedbackByComic = new Map(input.feedback.map((item) => [item.comicId, item]))
     const positives: VisualPrototypeEvidence[] = []
     const negatives: VisualPrototypeEvidence[] = []

@@ -86,6 +86,38 @@ describe('V5 Web UX audit contract', () => {
         expect(dashboard).toContain('等待数据')
     })
 
+    it('keeps dynamic UX copy bilingual and refresh-safe', () => {
+        const polish = read('web/ui-polish-v5.js')
+        const i18n = read('web/i18n.js')
+        expect(polish).toContain("downloadAdvanced: '性能与导出（高级）'")
+        expect(polish).toContain("downloadAdvanced: 'Performance & export (advanced)'")
+        expect(polish).toContain(
+            "for (const node of uxAll('[data-ux-copy]'))"
+        )
+        expect(polish).not.toContain(
+            "for (const node of ux$('[data-ux-copy]'))"
+        )
+        expect(i18n).toContain("'recommend.feedbackLabel': '推荐反馈'")
+        expect(i18n).toContain("'recommend.like': '喜欢'")
+        expect(i18n).toContain("'visual.similarStyle': '相似画风'")
+        expect(i18n).not.toContain(
+            "'recommend.feedbackLabel': 'Recommendation feedback'"
+        )
+    })
+
+    it('coalesces dynamic DOM polish instead of rerunning on every mutation', () => {
+        const polish = read('web/ui-polish-v5.js')
+        expect(polish).toContain('let polishQueued = false')
+        expect(polish).toContain('requestAnimationFrame(() => {')
+        expect(polish).toContain('scheduleDynamicPolish()')
+        const observerBody =
+            /const bodyObserver = new MutationObserver\(\(\) => \{([\s\S]*?)\n    \}\)/.exec(
+                polish
+            )?.[1] ?? ''
+        expect(observerBody).toContain('scheduleDynamicPolish()')
+        expect(observerBody).not.toContain('installExperimentHub()')
+    })
+
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'

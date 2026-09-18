@@ -162,6 +162,7 @@ export const translations = {
         'maintenance.healthSubtitle':
             'Check the current mode, data summary and service availability.',
         'maintenance.runHealth': 'Run check',
+        'maintenance.working': 'Working…',
         'settings.title': 'Settings',
         'settings.subtitle':
             'Manage accounts, connections, downloads, appearance and maintenance for this computer.',
@@ -304,6 +305,11 @@ export const translations = {
         'mobile.expires': 'Valid until {time}',
         'mobile.paired': 'Paired: {devices}',
         'mobile.noDevices': 'No paired devices yet',
+        'mobile.copyAddress': 'Copy address',
+        'mobile.copyCode': 'Copy pairing code',
+        'mobile.copiedAddress': 'Computer address copied.',
+        'mobile.copiedCode': 'Pairing code copied.',
+        'mobile.copyFailed': 'Copy failed. Select the value and copy it manually.',
         'reader.retryPage': 'Page {page} failed to load. Retry this page',
         'reader.noPages': 'No readable pages in this chapter.',
         'reader.title': 'Read',
@@ -796,6 +802,7 @@ export const translations = {
         'maintenance.pendingOnly': '仅看待审核',
         'maintenance.healthSubtitle': '确认当前模式、数据统计和服务可用性。',
         'maintenance.runHealth': '运行检查',
+        'maintenance.working': '正在处理…',
         'settings.title': '设置',
         'settings.subtitle': '管理这台电脑上的账号、连接、下载、外观与维护功能。',
         'settings.account': '账户',

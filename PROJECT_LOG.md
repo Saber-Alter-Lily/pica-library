@@ -17,6 +17,8 @@
 - Visual V1 保持冻结、版本化和可回滚；当前研发原则是不因 Recommendation V5 改造而重建或覆盖现有视觉向量。
 - P1 语义收尾开始：将“已经看过 / 已经拥有 / 重复上传 / 暂时不想看”从口味反馈中拆出，作为独立事实或约束；临时隐藏采用可过期状态。
 - 增加“保留收藏但不参与推荐口味画像”：仅移出 preference inference、召回 seed 与 Visual preference prototype，收藏/下载/已拥有过滤和 Visual embedding 均保留。
+- P2A 启动 Canonical Work Identity 基础层：新增 Series / Work / Edition / Upload 绑定、身份证据与人工裁决的加法表结构；首轮不自动绑定、不改写现有 comic_id。
+- P2A-2 增加 evidence-only 身份候选回填：高置信同作品候选可按 resolver version 幂等写入证据表，但 canonical work 与 upload binding 仍保持 0，等待后续人工裁决。
 
 ## v0.4.0 — 多来源与统一语义
 

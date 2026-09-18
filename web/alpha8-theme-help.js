@@ -7,7 +7,6 @@ const CREATOR_MAX_TOTAL_BYTES = 5 * 1024 * 1024
 const THEME_MAX_BYTES = 24 * 1024 * 1024
 const referenceFiles = []
 const progressHeads = new WeakMap()
-const viewScroll = new Map()
 let desktopStatus = null
 let activeDescriptor = null
 let progressTimer = null
@@ -15,7 +14,7 @@ let recommendationTimer = null
 let recommendationCompletionTimer = null
 let recommendationWatchBaselineCycleId = null
 let recommendationWatchStartedAt = 0
-let lastActiveView = $('.view.active')?.id || 'home'
+let decorationQueued = false
 
 function escapeHtml(value) {
     return String(value ?? '').replace(
@@ -851,6 +850,22 @@ function renderEmptyArt() {
     })
 }
 
+function scheduleThemeDecoration() {
+    if (
+        decorationQueued ||
+        !activeDescriptor ||
+        document.visibilityState === 'hidden'
+    )
+        return
+    decorationQueued = true
+    requestAnimationFrame(() => {
+        decorationQueued = false
+        if (!activeDescriptor || document.visibilityState === 'hidden') return
+        decorateProgress()
+        renderEmptyArt()
+    })
+}
+
 function setupRuntimeObservers() {
     ensureRecommendationProgress()
     $('#recommend-button')?.addEventListener(
@@ -863,39 +878,60 @@ function setupRuntimeObservers() {
         startRecommendationWatch,
         true
     )
-    window.addEventListener(
-        'scroll',
-        () => viewScroll.set(lastActiveView, window.scrollY),
-        { passive: true }
-    )
-    const viewObserver = new MutationObserver(() => {
-        const active = $('.view.active')?.id
-        if (!active || active === lastActiveView) return
-        lastActiveView = active
-        const restore = viewScroll.get(active) || 0
-        requestAnimationFrame(() =>
-            window.scrollTo({ top: restore, left: 0, behavior: 'auto' })
-        )
-    })
-    $$('.view').forEach((view) =>
-        viewObserver.observe(view, {
-            attributes: true,
-            attributeFilter: ['class']
-        })
-    )
+
+    // Main app.js owns view navigation and scroll restoration. Theme support
+    // must never maintain a competing scroll-position system.
     const themeObserver = new MutationObserver(() => {
-        if (activeDescriptor) applyDescriptor(activeDescriptor)
+        if (activeDescriptor) {
+            applyDescriptor(activeDescriptor)
+            scheduleThemeDecoration()
+        }
     })
     themeObserver.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ['data-pica-theme']
     })
-    progressTimer = setInterval(() => {
-        if (activeDescriptor) {
-            decorateProgress()
-            renderEmptyArt()
-        }
-    }, 650)
+
+    const decorationObserver = new MutationObserver((mutations) => {
+        const relevant = mutations.some((mutation) => {
+            const target =
+                mutation.target instanceof Element
+                    ? mutation.target
+                    : mutation.target.parentElement
+            return (
+                !target?.closest?.('.a85-progress-head') &&
+                !target?.classList?.contains('a85-empty-art')
+            )
+        })
+        if (relevant) scheduleThemeDecoration()
+    })
+    for (const selector of [
+        '#recommend',
+        '#downloads',
+        '#library',
+        '#downloaded'
+    ]) {
+        const root = $(selector)
+        if (!root) continue
+        decorationObserver.observe(root, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'hidden', 'style', 'value']
+        })
+    }
+    window.addEventListener('resize', scheduleThemeDecoration, {
+        passive: true
+    })
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible')
+            scheduleThemeDecoration()
+    })
+
+    // Low-frequency fallback only. Normal updates are driven by the observer
+    // above, so themed pages no longer rescan the DOM every 650 ms.
+    progressTimer = setInterval(scheduleThemeDecoration, 2500)
+    scheduleThemeDecoration()
 }
 
 async function bootstrap() {

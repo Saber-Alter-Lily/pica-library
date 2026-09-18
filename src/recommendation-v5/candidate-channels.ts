@@ -49,6 +49,7 @@ export interface CandidateChannelAnchorV5 {
     facet?: string
     score?: number
     supportItems?: number
+    providerCanonical?: Partial<Record<'eh' | 'exh', string>>
 }
 
 export interface CandidateProviderAllocationV5 {
@@ -238,9 +239,20 @@ function desiredProviderAllocations(
     // Related lookup currently has a provider-native implementation only on
     // the Pica path. E-H / ExH stay isolated and disabled for this family
     // until their own related-work retriever exists.
-    if (family === 'RELATED')
+    if (family === 'RELATED') {
+        const seed = anchors[0]?.key ?? ''
+        const picaSeedEligible = !seed.startsWith('eh:')
         return [
-            allocation('pica', strategy, 1, 40),
+            picaSeedEligible
+                ? allocation('pica', strategy, 1, 40)
+                : {
+                      ...allocation('pica', strategy, 0, 0),
+                      eligible: false,
+                      plannedRequests: 0,
+                      targetCandidates: 0,
+                      disabledReason:
+                          'CROSS_PROVIDER_RELATED_NOT_IMPLEMENTED'
+                  },
             {
                 ...allocation('eh', strategy, 0, 0),
                 eligible: false,
@@ -254,6 +266,30 @@ function desiredProviderAllocations(
                 plannedRequests: 0,
                 targetCandidates: 0,
                 disabledReason: 'RELATED_RETRIEVER_NOT_IMPLEMENTED'
+            }
+        ]
+    }
+
+    const targetType = anchors[0]?.targetType
+    if (
+        family === 'CATEGORY' ||
+        (family === 'TARGET' && targetType === 'CATEGORY')
+    )
+        return [
+            allocation('pica', 'KEYWORD', 1, 45),
+            {
+                ...allocation('eh', 'KEYWORD', 0, 0),
+                eligible: false,
+                plannedRequests: 0,
+                targetCandidates: 0,
+                disabledReason: 'CATEGORY_RETRIEVER_NOT_IMPLEMENTED'
+            },
+            {
+                ...allocation('exh', 'KEYWORD', 0, 0),
+                eligible: false,
+                plannedRequests: 0,
+                targetCandidates: 0,
+                disabledReason: 'CATEGORY_RETRIEVER_NOT_IMPLEMENTED'
             }
         ]
 
@@ -759,6 +795,22 @@ export function buildCandidateChannelPlanV5(
                           })
                 }
             })
+    }
+
+    for (const channel of ordered) {
+        if (!channel.enabled) continue
+        const hasExecutableRoute =
+            Boolean(channel.localCandidateIds?.length) ||
+            channel.providerAllocations.some(
+                (allocation) =>
+                    allocation.eligible &&
+                    (allocation.surface === 'local' ||
+                        allocation.plannedRequests > 0)
+            )
+        if (!hasExecutableRoute) {
+            channel.enabled = false
+            channel.disabledReason = 'NO_PROVIDER_ROUTE_AVAILABLE'
+        }
     }
 
     return {

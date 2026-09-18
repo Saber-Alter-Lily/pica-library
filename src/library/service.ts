@@ -127,6 +127,7 @@ import {
 } from '../recommendation-v5/shadow-pipeline'
 import { evaluateP3PromotionGateV5 } from '../recommendation-v5/promotion-gate'
 import { buildVisualRepresentationQcV5 } from '../recommendation-v5/visual-representation-qc'
+import { buildVisualAuthorAtlasV5 } from '../recommendation-v5/visual-author-atlas'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -1060,6 +1061,20 @@ export class LibraryService {
                 favorites.size +
                     feedback.filter((item) => item.sentiment === 'like').length
             )
+        })
+    }
+
+    visualAuthorAtlas(
+        minWorksPerAuthor = 2,
+        maxGraphAuthors = 600,
+        neighborLimit = 8
+    ) {
+        return buildVisualAuthorAtlasV5({
+            embeddings: this.database.listVisualEmbeddings(),
+            catalog: this.database.listComics({ limit: 10000 }),
+            minWorksPerAuthor,
+            maxGraphAuthors,
+            neighborLimit
         })
     }
 

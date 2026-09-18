@@ -133,6 +133,7 @@ import { buildVisualCandidateCoverageV5 } from '../recommendation-v5/visual-cand
 import { evaluateVisualActivationGateV5 } from '../recommendation-v5/visual-activation-gate'
 import { auditShadowCorrectnessV5 } from '../recommendation-v5/correctness-audit'
 import { buildRetrospectiveBenchmarkV5 } from '../recommendation-v5/retrospective-benchmark'
+import { evaluateSteerabilityV5 } from '../recommendation-v5/steerability-audit'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -556,6 +557,50 @@ export class LibraryService {
                 candidateIdCount: audit.candidateIds.length
             }
         }
+    }
+
+    recommendationV5SteerabilityAudit(
+        requestedStep = 3,
+        targetLimit = 30
+    ) {
+        const store = new RecommendationPolicyStoreV5(
+            this.database
+        )
+        const state = store.state()
+        const snapshot = this.recommendationV5Snapshot()
+        const targets = snapshot.inferred
+            .filter(
+                (signal) =>
+                    signal.targetType === 'TAG' ||
+                    signal.targetType === 'AUTHOR' ||
+                    signal.targetType === 'CATEGORY' ||
+                    signal.targetType === 'FANDOM'
+            )
+            .slice(
+                0,
+                Math.max(
+                    1,
+                    Math.min(100, Math.floor(targetLimit))
+                )
+            )
+            .map((signal) => ({
+                targetType: signal.targetType as
+                    | 'TAG'
+                    | 'AUTHOR'
+                    | 'CATEGORY'
+                    | 'FANDOM',
+                key: signal.key,
+                label: signal.label,
+                baselineLevel: signal.baselineLevel
+            }))
+        return evaluateSteerabilityV5({
+            catalog: this.database.listComics({
+                limit: 10000
+            }),
+            state,
+            targets,
+            requestedStep
+        })
     }
 
     recommendationV5RetrospectiveBenchmark(

@@ -238,6 +238,47 @@ export class LibraryDatabase {
         }
     }
 
+    listWorkIdentityBindings(limit = 5000) {
+        const bounded = Math.max(1, Math.min(10000, Math.floor(limit)))
+        const rows = this.db
+            .prepare(
+                `SELECT b.*, c.title AS comic_title,
+                        w.preferred_title AS work_title,
+                        e.label AS edition_label,
+                        e.language AS edition_language,
+                        e.edition_kind AS edition_kind
+                 FROM work_upload_bindings b
+                 JOIN comics c ON c.id = b.comic_id
+                 JOIN canonical_works w ON w.id = b.work_id
+                 LEFT JOIN work_editions e ON e.id = b.edition_id
+                 ORDER BY b.updated_at DESC, b.comic_id
+                 LIMIT ?`
+            )
+            .all(bounded) as SqlRow[]
+        return rows.map((row) => ({
+            comicId: String(row.comic_id),
+            comicTitle: String(row.comic_title ?? ''),
+            workId: String(row.work_id),
+            workTitle: String(row.work_title ?? ''),
+            editionId: row.edition_id ? String(row.edition_id) : null,
+            editionLabel: row.edition_label
+                ? String(row.edition_label)
+                : '',
+            editionLanguage: row.edition_language
+                ? String(row.edition_language)
+                : null,
+            editionKind: row.edition_kind
+                ? String(row.edition_kind)
+                : null,
+            bindingStatus: String(row.binding_status ?? ''),
+            confidence: numberValue(row.confidence),
+            resolverVersion: String(row.resolver_version ?? ''),
+            evidence: jsonObject(row.evidence_json),
+            createdAt: String(row.created_at),
+            updatedAt: String(row.updated_at)
+        }))
+    }
+
     saveWorkIdentityEvidence(
         records: Array<{
             leftComicId: string

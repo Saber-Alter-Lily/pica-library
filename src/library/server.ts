@@ -375,6 +375,34 @@ export async function startLibraryServer(options: {
                 )
 
             if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/evidence' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityEvidence(
+                        Number(url.searchParams.get('limit') ?? 200)
+                    )
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/evidence/refresh' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5RefreshWorkIdentityEvidence(
+                        Number(input.limit ?? 500)
+                    )
+                )
+            }
+
+            if (
                 url.pathname === '/api/v1/recommendation-v5/control' &&
                 request.method === 'POST'
             ) {

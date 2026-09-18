@@ -97,6 +97,7 @@ let language = resolveLanguage(
 let downloadPoll = null
 let downloadPollBusy = false
 let activeView = 'home'
+const viewScrollPositions = new Map()
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
@@ -231,15 +232,23 @@ function setupValue(prefix) {
 }
 
 function activateView(id) {
-    if (id === 'reader' && activeView !== 'reader')
-        state.reader.originView = activeView
+    const previousView = activeView
+    if (previousView && previousView !== 'reader')
+        viewScrollPositions.set(previousView, Math.max(0, window.scrollY))
+    if (id === 'reader' && previousView !== 'reader')
+        state.reader.originView = previousView
     activeView = id
-    $$('.view').forEach((view) =>
+    $('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
     )
-    $$('nav button').forEach((item) =>
+    $('nav button').forEach((item) =>
         item.classList.toggle('active', item.dataset.view === id)
     )
+    document.body.classList.toggle('reader-active', id === 'reader')
+    requestAnimationFrame(() => {
+        if (id === 'reader') window.scrollTo(0, 0)
+        else window.scrollTo(0, viewScrollPositions.get(id) ?? 0)
+    })
 }
 
 async function chooseFolder(prefix) {
@@ -2081,10 +2090,32 @@ async function exitReader() {
     await flushReaderProgress()
     if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
     readerScrollHandler = null
-    document.body.classList.remove('reader-active')
     activateView(state.reader.originView || 'downloaded')
 }
 $('#reader-exit').onclick = () => void exitReader()
+document.addEventListener('keydown', (event) => {
+    if (activeView !== 'reader') return
+    const target = event.target
+    if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLSelectElement ||
+        target instanceof HTMLTextAreaElement
+    )
+        return
+    if (event.key === 'Escape' && !document.fullscreenElement) {
+        event.preventDefault()
+        void exitReader()
+        return
+    }
+    if ($('#reader-mode').value === 'vertical') return
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        moveReader(-1)
+    } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        moveReader(1)
+    }
+})
 async function exportReaderArchive(format) {
     try {
         const value = await post(`/api/v1/reader/export-${format}`, {
@@ -2203,16 +2234,10 @@ function renderAll(summary) {
     updateSelectionStatus('search')
 }
 
-$$('nav [data-view], [data-go]').forEach((button) =>
+$('nav [data-view], [data-go]').forEach((button) =>
     button.addEventListener('click', () => {
         const id = button.dataset.view || button.dataset.go
-        activeView = id
-        $$('.view').forEach((view) =>
-            view.classList.toggle('active', view.id === id)
-        )
-        $$('nav button').forEach((item) =>
-            item.classList.toggle('active', item.dataset.view === id)
-        )
+        activateView(id)
         if (id === 'downloads') loadJobs()
         else if (downloadPoll) {
             clearInterval(downloadPoll)
@@ -2222,7 +2247,6 @@ $$('nav [data-view], [data-go]').forEach((button) =>
         if (id === 'shelves') void loadShelves()
         if (id === 'settings') void loadPreviewCacheStats()
         if (id === 'chronicle') void loadChronicle()
-        document.body.classList.toggle('reader-active', id === 'reader')
     })
 )
 

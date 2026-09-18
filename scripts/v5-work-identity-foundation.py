@@ -184,18 +184,10 @@ method = marker + """
                     .all() as SqlRow[]
             ).map((row) => String(row.name))
         )
-        const count = (table: string) =>
-            tables.has(table)
-                ? numberValue(
-                      (
-                          this.db
-                              .prepare(
-                                  \`SELECT COUNT(*) AS count FROM \${table}\`
-                              )
-                              .get() as SqlRow
-                      ).count
-                  )
-                : 0
+        const scalarCount = (sql: string) =>
+            numberValue(
+                (this.db.prepare(sql).get() as SqlRow).count
+            )
         const versionRow = this.db
             .prepare(
                 'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations'
@@ -208,12 +200,36 @@ method = marker + """
                 requiredTables.map((table) => [table, tables.has(table)])
             ),
             counts: {
-                series: count('canonical_series'),
-                works: count('canonical_works'),
-                editions: count('work_editions'),
-                bindings: count('work_upload_bindings'),
-                evidence: count('work_identity_evidence'),
-                decisions: count('work_identity_decisions')
+                series: tables.has('canonical_series')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM canonical_series'
+                      )
+                    : 0,
+                works: tables.has('canonical_works')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM canonical_works'
+                      )
+                    : 0,
+                editions: tables.has('work_editions')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_editions'
+                      )
+                    : 0,
+                bindings: tables.has('work_upload_bindings')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_upload_bindings'
+                      )
+                    : 0,
+                evidence: tables.has('work_identity_evidence')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_identity_evidence'
+                      )
+                    : 0,
+                decisions: tables.has('work_identity_decisions')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_identity_decisions'
+                      )
+                    : 0
             }
         }
     }

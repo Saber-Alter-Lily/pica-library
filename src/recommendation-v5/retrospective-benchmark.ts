@@ -8,7 +8,7 @@ import {
 import { normalizePreferenceKey } from './portable-policy'
 
 export const RETROSPECTIVE_BENCHMARK_V5_VERSION =
-    'retrospective-benchmark-v1'
+    'retrospective-benchmark-v2-outcome-maturity'
 
 export interface BenchmarkShadowRunV5 {
     modelVersion: string
@@ -164,12 +164,14 @@ export function buildRetrospectiveBenchmarkV5(input: {
     currentModelVersion: string
     catalogSize: number
     horizonDays?: number
+    now?: Date
 }) {
     const horizonDays = Math.max(
         1,
         Math.min(180, Math.floor(input.horizonDays ?? 30))
     )
     const horizonMs = horizonDays * 86_400_000
+    const nowMs = input.now?.getTime() ?? Date.now()
     const runs = input.runs
         .filter(
             (run) =>
@@ -183,11 +185,19 @@ export function buildRetrospectiveBenchmarkV5(input: {
     const perRun = runs.map((run) => {
         const generatedMs = Date.parse(run.generatedAt)
         const validTime = Number.isFinite(generatedMs)
+        const windowEndMs = validTime
+            ? generatedMs + horizonMs
+            : Number.NaN
+        const outcomeWindowMature =
+            validTime && nowMs >= windowEndMs
+        const observedEndMs = validTime
+            ? Math.min(windowEndMs, nowMs)
+            : Number.NaN
         const positiveIds = validTime
             ? eventIds(
                   input.events,
                   generatedMs,
-                  generatedMs + horizonMs,
+                  observedEndMs,
                   positiveEventTypes
               )
             : []
@@ -195,7 +205,7 @@ export function buildRetrospectiveBenchmarkV5(input: {
             ? eventIds(
                   input.events,
                   generatedMs,
-                  generatedMs + horizonMs,
+                  observedEndMs,
                   negativeEventTypes
               )
             : []
@@ -218,9 +228,15 @@ export function buildRetrospectiveBenchmarkV5(input: {
             candidateCount: run.candidateIds.length,
             rankedCount: ranked.length,
             batchCount: batch.length,
+            outcomeWindowMature,
+            outcomeWindowEndsAt: validTime
+                ? new Date(windowEndMs).toISOString()
+                : null,
             futurePositiveCount: positiveIds.length,
             futureNegativeCount: negativeIds.length,
-            evaluable: positiveIds.length > 0,
+            evaluable:
+                outcomeWindowMature &&
+                positiveIds.length > 0,
             rankedMetrics,
             batchMetrics,
             negativeLeakage12: negativeLeakage(
@@ -294,6 +310,12 @@ export function buildRetrospectiveBenchmarkV5(input: {
         horizonDays,
         support: {
             exactRunCount: runs.length,
+            matureRunCount: perRun.filter(
+                (run) => run.outcomeWindowMature
+            ).length,
+            immatureRunCount: perRun.filter(
+                (run) => !run.outcomeWindowMature
+            ).length,
             evaluableRunCount: evaluable.length,
             runWithCorrectnessAuditCount:
                 correctnessRuns.length,
@@ -303,6 +325,14 @@ export function buildRetrospectiveBenchmarkV5(input: {
                         sum + run.futurePositiveCount,
                     0
                 ),
+            maturePositiveEventCountAcrossWindows:
+                perRun
+                    .filter((run) => run.outcomeWindowMature)
+                    .reduce(
+                        (sum, run) =>
+                            sum + run.futurePositiveCount,
+                        0
+                    ),
             negativeEventCountAcrossWindows:
                 perRun.reduce(
                     (sum, run) =>
@@ -378,7 +408,8 @@ export function buildRetrospectiveBenchmarkV5(input: {
                 'NOT_YET_IDENTIFIABLE_WITH_CURRENT_LOGS'
         },
         limitations: [
-            'Run-level future-event windows may overlap; aggregate metrics are descriptive means across runs.',
+            'Accuracy metrics exclude runs whose future-outcome horizon has not fully matured, preventing right-censoring from recent runs.',
+            'Run-level future-event windows may overlap; aggregate metrics are descriptive means across mature evaluable runs.',
             'Future positives can arise outside recommendation exposure, so end-to-end recall measures interest recovery rather than causal recommendation effect.',
             'Serendipity and long-tail coverage remain unsupported until stable catalog popularity/exposure baselines are versioned.'
         ],

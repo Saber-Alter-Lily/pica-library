@@ -33,6 +33,7 @@
 - P3B-1 增加 deterministic candidate hygiene shadow：shadow retrieval 后、任何 relevance ranking 前，按 Owned / Seen / Duplicate Report / Temporary Suppression / BLOCK / work-level identity 去除确定性不可展示或重复候选，并逐项记录 removal reason；`Dislike` / `LESS` 等 taste negative 不硬过滤。Shadow audit 从本阶段起保存过滤后 candidate IDs，同时保留 raw retrieval 与 hygiene telemetry。
 - P3C-1 增加 explainable relevance ranker shadow：在 hygiene 后用 channel priority、route corroboration、provider rank/precision、精确 item feedback、Lifetime / 30d / 7d / Session affinity、显式 MORE/LESS/TARGET 与低权重 popularity 生成透明线性分数和真实 reason codes；Visual、diversity 和 exploration quota 不进入 relevance score，`learningToRank=false`、`servingImpact=false`。Shadow audit 从本阶段起保存 ranked candidate ID 顺序及前 100 项 feature/reason evidence。
 - P3D-1 增加 deterministic batch diversity shadow：在 relevance ranking 之后使用 greedy saturation 选择批次，作者 / FANDOM-IP / 语义标签采用 A→B→C 分阶段上限与软惩罚，Provider 仅使用小幅 balance bonus；记录 raw-top 与 selected concentration、relevance delta 和 pass 分布。Visual style diversity 继续关闭，`servingImpact=false`。
+- P3E-1 固化 session mode shadow policy：将 DEFAULT / FAMILIAR / RECENT / EXPLORE / TARGET 的差异版本化为 channel/source priority policy；模式改变召回来源与预算竞争，不改 relevance ranker 权重。当前仅在 shadow pipeline 生效，正式 Web/Android 模式入口暂不开放，等待 benchmark 与 serving promotion。
 
 ## v0.4.0 — 多来源与统一语义
 

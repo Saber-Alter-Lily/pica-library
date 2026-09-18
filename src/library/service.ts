@@ -131,6 +131,7 @@ import { buildVisualAuthorAtlasV5 } from '../recommendation-v5/visual-author-atl
 import { buildVisualStyleFamiliesV5 } from '../recommendation-v5/visual-style-families'
 import { buildVisualCandidateCoverageV5 } from '../recommendation-v5/visual-candidate-coverage'
 import { evaluateVisualActivationGateV5 } from '../recommendation-v5/visual-activation-gate'
+import { auditShadowCorrectnessV5 } from '../recommendation-v5/correctness-audit'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -453,6 +454,12 @@ export class LibraryService {
                 )
             )
         )
+        const correctnessAudit = auditShadowCorrectnessV5({
+            candidates: hygiene.candidates,
+            diversified: diversity.rows,
+            catalog,
+            state
+        })
         const visualCoverage = buildVisualCandidateCoverageV5({
             ranked: ranking.rows,
             diversified: diversity.rows,
@@ -500,6 +507,7 @@ export class LibraryService {
                 hygieneTelemetry: hygiene.telemetry,
                 rankingTelemetry: ranking.telemetry,
                 diversityTelemetry: diversity.telemetry,
+                correctnessAudit,
                 visualCandidateCoverage: visualCoverage,
                 diversifiedBatch: diversity.rows.map(
                     (row) => ({
@@ -534,6 +542,7 @@ export class LibraryService {
             hygiene,
             ranking,
             diversity,
+            correctnessAudit,
             visualCoverage,
             executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
             trigger: 'EXPLICIT_CONFIRMATION' as const,

@@ -64,6 +64,8 @@
 - V5 Evaluation 改为“测试进度优先”：普通层只展示基础轮次、安全检查、后续真实行为积累与“正式推荐未改变”；Precision/NDCG、Gate、modelVersion 与高级学习收进开发者详情。Future-outcome benchmark 升级为 outcome-maturity 口径，未走完整观察窗的 run 仅计 provisional evidence，不进入正式准确率，避免右删失偏倚。
 - 设置页实验能力分层：Visual QC、P2A 作品身份审计、V5 Evaluation 统一归入默认折叠的“实验与诊断（高级）”；画风模型参数、本地更新 ZIP、性能/Browser Lite 导出、文件/日志工具均从普通主流程降为高级项。
 - Web UX 审计第二轮收口：Reader 增加固定上一章/下一章与当前章节高亮；漫画库/搜索补明确空状态与回车操作；收藏同步、在线搜索、下载启动、维护工具及 WebDAV 测试/保存/扫描增加防重复 busy 状态；设置页连接状态改为用户主动检查，不再打开页面自动探测 Pica/WebDAV；退役重复软件更新轮询并合并全局 DOM observer；同时修正中文推荐/Visual/收藏图鉴与动态外观文案的语言一致性。
+- Web UX 审计第三轮收口：统一应用内确认/输入弹窗，替代书架、推荐重建、下载取消、更新、Browser Lite 与 WebDAV 等主流程中的浏览器原生 prompt/confirm；设置 Hub 升级为可键盘操作的标准 tablist/tab/tabpanel；E-H 主操作与高级操作分层并增加防重复提交；导入改为“选择并导入”单步流程；设置保存、连接测试、代理检测、更新检查、导出与预览缓存清理统一 busy/失败回执；移除主题脚本与主应用重复的滚动恢复，并将主题/Visual/设置 Hub 的全局 DOM 工作合并或降频，减少常驻扫描。
+
 
 ## v0.4.0 — 多来源与统一语义
 

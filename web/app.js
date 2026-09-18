@@ -238,10 +238,10 @@ function activateView(id) {
     if (id === 'reader' && previousView !== 'reader')
         state.reader.originView = previousView
     activeView = id
-    $('.view').forEach((view) =>
+    document.querySelectorAll('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
     )
-    $('nav button').forEach((item) =>
+    document.querySelectorAll('nav button').forEach((item) =>
         item.classList.toggle('active', item.dataset.view === id)
     )
     document.body.classList.toggle('reader-active', id === 'reader')

@@ -5,6 +5,9 @@ on:
     branches:
       - feature/recommendation-v5-portable-policy
       - tmp-v5-p2a-decisions
+  pull_request:
+    branches:
+      - feature/recommendation-v5-portable-policy
 
 permissions:
   contents: read

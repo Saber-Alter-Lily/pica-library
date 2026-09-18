@@ -33,6 +33,17 @@ jobs:
           pnpm test
           pnpm build
 
+      - name: Run real-browser Web smoke
+        run: bash scripts/run-web-browser-smoke.sh
+      - name: Upload Web smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-smoke-${{ github.run_id }}-${{ github.job }}
+          path: test-results/
+          retention-days: 3
+          if-no-files-found: ignore
+
   windows-beta:
     needs: web-and-desktop
     runs-on: windows-latest

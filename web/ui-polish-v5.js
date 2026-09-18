@@ -351,6 +351,24 @@ function installRemoteStorageFlow() {
     actions.insertAdjacentElement('beforebegin', hint)
 }
 
+function installGlobalNavMetrics() {
+    const nav = ux$('.app-nav')
+    if (!nav || nav.dataset.uxMeasured) return
+    nav.dataset.uxMeasured = '1'
+    const update = () => {
+        const height = Math.ceil(nav.getBoundingClientRect().height)
+        document.documentElement.style.setProperty(
+            '--ux-app-nav-height',
+            height + 'px'
+        )
+    }
+    update()
+    if ('ResizeObserver' in window) {
+        const observer = new ResizeObserver(update)
+        observer.observe(nav)
+    }
+}
+
 function installReaderHeader() {
     const header = ux$('.reader-header')
     if (!header || header.dataset.uxPolished) return
@@ -482,6 +500,7 @@ function installUxPolish() {
     installSettingsUtilities()
     installUpdatePanel()
     installRemoteStorageFlow()
+    installGlobalNavMetrics()
     installReaderHeader()
     installExperimentHub()
     normalizeDangerAndStatus()

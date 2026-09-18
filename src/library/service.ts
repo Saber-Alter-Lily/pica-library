@@ -137,6 +137,10 @@ import { evaluateSteerabilityV5 } from '../recommendation-v5/steerability-audit'
 import { buildEvaluationFrameworkV5 } from '../recommendation-v5/evaluation-framework'
 import { compareRetrospectiveBenchmarksV5 } from '../recommendation-v5/benchmark-comparison'
 import {
+    evaluateAdvancedLearningGateV5,
+    type AdvancedLearningDirectionV5
+} from '../recommendation-v5/advanced-learning-gate'
+import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
     preferenceAdjustmentV5
@@ -557,6 +561,60 @@ export class LibraryService {
                 modelVersion,
                 generatedAt: audit.generatedAt,
                 candidateIdCount: audit.candidateIds.length
+            }
+        }
+    }
+
+    recommendationV5AdvancedLearningGate(
+        directionInput?: string | null,
+        baselineVersion?: string | null,
+        candidateVersion?: string | null,
+        limit = 1000,
+        horizonDays = 30
+    ) {
+        const directionText = String(directionInput ?? '')
+            .trim()
+            .toUpperCase()
+        const direction = [
+            'LEARNING_TO_RANK',
+            'CONTEXTUAL_BANDIT',
+            'ACTIVE_LEARNING'
+        ].includes(directionText)
+            ? (directionText as AdvancedLearningDirectionV5)
+            : null
+        const evaluation = this.recommendationV5EvaluationSummary(
+            Math.max(1, Math.min(1000, Math.floor(limit))),
+            horizonDays,
+            3,
+            30
+        )
+        const baseline = String(baselineVersion ?? '').trim()
+        const candidate = String(candidateVersion ?? '').trim()
+        const comparison =
+            baseline && candidate
+                ? this.recommendationV5BenchmarkComparison(
+                      baseline,
+                      candidate,
+                      limit,
+                      horizonDays
+                  )
+                : null
+        return {
+            ...evaluateAdvancedLearningGateV5({
+                evaluation,
+                comparison,
+                direction
+            }),
+            evidence: {
+                evaluationStatus: evaluation.status,
+                evaluationFrameworkVersion:
+                    evaluation.frameworkVersion,
+                comparisonStatus:
+                    comparison?.status ?? null,
+                comparisonVersion:
+                    comparison?.comparisonVersion ?? null,
+                baselineVersion: baseline || null,
+                candidateVersion: candidate || null
             }
         }
     }

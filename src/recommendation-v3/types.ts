@@ -7,6 +7,7 @@ export type V3EventType =
     | 'recommend_like'
     | 'recommend_dislike'
     | 'recommend_feedback_reason'
+    | 'recommendation_item_disposition'
     | 'preview_open'
     | 'preview_more'
     | 'favorite_add'

@@ -49,6 +49,19 @@ describe('Recommendation V5 portable product contract', () => {
         expect(theme).toContain('新一轮推荐已更新')
     })
 
+    it('separates factual recommendation dispositions from taste feedback', () => {
+        const policy = read('src/recommendation-v5/policy-store.ts')
+        const portable = read('src/recommendation-v5/portable-policy.ts')
+        const web = read('web/recommendation-v5-beta.js')
+        expect(policy).toContain('setItemDisposition')
+        expect(policy).toContain('recommendation_item_disposition')
+        expect(portable).toContain('seenComicIds')
+        expect(portable).toContain('ownedComicIds')
+        expect(portable).toContain('duplicateReportComicIds')
+        expect(portable).toContain('temporarySuppressions')
+        expect(web).toContain('30 天后自动恢复')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

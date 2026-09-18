@@ -388,7 +388,7 @@ function suppressionMessage(reason) {
         already_seen:'已标记看过 · 当前作品将从新作推荐中隐藏',
         already_owned:'已标记已有 · 当前作品不再作为新作推荐',
         duplicate:'已标记重复反馈 · 当前上传将隐藏',
-        temporary:'已隐藏当前作品 · 可在后续偏好管理中恢复'
+        temporary:'已暂时隐藏当前作品 · 30 天后自动恢复'
     }[reason]||'已隐藏当前作品'
 }
 
@@ -401,7 +401,7 @@ function openQuickControl(card) {
     body.innerHTML=signals.map(quickSliderRow).join('')+`<div class="v5-quick-row"><strong>这本作品不该作为新推荐出现</strong>
     <div class="v5-suppress-grid"><button data-v5-suppress-reason="already_seen">已经看过</button>
     <button data-v5-suppress-reason="already_owned">已经拥有</button><button data-v5-suppress-reason="duplicate">重复上传</button>
-    <button data-v5-suppress-reason="temporary">暂时不想看</button></div></div>`
+    <button data-v5-suppress-reason="temporary">暂时不想看（30天）</button></div></div>`
     body.querySelectorAll('[data-v5-quick-level]').forEach(input=>{
         input.addEventListener('input',()=>{const output=body.querySelector(`[data-v5-quick-value="${CSS.escape(input.dataset.v5QuickLevel)}"]`);if(output)output.textContent=`${input.value}/10`})
         input.addEventListener('change',async()=>{const signal=V5.quickSignals.get(input.dataset.v5QuickLevel);if(!signal)return;await setLevel(signal,Number(input.value));dialog.close()})

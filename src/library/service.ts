@@ -292,10 +292,13 @@ export class LibraryService {
 
     suppressRecommendationV5Comic(input: Record<string, unknown>) {
         const store = new RecommendationPolicyStoreV5(this.database)
-        store.suppressComic(
-            String(input.comicId ?? ''),
-            input.suppressed !== false
-        )
+        store.setItemDisposition({
+            comicId: input.comicId,
+            reason: input.reason,
+            active: input.suppressed !== false,
+            durationDays: input.durationDays,
+            source: 'DESKTOP'
+        })
         return this.recommendationV5Snapshot()
     }
 

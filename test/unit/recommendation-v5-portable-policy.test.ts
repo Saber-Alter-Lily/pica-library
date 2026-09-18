@@ -189,6 +189,104 @@ describe('Recommendation V5 portable policy', () => {
         expect(signals.find((item) => item.targetType === 'TAG' && item.key === 't')?.supportCount).toBe(1)
     })
 
+    it('keeps seen/owned/duplicate/temporary facts separate from taste feedback', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-facts-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        database.importCatalog(
+            [
+                {
+                    comicId: 'comic-seen',
+                    title: 'Seen',
+                    author: 'Artist',
+                    tags: [],
+                    categories: [],
+                    finished: true
+                },
+                {
+                    comicId: 'comic-owned',
+                    title: 'Owned',
+                    author: 'Artist',
+                    tags: [],
+                    categories: [],
+                    finished: true
+                }
+            ],
+            'test'
+        )
+        const store = new RecommendationPolicyStoreV5(database)
+        store.setItemDisposition({
+            comicId: 'comic-seen',
+            reason: 'already_seen'
+        })
+        store.setItemDisposition({
+            comicId: 'comic-owned',
+            reason: 'already_owned'
+        })
+        store.setItemDisposition({
+            comicId: 'comic-dup',
+            reason: 'duplicate'
+        })
+        store.setItemDisposition({
+            comicId: 'comic-temp',
+            reason: 'temporary',
+            durationDays: 30
+        })
+        const snapshot = store.snapshot()
+        expect(snapshot.seenComicIds).toContain('comic-seen')
+        expect(snapshot.ownedComicIds).toContain('comic-owned')
+        expect(snapshot.duplicateReportComicIds).toContain('comic-dup')
+        expect(snapshot.temporarySuppressions).toHaveLength(1)
+        expect(database.recommendationFeedback()).toHaveLength(0)
+        expect(
+            database
+                .listUserEvents({ limit: 50 })
+                .filter(
+                    (event) =>
+                        event.eventType ===
+                        'recommendation_item_disposition'
+                )
+        ).toHaveLength(4)
+        database.close()
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('expires temporary suppression without turning it into a taste negative', () => {
+        const target = comic({
+            comicId: 'temporary',
+            title: 'Temporary'
+        })
+        const state = {
+            ...defaultPortablePolicyStateV5(),
+            temporarySuppressions: [
+                {
+                    comicId: 'temporary',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    expiresAt: '2026-01-02T00:00:00.000Z'
+                }
+            ]
+        }
+        expect(preferenceAdjustmentV5(target, state).blocked).toBe(false)
+    })
+
+    it('treats an ownership override as owned without changing the comic record', () => {
+        const target = comic({
+            comicId: 'manual-owned',
+            title: 'Manual owned'
+        })
+        const state = {
+            ...defaultPortablePolicyStateV5(),
+            ownedComicIds: ['manual-owned']
+        }
+        const result = filterCandidatesAgainstOwnedV5(
+            [{ comic: target }],
+            [target],
+            state
+        )
+        expect(result.rows).toHaveLength(0)
+        expect(target.isFavorite).toBe(false)
+        expect(target.inLibrary).toBe(false)
+    })
+
     it('persists controls and merges dirty mobile feedback using server-side events', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-policy-'))
         const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))

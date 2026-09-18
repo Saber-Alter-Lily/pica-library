@@ -8,6 +8,17 @@ export type PreferenceDirection = 'LESS' | 'DEFAULT' | 'MORE' | 'BLOCK'
 export type PreferenceScope = 'PERSISTENT' | 'SESSION'
 export type SessionIntentMode = 'DEFAULT' | 'FAMILIAR' | 'EXPLORE' | 'RECENT' | 'TARGET'
 
+export type RecommendationItemFactV5 =
+    | 'ALREADY_SEEN'
+    | 'ALREADY_OWNED'
+    | 'DUPLICATE_REPORT'
+
+export interface TemporarySuppressionV5 {
+    comicId: string
+    createdAt: string
+    expiresAt: string
+}
+
 export interface PreferenceControlV5 {
     targetType: PreferenceTargetType
     key: string
@@ -39,7 +50,16 @@ export interface PortablePolicyStateV5 {
     updatedAt: string
     controls: PreferenceControlV5[]
     sessionIntent: SessionIntentV5
+    /**
+     * Legacy/permanent comic-level hard suppression. Kept for Android and
+     * older V5 state compatibility; new factual actions use the typed fields
+     * below instead of collapsing everything into this set.
+     */
     hardSuppressComicIds: string[]
+    seenComicIds: string[]
+    ownedComicIds: string[]
+    duplicateReportComicIds: string[]
+    temporarySuppressions: TemporarySuppressionV5[]
     explicitDistinctPairs: string[]
     deviceSyncRevisions: Record<string, number>
 }
@@ -63,6 +83,10 @@ export interface PortablePolicySnapshotV5 extends PortablePolicyStateV5 {
         favorites: number
         controls: number
         hardSuppressed: number
+        seenFacts: number
+        ownedOverrides: number
+        duplicateReports: number
+        temporarySuppressed: number
     }
 }
 
@@ -86,6 +110,10 @@ export function defaultPortablePolicyStateV5(): PortablePolicyStateV5 {
             updatedAt: nowIso()
         },
         hardSuppressComicIds: [],
+        seenComicIds: [],
+        ownedComicIds: [],
+        duplicateReportComicIds: [],
+        temporarySuppressions: [],
         explicitDistinctPairs: [],
         deviceSyncRevisions: {}
     }
@@ -103,6 +131,30 @@ export function normalizeLevelDeltaV5(value: unknown) {
     const numeric = Number(value)
     if (!Number.isFinite(numeric)) return undefined
     return Math.max(-9, Math.min(9, Math.round(numeric)))
+}
+
+export const TEMPORARY_SUPPRESSION_DAYS_V5 = 30
+
+export function activeTemporarySuppressionsV5(
+    state: Pick<PortablePolicyStateV5, 'temporarySuppressions'>,
+    now = new Date()
+) {
+    const nowMs = now.getTime()
+    return (state.temporarySuppressions || []).filter((item) => {
+        const expiresAt = Date.parse(item.expiresAt)
+        return Number.isFinite(expiresAt) && expiresAt > nowMs
+    })
+}
+
+export function isTemporarilySuppressedV5(
+    comicId: string,
+    state: Pick<PortablePolicyStateV5, 'temporarySuppressions'>,
+    now = new Date()
+) {
+    const id = normalizePreferenceKey(comicId)
+    return activeTemporarySuppressionsV5(state, now).some(
+        (item) => normalizePreferenceKey(item.comicId) === id
+    )
 }
 
 /**
@@ -208,8 +260,18 @@ export function isOwnedComicV5(comic: StoredComic) {
     return Boolean(comic.isFavorite || comic.inLibrary || comic.downloadedPictures > 0)
 }
 
-export function buildOwnedCatalogV5(catalog: StoredComic[]) {
-    return catalog.filter(isOwnedComicV5)
+export function buildOwnedCatalogV5(
+    catalog: StoredComic[],
+    state?: Pick<PortablePolicyStateV5, 'ownedComicIds'>
+) {
+    const overrides = new Set(
+        (state?.ownedComicIds || []).map(normalizePreferenceKey)
+    )
+    return catalog.filter(
+        (comic) =>
+            isOwnedComicV5(comic) ||
+            overrides.has(normalizePreferenceKey(comic.comicId))
+    )
 }
 
 export function isAlreadyOwnedWorkV5(
@@ -298,7 +360,18 @@ export function matchesControlV5(comic: StoredComic, control: PreferenceControlV
 export function preferenceAdjustmentV5(comic: StoredComic, state: PortablePolicyStateV5) {
     let adjustment = 0
     const reasons: string[] = []
-    let blocked = state.hardSuppressComicIds.includes(comic.comicId)
+    const comicKey = normalizePreferenceKey(comic.comicId)
+    let blocked =
+        state.hardSuppressComicIds.some(
+            (id) => normalizePreferenceKey(id) === comicKey
+        ) ||
+        state.seenComicIds.some(
+            (id) => normalizePreferenceKey(id) === comicKey
+        ) ||
+        state.duplicateReportComicIds.some(
+            (id) => normalizePreferenceKey(id) === comicKey
+        ) ||
+        isTemporarilySuppressedV5(comic.comicId, state)
     for (const control of state.controls) {
         if (!matchesControlV5(comic, control)) continue
         if (control.direction === 'BLOCK') {
@@ -371,7 +444,7 @@ export function filterCandidatesAgainstOwnedV5<T extends { comic: StoredComic }>
     catalog: StoredComic[],
     state: PortablePolicyStateV5
 ) {
-    const owned = buildOwnedCatalogV5(catalog)
+    const owned = buildOwnedCatalogV5(catalog, state)
     let exactOrOwnedRemoved = 0
     let workDuplicateRemoved = 0
     let hardBlockedRemoved = 0
@@ -443,7 +516,11 @@ export function portablePolicySnapshotV5(state: PortablePolicyStateV5, catalog: 
             owned: catalog.filter(isOwnedComicV5).length,
             favorites: catalog.filter((comic) => comic.isFavorite).length,
             controls: state.controls.length,
-            hardSuppressed: state.hardSuppressComicIds.length
+            hardSuppressed: state.hardSuppressComicIds.length,
+            seenFacts: state.seenComicIds.length,
+            ownedOverrides: state.ownedComicIds.length,
+            duplicateReports: state.duplicateReportComicIds.length,
+            temporarySuppressed: activeTemporarySuppressionsV5(state).length
         }
     }
 }

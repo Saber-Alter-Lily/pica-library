@@ -2,6 +2,8 @@ import type { LibraryDatabase } from '../library/database'
 import {
     RECOMMENDATION_V5_POLICY_STATE_KEY,
     RECOMMENDATION_V5_POLICY_VERSION,
+    TEMPORARY_SUPPRESSION_DAYS_V5,
+    activeTemporarySuppressionsV5,
     defaultPortablePolicyStateV5,
     normalizeControlV5,
     portablePolicySnapshotV5,
@@ -78,6 +80,39 @@ export class RecommendationPolicyStoreV5 {
             return {
                 ...stored,
                 controls: stored.controls.map((item) => normalizeControlV5(item)),
+                seenComicIds: Array.isArray(stored.seenComicIds)
+                    ? stored.seenComicIds.map(String)
+                    : [],
+                ownedComicIds: Array.isArray(stored.ownedComicIds)
+                    ? stored.ownedComicIds.map(String)
+                    : [],
+                duplicateReportComicIds: Array.isArray(
+                    stored.duplicateReportComicIds
+                )
+                    ? stored.duplicateReportComicIds.map(String)
+                    : [],
+                temporarySuppressions: activeTemporarySuppressionsV5({
+                    temporarySuppressions: Array.isArray(
+                        stored.temporarySuppressions
+                    )
+                        ? stored.temporarySuppressions
+                              .filter(
+                                  (item) =>
+                                      item &&
+                                      typeof item === 'object' &&
+                                      String(item.comicId ?? '').trim() &&
+                                      String(item.expiresAt ?? '').trim()
+                              )
+                              .map((item) => ({
+                                  comicId: String(item.comicId),
+                                  createdAt: String(
+                                      item.createdAt ??
+                                          new Date().toISOString()
+                                  ),
+                                  expiresAt: String(item.expiresAt)
+                              }))
+                        : []
+                }),
                 explicitDistinctPairs: Array.isArray(stored.explicitDistinctPairs)
                     ? stored.explicitDistinctPairs.map(String)
                     : [],
@@ -175,6 +210,115 @@ export class RecommendationPolicyStoreV5 {
             revision: previous.revision + 1,
             updatedAt: new Date().toISOString(),
             hardSuppressComicIds: [...values].sort()
+        })
+        return this.snapshot()
+    }
+
+    setItemDisposition(input: {
+        comicId: unknown
+        reason?: unknown
+        active?: unknown
+        durationDays?: unknown
+        source?: 'DESKTOP' | 'ANDROID'
+    }) {
+        const comicId = String(input.comicId ?? '').trim()
+        if (!comicId) throw new Error('Comic id is required')
+        const reason = String(input.reason ?? '').trim().toLowerCase()
+        const active = input.active !== false
+        const previous = this.state()
+        const now = new Date()
+        const updateSet = (values: string[], enabled: boolean) => {
+            const next = new Set(values)
+            if (enabled) next.add(comicId)
+            else next.delete(comicId)
+            return [...next].sort()
+        }
+
+        let next: PortablePolicyStateV5 = {
+            ...previous,
+            temporarySuppressions: activeTemporarySuppressionsV5(previous, now)
+        }
+        let expiresAt: string | null = null
+        let auditReason = reason || 'legacy'
+
+        if (reason === 'already_seen') {
+            next = {
+                ...next,
+                seenComicIds: updateSet(next.seenComicIds, active)
+            }
+        } else if (reason === 'already_owned') {
+            next = {
+                ...next,
+                ownedComicIds: updateSet(next.ownedComicIds, active)
+            }
+        } else if (reason === 'duplicate') {
+            next = {
+                ...next,
+                duplicateReportComicIds: updateSet(
+                    next.duplicateReportComicIds,
+                    active
+                )
+            }
+        } else if (reason === 'temporary') {
+            const durationDays = Math.max(
+                1,
+                Math.min(
+                    365,
+                    Math.round(
+                        Number(input.durationDays) ||
+                            TEMPORARY_SUPPRESSION_DAYS_V5
+                    )
+                )
+            )
+            const remaining = next.temporarySuppressions.filter(
+                (item) => item.comicId !== comicId
+            )
+            if (active) {
+                const expiry = new Date(
+                    now.getTime() + durationDays * 24 * 60 * 60 * 1000
+                )
+                expiresAt = expiry.toISOString()
+                remaining.push({
+                    comicId,
+                    createdAt: now.toISOString(),
+                    expiresAt
+                })
+            }
+            next = {
+                ...next,
+                temporarySuppressions: remaining.sort((a, b) =>
+                    a.comicId.localeCompare(b.comicId)
+                )
+            }
+        } else {
+            auditReason = 'legacy_hard_suppress'
+            next = {
+                ...next,
+                hardSuppressComicIds: updateSet(
+                    next.hardSuppressComicIds,
+                    active
+                )
+            }
+        }
+
+        next = {
+            ...next,
+            revision: next.revision + 1,
+            updatedAt: now.toISOString()
+        }
+        this.save(next)
+        this.database.recordUserEvent({
+            eventType: 'recommendation_item_disposition',
+            comicId,
+            source:
+                input.source === 'ANDROID'
+                    ? 'android-v5'
+                    : 'desktop-v5',
+            metadata: {
+                reason: auditReason,
+                active,
+                ...(expiresAt ? { expiresAt } : {})
+            }
         })
         return this.snapshot()
     }

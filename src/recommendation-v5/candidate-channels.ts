@@ -91,6 +91,7 @@ export interface CandidateChannelPlannerInputV5 {
     policy: PortablePolicyStateV5
     catalog: StoredComic[]
     tagFacets?: Record<string, string>
+    tagProviderCanonicals?: Record<string, string>
     providerEligibility?: Partial<
         Record<'pica' | 'eh' | 'exh', boolean>
     >
@@ -124,7 +125,8 @@ function anchorForControl(
         PreferenceControlV5,
         'targetType' | 'key' | 'label'
     >,
-    tagFacets: Record<string, string>
+    tagFacets: Record<string, string>,
+    tagProviderCanonicals: Record<string, string>
 ): CandidateChannelAnchorV5 {
     const key = normalizePreferenceKey(control.key)
     const facet =
@@ -136,7 +138,15 @@ function anchorForControl(
                 : control.targetType,
         key,
         label: control.label || control.key,
-        ...(facet ? { facet } : {})
+        ...(facet ? { facet } : {}),
+        ...(tagProviderCanonicals[key]
+            ? {
+                  providerCanonical: {
+                      eh: tagProviderCanonicals[key],
+                      exh: tagProviderCanonicals[key]
+                  }
+              }
+            : {})
     }
 }
 
@@ -410,6 +420,14 @@ export function buildCandidateChannelPlanV5(
             value
         ])
     )
+    const tagProviderCanonicals = Object.fromEntries(
+        Object.entries(input.tagProviderCanonicals ?? {}).map(
+            ([key, value]) => [
+                normalizePreferenceKey(key),
+                String(value ?? '').trim()
+            ]
+        )
+    )
     const mode = input.policy.sessionIntent.mode
     const blockedTargets = new Set(
         input.policy.controls
@@ -531,6 +549,20 @@ export function buildCandidateChannelPlanV5(
                         key: item.key,
                         label: item.label,
                         ...(facet ? { facet } : {}),
+                        ...(tagProviderCanonicals[
+                            normalizePreferenceKey(item.key)
+                        ]
+                            ? {
+                                  providerCanonical: {
+                                      eh: tagProviderCanonicals[
+                                          normalizePreferenceKey(item.key)
+                                      ],
+                                      exh: tagProviderCanonicals[
+                                          normalizePreferenceKey(item.key)
+                                      ]
+                                  }
+                              }
+                            : {}),
                         score: item.score,
                         supportItems: item.supportItems
                     }
@@ -586,7 +618,7 @@ export function buildCandidateChannelPlanV5(
             item.direction === 'MORE' &&
             item.scope === 'SESSION'
     )) {
-        const anchor = anchorForControl(control, tagFacets)
+        const anchor = anchorForControl(control, tagFacets, tagProviderCanonicals)
         add(
             channelFamilyForTarget(control.targetType, anchor.facet),
             'EXPLICIT_SESSION',
@@ -600,7 +632,7 @@ export function buildCandidateChannelPlanV5(
             item.direction === 'MORE' &&
             item.scope === 'PERSISTENT'
     )) {
-        const anchor = anchorForControl(control, tagFacets)
+        const anchor = anchorForControl(control, tagFacets, tagProviderCanonicals)
         add(
             channelFamilyForTarget(control.targetType, anchor.facet),
             'EXPLICIT_PERSISTENT',
@@ -622,7 +654,8 @@ export function buildCandidateChannelPlanV5(
                 key: intent.key,
                 label: intent.label ?? intent.key
             },
-            tagFacets
+            tagFacets,
+            tagProviderCanonicals
         )
         add(
             'TARGET',
@@ -712,6 +745,20 @@ export function buildCandidateChannelPlanV5(
                     key: item.key,
                     label: item.label,
                     ...(facet ? { facet } : {}),
+                    ...(tagProviderCanonicals[
+                        normalizePreferenceKey(item.key)
+                    ]
+                        ? {
+                              providerCanonical: {
+                                  eh: tagProviderCanonicals[
+                                      normalizePreferenceKey(item.key)
+                                  ],
+                                  exh: tagProviderCanonicals[
+                                      normalizePreferenceKey(item.key)
+                                  ]
+                              }
+                          }
+                        : {}),
                     score: item.score,
                     supportItems: item.supportItems
                 }

@@ -403,6 +403,36 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).not.toContain('candidate-hygiene')
     })
 
+    it('adds an explainable relevance ranker without enabling serving or Visual', () => {
+        const ranker = read(
+            'src/recommendation-v5/relevance-ranker.ts'
+        )
+        const service = read('src/library/service.ts')
+        const v3Ranker = read(
+            'src/recommendation-v3/ranker-adapter-v3.ts'
+        )
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(ranker).toContain(
+            "RELEVANCE_RANKER_V5_VERSION ="
+        )
+        expect(ranker).toContain("mode: 'SHADOW'")
+        expect(ranker).toContain('servingImpact: false')
+        expect(ranker).toContain('learningToRank: false')
+        expect(ranker).toContain('visualFeatureEnabled: false')
+        expect(ranker).toContain(
+            "scoreSemantics: 'EXPLAINABLE_LINEAR_BASELINE'"
+        )
+        expect(ranker).toContain('exactItemEvidence')
+        expect(ranker).toContain('sessionAffinity')
+        expect(ranker).toContain('explicitAdjustment')
+        expect(service).toContain('rankShadowCandidatesV5')
+        expect(service).toContain('rankingTelemetry')
+        expect(v3Ranker).not.toContain('relevance-ranker')
+        expect(coordinator).not.toContain('relevance-ranker')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

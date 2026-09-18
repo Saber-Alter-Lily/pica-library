@@ -26,6 +26,7 @@
 - P2B-1 启动 Behavior Evidence 语义层：新增 shadow-only evidence ledger，明确区分 Taste / Ownership / Exposure / Identity Report / Temporal Constraint / Hard Constraint / Profile Control；Like/Dislike 保持显式口味证据，收藏为强正向，完成阅读与重复阅读分层，预览/少量阅读为弱证据，下载拆为 ownership + weak taste，单纯曝光不再视为正向口味。当前 `rankingImpact=false`，尚未替换 V3 ranker。
 - P2B-2 增加 legacy semantic drift 对照：shadow ledger 量化旧 V3 中“曝光被当正向”“下载/reader open/progress 被抬到接近强正向”“非 Dislike 的移除/取消被当负向”等差异，为后续行为权重迁移提供可审计基线；仍不改变线上排序。
 - P2C-1 增加 multi-timescale preference shadow：在不替换 V3 ranker 的前提下，将 inferred preference 分为 Lifetime / 7d / 30d / 90d / Session，并把 persistent/session explicit controls、session intent 与 hard constraints 作为独立层输出；历史收藏只进入 Lifetime，Recent/Session 仅使用带服务端事件时间的行为，当前 `rankingImpact=false`。
+- P3A-1 启动 multi-channel candidate planner：将 Session / Recent / Lifetime / Explicit 分别映射到 AUTHOR / FANDOM / TAG / CATEGORY / RELATED / EXPLORATION / REDISCOVERY / TARGET 通道，并为 Pica / E-H / ExH 分配独立请求预算；Provider failure isolation、BLOCK/LESS 语义和本地 rediscovery 均进入计划层，Visual 通道继续禁用。当前 `mode=SHADOW`、`servingImpact=false`，尚未接管 V3 retriever。
 
 ## v0.4.0 — 多来源与统一语义
 

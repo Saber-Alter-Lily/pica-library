@@ -433,6 +433,35 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).not.toContain('relevance-ranker')
     })
 
+    it('adds deterministic diversity after relevance ranking without enabling style diversity', () => {
+        const diversity = read(
+            'src/recommendation-v5/batch-diversity.ts'
+        )
+        const service = read('src/library/service.ts')
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(diversity).toContain(
+            "BATCH_DIVERSITY_V5_VERSION ="
+        )
+        expect(diversity).toContain(
+            "method: 'GREEDY_SATURATION'"
+        )
+        expect(diversity).toContain("mode: 'SHADOW'")
+        expect(diversity).toContain('servingImpact: false')
+        expect(diversity).toContain(
+            'visualStyleDiversityEnabled: false'
+        )
+        expect(diversity).toContain('AUTHOR_SATURATION')
+        expect(diversity).toContain('FANDOM_SATURATION')
+        expect(diversity).toContain('TAG_SATURATION')
+        expect(diversity).toContain('PROVIDER_BALANCE')
+        expect(service).toContain('diversifyShadowBatchV5')
+        expect(service).toContain('diversityTelemetry')
+        expect(service).toContain('diversifiedBatch')
+        expect(coordinator).not.toContain('batch-diversity')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

@@ -314,6 +314,42 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('runs provider-isolated shadow retrieval only through explicit Desktop authority', () => {
+        const shadow = read(
+            'src/recommendation-v5/shadow-retrieval.ts'
+        )
+        const provider = read('src/services/provider-service.ts')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const retriever = read(
+            'src/recommendation-v3/retriever-v3.ts'
+        )
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(shadow).toContain(
+            "SHADOW_RETRIEVAL_V5_VERSION ="
+        )
+        expect(shadow).toContain('persistCandidates: false')
+        expect(shadow).toContain('providerFailureIsolation: true')
+        expect(provider).toContain('options: { persist?: boolean }')
+        expect(provider).toContain('if (persist)')
+        expect(provider).toContain('relatedPica')
+        expect(service).toContain(
+            'RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION'
+        )
+        expect(service).toContain(
+            "RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL"
+        )
+        expect(service).toContain('{ persist: false }')
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/shadow-retrieval'
+        )
+        expect(server).toContain("request.headers['x-pica-csrf']")
+        expect(retriever).not.toContain('shadow-retrieval')
+        expect(coordinator).not.toContain('shadow-retrieval')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

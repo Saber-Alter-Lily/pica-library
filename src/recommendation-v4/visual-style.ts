@@ -151,13 +151,16 @@ function desiredPrototypeCount(count: number, maximum: number) {
     return Math.min(5, maximum)
 }
 
-interface WeightedVector {
+export interface VisualPrototypeEvidence {
     comicId: string
     vector: number[]
     weight: number
 }
 
-function buildPrototypes(evidence: WeightedVector[], maximum: number) {
+export function buildVisualPrototypes(
+    evidence: VisualPrototypeEvidence[],
+    maximum: number
+) {
     if (!evidence.length || maximum <= 0) return []
     const dimension = evidence[0].vector.length
     const rows = evidence
@@ -168,7 +171,7 @@ function buildPrototypes(evidence: WeightedVector[], maximum: number) {
     const k = Math.max(1, desiredPrototypeCount(rows.length, maximum))
     const centers: number[][] = [rows[0].vector]
     while (centers.length < k) {
-        let selected: WeightedVector | null = null
+        let selected: VisualPrototypeEvidence | null = null
         let selectedDistance = -1
         for (const row of rows) {
             const nearest = Math.max(
@@ -283,8 +286,8 @@ export function buildVisualPreferenceProfile(input: {
     for (const item of cover) preferred.set(item.comicId, item)
     for (const item of body) preferred.set(item.comicId, item)
     const feedbackByComic = new Map(input.feedback.map((item) => [item.comicId, item]))
-    const positives: WeightedVector[] = []
-    const negatives: WeightedVector[] = []
+    const positives: VisualPrototypeEvidence[] = []
+    const negatives: VisualPrototypeEvidence[] = []
     let favoriteEmbeddingCount = 0
     for (const comicId of [...input.favoriteComicIds].sort()) {
         const embedding = preferred.get(comicId)
@@ -318,7 +321,7 @@ export function buildVisualPreferenceProfile(input: {
         }
     }
     if (!positives.length) return null
-    const uniquePositive = new Map<string, WeightedVector>()
+    const uniquePositive = new Map<string, VisualPrototypeEvidence>()
     for (const row of positives) {
         const previous = uniquePositive.get(row.comicId)
         uniquePositive.set(row.comicId, {
@@ -326,7 +329,7 @@ export function buildVisualPreferenceProfile(input: {
             weight: Math.max(previous?.weight ?? 0, row.weight)
         })
     }
-    const uniqueNegative = new Map<string, WeightedVector>()
+    const uniqueNegative = new Map<string, VisualPrototypeEvidence>()
     for (const row of negatives) {
         const previous = uniqueNegative.get(row.comicId)
         uniqueNegative.set(row.comicId, {
@@ -340,8 +343,8 @@ export function buildVisualPreferenceProfile(input: {
         modelId: VISUAL_MODEL_ID,
         modelVersion: VISUAL_MODEL_VERSION,
         generatedAt: (input.now ?? new Date()).toISOString(),
-        positivePrototypes: buildPrototypes([...uniquePositive.values()], 5),
-        negativePrototypes: buildPrototypes([...uniqueNegative.values()], 3),
+        positivePrototypes: buildVisualPrototypes([...uniquePositive.values()], 5),
+        negativePrototypes: buildVisualPrototypes([...uniqueNegative.values()], 3),
         positiveEvidenceCount: uniquePositive.size,
         negativeEvidenceCount: uniqueNegative.size,
         favoriteEmbeddingCount,

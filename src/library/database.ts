@@ -348,6 +348,112 @@ export class LibraryDatabase {
         }))
     }
 
+
+    saveWorkIdentityDecision(input: {
+        leftComicId: string
+        rightComicId: string
+        decision: 'SAME_WORK' | 'EDITION_VARIANT' | 'KEEP_SEPARATE'
+        source?: string
+        note?: string
+    }) {
+        const left = String(input.leftComicId ?? '').trim()
+        const right = String(input.rightComicId ?? '').trim()
+        if (!left || !right || left === right)
+            throw new Error('Two distinct comic ids are required')
+        const [leftComicId, rightComicId] = [left, right].sort()
+        const decision = String(input.decision ?? '')
+        if (
+            !['SAME_WORK', 'EDITION_VARIANT', 'KEEP_SEPARATE'].includes(
+                decision
+            )
+        )
+            throw new Error('Unknown work identity decision')
+        const now = new Date().toISOString()
+        const existing = this.db
+            .prepare(
+                'SELECT id, created_at FROM work_identity_decisions WHERE left_comic_id = ? AND right_comic_id = ?'
+            )
+            .get(leftComicId, rightComicId) as SqlRow | undefined
+        const id = existing ? String(existing.id) : randomUUID()
+        const createdAt = existing ? String(existing.created_at) : now
+        this.db
+            .prepare(
+                `INSERT INTO work_identity_decisions(
+                    id, left_comic_id, right_comic_id, decision, source, note,
+                    created_at, updated_at
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(left_comic_id, right_comic_id)
+                 DO UPDATE SET
+                    decision = excluded.decision,
+                    source = excluded.source,
+                    note = excluded.note,
+                    updated_at = excluded.updated_at`
+            )
+            .run(
+                id,
+                leftComicId,
+                rightComicId,
+                decision,
+                String(input.source ?? 'USER').slice(0, 80),
+                String(input.note ?? '').slice(0, 500),
+                createdAt,
+                now
+            )
+        return this.listWorkIdentityDecisions(5000).find(
+            (item) =>
+                item.leftComicId === leftComicId &&
+                item.rightComicId === rightComicId
+        )!
+    }
+
+    clearWorkIdentityDecision(leftId: string, rightId: string) {
+        const left = String(leftId ?? '').trim()
+        const right = String(rightId ?? '').trim()
+        if (!left || !right || left === right)
+            throw new Error('Two distinct comic ids are required')
+        const [leftComicId, rightComicId] = [left, right].sort()
+        const result = this.db
+            .prepare(
+                'DELETE FROM work_identity_decisions WHERE left_comic_id = ? AND right_comic_id = ?'
+            )
+            .run(leftComicId, rightComicId)
+        return {
+            leftComicId,
+            rightComicId,
+            removed: Number(result.changes ?? 0) > 0
+        }
+    }
+
+    listWorkIdentityDecisions(limit = 500) {
+        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
+        const rows = this.db
+            .prepare(
+                `SELECT d.*, lc.title AS left_title,
+                        rc.title AS right_title
+                 FROM work_identity_decisions d
+                 JOIN comics lc ON lc.id = d.left_comic_id
+                 JOIN comics rc ON rc.id = d.right_comic_id
+                 ORDER BY d.updated_at DESC, d.left_comic_id, d.right_comic_id
+                 LIMIT ?`
+            )
+            .all(bounded) as SqlRow[]
+        return rows.map((row) => ({
+            id: String(row.id),
+            leftComicId: String(row.left_comic_id),
+            rightComicId: String(row.right_comic_id),
+            leftTitle: String(row.left_title ?? ''),
+            rightTitle: String(row.right_title ?? ''),
+            decision: String(row.decision) as
+                | 'SAME_WORK'
+                | 'EDITION_VARIANT'
+                | 'KEEP_SEPARATE',
+            source: String(row.source ?? ''),
+            note: String(row.note ?? ''),
+            createdAt: String(row.created_at),
+            updatedAt: String(row.updated_at)
+        }))
+    }
+
     recordUserEvent(input: UserEventInput): UserEvent {
         const id = input.id ?? randomUUID()
         const occurredAt = new Date().toISOString()

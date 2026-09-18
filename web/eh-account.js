@@ -226,6 +226,16 @@ async function cancelWebLogin() {
     }
 }
 
+async function withBusyButton(button, work) {
+    if (!button || button.disabled) return
+    button.disabled = true
+    try {
+        await work()
+    } finally {
+        button.disabled = false
+    }
+}
+
 function clearInputs() {
     for (const id of ['#eh-member-id','#eh-pass-hash','#eh-igneous','#eh-cf-clearance']) {
         const input = $(id)
@@ -240,42 +250,94 @@ observeResultCardActions()
 
 $('#eh-web-login-start')?.addEventListener('click', () => void startWebLogin())
 $('#eh-web-login-cancel')?.addEventListener('click', () => void cancelWebLogin())
-$('#eh-account-save')?.addEventListener('click', async () => {
+$('#eh-account-save')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget
     const message = $('#eh-account-message')
-    try {
-        message.textContent = '正在验证 E-H 会话…'
-        await action({
-            ehAccountAction: 'save-session',
-            memberId: $('#eh-member-id').value,
-            passHash: $('#eh-pass-hash').value,
-            igneous: $('#eh-igneous').value,
-            cfClearance: $('#eh-cf-clearance').value
-        })
-        clearInputs()
-        message.textContent = 'E-H 会话验证成功并已加密保存。'
-    } catch (error) {
-        message.textContent = error instanceof Error ? error.message : String(error)
-    }
+    await withBusyButton(button, async () => {
+        try {
+            message.textContent = '正在验证 E-H 会话…'
+            await action({
+                ehAccountAction: 'save-session',
+                memberId: $('#eh-member-id').value,
+                passHash: $('#eh-pass-hash').value,
+                igneous: $('#eh-igneous').value,
+                cfClearance: $('#eh-cf-clearance').value
+            })
+            clearInputs()
+            message.textContent = 'E-H 会话验证成功并已加密保存。'
+        } catch (error) {
+            message.textContent =
+                error instanceof Error ? error.message : String(error)
+        }
+    })
 })
-$('#eh-account-verify')?.addEventListener('click', async () => {
+$('#eh-account-verify')?.addEventListener('click', async (event) => {
     const message = $('#eh-account-message')
-    try { message.textContent = '正在验证…'; await action({ ehAccountAction: 'verify-session' }); message.textContent = 'E-H 会话有效。' }
-    catch (error) { message.textContent = error instanceof Error ? error.message : String(error) }
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            message.textContent = '正在验证…'
+            await action({ ehAccountAction: 'verify-session' })
+            message.textContent = 'E-H 会话有效。'
+        } catch (error) {
+            message.textContent =
+                error instanceof Error ? error.message : String(error)
+        }
+    })
 })
-$('#eh-exh-probe')?.addEventListener('click', async () => {
+$('#eh-exh-probe')?.addEventListener('click', async (event) => {
     const message = $('#eh-account-message')
-    try { const value = await action({ ehAccountAction: 'probe-exh' }); message.textContent = 'ExH 扩展：' + exhLabel(value.ehAccount.exHentai, Boolean(value.ehAccount.configured)) }
-    catch (error) { message.textContent = error instanceof Error ? error.message : String(error) }
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            const value = await action({ ehAccountAction: 'probe-exh' })
+            message.textContent =
+                'ExH 扩展：' +
+                exhLabel(
+                    value.ehAccount.exHentai,
+                    Boolean(value.ehAccount.configured)
+                )
+        } catch (error) {
+            message.textContent =
+                error instanceof Error ? error.message : String(error)
+        }
+    })
 })
-$('#eh-favorites-sync')?.addEventListener('click', async () => {
+$('#eh-favorites-sync')?.addEventListener('click', async (event) => {
     const message = $('#eh-account-message')
-    try { message.textContent = '正在同步 E-H 云收藏…'; const value = await action({ ehAccountAction: 'sync-favorites' }); message.textContent = 'E-H 云收藏已同步：' + Number(value.ehAccount.sync?.remoteFavoriteCount || 0) + ' 本。' }
-    catch (error) { message.textContent = error instanceof Error ? error.message : String(error) }
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            message.textContent = '正在同步 E-H 云收藏…'
+            const value = await action({ ehAccountAction: 'sync-favorites' })
+            message.textContent =
+                'E-H 云收藏已同步：' +
+                Number(value.ehAccount.sync?.remoteFavoriteCount || 0) +
+                ' 本。'
+        } catch (error) {
+            message.textContent =
+                error instanceof Error ? error.message : String(error)
+        }
+    })
 })
-$('#eh-account-clear')?.addEventListener('click', async () => {
+$('#eh-account-clear')?.addEventListener('click', async (event) => {
+    const confirmed = window.picaConfirmAction
+        ? await window.picaConfirmAction(
+              '清除本机保存的 E-H 会话？E-H 公共搜索和阅读仍可继续使用。'
+          )
+        : window.confirm(
+              '清除本机保存的 E-H 会话？E-H 公共搜索和阅读仍可继续使用。'
+          )
+    if (!confirmed) return
     const message = $('#eh-account-message')
-    try { await action({ ehAccountAction: 'clear-session' }); clearInputs(); message.textContent = 'E-H 会话已从本机删除；公共功能不受影响。' }
-    catch (error) { message.textContent = error instanceof Error ? error.message : String(error) }
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            await action({ ehAccountAction: 'clear-session' })
+            clearInputs()
+            message.textContent =
+                'E-H 会话已从本机删除；公共功能不受影响。'
+        } catch (error) {
+            message.textContent =
+                error instanceof Error ? error.message : String(error)
+        }
+    })
 })
 
 void status().then(() => pollWebLogin()).catch(() => {})

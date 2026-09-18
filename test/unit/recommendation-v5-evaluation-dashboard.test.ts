@@ -13,10 +13,15 @@ describe('Recommendation V5 evaluation dashboard', () => {
         )
         expect(dashboard).toContain('void evalLoad()')
         expect(dashboard).toContain('async function evalRunShadow()')
-        expect(dashboard).not.toContain('void evalRunShadow()')
         expect(dashboard).toContain(
             "panel.querySelector('#v5-eval-run-shadow').onclick"
         )
+        const installBody =
+            /function evalInstall\(\) \{([\s\S]*?)\n\}/.exec(
+                dashboard
+            )?.[1] ?? ''
+        expect(installBody).toContain('void evalLoad()')
+        expect(installBody).not.toContain('evalRunShadow')
     })
 
     it('requires Desktop CSRF and explicit shadow confirmation for manual runs', () => {
@@ -49,4 +54,26 @@ describe('Recommendation V5 evaluation dashboard', () => {
         expect(dashboard).toContain('Steerability')
         expect(dashboard).toContain('高级学习')
     })
+
+    it('compares exact model versions only after explicit user action', () => {
+        const dashboard = read(
+            'web/recommendation-v5-evaluation.js'
+        )
+        expect(dashboard).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/versions'
+        )
+        expect(dashboard).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/compare'
+        )
+        expect(dashboard).toContain(
+            "button.onclick = () => void evalCompareSelected()"
+        )
+        expect(dashboard).toContain('winner = null')
+        const installBody =
+            /function evalInstall\(\) \{([\s\S]*?)\n\}/.exec(
+                dashboard
+            )?.[1] ?? ''
+        expect(installBody).not.toContain('evalCompareSelected')
+    })
+
 })

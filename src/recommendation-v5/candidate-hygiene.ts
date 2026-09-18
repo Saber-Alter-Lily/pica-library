@@ -44,7 +44,7 @@ function containsComicId(ids: Iterable<string>, comicId: string) {
     return false
 }
 
-function projectCandidateV5(
+export function projectShadowCandidateV5(
     record: FavoriteRecord,
     existing?: StoredComic
 ): StoredComic {
@@ -128,7 +128,7 @@ export function applyCandidateHygieneV5(
 
     for (const candidate of candidates) {
         const comicId = candidate.comic.comicId
-        const projected = projectCandidateV5(
+        const projected = projectShadowCandidateV5(
             candidate.comic,
             catalogById.get(normalizePreferenceKey(comicId))
         )

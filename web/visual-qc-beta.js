@@ -153,7 +153,8 @@ function a88EnsurePanel() {
     a88$('#a88-qc-random').onclick = () => void a88RandomAnchor()
     a88$('#a88-qc-diagnose').onclick = () => void a88DiagnosePending()
     a88$('#a88-qc-export').onclick = () => a88ExportQc()
-    void a88RefreshPanel()
+    a88$('#a88-qc-status').textContent =
+        'Visual V1 QC 尚未读取。点击“刷新”或“随机 Anchor”后才加载当前索引；打开设置页不会自动扫描。'
     return true
 }
 

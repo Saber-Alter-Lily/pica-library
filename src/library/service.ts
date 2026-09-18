@@ -115,6 +115,9 @@ import {
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../recommendation-v5/work-identity-foundation'
 
+export const WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION =
+    'PREPARE_CANONICAL_WORK_BINDING'
+
 export interface DiscoverQuery {
     keyword?: string
     tags?: string[]
@@ -370,6 +373,67 @@ export class LibraryService {
             ...plan,
             planDigest,
             storage: this.database.workIdentityStorageStatus()
+        }
+    }
+
+    prepareRecommendationV5WorkIdentityMaterialization(
+        input: Record<string, unknown>
+    ) {
+        const requestKey = String(input.requestKey ?? '').trim()
+        const expectedPlanVersion = String(
+            input.planVersion ?? ''
+        ).trim()
+        const expectedPlanDigest = String(
+            input.planDigest ?? ''
+        )
+            .trim()
+            .toLowerCase()
+        const confirmation = String(input.confirmation ?? '').trim()
+        if (
+            confirmation !==
+            WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION
+        )
+            throw new Error(
+                'Explicit materialization preparation confirmation is required'
+            )
+
+        const current =
+            this.recommendationV5WorkIdentityMaterializationPlan()
+        if (expectedPlanVersion !== current.planVersion)
+            throw new Error('Materialization plan version changed')
+        if (expectedPlanDigest !== current.planDigest)
+            throw new Error('Materialization plan digest changed')
+        if (current.summary.workGroupCount < 1)
+            throw new Error('No adjudicated work groups are ready to prepare')
+        if (
+            current.summary.blockedGroupCount > 0 ||
+            current.summary.warningCount > 0 ||
+            current.summary.fullBindingReadyCount !==
+                current.summary.workGroupCount
+        )
+            throw new Error(
+                'Materialization plan still contains blockers, warnings, or unresolved edition partitions'
+            )
+
+        const run = this.database.prepareWorkIdentityMaterializationRun({
+            requestKey,
+            planVersion: current.planVersion,
+            planDigest: current.planDigest,
+            plan: current
+        })
+        return {
+            mode: 'PREPARED_ONLY' as const,
+            executionEnabled: false,
+            applyEndpoint: null,
+            run,
+            currentPlanDigest: current.planDigest
+        }
+    }
+
+    recommendationV5WorkIdentityMaterializationRuns(limit = 100) {
+        return {
+            executionEnabled: false,
+            runs: this.database.listWorkIdentityMaterializationRuns(limit)
         }
     }
 

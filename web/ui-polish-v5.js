@@ -230,6 +230,14 @@ function installSearchToolbar() {
     const more = makeDetails('ux-search-filters', 'sourceFilters')
     moveNodes(more.querySelector('.ux-more-body'), [tags, source, sort])
     toolbar.replaceChildren(primary, more)
+    if (keyword && !keyword.dataset.uxEnterSearch) {
+        keyword.dataset.uxEnterSearch = '1'
+        keyword.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            button?.click()
+        })
+    }
 
     if (!ux$('#ux-search-selection')) {
         const selection = document.createElement('div')

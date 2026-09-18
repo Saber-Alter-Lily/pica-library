@@ -130,6 +130,7 @@ import { buildVisualRepresentationQcV5 } from '../recommendation-v5/visual-repre
 import { buildVisualAuthorAtlasV5 } from '../recommendation-v5/visual-author-atlas'
 import { buildVisualStyleFamiliesV5 } from '../recommendation-v5/visual-style-families'
 import { buildVisualCandidateCoverageV5 } from '../recommendation-v5/visual-candidate-coverage'
+import { evaluateVisualActivationGateV5 } from '../recommendation-v5/visual-activation-gate'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -543,6 +544,43 @@ export class LibraryService {
                 modelVersion,
                 generatedAt: audit.generatedAt,
                 candidateIdCount: audit.candidateIds.length
+            }
+        }
+    }
+
+    recommendationV5VisualActivationGate(limit = 100) {
+        const modelVersion = shadowPipelineModelVersionV5()
+        const runs = this.database
+            .listCandidatePoolsByModelVersionPrefix(
+                modelVersion,
+                Math.max(1, Math.min(500, Math.floor(limit)))
+            )
+            .filter((pool) => pool.modelVersion === modelVersion)
+            .map((pool) => ({
+                modelVersion: pool.modelVersion,
+                generatedAt: pool.generatedAt,
+                telemetry: pool.telemetry
+            }))
+        const representationQc =
+            this.visualRepresentationQc()
+        const authorAtlas = this.visualAuthorAtlas()
+        const styleFamilies = buildVisualStyleFamiliesV5({
+            atlas: authorAtlas
+        })
+        return {
+            ...evaluateVisualActivationGateV5({
+                representationQc,
+                authorAtlas,
+                styleFamilies,
+                shadowRuns: runs,
+                currentShadowModelVersion: modelVersion
+            }),
+            pipelineVersions: shadowPipelineVersionsV5(),
+            visualEvidenceVersions: {
+                representationQc:
+                    representationQc.qcVersion,
+                authorAtlas: authorAtlas.atlasVersion,
+                styleFamilies: styleFamilies.familyVersion
             }
         }
     }

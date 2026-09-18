@@ -148,5 +148,5 @@ export function meanMetric(
                   )
                 : 0
         ])
-    ) as RankingMetricSet
+    ) as unknown as RankingMetricSet
 }

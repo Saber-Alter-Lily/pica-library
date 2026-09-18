@@ -1,8 +1,13 @@
 const EVAL = {
     summary: null,
     runs: [],
+    versions: [],
+    comparison: null,
+    baselineVersion: '',
+    candidateVersion: '',
     busy: false,
-    runningShadow: false
+    runningShadow: false,
+    comparing: false
 }
 
 const evalEsc = (value) =>
@@ -63,6 +68,12 @@ function evalEnsureStyles() {
 .v5-eval-run{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(70px,.5fr));gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--a83-line,#ddd7e4);font-size:.82rem}
 .v5-eval-run .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.72rem;overflow:hidden;text-overflow:ellipsis}
 .v5-eval-note{margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--a83-accent-soft,#eee7fa) 62%,transparent);line-height:1.55}
+.v5-eval-compare-controls{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:8px;align-items:end}
+.v5-eval-compare-controls label{display:grid;gap:5px;font-size:.8rem}
+.v5-eval-compare-controls select{min-width:0}
+.v5-eval-delta{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.82rem}
+.v5-eval-delta.positive{color:#20643a}.v5-eval-delta.negative{color:#8a2f2c}
+@media(max-width:720px){.v5-eval-compare-controls{grid-template-columns:1fr}.v5-eval-run{grid-template-columns:1fr 1fr}.v5-eval-run .mono{grid-column:1/-1}}
 @media(max-width:720px){.v5-eval-run{grid-template-columns:1fr 1fr}.v5-eval-run .mono{grid-column:1/-1}}
 `
     document.head.appendChild(style)
@@ -99,6 +110,7 @@ function evalEnsurePanel() {
       <p id="v5-eval-status" class="status">尚未读取评估数据。</p>
       <div id="v5-eval-summary"></div>
       <div id="v5-eval-criteria" class="v5-eval-section"></div>
+      <div id="v5-eval-comparison" class="v5-eval-section"></div>
       <div id="v5-eval-runs" class="v5-eval-section"></div>
     `
     anchor.insertAdjacentElement('afterend', panel)
@@ -270,6 +282,118 @@ function evalRenderCriteria() {
     `
 }
 
+function evalDeltaMarkup(value, higherIsBetter = true) {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return '<span class="v5-eval-delta">—</span>'
+    const favorable = higherIsBetter ? numeric > 0 : numeric < 0
+    const unfavorable = higherIsBetter ? numeric < 0 : numeric > 0
+    const className = favorable
+        ? 'positive'
+        : unfavorable
+          ? 'negative'
+          : ''
+    const sign = numeric > 0 ? '+' : ''
+    return `<span class="v5-eval-delta ${className}">${sign}${numeric.toFixed(4)}</span>`
+}
+
+function evalVersionOptions(selected) {
+    return EVAL.versions
+        .map((item) => {
+            const label = `${item.current ? '[current] ' : ''}${item.modelVersion} · runs ${Number(item.runCount || 0)}`
+            return `<option value="${evalEsc(item.modelVersion)}" ${item.modelVersion === selected ? 'selected' : ''}>${evalEsc(label)}</option>`
+        })
+        .join('')
+}
+
+function evalRenderComparison() {
+    const target = document.querySelector('#v5-eval-comparison')
+    if (!target) return
+    if (EVAL.versions.length < 2) {
+        target.innerHTML = `
+          <h4>Model Version Comparison</h4>
+          <p class="status">至少需要两个不同的 shadow modelVersion 才能做固定基线比较；当前只有 ${EVAL.versions.length} 个。</p>
+        `
+        return
+    }
+    const comparison = EVAL.comparison
+    const metrics = comparison?.accuracy?.diversifiedBatch || {}
+    const diversity = comparison?.diversity || {}
+    target.innerHTML = `
+      <h4>Model Version Comparison</h4>
+      <div class="v5-eval-compare-controls">
+        <label>Baseline
+          <select id="v5-eval-baseline-version">${evalVersionOptions(EVAL.baselineVersion)}</select>
+        </label>
+        <span>→</span>
+        <label>Candidate
+          <select id="v5-eval-candidate-version">${evalVersionOptions(EVAL.candidateVersion)}</select>
+        </label>
+        <button id="v5-eval-compare-btn" type="button">比较版本</button>
+      </div>
+      ${comparison ? `
+        <div class="v5-eval-grid">
+          ${evalMetricCard('Comparison', evalBadge(comparison.status), '不会自动选择 winner')}
+          ${evalMetricCard('Δ Precision@12', evalDeltaMarkup(metrics.precision12?.delta, true), 'candidate − baseline')}
+          ${evalMetricCard('Δ Recall@12', evalDeltaMarkup(metrics.recall12?.delta, true), 'candidate − baseline')}
+          ${evalMetricCard('Δ NDCG@12', evalDeltaMarkup(metrics.ndcg12?.delta, true), 'candidate − baseline')}
+          ${evalMetricCard('Δ Hit@12', evalDeltaMarkup(metrics.hit12?.delta, true), 'candidate − baseline')}
+          ${evalMetricCard('Δ MRR', evalDeltaMarkup(metrics.mrr?.delta, true), 'candidate − baseline')}
+          ${evalMetricCard('Δ Author concentration', evalDeltaMarkup(diversity.authorMaxShare?.delta, false), 'lower is better')}
+          ${evalMetricCard('Δ Catalog coverage', evalDeltaMarkup(diversity.itemCoverage?.delta, true), 'higher is better')}
+        </div>
+        <div class="v5-eval-note">
+          baseline: <code>${evalEsc(comparison.baseline?.modelVersion || '')}</code><br>
+          candidate: <code>${evalEsc(comparison.candidate?.modelVersion || '')}</code><br>
+          winner = null；这里只报告同口径描述性差值，不自动 promotion，不开启 LTR/Bandit/Active Learning。
+        </div>
+      ` : '<p class="status">选择两个版本后点击“比较版本”。</p>'}
+    `
+    const baseline = target.querySelector('#v5-eval-baseline-version')
+    const candidate = target.querySelector('#v5-eval-candidate-version')
+    const button = target.querySelector('#v5-eval-compare-btn')
+    if (baseline)
+        baseline.onchange = () => {
+            EVAL.baselineVersion = baseline.value
+            EVAL.comparison = null
+        }
+    if (candidate)
+        candidate.onchange = () => {
+            EVAL.candidateVersion = candidate.value
+            EVAL.comparison = null
+        }
+    if (button) button.onclick = () => void evalCompareSelected()
+}
+
+async function evalCompareSelected() {
+    if (EVAL.comparing) return
+    if (!EVAL.baselineVersion || !EVAL.candidateVersion) return
+    if (EVAL.baselineVersion === EVAL.candidateVersion) {
+        evalStatus('Baseline 与 Candidate 必须是两个不同的 modelVersion。', true)
+        return
+    }
+    EVAL.comparing = true
+    evalStatus('正在按同一 future-outcome benchmark 比较两个 exact modelVersion…')
+    try {
+        const params = new URLSearchParams({
+            baselineVersion: EVAL.baselineVersion,
+            candidateVersion: EVAL.candidateVersion,
+            limit: '1000',
+            horizonDays: '30'
+        })
+        EVAL.comparison = await evalRequest(
+            `/api/v1/desktop/recommendation-v5/evaluation/compare?${params.toString()}`
+        )
+        evalRenderComparison()
+        evalStatus(
+            `版本比较完成：${EVAL.comparison.status || 'UNKNOWN'}。不会自动选择 winner 或改变 serving。`
+        )
+    } catch (error) {
+        evalStatus(`版本比较失败：${error.message}`, true)
+    } finally {
+        EVAL.comparing = false
+    }
+}
+
 function evalRenderRuns() {
     const target = document.querySelector('#v5-eval-runs')
     if (!target) return
@@ -308,20 +432,37 @@ async function evalLoad(force = false) {
     evalEnsurePanel()
     evalStatus('正在读取 P3 / P4 / P5 评估数据…')
     try {
-        const [summary, runData] = await Promise.all([
+        const [summary, runData, versionData] = await Promise.all([
             evalRequest(
                 '/api/v1/desktop/recommendation-v5/evaluation/summary?limit=200&horizonDays=30&steerabilityStep=3&steerabilityTargetLimit=30'
             ),
             evalRequest(
                 '/api/v1/desktop/recommendation-v5/shadow-runs?limit=50'
+            ),
+            evalRequest(
+                '/api/v1/desktop/recommendation-v5/evaluation/versions?limit=1000'
             )
         ])
         EVAL.summary = summary
         EVAL.runs = Array.isArray(runData.runs)
             ? runData.runs
             : []
+        EVAL.versions = Array.isArray(versionData.versions)
+            ? versionData.versions
+            : []
+        const currentVersion = versionData.currentModelVersion || ''
+        if (!EVAL.candidateVersion || !EVAL.versions.some((item) => item.modelVersion === EVAL.candidateVersion))
+            EVAL.candidateVersion =
+                EVAL.versions.find((item) => item.modelVersion === currentVersion)?.modelVersion ||
+                EVAL.versions[0]?.modelVersion ||
+                ''
+        if (!EVAL.baselineVersion || !EVAL.versions.some((item) => item.modelVersion === EVAL.baselineVersion))
+            EVAL.baselineVersion =
+                EVAL.versions.find((item) => item.modelVersion !== EVAL.candidateVersion)?.modelVersion ||
+                EVAL.candidateVersion
         evalRenderSummary()
         evalRenderCriteria()
+        evalRenderComparison()
         evalRenderRuns()
         evalStatus(
             `评估已刷新：${summary.status || 'UNKNOWN'} · shadow runs ${EVAL.runs.length} · 自动 promotion 关闭。`
@@ -377,6 +518,7 @@ document.addEventListener('pica-language-change', () => {
     if (EVAL.summary) {
         evalRenderSummary()
         evalRenderCriteria()
+        evalRenderComparison()
         evalRenderRuns()
     }
 })

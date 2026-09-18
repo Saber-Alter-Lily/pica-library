@@ -249,7 +249,7 @@ function signalRow(signal) {
     const delta = Number(current?.levelDelta ?? legacyDelta)
     return `<div class="v5-signal-row" data-v5-signal="${esc(signalId(signal))}">
         <div class="v5-signal-copy"><strong>${esc(signal.label)}</strong>
-        <span class="status">收藏支持 ${Number(signal.supportCount || 0)} 本</span></div>
+        <span class="status">${signal.manual ? '显式标签 · 当前系统画像未收录' : `收藏支持 ${Number(signal.supportCount || 0)} 本`}</span></div>
         <div class="v5-range-wrap">
             <input type="range" min="1" max="10" step="1" value="${level}" data-v5-level="${esc(signalId(signal))}" ${blocked ? 'disabled' : ''} />
             <span class="v5-range-value" data-v5-level-value="${esc(signalId(signal))}">${blocked ? '已屏蔽' : `${level}/10`}</span>
@@ -285,6 +285,20 @@ function renderPolicy() {
         const rows = groups.get(facet) || []
         rows.push(item); groups.set(facet, rows)
     }
+    const manualSignal =
+        !filtered.length && V5.search
+            ? {
+                  targetType: 'TAG',
+                  key: webNorm(V5.search),
+                  label: V5.search,
+                  supportCount: 0,
+                  supportShare: 0,
+                  facet: 'RAW_TAG',
+                  baselineLevel: 1,
+                  manual: true
+              }
+            : null
+    if (manualSignal) V5.signalById.set(signalId(manualSignal), manualSignal)
     const groupRows = [...groups.entries()].sort((a,b) => {
         const ai = V5_FACET_ORDER.indexOf(a[0]), bi = V5_FACET_ORDER.indexOf(b[0])
         return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || facetLabel(a[0]).localeCompare(facetLabel(b[0]))
@@ -298,8 +312,8 @@ function renderPolicy() {
         <summary>${esc(facetLabel(facet))}<span class="v5-facet-count">${rows.length} 项</span></summary>
         <div class="v5-facet-body">${visible.map(signalRow).join('')}
         ${visible.length < rows.length ? `<p class="status">另有 ${rows.length-visible.length} 项；可用上方搜索定位。</p>` : ''}</div></details>`
-    }).join('') : V5.search
-        ? `<p class="status">系统画像里没有找到“${esc(V5.search)}”。当前搜索只筛选已有画像；清空搜索即可看到全部 1–10 档。</p>`
+    }).join('') : manualSignal
+        ? `<div class="v5-help"><strong>没有匹配到已有画像。</strong> 下面先把“${esc(V5.search)}”按标签提供显式 1–10 控制；系统基准为 1/10。移动滑杆后才会保存。若它其实是作者或分类，请清空搜索后从对应分组选择。</div><div class="v5-facet-group"><div class="v5-facet-body">${signalRow(manualSignal)}</div></div>`
         : '<p class="status">当前还没有可展示的系统画像。先完成收藏同步或生成一次推荐画像。</p>'
 
     document.querySelectorAll('[data-v5-level]').forEach((input) => {

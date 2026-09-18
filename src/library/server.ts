@@ -363,6 +363,20 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/recommendation-v5/provider-routes' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5ProviderRoutes(
+                        url.searchParams.get('appSessionId'),
+                        Number(url.searchParams.get('limit') ?? 5000)
+                    )
+                )
+
+            if (
+                url.pathname ===
                     '/api/v1/recommendation-v5/candidate-channels' &&
                 request.method === 'GET'
             )

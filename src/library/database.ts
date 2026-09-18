@@ -1092,12 +1092,13 @@ export class LibraryDatabase {
         const rows = this.db
             .prepare(
                 `SELECT id FROM recommendation_v3_candidate_pools
-                 WHERE model_version LIKE ?
+                 WHERE substr(model_version, 1, length(?)) = ?
                  ORDER BY generated_at DESC, id
                  LIMIT ?`
             )
             .all(
-                value.replace(/[\\%_]/g, (match) => '\\' + match) + '%',
+                value,
+                value,
                 Math.max(1, Math.min(500, Math.floor(limit)))
             ) as SqlRow[]
         return rows

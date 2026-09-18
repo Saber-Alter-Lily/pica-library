@@ -280,6 +280,40 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).not.toContain('candidate-channels')
     })
 
+    it('compiles provider-specific retrieval routes without executing them', () => {
+        const compiler = read(
+            'src/recommendation-v5/provider-query-compiler.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const retriever = read(
+            'src/recommendation-v3/retriever-v3.ts'
+        )
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(compiler).toContain(
+            "PROVIDER_QUERY_COMPILER_V5_VERSION ="
+        )
+        expect(compiler).toContain("mode: 'SHADOW'")
+        expect(compiler).toContain('executionEnabled: false')
+        expect(compiler).toContain("'EXACT_CANONICAL'")
+        expect(compiler).toContain("'FALLBACK_KEYWORD'")
+        expect(compiler).toContain(
+            'deriveObservedEhCanonicalBindingsV5'
+        )
+        expect(service).toContain('recommendationV5ProviderRoutes')
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/provider-routes'
+        )
+        expect(retriever).not.toContain(
+            'provider-query-compiler'
+        )
+        expect(coordinator).not.toContain(
+            'provider-query-compiler'
+        )
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

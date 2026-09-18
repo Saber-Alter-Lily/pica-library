@@ -109,6 +109,7 @@ import {
 } from '../recommendation-v5/policy-store'
 import { buildBehaviorEvidenceLedgerV5 } from '../recommendation-v5/behavior-evidence'
 import { buildCandidateChannelPlanV5 } from '../recommendation-v5/candidate-channels'
+import { compileCandidateChannelQueriesV5 } from '../recommendation-v5/channel-query-compiler'
 import { applyCandidateHygieneV5 } from '../recommendation-v5/candidate-hygiene'
 import {
     compileCandidateProviderRoutesV5,
@@ -578,6 +579,24 @@ export class LibraryService {
                 limit
             )
         )
+    }
+
+    recommendationV5CandidateQueryPlan(
+        appSessionId?: string | null,
+        limit = 5000
+    ) {
+        const channelPlan = this.recommendationV5CandidateChannels(
+            appSessionId,
+            limit
+        )
+        return {
+            ...compileCandidateChannelQueriesV5({
+                channels: channelPlan.channels
+            }),
+            channelPlannerVersion: channelPlan.plannerVersion,
+            providerBudgets: channelPlan.providerBudgets,
+            sessionMode: channelPlan.sessionMode
+        }
     }
 
     recommendationV5CandidateChannels(

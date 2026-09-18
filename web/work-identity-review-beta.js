@@ -46,6 +46,11 @@ function ensureStyles() {
 .v5-id-decision button{min-height:36px;padding:6px 10px}
 .v5-id-badge{padding:4px 8px;border-radius:999px;background:var(--a83-accent-soft,#eef0ff);font-size:.78rem;font-weight:700}
 .v5-id-badge.keep{color:#8a3e3e}.v5-id-badge.same{color:#2d6f46}.v5-id-badge.edition{color:#685391}
+.v5-id-preview{margin-top:10px;padding:10px 12px;border:1px dashed var(--a83-line,#ddd);border-radius:12px}
+.v5-id-preview strong{display:block;margin-bottom:4px}
+.v5-id-preview-groups{display:grid;gap:6px;margin-top:8px}
+.v5-id-preview-group{font-size:.84rem;line-height:1.45}
+.v5-id-preview-group.conflict{color:#8a3e3e}
 @media(max-width:760px){.v5-id-pair{grid-template-columns:1fr}.v5-id-arrow{display:none}}
 `
     document.head.appendChild(style)
@@ -95,6 +100,7 @@ function ensurePanel() {
             所有裁决都可以清除。
         </div>
         <p id="v5-id-status" class="status">尚未主动扫描。已有证据也不会在后台自动扩充。</p>
+        <div id="v5-id-preview" class="v5-id-preview" hidden></div>
         <div id="v5-id-list" class="v5-id-list"></div>
     `
     anchor.insertAdjacentElement('afterend', panel)
@@ -113,6 +119,37 @@ function status(message, bad = false) {
     node.classList.toggle('error', Boolean(bad))
 }
 
+function renderMaterializationPreview(review) {
+    const node = document.querySelector('#v5-id-preview')
+    if (!node) return
+    const preview = review?.materializationPreview
+    if (!preview || preview.mode !== 'PREVIEW_ONLY') {
+        node.hidden = true
+        node.innerHTML = ''
+        return
+    }
+    const groups = Array.isArray(preview.groups) ? preview.groups : []
+    const visible = groups.slice(0, 12)
+    node.hidden = false
+    node.innerHTML = `
+        <strong>Work 物化预览</strong>
+        <div>Work 组 ${Number(preview.workGroupCount || 0)} · 可进入后续绑定 ${Number(preview.readyGroupCount || 0)} · Upload 绑定候选 ${Number(preview.proposedUploadBindingCount || 0)} · 冲突 ${Number(preview.conflictCount || 0)}</div>
+        <div class="status">仅预览，不写入 Work/Edition binding；存在“保持分离”冲突的组会被阻断。</div>
+        ${visible.length ? `<div class="v5-id-preview-groups">${visible.map((group) => {
+            const titles = Array.isArray(group.titles) ? group.titles.slice(0, 3).join(' / ') : ''
+            const extra = Array.isArray(group.titles) && group.titles.length > 3
+                ? ` +${group.titles.length - 3}`
+                : ''
+            const conflicts = Array.isArray(group.conflicts) ? group.conflicts.length : 0
+            return `<div class="v5-id-preview-group ${conflicts ? 'conflict' : ''}">
+                ${esc(titles)}${esc(extra)} · ${Number(group.comicIds?.length || 0)} uploads
+                ${Number(group.editionVariantPairCount || 0) ? ` · edition variant ${Number(group.editionVariantPairCount || 0)}` : ''}
+                ${conflicts ? ` · 冲突 ${conflicts}` : ' · 无冲突'}
+            </div>`
+        }).join('')}</div>` : ''}
+    `
+}
+
 function renderReview() {
     ensurePanel()
     const target = document.querySelector('#v5-id-list')
@@ -120,6 +157,7 @@ function renderReview() {
     const review = IDENTITY.review
     const rows = Array.isArray(review.evidence) ? review.evidence : []
     const counts = review.storage?.counts || {}
+    renderMaterializationPreview(review)
     status(
         `证据 ${Number(counts.evidence || rows.length)} · 人工裁决 ${Number(counts.decisions || 0)} · 待裁决 ${Number(review.undecidedCount || 0)} · Work binding ${Number(counts.bindings || 0)}`
     )

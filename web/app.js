@@ -1652,7 +1652,7 @@ async function loadJobs() {
             const eta = job.bytesPerSecond && job.expectedBytes > job.bytes
                 ? `${Math.ceil((job.expectedBytes - job.bytes) / job.bytesPerSecond)}s` : '—'
             return `<article class="list-item download-job-card" data-job-status="${job.status}">
-                <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ETA ${eta} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
+                <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ${t('downloads.eta', { value: eta })} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
                 <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">${t('action.pause')}</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">${t('action.resume')}</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">${t('action.retry')}</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">${t('action.cancel')}</button>` : ''}</div>
             </article>`
         }).join('')
@@ -3771,7 +3771,7 @@ function buildChroniclePrintV2(snapshot) {
     root.innerHTML = `<section class="rc-sheet">
         <div class="rc-hero">
             <div class="rc-brand"><img src="./pica-library-icon.svg" alt=""><div><p>PICA LIBRARY · COLLECTION PROFILE</p><h1>${chronicleEscape(profileResult)}</h1><span>${chronicleEscape(profileDescription)}</span></div></div>
-            <div class="rc-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div>
+            <div class="rc-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div>
         </div>
 
         <section class="rc-panel rc-semantic"><div class="rc-panel-title"><small>01</small><h2>${t('chronicle.preferenceMap')}</h2></div><div class="rc-facet-stack">${semanticBands}</div></section>
@@ -3783,7 +3783,7 @@ function buildChroniclePrintV2(snapshot) {
         <section class="rc-footer-panel rc-footer-combos"><h2>${t('chronicle.combinationsV2')}</h2><div class="rc-combos">${combos}</div></section>
         <section class="rc-footer-panel rc-footer-traits"><h2>${t('chronicle.styleV2')}</h2><div class="rc-traits">${styles}</div></section>
 
-        <div class="rc-meta"><span>Pica Library · Snapshot v${chronicleEscape(snapshot.snapshotVersion)}</span><small>${chronicleEscape(String(snapshot.generatedAt || '').slice(0, 10))} · Generated locally</small></div>
+        <div class="rc-meta"><span>Pica Library · ${t('chronicle.snapshotLabel')} v${chronicleEscape(snapshot.snapshotVersion)}</span><small>${chronicleEscape(String(snapshot.generatedAt || '').slice(0, 10))} · ${t('chronicle.generatedLocallyShort')}</small></div>
     </section>`
     return root
 }

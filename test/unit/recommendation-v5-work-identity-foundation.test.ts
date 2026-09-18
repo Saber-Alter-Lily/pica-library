@@ -9,6 +9,7 @@ import {
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../../src/recommendation-v5/work-identity-foundation'
 import { defaultPortablePolicyStateV5 } from '../../src/recommendation-v5/portable-policy'
+import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-store'
 
 function comic(
     input: Partial<StoredComic> & Pick<StoredComic, 'comicId' | 'title'>
@@ -168,6 +169,77 @@ describe('Canonical Work Identity foundation', () => {
             resolverVersion: WORK_IDENTITY_RESOLVER_VERSION
         })
 
+        database.close()
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+
+    it('stores reversible human decisions without creating work bindings', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-work-decisions-')
+        )
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        database.importCatalog(
+            [
+                {
+                    comicId: 'pica:1',
+                    title: 'Same Work',
+                    author: 'Artist',
+                    tags: [],
+                    categories: [],
+                    finished: true,
+                    pagesCount: 20
+                },
+                {
+                    comicId: 'eh:2',
+                    title: 'Same Work',
+                    author: 'Artist',
+                    tags: [],
+                    categories: [],
+                    finished: true,
+                    pagesCount: 21
+                }
+            ],
+            'test'
+        )
+
+        const saved = database.saveWorkIdentityDecision({
+            leftComicId: 'pica:1',
+            rightComicId: 'eh:2',
+            decision: 'KEEP_SEPARATE',
+            source: 'USER'
+        })
+        expect(saved.decision).toBe('KEEP_SEPARATE')
+        expect(database.listWorkIdentityDecisions()).toHaveLength(1)
+        expect(database.workIdentityStorageStatus().counts.bindings).toBe(0)
+        expect(database.workIdentityStorageStatus().counts.works).toBe(0)
+
+        const policy = new RecommendationPolicyStoreV5(database)
+        policy.setExplicitDistinctPair('pica:1', 'eh:2', true)
+        expect(
+            buildWorkIdentityAuditV5(
+                database.listComics({ limit: 100 }),
+                policy.state()
+            ).candidates
+        ).toHaveLength(0)
+
+        database.saveWorkIdentityDecision({
+            leftComicId: 'pica:1',
+            rightComicId: 'eh:2',
+            decision: 'SAME_WORK',
+            source: 'USER'
+        })
+        policy.setExplicitDistinctPair('pica:1', 'eh:2', false)
+        expect(
+            buildWorkIdentityAuditV5(
+                database.listComics({ limit: 100 }),
+                policy.state()
+            ).candidates
+        ).toHaveLength(1)
+        expect(database.workIdentityStorageStatus().counts.bindings).toBe(0)
+
+        database.clearWorkIdentityDecision('pica:1', 'eh:2')
+        expect(database.listWorkIdentityDecisions()).toHaveLength(0)
         database.close()
         fs.rmSync(dir, { recursive: true, force: true })
     })

@@ -104,6 +104,7 @@ import {
     type MobileRecommendationSyncV5
 } from '../recommendation-v5/policy-store'
 import { buildBehaviorEvidenceLedgerV5 } from '../recommendation-v5/behavior-evidence'
+import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
 import {
     filterCandidatesAgainstOwnedV5,
     preferenceAdjustmentV5
@@ -272,6 +273,19 @@ export class LibraryService {
             // unavailable; the portable snapshot has a raw-tag fallback.
             return snapshot
         }
+    }
+
+    recommendationV5PreferenceTimescales(
+        appSessionId?: string | null,
+        limit = 5000
+    ) {
+        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
+        const events = this.database.listUserEvents({ limit: bounded })
+        const catalog = this.database.listComics({ limit: 10000 })
+        const state = new RecommendationPolicyStoreV5(this.database).state()
+        return buildPreferenceTimescalesV5(events, catalog, state, {
+            appSessionId: appSessionId ?? null
+        })
     }
 
     recommendationV5BehaviorEvidence(limit = 5000) {

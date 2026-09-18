@@ -128,6 +128,7 @@ import {
 import { evaluateP3PromotionGateV5 } from '../recommendation-v5/promotion-gate'
 import { buildVisualRepresentationQcV5 } from '../recommendation-v5/visual-representation-qc'
 import { buildVisualAuthorAtlasV5 } from '../recommendation-v5/visual-author-atlas'
+import { buildVisualStyleFamiliesV5 } from '../recommendation-v5/visual-style-families'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -1061,6 +1062,27 @@ export class LibraryService {
                 favorites.size +
                     feedback.filter((item) => item.sentiment === 'like').length
             )
+        })
+    }
+
+    visualStyleFamilies(
+        minWorksPerAuthor = 2,
+        maxAuthors = 300,
+        mutualK = 2,
+        minimumSimilarity = -1
+    ) {
+        const atlas = buildVisualAuthorAtlasV5({
+            embeddings: this.database.listVisualEmbeddings(),
+            catalog: this.database.listComics({ limit: 10000 }),
+            minWorksPerAuthor,
+            maxGraphAuthors: Math.max(maxAuthors, 10),
+            neighborLimit: Math.max(mutualK, 2)
+        })
+        return buildVisualStyleFamiliesV5({
+            atlas,
+            maxAuthors,
+            mutualK,
+            minimumSimilarity
         })
     }
 

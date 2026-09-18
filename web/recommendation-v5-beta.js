@@ -380,10 +380,12 @@ function quickSliderRow(signal) {
 
 function setCardState(card,className,message,tone='neutral') {
     if(!card) return
-    if(className) card.classList.add(className)
+    if(className && !card.classList.contains(className)) card.classList.add(className)
     let badge=card.querySelector('.v5-card-state')
     if(!badge){badge=document.createElement('div');badge.className='v5-card-state';card.querySelector('.result-body')?.appendChild(badge)}
-    badge.classList.remove('positive','negative'); if(tone!=='neutral') badge.classList.add(tone); badge.textContent=message
+    badge.classList.toggle('positive',tone==='positive')
+    badge.classList.toggle('negative',tone==='negative')
+    if(badge.textContent!==message) badge.textContent=message
 }
 
 function suppressionMessage(reason) {
@@ -473,12 +475,19 @@ function decorateLibraryTasteToggles() {
                 card.querySelector('td:nth-child(2)')
             if (!target) return
             let holder = target.querySelector('.v5-taste-toggle')
+            const excluded = tasteExcluded(comicId)
+            const renderState = excluded ? 'excluded' : 'included'
+            if (
+                holder?.dataset.v5TasteState === renderState &&
+                holder.querySelector('button')
+            )
+                return
             if (!holder) {
                 holder = document.createElement('div')
                 holder.className = 'v5-taste-toggle'
                 target.appendChild(holder)
             }
-            const excluded = tasteExcluded(comicId)
+            holder.dataset.v5TasteState = renderState
             holder.innerHTML =
                 '<span class="status">推荐口味：' +
                 (excluded ? '已排除' : '参与') +
@@ -514,8 +523,17 @@ const libraryRoots = [
     document.querySelector('#comic-grid'),
     document.querySelector('#comic-rows')
 ].filter(Boolean)
+let libraryTasteDecorationQueued = false
+function queueLibraryTasteDecoration() {
+    if (libraryTasteDecorationQueued) return
+    libraryTasteDecorationQueued = true
+    queueMicrotask(() => {
+        libraryTasteDecorationQueued = false
+        decorateLibraryTasteToggles()
+    })
+}
 for (const root of libraryRoots)
-    new MutationObserver(() => decorateLibraryTasteToggles()).observe(root, {
+    new MutationObserver(() => queueLibraryTasteDecoration()).observe(root, {
         childList: true,
         subtree: true
     })

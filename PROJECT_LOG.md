@@ -39,6 +39,7 @@
 - P4B-1 增加 Visual Author Atlas：复用现有 Visual V1 multi-prototype 聚类器，对至少 2 本已索引作品的作者建立一个或多个画风 prototype，保留 representative works、cohesion、substyle spread、Provider/source 支持，并构建有界 Top-K author similarity graph；当前 `mode=READ_ONLY`、`visualRecallEnabled=false`、`styleFamilyServingEnabled=false`，不重算 embedding、不进入 serving。
 - P4C-1 增加 provisional Style Families：在作者 prototype 节点上构建 bounded mutual-kNN 图并取 connected components，允许同一作者的不同 substyle prototype 进入不同候选 family；输出 family prototype、成员作者/作品、边相似度与 multi-family author 统计。当前 `provisional=true`、`servingImpact=false`、`visualRecallEnabled=false`、`styleDiversityEnabled=false`，不把图聚类直接当作正式艺术流派标签。
 - P4D-1 增加 Visual candidate coverage planner：在 P3 shadow run 仍持有完整候选对象时统计 ranked pool / diversified batch 的当前 Visual V1 覆盖，并按“最终批次缺向量 → Top relevance 缺向量”生成有预算上限的补算优先队列；同时区分 catalog 已存在、可直接 prepare 的候选与 non-persist shadow 候选，后者明确标记 `SHADOW_CANDIDATE_NOT_PERSISTED`。当前 `mode=PLAN_ONLY`、`embeddingGenerationEnabled=false`、`candidatePersistenceEnabled=false`，只将覆盖与阻塞信息写入 shadow telemetry。
+- P4E-1 增加 Visual activation review gate：综合冻结 representation QC、author atlas、provisional style family 非坍缩、exact current P3 shadow run 的 candidate coverage 与 preparation readiness，只在全部必需条件通过时返回 `READY_FOR_SHADOW_REVIEW`；否则保持 `NOT_READY/OFF`。Gate 始终 `autoActivation=false`、`servingMutationEnabled=false`、`embeddingGenerationEnabled=false`、`visualRecallActivationEnabled=false`、`styleDiversityActivationEnabled=false`，无 visual-promote/activate 写入口。
 
 ## v0.4.0 — 多来源与统一语义
 

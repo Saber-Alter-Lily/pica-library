@@ -6,7 +6,9 @@ import type { StoredComic } from '../../src/library/types'
 import { LibraryDatabase } from '../../src/library/database'
 import {
     buildWorkIdentityAuditV5,
+    buildWorkIdentityMaterializationPlanV5,
     buildWorkIdentityMaterializationPreviewV5,
+    WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION,
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../../src/recommendation-v5/work-identity-foundation'
 import { defaultPortablePolicyStateV5 } from '../../src/recommendation-v5/portable-policy'
@@ -72,6 +74,7 @@ describe('Canonical Work Identity foundation', () => {
             'pica:original'
         )
         expect(database.workIdentityStorageStatus().counts.bindings).toBe(0)
+        expect(database.listWorkIdentityBindings()).toEqual([])
 
         database.close()
         fs.rmSync(dir, { recursive: true, force: true })
@@ -338,6 +341,199 @@ describe('Canonical Work Identity foundation', () => {
         expect(conflicted.groups[0].conflicts[0].type).toBe(
             'KEEP_SEPARATE_INSIDE_WORK_COMPONENT'
         )
+    })
+
+
+    it('builds a deterministic dry-run binding plan without writing identity tables', () => {
+        const catalog = [
+            comic({
+                comicId: 'pica:a',
+                title: 'Example Work',
+                author: 'Creator',
+                pagesCount: 100
+            }),
+            comic({
+                comicId: 'eh:b',
+                title: 'Example Work',
+                author: 'Creator',
+                pagesCount: 101
+            }),
+            comic({
+                comicId: 'pica:c',
+                title: 'Example Work CN',
+                author: 'Creator',
+                pagesCount: 103
+            })
+        ]
+        const decisions = [
+            {
+                leftComicId: 'pica:a',
+                rightComicId: 'eh:b',
+                decision: 'SAME_WORK'
+            },
+            {
+                leftComicId: 'eh:b',
+                rightComicId: 'pica:c',
+                decision: 'EDITION_VARIANT'
+            }
+        ]
+        const plan = buildWorkIdentityMaterializationPlanV5(
+            catalog,
+            decisions
+        )
+        const reversed = buildWorkIdentityMaterializationPlanV5(
+            [...catalog].reverse(),
+            [...decisions].reverse()
+        )
+
+        expect(plan.mode).toBe('DRY_RUN')
+        expect(plan.planVersion).toBe(
+            WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION
+        )
+        expect(plan.writeEnabled).toBe(false)
+        expect(plan.automaticBinding).toBe(false)
+        expect(plan.summary).toMatchObject({
+            workGroupCount: 1,
+            workReadyCount: 1,
+            fullBindingReadyCount: 1,
+            blockedGroupCount: 0,
+            createWorkCount: 1,
+            proposedUploadBindingCount: 3
+        })
+        expect(plan.groups[0].editionPlans).toHaveLength(2)
+        expect(
+            plan.groups[0].editionPlans.every(
+                (edition) => edition.plannedEditionId
+            )
+        ).toBe(true)
+        expect(plan.groups[0].uploadBindings).toHaveLength(3)
+        expect(
+            plan.groups[0].uploadBindings.every(
+                (binding) => binding.rollback === null
+            )
+        ).toBe(true)
+        expect(reversed.groups[0].plannedWorkId).toBe(
+            plan.groups[0].plannedWorkId
+        )
+        expect(
+            reversed.groups[0].editionPlans.map(
+                (edition) => edition.plannedEditionId
+            )
+        ).toEqual(
+            plan.groups[0].editionPlans.map(
+                (edition) => edition.plannedEditionId
+            )
+        )
+    })
+
+    it('blocks contradictory identity state and preserves rollback information', () => {
+        const catalog = [
+            comic({
+                comicId: 'pica:a',
+                title: 'Example Work',
+                author: 'Creator'
+            }),
+            comic({
+                comicId: 'eh:b',
+                title: 'Example Work',
+                author: 'Creator'
+            }),
+            comic({
+                comicId: 'pica:c',
+                title: 'Example Work Alt',
+                author: 'Creator'
+            })
+        ]
+        const contradiction =
+            buildWorkIdentityMaterializationPlanV5(catalog, [
+                {
+                    leftComicId: 'pica:a',
+                    rightComicId: 'eh:b',
+                    decision: 'SAME_WORK'
+                },
+                {
+                    leftComicId: 'eh:b',
+                    rightComicId: 'pica:c',
+                    decision: 'SAME_WORK'
+                },
+                {
+                    leftComicId: 'pica:a',
+                    rightComicId: 'pica:c',
+                    decision: 'EDITION_VARIANT'
+                }
+            ])
+        expect(contradiction.summary.blockedGroupCount).toBe(1)
+        expect(
+            contradiction.groups[0].blockers.map((item) => item.type)
+        ).toContain('EDITION_CONSTRAINT_CONFLICT')
+
+        const existingSplit =
+            buildWorkIdentityMaterializationPlanV5(
+                catalog.slice(0, 2),
+                [
+                    {
+                        leftComicId: 'pica:a',
+                        rightComicId: 'eh:b',
+                        decision: 'SAME_WORK'
+                    }
+                ],
+                [
+                    {
+                        comicId: 'pica:a',
+                        workId: 'work-1',
+                        editionId: 'edition-1',
+                        bindingStatus: 'MANUAL_CONFIRMED',
+                        confidence: 1,
+                        resolverVersion: 'manual'
+                    },
+                    {
+                        comicId: 'eh:b',
+                        workId: 'work-2',
+                        editionId: 'edition-2',
+                        bindingStatus: 'MANUAL_CONFIRMED',
+                        confidence: 1,
+                        resolverVersion: 'manual'
+                    }
+                ]
+            )
+        expect(existingSplit.summary.blockedGroupCount).toBe(1)
+        expect(
+            existingSplit.groups[0].blockers.map((item) => item.type)
+        ).toContain('EXISTING_WORK_SPLIT')
+        expect(
+            existingSplit.groups[0].uploadBindings.every(
+                (binding) =>
+                    binding.action === 'BLOCKED' &&
+                    binding.rollback !== null
+            )
+        ).toBe(true)
+    })
+
+    it('keeps ambiguous edition partition at Work-ready but not full-binding-ready', () => {
+        const catalog = [
+            comic({ comicId: 'pica:a', title: 'W', author: 'A' }),
+            comic({ comicId: 'eh:b', title: 'W v2', author: 'A' }),
+            comic({ comicId: 'pica:c', title: 'W v3', author: 'A' })
+        ]
+        const plan = buildWorkIdentityMaterializationPlanV5(catalog, [
+            {
+                leftComicId: 'pica:a',
+                rightComicId: 'eh:b',
+                decision: 'EDITION_VARIANT'
+            },
+            {
+                leftComicId: 'eh:b',
+                rightComicId: 'pica:c',
+                decision: 'EDITION_VARIANT'
+            }
+        ])
+        expect(plan.summary.workReadyCount).toBe(1)
+        expect(plan.summary.fullBindingReadyCount).toBe(0)
+        expect(plan.groups[0].readyForWorkBinding).toBe(true)
+        expect(plan.groups[0].readyForFullBinding).toBe(false)
+        expect(
+            plan.groups[0].warnings.map((item) => item.type)
+        ).toContain('EDITION_PARTITION_UNDERDETERMINED')
     })
 
 })

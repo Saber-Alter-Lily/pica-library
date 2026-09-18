@@ -630,6 +630,37 @@ export const migrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_work_identity_decisions_pair
                 ON work_identity_decisions(left_comic_id, right_comic_id);
         `
+    },
+    {
+        version: 13,
+        name: 'work_identity_materialization_audit',
+        up: `
+            CREATE TABLE IF NOT EXISTS work_identity_materialization_runs (
+                id TEXT PRIMARY KEY,
+                request_key TEXT NOT NULL UNIQUE,
+                plan_version TEXT NOT NULL,
+                plan_digest TEXT NOT NULL,
+                status TEXT NOT NULL
+                    CHECK (
+                        status IN (
+                            'PREPARED',
+                            'APPLIED',
+                            'ROLLED_BACK',
+                            'FAILED'
+                        )
+                    ),
+                plan_json TEXT NOT NULL,
+                before_state_json TEXT NOT NULL DEFAULT '{}',
+                after_state_json TEXT NOT NULL DEFAULT '{}',
+                error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_work_identity_materialization_status
+                ON work_identity_materialization_runs(status, updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_work_identity_materialization_digest
+                ON work_identity_materialization_runs(plan_digest);
+        `
     }
 
 ]

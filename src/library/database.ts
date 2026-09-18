@@ -292,22 +292,36 @@ export class LibraryDatabase {
                  ORDER BY occurred_at ASC, created_at ASC, id ASC`
             )
             .all() as SqlRow[]
+
+        // Sentiment and optional reason are separate events. Resolve the latest
+        // sentiment first, then attach reason events by parentFeedbackId. This
+        // deliberately does not depend on two writes having distinct
+        // millisecond timestamps or lexicographically ordered random UUIDs.
         const latest = new Map<string, RecommendationFeedbackState>()
         for (const row of rows) {
             const comicId = String(row.comic_id ?? '')
             if (!comicId) continue
             const eventType = String(row.event_type ?? '')
-            if (eventType === 'recommend_like' || eventType === 'recommend_dislike') {
-                latest.set(comicId, {
-                    comicId,
-                    sentiment: eventType === 'recommend_like' ? 'like' : 'dislike',
-                    feedbackEventId: String(row.id),
-                    occurredAt: String(row.occurred_at),
-                    reasons: [],
-                    reasonEventId: null
-                })
+            if (
+                eventType !== 'recommend_like' &&
+                eventType !== 'recommend_dislike'
+            )
                 continue
-            }
+            latest.set(comicId, {
+                comicId,
+                sentiment:
+                    eventType === 'recommend_like' ? 'like' : 'dislike',
+                feedbackEventId: String(row.id),
+                occurredAt: String(row.occurred_at),
+                reasons: [],
+                reasonEventId: null
+            })
+        }
+
+        for (const row of rows) {
+            if (String(row.event_type ?? '') !== 'recommend_feedback_reason')
+                continue
+            const comicId = String(row.comic_id ?? '')
             const current = latest.get(comicId)
             if (!current) continue
             const metadata = jsonObject(row.metadata_json)
@@ -330,6 +344,7 @@ export class LibraryDatabase {
             current.reasons = reasons
             current.reasonEventId = String(row.id)
         }
+
         return [...latest.values()].sort(
             (a, b) =>
                 b.occurredAt.localeCompare(a.occurredAt) ||

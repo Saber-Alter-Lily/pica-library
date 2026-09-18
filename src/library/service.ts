@@ -104,9 +104,11 @@ import {
     type MobileRecommendationSyncV5
 } from '../recommendation-v5/policy-store'
 import { buildBehaviorEvidenceLedgerV5 } from '../recommendation-v5/behavior-evidence'
+import { buildCandidateChannelPlanV5 } from '../recommendation-v5/candidate-channels'
 import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
 import {
     filterCandidatesAgainstOwnedV5,
+    normalizePreferenceKey,
     preferenceAdjustmentV5
 } from '../recommendation-v5/portable-policy'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
@@ -273,6 +275,86 @@ export class LibraryService {
             // unavailable; the portable snapshot has a raw-tag fallback.
             return snapshot
         }
+    }
+
+    recommendationV5CandidateChannels(
+        appSessionId?: string | null,
+        limit = 5000
+    ) {
+        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
+        const events = this.database.listUserEvents({ limit: bounded })
+        const catalog = this.database.listComics({ limit: 10000 })
+        const store = new RecommendationPolicyStoreV5(this.database)
+        const state = store.state()
+        const timescales = buildPreferenceTimescalesV5(
+            events,
+            catalog,
+            state,
+            { appSessionId: appSessionId ?? null }
+        )
+        const tagFacets: Record<string, string> = {}
+        try {
+            const registry = loadTagRegistryV3(runtimeRegistryDirectory())
+            const tagRows = [
+                ...timescales.layers.inferred.lifetime.positive.tags,
+                ...timescales.layers.inferred.days30.positive.tags,
+                ...timescales.layers.inferred.days7.positive.tags,
+                ...timescales.layers.inferred.session.positive.tags,
+                ...state.controls
+                    .filter((control) => control.targetType === 'TAG')
+                    .map((control) => ({
+                        key: control.key,
+                        label: control.label
+                    })),
+                ...(state.sessionIntent.targetType === 'TAG' &&
+                state.sessionIntent.key
+                    ? [
+                          {
+                              key: state.sessionIntent.key,
+                              label:
+                                  state.sessionIntent.label ??
+                                  state.sessionIntent.key
+                          }
+                      ]
+                    : [])
+            ]
+            for (const item of tagRows) {
+                const resolved = resolveTagV3(
+                    item.label || item.key,
+                    registry
+                )
+                if (
+                    resolved.resolutionType !== 'SAFETY' &&
+                    resolved.resolutionStatus === 'RESOLVED'
+                )
+                    tagFacets[normalizePreferenceKey(item.key)] =
+                        resolved.facet
+            }
+        } catch {
+            // Raw tags remain valid retrieval anchors when the packaged
+            // registry is unavailable. They simply stay in the TAG family.
+        }
+
+        const provider = this.providerService()
+        const status = provider.providerStatus()
+        return buildCandidateChannelPlanV5({
+            timescales,
+            policy: state,
+            catalog,
+            tagFacets,
+            providerEligibility: {
+                pica: Boolean(status.pica.search),
+                eh: Boolean(status.eh.search),
+                exh: Boolean(
+                    status.eh.search &&
+                        status.eh.exHentai &&
+                        this.ehProvider.hasSession()
+                )
+            },
+            // Visual stays planning-only until the dedicated P4 activation
+            // gate. Existing embeddings do not silently enable a recall path.
+            visualEligible: false
+        })
     }
 
     recommendationV5PreferenceTimescales(

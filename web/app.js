@@ -1027,6 +1027,13 @@ function renderComics(records = state.records) {
             </article>`
         )
         .join('')
+    if (!page.length)
+        $('#comic-grid').innerHTML =
+            `<article class="ux-empty-state">${escapeHtml(
+                state.records.length
+                    ? t('library.noMatches')
+                    : t('library.empty')
+            )}</article>`
     $('#comic-rows').innerHTML = page
         .map(
             (comic) => `<tr data-comic-id="${escapeHtml(comic.comicId)}" data-is-favorite="${comic.isFavorite ? 'true' : 'false'}">
@@ -1042,6 +1049,13 @@ function renderComics(records = state.records) {
             </tr>`
         )
         .join('')
+    if (!page.length)
+        $('#comic-rows').innerHTML =
+            `<tr><td colspan="7"><div class="ux-empty-state">${escapeHtml(
+                state.records.length
+                    ? t('library.noMatches')
+                    : t('library.empty')
+            )}</div></td></tr>`
     $('#library-count').textContent = t('message.libraryCount', {
         shown: page.length,
         total: state.libraryQueryResult?.total ?? state.visible.length
@@ -2802,6 +2816,11 @@ $('#search-button').onclick = async () => {
         state.searchResults = records
         clearSelection('search')
         renderResultCards(records, '#search-results')
+        if (!records.length)
+            $('#search-results').innerHTML =
+                `<article class="ux-empty-state">${escapeHtml(
+                    t('search.empty')
+                )}</article>`
         $('#search-message').textContent = t('message.searchCount', {
             count: records.length
         })

@@ -1,0 +1,43 @@
+name: Apply V5 web recommendation polish
+
+on:
+  push:
+    branches: [feature/recommendation-v5-portable-policy]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v5-portable-policy
+          fetch-depth: 1
+      - name: Apply audited V5 web patch
+        run: |
+          python scripts/v5-web-polish.py
+          node --check web/recommendation-v5-beta.js
+          node --check web/alpha8-theme-help.js
+          git diff --check
+      - name: Commit product changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/recommendation-v5/portable-policy.ts \
+                  src/recommendation-v5/policy-store.ts \
+                  src/recommendation-v5/intent-policy.ts \
+                  src/recommendation-v5/explicit-intents.ts \
+                  src/library/service.ts \
+                  web/recommendation-v5-beta.js \
+                  web/alpha8-theme-help.js \
+                  test/unit/recommendation-v5-portable-policy.test.ts \
+                  test/unit/recommendation-v5-product-contract.test.ts
+          if git diff --cached --quiet; then
+            echo "No product changes to commit."
+            exit 0
+          fi
+          git commit -m "feat: refine V5 desktop recommendation controls and feedback UX"
+          git push origin HEAD:feature/recommendation-v5-portable-policy

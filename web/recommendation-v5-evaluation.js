@@ -71,6 +71,15 @@ function evalEnsureStyles() {
 .v5-eval-run{display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(70px,.5fr));gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--a83-line,#ddd7e4);font-size:.82rem}
 .v5-eval-run .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.72rem;overflow:hidden;text-overflow:ellipsis}
 .v5-eval-note{margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--a83-accent-soft,#eee7fa) 62%,transparent);line-height:1.55}
+.v5-eval-user-note{margin:12px 0 4px;padding:12px 14px;border-radius:12px;background:#f7f8fc;color:#596071;line-height:1.65}
+.v5-eval-technical{margin-top:14px;border:1px solid var(--a83-line,#ddd7e4);border-radius:14px;background:#fafbfe}
+.v5-eval-technical>summary{padding:12px 14px;cursor:pointer;font-weight:750;color:#596071;list-style:none}
+.v5-eval-technical>summary::-webkit-details-marker{display:none}
+.v5-eval-technical>summary::after{content:'展开';float:right;color:#6a72c8;font-size:.82rem}
+.v5-eval-technical[open]>summary::after{content:'收起'}
+.v5-eval-technical-body{padding:0 12px 12px}
+.v5-eval-run details{margin-top:5px}
+.v5-eval-run code{white-space:normal;overflow-wrap:anywhere}
 .v5-eval-compare-controls{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;gap:8px;align-items:end}
 .v5-eval-compare-controls label{display:grid;gap:5px;font-size:.8rem}
 .v5-eval-compare-controls select{min-width:0}
@@ -111,10 +120,16 @@ function evalEnsurePanel() {
       </div>
       <p id="v5-eval-status" class="status">尚未读取评估数据。</p>
       <div id="v5-eval-summary"></div>
-      <div id="v5-eval-criteria" class="v5-eval-section"></div>
-      <div id="v5-eval-comparison" class="v5-eval-section"></div>
-      <div id="v5-eval-advanced" class="v5-eval-section"></div>
       <div id="v5-eval-runs" class="v5-eval-section"></div>
+      <details class="v5-eval-technical">
+        <summary>高级评估详情</summary>
+        <div class="v5-eval-technical-body">
+          <div id="v5-eval-technical-summary"></div>
+          <div id="v5-eval-criteria" class="v5-eval-section"></div>
+          <div id="v5-eval-comparison" class="v5-eval-section"></div>
+          <div id="v5-eval-advanced" class="v5-eval-section"></div>
+        </div>
+      </details>
     `
     anchor.insertAdjacentElement('afterend', panel)
     panel.querySelector('#v5-eval-refresh').onclick = () => {

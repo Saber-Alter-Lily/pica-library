@@ -66,6 +66,8 @@ function candidate(
             families: ['TAG'],
             sourceLayers: ['LIFETIME'],
             precisions: ['PROVIDER_NATIVE'],
+            providerRanks: [5],
+            bestProviderRank: 5,
             maxPriority: 60
         }
     }

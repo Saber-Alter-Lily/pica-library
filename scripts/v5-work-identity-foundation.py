@@ -154,6 +154,75 @@ write(path, s)
 
 
 # ---------------------------------------------------------------------------
+# 1B. Read-only storage observability. Useful for migration QA and later
+# evidence-backfill audits; it never mutates work identity records.
+# ---------------------------------------------------------------------------
+path = "src/library/database.ts"
+s = read(path)
+marker = """    close() {
+        this.db.close()
+    }
+"""
+if marker not in s:
+    raise RuntimeError("missing LibraryDatabase close marker")
+method = marker + """
+    workIdentityStorageStatus() {
+        const requiredTables = [
+            'canonical_series',
+            'canonical_works',
+            'work_editions',
+            'work_upload_bindings',
+            'work_identity_evidence',
+            'work_identity_decisions'
+        ]
+        const tables = new Set(
+            (
+                this.db
+                    .prepare(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
+                    .all() as SqlRow[]
+            ).map((row) => String(row.name))
+        )
+        const count = (table: string) =>
+            tables.has(table)
+                ? numberValue(
+                      (
+                          this.db
+                              .prepare(
+                                  \`SELECT COUNT(*) AS count FROM \${table}\`
+                              )
+                              .get() as SqlRow
+                      ).count
+                  )
+                : 0
+        const versionRow = this.db
+            .prepare(
+                'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations'
+            )
+            .get() as SqlRow
+        return {
+            expectedSchemaVersion: latestMigrationVersion,
+            appliedSchemaVersion: numberValue(versionRow.version),
+            tables: Object.fromEntries(
+                requiredTables.map((table) => [table, tables.has(table)])
+            ),
+            counts: {
+                series: count('canonical_series'),
+                works: count('canonical_works'),
+                editions: count('work_editions'),
+                bindings: count('work_upload_bindings'),
+                evidence: count('work_identity_evidence'),
+                decisions: count('work_identity_decisions')
+            }
+        }
+    }
+"""
+s = s.replace(marker, method, 1)
+write(path, s)
+
+
+# ---------------------------------------------------------------------------
 # 2. Pure read-only audit resolver. It reuses the conservative V5 work
 #    identity keys; it does not persist or promote candidates.
 # ---------------------------------------------------------------------------
@@ -410,13 +479,9 @@ write(path, s)
 test = """import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import type { StoredComic } from '../../src/library/types'
-import {
-    latestMigrationVersion,
-    runMigrations
-} from '../../src/storage/sqlite/migrations'
+import { LibraryDatabase } from '../../src/library/database'
 import {
     buildWorkIdentityAuditV5,
     WORK_IDENTITY_RESOLVER_VERSION
@@ -449,52 +514,40 @@ function comic(
 }
 
 describe('Canonical Work Identity foundation', () => {
-    it('adds the identity schema without rewriting the comics table', () => {
+    it('adds the identity schema without rewriting existing comic identity', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-work-id-'))
-        const file = path.join(dir, 'library.sqlite')
-        const database = new DatabaseSync(file)
-        runMigrations(database)
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        const status = database.workIdentityStorageStatus()
 
-        expect(latestMigrationVersion).toBeGreaterThanOrEqual(12)
-        const tables = new Set(
-            (
-                database
-                    .prepare(
-                        "SELECT name FROM sqlite_master WHERE type='table'"
-                    )
-                    .all() as Array<{ name: string }>
-            ).map((row) => row.name)
+        expect(status.appliedSchemaVersion).toBe(
+            status.expectedSchemaVersion
         )
-        for (const name of [
-            'canonical_series',
-            'canonical_works',
-            'work_editions',
-            'work_upload_bindings',
-            'work_identity_evidence',
-            'work_identity_decisions'
-        ])
-            expect(tables.has(name)).toBe(true)
+        expect(status.expectedSchemaVersion).toBeGreaterThanOrEqual(12)
+        for (const present of Object.values(status.tables))
+            expect(present).toBe(true)
+        expect(status.counts.bindings).toBe(0)
+        expect(status.counts.evidence).toBe(0)
+        expect(status.counts.decisions).toBe(0)
 
-        const comicColumns = (
-            database.prepare('PRAGMA table_info(comics)').all() as Array<{
-                name: string
-                pk: number
-            }>
+        // Existing comic IDs stay canonical upload IDs; migration 12 does not
+        // require or pre-create a work binding.
+        database.importCatalog(
+            [
+                {
+                    comicId: 'pica:original',
+                    title: 'Original',
+                    author: 'Artist',
+                    tags: [],
+                    categories: [],
+                    finished: true
+                }
+            ],
+            'test'
         )
-        expect(
-            comicColumns.find((column) => column.name === 'id')?.pk
-        ).toBe(1)
-        expect(
-            Number(
-                (
-                    database
-                        .prepare(
-                            'SELECT COUNT(*) AS count FROM work_upload_bindings'
-                        )
-                        .get() as { count: number }
-                ).count
-            )
-        ).toBe(0)
+        expect(database.getComic('pica:original')?.comicId).toBe(
+            'pica:original'
+        )
+        expect(database.workIdentityStorageStatus().counts.bindings).toBe(0)
 
         database.close()
         fs.rmSync(dir, { recursive: true, force: true })

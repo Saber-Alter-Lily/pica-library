@@ -117,12 +117,22 @@ function installRecommendationToolbar() {
         selection.id = 'ux-recommend-selection'
         selection.className = 'ux-selection-bar is-empty'
         const results = ux$('#recommend-results')
+        const add = ux$('#recommend-add-shelf')
+        const clear = ux$('#recommend-clear-selection')
+        const legacyDisclosure =
+            add?.closest('.batch-action-disclosure') ||
+            clear?.closest('.batch-action-disclosure')
         if (results) results.before(selection)
         moveNodes(selection, [
-            ux$('#recommend-add-shelf'),
-            ux$('#recommend-clear-selection'),
+            add,
+            clear,
             ux$('#recommend-selection-status')
         ])
+        if (
+            legacyDisclosure &&
+            !legacyDisclosure.querySelector('button')
+        )
+            legacyDisclosure.remove()
     }
     updateRecommendationSelectionBar()
 }
@@ -151,6 +161,40 @@ function installSearchToolbar() {
     const more = makeDetails('ux-search-filters', '来源与筛选')
     moveNodes(more.querySelector('.ux-more-body'), [tags, source, sort])
     toolbar.replaceChildren(primary, more)
+
+    if (!ux$('#ux-search-selection')) {
+        const selection = document.createElement('div')
+        selection.id = 'ux-search-selection'
+        selection.className = 'ux-selection-bar is-empty'
+        const results = ux$('#search-results')
+        const add = ux$('#search-add-shelf')
+        const clear = ux$('#search-clear-selection')
+        const legacyDisclosure =
+            add?.closest('.batch-action-disclosure') ||
+            clear?.closest('.batch-action-disclosure')
+        if (results) results.before(selection)
+        moveNodes(selection, [
+            add,
+            clear,
+            ux$('#search-selection-status')
+        ])
+        if (
+            legacyDisclosure &&
+            !legacyDisclosure.querySelector('button')
+        )
+            legacyDisclosure.remove()
+    }
+    updateSearchSelectionBar()
+}
+
+function updateSearchSelectionBar() {
+    const bar = ux$('#ux-search-selection')
+    const status = ux$('#search-selection-status')
+    if (!bar || !status) return
+    bar.classList.toggle(
+        'is-empty',
+        !selectionHasItems(status.textContent)
+    )
 }
 
 function installDownloadsPage() {
@@ -350,13 +394,15 @@ function installDialogBehavior() {
 function installObservers() {
     for (const selector of [
         '#library-selection-status',
-        '#recommend-selection-status'
+        '#recommend-selection-status',
+        '#search-selection-status'
     ]) {
         const node = ux$(selector)
         if (!node) continue
         new MutationObserver(() => {
             updateLibrarySelectionBar()
             updateRecommendationSelectionBar()
+            updateSearchSelectionBar()
         }).observe(node, { childList: true, characterData: true, subtree: true })
     }
 

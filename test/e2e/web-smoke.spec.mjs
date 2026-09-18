@@ -26,6 +26,13 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
     const mode = page.locator('#mode')
     await expect(mode).not.toHaveText('正在检测模式', { timeout: 10_000 })
 
+    const disclaimer = page.locator('#pica-disclaimer-gate')
+    if (await disclaimer.isVisible()) {
+        await page.locator('#pica-disclaimer-check').check()
+        await page.locator('#pica-disclaimer-accept').click()
+        await expect(disclaimer).toBeHidden()
+    }
+
     for (const view of [
         'library',
         'shelves',

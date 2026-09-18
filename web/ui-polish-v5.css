@@ -1,0 +1,481 @@
+/* V5 Web UX polish ------------------------------------------------------- */
+
+:root {
+    --ux-focus: rgb(95 110 232 / 34%);
+    --ux-soft: #f7f8fc;
+    --ux-line: #e2e6ef;
+    --ux-muted: #747b8b;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid var(--ux-focus);
+    outline-offset: 2px;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.app-nav {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+}
+
+.page-heading {
+    align-items: center;
+}
+
+.page-heading > .actions,
+.ux-heading-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.status {
+    overflow-wrap: anywhere;
+    line-height: 1.55;
+}
+
+.status:empty {
+    display: none;
+}
+
+.ux-toolbar-shell {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0 16px;
+}
+
+.ux-toolbar-primary,
+.ux-selection-bar,
+.ux-recommend-pager,
+.ux-search-primary {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ux-toolbar-primary {
+    padding: 10px;
+    border: 1px solid var(--ux-line);
+    border-radius: 14px;
+    background: rgb(255 255 255 / 88%);
+}
+
+.ux-toolbar-primary > input[type='text'],
+.ux-toolbar-primary > input:not([type]),
+.ux-search-primary > input {
+    min-width: min(320px, 100%);
+    flex: 1 1 240px;
+}
+
+.ux-more {
+    border: 1px solid var(--ux-line);
+    border-radius: 14px;
+    background: #fff;
+}
+
+.ux-more > summary {
+    padding: 10px 13px;
+    cursor: pointer;
+    color: #596071;
+    font-weight: 700;
+    list-style: none;
+}
+
+.ux-more > summary::-webkit-details-marker {
+    display: none;
+}
+
+.ux-more > summary::after {
+    content: '＋';
+    float: right;
+    opacity: 0.55;
+}
+
+.ux-more[open] > summary::after {
+    content: '－';
+}
+
+.ux-more-body {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0 10px 10px;
+}
+
+.ux-selection-bar {
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px dashed #d7dce8;
+    border-radius: 12px;
+    background: #fafbfe;
+}
+
+.ux-selection-bar.is-empty {
+    display: none;
+}
+
+.ux-selection-bar .status {
+    margin: 0 0 0 auto;
+}
+
+.ux-empty-state {
+    padding: 28px;
+    border: 1px dashed #d9deea;
+    border-radius: 16px;
+    text-align: center;
+    color: var(--ux-muted);
+    background: #fbfcfe;
+}
+
+.ux-recommend-pager {
+    justify-content: space-between;
+    margin: 8px 0 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--ux-line);
+    border-radius: 12px;
+    background: #fff;
+}
+
+.ux-recommend-pager .status {
+    margin: 0;
+}
+
+#recommend-next-batch {
+    margin-left: auto;
+}
+
+#search .toolbar {
+    padding: 10px;
+    border: 1px solid var(--ux-line);
+    border-radius: 14px;
+    background: #fff;
+}
+
+#search .source-picker {
+    margin: 0;
+}
+
+#search .source-picker > summary {
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid #dfe3eb;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #fff;
+}
+
+#library .comic-card,
+#downloaded .downloaded-card,
+#shelves .comic-card,
+#recommend-results .result,
+#search-results .result {
+    transition:
+        transform 140ms ease,
+        border-color 140ms ease,
+        box-shadow 140ms ease;
+}
+
+#library .comic-card:hover,
+#downloaded .downloaded-card:hover,
+#shelves .comic-card:hover {
+    transform: translateY(-2px);
+    border-color: #cfd5e7;
+    box-shadow: 0 12px 30px rgb(34 42 70 / 10%);
+}
+
+#shelf-list .shelf-card[aria-current='true'],
+#shelf-list .shelf-card.active {
+    border-color: #9da7ec;
+    background: #f3f4ff;
+}
+
+.app-dialog,
+#a88-comic-detail-dialog,
+#v5-id-detail-dialog {
+    margin: auto;
+}
+
+.dialog-close {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    float: right;
+}
+
+body:has(dialog[open]) {
+    overflow: hidden;
+}
+
+/* Reader: controls must remain reachable regardless of scroll position. */
+body.reader-active {
+    --reader-header-height: 86px;
+}
+
+body.reader-active #reader {
+    padding-top: var(--reader-header-height);
+}
+
+body.reader-active .reader-header {
+    position: fixed !important;
+    inset: 0 0 auto 0;
+    z-index: 1000;
+    min-height: var(--reader-header-height);
+    border-bottom: 1px solid #dfe3eb;
+    background: rgb(255 255 255 / 96%);
+    box-shadow: 0 8px 26px rgb(0 0 0 / 10%);
+    backdrop-filter: blur(18px);
+}
+
+.reader-header-copy {
+    min-width: 0;
+}
+
+.reader-header-copy h2 {
+    max-width: min(48vw, 720px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.reader-essential-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.reader-options {
+    position: relative;
+}
+
+.reader-options > summary {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid #dfe3eb;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #555e70;
+    background: #fff;
+    font-weight: 700;
+    list-style: none;
+}
+
+.reader-options > summary::-webkit-details-marker {
+    display: none;
+}
+
+.reader-options .reader-controls {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(620px, calc(100vw - 32px));
+    padding: 12px;
+    border: 1px solid var(--ux-line);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 16px 42px rgb(0 0 0 / 18%);
+}
+
+.reader-chapters {
+    position: sticky;
+    top: var(--reader-header-height);
+    max-height: calc(100vh - var(--reader-header-height));
+}
+
+#reader-message {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    z-index: 900;
+    max-width: min(720px, calc(100vw - 32px));
+    transform: translateX(-50%);
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgb(20 24 31 / 82%);
+    color: #fff;
+    pointer-events: none;
+}
+
+#reader-message:empty {
+    display: none;
+}
+
+.reader-key-hint {
+    color: #858c9a;
+    font-size: 12px;
+}
+
+/* Settings: normal controls first; research/debug tooling is explicitly advanced. */
+#v5-experiment-tools {
+    margin-top: 18px;
+    border: 1px solid #dfe3eb;
+    border-radius: 16px;
+    background: #fafbfe;
+}
+
+#v5-experiment-tools > summary {
+    padding: 14px 16px;
+    cursor: pointer;
+    color: #525a6b;
+    font-weight: 760;
+    list-style: none;
+}
+
+#v5-experiment-tools > summary::-webkit-details-marker {
+    display: none;
+}
+
+#v5-experiment-tools > summary::after {
+    content: '展开';
+    float: right;
+    color: #6a72c8;
+    font-size: 0.85rem;
+}
+
+#v5-experiment-tools[open] > summary::after {
+    content: '收起';
+}
+
+#v5-experiment-tools .ux-experiment-intro {
+    margin: 0 16px 12px;
+    color: var(--ux-muted);
+    line-height: 1.6;
+}
+
+#v5-experiment-tools .ux-experiment-body {
+    display: grid;
+    gap: 14px;
+    padding: 0 12px 12px;
+}
+
+#v5-experiment-tools .panel {
+    margin: 0;
+    max-width: none;
+    box-shadow: none;
+}
+
+#a87-recommendations-panel > .panel,
+#a87-connections-panel > .panel,
+#a87-maintenance-panel > .panel,
+#a87-storage-panel > .panel {
+    max-width: none;
+}
+
+/* Dangerous actions should never look like ordinary primary navigation. */
+.danger-action,
+#clear-lite-state,
+#eh-account-clear,
+#exit-app {
+    color: #a63e45;
+    border-color: #e8c9cc;
+    background: #fff9fa;
+}
+
+.danger-action:hover,
+#clear-lite-state:hover,
+#eh-account-clear:hover,
+#exit-app:hover {
+    border-color: #dca8ad;
+    background: #fff1f2;
+}
+
+/* Small-screen normalization. */
+@media (max-width: 900px) {
+    .app-nav {
+        position: static;
+    }
+
+    .ux-toolbar-primary,
+    .ux-search-primary,
+    .ux-selection-bar,
+    .ux-recommend-pager {
+        align-items: stretch;
+    }
+
+    .ux-toolbar-primary > *,
+    .ux-search-primary > * {
+        flex: 1 1 auto;
+    }
+
+    .reader-header-copy h2 {
+        max-width: 42vw;
+    }
+}
+
+@media (max-width: 700px) {
+    body.reader-active {
+        --reader-header-height: 104px;
+    }
+
+    body.reader-active .reader-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .reader-header-copy .eyebrow {
+        display: none;
+    }
+
+    .reader-header-copy h2 {
+        max-width: 58vw;
+        margin: 0;
+        font-size: 16px;
+    }
+
+    #reader-chapter-title {
+        max-width: 58vw;
+        margin: 2px 0 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .reader-essential-actions {
+        justify-content: flex-end;
+    }
+
+    .reader-options .reader-controls {
+        position: fixed;
+        top: var(--reader-header-height);
+        left: 8px;
+        right: 8px;
+        width: auto;
+    }
+
+    .reader-chapters {
+        position: static;
+        max-height: none;
+    }
+
+    .ux-more-body {
+        align-items: stretch;
+    }
+
+    .ux-more-body > * {
+        flex: 1 1 180px;
+    }
+}

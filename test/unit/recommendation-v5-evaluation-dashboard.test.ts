@@ -7,11 +7,11 @@ const read = (file: string) =>
     fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('Recommendation V5 evaluation dashboard', () => {
-    it('loads evaluation data automatically but never auto-runs shadow retrieval', () => {
+    it('keeps evaluation lazy on page open and never auto-runs shadow retrieval', () => {
         const dashboard = read(
             'web/recommendation-v5-evaluation.js'
         )
-        expect(dashboard).toContain('void evalLoad()')
+        expect(dashboard).toContain('async function evalLoad(')
         expect(dashboard).toContain('async function evalRunShadow()')
         expect(dashboard).toContain(
             "panel.querySelector('#v5-eval-run-shadow').onclick"
@@ -20,8 +20,9 @@ describe('Recommendation V5 evaluation dashboard', () => {
             /function evalInstall\(\) \{([\s\S]*?)\n\}/.exec(
                 dashboard
             )?.[1] ?? ''
-        expect(installBody).toContain('void evalLoad()')
+        expect(installBody).not.toContain('evalLoad(')
         expect(installBody).not.toContain('evalRunShadow')
+        expect(installBody).toContain('打开设置页不会自动执行重计算')
     })
 
     it('requires Desktop CSRF and explicit shadow confirmation for manual runs', () => {

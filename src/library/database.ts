@@ -283,7 +283,7 @@ export class LibraryDatabase {
             }
 
         const statement = this.db.prepare(
-            \`INSERT INTO work_identity_evidence(
+            `INSERT INTO work_identity_evidence(
                 id, left_comic_id, right_comic_id, relation, confidence,
                 resolver_version, evidence_json, created_at
              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -292,7 +292,7 @@ export class LibraryDatabase {
                 relation = excluded.relation,
                 confidence = excluded.confidence,
                 evidence_json = excluded.evidence_json,
-                created_at = excluded.created_at\`
+                created_at = excluded.created_at`
         )
         const now = new Date().toISOString()
         this.db.exec('BEGIN IMMEDIATE')
@@ -324,14 +324,14 @@ export class LibraryDatabase {
         const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
         const rows = this.db
             .prepare(
-                \`SELECT e.*, lc.title AS left_title,
+                `SELECT e.*, lc.title AS left_title,
                         rc.title AS right_title
                  FROM work_identity_evidence e
                  JOIN comics lc ON lc.id = e.left_comic_id
                  JOIN comics rc ON rc.id = e.right_comic_id
                  ORDER BY e.confidence DESC, e.created_at DESC,
                           e.left_comic_id, e.right_comic_id
-                 LIMIT ?\`
+                 LIMIT ?`
             )
             .all(bounded) as SqlRow[]
         return rows.map((row) => ({

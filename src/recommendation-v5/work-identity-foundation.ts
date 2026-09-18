@@ -184,7 +184,7 @@ export type WorkIdentityHumanDecisionV5 =
 export interface WorkIdentityDecisionInputV5 {
     leftComicId: string
     rightComicId: string
-    decision: WorkIdentityHumanDecisionV5
+    decision: string
 }
 
 export function buildWorkIdentityMaterializationPreviewV5(

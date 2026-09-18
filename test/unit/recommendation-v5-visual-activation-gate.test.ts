@@ -113,7 +113,7 @@ function readyInput() {
 describe('Visual V1 activation review gate', () => {
     it('can only become ready for manual shadow review and never activates serving', () => {
         const result = evaluateVisualActivationGateV5(
-            readyInput() as Parameters<
+            readyInput() as unknown as Parameters<
                 typeof evaluateVisualActivationGateV5
             >[0]
         )
@@ -149,7 +149,7 @@ describe('Visual V1 activation review gate', () => {
             (run) => run.modelVersion === 'v5-shadow/old'
         )
         const result = evaluateVisualActivationGateV5(
-            input as Parameters<
+            input as unknown as Parameters<
                 typeof evaluateVisualActivationGateV5
             >[0]
         )
@@ -181,7 +181,7 @@ describe('Visual V1 activation review gate', () => {
             servingImpact: true
         }
         const result = evaluateVisualActivationGateV5(
-            input as Parameters<
+            input as unknown as Parameters<
                 typeof evaluateVisualActivationGateV5
             >[0]
         )

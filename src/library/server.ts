@@ -804,6 +804,20 @@ export async function startLibraryServer(options: {
                     )
                 )
             if (
+                url.pathname === '/api/v1/visual/style-families' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.visualStyleFamilies(
+                        Number(url.searchParams.get('minWorksPerAuthor') ?? 2),
+                        Number(url.searchParams.get('maxAuthors') ?? 300),
+                        Number(url.searchParams.get('mutualK') ?? 2),
+                        Number(url.searchParams.get('minimumSimilarity') ?? -1)
+                    )
+                )
+            if (
                 url.pathname === '/api/v1/visual/settings' &&
                 request.method === 'POST'
             )

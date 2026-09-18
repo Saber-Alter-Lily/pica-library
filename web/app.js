@@ -1847,6 +1847,34 @@ let readerComicRequest = 0
 function readerApiRoot() {
     return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
 }
+
+function readerReadableChapters() {
+    return (state.reader.chapters || []).filter(
+        (item) => state.reader.online || item.downloadedPictures > 0
+    )
+}
+
+function updateReaderChapterNavigation() {
+    const readable = readerReadableChapters()
+    const index = readable.findIndex(
+        (item) => item.id === state.reader.episodeId
+    )
+    const previous = $('#reader-prev-chapter')
+    const next = $('#reader-next-chapter')
+    if (previous) previous.disabled = index <= 0
+    if (next) next.disabled = index < 0 || index >= readable.length - 1
+    $('#reader-chapters [data-reader-episode]').forEach((button) => {
+        const active = button.dataset.readerEpisode === state.reader.episodeId
+        button.classList.toggle('active', active)
+        button.setAttribute('aria-current', String(active))
+    })
+}
+
+function scrollReaderViewportToTop() {
+    const target = $('#reader-pages')
+    if (!target) return
+    target.scrollIntoView({ block: 'start' })
+}
 function renderReaderPages() {
     const reader = state.reader
     if (!reader.chapter) return
@@ -1980,6 +2008,9 @@ async function openReaderChapter(episodeId) {
     state.reader.dirty = false
     renderReaderChapterHeading()
     renderReaderPages()
+    updateReaderChapterNavigation()
+    if ($('#reader-mode').value !== 'vertical')
+        requestAnimationFrame(() => scrollReaderViewportToTop())
     $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
     } catch (error) {
         if (requestId === readerChapterRequest)
@@ -2082,7 +2113,27 @@ $('#reader-chapters').onclick = (event) => {
     const episodeId = event.target.dataset.readerEpisode
     if (episodeId) void openReaderChapter(episodeId)
 }
-$('#reader-mode').onchange = renderReaderPages
+$('#reader-prev-chapter').onclick = () => {
+    const readable = readerReadableChapters()
+    const index = readable.findIndex(
+        (item) => item.id === state.reader.episodeId
+    )
+    if (index > 0) void openReaderChapter(readable[index - 1].id)
+}
+$('#reader-next-chapter').onclick = () => {
+    const readable = readerReadableChapters()
+    const index = readable.findIndex(
+        (item) => item.id === state.reader.episodeId
+    )
+    if (index >= 0 && index < readable.length - 1)
+        void openReaderChapter(readable[index + 1].id)
+}
+$('#reader-mode').onchange = () => {
+    renderReaderPages()
+    updateReaderChapterNavigation()
+    if ($('#reader-mode').value !== 'vertical')
+        requestAnimationFrame(() => scrollReaderViewportToTop())
+}
 $('#reader-direction').onchange = renderReaderPages
 $('#reader-fit').onchange = renderReaderPages
 $('#reader-fullscreen').onclick = () =>

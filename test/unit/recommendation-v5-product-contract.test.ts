@@ -883,6 +883,47 @@ describe('Recommendation V5 portable product contract', () => {
         expect(visual).toContain("VISUAL_MODEL_ID = 'onnx-community/dinov2-small'")
     })
 
+    it('acknowledges Android pairing before optional background recommendation sync', () => {
+        const pairing = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
+        )
+        const saved = pairing.indexOf('BridgeStore.save(this,h,token,name)')
+        const success = pairing.indexOf('配对成功 · 后台正在同步推荐状态')
+        const backgroundSync = pairing.indexOf(
+            'BridgeClient.syncRecommendationState(this,false)'
+        )
+        expect(saved).toBeGreaterThanOrEqual(0)
+        expect(success).toBeGreaterThan(saved)
+        expect(backgroundSync).toBeGreaterThan(success)
+        expect(pairing).not.toContain(
+            'BridgeClient.syncRecommendationState(this,true)'
+        )
+    })
+
+    it('makes work-identity review visual, detail-capable and undecided-first', () => {
+        const web = read('web/work-identity-review-beta.js')
+        const app = read('web/app.js')
+        expect(web).toContain('/api/v1/covers/')
+        expect(web).toContain('data-v5-id-detail')
+        expect(web).toContain('data-v5-id-read-online')
+        expect(web).toContain(
+            'Number(Boolean(a.decision)) - Number(Boolean(b.decision))'
+        )
+        expect(web).toContain("'pica-open-reader'")
+        expect(app).toContain("'pica-open-reader'")
+    })
+
+    it('makes Visual QC detail reading independent of the current page DOM', () => {
+        const qc = read('web/visual-qc-beta.js')
+        expect(qc).toContain("'pica-open-reader'")
+        expect(qc).not.toContain(
+            '当前页面没有可直接复用的在线阅读入口'
+        )
+        expect(qc).not.toContain(
+            'current page has no reusable online reader'
+        )
+    })
+
     it('queues mobile feedback and validates acknowledgement before clearing dirty state', () => {
         const feedback = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationFeedbackStore.java')
         const pairing = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java')

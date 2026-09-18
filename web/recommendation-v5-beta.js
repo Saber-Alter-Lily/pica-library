@@ -70,6 +70,9 @@ function ensureStyles() {
 #recommend-results .detail-actions,#recommend-results .recommend-feedback{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:8px}
 #recommend-results .detail-actions button,#recommend-results .recommend-feedback button{min-height:38px;padding:7px 9px}
 #recommend-results .result{position:relative;transition:opacity .2s ease,filter .2s ease}
+.v5-taste-toggle{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.v5-taste-toggle button{min-height:34px;padding:5px 9px}
+.v5-taste-toggle .status{margin:0}
 #recommend-results .result.v5-feedback-like{box-shadow:0 0 0 2px color-mix(in srgb,#2e9d63 38%,transparent)}
 #recommend-results .result.v5-feedback-dislike .cover-shell img,
 #recommend-results .result.v5-suppressed .cover-shell img{filter:blur(3px) grayscale(.55);opacity:.48}
@@ -430,6 +433,66 @@ function syncFeedbackVisual(card,announce=false) {
     if(announce&&next&&next!==previous)showToast(next==='like'?'已记录喜欢，将增加类似推荐。':'已记录不喜欢，将减少此类推荐。',next==='like'?'positive':'negative')
 }
 
+function tasteExcluded(comicId) {
+    return Array.isArray(V5.snapshot?.tasteExcludedComicIds) &&
+        V5.snapshot.tasteExcludedComicIds.includes(comicId)
+}
+
+async function setTasteExclusion(comicId, excluded) {
+    try {
+        V5.snapshot = await post(
+            '/api/v1/recommendation-v5/taste-exclusion',
+            { comicId, excluded }
+        )
+        renderPolicy()
+        decorateLibraryTasteToggles()
+        showToast(
+            excluded
+                ? '收藏已保留，但这本不再参与推荐口味画像。'
+                : '这本收藏已恢复参与推荐口味画像。',
+            'positive'
+        )
+    } catch (error) {
+        showToast('口味画像设置失败：' + error.message, 'negative')
+    }
+}
+
+function decorateLibraryTasteToggles() {
+    ensureStyles()
+    document
+        .querySelectorAll(
+            '#comic-grid .comic-card[data-is-favorite="true"], #comic-rows tr[data-is-favorite="true"]'
+        )
+        .forEach((card) => {
+            const comicId =
+                card.dataset.comicId ||
+                card.querySelector('[data-comic-id]')?.dataset.comicId
+            if (!comicId) return
+            const target =
+                card.querySelector('.comic-card-body') ||
+                card.querySelector('td:nth-child(2)')
+            if (!target) return
+            let holder = target.querySelector('.v5-taste-toggle')
+            if (!holder) {
+                holder = document.createElement('div')
+                holder.className = 'v5-taste-toggle'
+                target.appendChild(holder)
+            }
+            const excluded = tasteExcluded(comicId)
+            holder.innerHTML =
+                '<span class="status">推荐口味：' +
+                (excluded ? '已排除' : '参与') +
+                '</span><button type="button">' +
+                (excluded
+                    ? '恢复用于推荐口味'
+                    : '保留收藏，但不用于推荐口味') +
+                '</button>'
+            holder.querySelector('button').addEventListener('click', () => {
+                void setTasteExclusion(comicId, !excluded)
+            })
+        })
+}
+
 function decorateRecommendationCards() {
     ensureStyles()
     document.querySelectorAll('#recommend-results .result').forEach(card=>{
@@ -447,6 +510,16 @@ function decorateRecommendationCards() {
 }
 
 
+const libraryRoots = [
+    document.querySelector('#comic-grid'),
+    document.querySelector('#comic-rows')
+].filter(Boolean)
+for (const root of libraryRoots)
+    new MutationObserver(() => decorateLibraryTasteToggles()).observe(root, {
+        childList: true,
+        subtree: true
+    })
+
 const recommendationRoot=document.querySelector('#recommend-results')
 if(recommendationRoot)new MutationObserver(mutations=>{
     let needsDecorate=false
@@ -460,5 +533,6 @@ if(recommendationRoot)new MutationObserver(mutations=>{
 
 ensurePanel()
 decorateRecommendationCards()
-void loadPolicy()
+decorateLibraryTasteToggles()
+void loadPolicy().then(() => decorateLibraryTasteToggles())
 document.addEventListener('pica-language-change',()=>{ensurePanel();renderPolicy()})

@@ -31,6 +31,8 @@ export interface MobileRecommendationSyncV5 {
     feedback?: unknown
     suppressComicIds?: unknown
     clearSuppressComicIds?: unknown
+    tasteExcludedComicIds?: unknown
+    clearTasteExcludedComicIds?: unknown
 }
 
 function stringArray(value: unknown) {
@@ -113,6 +115,11 @@ export class RecommendationPolicyStoreV5 {
                               }))
                         : []
                 }),
+                tasteExcludedComicIds: Array.isArray(
+                    stored.tasteExcludedComicIds
+                )
+                    ? stored.tasteExcludedComicIds.map(String)
+                    : [],
                 explicitDistinctPairs: Array.isArray(stored.explicitDistinctPairs)
                     ? stored.explicitDistinctPairs.map(String)
                     : [],
@@ -323,6 +330,33 @@ export class RecommendationPolicyStoreV5 {
         return this.snapshot()
     }
 
+    setTasteExclusion(
+        comicId: string,
+        excluded = true,
+        source: 'DESKTOP' | 'ANDROID' = 'DESKTOP'
+    ) {
+        const id = comicId.trim()
+        if (!id) throw new Error('Comic id is required')
+        const previous = this.state()
+        const values = new Set(previous.tasteExcludedComicIds)
+        if (excluded) values.add(id)
+        else values.delete(id)
+        const next = {
+            ...previous,
+            revision: previous.revision + 1,
+            updatedAt: new Date().toISOString(),
+            tasteExcludedComicIds: [...values].sort()
+        }
+        this.save(next)
+        this.database.recordUserEvent({
+            eventType: 'recommendation_taste_exclusion',
+            comicId: id,
+            source: source === 'ANDROID' ? 'android-v5' : 'desktop-v5',
+            metadata: { excluded }
+        })
+        return this.snapshot()
+    }
+
     private applyFeedback(
         feedback: MobileFeedbackMutationV5,
         deviceId: string,
@@ -406,10 +440,17 @@ export class RecommendationPolicyStoreV5 {
         }
         const suppressed = new Set(state.hardSuppressComicIds)
         for (const id of stringArray(input.suppressComicIds)) suppressed.add(id)
-        for (const id of stringArray(input.clearSuppressComicIds)) suppressed.delete(id)
+        for (const id of stringArray(input.clearSuppressComicIds))
+            suppressed.delete(id)
+        const tasteExcluded = new Set(state.tasteExcludedComicIds)
+        for (const id of stringArray(input.tasteExcludedComicIds))
+            tasteExcluded.add(id)
+        for (const id of stringArray(input.clearTasteExcludedComicIds))
+            tasteExcluded.delete(id)
         state = {
             ...state,
             hardSuppressComicIds: [...suppressed].sort(),
+            tasteExcludedComicIds: [...tasteExcluded].sort(),
             deviceSyncRevisions: {
                 ...state.deviceSyncRevisions,
                 [deviceId]: Math.max(previousRevision + 1, state.revision + 1)

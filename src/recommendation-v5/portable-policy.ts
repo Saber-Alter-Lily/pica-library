@@ -60,6 +60,7 @@ export interface PortablePolicyStateV5 {
     ownedComicIds: string[]
     duplicateReportComicIds: string[]
     temporarySuppressions: TemporarySuppressionV5[]
+    tasteExcludedComicIds: string[]
     explicitDistinctPairs: string[]
     deviceSyncRevisions: Record<string, number>
 }
@@ -87,6 +88,7 @@ export interface PortablePolicySnapshotV5 extends PortablePolicyStateV5 {
         ownedOverrides: number
         duplicateReports: number
         temporarySuppressed: number
+        tasteExcluded: number
     }
 }
 
@@ -114,6 +116,7 @@ export function defaultPortablePolicyStateV5(): PortablePolicyStateV5 {
         ownedComicIds: [],
         duplicateReportComicIds: [],
         temporarySuppressions: [],
+        tasteExcludedComicIds: [],
         explicitDistinctPairs: [],
         deviceSyncRevisions: {}
     }
@@ -469,8 +472,19 @@ export function filterCandidatesAgainstOwnedV5<T extends { comic: StoredComic }>
     }
 }
 
-export function portableInferredSignalsV5(catalog: StoredComic[], limit = 120): PortablePreferenceSignalV5[] {
-    const positives = catalog.filter((comic) => comic.isFavorite)
+export function portableInferredSignalsV5(
+    catalog: StoredComic[],
+    limit = 120,
+    tasteExcludedComicIds: Iterable<string> = []
+): PortablePreferenceSignalV5[] {
+    const excluded = new Set(
+        [...tasteExcludedComicIds].map(normalizePreferenceKey)
+    )
+    const positives = catalog.filter(
+        (comic) =>
+            comic.isFavorite &&
+            !excluded.has(normalizePreferenceKey(comic.comicId))
+    )
     const total = Math.max(1, positives.length)
     const groups = new Map<string, { targetType: PortablePreferenceSignalV5['targetType']; key: string; label: string; ids: Set<string> }>()
     const add = (targetType: PortablePreferenceSignalV5['targetType'], raw: string, comicId: string) => {
@@ -511,7 +525,11 @@ export function portableInferredSignalsV5(catalog: StoredComic[], limit = 120): 
 export function portablePolicySnapshotV5(state: PortablePolicyStateV5, catalog: StoredComic[]): PortablePolicySnapshotV5 {
     return {
         ...state,
-        inferred: portableInferredSignalsV5(catalog),
+        inferred: portableInferredSignalsV5(
+            catalog,
+            120,
+            state.tasteExcludedComicIds
+        ),
         counts: {
             owned: catalog.filter(isOwnedComicV5).length,
             favorites: catalog.filter((comic) => comic.isFavorite).length,
@@ -520,7 +538,8 @@ export function portablePolicySnapshotV5(state: PortablePolicyStateV5, catalog: 
             seenFacts: state.seenComicIds.length,
             ownedOverrides: state.ownedComicIds.length,
             duplicateReports: state.duplicateReportComicIds.length,
-            temporarySuppressed: activeTemporarySuppressionsV5(state).length
+            temporarySuppressed: activeTemporarySuppressionsV5(state).length,
+            tasteExcluded: state.tasteExcludedComicIds.length
         }
     }
 }

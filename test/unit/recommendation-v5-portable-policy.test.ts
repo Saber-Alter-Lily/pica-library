@@ -287,6 +287,70 @@ describe('Recommendation V5 portable policy', () => {
         expect(target.inLibrary).toBe(false)
     })
 
+    it('excludes selected favorites from inferred taste without changing ownership', () => {
+        const favorite = comic({
+            comicId: 'archive-favorite',
+            title: 'Archive',
+            author: 'Artist',
+            tags: ['Archive Tag'],
+            isFavorite: true
+        })
+        const signals = portableInferredSignalsV5(
+            [favorite],
+            120,
+            ['archive-favorite']
+        )
+        expect(signals).toHaveLength(0)
+        expect(favorite.isFavorite).toBe(true)
+        expect(
+            filterCandidatesAgainstOwnedV5(
+                [{ comic: favorite }],
+                [favorite],
+                {
+                    ...defaultPortablePolicyStateV5(),
+                    tasteExcludedComicIds: ['archive-favorite']
+                }
+            ).rows
+        ).toHaveLength(0)
+    })
+
+    it('persists and audits taste-profile exclusion independently', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-v5-taste-exclusion-')
+        )
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        database.importFavorites(
+            [
+                {
+                    comicId: 'favorite-a',
+                    title: 'A',
+                    author: 'Artist',
+                    tags: ['T'],
+                    categories: [],
+                    finished: true
+                }
+            ],
+            'test',
+            false,
+            true
+        )
+        const store = new RecommendationPolicyStoreV5(database)
+        store.setTasteExclusion('favorite-a', true)
+        expect(store.snapshot().tasteExcludedComicIds).toEqual(['favorite-a'])
+        expect(store.snapshot().counts.tasteExcluded).toBe(1)
+        expect(database.recommendationFeedback()).toHaveLength(0)
+        expect(
+            database.listUserEvents({
+                eventType: 'recommendation_taste_exclusion',
+                limit: 10
+            })
+        ).toHaveLength(1)
+        store.setTasteExclusion('favorite-a', false)
+        expect(store.snapshot().tasteExcludedComicIds).toEqual([])
+        database.close()
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+
     it('persists controls and merges dirty mobile feedback using server-side events', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-policy-'))
         const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))

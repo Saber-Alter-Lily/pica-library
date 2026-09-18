@@ -983,7 +983,7 @@ function renderComics(records = state.records) {
     </div>`
     $('#comic-grid').innerHTML = page
         .map(
-            (comic) => `<article class="comic-card">
+            (comic) => `<article class="comic-card" data-comic-id="${escapeHtml(comic.comicId)}" data-is-favorite="${comic.isFavorite ? 'true' : 'false'}">
                 ${cover(comic)}
                 <div class="comic-card-body">
                     <label class="comic-select"><input type="checkbox" data-selection-context="library" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.library.has(comic.comicId) ? 'checked' : ''} /> ${t('action.select')}</label>
@@ -1003,7 +1003,7 @@ function renderComics(records = state.records) {
         .join('')
     $('#comic-rows').innerHTML = page
         .map(
-            (comic) => `<tr>
+            (comic) => `<tr data-comic-id="${escapeHtml(comic.comicId)}" data-is-favorite="${comic.isFavorite ? 'true' : 'false'}">
                 <td><input type="checkbox" data-selection-context="library" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.library.has(comic.comicId) ? 'checked' : ''} /></td>
                 <td><strong>${escapeHtml(comic.title)}</strong></td>
                 <td>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknown'))}</td>

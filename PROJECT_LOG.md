@@ -16,6 +16,7 @@
 - Like / Dislike 增加即时可见回执；Dislike 卡片弱化，避免用户无法判断操作是否生效。
 - Visual V1 保持冻结、版本化和可回滚；当前研发原则是不因 Recommendation V5 改造而重建或覆盖现有视觉向量。
 - P1 语义收尾开始：将“已经看过 / 已经拥有 / 重复上传 / 暂时不想看”从口味反馈中拆出，作为独立事实或约束；临时隐藏采用可过期状态。
+- 增加“保留收藏但不参与推荐口味画像”：仅移出 preference inference、召回 seed 与 Visual preference prototype，收藏/下载/已拥有过滤和 Visual embedding 均保留。
 
 ## v0.4.0 — 多来源与统一语义
 

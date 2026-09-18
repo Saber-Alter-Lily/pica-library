@@ -62,6 +62,20 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('30 天后自动恢复')
     })
 
+    it('supports keeping a favorite while excluding it from taste inference', () => {
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const web = read('web/recommendation-v5-beta.js')
+        const portable = read('src/recommendation-v5/portable-policy.ts')
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/taste-exclusion'
+        )
+        expect(service).toContain('tasteExcludedIds')
+        expect(service).toContain('tasteExcluded.has(comic.comicId)')
+        expect(portable).toContain('tasteExcludedComicIds')
+        expect(web).toContain('保留收藏，但不用于推荐口味')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

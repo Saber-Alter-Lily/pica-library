@@ -398,6 +398,19 @@ export async function startLibraryServer(options: {
             }
 
             if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/taste-exclusion' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.updateRecommendationV5TasteExclusion(input)
+                )
+            }
+
+            if (
                 url.pathname === '/api/v1/recommendation-events' &&
                 request.method === 'POST'
             ) {

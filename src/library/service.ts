@@ -302,6 +302,18 @@ export class LibraryService {
         return this.recommendationV5Snapshot()
     }
 
+    updateRecommendationV5TasteExclusion(
+        input: Record<string, unknown>
+    ) {
+        const store = new RecommendationPolicyStoreV5(this.database)
+        store.setTasteExclusion(
+            String(input.comicId ?? ''),
+            input.excluded !== false,
+            'DESKTOP'
+        )
+        return this.recommendationV5Snapshot()
+    }
+
     mergeMobileRecommendationV5(input: MobileRecommendationSyncV5) {
         return new RecommendationPolicyStoreV5(this.database).mergeMobile(input)
     }
@@ -380,9 +392,17 @@ export class LibraryService {
 
     visualPreferenceProfile() {
         const catalog = this.database.listComics({ limit: 10000 })
+        const tasteExcluded = new Set(
+            new RecommendationPolicyStoreV5(this.database).state()
+                .tasteExcludedComicIds
+        )
         const favorites = new Set(
             catalog
-                .filter((comic) => comic.isFavorite)
+                .filter(
+                    (comic) =>
+                        comic.isFavorite &&
+                        !tasteExcluded.has(comic.comicId)
+                )
                 .map((comic) => comic.comicId)
         )
         const feedback = this.database.recommendationFeedback()
@@ -628,10 +648,19 @@ export class LibraryService {
         const catalog = this.database.listComics({ limit: 10000 })
         const recommendationV5Store = new RecommendationPolicyStoreV5(this.database)
         const recommendationV5State = recommendationV5Store.state()
-        const readingIds = new Set(this.database.readingProgress().map((item) => item.comicId))
+        const tasteExcludedIds = new Set(
+            recommendationV5State.tasteExcludedComicIds
+        )
+        const readingIds = new Set(
+            this.database.readingProgress().map((item) => item.comicId)
+        )
         const explicitFavoriteIds = new Set(
             catalog
-                .filter((comic) => comic.isFavorite)
+                .filter(
+                    (comic) =>
+                        comic.isFavorite &&
+                        !tasteExcludedIds.has(comic.comicId)
+                )
                 .map((comic) => comic.comicId)
         )
         const recommendationFeedback = this.database.recommendationFeedback()
@@ -651,6 +680,7 @@ export class LibraryService {
         const favorites = catalog
             .filter(
                 (comic) =>
+                    !tasteExcludedIds.has(comic.comicId) &&
                     !dislikedIds.has(comic.comicId) &&
                     (comic.isFavorite || likedIds.has(comic.comicId))
             )
@@ -926,6 +956,8 @@ export class LibraryService {
                     controlCount: recommendationV5State.controls.length,
                     hardSuppressCount:
                         recommendationV5State.hardSuppressComicIds.length,
+                    tasteExcludedCount:
+                        recommendationV5State.tasteExcludedComicIds.length,
                     portableBaseline: {
                         schemaVersion: recommendationV5State.schemaVersion,
                         policyVersion: recommendationV5State.policyVersion,

@@ -195,6 +195,37 @@ describe('V5 Web UX audit contract', () => {
         expect(polish).toContain('scheduleDynamicPolish()')
     })
 
+    it('uses app-native confirmation and prompt dialogs for ordinary web flows', () => {
+        const index = read('web/index.html')
+        const app = read('web/app.js')
+        const cloud = read('web/alpha7-cloud.js')
+        const eh = read('web/eh-account.js')
+        expect(index).toContain('id="app-confirm-dialog"')
+        expect(index).toContain('id="app-prompt-dialog"')
+        expect(app).toContain('function askConfirm(')
+        expect(app).toContain('function askText(')
+        expect(app).toContain('window.picaConfirmAction = askConfirm')
+        expect(app).toContain("await askText(t('shelf.namePrompt'))")
+        expect(app).toContain(
+            "await askConfirm(t('recommend.restartConfirm'))"
+        )
+        expect(cloud).toContain('window.picaConfirmAction')
+        expect(eh).toContain('window.picaConfirmAction')
+        expect(eh).toContain('withBusyButton')
+    })
+
+    it('exposes the settings hub as a keyboard-accessible tab interface', () => {
+        const hub = read('web/alpha8-7-desktop-hub.js')
+        expect(hub).toContain("nav.setAttribute('role', 'tablist')")
+        expect(hub).toContain("button.setAttribute('role', 'tab')")
+        expect(hub).toContain("panel.setAttribute('role', 'tabpanel')")
+        expect(hub).toContain("button.setAttribute('aria-selected'")
+        expect(hub).toContain("nav.addEventListener('keydown'")
+        expect(hub).toContain("'ArrowDown'")
+        expect(hub).toContain("'Home'")
+        expect(hub).toContain('sectionsLabel')
+    })
+
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'

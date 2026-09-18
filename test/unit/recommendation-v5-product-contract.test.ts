@@ -108,6 +108,27 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+
+    it('supports reversible human identity adjudication without automatic binding', () => {
+        const database = read('src/library/database.ts')
+        const policy = read('src/recommendation-v5/policy-store.ts')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const web = read('web/work-identity-review-beta.js')
+        expect(database).toContain('saveWorkIdentityDecision')
+        expect(database).toContain('clearWorkIdentityDecision')
+        expect(policy).toContain('setExplicitDistinctPair')
+        expect(service).toContain('recommendationV5WorkIdentityReview')
+        expect(service).toContain('decision === \'KEEP_SEPARATE\'')
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/work-identity/decision'
+        )
+        expect(web).toContain('同一作品')
+        expect(web).toContain('不同版本')
+        expect(web).toContain('保持分离')
+        expect(web).toContain('不会自动创建 Work/Edition 绑定')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

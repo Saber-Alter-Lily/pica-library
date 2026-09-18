@@ -483,6 +483,28 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/advanced-learning-gate' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5AdvancedLearningGate(
+                        url.searchParams.get('direction'),
+                        url.searchParams.get('baselineVersion'),
+                        url.searchParams.get('candidateVersion'),
+                        Number(url.searchParams.get('limit') ?? 1000),
+                        Number(url.searchParams.get('horizonDays') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
                     '/api/v1/desktop/recommendation-v5/evaluation/versions' &&
                 request.method === 'GET'
             ) {

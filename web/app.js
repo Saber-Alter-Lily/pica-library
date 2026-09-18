@@ -102,7 +102,7 @@ let activeView = 'home'
 const viewScrollPositions = new Map()
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
-const $ = (selector) => [...document.querySelectorAll(selector)]
+const $$ = (selector) => [...document.querySelectorAll(selector)]
 
 function askConfirm(message, title = t('common.confirmAction')) {
     const dialog = $('#app-confirm-dialog')

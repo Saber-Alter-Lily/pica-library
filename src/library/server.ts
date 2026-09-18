@@ -791,6 +791,19 @@ export async function startLibraryServer(options: {
                     )
                 )
             if (
+                url.pathname === '/api/v1/visual/author-atlas' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.visualAuthorAtlas(
+                        Number(url.searchParams.get('minWorksPerAuthor') ?? 2),
+                        Number(url.searchParams.get('maxGraphAuthors') ?? 600),
+                        Number(url.searchParams.get('neighborLimit') ?? 8)
+                    )
+                )
+            if (
                 url.pathname === '/api/v1/visual/settings' &&
                 request.method === 'POST'
             )

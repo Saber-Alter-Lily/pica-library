@@ -15,7 +15,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('Recommendation V4 integration', () => {
     it('keeps schema 10 visual storage while later additive migrations advance the database', () => {
-        expect(latestMigrationVersion).toBe(11)
+        expect(latestMigrationVersion).toBe(12)
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v4-'))
         const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
         expect(

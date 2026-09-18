@@ -322,15 +322,23 @@ function evalRenderCriteria() {
     const criteria = Array.isArray(EVAL.summary.criteria)
         ? EVAL.summary.criteria
         : []
+    const labels = {
+        EXACT_SHADOW_RUN_SUPPORT: '重复测试轮次',
+        CORRECTNESS_AUDIT_SUPPORT: '安全审计轮次',
+        FUTURE_OUTCOME_SUPPORT: '后续真实行为支持',
+        STEERABILITY_TARGET_SUPPORT: '偏好控制测试样本',
+        STEERABILITY_MONOTONICITY: '偏好控制方向一致性',
+        P3_SHADOW_ENGINEERING_GATE: '新算法工程稳定性'
+    }
     target.innerHTML = `
-      <h4>固定 Gate 条件</h4>
+      <h4>固定 Gate 条件（开发者）</h4>
       <div class="v5-eval-criteria">
         ${criteria.map((item) => `
           <div class="v5-eval-criterion">
             ${evalBadge(item.status)}
             <div>
-              <strong>${evalEsc(item.id)}</strong>
-              <div class="v5-eval-meta">${evalEsc(item.note || '')}</div>
+              <strong>${evalEsc(labels[item.id] || item.id)}</strong>
+              <div class="v5-eval-meta"><code>${evalEsc(item.id)}</code> · ${evalEsc(item.note || '')}</div>
             </div>
             <code>${evalEsc(String(item.actual ?? '—'))} / ${evalEsc(item.threshold || '')}</code>
           </div>
@@ -367,7 +375,7 @@ function evalRenderComparison() {
     if (!target) return
     if (EVAL.versions.length < 2) {
         target.innerHTML = `
-          <h4>Model Version Comparison</h4>
+          <h4>Model Version Comparison（开发者）</h4>
           <p class="status">至少需要两个不同的 shadow modelVersion 才能做固定基线比较；当前只有 ${EVAL.versions.length} 个。</p>
         `
         return
@@ -376,7 +384,7 @@ function evalRenderComparison() {
     const metrics = comparison?.accuracy?.diversifiedBatch || {}
     const diversity = comparison?.diversity || {}
     target.innerHTML = `
-      <h4>Model Version Comparison</h4>
+      <h4>Model Version Comparison（开发者）</h4>
       <div class="v5-eval-compare-controls">
         <label>Baseline
           <select id="v5-eval-baseline-version">${evalVersionOptions(EVAL.baselineVersion)}</select>
@@ -467,7 +475,7 @@ function evalRenderAdvancedLearning() {
         ? gate.missingRequirements
         : []
     target.innerHTML = `
-      <h4>Advanced Learning Decision Gate</h4>
+      <h4>Advanced Learning Decision Gate（开发者）</h4>
       <div class="v5-eval-compare-controls">
         <label>方向
           <select id="v5-eval-advanced-direction">
@@ -542,31 +550,42 @@ async function evalEvaluateAdvancedLearning() {
 function evalRenderRuns() {
     const target = document.querySelector('#v5-eval-runs')
     if (!target) return
-    const rows = EVAL.runs.slice(0, 30)
+    const rows = EVAL.runs.slice(0, 12)
+    const readinessLabel = (value) => {
+        const status = String(value || '')
+        if (status === 'READY') return '完成'
+        if (status === 'READY_DEGRADED') return '完成（部分来源降级）'
+        return status || '—'
+    }
     target.innerHTML = `
-      <h4>最近 Shadow Runs</h4>
+      <h4>最近影子推荐</h4>
       <div class="v5-eval-runs">
-        ${rows.map((run) => {
+        ${rows.map((run, index) => {
             const telemetry = run.telemetry || {}
-            const mode = telemetry.sessionMode || 'UNKNOWN'
+            const mode = telemetry.sessionMode || 'DEFAULT'
             const readiness = telemetry.readiness || ''
-            const ranked = Number(telemetry.rankedCandidateCount || run.candidateCount || 0)
+            const ranked = Number(
+                telemetry.rankedCandidateCount || run.candidateCount || 0
+            )
             const batch = Array.isArray(telemetry.diversifiedBatch)
                 ? telemetry.diversifiedBatch.length
                 : 0
             return `
               <div class="v5-eval-run">
                 <div>
-                  <strong>${evalEsc(mode)}</strong>
-                  <div class="mono" title="${evalEsc(run.modelVersion)}">${evalEsc(run.modelVersion)}</div>
+                  <strong>#${index + 1} · ${evalEsc(mode)}</strong>
                   <div class="v5-eval-meta">${evalEsc(new Date(run.generatedAt).toLocaleString())}</div>
+                  <details>
+                    <summary>版本信息</summary>
+                    <code>${evalEsc(run.modelVersion)}</code>
+                  </details>
                 </div>
-                <span>${evalEsc(readiness || '—')}</span>
-                <span>ranked ${ranked}</span>
-                <span>batch ${batch}</span>
+                <span>${evalEsc(readinessLabel(readiness))}</span>
+                <span>排序 ${ranked}</span>
+                <span>最终 ${batch}</span>
               </div>
             `
-        }).join('') || '<p class="status">暂无影子推荐记录。点击上方“运行一次影子推荐”即可后台模拟一轮；不会改变正式推荐。</p>'}
+        }).join('') || '<p class="status">还没有影子推荐记录。隔一段时间运行一次即可；不会改变正式推荐。</p>'}
       </div>
     `
 }
@@ -610,8 +629,9 @@ async function evalLoad(force = false) {
         evalRenderComparison()
         evalRenderAdvancedLearning()
         evalRenderRuns()
+        const support = summary.sections?.retrospective?.support || {}
         evalStatus(
-            `评估已刷新：${summary.status || 'UNKNOWN'} · shadow runs ${EVAL.runs.length} · 自动 promotion 关闭。`
+            `评估已刷新：已完成 ${Number(support.exactRunCount || 0)}/3 次基础影子推荐；后续可评估记录 ${Number(support.evaluableRunCount || 0)}/3。正式推荐未改变。`
         )
     } catch (error) {
         evalStatus(`评估读取失败：${error.message}`, true)

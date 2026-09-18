@@ -400,6 +400,88 @@ body.reader-active .reader-header {
     background: #fff1f2;
 }
 
+/* Remaining page-level hierarchy normalization. */
+#downloads .page-heading .actions {
+    align-items: center;
+}
+
+#ux-download-advanced {
+    margin: -6px 0 14px;
+}
+
+#downloaded .ux-toolbar-primary,
+#shelf-view-controls.ux-toolbar-primary {
+    margin: 0;
+}
+
+#settings-form > .actions.wide + #ux-settings-utilities,
+#settings-update #ux-local-update-package {
+    margin-top: 10px;
+}
+
+.ux-local-update-body {
+    display: grid;
+    gap: 10px;
+}
+
+.ux-local-update-body #update-dropzone,
+.ux-local-update-body #update-summary {
+    width: 100%;
+}
+
+.ux-flow-hint {
+    margin: 10px 0 6px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #f7f8fc;
+}
+
+.output:empty {
+    display: none;
+}
+
+#settings-recommendation-v5 .v5-help-details {
+    margin: 12px 0 18px;
+}
+
+#settings-recommendation-v5 .v5-help-details > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+#settings-recommendation-v5 .v5-help-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+#settings-recommendation-v5 .v5-help-details > summary::after {
+    content: '查看说明';
+    float: right;
+    font-size: 0.82rem;
+    font-weight: 600;
+    opacity: 0.68;
+}
+
+#settings-recommendation-v5 .v5-help-details[open] > summary::after {
+    content: '收起说明';
+}
+
+#settings-recommendation-v5 .v5-help-details p {
+    margin: 10px 0 0;
+}
+
+#settings-recommendation-v5 #v5-control-list {
+    margin-bottom: 10px;
+}
+
+#settings-recommendation-v5 #v5-policy-search {
+    width: min(520px, 100%);
+    margin-top: 6px;
+}
+
+#maintenance .output {
+    max-height: 56vh;
+}
+
 /* Small-screen normalization. */
 @media (max-width: 900px) {
     .app-nav {

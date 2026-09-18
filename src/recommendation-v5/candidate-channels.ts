@@ -8,7 +8,7 @@ import type {
 import { normalizePreferenceKey } from './portable-policy'
 
 export const CANDIDATE_CHANNEL_PLANNER_VERSION =
-    'candidate-channel-planner-v1'
+    'candidate-channel-planner-v2-provider-isolated'
 export const SESSION_MODE_POLICY_V5_VERSION =
     'session-mode-policy-v1'
 

@@ -1,5 +1,6 @@
 const IDENTITY = {
     review: null,
+    plan: null,
     busy: false
 }
 
@@ -51,6 +52,10 @@ function ensureStyles() {
 .v5-id-preview-groups{display:grid;gap:6px;margin-top:8px}
 .v5-id-preview-group{font-size:.84rem;line-height:1.45}
 .v5-id-preview-group.conflict{color:#8a3e3e}
+.v5-id-plan{margin-top:10px;padding:10px 12px;border:1px solid var(--a83-line,#ddd);border-radius:12px}
+.v5-id-plan-groups{display:grid;gap:8px;margin-top:8px}
+.v5-id-plan-group{padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--a83-accent-soft,#eef0ff) 42%,transparent);font-size:.84rem;line-height:1.5}
+.v5-id-plan-group.blocked{color:#8a3e3e}
 @media(max-width:760px){.v5-id-pair{grid-template-columns:1fr}.v5-id-arrow{display:none}}
 `
     document.head.appendChild(style)
@@ -91,6 +96,7 @@ function ensurePanel() {
             <div class="v5-id-actions">
                 <button id="v5-id-load" type="button">读取现有证据</button>
                 <button id="v5-id-scan" type="button" class="primary">扫描身份证据</button>
+                <button id="v5-id-plan-btn" type="button">生成 Dry-run 绑定计划</button>
             </div>
         </div>
         <div class="v5-id-note">
@@ -101,6 +107,7 @@ function ensurePanel() {
         </div>
         <p id="v5-id-status" class="status">尚未主动扫描。已有证据也不会在后台自动扩充。</p>
         <div id="v5-id-preview" class="v5-id-preview" hidden></div>
+        <div id="v5-id-plan" class="v5-id-plan" hidden></div>
         <div id="v5-id-list" class="v5-id-list"></div>
     `
     anchor.insertAdjacentElement('afterend', panel)
@@ -109,6 +116,9 @@ function ensurePanel() {
     })
     panel.querySelector('#v5-id-scan').addEventListener('click', () => {
         void refreshEvidence()
+    })
+    panel.querySelector('#v5-id-plan-btn').addEventListener('click', () => {
+        void loadMaterializationPlan()
     })
 }
 
@@ -147,6 +157,38 @@ function renderMaterializationPreview(review) {
                 ${conflicts ? ` · 冲突 ${conflicts}` : ' · 无冲突'}
             </div>`
         }).join('')}</div>` : ''}
+    `
+}
+
+function renderMaterializationPlan(plan) {
+    const node = document.querySelector('#v5-id-plan')
+    if (!node) return
+    if (!plan || plan.mode !== 'DRY_RUN') {
+        node.hidden = true
+        node.innerHTML = ''
+        return
+    }
+    const summary = plan.summary || {}
+    const groups = Array.isArray(plan.groups) ? plan.groups : []
+    node.hidden = false
+    node.innerHTML = `
+        <strong>P2A-5 Dry-run 绑定计划</strong>
+        <div>Work 组 ${Number(summary.workGroupCount || 0)} · Work 可绑定 ${Number(summary.workReadyCount || 0)} · 完整绑定可执行 ${Number(summary.fullBindingReadyCount || 0)} · 阻断组 ${Number(summary.blockedGroupCount || 0)}</div>
+        <div>拟新建 Work ${Number(summary.createWorkCount || 0)} · 复用 Work ${Number(summary.reuseWorkCount || 0)} · Upload 变更 ${Number(summary.proposedUploadBindingCount || 0)} · 警告 ${Number(summary.warningCount || 0)} · 阻断项 ${Number(summary.blockerCount || 0)}</div>
+        <div class="status">planVersion: ${esc(plan.planVersion || '')} · writeEnabled=false。这里只计算执行与回滚计划，不写数据库。</div>
+        ${groups.length ? `<div class="v5-id-plan-groups">${groups.slice(0, 12).map((group) => {
+            const blockers = Array.isArray(group.blockers) ? group.blockers : []
+            const warnings = Array.isArray(group.warnings) ? group.warnings : []
+            const uploads = Array.isArray(group.uploadBindings) ? group.uploadBindings : []
+            const editions = Array.isArray(group.editionPlans) ? group.editionPlans : []
+            return `<div class="v5-id-plan-group ${blockers.length ? 'blocked' : ''}">
+                <strong>${esc(group.preferredTitle || group.planWorkKey || 'Work')}</strong>
+                <div>${Number(group.comicIds?.length || 0)} uploads · ${esc(group.workAction || '')} · ${group.readyForFullBinding ? '可完整执行' : group.readyForWorkBinding ? '仅 Work 层可执行' : '已阻断'}</div>
+                <div>Edition clusters ${editions.length} · planned changes ${uploads.filter((item) => item.action !== 'NOOP').length}</div>
+                ${blockers.length ? `<div>阻断：${esc(blockers.map((item) => item.type).join(' / '))}</div>` : ''}
+                ${warnings.length ? `<div>警告：${esc(warnings.map((item) => item.type).join(' / '))}</div>` : ''}
+            </div>`
+        }).join('')}</div>` : '<p class="status">尚没有足够的人工裁决形成可物化 Work 组。</p>'}
     `
 }
 
@@ -252,6 +294,26 @@ async function refreshEvidence() {
         renderReview()
     } catch (error) {
         status(`扫描失败：${error.message}`, true)
+    } finally {
+        IDENTITY.busy = false
+    }
+}
+
+async function loadMaterializationPlan() {
+    if (IDENTITY.busy) return
+    IDENTITY.busy = true
+    status('正在生成只读 Work / Edition / Upload 绑定计划…')
+    try {
+        IDENTITY.plan = await request(
+            '/api/v1/recommendation-v5/work-identity/materialization-plan'
+        )
+        renderMaterializationPlan(IDENTITY.plan)
+        const summary = IDENTITY.plan.summary || {}
+        status(
+            `Dry-run 完成：Work 组 ${Number(summary.workGroupCount || 0)}，完整可执行 ${Number(summary.fullBindingReadyCount || 0)}，阻断组 ${Number(summary.blockedGroupCount || 0)}。未写入任何 binding。`
+        )
+    } catch (error) {
+        status(`Dry-run 失败：${error.message}`, true)
     } finally {
         IDENTITY.busy = false
     }

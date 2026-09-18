@@ -483,6 +483,27 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/summary' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5EvaluationSummary(
+                        Number(url.searchParams.get('limit') ?? 200),
+                        Number(url.searchParams.get('horizonDays') ?? 30),
+                        Number(url.searchParams.get('steerabilityStep') ?? 3),
+                        Number(url.searchParams.get('steerabilityTargetLimit') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
                     '/api/v1/desktop/recommendation-v5/evaluation/steerability' &&
                 request.method === 'GET'
             ) {

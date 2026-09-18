@@ -24,29 +24,14 @@ def once(text, old, new, label):
 # ---------------------------------------------------------------------------
 path = "src/storage/sqlite/migrations.ts"
 s = read(path)
-marker = """    {
-        version: 11,
-        name: 'download_queue_scale_indexes',
-        up: \`
-            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_runner_priority_created
-                ON download_jobs(status, runner, priority DESC, created_at);
-            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_created
-                ON download_jobs(status, created_at DESC);
-        \`
-    }
-]"""
-if marker not in s:
-    raise RuntimeError("missing migration 11 marker")
-replacement = """    {
-        version: 11,
-        name: 'download_queue_scale_indexes',
-        up: \`
-            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_runner_priority_created
-                ON download_jobs(status, runner, priority DESC, created_at);
-            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_created
-                ON download_jobs(status, created_at DESC);
-        \`
-    },
+anchor = """
+]
+
+export const latestMigrationVersion"""
+if anchor not in s:
+    raise RuntimeError("missing migrations array end")
+migration12 = """
+    ,
     {
         version: 12,
         name: 'canonical_work_identity_foundation',
@@ -163,8 +148,8 @@ replacement = """    {
                 ON work_identity_decisions(left_comic_id, right_comic_id);
         \`
     }
-]"""
-s = s.replace(marker, replacement, 1)
+"""
+s = s.replace(anchor, migration12 + anchor, 1)
 write(path, s)
 
 

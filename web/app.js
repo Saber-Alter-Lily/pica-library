@@ -36,6 +36,8 @@ const state = {
     recommendationBatchId: null,
     recommendationManagedV3: false,
     recommendationPending: false,
+    syncPending: false,
+    searchPending: false,
     recommendationFeedback: {},
     recommendationFeedbackReasonsEnabled:
         localStorage.getItem('pica-recommend-feedback-reasons') === 'true',
@@ -2578,6 +2580,15 @@ $('#import-file').onchange = importSelectedFile
 $('#onboarding-import').onclick = () => $('#import-file').click()
 $('#lite-reimport').onclick = () => $('#import-file').click()
 async function syncFavorites(message = $('#import-result'), mode = 'quick') {
+    if (state.syncPending) return
+    state.syncPending = true
+    const syncButtons = [
+        $('#sync-button'),
+        $('#full-sync-button'),
+        $('#home-sync'),
+        $('#setup-sync')
+    ].filter(Boolean)
+    syncButtons.forEach((button) => (button.disabled = true))
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.syncNeedsEngine'))
@@ -2637,6 +2648,9 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
     } catch (error) {
         clearProgress($('#library-operation'))
         message.textContent = localizeError(language, error)
+    } finally {
+        state.syncPending = false
+        syncButtons.forEach((button) => (button.disabled = false))
     }
 }
 $('#sync-button').onclick = () => syncFavorites()
@@ -2782,6 +2796,11 @@ $('#shelf-detail').onclick = async (event) => {
     else if (download) await enqueue([download], 'shelf')
 }
 $('#search-button').onclick = async () => {
+    if (state.searchPending) return
+    state.searchPending = true
+    const searchButton = $('#search-button')
+    searchButton.disabled = true
+    $('#search-message').textContent = t('message.searching')
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.searchNeedsEngine'))
@@ -2826,6 +2845,9 @@ $('#search-button').onclick = async () => {
         })
     } catch (error) {
         $('#search-message').textContent = localizeError(language, error)
+    } finally {
+        state.searchPending = false
+        searchButton.disabled = false
     }
 }
 $('#recommend-button').onclick = async () => {
@@ -3112,22 +3134,36 @@ $('#performance-profile').onchange = () => {
         $('#performance-profile').value !== 'custom'
 }
 $('#run-jobs').onclick = async () => {
+    const button = $('#run-jobs')
+    if (button.disabled) return
     if (state.mode === 'lite') {
         downloadJson('download-plan.json', portablePlan())
         return
     }
-    const profile = $('#performance-profile').value
-    const runtime = { profile }
-    if (profile === 'custom') {
-        Object.assign(runtime, {
-            jobConcurrency: Number($('#custom-jobs').value),
-            globalMediaConcurrency: Number($('#custom-media').value),
-            requestIntervalMs: Number($('#custom-interval').value),
-            maxRetries: Number($('#custom-retries').value)
-        })
+    button.disabled = true
+    setProgress(
+        $('#download-operation'),
+        t('downloads.starting'),
+        0,
+        0
+    )
+    try {
+        const profile = $('#performance-profile').value
+        const runtime = { profile }
+        if (profile === 'custom') {
+            Object.assign(runtime, {
+                jobConcurrency: Number($('#custom-jobs').value),
+                globalMediaConcurrency: Number($('#custom-media').value),
+                requestIntervalMs: Number($('#custom-interval').value),
+                maxRetries: Number($('#custom-retries').value)
+            })
+        }
+        await post('/api/v1/downloads/run', runtime)
+        await loadJobs()
+    } finally {
+        clearProgress($('#download-operation'))
+        button.disabled = false
     }
-    await post('/api/v1/downloads/run', runtime)
-    await loadJobs()
 }
 $('#job-list').onclick = async (event) => {
     if (!event.target.dataset.jobAction || state.mode !== 'connected') return
@@ -3152,43 +3188,45 @@ $('#job-list').onclick = async (event) => {
     )
     await loadJobs()
 }
-$('#check-updates').onclick = async () => {
+async function runMaintenanceAction(button, output, work) {
+    if (button.disabled) return
+    button.disabled = true
+    output.textContent = language === 'en' ? 'Working…' : '正在处理…'
     try {
-        $('#update-result').textContent = JSON.stringify(
-            await post('/api/v1/maintenance/updates', {}),
-            null,
-            2
-        )
+        output.textContent = JSON.stringify(await work(), null, 2)
     } catch (error) {
-        $('#update-result').textContent = localizeError(language, error)
+        output.textContent = localizeError(language, error)
+    } finally {
+        button.disabled = false
     }
 }
-$('#scan-repair').onclick = async () => {
-    try {
-        $('#repair-result').textContent = JSON.stringify(
-            await post('/api/v1/maintenance/repair', {}),
-            null,
-            2
-        )
-    } catch (error) {
-        $('#repair-result').textContent = localizeError(language, error)
-    }
-}
-$('#run-health').onclick = async () => {
-    $('#health-result').textContent = JSON.stringify(
-        state.mode === 'connected'
-            ? await api('/api/v1/status')
-            : {
-                  mode: 'lite',
-                  records: state.records.length,
-                  recommendations: state.recommendations.length,
-                  queue: state.queue.length,
-                  storage: 'IndexedDB'
-              },
-        null,
-        2
+$('#check-updates').onclick = () =>
+    void runMaintenanceAction(
+        $('#check-updates'),
+        $('#update-result'),
+        () => post('/api/v1/maintenance/updates', {})
     )
-}
+$('#scan-repair').onclick = () =>
+    void runMaintenanceAction(
+        $('#scan-repair'),
+        $('#repair-result'),
+        () => post('/api/v1/maintenance/repair', {})
+    )
+$('#run-health').onclick = () =>
+    void runMaintenanceAction(
+        $('#run-health'),
+        $('#health-result'),
+        async () =>
+            state.mode === 'connected'
+                ? api('/api/v1/status')
+                : {
+                      mode: 'lite',
+                      records: state.records.length,
+                      recommendations: state.recommendations.length,
+                      queue: state.queue.length,
+                      storage: 'IndexedDB'
+                  }
+    )
 $('#author-list').onclick = async (event) => {
     const decision = event.target.dataset.decision
     if (!decision) return

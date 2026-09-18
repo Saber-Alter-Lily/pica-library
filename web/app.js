@@ -1506,7 +1506,7 @@ async function loadShelves() {
         state.shelves
             .map(
                 (shelf) =>
-                    `<button class="shelf-card" data-shelf-open="${escapeHtml(shelf.id)}"><strong>${escapeHtml(shelf.name)}</strong><span>${t('shelf.count', { count: Number(shelf.count) })}</span></button>`
+                    `<button class="shelf-card ${shelf.id === state.activeShelfId ? 'active' : ''}" aria-current="${shelf.id === state.activeShelfId ? 'true' : 'false'}" data-shelf-open="${escapeHtml(shelf.id)}"><strong>${escapeHtml(shelf.name)}</strong><span>${t('shelf.count', { count: Number(shelf.count) })}</span></button>`
             )
             .join('') || `<article class="notice">${t('shelf.empty')}</article>`
     $('#shelf-dialog-select').innerHTML = state.shelves
@@ -1520,6 +1520,11 @@ async function loadShelves() {
 async function openShelf(shelfId) {
     const value = await api(`/api/v1/shelves/${encodeURIComponent(shelfId)}`)
     state.activeShelfId = shelfId
+    $('#shelf-list [data-shelf-open]').forEach((button) => {
+        const active = button.dataset.shelfOpen === shelfId
+        button.classList.toggle('active', active)
+        button.setAttribute('aria-current', String(active))
+    })
     const shelf = value.shelf
     if (!shelf) throw new Error(t('shelf.notFound'))
     $('#shelf-detail').innerHTML =
@@ -2088,6 +2093,8 @@ async function exitReader() {
     readerComicRequest++
     readerChapterRequest++
     await flushReaderProgress()
+    if (document.fullscreenElement)
+        await document.exitFullscreen().catch(() => undefined)
     if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
     readerScrollHandler = null
     activateView(state.reader.originView || 'downloaded')
@@ -2108,10 +2115,10 @@ document.addEventListener('keydown', (event) => {
         return
     }
     if ($('#reader-mode').value === 'vertical') return
-    if (event.key === 'ArrowLeft') {
+    if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
         event.preventDefault()
         moveReader(-1)
-    } else if (event.key === 'ArrowRight') {
+    } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
         event.preventDefault()
         moveReader(1)
     }
@@ -2148,15 +2155,6 @@ window.addEventListener('pagehide', () => void flushReaderProgress(true))
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushReaderProgress(true)
 })
-document.addEventListener('keydown', (event) => {
-    if (activeView !== 'reader') return
-    if (event.key === 'ArrowLeft' || event.key === 'PageUp') moveReader(-1)
-    if (event.key === 'ArrowRight' || event.key === 'PageDown') moveReader(1)
-    if (event.key === 'Escape' && !document.fullscreenElement) {
-        void exitReader()
-    }
-})
-
 async function loadDownloaded() {
     if (state.mode === 'lite') return
     const records = await api('/api/v1/downloaded')
@@ -2208,6 +2206,7 @@ async function enqueue(ids, source) {
 function renderAll(summary) {
     $('#browser-lite-onboarding').hidden =
         state.mode !== 'lite' || state.records.length > 0
+    $('#clear-lite-state').hidden = state.mode !== 'lite'
     renderSummary(summary)
     renderFilterFacets()
     renderComics()

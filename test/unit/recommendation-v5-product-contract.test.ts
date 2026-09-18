@@ -462,6 +462,34 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).not.toContain('batch-diversity')
     })
 
+    it('versions session modes as retrieval policy instead of separate rankers', () => {
+        const channels = read(
+            'src/recommendation-v5/candidate-channels.ts'
+        )
+        const ranker = read(
+            'src/recommendation-v5/relevance-ranker.ts'
+        )
+        const web = read('web/recommendation-v5-beta.js')
+        const android = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java'
+        )
+        expect(channels).toContain(
+            "SESSION_MODE_POLICY_V5_VERSION ="
+        )
+        expect(channels).toContain('FAMILIAR')
+        expect(channels).toContain('RECENT')
+        expect(channels).toContain('EXPLORE')
+        expect(channels).toContain('TARGET')
+        expect(channels).toContain('sessionModePolicy')
+        expect(ranker).toContain(
+            'Session mode affects channel planning, not these weights'
+        )
+        expect(web).not.toContain(
+            'data-v5-session-mode="FAMILIAR"'
+        )
+        expect(android).not.toContain('按平时口味')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

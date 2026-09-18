@@ -2206,6 +2206,7 @@ async function enqueue(ids, source) {
 function renderAll(summary) {
     $('#browser-lite-onboarding').hidden =
         state.mode !== 'lite' || state.records.length > 0
+    $('#home-mode-notice').hidden = state.mode !== 'lite'
     $('#clear-lite-state').hidden = state.mode !== 'lite'
     renderSummary(summary)
     renderFilterFacets()

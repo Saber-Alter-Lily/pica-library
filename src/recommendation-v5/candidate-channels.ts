@@ -100,8 +100,11 @@ export interface CandidateChannelPlannerInputV5 {
 
 const globalRequestCaps = {
     pica: 8,
-    eh: 8,
-    exh: 4
+    // Reuse the proven Android V3 pacing envelope. E-H itself enforces a
+    // multi-second search interval, so larger shadow budgets add latency
+    // faster than useful coverage at the current catalog scale.
+    eh: 4,
+    exh: 2
 } as const
 
 function controlIdentity(targetType: PreferenceTargetType, key: string) {

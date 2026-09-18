@@ -177,7 +177,8 @@ export class LibraryDatabase {
             'work_editions',
             'work_upload_bindings',
             'work_identity_evidence',
-            'work_identity_decisions'
+            'work_identity_decisions',
+            'work_identity_materialization_runs'
         ]
         const tables = new Set(
             (
@@ -233,6 +234,13 @@ export class LibraryDatabase {
                     ? scalarCount(
                           'SELECT COUNT(*) AS count FROM work_identity_decisions'
                       )
+                    : 0,
+                materializationRuns: tables.has(
+                    'work_identity_materialization_runs'
+                )
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_identity_materialization_runs'
+                      )
                     : 0
             }
         }
@@ -277,6 +285,111 @@ export class LibraryDatabase {
             createdAt: String(row.created_at),
             updatedAt: String(row.updated_at)
         }))
+    }
+
+    private workIdentityMaterializationRun(row: SqlRow) {
+        return {
+            id: String(row.id),
+            requestKey: String(row.request_key),
+            planVersion: String(row.plan_version),
+            planDigest: String(row.plan_digest),
+            status: String(row.status) as
+                | 'PREPARED'
+                | 'APPLIED'
+                | 'ROLLED_BACK'
+                | 'FAILED',
+            plan: jsonObject(row.plan_json),
+            beforeState: jsonObject(row.before_state_json),
+            afterState: jsonObject(row.after_state_json),
+            error: String(row.error ?? ''),
+            createdAt: String(row.created_at),
+            updatedAt: String(row.updated_at)
+        }
+    }
+
+    prepareWorkIdentityMaterializationRun(input: {
+        requestKey: string
+        planVersion: string
+        planDigest: string
+        plan: Record<string, unknown>
+    }) {
+        const requestKey = String(input.requestKey ?? '').trim()
+        const planVersion = String(input.planVersion ?? '').trim()
+        const planDigest = String(input.planDigest ?? '')
+            .trim()
+            .toLowerCase()
+        if (
+            requestKey.length < 8 ||
+            requestKey.length > 160 ||
+            !/^[a-zA-Z0-9._:-]+$/.test(requestKey)
+        )
+            throw new Error('Invalid materialization request key')
+        if (!planVersion || planVersion.length > 120)
+            throw new Error('Invalid materialization plan version')
+        if (!/^[a-f0-9]{64}$/.test(planDigest))
+            throw new Error('Invalid materialization plan digest')
+
+        const existing = this.db
+            .prepare(
+                'SELECT * FROM work_identity_materialization_runs WHERE request_key = ?'
+            )
+            .get(requestKey) as SqlRow | undefined
+        if (existing) {
+            if (
+                String(existing.plan_version) !== planVersion ||
+                String(existing.plan_digest) !== planDigest
+            )
+                throw new Error(
+                    'Materialization request key was already used for a different plan'
+                )
+            return {
+                ...this.workIdentityMaterializationRun(existing),
+                idempotentReplay: true
+            }
+        }
+
+        const id = randomUUID()
+        const now = new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO work_identity_materialization_runs(
+                    id, request_key, plan_version, plan_digest, status,
+                    plan_json, before_state_json, after_state_json, error,
+                    created_at, updated_at
+                 ) VALUES (?, ?, ?, ?, 'PREPARED', ?, '{}', '{}', '', ?, ?)`
+            )
+            .run(
+                id,
+                requestKey,
+                planVersion,
+                planDigest,
+                JSON.stringify(input.plan ?? {}),
+                now,
+                now
+            )
+        const created = this.db
+            .prepare(
+                'SELECT * FROM work_identity_materialization_runs WHERE id = ?'
+            )
+            .get(id) as SqlRow
+        return {
+            ...this.workIdentityMaterializationRun(created),
+            idempotentReplay: false
+        }
+    }
+
+    listWorkIdentityMaterializationRuns(limit = 100) {
+        const bounded = Math.max(1, Math.min(1000, Math.floor(limit)))
+        return (
+            this.db
+                .prepare(
+                    `SELECT *
+                     FROM work_identity_materialization_runs
+                     ORDER BY updated_at DESC, id
+                     LIMIT ?`
+                )
+                .all(bounded) as SqlRow[]
+        ).map((row) => this.workIdentityMaterializationRun(row))
     }
 
     saveWorkIdentityEvidence(

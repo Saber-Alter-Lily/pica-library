@@ -95,6 +95,19 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain('automaticBinding: false')
     })
 
+    it('persists work-identity evidence without promoting work bindings', () => {
+        const database = read('src/library/database.ts')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(database).toContain('saveWorkIdentityEvidence')
+        expect(database).toContain('listWorkIdentityEvidence')
+        expect(service).toContain("'EVIDENCE_ONLY' as const")
+        expect(service).toContain('automaticBinding: false')
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/work-identity/evidence/refresh'
+        )
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

@@ -375,6 +375,34 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain('{ persist: false }')
     })
 
+    it('adds deterministic candidate hygiene before any relevance ranking', () => {
+        const hygiene = read(
+            'src/recommendation-v5/candidate-hygiene.ts'
+        )
+        const service = read('src/library/service.ts')
+        const ranker = read(
+            'src/recommendation-v3/ranker-adapter-v3.ts'
+        )
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(hygiene).toContain(
+            "CANDIDATE_HYGIENE_V5_VERSION ="
+        )
+        expect(hygiene).toContain("mode: 'SHADOW'")
+        expect(hygiene).toContain('servingImpact: false')
+        expect(hygiene).toContain(
+            'tasteNegativeHardFiltered: false'
+        )
+        expect(hygiene).toContain("'OWNED_WORK'")
+        expect(hygiene).toContain("'ALREADY_SEEN'")
+        expect(hygiene).toContain("'BLOCK_CONTROL'")
+        expect(service).toContain('applyCandidateHygieneV5')
+        expect(service).toContain('hygieneTelemetry')
+        expect(ranker).not.toContain('candidate-hygiene')
+        expect(coordinator).not.toContain('candidate-hygiene')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

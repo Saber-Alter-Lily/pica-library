@@ -531,11 +531,18 @@ function a88InstallIndexFailureCapture() {
 }
 
 function a88InstallObservers() {
-    const observer = new MutationObserver(() => {
-        a88EnsurePanel()
-        a88InstallDetailButtons()
-        a88InstallIndexFailureCapture()
-    })
+    let queued = false
+    const schedule = () => {
+        if (queued) return
+        queued = true
+        requestAnimationFrame(() => {
+            queued = false
+            a88EnsurePanel()
+            a88InstallDetailButtons()
+            a88InstallIndexFailureCapture()
+        })
+    }
+    const observer = new MutationObserver(schedule)
     observer.observe(document.body, { childList: true, subtree: true })
 }
 

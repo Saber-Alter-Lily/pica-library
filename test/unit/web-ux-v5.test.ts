@@ -285,11 +285,10 @@ describe('V5 Web UX audit contract', () => {
         expect(i18n).toContain("'preview.cacheCleared'")
     })
 
-
     it('binds multi-element navigation with querySelectorAll', () => {
         const app = read('web/app.js')
         expect(app).toContain(
-            "$('nav [data-view], [data-go]').forEach((button) =>"
+            "$$('nav [data-view], [data-go]').forEach((button) =>"
         )
         expect(app).not.toContain(
             "$('nav [data-view], [data-go]').forEach((button) =>"

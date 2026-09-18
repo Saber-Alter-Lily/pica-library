@@ -414,11 +414,18 @@ function refreshHubLabels() {
 }
 
 function installObservers() {
-    const observer = new MutationObserver(() => {
-        movePersonalization()
-        const settingsNav = hub$('#settings-nav')
-        if (settingsNav) settingsNav.style.display = 'none'
-    })
+    let queued = false
+    const schedule = () => {
+        if (queued) return
+        queued = true
+        requestAnimationFrame(() => {
+            queued = false
+            movePersonalization()
+            const settingsNav = hub$('#settings-nav')
+            if (settingsNav) settingsNav.style.display = 'none'
+        })
+    }
+    const observer = new MutationObserver(schedule)
     observer.observe(document.body, { childList: true, subtree: true })
 }
 

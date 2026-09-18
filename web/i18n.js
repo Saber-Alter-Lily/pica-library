@@ -179,6 +179,8 @@ export const translations = {
         'settings.openData': 'Open data folder',
         'settings.openLogs': 'Open log folder',
         'settings.exit': 'Exit Pica Library',
+        'settings.exitConfirm':
+            'Exit Pica Library? Active local operations may stop.',
         'settings.browserLiteTitle': 'Browser Lite',
         'settings.browserLiteText':
             'Export your current library as a Browser Lite data package for use in the standalone Browser Lite page.',
@@ -296,6 +298,7 @@ export const translations = {
         'preview.cacheTitle': 'Preview cache',
         'preview.cacheLoading': 'Reading cache usage…',
         'preview.cacheClear': 'Clear preview cache',
+        'preview.cacheCleared': 'Preview cache cleared.',
         'preview.cacheStats':
             'Current: {current} · Maximum: {maximum} · Retained for about {days} days',
         'reader.eyebrow': 'Local reader',
@@ -823,6 +826,8 @@ export const translations = {
         'settings.openData': '打开数据目录',
         'settings.openLogs': '打开日志目录',
         'settings.exit': '退出 Pica Library',
+        'settings.exitConfirm':
+            '退出 Pica Library？正在进行的本地任务可能会停止。',
         'settings.browserLiteTitle': 'Browser Lite',
         'settings.browserLiteText':
             '将当前漫画库导出为 Browser Lite 数据包，之后可在独立的 Browser Lite 网页中导入使用。',
@@ -930,6 +935,7 @@ export const translations = {
         'preview.cacheTitle': '预览缓存',
         'preview.cacheLoading': '正在读取缓存占用…',
         'preview.cacheClear': '清理预览缓存',
+        'preview.cacheCleared': '预览缓存已清理。',
         'preview.cacheStats':
             '当前占用：{current} · 最大缓存：{maximum} · 自动保留约 {days} 天',
         'reader.eyebrow': '本地阅读器',

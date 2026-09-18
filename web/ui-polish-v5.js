@@ -12,6 +12,7 @@ const UX_COPY = {
         visualAdvanced: '画风推荐高级设置',
         settingsUtilities: '文件、日志与退出',
         localUpdate: '使用本地更新 ZIP',
+        ehMore: '更多 E-H 操作',
         experimentTools: '实验与诊断（高级）',
         experimentIntro:
             '这里用于影子推荐、Visual QC 和作品身份审计。正常使用不需要操作；所有重计算仍需手动点击。',
@@ -31,6 +32,7 @@ const UX_COPY = {
         visualAdvanced: 'Visual recommendation settings',
         settingsUtilities: 'Files, logs & exit',
         localUpdate: 'Use a local update ZIP',
+        ehMore: 'More E-H actions',
         experimentTools: 'Experiments & diagnostics (advanced)',
         experimentIntro:
             'Shadow recommendations, Visual QC and work-identity review live here. Normal use does not require these tools; heavy work still runs only after explicit action.',
@@ -372,6 +374,44 @@ function installUpdatePanel() {
     else panel.appendChild(details)
 }
 
+function installEhAccountFlow() {
+    const panel = ux$('#settings-eh-account')
+    const actions = panel?.querySelector(':scope > .actions')
+    if (!panel || !actions || panel.dataset.uxEhPolished) return
+    panel.dataset.uxEhPolished = '1'
+
+    const manual = panel.querySelector('.account-advanced')
+    const saveSession = ux$('#eh-account-save')
+    if (manual && saveSession) {
+        let manualActions = manual.querySelector('.ux-eh-manual-actions')
+        if (!manualActions) {
+            manualActions = document.createElement('div')
+            manualActions.className = 'actions ux-eh-manual-actions'
+            manual.appendChild(manualActions)
+        }
+        manualActions.appendChild(saveSession)
+    }
+
+    const more = makeDetails('ux-eh-more', 'ehMore')
+    moveNodes(more.querySelector('.ux-more-body'), [
+        actions.querySelector(
+            'a[href*="forums.e-hentai.org"][href*="act=Login"]'
+        ),
+        actions.querySelector(
+            'a[href*="forums.e-hentai.org"][href*="act=Reg"]'
+        ),
+        ux$('#eh-account-verify'),
+        ux$('#eh-exh-probe'),
+        ux$('#eh-account-clear')
+    ])
+    actions.insertAdjacentElement('afterend', more)
+
+    const login = ux$('#eh-web-login-start')
+    const sync = ux$('#eh-favorites-sync')
+    if (login) login.classList.add('primary')
+    if (sync && sync.parentElement !== actions) actions.appendChild(sync)
+}
+
 function installRemoteStorageFlow() {
     const panel = ux$('#settings-remote-storage')
     const actions = panel?.querySelector('.actions')
@@ -523,6 +563,7 @@ function installObservers() {
             installVisualSettingsDisclosure()
             installSettingsUtilities()
             installUpdatePanel()
+            installEhAccountFlow()
             installRemoteStorageFlow()
             installDialogBehavior()
         })
@@ -542,6 +583,7 @@ function installUxPolish() {
     installVisualSettingsDisclosure()
     installSettingsUtilities()
     installUpdatePanel()
+    installEhAccountFlow()
     installRemoteStorageFlow()
     installGlobalNavMetrics()
     installReaderHeader()

@@ -778,14 +778,56 @@ describe('Recommendation V5 portable product contract', () => {
         expect(dashboard).toContain("'x-pica-csrf'")
         expect(dashboard).toContain('Advanced Learning')
         expect(dashboard).toContain('evalInstall()')
-        expect(dashboard).not.toContain(
-            'void evalRunShadow()'
+        expect(dashboard).toContain(
+            "panel.querySelector('#v5-eval-run-shadow').onclick"
         )
         expect(beta).toContain(
             "import('./recommendation-v5-evaluation.js')"
         )
         expect(server).not.toContain(
             '/api/v1/desktop/recommendation-v5/evaluation/promote'
+        )
+    })
+
+    it('adds explicit version-to-version benchmark comparison without selecting a winner', () => {
+        const comparison = read(
+            'src/recommendation-v5/benchmark-comparison.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const dashboard = read(
+            'web/recommendation-v5-evaluation.js'
+        )
+        expect(comparison).toContain(
+            "BENCHMARK_COMPARISON_V5_VERSION ="
+        )
+        expect(comparison).toContain("'COMPARISON_READY'")
+        expect(comparison).toContain("'INSUFFICIENT_SUPPORT'")
+        expect(comparison).toContain('winner: null')
+        expect(comparison).toContain(
+            'automaticWinnerSelection: false'
+        )
+        expect(comparison).toContain(
+            'modelEscalationEnabled: false'
+        )
+        expect(service).toContain(
+            'recommendationV5BenchmarkVersions'
+        )
+        expect(service).toContain(
+            'recommendationV5BenchmarkComparison'
+        )
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/versions'
+        )
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/compare'
+        )
+        expect(dashboard).toContain(
+            'Model Version Comparison'
+        )
+        expect(dashboard).toContain('winner = null')
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/select-winner'
         )
     })
 

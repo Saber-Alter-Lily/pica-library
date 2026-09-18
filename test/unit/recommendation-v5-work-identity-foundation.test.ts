@@ -114,6 +114,64 @@ describe('Canonical Work Identity foundation', () => {
         })
     })
 
+    it('persists evidence idempotently without creating work bindings', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-work-evidence-')
+        )
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        database.importCatalog(
+            [
+                {
+                    comicId: 'pica:1',
+                    title: 'Work Title',
+                    author: 'Artist',
+                    tags: [],
+                    categories: [],
+                    finished: true,
+                    pagesCount: 24
+                },
+                {
+                    comicId: 'eh:2',
+                    title: '[Chinese] Work Title',
+                    author: 'Artist',
+                    tags: [],
+                    categories: [],
+                    finished: true,
+                    pagesCount: 25
+                }
+            ],
+            'test'
+        )
+        const audit = buildWorkIdentityAuditV5(
+            database.listComics({ limit: 100 }),
+            defaultPortablePolicyStateV5()
+        )
+        expect(audit.candidates).toHaveLength(1)
+        const payload = audit.candidates.map((candidate) => ({
+            leftComicId: candidate.leftComicId,
+            rightComicId: candidate.rightComicId,
+            relation: candidate.relation,
+            confidence: candidate.confidence,
+            resolverVersion: candidate.resolverVersion,
+            evidence: candidate.evidence
+        }))
+        database.saveWorkIdentityEvidence(payload)
+        database.saveWorkIdentityEvidence(payload)
+
+        const status = database.workIdentityStorageStatus()
+        expect(status.counts.evidence).toBe(1)
+        expect(status.counts.bindings).toBe(0)
+        expect(status.counts.works).toBe(0)
+        expect(database.listWorkIdentityEvidence()).toHaveLength(1)
+        expect(database.listWorkIdentityEvidence()[0]).toMatchObject({
+            relation: 'PROBABLE_SAME_WORK',
+            resolverVersion: WORK_IDENTITY_RESOLVER_VERSION
+        })
+
+        database.close()
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+
     it('respects an explicit keep-separate override from the existing policy', () => {
         const state = {
             ...defaultPortablePolicyStateV5(),

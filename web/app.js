@@ -1699,7 +1699,7 @@ async function loadShelves() {
 async function openShelf(shelfId) {
     const value = await api(`/api/v1/shelves/${encodeURIComponent(shelfId)}`)
     state.activeShelfId = shelfId
-    $('#shelf-list [data-shelf-open]').forEach((button) => {
+    $$('#shelf-list [data-shelf-open]').forEach((button) => {
         const active = button.dataset.shelfOpen === shelfId
         button.classList.toggle('active', active)
         button.setAttribute('aria-current', String(active))
@@ -2046,7 +2046,7 @@ function updateReaderChapterNavigation() {
     const next = $('#reader-next-chapter')
     if (previous) previous.disabled = index <= 0
     if (next) next.disabled = index < 0 || index >= readable.length - 1
-    $('#reader-chapters [data-reader-episode]').forEach((button) => {
+    $$('#reader-chapters [data-reader-episode]').forEach((button) => {
         const active = button.dataset.readerEpisode === state.reader.episodeId
         button.classList.toggle('active', active)
         button.setAttribute('aria-current', String(active))

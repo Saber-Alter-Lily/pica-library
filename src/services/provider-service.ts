@@ -280,8 +280,10 @@ export class ProviderService {
     async search(
         input: string | SearchRequest,
         providers: OnlineSource[] = ['pica'],
-        provenance: 'discover' | 'recommendations' = 'discover'
+        provenance: 'discover' | 'recommendations' = 'discover',
+        options: { persist?: boolean } = {}
     ) {
+        const persist = options.persist !== false
         const request: SearchRequest =
             typeof input === 'string' ? { keyword: input, limit: 100 } : input
         const uniqueProviders = [...new Set(providers)]
@@ -292,8 +294,14 @@ export class ProviderService {
                     ...request,
                     ...(source === 'pica' ? {} : { surface: source })
                 })
-                const records = comics.map((comic) => this.recordForOnlineSource(comic, source))
-                this.database.importCatalog(records, `${source}:${provenance}`)
+                const records = comics.map((comic) =>
+                    this.recordForOnlineSource(comic, source)
+                )
+                if (persist)
+                    this.database.importCatalog(
+                        records,
+                        `${source}:${provenance}`
+                    )
                 return records
             })
         )
@@ -349,12 +357,25 @@ export class ProviderService {
                 Array.isArray(record.providerMetadata?.knownSurfaces) &&
                 record.providerMetadata.knownSurfaces.length > 1
         )
-        if (surfaceMerged.length)
+        if (persist && surfaceMerged.length)
             this.database.importCatalog(
                 surfaceMerged,
                 'eh:surface-merge:' + provenance
             )
         return result
+    }
+
+    async relatedPica(
+        comicId: string,
+        provenance: 'discover' | 'recommendations' = 'recommendations',
+        options: { persist?: boolean } = {}
+    ) {
+        const records = (await (await this.connect()).related(comicId)).map(
+            providerComicRecord
+        )
+        if (options.persist !== false)
+            this.database.importCatalog(records, `pica:${provenance}`)
+        return records
     }
 
     async getComicDetails(comicId: string) {

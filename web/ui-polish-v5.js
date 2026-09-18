@@ -19,6 +19,13 @@ function makeDetails(id, summary, className = 'ux-more') {
     return details
 }
 
+function selectionHasItems(value) {
+    const text = String(value || '').trim()
+    const match = text.match(/(?:已选择|selected)\s*[:：]?\s*(\d+)/i)
+    if (match) return Number(match[1]) > 0
+    return Boolean(text) && !/未选择|none selected/i.test(text)
+}
+
 function installLibraryToolbar() {
     const toolbar = ux$('#library .toolbar[data-control-scope="library"]')
     if (!toolbar || toolbar.dataset.uxPolished) return
@@ -71,10 +78,7 @@ function updateLibrarySelectionBar() {
     const status = ux$('#library-selection-status')
     if (!bar || !status) return
     const text = status.textContent || ''
-    const hasSelection =
-        !/0\s*(部|项|本)?/.test(text) &&
-        !/未选择|none selected/i.test(text) &&
-        Boolean(text.trim())
+    const hasSelection = selectionHasItems(text)
     bar.classList.toggle('is-empty', !hasSelection)
 }
 
@@ -119,10 +123,7 @@ function updateRecommendationSelectionBar() {
     const status = ux$('#recommend-selection-status')
     if (!bar || !status) return
     const text = status.textContent || ''
-    const hasSelection =
-        !/0\s*(部|项|本)?/.test(text) &&
-        !/未选择|none selected/i.test(text) &&
-        Boolean(text.trim())
+    const hasSelection = selectionHasItems(text)
     bar.classList.toggle('is-empty', !hasSelection)
 }
 
@@ -141,6 +142,68 @@ function installSearchToolbar() {
     const more = makeDetails('ux-search-filters', '来源与筛选')
     moveNodes(more.querySelector('.ux-more-body'), [tags, source, sort])
     toolbar.replaceChildren(primary, more)
+}
+
+function installDownloadsPage() {
+    const section = ux$('#downloads')
+    const heading = ux$('#downloads .page-heading')
+    const actions = heading?.querySelector('.actions')
+    if (!section || !heading || !actions) return
+
+    let advanced = ux$('#ux-download-advanced')
+    if (!advanced) {
+        advanced = makeDetails(
+            'ux-download-advanced',
+            '性能与导出（高级）'
+        )
+        heading.insertAdjacentElement('afterend', advanced)
+        moveNodes(advanced.querySelector('.ux-more-body'), [
+            ux$('#performance-profile'),
+            ux$('#custom-performance'),
+            ux$('#sync-export-browser-lite')
+        ])
+    }
+
+    const refresh = ux$('#refresh-jobs')
+    const run = ux$('#run-jobs')
+    const history = ux$('#a87-download-history-controls')
+    if (refresh && refresh.parentElement !== actions) actions.appendChild(refresh)
+    if (run && run.parentElement !== actions) actions.appendChild(run)
+    if (history && history.parentElement !== actions) actions.appendChild(history)
+
+    const copy = heading.querySelector('p')
+    if (
+        copy &&
+        /持久化队列语义|persistent/i.test(copy.textContent || '')
+    )
+        copy.textContent = '管理下载任务、进度、暂停与失败重试。'
+}
+
+function installCollectionToolbars() {
+    ux$('#downloaded .view-controls')?.classList.add('ux-toolbar-primary')
+    ux$('#shelf-view-controls')?.classList.add('ux-toolbar-primary')
+}
+
+function installVisualSettingsDisclosure() {
+    const panel = ux$('#settings-recommendation-v4')
+    if (!panel || panel.dataset.uxDisclosure) return
+    panel.dataset.uxDisclosure = '1'
+    const divider = panel.querySelector('hr')
+    if (!divider) return
+    const details = makeDetails(
+        'ux-visual-settings',
+        '画风推荐高级设置'
+    )
+    const body = details.querySelector('.ux-more-body')
+    const movable = []
+    let node = divider
+    while (node) {
+        const next = node.nextSibling
+        movable.push(node)
+        node = next
+    }
+    for (const item of movable) body.appendChild(item)
+    panel.appendChild(details)
 }
 
 function installReaderHeader() {
@@ -244,6 +307,8 @@ function installObservers() {
 
     const bodyObserver = new MutationObserver(() => {
         installExperimentHub()
+        installDownloadsPage()
+        installVisualSettingsDisclosure()
         installDialogBehavior()
     })
     bodyObserver.observe(document.body, { childList: true, subtree: true })
@@ -253,6 +318,9 @@ function installUxPolish() {
     installLibraryToolbar()
     installRecommendationToolbar()
     installSearchToolbar()
+    installDownloadsPage()
+    installCollectionToolbars()
+    installVisualSettingsDisclosure()
     installReaderHeader()
     installExperimentHub()
     normalizeDangerAndStatus()

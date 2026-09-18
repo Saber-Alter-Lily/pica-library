@@ -492,6 +492,40 @@ describe('Recommendation V5 portable product contract', () => {
         expect(android).not.toContain('按平时口味')
     })
 
+    it('adds a read-only P3 promotion gate that cannot activate serving', () => {
+        const gate = read(
+            'src/recommendation-v5/promotion-gate.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(gate).toContain(
+            "P3_PROMOTION_GATE_V5_VERSION ="
+        )
+        expect(gate).toContain(
+            "'READY_FOR_MANUAL_REVIEW'"
+        )
+        expect(gate).toContain("'NOT_READY'")
+        expect(gate).toContain('autoPromotion: false')
+        expect(gate).toContain(
+            'servingMutationEnabled: false'
+        )
+        expect(service).toContain(
+            'recommendationV5P3PromotionGate'
+        )
+        expect(service).toContain(
+            'shadowPipelineModelVersionV5()'
+        )
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/promotion-gate'
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/promote'
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/activate'
+        )
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

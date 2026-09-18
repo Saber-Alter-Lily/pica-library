@@ -189,6 +189,33 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('adds a shadow behavior evidence layer without changing ranking', () => {
+        const evidence = read(
+            'src/recommendation-v5/behavior-evidence.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const ranker = read(
+            'src/recommendation-v3/ranker-adapter-v3.ts'
+        )
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(evidence).toContain(
+            "BEHAVIOR_EVIDENCE_VERSION = 'behavior-evidence-v1'"
+        )
+        expect(evidence).toContain("mode: 'SHADOW'")
+        expect(evidence).toContain('rankingImpact: false')
+        expect(evidence).toContain("'EXPLICIT_NEGATIVE'")
+        expect(evidence).toContain("'WEAK_POSITIVE'")
+        expect(service).toContain('recommendationV5BehaviorEvidence')
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/behavior-evidence'
+        )
+        expect(ranker).not.toContain('behavior-evidence')
+        expect(coordinator).not.toContain('behavior-evidence')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

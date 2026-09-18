@@ -2045,6 +2045,13 @@ async function openReaderComic(comicId, online = false) {
     }
 }
 
+document.addEventListener('pica-open-reader', (event) => {
+    const detail = event instanceof CustomEvent ? event.detail : null
+    const comicId = String(detail?.comicId || '').trim()
+    if (!comicId) return
+    void openReaderComic(comicId, detail?.online !== false)
+})
+
 function moveReader(delta) {
     const total = state.reader.chapter?.pages?.length || 0
     if (!total || $('#reader-mode').value === 'vertical') return

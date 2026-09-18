@@ -102,7 +102,67 @@ let activeView = 'home'
 const viewScrollPositions = new Map()
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
-const $$ = (selector) => [...document.querySelectorAll(selector)]
+const $ = (selector) => [...document.querySelectorAll(selector)]
+
+function askConfirm(message, title = t('common.confirmAction')) {
+    const dialog = $('#app-confirm-dialog')
+    if (!dialog) return Promise.resolve(window.confirm(message))
+    if (dialog.open) dialog.close('cancel')
+    $('#app-confirm-title').textContent = title
+    $('#app-confirm-message').textContent = message
+    dialog.returnValue = 'cancel'
+    return new Promise((resolve) => {
+        dialog.addEventListener(
+            'close',
+            () => resolve(dialog.returnValue === 'confirm'),
+            { once: true }
+        )
+        dialog.showModal()
+        requestAnimationFrame(() => $('#app-confirm-submit')?.focus())
+    })
+}
+
+function askText(
+    title,
+    initialValue = '',
+    label = t('common.name')
+) {
+    const dialog = $('#app-prompt-dialog')
+    if (!dialog)
+        return Promise.resolve(
+            window.prompt(title, initialValue)?.trim() || null
+        )
+    if (dialog.open) dialog.close('cancel')
+    $('#app-prompt-title').textContent = title || t('common.enterValue')
+    const labelNode = $('#app-prompt-label')
+    if (labelNode?.firstChild) labelNode.firstChild.textContent = label
+    const input = $('#app-prompt-input')
+    input.value = initialValue
+    $('#app-prompt-message').textContent = ''
+    dialog.returnValue = 'cancel'
+    return new Promise((resolve) => {
+        dialog.addEventListener(
+            'close',
+            () => {
+                const value = input.value.trim()
+                resolve(
+                    dialog.returnValue === 'confirm' && value
+                        ? value
+                        : null
+                )
+            },
+            { once: true }
+        )
+        dialog.showModal()
+        requestAnimationFrame(() => {
+            input.focus()
+            input.select()
+        })
+    })
+}
+
+window.picaConfirmAction = askConfirm
+window.picaPromptText = askText
 const escapeHtml = (value) =>
     String(value ?? '').replace(
         /[&<>"']/g,
@@ -420,7 +480,9 @@ async function applyStagedUpdate(
     if (!value) return
     if (
         !skipConfirm &&
-        !window.confirm(t('update.confirm', { version: value.targetVersion }))
+        !(await askConfirm(
+            t('update.confirm', { version: value.targetVersion })
+        ))
     )
         return
     await desktopPost('/api/v1/update/apply', { id: value.id })
@@ -508,9 +570,9 @@ $('#update-one-click').onclick = async () => {
             return
         }
         if (
-            !window.confirm(
+            !(await askConfirm(
                 t('update.oneClickConfirm', { version: available.version })
-            )
+            ))
         )
             return
         message.textContent = t('update.downloading', {
@@ -1586,7 +1648,7 @@ let pendingShelfAction = null
 async function chooseShelf(count, action) {
     await loadShelves()
     if (!state.shelves.length) {
-        const name = window.prompt(t('shelf.createPrompt'))
+        const name = await askText(t('shelf.createPrompt'))
         if (!name) return
         await post('/api/v1/shelves', { name })
         await loadShelves()
@@ -2219,7 +2281,7 @@ async function exportReaderArchive(format) {
             bytes: formatBytes(value.bytes)
         })
         if (
-            window.confirm(
+            await askConfirm(
                 t('reader.openExport', {
                     format: format.toUpperCase()
                 })
@@ -2665,6 +2727,7 @@ $('#setup-sync').onclick = async () => {
 $('#setup-sync-later').onclick = () => location.assign('/')
 $('#clear-lite-state').onclick = async () => {
     if (state.mode !== 'lite') return
+    if (!(await askConfirm(t('home.clearConfirm')))) return
     await clearLiteState()
     replaceLiteState(emptyLiteState())
     renderAll()
@@ -2700,12 +2763,12 @@ $('#library-add-filtered-shelf').onclick = () => {
     void chooseShelf(total, async (shelfId) => {
         const shelf = state.shelves.find((item) => item.id === shelfId)
         if (
-            !window.confirm(
+            !(await askConfirm(
                 t('shelf.addFilteredConfirm', {
                     count: total,
                     name: shelf?.name || ''
                 })
-            )
+            ))
         )
             return
         return post(
@@ -2741,7 +2804,7 @@ $('#search-add-shelf').onclick = () => {
     )
 }
 $('#shelf-create').onclick = async () => {
-    const name = window.prompt(t('shelf.namePrompt'))
+    const name = await askText(t('shelf.namePrompt'))
     if (!name) return
     try {
         await post('/api/v1/shelves', { name })
@@ -2761,7 +2824,7 @@ $('#shelf-detail').onclick = async (event) => {
     const read = event.target.dataset.shelfRead
     const download = event.target.dataset.shelfDownload
     if (rename) {
-        const name = window.prompt(t('shelf.renamePrompt'))
+        const name = await askText(t('shelf.renamePrompt'))
         if (name) {
             await mutate(
                 `/api/v1/shelves/${encodeURIComponent(rename)}`,
@@ -2774,7 +2837,7 @@ $('#shelf-detail').onclick = async (event) => {
             await openShelf(rename)
         }
     } else if (removeShelf) {
-        if (!window.confirm(t('shelf.deleteConfirm'))) return
+        if (!(await askConfirm(t('shelf.deleteConfirm')))) return
         await mutate(
             `/api/v1/shelves/${encodeURIComponent(removeShelf)}`,
             'DELETE'
@@ -2885,7 +2948,7 @@ $('#recommend-button').onclick = async () => {
     }
 }
 $('#recommend-restart').onclick = async () => {
-    if (!window.confirm(t('recommend.restartConfirm'))) return
+    if (!(await askConfirm(t('recommend.restartConfirm')))) return
     try {
         if (state.recommendationPending) return
         state.recommendationPending = true
@@ -3172,12 +3235,12 @@ $('#job-list').onclick = async (event) => {
         )
         if (
             job &&
-            !window.confirm(
+            !(await askConfirm(
                 t('downloads.cancelConfirm', {
                     completed: job.progressCompleted,
                     total: job.progressTotal || '—'
                 })
-            )
+            ))
         )
             return
     }

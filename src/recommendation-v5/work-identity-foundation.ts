@@ -174,3 +174,148 @@ export function buildWorkIdentityAuditV5(
         candidates
     }
 }
+
+
+export type WorkIdentityHumanDecisionV5 =
+    | 'SAME_WORK'
+    | 'EDITION_VARIANT'
+    | 'KEEP_SEPARATE'
+
+export interface WorkIdentityDecisionInputV5 {
+    leftComicId: string
+    rightComicId: string
+    decision: WorkIdentityHumanDecisionV5
+}
+
+export function buildWorkIdentityMaterializationPreviewV5(
+    catalog: StoredComic[],
+    decisions: WorkIdentityDecisionInputV5[]
+) {
+    const catalogById = new Map(catalog.map((comic) => [comic.comicId, comic]))
+    const normalized = decisions
+        .map((item) => ({
+            leftComicId: String(item.leftComicId ?? '').trim(),
+            rightComicId: String(item.rightComicId ?? '').trim(),
+            decision: item.decision
+        }))
+        .filter(
+            (item) =>
+                item.leftComicId &&
+                item.rightComicId &&
+                item.leftComicId !== item.rightComicId &&
+                catalogById.has(item.leftComicId) &&
+                catalogById.has(item.rightComicId) &&
+                ['SAME_WORK', 'EDITION_VARIANT', 'KEEP_SEPARATE'].includes(
+                    item.decision
+                )
+        )
+
+    const parent = new Map<string, string>()
+    const ensure = (id: string) => {
+        if (!parent.has(id)) parent.set(id, id)
+    }
+    const find = (id: string): string => {
+        ensure(id)
+        const current = parent.get(id)!
+        if (current === id) return id
+        const root = find(current)
+        parent.set(id, root)
+        return root
+    }
+    const union = (left: string, right: string) => {
+        const a = find(left)
+        const b = find(right)
+        if (a === b) return
+        const [keep, move] = [a, b].sort()
+        parent.set(move, keep)
+    }
+
+    for (const item of normalized) {
+        ensure(item.leftComicId)
+        ensure(item.rightComicId)
+        if (item.decision !== 'KEEP_SEPARATE')
+            union(item.leftComicId, item.rightComicId)
+    }
+
+    const memberIds = new Map<string, string[]>()
+    for (const id of parent.keys()) {
+        const root = find(id)
+        memberIds.set(root, [...(memberIds.get(root) || []), id])
+    }
+
+    const acceptedEdges = normalized.filter(
+        (item) => item.decision !== 'KEEP_SEPARATE'
+    )
+    const separateEdges = normalized.filter(
+        (item) => item.decision === 'KEEP_SEPARATE'
+    )
+
+    const groups = [...memberIds.entries()]
+        .map(([root, ids]) => {
+            const comicIds = [...new Set(ids)].sort()
+            if (comicIds.length < 2) return null
+            const memberSet = new Set(comicIds)
+            const groupEdges = acceptedEdges.filter(
+                (item) =>
+                    memberSet.has(item.leftComicId) &&
+                    memberSet.has(item.rightComicId)
+            )
+            const conflicts = separateEdges.filter(
+                (item) =>
+                    memberSet.has(item.leftComicId) &&
+                    memberSet.has(item.rightComicId)
+            )
+            const editionVariantEdges = groupEdges.filter(
+                (item) => item.decision === 'EDITION_VARIANT'
+            )
+            return {
+                previewWorkKey: `work-preview:${root}`,
+                comicIds,
+                titles: comicIds.map(
+                    (id) => catalogById.get(id)?.title || id
+                ),
+                acceptedDecisionCount: groupEdges.length,
+                editionVariantPairCount: editionVariantEdges.length,
+                editionStatus:
+                    editionVariantEdges.length > 0
+                        ? ('VARIANT_RELATION_RECORDED' as const)
+                        : ('UNRESOLVED' as const),
+                conflicts: conflicts.map((item) => ({
+                    leftComicId: item.leftComicId,
+                    rightComicId: item.rightComicId,
+                    type: 'KEEP_SEPARATE_INSIDE_WORK_COMPONENT' as const
+                })),
+                readyForBinding: conflicts.length === 0
+            }
+        })
+        .filter(
+            (
+                item
+            ): item is NonNullable<typeof item> => item !== null
+        )
+        .sort(
+            (a, b) =>
+                Number(a.readyForBinding) - Number(b.readyForBinding) ||
+                b.comicIds.length - a.comicIds.length ||
+                a.previewWorkKey.localeCompare(b.previewWorkKey)
+        )
+
+    const conflictCount = groups.reduce(
+        (sum, group) => sum + group.conflicts.length,
+        0
+    )
+    const readyGroups = groups.filter((group) => group.readyForBinding)
+
+    return {
+        mode: 'PREVIEW_ONLY' as const,
+        automaticBinding: false,
+        workGroupCount: groups.length,
+        readyGroupCount: readyGroups.length,
+        conflictCount,
+        proposedUploadBindingCount: readyGroups.reduce(
+            (sum, group) => sum + group.comicIds.length,
+            0
+        ),
+        groups
+    }
+}

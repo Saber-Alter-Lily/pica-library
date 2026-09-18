@@ -102,11 +102,11 @@ function evalEnsurePanel() {
       <div class="v5-eval-head">
         <div>
           <h3>推荐系统评估 · V5 Development</h3>
-          <p>汇总当前 shadow pipeline 的工程、准确性、多样性、控制性和 Visual readiness。这里只读评估，不会自动切换正式推荐算法。</p>
+          <p>“影子推荐（Shadow）”= 让新算法在后台模拟推荐一次，但不替换你现在看到的正式推荐。这里只记录它会召回、排序和选出哪些作品，用于后续比较新旧算法。</p>
         </div>
         <div class="v5-eval-actions">
           <button id="v5-eval-refresh" type="button">刷新评估</button>
-          <button id="v5-eval-run-shadow" type="button">运行一次 Shadow Benchmark</button>
+          <button id="v5-eval-run-shadow" type="button">运行一次影子推荐</button>
         </div>
       </div>
       <p id="v5-eval-status" class="status">尚未读取评估数据。</p>
@@ -512,7 +512,7 @@ function evalRenderRuns() {
                 <span>batch ${batch}</span>
               </div>
             `
-        }).join('') || '<p class="status">暂无 shadow run。点击上方按钮可手动运行一次。</p>'}
+        }).join('') || '<p class="status">暂无影子推荐记录。点击上方“运行一次影子推荐”即可后台模拟一轮；不会改变正式推荐。</p>'}
       </div>
     `
 }
@@ -572,7 +572,7 @@ async function evalRunShadow() {
     const button = document.querySelector('#v5-eval-run-shadow')
     if (button) button.disabled = true
     evalStatus(
-        '正在手动运行一次 Shadow benchmark；候选不会进入正式 serving，也不会持久化 shadow 候选元数据…'
+        '正在后台模拟一次新算法推荐：不会改变当前正式推荐。正在召回候选、排序并生成 12 本测试批次…'
     )
     try {
         const result = await evalDesktopPost(
@@ -588,7 +588,7 @@ async function evalRunShadow() {
         )
         const audit = result.audit || {}
         evalStatus(
-            `Shadow run 完成：ranked ${Number(result.ranking?.candidateCount || 0)} · batch ${Number(result.diversity?.selectedCount || 0)} · audit ${audit.poolId || 'recorded'}。正在重算评估…`
+            `影子推荐完成：原始候选 ${Number(result.rawCandidateCount || 0)} → 清洗后 ${Number(result.candidateCount || 0)} → 排序 ${Number(result.ranking?.candidateCount || 0)} → 最终测试批次 ${Number(result.diversity?.selectedCount || 0)}。正式推荐未改变。正在刷新评估…`
         )
         await evalLoad(true)
     } catch (error) {

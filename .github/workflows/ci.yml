@@ -32,7 +32,7 @@ jobs:
       - name: Run real-browser Web smoke
         run: bash scripts/run-web-browser-smoke.sh
       - name: Upload Web smoke diagnostics
-        if: failure()
+        if: failure() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
           name: web-browser-smoke-${{ github.run_id }}-${{ github.job }}

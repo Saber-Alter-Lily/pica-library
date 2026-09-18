@@ -124,6 +124,77 @@ describe('V5 Web UX audit contract', () => {
         expect(observerBody).not.toContain('installExperimentHub()')
     })
 
+    it('keeps connection probes explicit and avoids duplicate update polling', () => {
+        const connections = read('web/alpha8-connections.js')
+        const product = read('web/alpha8-product.js')
+        const update = read('web/alpha8-update-ui.js')
+        expect(connections).toContain('id="a83-check-connections"')
+        expect(connections).toContain('async function checkConnections()')
+        const configurationBody =
+            /async function loadConnectionConfiguration\(\) \{([\s\S]*?)\n\}/.exec(
+                connections
+            )?.[1] ?? ''
+        expect(configurationBody).not.toContain('postProbe(')
+        expect(product).not.toContain('function updateEnhancement()')
+        expect(product).not.toContain('/api/v1/update/progress')
+        expect(update).toContain('/api/v1/update/progress')
+    })
+
+    it('keeps destructive actions visually distinct across theme overrides', () => {
+        const css = read('web/ui-polish-v5.css')
+        expect(css).toContain('.danger-action')
+        expect(css).toContain('var(--a83-bad')
+        expect(css).toContain('!important')
+        expect(css).toContain('#eh-account-clear')
+        expect(css).toContain('#exit-app')
+    })
+
+    it('prevents duplicate WebDAV and ordinary long-running actions', () => {
+        const cloud = read('web/alpha7-cloud.js')
+        const app = read('web/app.js')
+        expect(cloud).toContain("const button = $('#remote-test')")
+        expect(cloud).toContain("const button = $('#remote-save')")
+        expect(cloud).toContain("const button = $('#remote-plan')")
+        expect(cloud).toContain('if (button.disabled) return')
+        expect(app).toContain('syncPending: false')
+        expect(app).toContain('searchPending: false')
+        expect(app).toContain('async function runMaintenanceAction')
+        expect(app).toContain("t('maintenance.working')")
+    })
+
+    it('renders explicit empty states for library and online search', () => {
+        const app = read('web/app.js')
+        const i18n = read('web/i18n.js')
+        expect(app).toContain("t('library.noMatches')")
+        expect(app).toContain("t('library.empty')")
+        expect(app).toContain("t('search.empty')")
+        expect(i18n).toContain("'library.noMatches'")
+        expect(i18n).toContain("'search.empty'")
+    })
+
+    it('keeps mobile pairing and library maintenance secondary actions discoverable', () => {
+        const index = read('web/index.html')
+        const polish = read('web/ui-polish-v5.js')
+        const app = read('web/app.js')
+        expect(index).toContain('mobile-bridge-copy-address')
+        expect(index).toContain('mobile-bridge-copy-code')
+        expect(app).toContain('copyMobileBridgeValue')
+        expect(polish).toContain('libraryMaintenance')
+        expect(polish).toContain("'ux-library-maintenance'")
+    })
+
+    it('keeps product-wide DOM observers coalesced', () => {
+        const product = read('web/alpha8-product.js')
+        const polish = read('web/ui-polish-v5.js')
+        expect(product).toContain('let cleanupQueued = false')
+        expect(product).toContain('requestAnimationFrame(() => {')
+        expect(product).toContain(
+            'const observer = new MutationObserver(scheduleSourceCleanup)'
+        )
+        expect(polish).toContain('let polishQueued = false')
+        expect(polish).toContain('scheduleDynamicPolish()')
+    })
+
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'

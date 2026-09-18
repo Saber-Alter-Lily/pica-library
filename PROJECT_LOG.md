@@ -19,6 +19,8 @@
 - 增加“保留收藏但不参与推荐口味画像”：仅移出 preference inference、召回 seed 与 Visual preference prototype，收藏/下载/已拥有过滤和 Visual embedding 均保留。
 - P2A 启动 Canonical Work Identity 基础层：新增 Series / Work / Edition / Upload 绑定、身份证据与人工裁决的加法表结构；首轮不自动绑定、不改写现有 comic_id。
 - P2A-2 增加 evidence-only 身份候选回填：高置信同作品候选可按 resolver version 幂等写入证据表，但 canonical work 与 upload binding 仍保持 0，等待后续人工裁决。
+- P2A-3 增加可逆人工身份裁决：同一作品 / 不同版本 / 保持分离均独立持久化；只有“保持分离”立即进入高权限去重保护，其余裁决暂不改写 serving 或创建 binding。
+- P2A-4 增加 Work 物化预览：把已裁决 SAME_WORK / EDITION_VARIANT 关系按传递连通性组织成候选 Work 组，并检测组内 KEEP_SEPARATE 冲突；当前仅预览，仍不写入 Work/Edition/Upload binding。
 
 ## v0.4.0 — 多来源与统一语义
 

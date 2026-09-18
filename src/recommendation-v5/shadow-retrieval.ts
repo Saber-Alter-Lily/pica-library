@@ -6,7 +6,7 @@ import type {
 } from './provider-query-compiler'
 
 export const SHADOW_RETRIEVAL_V5_VERSION =
-    'shadow-retrieval-v1'
+    'shadow-retrieval-v2-provider-rank'
 
 type CompiledProviderPlanV5 = ReturnType<
     typeof compileCandidateProviderRoutesV5

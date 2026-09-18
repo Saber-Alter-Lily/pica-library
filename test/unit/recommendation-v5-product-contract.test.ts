@@ -364,7 +364,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain("cycleId = `v5-shadow:")
         expect(service).toContain("'v5-shadow'")
         expect(service).toContain('saveV3CandidatePool')
-        expect(service).toContain('candidateIds: result.candidates.map')
+        expect(service).toContain('candidateIds: ranking.rows.map')
         expect(service).toContain(
             'recommendationV5ShadowRuns'
         )

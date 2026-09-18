@@ -158,6 +158,37 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).not.toContain('执行绑定')
     })
 
+    it('keeps materialization execution disabled behind a Desktop prepare-only contract', () => {
+        const migrations = read('src/storage/sqlite/migrations.ts')
+        const database = read('src/library/database.ts')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(migrations).toContain(
+            "name: 'work_identity_materialization_audit'"
+        )
+        expect(migrations).toContain(
+            'work_identity_materialization_runs'
+        )
+        expect(database).toContain(
+            'prepareWorkIdentityMaterializationRun'
+        )
+        expect(database).toContain('idempotentReplay')
+        expect(service).toContain(
+            'WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION'
+        )
+        expect(service).toContain("createHash('sha256')")
+        expect(service).toContain("mode: 'PREPARED_ONLY'")
+        expect(service).toContain('executionEnabled: false')
+        expect(service).toContain('applyEndpoint: null')
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/work-identity/materialization/prepare'
+        )
+        expect(server).toContain("request.headers['x-pica-csrf']")
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/work-identity/materialization/apply'
+        )
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

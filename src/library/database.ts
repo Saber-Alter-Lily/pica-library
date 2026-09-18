@@ -238,6 +238,116 @@ export class LibraryDatabase {
         }
     }
 
+    saveWorkIdentityEvidence(
+        records: Array<{
+            leftComicId: string
+            rightComicId: string
+            relation:
+                | 'PROBABLE_SAME_WORK'
+                | 'EDITION_VARIANT'
+                | 'RELATED_WORK'
+                | 'DISTINCT'
+            confidence: number
+            resolverVersion: string
+            evidence: Record<string, unknown>
+        }>
+    ) {
+        const normalized = records.flatMap((record) => {
+            const left = String(record.leftComicId ?? '').trim()
+            const right = String(record.rightComicId ?? '').trim()
+            const resolverVersion = String(
+                record.resolverVersion ?? ''
+            ).trim()
+            if (!left || !right || left === right || !resolverVersion)
+                return []
+            const [leftComicId, rightComicId] = [left, right].sort()
+            return [
+                {
+                    ...record,
+                    leftComicId,
+                    rightComicId,
+                    resolverVersion,
+                    confidence: Math.max(
+                        0,
+                        Math.min(1, Number(record.confidence) || 0)
+                    )
+                }
+            ]
+        })
+        if (!normalized.length)
+            return {
+                requested: records.length,
+                upserted: 0,
+                evidenceCount:
+                    this.workIdentityStorageStatus().counts.evidence
+            }
+
+        const statement = this.db.prepare(
+            \`INSERT INTO work_identity_evidence(
+                id, left_comic_id, right_comic_id, relation, confidence,
+                resolver_version, evidence_json, created_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(left_comic_id, right_comic_id, resolver_version)
+             DO UPDATE SET
+                relation = excluded.relation,
+                confidence = excluded.confidence,
+                evidence_json = excluded.evidence_json,
+                created_at = excluded.created_at\`
+        )
+        const now = new Date().toISOString()
+        this.db.exec('BEGIN IMMEDIATE')
+        try {
+            for (const record of normalized)
+                statement.run(
+                    randomUUID(),
+                    record.leftComicId,
+                    record.rightComicId,
+                    record.relation,
+                    record.confidence,
+                    record.resolverVersion,
+                    JSON.stringify(record.evidence ?? {}),
+                    now
+                )
+            this.db.exec('COMMIT')
+        } catch (error) {
+            this.db.exec('ROLLBACK')
+            throw error
+        }
+        return {
+            requested: records.length,
+            upserted: normalized.length,
+            evidenceCount: this.workIdentityStorageStatus().counts.evidence
+        }
+    }
+
+    listWorkIdentityEvidence(limit = 500) {
+        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
+        const rows = this.db
+            .prepare(
+                \`SELECT e.*, lc.title AS left_title,
+                        rc.title AS right_title
+                 FROM work_identity_evidence e
+                 JOIN comics lc ON lc.id = e.left_comic_id
+                 JOIN comics rc ON rc.id = e.right_comic_id
+                 ORDER BY e.confidence DESC, e.created_at DESC,
+                          e.left_comic_id, e.right_comic_id
+                 LIMIT ?\`
+            )
+            .all(bounded) as SqlRow[]
+        return rows.map((row) => ({
+            id: String(row.id),
+            leftComicId: String(row.left_comic_id),
+            rightComicId: String(row.right_comic_id),
+            leftTitle: String(row.left_title ?? ''),
+            rightTitle: String(row.right_title ?? ''),
+            relation: String(row.relation),
+            confidence: numberValue(row.confidence),
+            resolverVersion: String(row.resolver_version),
+            evidence: jsonObject(row.evidence_json),
+            createdAt: String(row.created_at)
+        }))
+    }
+
     recordUserEvent(input: UserEventInput): UserEvent {
         const id = input.id ?? randomUUID()
         const occurredAt = new Date().toISOString()

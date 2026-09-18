@@ -375,7 +375,14 @@ $('#remote-sync')?.addEventListener('click', async () => {
     try { request = savedTargetRequest('sync') }
     catch (error) { message(error.message, true); return }
     const target = remoteState.targets.find((item) => item.id === selectedTargetId)?.label || '所选网盘'
-    if (!confirm(`把已下载漫画增量同步到「${target}」？不会上传到其他已配置网盘。`)) return
+    const confirmed = window.picaConfirmAction
+        ? await window.picaConfirmAction(
+              `把已下载漫画增量同步到「${target}」？不会上传到其他已配置网盘。`
+          )
+        : window.confirm(
+              `把已下载漫画增量同步到「${target}」？不会上传到其他已配置网盘。`
+          )
+    if (!confirmed) return
     message(`正在同步到「${target}」。页面会实时显示整库和当前漫画进度。`)
     const button = $('#remote-sync'); button.disabled = true; startProgressPolling()
     try {

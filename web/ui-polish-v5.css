@@ -468,6 +468,59 @@ body.reader-active .reader-header {
     background: var(--a83-bad-soft, #fff1f2) !important;
 }
 
+/* Unified app dialogs ---------------------------------------------------- */
+.ux-confirm-dialog,
+.ux-prompt-dialog {
+    width: min(520px, calc(100vw - 32px));
+}
+
+.ux-confirm-dialog form,
+.ux-prompt-dialog form {
+    display: grid;
+    gap: 14px;
+}
+
+.ux-confirm-dialog h3,
+.ux-prompt-dialog h3 {
+    margin: 0;
+    color: var(--a83-text, #202534);
+}
+
+.ux-confirm-dialog p,
+.ux-prompt-dialog p {
+    margin: 0;
+    line-height: 1.65;
+    color: var(--a83-muted, #68636e);
+}
+
+.ux-confirm-dialog .actions,
+.ux-prompt-dialog .actions {
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.ux-prompt-dialog label {
+    display: grid;
+    gap: 7px;
+    font-weight: 700;
+}
+
+.ux-prompt-dialog input {
+    width: 100%;
+}
+
+#ux-eh-more {
+    margin-top: 10px;
+}
+
+#settings-eh-account > .actions {
+    margin-top: 10px;
+}
+
+.ux-eh-manual-actions {
+    margin-top: 10px;
+}
+
 /* Remaining page-level hierarchy normalization. */
 #downloads .page-heading .actions {
     align-items: center;

@@ -759,10 +759,28 @@ $('#settings-form').onsubmit = async (event) => {
         }
     })
 }
-$('#open-data').onclick = () =>
-    desktopPost('/api/v1/desktop/open-directory', { kind: 'data' })
-$('#open-logs').onclick = () =>
-    desktopPost('/api/v1/desktop/open-directory', { kind: 'logs' })
+async function openDesktopDirectory(kind, button, message) {
+    await withBusyButton(button, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/open-directory', { kind })
+        } catch (error) {
+            if (message)
+                message.textContent = localizeError(language, error)
+        }
+    })
+}
+$('#open-data').onclick = (event) =>
+    void openDesktopDirectory(
+        'data',
+        event.currentTarget,
+        $('#settings-message')
+    )
+$('#open-logs').onclick = (event) =>
+    void openDesktopDirectory(
+        'logs',
+        event.currentTarget,
+        $('#settings-message')
+    )
 $('#export-browser-lite').onclick = async (event) => {
     const message = $('#browser-lite-export-message')
     await withBusyButton(event.currentTarget, async () => {
@@ -838,12 +856,22 @@ $('#sync-export-browser-lite').onclick = async (event) => {
         button.disabled = false
     }
 }
-$('#open-browser-lite-export').onclick = () =>
-    desktopPost('/api/v1/desktop/open-directory', {
-        kind: 'browser-lite-export'
+$('#open-browser-lite-export').onclick = (event) =>
+    void openDesktopDirectory(
+        'browser-lite-export',
+        event.currentTarget,
+        $('#browser-lite-export-message')
+    )
+$('#open-browser-lite').onclick = async (event) => {
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/open-browser-lite')
+        } catch (error) {
+            $('#browser-lite-export-message').textContent =
+                localizeError(language, error)
+        }
     })
-$('#open-browser-lite').onclick = () =>
-    desktopPost('/api/v1/desktop/open-browser-lite')
+}
 $('#detect-proxy').onclick = async (event) => {
     await withBusyButton(event.currentTarget, async () => {
         try {
@@ -888,9 +916,18 @@ $('#settings-detect-proxy').onclick = async (event) => {
         }
     })
 }
-$('#exit-app').onclick = async () => {
-    await desktopPost('/api/v1/desktop/shutdown')
-    document.body.innerHTML = `<main><article class="notice"><strong>${t('message.stopped')}</strong><p>${t('message.closeTab')}</p></article></main>`
+$('#exit-app').onclick = async (event) => {
+    if (!(await askConfirm(t('settings.exitConfirm')))) return
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/shutdown')
+            document.body.innerHTML =
+                `<main><article class="notice"><strong>${t('message.stopped')}</strong><p>${t('message.closeTab')}</p></article></main>`
+        } catch (error) {
+            $('#settings-message').textContent =
+                localizeError(language, error)
+        }
+    })
 }
 
 function replaceLiteState(value) {
@@ -1818,13 +1855,17 @@ async function loadPreviewCacheStats() {
     }
 }
 
-$('#preview-cache-clear').onclick = async () => {
-    try {
-        await post('/api/v1/previews/cache/clear', {})
-        await loadPreviewCacheStats()
-    } catch (error) {
-        $('#preview-cache-stats').textContent = localizeError(language, error)
-    }
+$('#preview-cache-clear').onclick = async (event) => {
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            await post('/api/v1/previews/cache/clear', {})
+            $('#preview-cache-stats').textContent = t('preview.cacheCleared')
+            await loadPreviewCacheStats()
+        } catch (error) {
+            $('#preview-cache-stats').textContent =
+                localizeError(language, error)
+        }
+    })
 }
 
 function recommendationRecord(comicId, context) {

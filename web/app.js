@@ -98,6 +98,7 @@ let language = resolveLanguage(
 )
 let downloadPoll = null
 let downloadPollBusy = false
+let importPending = false
 let activeView = 'home'
 const viewScrollPositions = new Map()
 const t = (key, values) => translate(language, key, values)
@@ -530,33 +531,35 @@ $('#update-file').onchange = (event) => {
             renderUpdateProgress({ phase: 'failed' })
         })
 }
-$('#update-check').onclick = async () => {
+$('#update-check').onclick = async (event) => {
     const message = $('#update-message')
     if (!desktop) {
         message.textContent = t('update.localOnly')
         return
     }
-    message.textContent = t('update.checking')
-    try {
-        const value = await api('/api/v1/update/check')
-        if (value.status === 'current') {
-            message.textContent = t('update.current')
-            return
-        }
-        if (value.status === 'full-install') {
-            message.innerHTML = t('update.fullFound', {
+    await withBusyButton(event.currentTarget, async () => {
+        message.textContent = t('update.checking')
+        try {
+            const value = await api('/api/v1/update/check')
+            if (value.status === 'current') {
+                message.textContent = t('update.current')
+                return
+            }
+            if (value.status === 'full-install') {
+                message.innerHTML = t('update.fullFound', {
+                    version: escapeHtml(value.version),
+                    url: escapeHtml(value.releaseUrl)
+                })
+                return
+            }
+            message.innerHTML = t('update.incrementalFound', {
                 version: escapeHtml(value.version),
                 url: escapeHtml(value.releaseUrl)
             })
-            return
+        } catch (error) {
+            message.textContent = localizeError(language, error)
         }
-        message.innerHTML = t('update.incrementalFound', {
-            version: escapeHtml(value.version),
-            url: escapeHtml(value.releaseUrl)
-        })
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    })
 }
 $('#update-one-click').onclick = async () => {
     const button = $('#update-one-click')
@@ -760,28 +763,35 @@ $('#open-data').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', { kind: 'data' })
 $('#open-logs').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', { kind: 'logs' })
-$('#export-browser-lite').onclick = async () => {
+$('#export-browser-lite').onclick = async (event) => {
     const message = $('#browser-lite-export-message')
-    message.textContent = t('message.browserLiteExporting')
-    try {
-        const result = await desktopPost('/api/v1/desktop/export-browser-lite')
-        if (result.cancelled) {
-            message.textContent = t('message.browserLiteExportCancelled')
-            return
+    await withBusyButton(event.currentTarget, async () => {
+        message.textContent = t('message.browserLiteExporting')
+        try {
+            const result = await desktopPost(
+                '/api/v1/desktop/export-browser-lite'
+            )
+            if (result.cancelled) {
+                message.textContent = t('message.browserLiteExportCancelled')
+                return
+            }
+            message.textContent = t('message.browserLiteExported')
+            $('#open-browser-lite-export').hidden = false
+            desktop.lastExportAt = result.generatedAt
+            renderTimestamps()
+        } catch (error) {
+            message.textContent = String(error?.message || error).includes(
+                'There is no library data to export yet'
+            )
+                ? t('message.browserLiteExportEmpty')
+                : t('message.browserLiteExportFailed')
         }
-        message.textContent = t('message.browserLiteExported')
-        $('#open-browser-lite-export').hidden = false
-        desktop.lastExportAt = result.generatedAt
-        renderTimestamps()
-    } catch (error) {
-        message.textContent = String(error?.message || error).includes(
-            'There is no library data to export yet'
-        )
-            ? t('message.browserLiteExportEmpty')
-            : t('message.browserLiteExportFailed')
-    }
+    })
 }
-$('#sync-export-browser-lite').onclick = async () => {
+$('#sync-export-browser-lite').onclick = async (event) => {
+    const button = event.currentTarget
+    if (button.disabled) return
+    button.disabled = true
     const message = $('#browser-lite-export-message')
     message.textContent = t('bundle.syncExporting')
     const phases = {
@@ -825,6 +835,7 @@ $('#sync-export-browser-lite').onclick = async () => {
     } finally {
         clearInterval(progressTimer)
         clearProgress($('#download-operation'))
+        button.disabled = false
     }
 }
 $('#open-browser-lite-export').onclick = () =>
@@ -833,39 +844,49 @@ $('#open-browser-lite-export').onclick = () =>
     })
 $('#open-browser-lite').onclick = () =>
     desktopPost('/api/v1/desktop/open-browser-lite')
-$('#detect-proxy').onclick = async () => {
-    try {
-        const result = await desktopPost(
-            '/api/v1/desktop/detect-proxy',
-            setupValue('setup')
-        )
-        $('#setup-message').textContent = result.candidates?.length
-            ? `Detected ${result.candidates.map((item) => item.url).join(', ')}`
-            : 'No local proxy detected.'
-        if (result.candidates?.[0] && !result.candidates[0].url.includes('***'))
-            $('#setup-proxy').value = result.candidates[0].url
-    } catch (error) {
-        $('#setup-message').textContent = localizeError(language, error)
-    }
+$('#detect-proxy').onclick = async (event) => {
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            const result = await desktopPost(
+                '/api/v1/desktop/detect-proxy',
+                setupValue('setup')
+            )
+            $('#setup-message').textContent = result.candidates?.length
+                ? `Detected ${result.candidates.map((item) => item.url).join(', ')}`
+                : 'No local proxy detected.'
+            if (
+                result.candidates?.[0] &&
+                !result.candidates[0].url.includes('***')
+            )
+                $('#setup-proxy').value = result.candidates[0].url
+        } catch (error) {
+            $('#setup-message').textContent = localizeError(language, error)
+        }
+    })
 }
-$('#settings-detect-proxy').onclick = async () => {
+$('#settings-detect-proxy').onclick = async (event) => {
     const message = $('#settings-message')
-    try {
-        const value = setupValue('settings')
-        if (!value.account) delete value.account
-        if (!value.password) delete value.password
-        const result = await desktopPost('/api/v1/desktop/detect-proxy', value)
-        const usable = result.candidates?.find((item) => item.usable)
-        message.textContent = usable
-            ? t('proxy.detected', { url: usable.url })
-            : result.candidates?.length
-              ? t('proxy.localUnavailable')
-              : t('proxy.none')
-        if (usable && !usable.url.includes('***'))
-            $('#settings-proxy').value = usable.url
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            const value = setupValue('settings')
+            if (!value.account) delete value.account
+            if (!value.password) delete value.password
+            const result = await desktopPost(
+                '/api/v1/desktop/detect-proxy',
+                value
+            )
+            const usable = result.candidates?.find((item) => item.usable)
+            message.textContent = usable
+                ? t('proxy.detected', { url: usable.url })
+                : result.candidates?.length
+                  ? t('proxy.localUnavailable')
+                  : t('proxy.none')
+            if (usable && !usable.url.includes('***'))
+                $('#settings-proxy').value = usable.url
+        } catch (error) {
+            message.textContent = localizeError(language, error)
+        }
+    })
 }
 $('#exit-app').onclick = async () => {
     await desktopPost('/api/v1/desktop/shutdown')
@@ -2616,8 +2637,12 @@ $('#downloaded-cover-toggle').onchange = (event) => {
 }
 $('#pending-only').onchange = renderAuthors
 async function importSelectedFile() {
-    const file = $('#import-file').files[0]
+    if (importPending) return
+    const input = $('#import-file')
+    const file = input.files[0]
     if (!file) return
+    importPending = true
+    input.disabled = true
     try {
         setProgress($('#library-operation'), t('message.importRead'), 0, 0)
         const text = await file.text()
@@ -2661,6 +2686,9 @@ async function importSelectedFile() {
     } catch (error) {
         clearProgress($('#library-operation'))
         $('#import-result').textContent = localizeError(language, error)
+    } finally {
+        importPending = false
+        input.disabled = false
     }
 }
 $('#import-button').onclick = importSelectedFile

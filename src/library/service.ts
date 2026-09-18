@@ -5,7 +5,6 @@ import pLimit from 'p-limit'
 import { Pica } from '../sdk'
 import {
     EhProvider,
-    parseEhTag,
     type EhSession
 } from '../providers/eh-provider'
 import type { EhBrowseMode, OnlineSource } from '../providers/types'
@@ -109,7 +108,10 @@ import {
 } from '../recommendation-v5/policy-store'
 import { buildBehaviorEvidenceLedgerV5 } from '../recommendation-v5/behavior-evidence'
 import { buildCandidateChannelPlanV5 } from '../recommendation-v5/candidate-channels'
-import { compileCandidateProviderRoutesV5 } from '../recommendation-v5/provider-query-compiler'
+import {
+    compileCandidateProviderRoutesV5,
+    deriveObservedEhCanonicalBindingsV5
+} from '../recommendation-v5/provider-query-compiler'
 import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
 import {
     filterCandidatesAgainstOwnedV5,
@@ -309,31 +311,14 @@ export class LibraryService {
             state,
             { appSessionId: appSessionId ?? null }
         )
-        const tagFacets: Record<string, string> = {}
-        const tagProviderCanonicals: Record<string, string> = {}
-        const observedCanonicalSets = new Map<string, Set<string>>()
-        for (const comic of catalog) {
-            if (comic.providerId !== 'eh') continue
-            const rawTags = Array.isArray(
-                comic.providerMetadata?.rawTags
-            )
-                ? comic.providerMetadata.rawTags.map(String)
-                : []
-            for (const raw of rawTags) {
-                const parsed = parseEhTag(raw)
-                const key = normalizePreferenceKey(parsed.value)
-                if (!key || !parsed.namespace) continue
-                const values =
-                    observedCanonicalSets.get(key) ?? new Set<string>()
-                values.add(parsed.raw.trim())
-                observedCanonicalSets.set(key, values)
-                if (!tagFacets[key] && parsed.facet)
-                    tagFacets[key] = parsed.facet
-            }
+        const observedBindings =
+            deriveObservedEhCanonicalBindingsV5(catalog)
+        const tagFacets: Record<string, string> = {
+            ...observedBindings.facets
         }
-        for (const [key, values] of observedCanonicalSets)
-            if (values.size === 1)
-                tagProviderCanonicals[key] = [...values][0]
+        const tagProviderCanonicals: Record<string, string> = {
+            ...observedBindings.canonicals
+        }
 
         try {
             const registry = loadTagRegistryV3(runtimeRegistryDirectory())

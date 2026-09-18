@@ -400,7 +400,9 @@ function installReaderHeader() {
     if (copy) copy.classList.add('reader-header-copy')
     const controls = ux$('.reader-controls', header)
     const exit = ux$('#reader-exit')
-    if (!controls || !exit) return
+    const previous = ux$('#reader-prev-chapter')
+    const next = ux$('#reader-next-chapter')
+    if (!controls || !exit || !previous || !next) return
 
     const essential = document.createElement('div')
     essential.className = 'reader-essential-actions'
@@ -410,7 +412,7 @@ function installReaderHeader() {
     summary.dataset.uxCopy = 'readerSettings'
     summary.textContent = uxText('readerSettings')
     options.append(summary, controls)
-    essential.append(exit, options)
+    essential.append(exit, previous, next, options)
     header.appendChild(essential)
 
     const hint = document.createElement('span')

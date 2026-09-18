@@ -416,19 +416,21 @@ async function a88OpenDetail(comicId) {
     const indexed = a88State.indexedIds.has(comicId)
     dialog.querySelector('.a88-dialog-shell').innerHTML = `
       <div class="a88-dialog-head"><div><h2>${a88Escape(comic.title)}</h2><p>${a88Escape(comic.canonicalAuthor || comic.author || '')} · ${a88Provider(comic)}</p></div><button type="button" data-a88-close>关闭</button></div>
-      <div class="a88-dialog-main"><img src="/api/v1/covers/${encodeURIComponent(comicId)}" alt=""><div><p>${a88Escape(comic.description || '')}</p><div>${(comic.tags || []).slice(0,12).map((tag) => `<span class="tag">${a88Escape(tag)}</span>`).join(' ')}</div><p class="a88-meta">Visual V1：${indexed ? '已索引，可比较' : (a88State.status?.pendingComicIds || []).includes(comicId) ? 'Pending' : '未纳入当前索引'}</p><div class="a88-detail-actions"><button type="button" data-a88-similar="${a88Escape(comicId)}" ${indexed ? '' : 'disabled'}>相似画风</button><button type="button" data-a88-local-read="${a88Escape(comicId)}">尝试本地阅读</button><button type="button" data-a88-online-read="${a88Escape(comicId)}">在线阅读</button></div></div></div>
+      <div class="a88-dialog-main"><img src="/api/v1/covers/${encodeURIComponent(comicId)}" alt=""><div><p>${a88Escape(comic.description || '暂无简介')}</p><p class="a88-meta">页数 ${Number(comic.pagesCount || comic.knownPictures || 0)} · 章节 ${Number(comic.epsCount || comic.knownEpisodes || 0)} · ${comic.finished ? '已完结' : '连载/未知'}</p><div>${(comic.categories || []).slice(0,6).map((tag) => `<span class="tag">${a88Escape(tag)}</span>`).join(' ')} ${(comic.tags || []).slice(0,18).map((tag) => `<span class="tag">${a88Escape(tag)}</span>`).join(' ')}</div><p class="a88-meta">Visual V1：${indexed ? '已索引，可比较' : (a88State.status?.pendingComicIds || []).includes(comicId) ? 'Pending' : '未纳入当前索引'}</p><div class="a88-detail-actions"><button type="button" data-a88-similar="${a88Escape(comicId)}" ${indexed ? '' : 'disabled'}>相似画风</button><button type="button" data-a88-local-read="${a88Escape(comicId)}">本地阅读</button><button type="button" data-a88-online-read="${a88Escape(comicId)}">在线阅读</button></div></div></div>
       <p id="a88-detail-message" class="status"></p><div id="a88-detail-results" class="a88-similar-grid"></div>`
     dialog.querySelector('[data-a88-close]').onclick = () => dialog.close()
     dialog.querySelector('[data-a88-similar]')?.addEventListener('click', (event) => void a88RunDetailSimilar(comicId, event.currentTarget))
     dialog.querySelector('[data-a88-local-read]').onclick = () => {
-        const source = document.querySelector(`[data-read-comic="${CSS.escape(comicId)}"]`)
-        if (source) { dialog.close(); source.click() }
-        else a88$('#a88-detail-message').textContent = '当前页面没有可直接复用的本地阅读入口。'
+        dialog.close()
+        document.dispatchEvent(new CustomEvent('pica-open-reader', {
+            detail: { comicId, online: false }
+        }))
     }
     dialog.querySelector('[data-a88-online-read]').onclick = () => {
-        const source = document.querySelector(`[data-online-comic="${CSS.escape(comicId)}"]`)
-        if (source) { dialog.close(); source.click() }
-        else a88$('#a88-detail-message').textContent = '当前页面没有可直接复用的在线阅读入口。'
+        dialog.close()
+        document.dispatchEvent(new CustomEvent('pica-open-reader', {
+            detail: { comicId, online: true }
+        }))
     }
     dialog.showModal()
 }

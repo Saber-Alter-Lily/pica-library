@@ -74,7 +74,6 @@ function evalEnsureStyles() {
 .v5-eval-delta{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.82rem}
 .v5-eval-delta.positive{color:#20643a}.v5-eval-delta.negative{color:#8a2f2c}
 @media(max-width:720px){.v5-eval-compare-controls{grid-template-columns:1fr}.v5-eval-run{grid-template-columns:1fr 1fr}.v5-eval-run .mono{grid-column:1/-1}}
-@media(max-width:720px){.v5-eval-run{grid-template-columns:1fr 1fr}.v5-eval-run .mono{grid-column:1/-1}}
 `
     document.head.appendChild(style)
 }
@@ -355,11 +354,13 @@ function evalRenderComparison() {
         baseline.onchange = () => {
             EVAL.baselineVersion = baseline.value
             EVAL.comparison = null
+            evalRenderComparison()
         }
     if (candidate)
         candidate.onchange = () => {
             EVAL.candidateVersion = candidate.value
             EVAL.comparison = null
+            evalRenderComparison()
         }
     if (button) button.onclick = () => void evalCompareSelected()
 }

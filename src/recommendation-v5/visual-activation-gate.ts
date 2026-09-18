@@ -148,9 +148,11 @@ export function evaluateVisualActivationGateV5(input: {
         criterion(
             'FAVORITE_EMBEDDING_COVERAGE',
             true,
-            favoriteCoverage >= thresholds.minimumFavoriteCoverage
-                ? 'PASS'
-                : 'FAIL',
+            favoriteCoverage === null
+                ? 'INSUFFICIENT'
+                : favoriteCoverage >= thresholds.minimumFavoriteCoverage
+                  ? 'PASS'
+                  : 'FAIL',
             favoriteCoverage,
             '>= ' + thresholds.minimumFavoriteCoverage,
             'Preference-side Visual evidence must cover most favorite items before any V5 Visual shadow feature is considered.'

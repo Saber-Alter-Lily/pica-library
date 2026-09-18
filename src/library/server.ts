@@ -363,6 +363,19 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/recommendation-v5/behavior-evidence' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5BehaviorEvidence(
+                        Number(url.searchParams.get('limit') ?? 5000)
+                    )
+                )
+
+            if (
+                url.pathname ===
                     '/api/v1/recommendation-v5/work-identity/audit' &&
                 request.method === 'GET'
             )

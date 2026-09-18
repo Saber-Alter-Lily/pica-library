@@ -199,7 +199,12 @@ export class LibraryService {
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
     private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
-    private recommendationProgress = { state: 'idle', phase: 'idle', done: 0, total: 6 }
+    private recommendationProgress = {
+        state: 'idle',
+        phase: 'idle',
+        done: 0,
+        total: 7
+    }
 
     recommendationBuildProgress() { return { ...this.recommendationProgress } }
 
@@ -208,35 +213,90 @@ export class LibraryService {
     }
 
     recommendationV5Snapshot() {
-        return new RecommendationPolicyStoreV5(this.database).snapshot()
+        const snapshot = new RecommendationPolicyStoreV5(
+            this.database
+        ).snapshot()
+        try {
+            const registry = loadTagRegistryV3(runtimeRegistryDirectory())
+            const inferred = snapshot.inferred.flatMap((signal) => {
+                if (signal.targetType !== 'TAG')
+                    return [
+                        {
+                            ...signal,
+                            facet:
+                                signal.targetType === 'AUTHOR'
+                                    ? 'CREATOR_ENTITY'
+                                    : signal.targetType === 'CATEGORY'
+                                      ? 'CATEGORY'
+                                      : signal.facet || 'OTHER'
+                        }
+                    ]
+                const resolved = resolveTagV3(
+                    signal.label || signal.key,
+                    registry
+                )
+                if (
+                    resolved.resolutionType === 'SAFETY' ||
+                    ['SAFETY_EXCLUDE', 'IGNORE', 'EXCLUDE'].includes(
+                        resolved.recommendationRole
+                    )
+                )
+                    return []
+                return [
+                    {
+                        ...signal,
+                        label:
+                            resolved.resolutionStatus === 'RESOLVED'
+                                ? resolved.canonicalLabel
+                                : signal.label,
+                        facet:
+                            resolved.resolutionStatus === 'RESOLVED'
+                                ? resolved.facet
+                                : 'OTHER'
+                    }
+                ]
+            })
+            return { ...snapshot, inferred }
+        } catch {
+            // V5 controls remain usable when a packaged registry asset is
+            // unavailable; the portable snapshot has a raw-tag fallback.
+            return snapshot
+        }
     }
 
     updateRecommendationV5Control(input: Record<string, unknown>) {
-        return new RecommendationPolicyStoreV5(this.database).setControl({
+        const store = new RecommendationPolicyStoreV5(this.database)
+        store.setControl({
             targetType: input.targetType,
             key: input.key,
             label: input.label,
             direction: input.direction,
+            levelDelta: input.levelDelta,
             scope: input.scope,
             source: 'DESKTOP'
         })
+        return this.recommendationV5Snapshot()
     }
 
     updateRecommendationV5Session(input: Record<string, unknown>) {
-        return new RecommendationPolicyStoreV5(this.database).setSessionIntent({
+        const store = new RecommendationPolicyStoreV5(this.database)
+        store.setSessionIntent({
             mode: input.mode,
             targetType: input.targetType,
             key: input.key,
             label: input.label,
             source: 'DESKTOP'
         })
+        return this.recommendationV5Snapshot()
     }
 
     suppressRecommendationV5Comic(input: Record<string, unknown>) {
-        return new RecommendationPolicyStoreV5(this.database).suppressComic(
+        const store = new RecommendationPolicyStoreV5(this.database)
+        store.suppressComic(
             String(input.comicId ?? ''),
             input.suppressed !== false
         )
+        return this.recommendationV5Snapshot()
     }
 
     mergeMobileRecommendationV5(input: MobileRecommendationSyncV5) {
@@ -655,7 +715,16 @@ export class LibraryService {
         const externalCache = new Map<string, StoredComic[]>()
         const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }
         const sourceRequests: Record<'eh' | 'exh', number> = { eh: 0, exh: 0 }
-        const exhAvailable = (await providerService.probeExHentai().catch(() => 'UNAVAILABLE')) === 'AVAILABLE'
+        this.recommendationProgress = {
+            state: 'running',
+            phase: 'providers',
+            done: 3,
+            total: 7
+        }
+        const exhAvailable =
+            (await providerService
+                .probeExHentai()
+                .catch(() => 'UNAVAILABLE')) === 'AVAILABLE'
         const externalSearch = async (
             query: string,
             kind: 'keyword' | 'author',
@@ -684,7 +753,12 @@ export class LibraryService {
                 return []
             }
         }
-        this.recommendationProgress = { state: 'running', phase: 'retrieve', done: 3, total: 7 }
+        this.recommendationProgress = {
+            state: 'running',
+            phase: 'retrieve',
+            done: 4,
+            total: 7
+        }
         const retrieved = await retrieveCandidatesV3({
             provider: {
                 keyword: async (query, page) => {
@@ -735,7 +809,12 @@ export class LibraryService {
                         : []
                 })
         })
-        this.recommendationProgress = { state: 'running', phase: 'rank', done: 4, total: 7 }
+        this.recommendationProgress = {
+            state: 'running',
+            phase: 'rank',
+            done: 5,
+            total: 7
+        }
         const v5Filtered = filterCandidatesAgainstOwnedV5(
             retrieved.candidates,
             catalog,
@@ -806,7 +885,7 @@ export class LibraryService {
         this.recommendationProgress = {
             state: 'running',
             phase: 'visual',
-            done: 5,
+            done: 6,
             total: 7
         }
         const visualSettings = this.visualSettings()

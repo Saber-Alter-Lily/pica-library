@@ -11,6 +11,7 @@ import {
     normalizeControlV5,
     portableInferredSignalsV5,
     preferenceAdjustmentV5,
+    preferenceBaselineLevelV5,
     upsertControlV5,
     workIdentityEvidenceV5
 } from '../../src/recommendation-v5/portable-policy'
@@ -113,6 +114,56 @@ describe('Recommendation V5 portable policy', () => {
         expect(preferenceAdjustmentV5(target, state).adjustment).toBeGreaterThan(0)
         state = upsertControlV5(state, normalizeControlV5({ targetType: 'TAG', key: 'Tag A', label: 'Tag A', direction: 'LESS', scope: 'PERSISTENT' }))
         expect(preferenceAdjustmentV5(target, state).adjustment).toBeLessThan(0)
+    })
+
+    it('maps the 10-step control to a graded ranking adjustment', () => {
+        const target = comic({
+            comicId: 'x',
+            title: 'X',
+            tags: ['Tag A']
+        })
+        let state = defaultPortablePolicyStateV5()
+        state = upsertControlV5(
+            state,
+            normalizeControlV5({
+                targetType: 'TAG',
+                key: 'Tag A',
+                direction: 'MORE',
+                levelDelta: 3
+            })
+        )
+        expect(state.controls[0]).toMatchObject({
+            direction: 'MORE',
+            levelDelta: 3
+        })
+        expect(preferenceAdjustmentV5(target, state).adjustment).toBeCloseTo(
+            0.09,
+            6
+        )
+        state = upsertControlV5(
+            state,
+            normalizeControlV5({
+                targetType: 'TAG',
+                key: 'Tag A',
+                direction: 'LESS',
+                levelDelta: -2
+            })
+        )
+        expect(preferenceAdjustmentV5(target, state).adjustment).toBeCloseTo(
+            -0.06,
+            6
+        )
+    })
+
+    it('derives a nonlinear 1..10 baseline from collection evidence', () => {
+        expect(preferenceBaselineLevelV5(0, 0)).toBe(1)
+        expect(preferenceBaselineLevelV5(1, 0.001)).toBeLessThan(
+            preferenceBaselineLevelV5(10, 0.03)
+        )
+        expect(preferenceBaselineLevelV5(10, 0.03)).toBeLessThanOrEqual(
+            preferenceBaselineLevelV5(50, 0.1)
+        )
+        expect(preferenceBaselineLevelV5(50, 0.1)).toBeLessThanOrEqual(10)
     })
 
     it('keeps hard block separate from a soft negative', () => {

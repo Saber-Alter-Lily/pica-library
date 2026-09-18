@@ -109,6 +109,7 @@ export class RecommendationPolicyStoreV5 {
         key: unknown
         label?: unknown
         direction?: unknown
+        levelDelta?: unknown
         scope?: unknown
         source?: 'DESKTOP' | 'ANDROID'
     }) {
@@ -121,6 +122,10 @@ export class RecommendationPolicyStoreV5 {
                 key: String(input.key ?? ''),
                 label: String(input.label ?? input.key ?? ''),
                 direction: validDirection(input.direction),
+                levelDelta:
+                    input.levelDelta === undefined
+                        ? undefined
+                        : Number(input.levelDelta),
                 scope: validScope(input.scope),
                 source: input.source === 'ANDROID' ? 'ANDROID' : 'DESKTOP',
                 updatedAt: new Date().toISOString()
@@ -227,6 +232,10 @@ export class RecommendationPolicyStoreV5 {
                     key: String(row.key ?? ''),
                     label: String(row.label ?? row.key ?? ''),
                     direction: validDirection(row.direction),
+                    levelDelta:
+                        row.levelDelta === undefined
+                            ? undefined
+                            : Number(row.levelDelta),
                     scope: validScope(row.scope),
                     source: 'ANDROID',
                     updatedAt: new Date().toISOString()

@@ -12,6 +12,9 @@ let desktopStatus = null
 let activeDescriptor = null
 let progressTimer = null
 let recommendationTimer = null
+let recommendationCompletionTimer = null
+let recommendationWatchBaselineCycleId = null
+let recommendationWatchStartedAt = 0
 let lastActiveView = $('.view.active')?.id || 'home'
 
 function escapeHtml(value) {
@@ -592,8 +595,10 @@ const buildPhaseLabels = {
     profile: '分析收藏与兴趣画像',
     intents: '规划推荐方向',
     routes: '准备多路召回',
-    retrieve: '从 Pica 召回候选漫画',
-    rank: '排序与去重候选',
+    providers: '检查 Pica / E-H / ExH 可用性',
+    retrieve: '跨来源召回候选漫画',
+    rank: '排序、去重与偏好调节',
+    visual: '应用画风信号与最终重排',
     complete: '正在保存推荐结果'
 }
 
@@ -602,10 +607,16 @@ function startRecommendationWatch() {
     updateRecommendationArtwork()
     const card = $('#a85-recommend-progress')
     if (!card) return
+    if (recommendationCompletionTimer) {
+        clearTimeout(recommendationCompletionTimer)
+        recommendationCompletionTimer = null
+    }
+    recommendationWatchBaselineCycleId = null
+    recommendationWatchStartedAt = Date.now()
     card.classList.add('active')
     $('#a85-recommend-phase').textContent = '正在启动推荐生成…'
     $('#a85-recommend-detail').textContent =
-        '进度会直接显示在这里，完成后自动收起。'
+        '下方暂时保留上一轮推荐；新一轮完成后会自动切换。'
     $('#a85-recommend-line').classList.add('indeterminate')
     $('#a85-recommend-line').querySelector('span').style.width = ''
     if (recommendationTimer) clearInterval(recommendationTimer)
@@ -615,40 +626,111 @@ function startRecommendationWatch() {
 
 async function pollRecommendationProgress() {
     const card = $('#a85-recommend-progress')
-    if (!card) return
+    if (!card) return false
     try {
         const current = await api(
             '/api/v1/recommendation-sessions/status?mode=final'
         )
         const progress = current.buildProgress || {}
+        if (
+            recommendationWatchBaselineCycleId === null &&
+            current.activeCycleId
+        )
+            recommendationWatchBaselineCycleId = current.activeCycleId
         if (current.buildingCycleId) {
             card.classList.add('active')
             $('#a85-recommend-phase').textContent =
                 buildPhaseLabels[progress.phase] || '正在生成推荐…'
-            const done = Number(progress.done || 0),
-                total = Number(progress.total || 0)
+            const done = Number(progress.done || 0)
+            const total = Number(progress.total || 0)
+            const elapsed = recommendationWatchStartedAt
+                ? Math.max(
+                      0,
+                      Math.round(
+                          (Date.now() - recommendationWatchStartedAt) / 1000
+                      )
+                  )
+                : 0
             if (total > 0) {
                 const percent = Math.max(
                     0,
                     Math.min(100, Math.round((done * 100) / total))
                 )
                 $('#a85-recommend-detail').textContent =
-                    `${done} / ${total} · ${percent}%`
+                    '下方仍显示上一轮结果，完成后自动切换 · ' +
+                    done +
+                    ' / ' +
+                    total +
+                    ' · ' +
+                    percent +
+                    '% · 已用时 ' +
+                    elapsed +
+                    's'
                 $('#a85-recommend-line').classList.remove('indeterminate')
                 $('#a85-recommend-line').querySelector('span').style.width =
-                    `${percent}%`
+                    percent + '%'
             } else {
-                $('#a85-recommend-detail').textContent = '正在处理…'
+                $('#a85-recommend-detail').textContent =
+                    '后台仍在处理；下方不是新结果 · 已用时 ' +
+                    elapsed +
+                    's'
                 $('#a85-recommend-line').classList.add('indeterminate')
             }
             decorateProgress()
             return true
         }
-        card.classList.remove('active')
+
+        const watched =
+            Boolean(recommendationTimer) || recommendationWatchStartedAt > 0
         if (recommendationTimer) clearInterval(recommendationTimer)
         recommendationTimer = null
+        if (!watched) {
+            card.classList.remove('active')
+            return false
+        }
+        const elapsedMs = recommendationWatchStartedAt
+            ? Date.now() - recommendationWatchStartedAt
+            : 0
+        const changed = Boolean(
+            current.activeCycleId &&
+                (!recommendationWatchBaselineCycleId ||
+                    current.activeCycleId !==
+                        recommendationWatchBaselineCycleId)
+        )
+        if (!changed && elapsedMs < 1200) {
+            card.classList.remove('active')
+            recommendationWatchStartedAt = 0
+            return false
+        }
+        card.classList.add('active')
+        $('#a85-recommend-line').classList.remove('indeterminate')
+        $('#a85-recommend-line').querySelector('span').style.width = '100%'
+        if (changed) {
+            $('#a85-recommend-phase').textContent = '新一轮推荐已更新'
+            const shortCycle = String(current.activeCycleId || '').slice(0, 8)
+            $('#a85-recommend-detail').textContent =
+                '已切换到新结果' +
+                (shortCycle ? ' · cycle ' + shortCycle : '') +
+                ' · ' +
+                new Date().toLocaleTimeString()
+        } else {
+            $('#a85-recommend-phase').textContent =
+                '推荐生成已结束，但当前结果未切换'
+            $('#a85-recommend-detail').textContent =
+                '下方仍是上一轮结果；请查看页面错误提示后重试。'
+        }
+        decorateProgress()
+        recommendationCompletionTimer = window.setTimeout(() => {
+            card.classList.remove('active')
+            recommendationCompletionTimer = null
+        }, 4800)
+        recommendationWatchStartedAt = 0
         return false
-    } catch {
+    } catch (error) {
+        $('#a85-recommend-phase').textContent = '正在等待推荐服务响应'
+        $('#a85-recommend-detail').textContent =
+            '暂时无法读取实时进度：' +
+            String(error?.message || error)
         return false
     }
 }

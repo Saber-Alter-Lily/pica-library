@@ -16,6 +16,11 @@ export interface PreferenceControlV5 {
     scope: PreferenceScope
     source: 'DESKTOP' | 'ANDROID'
     updatedAt: string
+    /**
+     * User correction relative to the collection-derived baseline, expressed
+     * in 1..10 slider steps. Legacy controls may omit this field.
+     */
+    levelDelta?: number
 }
 
 export interface SessionIntentV5 {
@@ -45,6 +50,10 @@ export interface PortablePreferenceSignalV5 {
     label: string
     supportCount: number
     supportShare: number
+    /** Semantic V3 facet used for grouped presentation. */
+    facet: string
+    /** Collection-derived 1..10 baseline shown in the UI. */
+    baselineLevel: number
 }
 
 export interface PortablePolicySnapshotV5 extends PortablePolicyStateV5 {
@@ -88,6 +97,30 @@ export function normalizePreferenceKey(value: unknown) {
         .trim()
         .toLocaleLowerCase('und')
         .replace(/\s+/g, ' ')
+}
+
+export function normalizeLevelDeltaV5(value: unknown) {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return undefined
+    return Math.max(-9, Math.min(9, Math.round(numeric)))
+}
+
+/**
+ * Convert observed collection support into an interpretable 1..10 baseline.
+ * A nonlinear curve keeps rare interests visible while preventing very common
+ * interests from dominating the scale.
+ */
+export function preferenceBaselineLevelV5(
+    supportCount: number,
+    supportShare: number
+) {
+    const count = Math.max(0, Number(supportCount) || 0)
+    const share = Math.max(0, Math.min(1, Number(supportShare) || 0))
+    if (count <= 0) return 1
+    const countStrength = 1 - Math.exp(-count / 12)
+    const shareStrength = Math.sqrt(Math.min(1, share / 0.12))
+    const combined = 0.75 * countStrength + 0.25 * shareStrength
+    return Math.max(1, Math.min(10, Math.round(1 + 9 * combined)))
 }
 
 function normalizeTitleStrict(value: unknown) {
@@ -195,14 +228,34 @@ export function controlIdentityV5(targetType: PreferenceTargetType, key: string)
     return `${targetType}:${normalizePreferenceKey(key)}`
 }
 
-export function normalizeControlV5(input: Partial<PreferenceControlV5> & Pick<PreferenceControlV5, 'targetType' | 'key'>): PreferenceControlV5 {
+export function normalizeControlV5(
+    input: Partial<PreferenceControlV5> &
+        Pick<PreferenceControlV5, 'targetType' | 'key'>
+): PreferenceControlV5 {
     const targetType = input.targetType
     const key = normalizePreferenceKey(input.key)
     if (!key) throw new Error('Preference control key is required')
-    const direction: PreferenceDirection = ['LESS', 'DEFAULT', 'MORE', 'BLOCK'].includes(String(input.direction))
+    const requestedDirection: PreferenceDirection = [
+        'LESS',
+        'DEFAULT',
+        'MORE',
+        'BLOCK'
+    ].includes(String(input.direction))
         ? (input.direction as PreferenceDirection)
         : 'DEFAULT'
-    const scope: PreferenceScope = input.scope === 'SESSION' ? 'SESSION' : 'PERSISTENT'
+    const levelDelta = normalizeLevelDeltaV5(input.levelDelta)
+    const direction: PreferenceDirection =
+        requestedDirection === 'BLOCK'
+            ? 'BLOCK'
+            : levelDelta === undefined
+              ? requestedDirection
+              : levelDelta > 0
+                ? 'MORE'
+                : levelDelta < 0
+                  ? 'LESS'
+                  : 'DEFAULT'
+    const scope: PreferenceScope =
+        input.scope === 'SESSION' ? 'SESSION' : 'PERSISTENT'
     return {
         targetType,
         key,
@@ -210,7 +263,10 @@ export function normalizeControlV5(input: Partial<PreferenceControlV5> & Pick<Pr
         direction,
         scope,
         source: input.source === 'ANDROID' ? 'ANDROID' : 'DESKTOP',
-        updatedAt: String(input.updatedAt ?? nowIso())
+        updatedAt: String(input.updatedAt ?? nowIso()),
+        ...(direction !== 'BLOCK' && levelDelta !== undefined
+            ? { levelDelta }
+            : {})
     }
 }
 
@@ -249,12 +305,33 @@ export function preferenceAdjustmentV5(comic: StoredComic, state: PortablePolicy
             blocked = true
             reasons.push(`BLOCK:${control.targetType}:${control.label}`)
         } else if (control.direction === 'MORE') {
-            adjustment += control.scope === 'SESSION' ? 0.12 : 0.08
-            reasons.push(`MORE:${control.targetType}:${control.label}`)
+            const magnitude =
+                control.levelDelta === undefined
+                    ? control.scope === 'SESSION'
+                        ? 0.12
+                        : 0.08
+                    : Math.min(0.27, Math.abs(control.levelDelta) * 0.03)
+            adjustment += magnitude
+            reasons.push(
+                control.levelDelta === undefined
+                    ? `MORE:${control.targetType}:${control.label}`
+                    : `MORE_LEVEL:${control.targetType}:${control.label}:+${control.levelDelta}`
+            )
         } else if (control.direction === 'LESS') {
-            adjustment -= control.scope === 'SESSION' ? 0.12 : 0.08
-            reasons.push(`LESS:${control.targetType}:${control.label}`)
+            const magnitude =
+                control.levelDelta === undefined
+                    ? control.scope === 'SESSION'
+                        ? 0.12
+                        : 0.08
+                    : Math.min(0.27, Math.abs(control.levelDelta) * 0.03)
+            adjustment -= magnitude
+            reasons.push(
+                control.levelDelta === undefined
+                    ? `LESS:${control.targetType}:${control.label}`
+                    : `LESS_LEVEL:${control.targetType}:${control.label}:${control.levelDelta}`
+            )
         }
+
     }
     const intent = state.sessionIntent
     if (intent.mode === 'TARGET' && intent.targetType && intent.key) {
@@ -342,7 +419,17 @@ export function portableInferredSignalsV5(catalog: StoredComic[], limit = 120): 
             key: row.key,
             label: row.label,
             supportCount: row.ids.size,
-            supportShare: row.ids.size / total
+            supportShare: row.ids.size / total,
+            facet:
+                row.targetType === 'AUTHOR'
+                    ? 'CREATOR_ENTITY'
+                    : row.targetType === 'CATEGORY'
+                      ? 'CATEGORY'
+                      : 'RAW_TAG',
+            baselineLevel: preferenceBaselineLevelV5(
+                row.ids.size,
+                row.ids.size / total
+            )
         }))
         .sort((a, b) => b.supportCount - a.supportCount || a.targetType.localeCompare(b.targetType) || a.key.localeCompare(b.key))
         .slice(0, Math.max(1, Math.min(500, limit)))

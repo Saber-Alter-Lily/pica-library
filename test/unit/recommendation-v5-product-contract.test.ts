@@ -34,6 +34,21 @@ describe('Recommendation V5 portable product contract', () => {
         expect(store).toContain('DIRTY_SESSION')
     })
 
+    it('renders classified 10-step Desktop controls and explicit feedback acknowledgement', () => {
+        const web = read('web/recommendation-v5-beta.js')
+        const service = read('src/library/service.ts')
+        const theme = read('web/alpha8-theme-help.js')
+        expect(web).toContain('type="range"')
+        expect(web).toContain('系统基准')
+        expect(web).toContain('v5-facet-group')
+        expect(web).toContain('已记录不喜欢')
+        expect(web).toContain('v5-feedback-dislike')
+        expect(service).toContain('resolveTagV3(')
+        expect(service).toContain("phase: 'providers'")
+        expect(theme).toContain('下方仍显示上一轮结果')
+        expect(theme).toContain('新一轮推荐已更新')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

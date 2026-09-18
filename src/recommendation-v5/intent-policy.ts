@@ -33,7 +33,11 @@ function suppressedDirectIntent(
         const control = state.controls.find(
             (item) => controlIdentityV5(item.targetType, item.key) === id
         )
-        return control?.direction === 'LESS' || control?.direction === 'BLOCK'
+        if (control?.direction === 'BLOCK') return true
+        if (control?.direction !== 'LESS') return false
+        // Mild slider reductions remain ranking-only. Larger reductions
+        // suppress the direct retrieval route; legacy LESS keeps old behavior.
+        return control.levelDelta === undefined || control.levelDelta <= -3
     })
 }
 

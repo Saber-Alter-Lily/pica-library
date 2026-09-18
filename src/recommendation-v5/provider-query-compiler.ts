@@ -360,6 +360,7 @@ export function compileCandidateProviderRoutesV5(
     return {
         mode: 'SHADOW' as const,
         compilerVersion: PROVIDER_QUERY_COMPILER_V5_VERSION,
+        sourcePlannerVersion: plan.plannerVersion,
         executionEnabled: false,
         servingImpact: false,
         summary: {

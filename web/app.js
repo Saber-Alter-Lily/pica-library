@@ -2468,7 +2468,7 @@ function renderAll(summary) {
     updateSelectionStatus('search')
 }
 
-$('nav [data-view], [data-go]').forEach((button) =>
+$$('nav [data-view], [data-go]').forEach((button) =>
     button.addEventListener('click', () => {
         const id = button.dataset.view || button.dataset.go
         activateView(id)

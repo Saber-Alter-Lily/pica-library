@@ -607,6 +607,29 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain('/api/v1/visual/author-atlas')
     })
 
+    it('derives provisional style families from author prototypes without enabling Visual serving', () => {
+        const families = read(
+            'src/recommendation-v5/visual-style-families.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(families).toContain(
+            "VISUAL_STYLE_FAMILY_V5_VERSION ="
+        )
+        expect(families).toContain(
+            "method: 'MUTUAL_KNN_CONNECTED_COMPONENTS'"
+        )
+        expect(families).toContain('provisional: true')
+        expect(families).toContain('servingImpact: false')
+        expect(families).toContain('visualRecallEnabled: false')
+        expect(families).toContain('styleDiversityEnabled: false')
+        expect(families).toContain('multiFamilyAuthorCount')
+        expect(service).toContain('visualStyleFamilies')
+        expect(server).toContain(
+            '/api/v1/visual/style-families'
+        )
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

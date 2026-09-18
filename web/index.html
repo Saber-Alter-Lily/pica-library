@@ -1001,7 +1001,7 @@
                 </details>
                 <article id="settings-remote-storage" class="panel">
                     <h3>远程存储 · WebDAV</h3>
-                    <p>把电脑已经下载的漫画增量同步到远程存储。Alpha7 使用 <code>PicaLibrary/v1</code> generation 结构；手机之后可在电脑关机时直接读取。</p>
+                    <p>把电脑已下载的漫画增量同步到 WebDAV。同步完成后，即使电脑关机，手机也可以继续从远程存储读取。</p>
                     <p id="remote-storage-state" class="status"></p>
                     <div class="settings-form">
                         <label class="wide">WebDAV 地址<input id="remote-webdav-url" placeholder="https://dav.example.com/path" /></label>
@@ -1022,7 +1022,7 @@
                         <p class="status">预计上传 <span id="remote-plan-pages">0</span> 页 · <span id="remote-plan-bytes">0 B</span></p>
                         <div id="remote-plan-list"></div>
                     </div>
-                    <p class="status">默认只做增量/加法同步，不删除云端独有漫画。新 generation 完成后最后才切换 <code>current.json</code>。</p>
+                    <p class="status">默认只做增量同步，不删除云端独有漫画；只有整轮上传成功后才会切换到新版本。</p>
                 </article>
                 <article id="settings-mobile-bridge" class="panel">
                     <h3>手机连接</h3>
@@ -1030,9 +1030,15 @@
                     <p id="mobile-bridge-state" class="status"></p>
                     <div id="mobile-bridge-details" hidden>
                         <p><strong>电脑地址</strong></p>
-                        <code id="mobile-bridge-address"></code>
+                        <div class="mobile-pair-value">
+                            <code id="mobile-bridge-address"></code>
+                            <button id="mobile-bridge-copy-address" type="button">复制地址</button>
+                        </div>
                         <p><strong>6 位配对码</strong></p>
-                        <div id="mobile-bridge-code" style="font-size:2rem;font-weight:700;letter-spacing:.18em"></div>
+                        <div class="mobile-pair-value">
+                            <div id="mobile-bridge-code" style="font-size:2rem;font-weight:700;letter-spacing:.18em"></div>
+                            <button id="mobile-bridge-copy-code" type="button">复制配对码</button>
+                        </div>
                         <p id="mobile-bridge-expiry" class="status"></p>
                         <p id="mobile-bridge-devices" class="status"></p>
                         <p class="status">首次连接如 Windows 弹出防火墙提示，请允许“专用网络”。</p>

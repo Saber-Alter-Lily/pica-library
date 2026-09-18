@@ -64,7 +64,7 @@ export const translations = {
         'browserLite.compatibility':
             'Existing compatible CSV / JSON files are also supported.',
         'library.title': 'Library',
-        'library.selectFile': 'Choose data file',
+        'library.selectFile': 'Choose & import data file',
         'library.subtitle':
             'Browse, filter and organize manga from favorites, discovery, recommendations and downloads.',
         'library.import': 'Import Bundle',
@@ -717,7 +717,7 @@ export const translations = {
         'browserLite.download': '下载 Windows 版',
         'browserLite.compatibility': '也支持现有兼容的 CSV / JSON 文件。',
         'library.title': '漫画库',
-        'library.selectFile': '选择数据文件',
+        'library.selectFile': '选择并导入数据文件',
         'library.subtitle': '浏览、筛选和整理来自收藏、发现、推荐与下载的漫画。',
         'library.import': '导入数据包',
         'library.sync': '同步收藏',

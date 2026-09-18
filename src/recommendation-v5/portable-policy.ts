@@ -527,7 +527,7 @@ export function portablePolicySnapshotV5(state: PortablePolicyStateV5, catalog: 
         ...state,
         inferred: portableInferredSignalsV5(
             catalog,
-            120,
+            500,
             state.tasteExcludedComicIds
         ),
         counts: {

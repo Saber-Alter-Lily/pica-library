@@ -170,8 +170,10 @@ function ensurePanel() {
             <span id="v5-session-status" class="status">本次意图：默认</span>
             <button id="v5-session-reset" type="button" class="v5-compact">清除本次意图</button>
         </div>
+        <h4>主要兴趣强度 · 1–10 档</h4>
+        <p class="status">下面每个滑杆就是 1–10 档控制；未手动调整时显示系统根据收藏计算的基准值。</p>
         <label>查找标签 / 作者 / 分类
-            <input id="v5-policy-search" placeholder="输入名称，例如作者或标签" />
+            <input id="v5-policy-search" placeholder="输入名称，例如作者或标签；清空可查看全部 1–10 档" />
         </label>
         <div id="v5-inferred-list" class="v5-facet-list"></div>
         <h4>你主动调整的项目</h4>
@@ -296,7 +298,9 @@ function renderPolicy() {
         <summary>${esc(facetLabel(facet))}<span class="v5-facet-count">${rows.length} 项</span></summary>
         <div class="v5-facet-body">${visible.map(signalRow).join('')}
         ${visible.length < rows.length ? `<p class="status">另有 ${rows.length-visible.length} 项；可用上方搜索定位。</p>` : ''}</div></details>`
-    }).join('') : '<p class="status">没有匹配项。</p>'
+    }).join('') : V5.search
+        ? `<p class="status">系统画像里没有找到“${esc(V5.search)}”。当前搜索只筛选已有画像；清空搜索即可看到全部 1–10 档。</p>`
+        : '<p class="status">当前还没有可展示的系统画像。先完成收藏同步或生成一次推荐画像。</p>'
 
     document.querySelectorAll('[data-v5-level]').forEach((input) => {
         input.addEventListener('input', () => {

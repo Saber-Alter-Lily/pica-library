@@ -109,6 +109,7 @@ import {
 } from '../recommendation-v5/policy-store'
 import { buildBehaviorEvidenceLedgerV5 } from '../recommendation-v5/behavior-evidence'
 import { buildCandidateChannelPlanV5 } from '../recommendation-v5/candidate-channels'
+import { compileCandidateProviderRoutesV5 } from '../recommendation-v5/provider-query-compiler'
 import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
 import {
     filterCandidatesAgainstOwnedV5,
@@ -279,6 +280,18 @@ export class LibraryService {
             // unavailable; the portable snapshot has a raw-tag fallback.
             return snapshot
         }
+    }
+
+    recommendationV5ProviderRoutes(
+        appSessionId?: string | null,
+        limit = 5000
+    ) {
+        return compileCandidateProviderRoutesV5(
+            this.recommendationV5CandidateChannels(
+                appSessionId,
+                limit
+            )
+        )
     }
 
     recommendationV5CandidateChannels(

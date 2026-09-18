@@ -1,0 +1,31 @@
+name: Validate P2A evidence-only identity
+
+on:
+  push:
+    branches: [tmp-v5-p2a-evidence]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: tmp-v5-p2a-evidence
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck and focused identity tests
+        run: |
+          pnpm type:check
+          pnpm web:check
+          pnpm exec vitest run \
+            test/unit/recommendation-v5-work-identity-foundation.test.ts \
+            test/unit/recommendation-v5-product-contract.test.ts \
+            test/unit/recommendation-v5-portable-policy.test.ts
+          git diff --check

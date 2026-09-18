@@ -127,6 +127,9 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('不同版本')
         expect(web).toContain('保持分离')
         expect(web).toContain('不会自动创建 Work/Edition 绑定')
+        expect(service).toContain('materializationPreview')
+        expect(web).toContain('Work 物化预览')
+        expect(web).toContain('仅预览，不写入 Work/Edition binding')
     })
 
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {

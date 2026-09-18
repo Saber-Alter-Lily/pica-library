@@ -113,6 +113,7 @@ import {
     deriveObservedEhCanonicalBindingsV5
 } from '../recommendation-v5/provider-query-compiler'
 import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
+import { executeShadowRetrievalV5 } from '../recommendation-v5/shadow-retrieval'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -128,6 +129,8 @@ import {
 
 export const WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION =
     'PREPARE_CANONICAL_WORK_BINDING'
+export const RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION =
+    'RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -281,6 +284,64 @@ export class LibraryService {
             // V5 controls remain usable when a packaged registry asset is
             // unavailable; the portable snapshot has a raw-tag fallback.
             return snapshot
+        }
+    }
+
+    async runRecommendationV5ShadowRetrieval(
+        input: Record<string, unknown>
+    ) {
+        if (
+            String(input.confirmation ?? '').trim() !==
+            RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION
+        )
+            throw new Error(
+                'Explicit shadow retrieval confirmation is required'
+            )
+        const appSessionId = input.appSessionId
+            ? String(input.appSessionId)
+            : null
+        const eventLimit = Math.max(
+            1,
+            Math.min(5000, Math.floor(Number(input.limit) || 5000))
+        )
+        const maxCandidates = Math.max(
+            12,
+            Math.min(
+                1000,
+                Math.floor(Number(input.maxCandidates) || 500)
+            )
+        )
+        const plan = this.recommendationV5ProviderRoutes(
+            appSessionId,
+            eventLimit
+        )
+        const catalog = this.database.listComics({ limit: 10000 })
+        const provider = this.providerService()
+        const result = await executeShadowRetrievalV5(
+            plan,
+            {
+                search: (surface, request) =>
+                    provider.search(
+                        request,
+                        [surface],
+                        'recommendations',
+                        { persist: false }
+                    ),
+                relatedPica: (comicId) =>
+                    provider.relatedPica(
+                        comicId,
+                        'recommendations',
+                        { persist: false }
+                    )
+            },
+            catalog,
+            { maxCandidates }
+        )
+        return {
+            ...result,
+            executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
+            trigger: 'EXPLICIT_CONFIRMATION' as const,
+            providerRouteSummary: plan.summary
         }
     }
 

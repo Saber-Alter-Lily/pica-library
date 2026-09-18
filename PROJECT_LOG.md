@@ -48,6 +48,8 @@
 - P5F-1 增加 exact modelVersion baseline comparison：可显式选择 baseline 与 candidate 两个 shadow modelVersion，在相同 retrospective benchmark / future horizon 下比较 Precision@12、Recall@12、NDCG@12、Hit@12、MRR、correctness leakage、作者/IP/标签集中度、catalog coverage 与 EXPLORE hit；双方至少各有 3 个 exact runs、3 个 future-evaluable runs 和 3 个 correctness audits 才标记 `COMPARISON_READY`。始终 `winner=null`、`automaticWinnerSelection=false`、`modelEscalationEnabled=false`，Dashboard 仅在用户点击“比较版本”后执行比较。
 - P6A-1 增加 Advanced Learning Decision Gate：高级学习必须由人工先选择 LTR / Contextual Bandit / Active Learning；共同前置为 `BASELINE_EVALUATION_READY`。LTR 还要求 exact modelVersion comparison=`COMPARISON_READY`，满足时最多进入 `READY_FOR_EXPERIMENT_DESIGN`；Bandit 因缺 propensity/randomized assignment/online reward attribution，Active Learning 因缺 uncertainty/query-value/question-response telemetry 继续 deferred。Gate 始终 `trainingEnabled=false`、`servingMutationEnabled=false`、`autoExperimentCreation=false`、`autoModelSelection=false`，Dashboard 只提供“评估实验门槛”。
 
+- V5 Beta 稳定性修复：推荐设置页不再在打开时自动运行完整 Evaluation/Visual QC 重计算；修复书库推荐口味与推荐反馈 DOM `MutationObserver` 自触发重渲染风险。重型评估和 Visual QC 改为用户显式点击后执行。
+
 ## v0.4.0 — 多来源与统一语义
 
 - Pica 从唯一在线来源升级为多来源架构。

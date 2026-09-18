@@ -549,6 +549,33 @@ describe('Recommendation V5 portable product contract', () => {
         expect(cache).toContain('final List<String> tags,categories')
     })
 
+    it('adds read-only Visual V1 representation QC before any P4 activation', () => {
+        const qc = read(
+            'src/recommendation-v5/visual-representation-qc.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(qc).toContain(
+            "VISUAL_REPRESENTATION_QC_V5_VERSION ="
+        )
+        expect(qc).toContain("mode: 'READ_ONLY'")
+        expect(qc).toContain('rebuildPerformed: false')
+        expect(qc).toContain('servingImpact: false')
+        expect(qc).toContain('authorSeparation')
+        expect(qc).toContain('sameFandomDifferentAuthor')
+        expect(qc).toContain('providerEffectProxy')
+        expect(qc).toContain('sourceKindEffectProxy')
+        expect(qc).toContain('pageCountSensitivityProxy')
+        expect(qc).toContain('top5HitRate')
+        expect(service).toContain('visualRepresentationQc')
+        expect(server).toContain(
+            '/api/v1/visual/representation-qc'
+        )
+        expect(service).not.toContain(
+            'buildVisualRepresentationQcV5({\n            embeddings: []'
+        )
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

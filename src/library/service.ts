@@ -360,11 +360,7 @@ export class LibraryService {
                 readiness: result.readiness,
                 candidateCount: result.candidateCount,
                 providerRouteSummary: plan.summary,
-                providerBudgets:
-                    this.recommendationV5CandidateChannels(
-                        appSessionId,
-                        eventLimit
-                    ).providerBudgets,
+                providerBudgets: plan.sourceProviderBudgets,
                 retrievalTelemetry: result.telemetry
             }
         })

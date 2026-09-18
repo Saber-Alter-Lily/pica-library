@@ -76,4 +76,28 @@ describe('Recommendation V5 evaluation dashboard', () => {
         expect(installBody).not.toContain('evalCompareSelected')
     })
 
+
+    it('evaluates advanced learning readiness without exposing training actions', () => {
+        const dashboard = read(
+            'web/recommendation-v5-evaluation.js'
+        )
+        expect(dashboard).toContain(
+            'Advanced Learning Decision Gate'
+        )
+        expect(dashboard).toContain('LEARNING_TO_RANK')
+        expect(dashboard).toContain('CONTEXTUAL_BANDIT')
+        expect(dashboard).toContain('ACTIVE_LEARNING')
+        expect(dashboard).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/advanced-learning-gate'
+        )
+        expect(dashboard).toContain(
+            'trainingEnabled=false'
+        )
+        expect(dashboard).toContain(
+            'servingMutationEnabled=false'
+        )
+        expect(dashboard).not.toContain('训练模型')
+        expect(dashboard).not.toContain('开始训练')
+    })
+
 })

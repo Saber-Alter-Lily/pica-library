@@ -576,6 +576,37 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('builds a read-only multi-prototype author atlas before style-family activation', () => {
+        const visualCore = read(
+            'src/recommendation-v4/visual-style.ts'
+        )
+        const atlas = read(
+            'src/recommendation-v5/visual-author-atlas.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(visualCore).toContain(
+            'export function buildVisualPrototypes'
+        )
+        expect(visualCore).toContain(
+            'export function selectPreferredVisualEmbeddings'
+        )
+        expect(atlas).toContain(
+            "VISUAL_AUTHOR_ATLAS_V5_VERSION ="
+        )
+        expect(atlas).toContain("mode: 'READ_ONLY'")
+        expect(atlas).toContain('rebuildPerformed: false')
+        expect(atlas).toContain('servingImpact: false')
+        expect(atlas).toContain('visualRecallEnabled: false')
+        expect(atlas).toContain(
+            'styleFamilyServingEnabled: false'
+        )
+        expect(atlas).toContain('prototypeCount')
+        expect(atlas).toContain('substyleSpread')
+        expect(service).toContain('visualAuthorAtlas')
+        expect(server).toContain('/api/v1/visual/author-atlas')
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

@@ -36,6 +36,26 @@ select:disabled {
     align-items: center;
 }
 
+#settings .a87-hub-nav {
+    top: calc(var(--ux-app-nav-height, 64px) + 12px);
+}
+
+#ux-settings-utilities {
+    grid-column: 1 / -1;
+}
+
+#ux-visual-settings .ux-more-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+#ux-visual-settings .status,
+#ux-visual-settings .actions,
+#ux-visual-settings progress,
+#ux-visual-settings hr {
+    grid-column: 1 / -1;
+}
+
 .page-heading > .actions,
 .ux-heading-actions {
     display: flex;

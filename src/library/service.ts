@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import pLimit from 'p-limit'
 import { Pica } from '../sdk'
 import {
@@ -337,11 +337,71 @@ export class LibraryService {
             catalog,
             { maxCandidates }
         )
+        const cycleId = `v5-shadow:${randomUUID()}`
+        const modelVersion = [
+            'v5-shadow',
+            plan.sourcePlannerVersion,
+            plan.compilerVersion,
+            result.retrievalVersion
+        ].join('/')
+        const audit = this.database.saveV3CandidatePool({
+            appSessionId,
+            cycleId,
+            candidateIds: result.candidates.map(
+                (item) => item.comic.comicId
+            ),
+            modelVersion,
+            telemetry: {
+                mode: result.mode,
+                servingImpact: result.servingImpact,
+                persistCandidates: result.persistCandidates,
+                providerFailureIsolation:
+                    result.providerFailureIsolation,
+                readiness: result.readiness,
+                candidateCount: result.candidateCount,
+                providerRouteSummary: plan.summary,
+                providerBudgets:
+                    this.recommendationV5CandidateChannels(
+                        appSessionId,
+                        eventLimit
+                    ).providerBudgets,
+                retrievalTelemetry: result.telemetry
+            }
+        })
         return {
             ...result,
             executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
             trigger: 'EXPLICIT_CONFIRMATION' as const,
-            providerRouteSummary: plan.summary
+            providerRouteSummary: plan.summary,
+            audit: {
+                poolId: audit.id,
+                cycleId,
+                modelVersion,
+                generatedAt: audit.generatedAt,
+                candidateIdCount: audit.candidateIds.length
+            }
+        }
+    }
+
+    recommendationV5ShadowRuns(limit = 50) {
+        return {
+            modelPrefix: 'v5-shadow/',
+            runs: this.database
+                .listCandidatePoolsByModelVersionPrefix(
+                    'v5-shadow/',
+                    limit
+                )
+                .map((pool) => ({
+                    poolId: pool.id,
+                    appSessionId: pool.appSessionId,
+                    cycleId: pool.cycleId,
+                    generatedAt: pool.generatedAt,
+                    expiresAt: pool.expiresAt,
+                    modelVersion: pool.modelVersion,
+                    candidateCount: pool.candidateIds.length,
+                    candidateIds: pool.candidateIds,
+                    telemetry: pool.telemetry
+                }))
         }
     }
 

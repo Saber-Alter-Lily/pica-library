@@ -317,6 +317,89 @@ export class LibraryService {
         }
     }
 
+
+    recommendationV5WorkIdentityReview(limit = 200) {
+        const evidence = this.database.listWorkIdentityEvidence(limit)
+        const decisions = this.database.listWorkIdentityDecisions(5000)
+        const decisionByPair = new Map(
+            decisions.map((item) => [
+                [item.leftComicId, item.rightComicId].sort().join('\u0000'),
+                item
+            ])
+        )
+        const rows = evidence.map((item) => ({
+            ...item,
+            decision:
+                decisionByPair.get(
+                    [item.leftComicId, item.rightComicId]
+                        .sort()
+                        .join('\u0000')
+                ) ?? null
+        }))
+        return {
+            mode: 'HUMAN_REVIEW' as const,
+            storage: this.database.workIdentityStorageStatus(),
+            evidence: rows,
+            decisions,
+            undecidedCount: rows.filter((item) => !item.decision).length,
+            automaticBinding: false
+        }
+    }
+
+    updateRecommendationV5WorkIdentityDecision(
+        input: Record<string, unknown>
+    ) {
+        const leftComicId = String(input.leftComicId ?? '').trim()
+        const rightComicId = String(input.rightComicId ?? '').trim()
+        const rawDecision = String(input.decision ?? '').trim().toUpperCase()
+        const store = new RecommendationPolicyStoreV5(this.database)
+
+        if (rawDecision === 'CLEAR') {
+            this.database.clearWorkIdentityDecision(
+                leftComicId,
+                rightComicId
+            )
+            store.setExplicitDistinctPair(
+                leftComicId,
+                rightComicId,
+                false
+            )
+            return this.recommendationV5WorkIdentityReview(
+                Number(input.limit ?? 200)
+            )
+        }
+
+        if (
+            !['SAME_WORK', 'EDITION_VARIANT', 'KEEP_SEPARATE'].includes(
+                rawDecision
+            )
+        )
+            throw new Error('Unknown work identity decision')
+
+        const decision = rawDecision as
+            | 'SAME_WORK'
+            | 'EDITION_VARIANT'
+            | 'KEEP_SEPARATE'
+        this.database.saveWorkIdentityDecision({
+            leftComicId,
+            rightComicId,
+            decision,
+            source: 'USER',
+            note: String(input.note ?? '')
+        })
+        // Only KEEP_SEPARATE changes serving at this stage. SAME_WORK and
+        // EDITION_VARIANT remain adjudicated evidence until a later binding
+        // phase is explicitly enabled.
+        store.setExplicitDistinctPair(
+            leftComicId,
+            rightComicId,
+            decision === 'KEEP_SEPARATE'
+        )
+        return this.recommendationV5WorkIdentityReview(
+            Number(input.limit ?? 200)
+        )
+    }
+
     updateRecommendationV5Control(input: Record<string, unknown>) {
         const store = new RecommendationPolicyStoreV5(this.database)
         store.setControl({

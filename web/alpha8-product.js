@@ -1,9 +1,6 @@
 const $ = (selector) => document.querySelector(selector)
 const THEME_KEY = 'pica-library-web-theme-v1'
 let desktopStatus = null
-let updateTimer = null
-let lastUpdateProgress = ''
-let lastUpdateChangeAt = 0
 
 function productLanguage() {
     return $('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
@@ -165,43 +162,6 @@ async function personalizationPanel() {
     for (const name of ['dragenter','dragover']) drop.addEventListener(name,(event)=>{event.preventDefault();drop.classList.add('drag')})
     for (const name of ['dragleave','drop']) drop.addEventListener(name,(event)=>{event.preventDefault();drop.classList.remove('drag')})
     drop.addEventListener('drop',(event)=>install(event.dataTransfer?.files?.[0]))
-}
-
-function updateEnhancement() {
-    const panel = $('#settings-update')
-    if (!panel || $('#a83-update-detail')) return
-    const detail = document.createElement('div')
-    detail.id = 'a83-update-detail'; detail.className = 'a83-update-detail'; detail.textContent = '可在网页内完成检查、下载校验、应用和重启。'
-    $('#update-message')?.insertAdjacentElement('afterend', detail)
-    const retry = document.createElement('button')
-    retry.type = 'button'; retry.textContent = '重新检查'; retry.id = 'a83-update-retry'
-    retry.onclick = () => $('#update-check')?.click()
-    panel.querySelector('.actions')?.appendChild(retry)
-    const start = () => {
-        if (updateTimer) clearInterval(updateTimer)
-        lastUpdateProgress = ''; lastUpdateChangeAt = Date.now()
-        updateTimer = setInterval(pollUpdate, 650)
-        pollUpdate()
-    }
-    $('#update-one-click')?.addEventListener('click', start)
-    $('#update-apply')?.addEventListener('click', start)
-    async function pollUpdate() {
-        try {
-            const progress = await api('/api/v1/update/progress')
-            const signature = JSON.stringify(progress)
-            if (signature !== lastUpdateProgress) { lastUpdateProgress = signature; lastUpdateChangeAt = Date.now() }
-            const phase = String(progress.phase || 'idle')
-            const current = Number(progress.current || 0), total = Number(progress.total || 0)
-            const suffix = total > 0 ? ` · ${current}/${total} · ${Math.round(current/total*100)}%` : ''
-            detail.textContent = `更新状态：${phase}${suffix}`
-            detail.className = `a83-update-detail ${phase === 'failed' ? 'a83-bad' : phase === 'ready' || phase === 'complete' ? 'a83-good' : ''}`
-            const active = ['validating','extracting','applying','downloading'].includes(phase)
-            if (!active && updateTimer) { clearInterval(updateTimer); updateTimer = null }
-            if (active && Date.now() - lastUpdateChangeAt > 120000) detail.textContent += ' · 状态长时间未变化，可重新检查；程序不会覆盖用户数据。'
-        } catch (error) {
-            detail.textContent = `更新状态暂不可读：${error.message}`
-        }
-    }
 }
 
 function refreshProductCopy() {

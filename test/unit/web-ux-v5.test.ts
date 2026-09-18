@@ -35,6 +35,11 @@ describe('V5 Web UX audit contract', () => {
         expect(app).toContain('window.scrollTo(0, viewScrollPositions.get(id) ?? 0)')
         expect(app).toContain("event.key === 'Escape'")
         expect(app).toContain('await document.exitFullscreen().catch')
+        expect(app).toContain("$('#reader-prev-chapter').onclick")
+        expect(app).toContain("$('#reader-next-chapter').onclick")
+        expect(app).toContain('updateReaderChapterNavigation()')
+        expect(polish).toContain("ux$('#reader-prev-chapter')")
+        expect(polish).toContain("ux$('#reader-next-chapter')")
         expect(polish).toContain('Esc 退出')
         expect(css).toContain('body.reader-active .reader-header')
         expect(css).toContain('position: fixed !important')
@@ -89,6 +94,7 @@ describe('V5 Web UX audit contract', () => {
     it('keeps dynamic UX copy bilingual and refresh-safe', () => {
         const polish = read('web/ui-polish-v5.js')
         const i18n = read('web/i18n.js')
+        const zh = i18n.slice(i18n.indexOf("'zh-CN':"))
         expect(polish).toContain("downloadAdvanced: '性能与导出（高级）'")
         expect(polish).toContain("downloadAdvanced: 'Performance & export (advanced)'")
         expect(polish).toContain(
@@ -97,10 +103,10 @@ describe('V5 Web UX audit contract', () => {
         expect(polish).not.toContain(
             "for (const node of ux$('[data-ux-copy]'))"
         )
-        expect(i18n).toContain("'recommend.feedbackLabel': '推荐反馈'")
-        expect(i18n).toContain("'recommend.like': '喜欢'")
-        expect(i18n).toContain("'visual.similarStyle': '相似画风'")
-        expect(i18n).not.toContain(
+        expect(zh).toContain("'recommend.feedbackLabel': '推荐反馈'")
+        expect(zh).toContain("'recommend.like': '喜欢'")
+        expect(zh).toContain("'visual.similarStyle': '相似画风'")
+        expect(zh).not.toContain(
             "'recommend.feedbackLabel': 'Recommendation feedback'"
         )
     })

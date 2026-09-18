@@ -31,6 +31,7 @@
 - P3A-3 增加 provider-isolated shadow retrieval：Pica 新增可选 bounded page seam，ProviderService 支持 `persist:false` 与 non-persisting Pica related；shadow executor 按 Provider 隔离失败、同 Provider 顺序执行、跨 route/provider 去重并记录 yield/latency/failure telemetry。真实网络执行仅开放 Desktop CSRF + 显式 confirmation 的手动入口，`persistCandidates=false`、`servingImpact=false`，结果不进入 V3 ranker。
 - P3A-4 增加 shadow run audit history：复用现有 candidate-pool 存储，以 `v5-shadow/<planner>/<compiler>/<retrieval>` model version 保存候选 ID 与聚合 telemetry，不持久化 shadow 候选元数据；支持按版本前缀读取历史运行，为后续 channel/provider benchmark 提供基线。同步将 E-H / ExH shadow 请求上限收敛到已验证的 4 / 2，Pica 保持 8。
 - P3B-1 增加 deterministic candidate hygiene shadow：shadow retrieval 后、任何 relevance ranking 前，按 Owned / Seen / Duplicate Report / Temporary Suppression / BLOCK / work-level identity 去除确定性不可展示或重复候选，并逐项记录 removal reason；`Dislike` / `LESS` 等 taste negative 不硬过滤。Shadow audit 从本阶段起保存过滤后 candidate IDs，同时保留 raw retrieval 与 hygiene telemetry。
+- P3C-1 增加 explainable relevance ranker shadow：在 hygiene 后用 channel priority、route corroboration、provider rank/precision、精确 item feedback、Lifetime / 30d / 7d / Session affinity、显式 MORE/LESS/TARGET 与低权重 popularity 生成透明线性分数和真实 reason codes；Visual、diversity 和 exploration quota 不进入 relevance score，`learningToRank=false`、`servingImpact=false`。Shadow audit 从本阶段起保存 ranked candidate ID 顺序及前 100 项 feature/reason evidence。
 
 ## v0.4.0 — 多来源与统一语义
 

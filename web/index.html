@@ -1054,6 +1054,27 @@
                 </article>
             </section>
         </main>
+        <dialog id="app-confirm-dialog" class="app-dialog ux-confirm-dialog">
+            <form method="dialog">
+                <h3 id="app-confirm-title">确认操作</h3>
+                <p id="app-confirm-message"></p>
+                <div class="actions">
+                    <button value="cancel">取消</button>
+                    <button id="app-confirm-submit" value="confirm" class="primary">确认</button>
+                </div>
+            </form>
+        </dialog>
+        <dialog id="app-prompt-dialog" class="app-dialog ux-prompt-dialog">
+            <form method="dialog">
+                <h3 id="app-prompt-title">输入内容</h3>
+                <label id="app-prompt-label">名称<input id="app-prompt-input" autocomplete="off" /></label>
+                <p id="app-prompt-message" class="status"></p>
+                <div class="actions">
+                    <button value="cancel">取消</button>
+                    <button id="app-prompt-submit" value="confirm" class="primary">确认</button>
+                </div>
+            </form>
+        </dialog>
         <dialog id="shelf-dialog" class="app-dialog">
             <form method="dialog">
                 <h3 id="shelf-dialog-title">加入书架</h3>

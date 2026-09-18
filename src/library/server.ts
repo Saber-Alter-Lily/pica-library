@@ -362,6 +362,19 @@ export async function startLibraryServer(options: {
                 return json(response, 200, options.service.recommendationV5Snapshot())
 
             if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/audit' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityAudit(
+                        Number(url.searchParams.get('limit') ?? 200)
+                    )
+                )
+
+            if (
                 url.pathname === '/api/v1/recommendation-v5/control' &&
                 request.method === 'POST'
             ) {

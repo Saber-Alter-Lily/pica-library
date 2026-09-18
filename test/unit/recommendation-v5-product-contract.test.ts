@@ -76,6 +76,25 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('保留收藏，但不用于推荐口味')
     })
 
+    it('adds a non-destructive canonical work identity foundation', () => {
+        const migrations = read('src/storage/sqlite/migrations.ts')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const identity = read(
+            'src/recommendation-v5/work-identity-foundation.ts'
+        )
+        expect(migrations).toContain(
+            "name: 'canonical_work_identity_foundation'"
+        )
+        expect(migrations).toContain('work_upload_bindings')
+        expect(migrations).toContain('work_identity_decisions')
+        expect(identity).toContain("mode: 'READ_ONLY'")
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/work-identity/audit'
+        )
+        expect(service).toContain('automaticBinding: false')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

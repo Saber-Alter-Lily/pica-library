@@ -108,6 +108,10 @@ import {
     preferenceAdjustmentV5
 } from '../recommendation-v5/portable-policy'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
+import {
+    buildWorkIdentityAuditV5,
+    WORK_IDENTITY_RESOLVER_VERSION
+} from '../recommendation-v5/work-identity-foundation'
 
 export interface DiscoverQuery {
     keyword?: string
@@ -261,6 +265,17 @@ export class LibraryService {
             // V5 controls remain usable when a packaged registry asset is
             // unavailable; the portable snapshot has a raw-tag fallback.
             return snapshot
+        }
+    }
+
+    recommendationV5WorkIdentityAudit(limit = 200) {
+        const catalog = this.database.listComics({ limit: 10000 })
+        const state = new RecommendationPolicyStoreV5(this.database).state()
+        return {
+            ...buildWorkIdentityAuditV5(catalog, state, limit),
+            resolverVersion: WORK_IDENTITY_RESOLVER_VERSION,
+            persistence: 'NONE' as const,
+            automaticBinding: false
         }
     }
 

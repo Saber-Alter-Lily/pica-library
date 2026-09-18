@@ -170,6 +170,74 @@ export class LibraryDatabase {
         this.db.close()
     }
 
+    workIdentityStorageStatus() {
+        const requiredTables = [
+            'canonical_series',
+            'canonical_works',
+            'work_editions',
+            'work_upload_bindings',
+            'work_identity_evidence',
+            'work_identity_decisions'
+        ]
+        const tables = new Set(
+            (
+                this.db
+                    .prepare(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
+                    .all() as SqlRow[]
+            ).map((row) => String(row.name))
+        )
+        const scalarCount = (sql: string) =>
+            numberValue(
+                (this.db.prepare(sql).get() as SqlRow).count
+            )
+        const versionRow = this.db
+            .prepare(
+                'SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations'
+            )
+            .get() as SqlRow
+        return {
+            expectedSchemaVersion: latestMigrationVersion,
+            appliedSchemaVersion: numberValue(versionRow.version),
+            tables: Object.fromEntries(
+                requiredTables.map((table) => [table, tables.has(table)])
+            ),
+            counts: {
+                series: tables.has('canonical_series')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM canonical_series'
+                      )
+                    : 0,
+                works: tables.has('canonical_works')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM canonical_works'
+                      )
+                    : 0,
+                editions: tables.has('work_editions')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_editions'
+                      )
+                    : 0,
+                bindings: tables.has('work_upload_bindings')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_upload_bindings'
+                      )
+                    : 0,
+                evidence: tables.has('work_identity_evidence')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_identity_evidence'
+                      )
+                    : 0,
+                decisions: tables.has('work_identity_decisions')
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_identity_decisions'
+                      )
+                    : 0
+            }
+        }
+    }
+
     recordUserEvent(input: UserEventInput): UserEvent {
         const id = input.id ?? randomUUID()
         const occurredAt = new Date().toISOString()

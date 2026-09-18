@@ -1,7 +1,10 @@
+import { parseEhTag } from '../providers/eh-provider'
 import type {
     EhSurface,
     SearchRequest
 } from '../providers/types'
+import type { StoredComic } from '../library/types'
+import { normalizePreferenceKey } from './portable-policy'
 import type {
     CandidateChannelAnchorV5,
     CandidateChannelFamilyV5,
@@ -50,6 +53,51 @@ export interface DroppedProviderRouteV5 {
     channelId: string
     surface: CandidateProviderSurfaceV5
     reason: string
+}
+
+export function deriveObservedEhCanonicalBindingsV5(
+    catalog: StoredComic[]
+) {
+    const canonicalSets = new Map<string, Set<string>>()
+    const facetSets = new Map<string, Set<string>>()
+
+    for (const comic of catalog) {
+        if (comic.providerId !== 'eh') continue
+        const rawTags = Array.isArray(
+            comic.providerMetadata?.rawTags
+        )
+            ? comic.providerMetadata.rawTags.map(String)
+            : []
+        for (const raw of rawTags) {
+            const parsed = parseEhTag(raw)
+            const key = normalizePreferenceKey(parsed.value)
+            if (!key || !parsed.namespace) continue
+            const canonicals =
+                canonicalSets.get(key) ?? new Set<string>()
+            canonicals.add(parsed.raw.trim())
+            canonicalSets.set(key, canonicals)
+            const facets = facetSets.get(key) ?? new Set<string>()
+            if (parsed.facet) facets.add(parsed.facet)
+            facetSets.set(key, facets)
+        }
+    }
+
+    const canonicals: Record<string, string> = {}
+    const facets: Record<string, string> = {}
+    const ambiguousKeys: string[] = []
+    for (const [key, values] of canonicalSets) {
+        if (values.size === 1) canonicals[key] = [...values][0]
+        else ambiguousKeys.push(key)
+        const observedFacets = facetSets.get(key) ?? new Set<string>()
+        if (values.size === 1 && observedFacets.size === 1)
+            facets[key] = [...observedFacets][0]
+    }
+
+    return {
+        canonicals,
+        facets,
+        ambiguousKeys: ambiguousKeys.sort()
+    }
 }
 
 function cleanText(value: unknown, max = 180) {

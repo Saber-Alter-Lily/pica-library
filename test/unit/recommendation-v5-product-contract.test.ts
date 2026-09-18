@@ -132,6 +132,32 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('仅预览，不写入 Work/Edition binding')
     })
 
+    it('exposes a no-write controlled materialization plan before any binding mutation', () => {
+        const database = read('src/library/database.ts')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const identity = read(
+            'src/recommendation-v5/work-identity-foundation.ts'
+        )
+        const web = read('web/work-identity-review-beta.js')
+        expect(database).toContain('listWorkIdentityBindings')
+        expect(identity).toContain(
+            "WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION"
+        )
+        expect(identity).toContain("mode: 'DRY_RUN'")
+        expect(identity).toContain('writeEnabled: false')
+        expect(identity).toContain('rollback:')
+        expect(service).toContain(
+            'recommendationV5WorkIdentityMaterializationPlan'
+        )
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/work-identity/materialization-plan'
+        )
+        expect(web).toContain('生成 Dry-run 绑定计划')
+        expect(web).toContain('writeEnabled=false')
+        expect(web).not.toContain('执行绑定')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

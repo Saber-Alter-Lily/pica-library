@@ -54,6 +54,7 @@ describe('Canonical Work Identity foundation', () => {
         expect(status.counts.bindings).toBe(0)
         expect(status.counts.evidence).toBe(0)
         expect(status.counts.decisions).toBe(0)
+        expect(status.counts.materializationRuns).toBe(0)
 
         // Existing comic IDs stay canonical upload IDs; migration 12 does not
         // require or pre-create a work binding.
@@ -534,6 +535,55 @@ describe('Canonical Work Identity foundation', () => {
         expect(
             plan.groups[0].warnings.map((item) => item.type)
         ).toContain('EDITION_PARTITION_UNDERDETERMINED')
+    })
+
+
+    it('stores prepare-only materialization audit runs idempotently without binding uploads', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-work-materialize-audit-')
+        )
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        const digest = 'a'.repeat(64)
+        const first = database.prepareWorkIdentityMaterializationRun({
+            requestKey: 'p2a-test-request-001',
+            planVersion: WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION,
+            planDigest: digest,
+            plan: {
+                mode: 'DRY_RUN',
+                planVersion: WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION,
+                planDigest: digest
+            }
+        })
+        const replay = database.prepareWorkIdentityMaterializationRun({
+            requestKey: 'p2a-test-request-001',
+            planVersion: WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION,
+            planDigest: digest,
+            plan: {
+                mode: 'DRY_RUN',
+                planVersion: WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION,
+                planDigest: digest
+            }
+        })
+        expect(first.status).toBe('PREPARED')
+        expect(first.idempotentReplay).toBe(false)
+        expect(replay.id).toBe(first.id)
+        expect(replay.idempotentReplay).toBe(true)
+        expect(database.listWorkIdentityMaterializationRuns()).toHaveLength(1)
+        expect(
+            database.workIdentityStorageStatus().counts.materializationRuns
+        ).toBe(1)
+        expect(database.workIdentityStorageStatus().counts.bindings).toBe(0)
+        expect(() =>
+            database.prepareWorkIdentityMaterializationRun({
+                requestKey: 'p2a-test-request-001',
+                planVersion: WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION,
+                planDigest: 'b'.repeat(64),
+                plan: { mode: 'DRY_RUN' }
+            })
+        ).toThrow(/different plan/)
+
+        database.close()
+        fs.rmSync(dir, { recursive: true, force: true })
     })
 
 })

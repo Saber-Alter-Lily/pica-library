@@ -215,4 +215,32 @@ describe('Recommendation V5 behavior evidence semantics', () => {
             tasteClass: 'EXCLUDED'
         })
     })
+
+    it('quantifies semantic drift from legacy V3 behavior weights', () => {
+        const ledger = buildBehaviorEvidenceLedgerV5(
+            [
+                event('recommend_impression', 'comic-a'),
+                event('download_complete', 'comic-b'),
+                event('reader_open', 'comic-c'),
+                event('favorite_remove', 'comic-d'),
+                event('recommend_dislike', 'comic-e')
+            ],
+            [
+                comic('comic-a'),
+                comic('comic-b'),
+                comic('comic-c'),
+                comic('comic-d'),
+                comic('comic-e')
+            ],
+            defaultPortablePolicyStateV5()
+        )
+        expect(ledger.summary.semanticDrift).toEqual({
+            legacyPositiveEventCount: 3,
+            newPositiveTasteEventCount: 2,
+            legacyImpressionCountedPositive: 1,
+            legacyStrongNowWeakOrFactCount: 2,
+            legacyNegativeButNotExplicitDislikeCount: 1
+        })
+    })
+
 })

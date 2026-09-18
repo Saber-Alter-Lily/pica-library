@@ -558,7 +558,7 @@ tests = """    it('excludes selected favorites from inferred taste without chang
             path.join(os.tmpdir(), 'pica-v5-taste-exclusion-')
         )
         const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
-        database.importCatalog(
+        database.importFavorites(
             [
                 {
                     comicId: 'favorite-a',
@@ -566,11 +566,12 @@ tests = """    it('excludes selected favorites from inferred taste without chang
                     author: 'Artist',
                     tags: ['T'],
                     categories: [],
-                    finished: true,
-                    isFavorite: true
+                    finished: true
                 }
             ],
-            'test'
+            'test',
+            false,
+            true
         )
         const store = new RecommendationPolicyStoreV5(database)
         store.setTasteExclusion('favorite-a', true)

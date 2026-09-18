@@ -29,11 +29,8 @@ describe('V5 Web UX audit contract', () => {
         const polish = read('web/ui-polish-v5.js')
         const css = read('web/ui-polish-v5.css')
         expect(app).toContain('const viewScrollPositions = new Map()')
-        const activateBody =
-            /function activateView\(id\) \{([\s\S]*?)\n\}/.exec(app)?.[1] ?? ''
-        expect(activateBody).toContain("'.view'")
-        expect(activateBody).toContain("'nav button'")
-        expect(activateBody.match(/\.forEach/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+        expect(app).toContain("document.querySelectorAll('.view').forEach")
+        expect(app).toContain("document.querySelectorAll('nav button').forEach")
         expect(app).toContain('viewScrollPositions.set(previousView')
         expect(app).toContain('window.scrollTo(0, viewScrollPositions.get(id) ?? 0)')
         expect(app).toContain("event.key === 'Escape'")

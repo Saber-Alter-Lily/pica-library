@@ -483,6 +483,45 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/versions' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5BenchmarkVersions(
+                        Number(url.searchParams.get('limit') ?? 1000)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/compare' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5BenchmarkComparison(
+                        String(url.searchParams.get('baselineVersion') ?? ''),
+                        String(url.searchParams.get('candidateVersion') ?? ''),
+                        Number(url.searchParams.get('limit') ?? 1000),
+                        Number(url.searchParams.get('horizonDays') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
                     '/api/v1/desktop/recommendation-v5/evaluation/summary' &&
                 request.method === 'GET'
             ) {

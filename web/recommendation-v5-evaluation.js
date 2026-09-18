@@ -202,6 +202,8 @@ function evalRenderSummary() {
     const decisions = summary.decisions || {}
     const exactRuns = Number(support.exactRunCount || 0)
     const evaluableRuns = Number(support.evaluableRunCount || 0)
+    const matureRuns = Number(support.matureRunCount || 0)
+    const immatureRuns = Number(support.immatureRunCount || 0)
     const correctnessPass =
         Number(correctness.totalRankedLeakage || 0) === 0 &&
         Number(correctness.totalBatchLeakage || 0) === 0
@@ -229,8 +231,8 @@ function evalRenderSummary() {
                 ? `<strong>${evaluableRuns}/3</strong>`
                 : '<strong>等待积累</strong>',
             evaluableRuns
-                ? `已观察到 ${Number(support.positiveEventCountAcrossWindows || 0)} 个后续正向行为`
-                : '继续正常使用、收藏、Like 和阅读即可'
+                ? `成熟观察窗 ${matureRuns} · 已观察到 ${Number(support.maturePositiveEventCountAcrossWindows || 0)} 个成熟正向行为`
+                : `成熟观察窗 ${matureRuns} · 仍在观察 ${immatureRuns} 轮；继续正常使用即可`
         )}
         ${evalMetricCard(
             '正式推荐',
@@ -240,7 +242,7 @@ function evalRenderSummary() {
       </div>
       <div class="v5-eval-user-note">
         <strong>你现在需要做的事：</strong>
-        正常使用软件即可。隔一段时间再运行一次影子推荐；系统会自动把后续真实收藏、Like 和阅读结果用于回顾性评估。
+        正常使用软件即可。隔一段时间再运行一次影子推荐；系统会自动记录后续真实收藏、Like 和阅读结果。30 天观察窗走完整之前只显示为“正在积累”，不会提前计算正式准确率。
       </div>
     `
 
@@ -631,7 +633,7 @@ async function evalLoad(force = false) {
         evalRenderRuns()
         const support = summary.sections?.retrospective?.support || {}
         evalStatus(
-            `评估已刷新：已完成 ${Number(support.exactRunCount || 0)}/3 次基础影子推荐；后续可评估记录 ${Number(support.evaluableRunCount || 0)}/3。正式推荐未改变。`
+            `评估已刷新：基础影子推荐 ${Number(support.exactRunCount || 0)}/3；成熟观察窗 ${Number(support.matureRunCount || 0)}，可评估记录 ${Number(support.evaluableRunCount || 0)}/3。正式推荐未改变。`
         )
     } catch (error) {
         evalStatus(`评估读取失败：${error.message}`, true)

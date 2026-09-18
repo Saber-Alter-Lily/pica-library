@@ -252,7 +252,7 @@ function signalRow(signal) {
         </div>
         <div class="v5-row-actions">
             <button type="button" data-v5-session-target="${esc(signalId(signal))}">本次想看</button>
-            ${current ? `<button type="button" data-v5-reset="${esc(signalId(signal))}">恢复</button>` : ''}
+            ${current ? `<button type="button" data-v5-reset="${esc(signalId(signal))}">恢复系统判断</button>` : ''}
             <button type="button" data-v5-block="${esc(signalId(signal))}">${blocked ? '已屏蔽' : '屏蔽'}</button>
         </div>
     </div>`
@@ -324,7 +324,7 @@ function renderPolicy() {
         controlTarget.innerHTML=controls.length?controls.map(item=>{
             const signal=V5.signalById.get(`${item.targetType}:${item.key}`)||{...item,supportCount:0,supportShare:0,baselineLevel:1}
             const current=item.direction==='BLOCK'?'屏蔽':`${currentLevel(signal)}/10`
-            return `<span class="v5-control-chip"><strong>${esc(item.label)}</strong><span>${esc(current)}</span><button type="button" data-v5-control-reset="${esc(signalId(signal))}">恢复</button></span>`
+            return `<span class="v5-control-chip"><strong>${esc(item.label)}</strong><span>${esc(current)}</span><button type="button" data-v5-control-reset="${esc(signalId(signal))}">恢复系统判断</button></span>`
         }).join(''):'<p class="status">目前没有手动覆盖，完全使用系统推断。</p>'
         document.querySelectorAll('[data-v5-control-reset]').forEach(button=>button.addEventListener('click',()=>{
             const signal=V5.signalById.get(button.dataset.v5ControlReset)||controls.filter(item=>`${item.targetType}:${item.key}`===button.dataset.v5ControlReset).map(item=>({...item,supportCount:0,supportShare:0,baselineLevel:1}))[0]

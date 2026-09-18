@@ -350,6 +350,31 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).not.toContain('shadow-retrieval')
     })
 
+    it('persists only versioned shadow telemetry and candidate IDs for benchmark history', () => {
+        const database = read('src/library/database.ts')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const shadow = read(
+            'src/recommendation-v5/shadow-retrieval.ts'
+        )
+        expect(database).toContain(
+            'listCandidatePoolsByModelVersionPrefix'
+        )
+        expect(database).toContain('modelVersion:')
+        expect(service).toContain("cycleId = `v5-shadow:")
+        expect(service).toContain("'v5-shadow'")
+        expect(service).toContain('saveV3CandidatePool')
+        expect(service).toContain('candidateIds: result.candidates.map')
+        expect(service).toContain(
+            'recommendationV5ShadowRuns'
+        )
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/shadow-runs'
+        )
+        expect(shadow).toContain('persistCandidates: false')
+        expect(service).toContain('{ persist: false }')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

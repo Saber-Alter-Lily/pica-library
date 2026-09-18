@@ -185,7 +185,10 @@ function evalMetricCard(title, value, meta = '') {
 
 function evalRenderSummary() {
     const target = document.querySelector('#v5-eval-summary')
-    if (!target || !EVAL.summary) return
+    const technicalTarget = document.querySelector(
+        '#v5-eval-technical-summary'
+    )
+    if (!target || !technicalTarget || !EVAL.summary) return
     const summary = EVAL.summary
     const retrospective = summary.sections?.retrospective || {}
     const p3 = summary.sections?.p3EngineeringGate || {}
@@ -197,8 +200,51 @@ function evalRenderSummary() {
     const support = retrospective.support || {}
     const correctness = retrospective.correctness || {}
     const decisions = summary.decisions || {}
+    const exactRuns = Number(support.exactRunCount || 0)
+    const evaluableRuns = Number(support.evaluableRunCount || 0)
+    const correctnessPass =
+        Number(correctness.totalRankedLeakage || 0) === 0 &&
+        Number(correctness.totalBatchLeakage || 0) === 0
+    const accuracyAvailable = evaluableRuns > 0
 
     target.innerHTML = `
+      <div class="v5-eval-grid">
+        ${evalMetricCard(
+            '基础测试进度',
+            `<strong>${Math.min(exactRuns, 3)}/3</strong>`,
+            exactRuns >= 3
+                ? '基础影子推荐轮次已经够用'
+                : '隔一段时间再运行一次即可，不要连续重复点击'
+        )}
+        ${evalMetricCard(
+            '安全检查',
+            correctnessPass ? evalBadge('PASS') : evalBadge('FAIL'),
+            correctnessPass
+                ? '没有把已拥有 / 已看过 / 硬屏蔽等内容漏进测试批次'
+                : '发现过滤泄漏，需要先修复'
+        )}
+        ${evalMetricCard(
+            '后续真实行为',
+            evaluableRuns
+                ? `<strong>${evaluableRuns}/3</strong>`
+                : '<strong>等待积累</strong>',
+            evaluableRuns
+                ? `已观察到 ${Number(support.positiveEventCountAcrossWindows || 0)} 个后续正向行为`
+                : '继续正常使用、收藏、Like 和阅读即可'
+        )}
+        ${evalMetricCard(
+            '正式推荐',
+            '<strong>未改变</strong>',
+            '影子推荐只在后台模拟，不会替换你现在看到的正式推荐'
+        )}
+      </div>
+      <div class="v5-eval-user-note">
+        <strong>你现在需要做的事：</strong>
+        正常使用软件即可。隔一段时间再运行一次影子推荐；系统会自动把后续真实收藏、Like 和阅读结果用于回顾性评估。
+      </div>
+    `
+
+    technicalTarget.innerHTML = `
       <div class="v5-eval-grid">
         ${evalMetricCard(
             'P5 基线状态',
@@ -208,40 +254,33 @@ function evalRenderSummary() {
         ${evalMetricCard(
             'P3 工程 Gate',
             evalBadge(p3.verdict),
-            `exact shadow runs ${Number(support.exactRunCount || 0)}`
+            `exact shadow runs ${exactRuns}`
         )}
         ${evalMetricCard(
             'P4 Visual Gate',
             evalBadge(visual.verdict),
-            '仅允许进入人工 Shadow review，不自动激活'
-        )}
-        ${evalMetricCard(
-            '未来行为可评估 Runs',
-            String(Number(support.evaluableRunCount || 0)),
-            `future positives ${Number(support.positiveEventCountAcrossWindows || 0)}`
+            'Visual 仍不自动激活'
         )}
         ${evalMetricCard(
             'Batch Precision@12',
-            evalPct(batch.precision12),
-            `Ranked P@12 ${evalPct(ranked.precision12)}`
+            accuracyAvailable ? evalPct(batch.precision12) : '等待数据',
+            accuracyAvailable
+                ? `Ranked P@12 ${evalPct(ranked.precision12)}`
+                : '没有成熟 future-outcome 时不把 0% 解释成模型失败'
         )}
         ${evalMetricCard(
             'Batch Recall@12',
-            evalPct(batch.recall12),
-            `Ranked R@12 ${evalPct(ranked.recall12)}`
+            accuracyAvailable ? evalPct(batch.recall12) : '等待数据',
+            accuracyAvailable
+                ? `Ranked R@12 ${evalPct(ranked.recall12)}`
+                : ''
         )}
         ${evalMetricCard(
             'Batch NDCG@12',
-            evalFmt(batch.ndcg12),
-            `Hit@12 ${evalPct(batch.hit12)} · MRR ${evalFmt(batch.mrr)}`
-        )}
-        ${evalMetricCard(
-            'Correctness',
-            correctness.totalRankedLeakage === 0 &&
-            correctness.totalBatchLeakage === 0
-                ? evalBadge('PASS')
-                : evalBadge('FAIL'),
-            `ranked leakage ${Number(correctness.totalRankedLeakage || 0)} · batch leakage ${Number(correctness.totalBatchLeakage || 0)}`
+            accuracyAvailable ? evalFmt(batch.ndcg12) : '等待数据',
+            accuracyAvailable
+                ? `Hit@12 ${evalPct(batch.hit12)} · MRR ${evalFmt(batch.mrr)}`
+                : ''
         )}
         ${evalMetricCard(
             '作者最大集中度',
@@ -257,7 +296,7 @@ function evalRenderSummary() {
             'Steerability',
             steer.summary?.passRate === null ||
             steer.summary?.passRate === undefined
-                ? '—'
+                ? '等待数据'
                 : evalPct(steer.summary.passRate),
             `two-sided targets ${Number(steer.summary?.twoSidedTestableCount || 0)}`
         )}

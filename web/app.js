@@ -3269,7 +3269,7 @@ function renderChronicleLegacy(snapshot) {
     if (!snapshot) return
     const metric = (label, value) =>
         `<div class="chronicle-metric"><strong>${chronicleEscape(value)}</strong><span>${chronicleEscape(label)}</span></div>`
-    content.innerHTML = `<article class="chronicle-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.hero')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric('Tags', snapshot.globalStats.tags)}${metric('Interests', snapshot.tasteClusters.length)}</div><small>${t('chronicle.local')}</small></article>
+    content.innerHTML = `<article class="chronicle-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.hero')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.tagsMetric'), snapshot.globalStats.tags)}${metric(t('chronicle.interestsMetric'), snapshot.tasteClusters.length)}</div><small>${t('chronicle.local')}</small></article>
     <article class="chronicle-section chronicle-page"><h2>${t('chronicle.keywords')}</h2><div class="chronicle-tags">${snapshot.tagPreferences
         .slice(0, 20)
         .map(
@@ -3356,7 +3356,7 @@ function renderChronicleLegacy(snapshot) {
         .join(
             ''
         )}</div><div class="chronicle-subsection"><h2>${t('chronicle.future')}</h2><p>${t('chronicle.futureNote')}</p><ol class="chronicle-flow"><li>${t('chronicle.futureLifetime')}</li><li>${t('chronicle.futureRecent')}</li><li>${t('chronicle.futureBalance')}</li></ol><p>${t('chronicle.futureSafety')}</p></div></article>
-    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.about')}</h2><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><p>${t('chronicle.definition')}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · Generated locally by Pica Library</small><h3>${t('chronicle.return')}</h3></article>`
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.about')}</h2><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><p>${t('chronicle.definition')}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · ${t('chronicle.generatedLocally')}</small><h3>${t('chronicle.return')}</h3></article>`
 }
 
 function chronicleFacetLabel(facet) {
@@ -3558,7 +3558,7 @@ function renderChronicleV2(snapshot) {
         )
         .join('')
 
-    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
+    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">01</p><h2>${t('chronicle.keywordsV2')}</h2></div></div><div class="atlas-keyword-groups">${keywordGroups}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">02</p><h2>${t('chronicle.themes')}</h2></div><p>${t('chronicle.themesNote')}</p></div><div class="atlas-themes">${themes}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">03</p><h2>${t('chronicle.universe')}</h2></div><p>${t('chronicle.universeNoteV2')}</p></div>${renderChronicleUniverse(snapshot)}</article>
@@ -3566,7 +3566,7 @@ function renderChronicleV2(snapshot) {
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">05</p><h2>${t('chronicle.familiarV2')}</h2></div></div><div class="chronicle-preference-grid atlas-preference-grid"><section><h3>${t('chronicle.fandoms')}</h3>${preferenceList(snapshot.fandomPreferences)}</section><section><h3>${t('chronicle.authors')}</h3>${preferenceList(snapshot.authorPreferences)}</section><section><h3>${t('chronicle.circles')}</h3>${preferenceList(snapshot.circlePreferences)}</section></div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">06</p><h2>${t('chronicle.combinationsV2')}</h2></div><p>${t('chronicle.combinationsNoteV2')}</p></div><div class="atlas-combinations">${combinations || `<div class="atlas-empty">${t('chronicle.noCombinations')}</div>`}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">07</p><h2>${t('chronicle.styleV2')}</h2></div></div><div class="atlas-style-grid">${style}</div></article>
-    <article class="chronicle-section chronicle-page atlas-about"><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · Generated locally by Pica Library</small></article>`
+    <article class="chronicle-section chronicle-page atlas-about"><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · ${t('chronicle.generatedLocally')}</small></article>`
 }
 
 function renderChronicle(snapshot) {

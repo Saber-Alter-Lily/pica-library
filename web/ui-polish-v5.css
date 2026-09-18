@@ -323,6 +323,22 @@ body.reader-active .reader-header {
     max-height: calc(100vh - var(--reader-header-height));
 }
 
+#reader-pages {
+    scroll-margin-top: calc(var(--reader-header-height) + 12px);
+}
+
+.reader-chapters button.active,
+.reader-chapters button[aria-current='true'] {
+    border-color: #9da7ec;
+    background: #f0f2ff;
+    color: #3f4ca8;
+    font-weight: 750;
+}
+
+.reader-essential-actions > button {
+    min-height: 40px;
+}
+
 #reader-message {
     position: fixed;
     left: 50%;

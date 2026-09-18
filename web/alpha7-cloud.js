@@ -319,14 +319,24 @@ async function load(preferredTargetId = '') {
 }
 
 $('#remote-test')?.addEventListener('click', async () => {
+    const button = $('#remote-test')
+    if (button.disabled) return
+    button.disabled = true
     message('正在测试 WebDAV…')
     try {
         const result = await post('/api/v1/desktop/test-connection', editableForm('test'))
         message(`连接成功 · ${result.label} · HTTP ${result.status} · ${result.root}`)
-    } catch (error) { message(`连接失败：${error.message}`, true) }
+    } catch (error) {
+        message(`连接失败：${error.message}`, true)
+    } finally {
+        button.disabled = false
+    }
 })
 
 $('#remote-save')?.addEventListener('click', async () => {
+    const button = $('#remote-save')
+    if (button.disabled) return
+    button.disabled = true
     message('正在保存网盘配置…')
     try {
         const result = await post('/api/v1/desktop/settings', editableForm('save'))
@@ -335,10 +345,17 @@ $('#remote-save')?.addEventListener('click', async () => {
         creatingTarget = false
         message('网盘配置已保存。密码已进入 Windows DPAPI 凭据存储。')
         await load(selectedTargetId)
-    } catch (error) { message(`保存失败：${error.message}`, true) }
+    } catch (error) {
+        message(`保存失败：${error.message}`, true)
+    } finally {
+        button.disabled = false
+    }
 })
 
 $('#remote-plan')?.addEventListener('click', async () => {
+    const button = $('#remote-plan')
+    if (button.disabled) return
+    button.disabled = true
     message('正在扫描本地漫画与所选网盘目录…首次扫描会计算文件哈希。')
     try {
         const result = await post('/api/v1/desktop/test-connection', savedTargetRequest('plan'))
@@ -346,7 +363,11 @@ $('#remote-plan')?.addEventListener('click', async () => {
         const skipped = Number(result.skippedComicCount || 0)
         const target = remoteState.targets.find((item) => item.id === selectedTargetId)?.label || '所选网盘'
         message(`${target} 扫描完成：${result.uploadComicCount || 0} 部需要上传/更新，预计 ${bytes(result.uploadBytes)}${skipped ? `；${skipped} 部因本地文件不完整将跳过。` : '。'}`)
-    } catch (error) { message(`扫描失败：${error.message}`, true) }
+    } catch (error) {
+        message(`扫描失败：${error.message}`, true)
+    } finally {
+        button.disabled = false
+    }
 })
 
 $('#remote-sync')?.addEventListener('click', async () => {

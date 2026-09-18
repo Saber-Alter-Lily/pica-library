@@ -483,6 +483,25 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/retrospective' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5RetrospectiveBenchmark(
+                        Number(url.searchParams.get('limit') ?? 200),
+                        Number(url.searchParams.get('horizonDays') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
                     '/api/v1/desktop/recommendation-v5/visual-activation-gate' &&
                 request.method === 'GET'
             ) {

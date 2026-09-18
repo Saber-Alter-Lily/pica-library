@@ -457,13 +457,18 @@ export class LibraryService {
             diversified: diversity.rows,
             embeddings: this.database.listVisualEmbeddings(),
             catalog,
-            analysisBudget: Math.max(
-                0,
-                Math.min(
-                    100,
-                    Math.floor(Number(input.visualAnalysisBudget) || 24)
+            analysisBudget: (() => {
+                const requested = Number(input.visualAnalysisBudget)
+                return Math.max(
+                    0,
+                    Math.min(
+                        100,
+                        Number.isFinite(requested)
+                            ? Math.floor(requested)
+                            : 24
+                    )
                 )
-            )
+            })()
         })
         const cycleId = `v5-shadow:${randomUUID()}`
         const modelVersion = shadowPipelineModelVersionV5()

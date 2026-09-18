@@ -1087,7 +1087,9 @@ export class LibraryDatabase {
         limit = 50
     ) {
         const value = String(prefix ?? '').trim()
-        if (!value || value.length > 160)
+        // Composite V5 shadow model identities include every pipeline component
+        // and can legitimately exceed the older 160-character guard.
+        if (!value || value.length > 512)
             throw new Error('Invalid candidate-pool model prefix')
         const rows = this.db
             .prepare(

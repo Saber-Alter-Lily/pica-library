@@ -108,6 +108,7 @@ import {
 } from '../recommendation-v5/policy-store'
 import { buildBehaviorEvidenceLedgerV5 } from '../recommendation-v5/behavior-evidence'
 import { buildCandidateChannelPlanV5 } from '../recommendation-v5/candidate-channels'
+import { applyCandidateHygieneV5 } from '../recommendation-v5/candidate-hygiene'
 import {
     compileCandidateProviderRoutesV5,
     deriveObservedEhCanonicalBindingsV5
@@ -337,17 +338,26 @@ export class LibraryService {
             catalog,
             { maxCandidates }
         )
+        const state = new RecommendationPolicyStoreV5(
+            this.database
+        ).state()
+        const hygiene = applyCandidateHygieneV5(
+            result.candidates,
+            catalog,
+            state
+        )
         const cycleId = `v5-shadow:${randomUUID()}`
         const modelVersion = [
             'v5-shadow',
             plan.sourcePlannerVersion,
             plan.compilerVersion,
-            result.retrievalVersion
+            result.retrievalVersion,
+            hygiene.hygieneVersion
         ].join('/')
         const audit = this.database.saveV3CandidatePool({
             appSessionId,
             cycleId,
-            candidateIds: result.candidates.map(
+            candidateIds: hygiene.candidates.map(
                 (item) => item.comic.comicId
             ),
             modelVersion,
@@ -358,14 +368,20 @@ export class LibraryService {
                 providerFailureIsolation:
                     result.providerFailureIsolation,
                 readiness: result.readiness,
-                candidateCount: result.candidateCount,
+                rawCandidateCount: result.candidateCount,
+                hygienicCandidateCount: hygiene.outputCandidateCount,
                 providerRouteSummary: plan.summary,
                 providerBudgets: plan.sourceProviderBudgets,
-                retrievalTelemetry: result.telemetry
+                retrievalTelemetry: result.telemetry,
+                hygieneTelemetry: hygiene.telemetry
             }
         })
         return {
             ...result,
+            candidates: hygiene.candidates,
+            candidateCount: hygiene.outputCandidateCount,
+            rawCandidateCount: result.candidateCount,
+            hygiene,
             executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
             trigger: 'EXPLICIT_CONFIRMATION' as const,
             providerRouteSummary: plan.summary,

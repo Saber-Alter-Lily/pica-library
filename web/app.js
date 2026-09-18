@@ -3190,7 +3190,7 @@ $('#job-list').onclick = async (event) => {
 async function runMaintenanceAction(button, output, work) {
     if (button.disabled) return
     button.disabled = true
-    output.textContent = language === 'en' ? 'Working…' : '正在处理…'
+    output.textContent = t('maintenance.working')
     try {
         output.textContent = JSON.stringify(await work(), null, 2)
     } catch (error) {

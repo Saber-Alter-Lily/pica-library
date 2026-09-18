@@ -1059,6 +1059,8 @@ export class LibraryDatabase {
                       : null,
                   cycleId: String(row.recommendation_cycle_id),
                   generatedAt: String(row.generated_at),
+                  expiresAt: row.expires_at ? String(row.expires_at) : null,
+                  modelVersion: String(row.model_version ?? ''),
                   candidateIds: jsonArray(row.candidate_ids_json),
                   telemetry: JSON.parse(
                       String(row.telemetry_json ?? '{}')
@@ -1078,6 +1080,31 @@ export class LibraryDatabase {
             )
             .get(cycleId) as SqlRow | undefined
         return row ? this.getV3CandidatePool(String(row.id)) : null
+    }
+
+    listCandidatePoolsByModelVersionPrefix(
+        prefix: string,
+        limit = 50
+    ) {
+        const value = String(prefix ?? '').trim()
+        if (!value || value.length > 160)
+            throw new Error('Invalid candidate-pool model prefix')
+        const rows = this.db
+            .prepare(
+                `SELECT id FROM recommendation_v3_candidate_pools
+                 WHERE model_version LIKE ?
+                 ORDER BY generated_at DESC, id
+                 LIMIT ?`
+            )
+            .all(
+                value.replace(/[\\%_]/g, (match) => '\\' + match) + '%',
+                Math.max(1, Math.min(500, Math.floor(limit)))
+            ) as SqlRow[]
+        return rows
+            .map((row) => this.getV3CandidatePool(String(row.id)))
+            .filter(
+                (row): row is NonNullable<typeof row> => Boolean(row)
+            )
     }
 
     updateV3CandidatePoolState(

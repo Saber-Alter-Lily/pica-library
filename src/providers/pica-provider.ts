@@ -74,13 +74,39 @@ export class PicaProvider implements ComicProvider {
     async search(input: SearchRequest) {
         const pica = await this.connect()
         const keyword = input.keyword?.trim() ?? ''
-        const comics = keyword
-            ? await pica.searchAll(keyword, pica.Order.loved, input.categories ?? [])
-            : await pica.comicsAll(
-                  input.categories?.[0] ?? '',
-                  input.tags?.[0] ?? '',
-                  pica.Order.loved
-              )
+        const page =
+            Number.isInteger(input.page) && Number(input.page) > 0
+                ? Number(input.page)
+                : null
+        const comics = page
+            ? keyword
+                ? (
+                      await pica.search(
+                          keyword,
+                          page,
+                          pica.Order.loved,
+                          input.categories ?? []
+                      )
+                  ).docs
+                : (
+                      await pica.comicsPage(
+                          input.categories?.[0] ?? '',
+                          input.tags?.[0] ?? '',
+                          pica.Order.loved,
+                          page
+                      )
+                  ).docs
+            : keyword
+              ? await pica.searchAll(
+                    keyword,
+                    pica.Order.loved,
+                    input.categories ?? []
+                )
+              : await pica.comicsAll(
+                    input.categories?.[0] ?? '',
+                    input.tags?.[0] ?? '',
+                    pica.Order.loved
+                )
         return comics.slice(0, input.limit ?? 100).map(picaComic)
     }
 

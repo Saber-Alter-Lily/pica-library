@@ -279,6 +279,44 @@ export class LibraryService {
         }
     }
 
+    recommendationV5WorkIdentityEvidence(limit = 200) {
+        return {
+            storage: this.database.workIdentityStorageStatus(),
+            evidence: this.database.listWorkIdentityEvidence(limit),
+            automaticBinding: false
+        }
+    }
+
+    recommendationV5RefreshWorkIdentityEvidence(limit = 500) {
+        const audit = this.recommendationV5WorkIdentityAudit(limit)
+        const saved = this.database.saveWorkIdentityEvidence(
+            audit.candidates.map((candidate) => ({
+                leftComicId: candidate.leftComicId,
+                rightComicId: candidate.rightComicId,
+                relation: candidate.relation,
+                confidence: candidate.confidence,
+                resolverVersion: candidate.resolverVersion,
+                evidence: {
+                    ...candidate.evidence,
+                    leftProvider: candidate.leftProvider,
+                    rightProvider: candidate.rightProvider,
+                    crossProvider: candidate.crossProvider
+                }
+            }))
+        )
+        return {
+            mode: 'EVIDENCE_ONLY' as const,
+            resolverVersion: audit.resolverVersion,
+            scannedComicCount: audit.scannedComicCount,
+            candidateCount: audit.candidateCount,
+            crossProviderCandidateCount:
+                audit.crossProviderCandidateCount,
+            saved,
+            storage: this.database.workIdentityStorageStatus(),
+            automaticBinding: false
+        }
+    }
+
     updateRecommendationV5Control(input: Record<string, unknown>) {
         const store = new RecommendationPolicyStoreV5(this.database)
         store.setControl({

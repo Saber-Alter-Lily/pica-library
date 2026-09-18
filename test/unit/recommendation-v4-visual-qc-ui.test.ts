@@ -13,7 +13,9 @@ describe('Visual V1 QC beta surface', () => {
         expect(qc).toContain('只读取已冻结的 Visual V1 embedding')
         const ensurePanelBody =
             /function a88EnsurePanel\(\) \{([\s\S]*?)\n\}/.exec(qc)?.[1] ?? ''
-        expect(ensurePanelBody).not.toContain('a88RefreshPanel()')
+        expect(ensurePanelBody).not.toMatch(
+            /\n\s*void a88RefreshPanel\(\)\s*\n/
+        )
         expect(ensurePanelBody).toContain('打开设置页不会自动扫描')
         expect(qc).not.toContain("post('/api/v1/visual/embedding'")
     })

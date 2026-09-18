@@ -831,6 +831,52 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
+    it('adds an advanced learning decision gate without enabling training or serving mutation', () => {
+        const gate = read(
+            'src/recommendation-v5/advanced-learning-gate.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const dashboard = read(
+            'web/recommendation-v5-evaluation.js'
+        )
+        expect(gate).toContain(
+            "ADVANCED_LEARNING_GATE_V5_VERSION ="
+        )
+        expect(gate).toContain(
+            "'READY_FOR_EXPERIMENT_DESIGN'"
+        )
+        expect(gate).toContain(
+            "'DEFERRED_MISSING_ONLINE_EXPERIMENT_LOGGING'"
+        )
+        expect(gate).toContain(
+            "'DEFERRED_MISSING_UNCERTAINTY_LOGGING'"
+        )
+        expect(gate).toContain('trainingEnabled: false')
+        expect(gate).toContain(
+            'servingMutationEnabled: false'
+        )
+        expect(gate).toContain(
+            'autoExperimentCreation: false'
+        )
+        expect(gate).toContain('autoModelSelection: false')
+        expect(service).toContain(
+            'recommendationV5AdvancedLearningGate'
+        )
+        expect(server).toContain(
+            '/api/v1/desktop/recommendation-v5/evaluation/advanced-learning-gate'
+        )
+        expect(dashboard).toContain(
+            'Advanced Learning Decision Gate'
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/train'
+        )
+        expect(server).not.toContain(
+            '/api/v1/desktop/recommendation-v5/model-activate'
+        )
+    })
+
     it('keeps Visual V1 versioned assets untouched by policy integration', () => {
         const visual = read('src/recommendation-v4/visual-style.ts')
         expect(visual).toContain("VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'")

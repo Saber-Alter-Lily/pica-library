@@ -1,7 +1,9 @@
 const IDENTITY = {
     review: null,
     plan: null,
-    busy: false
+    busy: false,
+    catalog: null,
+    catalogById: new Map()
 }
 
 const esc = (value) =>
@@ -40,7 +42,20 @@ function ensureStyles() {
 .v5-id-list{display:grid;gap:10px;margin-top:12px}
 .v5-id-row{border:1px solid var(--a83-line,#ddd);border-radius:14px;padding:12px;display:grid;gap:9px}
 .v5-id-pair{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
-.v5-id-comic{min-width:0}.v5-id-comic strong{display:block;overflow:hidden;text-overflow:ellipsis}
+.v5-id-comic{min-width:0;display:grid;grid-template-columns:70px minmax(0,1fr);gap:10px;align-items:center}
+.v5-id-comic img{width:70px;height:98px;object-fit:cover;border-radius:8px;background:#eee}
+.v5-id-comic-copy{min-width:0}.v5-id-comic strong{display:block;overflow:hidden;text-overflow:ellipsis}
+.v5-id-comic .v5-id-mini-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.v5-id-comic .v5-id-mini-actions button{min-height:32px;padding:5px 9px}
+.v5-id-row.decided{opacity:.78}
+#v5-id-detail-dialog{border:0;border-radius:18px;max-width:min(860px,92vw);width:780px;padding:0;box-shadow:0 30px 80px #0004}
+#v5-id-detail-dialog::backdrop{background:#0007}
+.v5-id-detail-shell{padding:20px;max-height:82vh;overflow:auto}
+.v5-id-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.v5-id-detail-main{display:grid;grid-template-columns:180px minmax(0,1fr);gap:18px;margin-top:12px}
+.v5-id-detail-main>img{width:180px;max-height:260px;object-fit:cover;border-radius:10px;background:#eee}
+.v5-id-detail-tags{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.v5-id-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .v5-id-arrow{opacity:.55;font-weight:700}
 .v5-id-meta{display:flex;gap:8px;flex-wrap:wrap;font-size:.82rem;opacity:.76}
 .v5-id-decision{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
@@ -56,7 +71,7 @@ function ensureStyles() {
 .v5-id-plan-groups{display:grid;gap:8px;margin-top:8px}
 .v5-id-plan-group{padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--a83-accent-soft,#eef0ff) 42%,transparent);font-size:.84rem;line-height:1.5}
 .v5-id-plan-group.blocked{color:#8a3e3e}
-@media(max-width:760px){.v5-id-pair{grid-template-columns:1fr}.v5-id-arrow{display:none}}
+@media(max-width:760px){.v5-id-pair{grid-template-columns:1fr}.v5-id-arrow{display:none}.v5-id-detail-main{grid-template-columns:1fr}.v5-id-detail-main>img{width:140px}}
 `
     document.head.appendChild(style)
 }
@@ -192,12 +207,109 @@ function renderMaterializationPlan(plan) {
     `
 }
 
+async function loadCatalog() {
+    if (IDENTITY.catalog) return IDENTITY.catalog
+    const rows = await request('/api/v1/comics?limit=10000')
+    IDENTITY.catalog = Array.isArray(rows) ? rows : []
+    IDENTITY.catalogById = new Map(
+        IDENTITY.catalog.map((comic) => [comic.comicId, comic])
+    )
+    return IDENTITY.catalog
+}
+
+function identityComic(comicId, fallbackTitle = '', fallbackProvider = '') {
+    return (
+        IDENTITY.catalogById.get(comicId) || {
+            comicId,
+            title: fallbackTitle || comicId,
+            author: '',
+            canonicalAuthor: '',
+            providerId: fallbackProvider || '',
+            tags: [],
+            categories: []
+        }
+    )
+}
+
+function identityComicMarkup(comic, provider) {
+    const author = comic.canonicalAuthor || comic.author || '未知作者'
+    return `
+        <div class="v5-id-comic">
+            <img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+            <div class="v5-id-comic-copy">
+                <strong>${esc(comic.title || comic.comicId)}</strong>
+                <span class="status">${esc(author)} · ${esc(provider || comic.providerId || 'unknown')}</span>
+                <span class="status">${esc(comic.comicId)}</span>
+                <div class="v5-id-mini-actions">
+                    <button type="button" data-v5-id-detail="${esc(comic.comicId)}">详情</button>
+                    <button type="button" data-v5-id-read-online="${esc(comic.comicId)}">在线阅读</button>
+                </div>
+            </div>
+        </div>`
+}
+
+function ensureIdentityDetailDialog() {
+    let dialog = document.querySelector('#v5-id-detail-dialog')
+    if (dialog) return dialog
+    dialog = document.createElement('dialog')
+    dialog.id = 'v5-id-detail-dialog'
+    dialog.innerHTML = '<div class="v5-id-detail-shell"></div>'
+    document.body.appendChild(dialog)
+    return dialog
+}
+
+function openIdentityDetail(comicId) {
+    const comic = identityComic(comicId)
+    const dialog = ensureIdentityDetailDialog()
+    const author = comic.canonicalAuthor || comic.author || '未知作者'
+    const tags = Array.isArray(comic.tags) ? comic.tags : []
+    const categories = Array.isArray(comic.categories) ? comic.categories : []
+    dialog.querySelector('.v5-id-detail-shell').innerHTML = `
+        <div class="v5-id-detail-head">
+            <div><h2>${esc(comic.title || comic.comicId)}</h2><p>${esc(author)} · ${esc(String(comic.providerId || '').toUpperCase())}</p></div>
+            <button type="button" data-v5-id-detail-close>关闭</button>
+        </div>
+        <div class="v5-id-detail-main">
+            <img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" alt="" onerror="this.style.visibility='hidden'">
+            <div>
+                <p>${esc(comic.description || '暂无简介')}</p>
+                <p class="status">页数 ${Number(comic.pagesCount || comic.knownPictures || 0)} · 章节 ${Number(comic.epsCount || comic.knownEpisodes || 0)} · ${comic.finished ? '已完结' : '连载/未知'}</p>
+                <div class="v5-id-detail-tags">
+                    ${categories.slice(0,8).map((x)=>`<span class="tag">${esc(x)}</span>`).join('')}
+                    ${tags.slice(0,18).map((x)=>`<span class="tag">${esc(x)}</span>`).join('')}
+                </div>
+                <div class="v5-id-detail-actions">
+                    <button type="button" data-v5-id-detail-local="${esc(comic.comicId)}">本地阅读</button>
+                    <button type="button" data-v5-id-detail-online="${esc(comic.comicId)}">在线阅读</button>
+                </div>
+            </div>
+        </div>`
+    dialog.querySelector('[data-v5-id-detail-close]').onclick = () => dialog.close()
+    dialog.querySelector('[data-v5-id-detail-local]').onclick = () => {
+        dialog.close()
+        document.dispatchEvent(new CustomEvent('pica-open-reader', {
+            detail: { comicId, online: false }
+        }))
+    }
+    dialog.querySelector('[data-v5-id-detail-online]').onclick = () => {
+        dialog.close()
+        document.dispatchEvent(new CustomEvent('pica-open-reader', {
+            detail: { comicId, online: true }
+        }))
+    }
+    dialog.showModal()
+}
+
 function renderReview() {
     ensurePanel()
     const target = document.querySelector('#v5-id-list')
     if (!target || !IDENTITY.review) return
     const review = IDENTITY.review
-    const rows = Array.isArray(review.evidence) ? review.evidence : []
+    const rows = (Array.isArray(review.evidence) ? [...review.evidence] : []).sort(
+        (a, b) =>
+            Number(Boolean(a.decision)) - Number(Boolean(b.decision)) ||
+            Number(b.confidence || 0) - Number(a.confidence || 0)
+    )
     const counts = review.storage?.counts || {}
     renderMaterializationPreview(review)
     status(
@@ -217,19 +329,15 @@ function renderReview() {
             evidence.leftPages || evidence.rightPages
                 ? `${Number(evidence.leftPages || 0)} ↔ ${Number(evidence.rightPages || 0)} 页`
                 : ''
-        return `<article class="v5-id-row"
+        const leftComic = identityComic(item.leftComicId, item.leftTitle, leftProvider)
+        const rightComic = identityComic(item.rightComicId, item.rightTitle, rightProvider)
+        return `<article class="v5-id-row ${decision ? 'decided' : ''}"
             data-left-id="${esc(item.leftComicId)}"
             data-right-id="${esc(item.rightComicId)}">
             <div class="v5-id-pair">
-                <div class="v5-id-comic">
-                    <strong>${esc(item.leftTitle || item.leftComicId)}</strong>
-                    <span class="status">${esc(leftProvider)} · ${esc(item.leftComicId)}</span>
-                </div>
+                ${identityComicMarkup(leftComic, leftProvider)}
                 <span class="v5-id-arrow">↔</span>
-                <div class="v5-id-comic">
-                    <strong>${esc(item.rightTitle || item.rightComicId)}</strong>
-                    <span class="status">${esc(rightProvider)} · ${esc(item.rightComicId)}</span>
-                </div>
+                ${identityComicMarkup(rightComic, rightProvider)}
             </div>
             <div class="v5-id-meta">
                 <span>置信度 ${Number(item.confidence || 0).toFixed(2)}</span>
@@ -246,6 +354,17 @@ function renderReview() {
             </div>
         </article>`
     }).join('')
+
+    target.querySelectorAll('[data-v5-id-detail]').forEach((button) => {
+        button.addEventListener('click', () => openIdentityDetail(button.dataset.v5IdDetail))
+    })
+    target.querySelectorAll('[data-v5-id-read-online]').forEach((button) => {
+        button.addEventListener('click', () => {
+            document.dispatchEvent(new CustomEvent('pica-open-reader', {
+                detail: { comicId: button.dataset.v5IdReadOnline, online: true }
+            }))
+        })
+    })
 
     target.querySelectorAll('[data-v5-id-decision]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -265,9 +384,11 @@ async function loadReview() {
     IDENTITY.busy = true
     status('正在读取已保存身份证据…')
     try {
-        IDENTITY.review = await request(
-            '/api/v1/recommendation-v5/work-identity/review?limit=300'
-        )
+        const [review] = await Promise.all([
+            request('/api/v1/recommendation-v5/work-identity/review?limit=300'),
+            loadCatalog()
+        ])
+        IDENTITY.review = review
         renderReview()
     } catch (error) {
         status(`读取失败：${error.message}`, true)
@@ -291,6 +412,7 @@ async function refreshEvidence() {
         IDENTITY.review = await request(
             '/api/v1/recommendation-v5/work-identity/review?limit=300'
         )
+        await loadCatalog()
         renderReview()
     } catch (error) {
         status(`扫描失败：${error.message}`, true)

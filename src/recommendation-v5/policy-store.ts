@@ -6,6 +6,7 @@ import {
     activeTemporarySuppressionsV5,
     defaultPortablePolicyStateV5,
     normalizeControlV5,
+    normalizePreferenceKey,
     portablePolicySnapshotV5,
     type PortablePolicyStateV5,
     type PreferenceControlV5,
@@ -353,6 +354,30 @@ export class RecommendationPolicyStoreV5 {
             comicId: id,
             source: source === 'ANDROID' ? 'android-v5' : 'desktop-v5',
             metadata: { excluded }
+        })
+        return this.snapshot()
+    }
+
+
+    setExplicitDistinctPair(
+        leftComicId: string,
+        rightComicId: string,
+        distinct: boolean
+    ) {
+        const left = normalizePreferenceKey(leftComicId)
+        const right = normalizePreferenceKey(rightComicId)
+        if (!left || !right || left === right)
+            throw new Error('Two distinct comic ids are required')
+        const pair = [left, right].sort().join('\u0000')
+        const previous = this.state()
+        const values = new Set(previous.explicitDistinctPairs)
+        if (distinct) values.add(pair)
+        else values.delete(pair)
+        this.save({
+            ...previous,
+            revision: previous.revision + 1,
+            updatedAt: new Date().toISOString(),
+            explicitDistinctPairs: [...values].sort()
         })
         return this.snapshot()
     }

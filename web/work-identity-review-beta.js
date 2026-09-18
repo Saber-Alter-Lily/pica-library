@@ -175,7 +175,7 @@ function renderMaterializationPlan(plan) {
         <strong>P2A-5 Dry-run 绑定计划</strong>
         <div>Work 组 ${Number(summary.workGroupCount || 0)} · Work 可绑定 ${Number(summary.workReadyCount || 0)} · 完整绑定可执行 ${Number(summary.fullBindingReadyCount || 0)} · 阻断组 ${Number(summary.blockedGroupCount || 0)}</div>
         <div>拟新建 Work ${Number(summary.createWorkCount || 0)} · 复用 Work ${Number(summary.reuseWorkCount || 0)} · Upload 变更 ${Number(summary.proposedUploadBindingCount || 0)} · 警告 ${Number(summary.warningCount || 0)} · 阻断项 ${Number(summary.blockerCount || 0)}</div>
-        <div class="status">planVersion: ${esc(plan.planVersion || '')} · writeEnabled=false。这里只计算执行与回滚计划，不写数据库。</div>
+        <div class="status">planVersion: ${esc(plan.planVersion || '')} · digest: ${esc(String(plan.planDigest || '').slice(0, 16))}… · writeEnabled=false。这里只计算执行与回滚计划，不写数据库。</div>
         ${groups.length ? `<div class="v5-id-plan-groups">${groups.slice(0, 12).map((group) => {
             const blockers = Array.isArray(group.blockers) ? group.blockers : []
             const warnings = Array.isArray(group.warnings) ? group.warnings : []

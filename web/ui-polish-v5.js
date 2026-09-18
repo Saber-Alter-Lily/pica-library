@@ -41,7 +41,8 @@ function installLibraryToolbar() {
         toolbar.querySelector('.grid-size-controls'),
         ux$('#cover-toggle')?.closest('label'),
         ux$('#filter-text'),
-        ux$('#filter-scope')
+        ux$('#filter-scope'),
+        ux$('#apply-filter')
     ])
 
     const filters = makeDetails('ux-library-filters', '更多筛选')
@@ -49,8 +50,7 @@ function installLibraryToolbar() {
         ux$('#filter-author-input')?.closest('label'),
         ux$('#filter-tag')?.closest('label'),
         ux$('#filter-tag-mode'),
-        ux$('#sort-mode'),
-        ux$('#apply-filter')
+        ux$('#sort-mode')
     ])
 
     const bulk = makeDetails('ux-library-bulk', '批量与整理')
@@ -70,6 +70,15 @@ function installLibraryToolbar() {
     ])
 
     toolbar.append(primary, filters, bulk, selection)
+    const search = ux$('#filter-text')
+    if (search && !search.dataset.uxEnterFilter) {
+        search.dataset.uxEnterFilter = '1'
+        search.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return
+            event.preventDefault()
+            ux$('#apply-filter')?.click()
+        })
+    }
     updateLibrarySelectionBar()
 }
 
@@ -206,6 +215,52 @@ function installVisualSettingsDisclosure() {
     panel.appendChild(details)
 }
 
+function installSettingsUtilities() {
+    const form = ux$('#settings-form')
+    const actions = form?.querySelector('.actions.wide')
+    if (!form || !actions || ux$('#ux-settings-utilities')) return
+    const details = makeDetails(
+        'ux-settings-utilities',
+        '文件、日志与退出'
+    )
+    moveNodes(details.querySelector('.ux-more-body'), [
+        ux$('#open-data'),
+        ux$('#open-logs'),
+        ux$('#exit-app')
+    ])
+    actions.insertAdjacentElement('afterend', details)
+}
+
+function installUpdatePanel() {
+    const panel = ux$('#settings-update')
+    if (!panel || ux$('#ux-local-update-package')) return
+    const details = makeDetails(
+        'ux-local-update-package',
+        '使用本地更新 ZIP'
+    )
+    const body = details.querySelector('.ux-more-body')
+    body.classList.add('ux-local-update-body')
+    moveNodes(body, [
+        ux$('#update-dropzone'),
+        ux$('#update-summary'),
+        ux$('#update-apply')
+    ])
+    const actions = panel.querySelector('.actions')
+    if (actions) actions.insertAdjacentElement('afterend', details)
+    else panel.appendChild(details)
+}
+
+function installRemoteStorageFlow() {
+    const panel = ux$('#settings-remote-storage')
+    const actions = panel?.querySelector('.actions')
+    if (!panel || !actions || panel.querySelector('.ux-flow-hint')) return
+    const hint = document.createElement('p')
+    hint.className = 'status ux-flow-hint'
+    hint.textContent =
+        '建议顺序：1 测试连接 → 2 保存设置 → 3 扫描同步计划 → 4 开始同步。'
+    actions.insertAdjacentElement('beforebegin', hint)
+}
+
 function installReaderHeader() {
     const header = ux$('.reader-header')
     if (!header || header.dataset.uxPolished) return
@@ -309,6 +364,9 @@ function installObservers() {
         installExperimentHub()
         installDownloadsPage()
         installVisualSettingsDisclosure()
+        installSettingsUtilities()
+        installUpdatePanel()
+        installRemoteStorageFlow()
         installDialogBehavior()
     })
     bodyObserver.observe(document.body, { childList: true, subtree: true })
@@ -321,6 +379,9 @@ function installUxPolish() {
     installDownloadsPage()
     installCollectionToolbars()
     installVisualSettingsDisclosure()
+    installSettingsUtilities()
+    installUpdatePanel()
+    installRemoteStorageFlow()
     installReaderHeader()
     installExperimentHub()
     normalizeDangerAndStatus()

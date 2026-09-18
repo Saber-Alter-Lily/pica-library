@@ -72,6 +72,40 @@ describe('Recommendation V5 shadow retrieval audit persistence', () => {
         fs.rmSync(dir, { recursive: true, force: true })
     })
 
+    it('accepts long composite V5 model versions used by the real pipeline', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-v5-shadow-long-version-')
+        )
+        const database = new LibraryDatabase(
+            path.join(dir, 'library.sqlite')
+        )
+        const modelVersion =
+            'v5-shadow/' +
+            [
+                'candidate-channel-planner-v2-provider-isolated',
+                'session-mode-policy-v1',
+                'provider-query-compiler-v1',
+                'shadow-retrieval-v2-provider-rank',
+                'candidate-hygiene-v1',
+                'relevance-ranker-v1',
+                'batch-diversity-v1'
+            ].join('/')
+        expect(modelVersion.length).toBeGreaterThan(160)
+        database.saveV3CandidatePool({
+            cycleId: 'shadow-long',
+            candidateIds: ['candidate-a'],
+            modelVersion
+        })
+        expect(
+            database.listCandidatePoolsByModelVersionPrefix(
+                modelVersion,
+                20
+            )
+        ).toHaveLength(1)
+        database.close()
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+
     it('matches model-version prefixes literally rather than treating wildcard characters specially', () => {
         const dir = fs.mkdtempSync(
             path.join(os.tmpdir(), 'pica-v5-shadow-prefix-')

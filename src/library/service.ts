@@ -134,6 +134,7 @@ import { evaluateVisualActivationGateV5 } from '../recommendation-v5/visual-acti
 import { auditShadowCorrectnessV5 } from '../recommendation-v5/correctness-audit'
 import { buildRetrospectiveBenchmarkV5 } from '../recommendation-v5/retrospective-benchmark'
 import { evaluateSteerabilityV5 } from '../recommendation-v5/steerability-audit'
+import { buildEvaluationFrameworkV5 } from '../recommendation-v5/evaluation-framework'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -557,6 +558,33 @@ export class LibraryService {
                 candidateIdCount: audit.candidateIds.length
             }
         }
+    }
+
+    recommendationV5EvaluationSummary(
+        limit = 200,
+        horizonDays = 30,
+        steerabilityStep = 3,
+        steerabilityTargetLimit = 30
+    ) {
+        return buildEvaluationFrameworkV5({
+            p3Gate: this.recommendationV5P3PromotionGate(
+                limit
+            ),
+            visualGate:
+                this.recommendationV5VisualActivationGate(
+                    limit
+                ),
+            retrospective:
+                this.recommendationV5RetrospectiveBenchmark(
+                    limit,
+                    horizonDays
+                ),
+            steerability:
+                this.recommendationV5SteerabilityAudit(
+                    steerabilityStep,
+                    steerabilityTargetLimit
+                )
+        })
     }
 
     recommendationV5SteerabilityAudit(

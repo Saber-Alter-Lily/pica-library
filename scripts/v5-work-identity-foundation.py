@@ -35,7 +35,7 @@ migration12 = """
     {
         version: 12,
         name: 'canonical_work_identity_foundation',
-        up: \`
+        up: `
             CREATE TABLE IF NOT EXISTS canonical_series (
                 id TEXT PRIMARY KEY,
                 preferred_title TEXT NOT NULL DEFAULT '',
@@ -146,7 +146,7 @@ migration12 = """
             );
             CREATE INDEX IF NOT EXISTS idx_work_identity_decisions_pair
                 ON work_identity_decisions(left_comic_id, right_comic_id);
-        \`
+        `
     }
 """
 s = s.replace(anchor, migration12 + anchor, 1)

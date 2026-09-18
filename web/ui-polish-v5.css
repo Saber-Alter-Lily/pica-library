@@ -362,6 +362,24 @@ body.reader-active .reader-header {
     font-size: 12px;
 }
 
+.mobile-pair-value {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.mobile-pair-value code,
+#mobile-bridge-code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.mobile-pair-value button {
+    flex: 0 0 auto;
+}
+
 /* Settings: normal controls first; research/debug tooling is explicitly advanced. */
 #v5-experiment-tools {
     margin-top: 18px;

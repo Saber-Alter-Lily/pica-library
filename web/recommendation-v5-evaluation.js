@@ -5,9 +5,12 @@ const EVAL = {
     comparison: null,
     baselineVersion: '',
     candidateVersion: '',
+    advancedGate: null,
+    advancedDirection: 'LEARNING_TO_RANK',
     busy: false,
     runningShadow: false,
-    comparing: false
+    comparing: false,
+    evaluatingAdvanced: false
 }
 
 const evalEsc = (value) =>
@@ -110,6 +113,7 @@ function evalEnsurePanel() {
       <div id="v5-eval-summary"></div>
       <div id="v5-eval-criteria" class="v5-eval-section"></div>
       <div id="v5-eval-comparison" class="v5-eval-section"></div>
+      <div id="v5-eval-advanced" class="v5-eval-section"></div>
       <div id="v5-eval-runs" class="v5-eval-section"></div>
     `
     anchor.insertAdjacentElement('afterend', panel)
@@ -354,13 +358,17 @@ function evalRenderComparison() {
         baseline.onchange = () => {
             EVAL.baselineVersion = baseline.value
             EVAL.comparison = null
+            EVAL.advancedGate = null
             evalRenderComparison()
+            evalRenderAdvancedLearning()
         }
     if (candidate)
         candidate.onchange = () => {
             EVAL.candidateVersion = candidate.value
             EVAL.comparison = null
+            EVAL.advancedGate = null
             evalRenderComparison()
+            evalRenderAdvancedLearning()
         }
     if (button) button.onclick = () => void evalCompareSelected()
 }
@@ -384,7 +392,9 @@ async function evalCompareSelected() {
         EVAL.comparison = await evalRequest(
             `/api/v1/desktop/recommendation-v5/evaluation/compare?${params.toString()}`
         )
+        EVAL.advancedGate = null
         evalRenderComparison()
+        evalRenderAdvancedLearning()
         evalStatus(
             `版本比较完成：${EVAL.comparison.status || 'UNKNOWN'}。不会自动选择 winner 或改变 serving。`
         )
@@ -392,6 +402,86 @@ async function evalCompareSelected() {
         evalStatus(`版本比较失败：${error.message}`, true)
     } finally {
         EVAL.comparing = false
+    }
+}
+
+function evalRenderAdvancedLearning() {
+    const target = document.querySelector('#v5-eval-advanced')
+    if (!target) return
+    const gate = EVAL.advancedGate
+    const missing = Array.isArray(gate?.missingRequirements)
+        ? gate.missingRequirements
+        : []
+    target.innerHTML = `
+      <h4>Advanced Learning Decision Gate</h4>
+      <div class="v5-eval-compare-controls">
+        <label>方向
+          <select id="v5-eval-advanced-direction">
+            <option value="LEARNING_TO_RANK" ${EVAL.advancedDirection === 'LEARNING_TO_RANK' ? 'selected' : ''}>Learning-to-Rank</option>
+            <option value="CONTEXTUAL_BANDIT" ${EVAL.advancedDirection === 'CONTEXTUAL_BANDIT' ? 'selected' : ''}>Contextual Bandit</option>
+            <option value="ACTIVE_LEARNING" ${EVAL.advancedDirection === 'ACTIVE_LEARNING' ? 'selected' : ''}>Active Learning</option>
+          </select>
+        </label>
+        <span></span>
+        <div class="v5-eval-meta">
+          LTR 使用当前 baseline/candidate 比较；Bandit 需要 propensity/randomized assignment；Active Learning 需要 uncertainty/query-value 日志。
+        </div>
+        <button id="v5-eval-advanced-btn" type="button">评估实验门槛</button>
+      </div>
+      ${gate ? `
+        <div class="v5-eval-grid">
+          ${evalMetricCard('Verdict', evalBadge(gate.verdict), `direction ${evalEsc(gate.selectedDirection || 'none')}`)}
+          ${evalMetricCard('Baseline ready', evalBadge(gate.baselineReady ? 'PASS' : 'INSUFFICIENT'), evalEsc(gate.evidence?.evaluationStatus || ''))}
+          ${evalMetricCard('Comparison ready', evalBadge(gate.comparisonReady ? 'PASS' : 'INSUFFICIENT'), evalEsc(gate.evidence?.comparisonStatus || 'not supplied'))}
+          ${evalMetricCard('Design ready', evalBadge(gate.designReady ? 'PASS' : 'INSUFFICIENT'), evalEsc(gate.nextStage || ''))}
+        </div>
+        <div class="v5-eval-note">
+          trainingEnabled=${String(Boolean(gate.trainingEnabled))} · servingMutationEnabled=${String(Boolean(gate.servingMutationEnabled))} · autoModelSelection=${String(Boolean(gate.autoModelSelection))}<br>
+          ${missing.length ? `缺失条件：${evalEsc(missing.join(' / '))}` : '当前只允许进入离线实验设计；仍不授权训练或 serving mutation。'}
+        </div>
+      ` : '<p class="status">选择方向后点击“评估实验门槛”。不会自动训练或上线。</p>'}
+    `
+    const select = target.querySelector('#v5-eval-advanced-direction')
+    const button = target.querySelector('#v5-eval-advanced-btn')
+    if (select)
+        select.onchange = () => {
+            EVAL.advancedDirection = select.value
+            EVAL.advancedGate = null
+            evalRenderAdvancedLearning()
+        }
+    if (button)
+        button.onclick = () => void evalEvaluateAdvancedLearning()
+}
+
+async function evalEvaluateAdvancedLearning() {
+    if (EVAL.evaluatingAdvanced) return
+    EVAL.evaluatingAdvanced = true
+    evalStatus('正在评估高级学习实验门槛；不会训练模型或改变 serving…')
+    try {
+        const params = new URLSearchParams({
+            direction: EVAL.advancedDirection,
+            limit: '1000',
+            horizonDays: '30'
+        })
+        if (
+            EVAL.baselineVersion &&
+            EVAL.candidateVersion &&
+            EVAL.baselineVersion !== EVAL.candidateVersion
+        ) {
+            params.set('baselineVersion', EVAL.baselineVersion)
+            params.set('candidateVersion', EVAL.candidateVersion)
+        }
+        EVAL.advancedGate = await evalRequest(
+            `/api/v1/desktop/recommendation-v5/evaluation/advanced-learning-gate?${params.toString()}`
+        )
+        evalRenderAdvancedLearning()
+        evalStatus(
+            `高级学习门槛：${EVAL.advancedGate.verdict || 'UNKNOWN'}。trainingEnabled=false，servingMutationEnabled=false。`
+        )
+    } catch (error) {
+        evalStatus(`高级学习门槛评估失败：${error.message}`, true)
+    } finally {
+        EVAL.evaluatingAdvanced = false
     }
 }
 
@@ -464,6 +554,7 @@ async function evalLoad(force = false) {
         evalRenderSummary()
         evalRenderCriteria()
         evalRenderComparison()
+        evalRenderAdvancedLearning()
         evalRenderRuns()
         evalStatus(
             `评估已刷新：${summary.status || 'UNKNOWN'} · shadow runs ${EVAL.runs.length} · 自动 promotion 关闭。`
@@ -520,6 +611,7 @@ document.addEventListener('pica-language-change', () => {
         evalRenderSummary()
         evalRenderCriteria()
         evalRenderComparison()
+        evalRenderAdvancedLearning()
         evalRenderRuns()
     }
 })

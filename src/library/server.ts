@@ -779,6 +779,18 @@ export async function startLibraryServer(options: {
             )
                 return json(response, 200, options.service.visualIndexStatus())
             if (
+                url.pathname === '/api/v1/visual/representation-qc' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.visualRepresentationQc(
+                        Number(url.searchParams.get('maxPairSamples') ?? 4000),
+                        Number(url.searchParams.get('maxAnchors') ?? 120)
+                    )
+                )
+            if (
                 url.pathname === '/api/v1/visual/settings' &&
                 request.method === 'POST'
             )

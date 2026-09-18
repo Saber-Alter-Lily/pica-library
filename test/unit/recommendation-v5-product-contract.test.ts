@@ -216,6 +216,40 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).not.toContain('behavior-evidence')
     })
 
+    it('adds shadow Lifetime / Recent / Session preference layers without replacing the ranker', () => {
+        const timescales = read(
+            'src/recommendation-v5/preference-timescales.ts'
+        )
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        const ranker = read(
+            'src/recommendation-v3/ranker-adapter-v3.ts'
+        )
+        const coordinator = read(
+            'src/recommendation-v3/cycle-coordinator-v3.ts'
+        )
+        expect(timescales).toContain(
+            "PREFERENCE_TIMESCALE_VERSION ="
+        )
+        expect(timescales).toContain("'LIFETIME'")
+        expect(timescales).toContain("'7D'")
+        expect(timescales).toContain("'30D'")
+        expect(timescales).toContain("'90D'")
+        expect(timescales).toContain("'SESSION'")
+        expect(timescales).toContain("mode: 'SHADOW'")
+        expect(timescales).toContain('rankingImpact: false')
+        expect(timescales).toContain('persistentControls')
+        expect(timescales).toContain('hardConstraints')
+        expect(service).toContain(
+            'recommendationV5PreferenceTimescales'
+        )
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/preference-timescales'
+        )
+        expect(ranker).not.toContain('preference-timescales')
+        expect(coordinator).not.toContain('preference-timescales')
+    })
+
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
         const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')

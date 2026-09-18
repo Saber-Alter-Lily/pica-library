@@ -123,6 +123,7 @@ export const translations = {
         'downloads.retries': 'Retries',
         'downloads.refresh': 'Refresh',
         'downloads.run': 'Run queue',
+        'downloads.starting': 'Starting the download queue…',
         'downloads.inProgress': 'In progress',
         'downloads.waiting': 'Waiting',
         'downloads.paused': 'Paused',
@@ -480,6 +481,7 @@ export const translations = {
         'message.syncNeedsEngine': 'Sync Favorites requires the local engine.',
         'message.searchNeedsEngine':
             'Provider search requires the local engine.',
+        'message.searching': 'Searching…',
         'message.searchCount': 'Found {count} results.',
         'message.recommendNeedsData':
             'Import a Bundle with recommendations or connect the local engine first.',
@@ -752,6 +754,7 @@ export const translations = {
         'downloads.retries': '重试次数',
         'downloads.refresh': '刷新',
         'downloads.run': '运行队列',
+        'downloads.starting': '正在启动下载队列…',
         'downloads.inProgress': '进行中',
         'downloads.waiting': '等待中',
         'downloads.paused': '已暂停',
@@ -1085,6 +1088,7 @@ export const translations = {
         'message.importAuthors': '更新作者索引',
         'message.syncNeedsEngine': '同步收藏需要连接本地服务。',
         'message.searchNeedsEngine': '站内搜索需要连接本地服务。',
+        'message.searching': '正在搜索…',
         'message.searchCount': '找到 {count} 条结果。',
         'message.recommendNeedsData':
             '请先导入包含推荐结果的数据包，或连接本地服务。',

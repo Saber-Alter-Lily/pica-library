@@ -110,6 +110,7 @@ import {
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 import {
     buildWorkIdentityAuditV5,
+    buildWorkIdentityMaterializationPreviewV5,
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../recommendation-v5/work-identity-foundation'
 
@@ -336,12 +337,18 @@ export class LibraryService {
                         .join('\u0000')
                 ) ?? null
         }))
+        const materializationPreview =
+            buildWorkIdentityMaterializationPreviewV5(
+                this.database.listComics({ limit: 10000 }),
+                decisions
+            )
         return {
             mode: 'HUMAN_REVIEW' as const,
             storage: this.database.workIdentityStorageStatus(),
             evidence: rows,
             decisions,
             undecidedCount: rows.filter((item) => !item.decision).length,
+            materializationPreview,
             automaticBinding: false
         }
     }

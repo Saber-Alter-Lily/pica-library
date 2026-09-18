@@ -162,22 +162,23 @@ function ensurePanel() {
             </div>
         </div>
         <p id="v5-policy-status" class="status">正在读取推荐策略…</p>
-        <div class="v5-help"><strong>10 档怎么理解：</strong>
-        系统基准来自你的收藏支持数量与占比，不是固定 5 分。每离开基准 1 格会改变一档排序偏置；
-        向右 = 多一点，向左 = 少一点；向上偏 2 格及以上会在完整重算时额外增加该方向的召回，
-        向下偏 3 格及以上会抑制对应直接召回；“屏蔽”则是硬排除。</div>
         <div class="v5-session-row">
-            <span id="v5-session-status" class="status">本次意图：默认</span>
-            <button id="v5-session-reset" type="button" class="v5-compact">清除本次意图</button>
+            <span id="v5-session-status" class="status">本次想看：默认</span>
+            <button id="v5-session-reset" type="button" class="v5-compact">清除本次想看</button>
         </div>
-        <h4>主要兴趣强度 · 1–10 档</h4>
-        <p class="status">下面每个滑杆就是 1–10 档控制；未手动调整时显示系统根据收藏计算的基准值。</p>
-        <label>查找标签 / 作者 / 分类
-            <input id="v5-policy-search" placeholder="输入名称，例如作者或标签；清空可查看全部 1–10 档" />
+        <h4>你的调整</h4>
+        <div id="v5-control-list" class="v5-control-list"></div>
+        <details class="v5-help v5-help-details">
+            <summary><strong>1–10 档怎么理解？</strong></summary>
+            <p><strong>1 = 尽量少推荐，10 = 非常喜欢。</strong> 不修改时由系统根据收藏与后续行为自动判断；“本次想看”只影响当前会话，“屏蔽”则是硬排除。</p>
+            <p class="status">召回阈值和排序偏置由系统自动处理，不需要手工维护。</p>
+        </details>
+        <h4>系统主要兴趣 · 1–10 档</h4>
+        <p class="status">直接拖动滑杆即可纠正系统判断。清空搜索时可浏览系统当前识别到的主要作者、IP、标签和分类。</p>
+        <label>查找一个具体偏好
+            <input id="v5-policy-search" placeholder="作者、IP、标签或分类，例如：巨乳" />
         </label>
         <div id="v5-inferred-list" class="v5-facet-list"></div>
-        <h4>你主动调整的项目</h4>
-        <div id="v5-control-list" class="v5-control-list"></div>
     `
     anchor.insertAdjacentElement('afterend', panel)
     panel.querySelector('#v5-policy-refresh').addEventListener('click', loadPolicy)
@@ -223,11 +224,20 @@ async function setLevel(signal, desiredLevel) {
     const direction = delta > 0 ? 'MORE' : delta < 0 ? 'LESS' : 'DEFAULT'
     const result = await setControl(signal, direction, delta)
     if (!result) return
-    if (!delta) showToast(`「${signal.label}」已恢复系统基准 ${baseline}/10。`, 'positive')
-    else showToast(
-        `「${signal.label}」已从系统基准 ${baseline}/10 调到 ${desired}/10；重新生成后会按档位影响召回与排序。`,
-        delta > 0 ? 'positive' : 'negative'
-    )
+    if (!delta)
+        showToast(
+            signal.manual
+                ? `「${signal.label}」已恢复为“系统未判断”，不再保留手动偏好。`
+                : `「${signal.label}」已恢复系统基准 ${baseline}/10。`,
+            'positive'
+        )
+    else
+        showToast(
+            signal.manual
+                ? `已将「${signal.label}」设为 ${desired}/10；系统此前没有稳定判断。`
+                : `「${signal.label}」已从系统基准 ${baseline}/10 调到 ${desired}/10。`,
+            delta > 0 ? 'positive' : 'negative'
+        )
 }
 
 async function setSession(signal) {
@@ -249,11 +259,11 @@ function signalRow(signal) {
     const delta = Number(current?.levelDelta ?? legacyDelta)
     return `<div class="v5-signal-row" data-v5-signal="${esc(signalId(signal))}">
         <div class="v5-signal-copy"><strong>${esc(signal.label)}</strong>
-        <span class="status">${signal.manual ? '显式标签 · 当前系统画像未收录' : `收藏支持 ${Number(signal.supportCount || 0)} 本`}</span></div>
+        <span class="status">${signal.manual ? '系统尚未形成稳定判断' : `收藏支持 ${Number(signal.supportCount || 0)} 本`}</span></div>
         <div class="v5-range-wrap">
             <input type="range" min="1" max="10" step="1" value="${level}" data-v5-level="${esc(signalId(signal))}" ${blocked ? 'disabled' : ''} />
             <span class="v5-range-value" data-v5-level-value="${esc(signalId(signal))}">${blocked ? '已屏蔽' : `${level}/10`}</span>
-            <span class="v5-range-meta">系统基准 ${baseline}/10${current && !blocked ? ` · 手动偏移 ${delta > 0 ? '+' : ''}${delta}` : ''}</span>
+            <span class="v5-range-meta">${signal.manual ? '系统未判断 · 5/10 为中性起点' : `系统基准 ${baseline}/10`}${current && !blocked ? ` · 你的调整 ${delta > 0 ? '+' : ''}${delta}` : ''}</span>
         </div>
         <div class="v5-row-actions">
             <button type="button" data-v5-session-target="${esc(signalId(signal))}">本次想看</button>
@@ -272,7 +282,7 @@ function renderPolicy() {
     if (sessionLabel) {
         const intent = V5.snapshot.sessionIntent || {}
         sessionLabel.textContent = intent.mode === 'TARGET'
-            ? `本次想看：${intent.label || intent.key || ''}` : '本次意图：默认'
+            ? `本次想看：${intent.label || intent.key || ''}` : '本次想看：默认'
     }
     const inferred = Array.isArray(V5.snapshot.inferred) ? V5.snapshot.inferred : []
     V5.signalById = new Map(inferred.map((item) => [signalId(item), item]))
@@ -294,8 +304,9 @@ function renderPolicy() {
                   supportCount: 0,
                   supportShare: 0,
                   facet: 'RAW_TAG',
-                  baselineLevel: 1,
-                  manual: true
+                  baselineLevel: 5,
+                  manual: true,
+                  systemUnknown: true
               }
             : null
     if (manualSignal) V5.signalById.set(signalId(manualSignal), manualSignal)
@@ -313,7 +324,7 @@ function renderPolicy() {
         <div class="v5-facet-body">${visible.map(signalRow).join('')}
         ${visible.length < rows.length ? `<p class="status">另有 ${rows.length-visible.length} 项；可用上方搜索定位。</p>` : ''}</div></details>`
     }).join('') : manualSignal
-        ? `<div class="v5-help"><strong>没有匹配到已有画像。</strong> 下面先把“${esc(V5.search)}”按标签提供显式 1–10 控制；系统基准为 1/10。移动滑杆后才会保存。若它其实是作者或分类，请清空搜索后从对应分组选择。</div><div class="v5-facet-group"><div class="v5-facet-body">${signalRow(manualSignal)}</div></div>`
+        ? `<div class="v5-help"><strong>系统还没有对“${esc(V5.search)}”形成稳定判断。</strong> 你仍可以把它作为标签直接设置；5/10 只是中性起点，不代表系统认为你只喜欢 5 分。若它其实是作者或分类，请清空搜索后从对应分组选择。</div><div class="v5-facet-group"><div class="v5-facet-body">${signalRow(manualSignal)}</div></div>`
         : '<p class="status">当前还没有可展示的系统画像。先完成收藏同步或生成一次推荐画像。</p>'
 
     document.querySelectorAll('[data-v5-level]').forEach((input) => {
@@ -343,7 +354,7 @@ function renderPolicy() {
     const controlTarget=document.querySelector('#v5-control-list')
     if(controlTarget){
         controlTarget.innerHTML=controls.length?controls.map(item=>{
-            const signal=V5.signalById.get(`${item.targetType}:${item.key}`)||{...item,supportCount:0,supportShare:0,baselineLevel:1}
+            const signal=V5.signalById.get(`${item.targetType}:${item.key}`)||{...item,supportCount:0,supportShare:0,baselineLevel:5,manual:true,systemUnknown:true}
             const current=item.direction==='BLOCK'?'屏蔽':`${currentLevel(signal)}/10`
             return `<span class="v5-control-chip"><strong>${esc(item.label)}</strong><span>${esc(current)}</span><button type="button" data-v5-control-reset="${esc(signalId(signal))}">恢复系统判断</button></span>`
         }).join(''):'<p class="status">目前没有手动覆盖，完全使用系统推断。</p>'

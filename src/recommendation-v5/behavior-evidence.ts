@@ -1,4 +1,5 @@
 import type { StoredComic } from '../library/types'
+import { BEHAVIOR_CONFIG } from '../recommendation-v3/behavior-profile'
 import type { UserEvent, V3EventType } from '../recommendation-v3/types'
 import type { PortablePolicyStateV5 } from './portable-policy'
 import {
@@ -186,6 +187,20 @@ export function classifyBehaviorEventV5(
         default:
             return []
     }
+}
+
+function legacyEngagementStrengthV3(eventType: V3EventType) {
+    const engagement = BEHAVIOR_CONFIG.engagement as Partial<
+        Record<V3EventType, number>
+    >
+    return engagement[eventType] ?? 0
+}
+
+function legacyNegativeStrengthV3(eventType: V3EventType) {
+    const negative = BEHAVIOR_CONFIG.negative as Partial<
+        Record<V3EventType, number>
+    >
+    return negative[eventType] ?? 0
 }
 
 function currentCatalogSignals(comic: StoredComic) {
@@ -445,6 +460,31 @@ export function buildBehaviorEvidenceLedgerV5(
         ])
     ) as Record<BehaviorTasteClassV5, number>
 
+    const legacyPositiveEvents = events.filter(
+        (event) =>
+            Boolean(event.comicId) &&
+            legacyEngagementStrengthV3(event.eventType) > 0
+    )
+    const newPositiveTasteEvents = events.filter((event) =>
+        classifyBehaviorEventV5(event).some(
+            (signal) =>
+                signal.kind === 'TASTE' &&
+                signal.polarity === 'POSITIVE'
+        )
+    )
+    const legacyStrongNowWeakOrFactTypes = new Set<V3EventType>([
+        'download_enqueue',
+        'download_complete',
+        'reader_open',
+        'reader_progress'
+    ])
+    const legacyNegativeButNotExplicitDislike = events.filter(
+        (event) =>
+            Boolean(event.comicId) &&
+            event.eventType !== 'recommend_dislike' &&
+            legacyNegativeStrengthV3(event.eventType) > 0
+    )
+
     return {
         mode: 'SHADOW' as const,
         evidenceVersion: BEHAVIOR_EVIDENCE_VERSION,
@@ -462,7 +502,29 @@ export function buildBehaviorEvidenceLedgerV5(
             tasteExcludedCount: items.filter(
                 (item) => item.tasteExcluded
             ).length,
-            classCounts
+            classCounts,
+            semanticDrift: {
+                legacyPositiveEventCount: legacyPositiveEvents.length,
+                newPositiveTasteEventCount:
+                    newPositiveTasteEvents.length,
+                legacyImpressionCountedPositive: events.filter(
+                    (event) =>
+                        Boolean(event.comicId) &&
+                        event.eventType === 'recommend_impression'
+                ).length,
+                legacyStrongNowWeakOrFactCount: events.filter(
+                    (event) =>
+                        Boolean(event.comicId) &&
+                        legacyStrongNowWeakOrFactTypes.has(
+                            event.eventType
+                        ) &&
+                        legacyEngagementStrengthV3(
+                            event.eventType
+                        ) >= 0.8
+                ).length,
+                legacyNegativeButNotExplicitDislikeCount:
+                    legacyNegativeButNotExplicitDislike.length
+            }
         },
         items
     }

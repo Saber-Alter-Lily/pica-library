@@ -1,6 +1,6 @@
 # Web UX Audit — V5 Development
 
-Status: second implementation pass complete; awaiting manual QA on the current beta build. This document tracks product UX, not scientific/recommendation promotion.
+Status: third implementation pass complete; awaiting manual QA on the current beta build. This document tracks product UX, not scientific/recommendation promotion.
 
 ## Audit rules
 
@@ -51,6 +51,9 @@ Every surface is reviewed for:
 - Shadow future-outcome accuracy excludes immature observation windows to avoid displaying recent partial data as formal accuracy.
 - Shelf/create/rename/delete, recommendation restart, download cancel, update confirmation, Reader export-open, Browser Lite clear and WebDAV sync now use the app's themed confirmation/text-entry dialogs.
 - Settings Hub uses `tablist` / `tab` / `tabpanel` semantics with Arrow/Home/End keyboard navigation and localized accessibility labels.
+- Main `app.js` is the sole authority for page/Reader scroll restoration; theme decoration no longer owns a competing scroll map.
+- Theme/Visual/settings observers are coalesced and themed progress decoration uses event-driven updates with a low-frequency fallback instead of 650 ms full-page rescans.
+- File import is one-step (`choose → import`) with duplicate execution locked; settings, connection, update, export and cache actions expose busy/failed states.
 - E-H secondary actions are visually separated from the primary web-login and cloud-favorites workflow, and long-running account actions reject duplicate clicks.
 
 ## Manual QA gates for this pass

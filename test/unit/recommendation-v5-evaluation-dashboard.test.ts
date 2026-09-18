@@ -45,6 +45,8 @@ describe('Recommendation V5 evaluation dashboard', () => {
         const dashboard = read(
             'web/recommendation-v5-evaluation.js'
         )
+        expect(dashboard).toContain('运行一次影子推荐')
+        expect(dashboard).toContain('正式推荐未改变')
         expect(dashboard).toContain('P3 工程 Gate')
         expect(dashboard).toContain('P4 Visual Gate')
         expect(dashboard).toContain('Batch Precision@12')

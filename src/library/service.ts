@@ -122,6 +122,10 @@ import {
     type CandidateSemanticDiversityV5
 } from '../recommendation-v5/batch-diversity'
 import {
+    shadowPipelineModelVersionV5,
+    shadowPipelineVersionsV5
+} from '../recommendation-v5/shadow-pipeline'
+import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
     preferenceAdjustmentV5
@@ -444,15 +448,7 @@ export class LibraryService {
             )
         )
         const cycleId = `v5-shadow:${randomUUID()}`
-        const modelVersion = [
-            'v5-shadow',
-            plan.sourcePlannerVersion,
-            plan.compilerVersion,
-            result.retrievalVersion,
-            hygiene.hygieneVersion,
-            ranking.rankerVersion,
-            diversity.allocatorVersion
-        ].join('/')
+        const modelVersion = shadowPipelineModelVersionV5()
         const audit = this.database.saveV3CandidatePool({
             appSessionId,
             cycleId,
@@ -462,6 +458,7 @@ export class LibraryService {
             modelVersion,
             telemetry: {
                 mode: result.mode,
+                pipelineVersions: shadowPipelineVersionsV5(),
                 servingImpact: result.servingImpact,
                 persistCandidates: result.persistCandidates,
                 providerFailureIsolation:

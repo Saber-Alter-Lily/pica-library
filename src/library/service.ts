@@ -126,6 +126,7 @@ import {
     shadowPipelineVersionsV5
 } from '../recommendation-v5/shadow-pipeline'
 import { evaluateP3PromotionGateV5 } from '../recommendation-v5/promotion-gate'
+import { buildVisualRepresentationQcV5 } from '../recommendation-v5/visual-representation-qc'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -1059,6 +1060,42 @@ export class LibraryService {
                 favorites.size +
                     feedback.filter((item) => item.sentiment === 'like').length
             )
+        })
+    }
+
+    visualRepresentationQc(
+        maxPairSamples = 4000,
+        maxAnchors = 120
+    ) {
+        const catalog = this.database.listComics({ limit: 10000 })
+        const fandomKeysByComic: Record<string, string[]> = {}
+        try {
+            const registry = loadTagRegistryV3(runtimeRegistryDirectory())
+            for (const comic of catalog) {
+                const keys = new Set<string>()
+                for (const tag of comic.tags) {
+                    const resolved = resolveTagV3(tag, registry)
+                    if (
+                        resolved.resolutionStatus === 'RESOLVED' &&
+                        resolved.resolutionType !== 'SAFETY' &&
+                        resolved.facet === 'FANDOM_IP' &&
+                        resolved.canonicalKey
+                    )
+                        keys.add(resolved.canonicalKey)
+                }
+                if (keys.size)
+                    fandomKeysByComic[comic.comicId] = [...keys].sort()
+            }
+        } catch {
+            // E-H raw parody tags remain available inside the QC module even
+            // when the packaged semantic registry cannot be loaded.
+        }
+        return buildVisualRepresentationQcV5({
+            embeddings: this.database.listVisualEmbeddings(),
+            catalog,
+            fandomKeysByComic,
+            maxPairSamples,
+            maxAnchors
         })
     }
 

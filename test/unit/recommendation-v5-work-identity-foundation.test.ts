@@ -6,6 +6,7 @@ import type { StoredComic } from '../../src/library/types'
 import { LibraryDatabase } from '../../src/library/database'
 import {
     buildWorkIdentityAuditV5,
+    buildWorkIdentityMaterializationPreviewV5,
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../../src/recommendation-v5/work-identity-foundation'
 import { defaultPortablePolicyStateV5 } from '../../src/recommendation-v5/portable-policy'
@@ -268,4 +269,75 @@ describe('Canonical Work Identity foundation', () => {
         )
         expect(result.candidates).toHaveLength(0)
     })
+
+    it('builds a no-write transitive work materialization preview and blocks conflicts', () => {
+        const catalog = [
+            comic({
+                comicId: 'pica:a',
+                title: 'Example Work',
+                author: 'Creator',
+                pagesCount: 100
+            }),
+            comic({
+                comicId: 'eh:b',
+                title: 'Example Work',
+                author: 'Creator',
+                pagesCount: 101
+            }),
+            comic({
+                comicId: 'pica:c',
+                title: 'Example Work Special Edition',
+                author: 'Creator',
+                pagesCount: 110
+            })
+        ]
+        const clean = buildWorkIdentityMaterializationPreviewV5(catalog, [
+            {
+                leftComicId: 'pica:a',
+                rightComicId: 'eh:b',
+                decision: 'SAME_WORK'
+            },
+            {
+                leftComicId: 'eh:b',
+                rightComicId: 'pica:c',
+                decision: 'EDITION_VARIANT'
+            }
+        ])
+        expect(clean.mode).toBe('PREVIEW_ONLY')
+        expect(clean.automaticBinding).toBe(false)
+        expect(clean.workGroupCount).toBe(1)
+        expect(clean.readyGroupCount).toBe(1)
+        expect(clean.proposedUploadBindingCount).toBe(3)
+        expect(clean.groups[0]).toMatchObject({
+            editionVariantPairCount: 1,
+            editionStatus: 'VARIANT_RELATION_RECORDED',
+            readyForBinding: true
+        })
+
+        const conflicted = buildWorkIdentityMaterializationPreviewV5(catalog, [
+            {
+                leftComicId: 'pica:a',
+                rightComicId: 'eh:b',
+                decision: 'SAME_WORK'
+            },
+            {
+                leftComicId: 'eh:b',
+                rightComicId: 'pica:c',
+                decision: 'EDITION_VARIANT'
+            },
+            {
+                leftComicId: 'pica:a',
+                rightComicId: 'pica:c',
+                decision: 'KEEP_SEPARATE'
+            }
+        ])
+        expect(conflicted.conflictCount).toBe(1)
+        expect(conflicted.readyGroupCount).toBe(0)
+        expect(conflicted.proposedUploadBindingCount).toBe(0)
+        expect(conflicted.groups[0].readyForBinding).toBe(false)
+        expect(conflicted.groups[0].conflicts[0].type).toBe(
+            'KEEP_SEPARATE_INSIDE_WORK_COMPONENT'
+        )
+    })
+
 })

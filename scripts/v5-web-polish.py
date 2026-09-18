@@ -150,15 +150,10 @@ s = replace_between(
 """,
     "normalizeControlV5",
 )
-s = replace_once(
+s = replace_between(
     s,
-    """        } else if (control.direction === 'MORE') {
-            adjustment += control.scope === 'SESSION' ? 0.12 : 0.08
-            reasons.push(\`MORE:\${control.targetType}:\${control.label}\`)
-        } else if (control.direction === 'LESS') {
-            adjustment -= control.scope === 'SESSION' ? 0.12 : 0.08
-            reasons.push(\`LESS:\${control.targetType}:\${control.label}\`)
-        }""",
+    "        } else if (control.direction === 'MORE') {",
+    "\n    }\n    const intent = state.sessionIntent",
     """        } else if (control.direction === 'MORE') {
             const magnitude =
                 control.levelDelta === undefined
@@ -169,8 +164,8 @@ s = replace_once(
             adjustment += magnitude
             reasons.push(
                 control.levelDelta === undefined
-                    ? \`MORE:\${control.targetType}:\${control.label}\`
-                    : \`MORE_LEVEL:\${control.targetType}:\${control.label}:+\${control.levelDelta}\`
+                    ? `MORE:${control.targetType}:${control.label}`
+                    : `MORE_LEVEL:${control.targetType}:${control.label}:+${control.levelDelta}`
             )
         } else if (control.direction === 'LESS') {
             const magnitude =
@@ -182,10 +177,11 @@ s = replace_once(
             adjustment -= magnitude
             reasons.push(
                 control.levelDelta === undefined
-                    ? \`LESS:\${control.targetType}:\${control.label}\`
-                    : \`LESS_LEVEL:\${control.targetType}:\${control.label}:\${control.levelDelta}\`
+                    ? `LESS:${control.targetType}:${control.label}`
+                    : `LESS_LEVEL:${control.targetType}:${control.label}:${control.levelDelta}`
             )
-        }""",
+        }
+""",
     "graded preference adjustment",
 )
 s = replace_once(

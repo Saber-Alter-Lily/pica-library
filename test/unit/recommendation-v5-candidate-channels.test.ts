@@ -6,7 +6,8 @@ import type {
 } from '../../src/recommendation-v3/types'
 import {
     buildCandidateChannelPlanV5,
-    CANDIDATE_CHANNEL_PLANNER_VERSION
+    CANDIDATE_CHANNEL_PLANNER_VERSION,
+    SESSION_MODE_POLICY_V5_VERSION
 } from '../../src/recommendation-v5/candidate-channels'
 import { buildPreferenceTimescalesV5 } from '../../src/recommendation-v5/preference-timescales'
 import { defaultPortablePolicyStateV5 } from '../../src/recommendation-v5/portable-policy'
@@ -414,4 +415,168 @@ describe('Recommendation V5 candidate channel planner', () => {
             'excluded-favorite'
         )
     })
+
+    it('versions and applies all four non-default session mode policies', () => {
+        const catalog = [
+            comic('old-favorite', {
+                author: 'Lifetime Artist',
+                tags: ['common-tag', 'tail-tag'],
+                isFavorite: true,
+                inLibrary: true,
+                lastSeenAt: '2025-01-01T00:00:00.000Z'
+            }),
+            comic('recent-item', {
+                author: 'Recent Artist',
+                tags: ['recent-tag']
+            })
+        ]
+        const events = [
+            event(
+                'reader_complete',
+                'recent-item',
+                '2026-09-16T12:00:00.000Z',
+                {
+                    appSessionId: 'session-1',
+                    contextId: 'recent-read'
+                }
+            )
+        ]
+        const planFor = (
+            mode:
+                | 'DEFAULT'
+                | 'FAMILIAR'
+                | 'RECENT'
+                | 'EXPLORE'
+        ) => {
+            const state = {
+                ...defaultPortablePolicyStateV5(),
+                sessionIntent: {
+                    mode,
+                    source: 'DESKTOP' as const,
+                    updatedAt: NOW.toISOString()
+                }
+            }
+            return buildCandidateChannelPlanV5({
+                timescales: buildPreferenceTimescalesV5(
+                    events,
+                    catalog,
+                    state,
+                    {
+                        now: NOW,
+                        appSessionId: 'session-1'
+                    }
+                ),
+                policy: state,
+                catalog
+            })
+        }
+        const priority = (
+            plan: ReturnType<typeof buildCandidateChannelPlanV5>,
+            predicate: (
+                channel: ReturnType<
+                    typeof buildCandidateChannelPlanV5
+                >['channels'][number]
+            ) => boolean
+        ) =>
+            plan.channels.find(predicate)?.priority ??
+            Number.NEGATIVE_INFINITY
+
+        const base = planFor('DEFAULT')
+        const familiar = planFor('FAMILIAR')
+        const recent = planFor('RECENT')
+        const explore = planFor('EXPLORE')
+
+        expect(base.sessionModePolicy.version).toBe(
+            SESSION_MODE_POLICY_V5_VERSION
+        )
+        expect(familiar.sessionModePolicy.mode).toBe('FAMILIAR')
+        expect(recent.sessionModePolicy.mode).toBe('RECENT')
+        expect(explore.sessionModePolicy.mode).toBe('EXPLORE')
+
+        const lifetimeTag = (channel: typeof base.channels[number]) =>
+            channel.sourceLayer === 'LIFETIME' &&
+            channel.family === 'TAG'
+        const recentTag = (channel: typeof base.channels[number]) =>
+            channel.sourceLayer === 'RECENT_7D' &&
+            channel.family === 'TAG'
+        const exploration = (channel: typeof base.channels[number]) =>
+            channel.family === 'EXPLORATION'
+        const rediscovery = (channel: typeof base.channels[number]) =>
+            channel.family === 'REDISCOVERY'
+
+        expect(priority(familiar, lifetimeTag)).toBe(
+            priority(base, lifetimeTag) + 12
+        )
+        expect(priority(familiar, rediscovery)).toBe(
+            priority(base, rediscovery) + 18
+        )
+        expect(priority(familiar, exploration)).toBe(
+            priority(base, exploration) - 10
+        )
+
+        expect(priority(recent, recentTag)).toBe(
+            priority(base, recentTag) + 14
+        )
+        expect(priority(recent, lifetimeTag)).toBe(
+            priority(base, lifetimeTag) - 8
+        )
+
+        expect(priority(explore, exploration)).toBe(
+            priority(base, exploration) + 34
+        )
+        expect(priority(explore, lifetimeTag)).toBe(
+            priority(base, lifetimeTag) - 8
+        )
+        expect(priority(explore, rediscovery)).toBe(
+            priority(base, rediscovery) - 8
+        )
+    })
+
+    it('gives TARGET its own highest-priority explicit session channel', () => {
+        const catalog = [
+            comic('fav', {
+                author: 'Alice',
+                tags: ['tag-a'],
+                isFavorite: true
+            })
+        ]
+        const state = {
+            ...defaultPortablePolicyStateV5(),
+            sessionIntent: {
+                mode: 'TARGET' as const,
+                targetType: 'AUTHOR' as const,
+                key: 'Alice',
+                label: 'Alice',
+                source: 'DESKTOP' as const,
+                updatedAt: NOW.toISOString()
+            }
+        }
+        const plan = buildCandidateChannelPlanV5({
+            timescales: buildPreferenceTimescalesV5(
+                [],
+                catalog,
+                state,
+                { now: NOW }
+            ),
+            policy: state,
+            catalog
+        })
+        const target = plan.channels.find(
+            (channel) => channel.family === 'TARGET'
+        )
+        expect(target).toBeTruthy()
+        expect(target!.priority).toBeGreaterThan(
+            Math.max(
+                ...plan.channels
+                    .filter(
+                        (channel) =>
+                            channel.enabled &&
+                            channel.family !== 'TARGET'
+                    )
+                    .map((channel) => channel.priority)
+            )
+        )
+        expect(plan.sessionModePolicy.mode).toBe('TARGET')
+    })
+
 })

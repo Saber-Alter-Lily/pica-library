@@ -403,6 +403,34 @@ export async function startLibraryServer(options: {
             }
 
             if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/review' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityReview(
+                        Number(url.searchParams.get('limit') ?? 200)
+                    )
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/decision' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.updateRecommendationV5WorkIdentityDecision(
+                        input
+                    )
+                )
+            }
+
+            if (
                 url.pathname === '/api/v1/recommendation-v5/control' &&
                 request.method === 'POST'
             ) {

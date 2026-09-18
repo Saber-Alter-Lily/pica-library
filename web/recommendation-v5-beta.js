@@ -154,14 +154,18 @@ function ensurePanel() {
     panel.className = 'panel'
     panel.innerHTML = `
         <div class="v5-head">
-            <div><h3>推荐控制中心 · V5 Beta</h3>
-            <p>系统先根据收藏生成基准画像；你只需要在判断不准确时修正，不必维护算法参数。</p></div>
+            <div><h3>推荐偏好</h3>
+            <p>系统会根据收藏和后续使用自动学习；只有判断不准确时才需要手动纠正。</p></div>
             <div class="actions">
                 <button id="v5-policy-refresh" type="button">刷新</button>
                 <button id="v5-policy-rebuild" type="button" class="primary">重新生成推荐</button>
             </div>
         </div>
-        <p id="v5-policy-status" class="status">正在读取推荐策略…</p>
+        <p id="v5-policy-status" class="status">正在读取推荐偏好…</p>
+        <details class="v5-policy-tech">
+            <summary>策略信息</summary>
+            <code id="v5-policy-tech"></code>
+        </details>
         <div class="v5-session-row">
             <span id="v5-session-status" class="status">本次想看：默认</span>
             <button id="v5-session-reset" type="button" class="v5-compact">清除本次想看</button>
@@ -277,7 +281,13 @@ function renderPolicy() {
     ensurePanel()
     if (!V5.snapshot) return
     const counts = V5.snapshot.counts || {}
-    showStatus(`策略 ${V5.snapshot.policyVersion || 'V5'} · rev ${Number(V5.snapshot.revision || 0)} · 已有 ${Number(counts.owned || 0)} · 手动调整 ${Number(counts.controls || 0)} · 硬屏蔽 ${Number(counts.hardSuppressed || 0)}`)
+    showStatus(
+        `已学习 ${Number(counts.owned || 0)} 本 · 你调整 ${Number(counts.controls || 0)} 项 · 已屏蔽 ${Number(counts.hardSuppressed || 0)} 项`
+    )
+    const technical = document.querySelector('#v5-policy-tech')
+    if (technical)
+        technical.textContent =
+            `${V5.snapshot.policyVersion || 'V5'} · revision ${Number(V5.snapshot.revision || 0)}`
     const sessionLabel = document.querySelector('#v5-session-status')
     if (sessionLabel) {
         const intent = V5.snapshot.sessionIntent || {}

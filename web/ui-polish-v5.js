@@ -8,6 +8,7 @@ const UX_COPY = {
         libraryMaintenance: '导入与完整校验',
         sourceFilters: '来源与筛选',
         downloadAdvanced: '性能与导出（高级）',
+        downloadsIntro: '管理下载任务、进度、暂停与失败重试。',
         visualAdvanced: '画风推荐高级设置',
         settingsUtilities: '文件、日志与退出',
         localUpdate: '使用本地更新 ZIP',
@@ -26,6 +27,7 @@ const UX_COPY = {
         libraryMaintenance: 'Import & full verification',
         sourceFilters: 'Sources & filters',
         downloadAdvanced: 'Performance & export (advanced)',
+        downloadsIntro: 'Manage download jobs, progress, pause/resume and failed retries.',
         visualAdvanced: 'Visual recommendation settings',
         settingsUtilities: 'Files, logs & exit',
         localUpdate: 'Use a local update ZIP',
@@ -302,11 +304,10 @@ function installDownloadsPage() {
     if (history && history.parentElement !== actions) actions.appendChild(history)
 
     const copy = heading.querySelector('p')
-    if (
-        copy &&
-        /持久化队列语义|persistent/i.test(copy.textContent || '')
-    )
-        copy.textContent = '管理下载任务、进度、暂停与失败重试。'
+    if (copy) {
+        copy.dataset.uxCopy = 'downloadsIntro'
+        copy.textContent = uxText('downloadsIntro')
+    }
 }
 
 function installCollectionToolbars() {

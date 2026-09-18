@@ -1,6 +1,6 @@
 # Web UX Audit — V5 Development
 
-Status: active manual-QA audit. This document tracks product UX, not scientific/recommendation promotion.
+Status: implementation pass complete; awaiting manual QA on the current beta build. This document tracks product UX, not scientific/recommendation promotion.
 
 ## Audit rules
 
@@ -17,29 +17,29 @@ Every surface is reviewed for:
 
 | Surface | Current finding | Action |
 | --- | --- | --- |
-| Global header/navigation | Functional; mixed legacy/new spacing and weak focus/disabled states | Normalize hierarchy, focus-visible, disabled/busy states, sticky navigation |
-| Home | Connected and Browser Lite concepts compete for attention | Keep connected quick actions primary; demote destructive/local-reset action |
-| Library | Filter, view and batch actions are one long toolbar | Split view controls, collapsible filters and contextual selection actions |
-| Shelves | Two-column layout works but selection/empty states are weak | Improve active shelf, empty state and responsive split |
-| Discover / recommendation | Primary action, restart, view controls and batch actions have equal weight | Separate generation, browsing and selection actions; clearer batch status |
-| Online search | Provider/sort/filter controls are dense | Group source/filter options and preserve simple keyword-first flow |
-| Reader | Exit can scroll out of reach; origin scroll is not restored | Fixed compact header, persistent exit, Esc key, page/view scroll restoration |
-| Downloads | Dense controls; history and active jobs compete | Keep active work prominent; collapse advanced performance/history controls |
-| Downloaded | Mostly stable; view controls should match Library | Normalize toolbar and empty state |
-| Collection Chronicle | Visually distinct and stable | Preserve; only normalize outer actions/focus |
-| Settings hub | Good category split, but recommendation page exposes development tools directly | Separate normal controls from collapsed Experiment & Diagnostics area |
-| Pica account/proxy | Functional but mixed English/Chinese and too many peer actions | Clarify primary save/test and demote utilities |
-| E-H / ExH | Functional; account actions still dense | Keep web login primary; advanced cookie/actions collapsed |
-| Mobile bridge | Functional; manual code flow is verbose | Keep current fallback; QR-first pairing planned separately |
-| Remote storage | Functional; scan/save/sync need clearer sequence | Present as Test → Save → Scan → Sync with explicit status |
-| Software update | Functional | Keep; normalize status, disabled/busy and destructive/restart feedback |
-| Maintenance | Many developer-like utilities | Group by task and keep destructive actions explicit |
-| Recommendation V5 controls | Algorithm exists but control discoverability is weak | Make 1–10 controls the primary content; move algorithm explanation to advanced help |
-| Visual V1 QC | Useful for QA but not normal-user settings | Move under Experiment & Diagnostics; keep manual-only heavy work |
-| Work identity P2A | Useful for QA; now visual/detail-capable | Move under Experiment & Diagnostics; undecided-first |
-| V5 Evaluation | Correct but too engineering-heavy | Show human-readable progress first; technical gates/version/LTR collapsed |
-| Dialogs/toasts | Inconsistent close/backdrop/busy feedback | Normalize modal sizing, backdrop close where safe, visible focus |
-| Responsive | Basic breakpoints exist; toolbars still stack awkwardly | Add compact mobile/tablet rules and avoid horizontal overflow |
+| Global header/navigation | IMPLEMENTED_NEEDS_QA | Sticky navigation, focus-visible and disabled states normalized |
+| Home | IMPLEMENTED_NEEDS_QA | Browser Lite destructive reset hidden in connected Desktop mode; normal quick actions remain primary |
+| Library | IMPLEMENTED_NEEDS_QA | Primary view/search/scope, collapsible advanced filters, contextual batch/selection actions |
+| Shelves | IMPLEMENTED_NEEDS_QA | Active shelf state and unified view toolbar added; responsive split preserved |
+| Discover / recommendation | IMPLEMENTED_NEEDS_QA | Generate/restart, batch paging and selection actions separated into distinct layers |
+| Online search | IMPLEMENTED_NEEDS_QA | Keyword-first flow retained; source/tags/sort moved into collapsible filters |
+| Reader | IMPLEMENTED_NEEDS_QA | Fixed compact header, persistent exit, Esc, single keyboard handler, fullscreen exit and origin scroll restoration |
+| Downloads | IMPLEMENTED_NEEDS_QA | Run/refresh stay primary; performance and Browser Lite export moved to advanced controls |
+| Downloaded | IMPLEMENTED_NEEDS_QA | View controls normalized with Library; underlying data flow unchanged |
+| Collection Chronicle | PASS_NO_BEHAVIOR_CHANGE | Existing visual language retained; global focus/navigation polish applies |
+| Settings hub | IMPLEMENTED_NEEDS_QA | Normal settings separated from collapsed Experiment & Diagnostics area |
+| Pica account/proxy | IMPLEMENTED_NEEDS_QA | File/log/exit utilities demoted; existing save/test behavior preserved |
+| E-H / ExH | PASS_EXISTING_COMPACT_FLOW | Web login remains primary; manual cookie/actions remain advanced disclosure |
+| Mobile bridge | MANUAL_QA + PLANNED_QR | Current address/code fallback retained; QR-first pairing remains a separate planned feature |
+| Remote storage | IMPLEMENTED_NEEDS_QA | Explicit Test → Save → Scan → Sync sequence hint added |
+| Software update | IMPLEMENTED_NEEDS_QA | One-click update remains primary; local ZIP path moved to advanced disclosure |
+| Maintenance | IMPLEMENTED_NEEDS_QA | Existing task tabs retained; empty outputs no longer occupy large black panels |
+| Recommendation V5 controls | IMPLEMENTED_NEEDS_QA | User adjustments first, 1–10 semantics simplified, unknown preference shown as unknown with neutral 5/10 start |
+| Visual V1 QC | IMPLEMENTED_NEEDS_QA | Moved under Experiment & Diagnostics; heavy work remains manual-only |
+| Work identity P2A | IMPLEMENTED_NEEDS_QA | Moved under Experiment & Diagnostics; covers/details/reader links and undecided-first ordering retained |
+| V5 Evaluation | IMPLEMENTED_NEEDS_QA | Human-readable progress first; immature outcomes excluded; gates/version/LTR collapsed under advanced details |
+| Dialogs/toasts | IMPLEMENTED_NEEDS_QA | Backdrop close where safe, visible focus and modal sizing normalized |
+| Responsive | IMPLEMENTED_NEEDS_QA | Compact toolbar/Reader/settings breakpoints added; requires real-browser QA |
 
 ## Manual QA gates for this pass
 

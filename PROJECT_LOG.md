@@ -50,6 +50,13 @@
 
 - V5 Beta 稳定性修复：推荐设置页不再在打开时自动运行完整 Evaluation/Visual QC 重计算；修复书库推荐口味与推荐反馈 DOM `MutationObserver` 自触发重渲染风险。重型评估和 Visual QC 改为用户显式点击后执行。
 
+- V5 Beta 实机反馈修复：Android 配对在获得 Desktop token 后立即显示“配对成功”，推荐/书架同步转为后台执行，不再让重算耗时伪装成“仍在连接”。
+- V5 Evaluation 修复 composite shadow modelVersion 超过旧 160 字符读取上限导致的 `Invalid candidate-pool model prefix`；Shadow 按钮改为“影子推荐”并明确说明不会改变正式推荐。
+- 推荐控制中心强化 1–10 档可发现性：扩大系统推断控制目录，并在搜索未命中时提供显式标签 1–10 滑杆，而不是空白结果。
+- P2A 作品身份审计增加双封面、详情、本地/在线阅读入口；未裁决候选优先，已经裁决的 pair 自动沉底。
+- Visual V1 QC 详情改为直接接入主 Reader，详情页的本地/在线阅读不再依赖当前页面是否存在其他阅读按钮。
+- 后续连接体验规划：Desktop↔Android 扫码配对作为首选入口，手工地址 + 6 位配对码保留为 fallback；尚未在本轮 hotfix 中引入相机权限/扫码依赖。
+
 ## v0.4.0 — 多来源与统一语义
 
 - Pica 从唯一在线来源升级为多来源架构。

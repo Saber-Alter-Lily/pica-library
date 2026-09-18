@@ -1,5 +1,5 @@
 const ux$ = (selector, root = document) => root.querySelector(selector)
-const ux$ = (selector, root = document) => [...root.querySelectorAll(selector)]
+const uxAll = (selector, root = document) => [...root.querySelectorAll(selector)]
 
 const UX_COPY = {
     'zh-CN': {
@@ -444,12 +444,12 @@ function normalizeDangerAndStatus() {
         clear.dataset.uxCopy = 'clearLite'
         clear.textContent = uxText('clearLite')
     }
-    for (const node of ux$$('.status'))
+    for (const node of uxAll('.status'))
         if (!node.hasAttribute('aria-live')) node.setAttribute('aria-live', 'polite')
 }
 
 function installDialogBehavior() {
-    for (const dialog of ux$$('dialog')) {
+    for (const dialog of uxAll('dialog')) {
         if (dialog.dataset.uxBackdropClose) continue
         dialog.dataset.uxBackdropClose = '1'
         dialog.addEventListener('click', (event) => {

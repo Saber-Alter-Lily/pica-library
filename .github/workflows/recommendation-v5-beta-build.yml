@@ -2,7 +2,9 @@ name: Recommendation V5 Portable Policy Beta Builds (unpublished)
 
 on:
   push:
-    branches: [feature/recommendation-v5-portable-policy]
+    branches:
+      - feature/recommendation-v5-portable-policy
+      - tmp-v5-p2a-decisions
 
 permissions:
   contents: read

@@ -253,7 +253,7 @@ function installDownloadsPage() {
     if (!advanced) {
         advanced = makeDetails(
             'ux-download-advanced',
-            '性能与导出（高级）'
+            'downloadAdvanced'
         )
         heading.insertAdjacentElement('afterend', advanced)
         moveNodes(advanced.querySelector('.ux-more-body'), [
@@ -291,7 +291,7 @@ function installVisualSettingsDisclosure() {
     if (!divider) return
     const details = makeDetails(
         'ux-visual-settings',
-        '画风推荐高级设置'
+        'visualAdvanced'
     )
     const body = details.querySelector('.ux-more-body')
     const movable = []
@@ -311,7 +311,7 @@ function installSettingsUtilities() {
     if (!form || !actions || ux$('#ux-settings-utilities')) return
     const details = makeDetails(
         'ux-settings-utilities',
-        '文件、日志与退出'
+        'settingsUtilities'
     )
     moveNodes(details.querySelector('.ux-more-body'), [
         ux$('#open-data'),
@@ -326,7 +326,7 @@ function installUpdatePanel() {
     if (!panel || ux$('#ux-local-update-package')) return
     const details = makeDetails(
         'ux-local-update-package',
-        '使用本地更新 ZIP'
+        'localUpdate'
     )
     const body = details.querySelector('.ux-more-body')
     body.classList.add('ux-local-update-body')
@@ -459,7 +459,7 @@ function installDialogBehavior() {
 }
 
 function refreshUxCopy() {
-    for (const node of ux$('[data-ux-copy]'))
+    for (const node of uxAll('[data-ux-copy]'))
         node.textContent = uxText(node.dataset.uxCopy)
 }
 
@@ -478,14 +478,23 @@ function installObservers() {
         }).observe(node, { childList: true, characterData: true, subtree: true })
     }
 
+    let polishQueued = false
+    const scheduleDynamicPolish = () => {
+        if (polishQueued) return
+        polishQueued = true
+        requestAnimationFrame(() => {
+            polishQueued = false
+            installExperimentHub()
+            installDownloadsPage()
+            installVisualSettingsDisclosure()
+            installSettingsUtilities()
+            installUpdatePanel()
+            installRemoteStorageFlow()
+            installDialogBehavior()
+        })
+    }
     const bodyObserver = new MutationObserver(() => {
-        installExperimentHub()
-        installDownloadsPage()
-        installVisualSettingsDisclosure()
-        installSettingsUtilities()
-        installUpdatePanel()
-        installRemoteStorageFlow()
-        installDialogBehavior()
+        scheduleDynamicPolish()
     })
     bodyObserver.observe(document.body, { childList: true, subtree: true })
 }

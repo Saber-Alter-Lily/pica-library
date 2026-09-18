@@ -441,17 +441,18 @@ body.reader-active .reader-header {
 #clear-lite-state,
 #eh-account-clear,
 #exit-app {
-    color: #a63e45;
-    border-color: #e8c9cc;
-    background: #fff9fa;
+    color: var(--a83-bad, #a63e45) !important;
+    border-color: color-mix(in srgb, var(--a83-bad, #a63e45) 34%, var(--a83-line, #e8c9cc)) !important;
+    background: color-mix(in srgb, var(--a83-bad-soft, #fff1f2) 72%, var(--a83-surface, #fff)) !important;
 }
 
 .danger-action:hover,
 #clear-lite-state:hover,
 #eh-account-clear:hover,
 #exit-app:hover {
-    border-color: #dca8ad;
-    background: #fff1f2;
+    color: var(--a83-bad, #a63e45) !important;
+    border-color: color-mix(in srgb, var(--a83-bad, #a63e45) 55%, var(--a83-line, #dca8ad)) !important;
+    background: var(--a83-bad-soft, #fff1f2) !important;
 }
 
 /* Remaining page-level hierarchy normalization. */

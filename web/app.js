@@ -163,6 +163,17 @@ function askText(
 
 window.picaConfirmAction = askConfirm
 window.picaPromptText = askText
+
+async function withBusyButton(button, work) {
+    if (!button || button.disabled) return undefined
+    button.disabled = true
+    try {
+        return await work()
+    } finally {
+        button.disabled = false
+    }
+}
+
 const escapeHtml = (value) =>
     String(value ?? '').replace(
         /[&<>"']/g,
@@ -675,15 +686,21 @@ async function waitForDesktopHealth(timeoutMs = 30000) {
 }
 
 async function testDesktop(prefix) {
+    const button = $(`#${prefix}-test`)
     const message = $(`#${prefix}-message`)
-    message.textContent = t('message.testing')
-    try {
-        await desktopPost('/api/v1/desktop/test-connection', setupValue(prefix))
-        message.textContent = t('message.connectionSuccess')
-        if (prefix === 'setup') $('#setup-next-step').hidden = false
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    await withBusyButton(button, async () => {
+        message.textContent = t('message.testing')
+        try {
+            await desktopPost(
+                '/api/v1/desktop/test-connection',
+                setupValue(prefix)
+            )
+            message.textContent = t('message.connectionSuccess')
+            if (prefix === 'setup') $('#setup-next-step').hidden = false
+        } catch (error) {
+            message.textContent = localizeError(language, error)
+        }
+    })
 }
 
 $('#setup-folder').onclick = () => chooseFolder('setup')
@@ -701,33 +718,43 @@ $('#setup-test').onclick = () => testDesktop('setup')
 $('#settings-test').onclick = () => testDesktop('settings')
 $('#setup-form').onsubmit = async (event) => {
     event.preventDefault()
+    const button =
+        event.submitter ||
+        $('#setup-form button[type="submit"]')
     const message = $('#setup-message')
-    try {
-        await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
-        message.textContent = t('message.savedOpening')
-        await waitForDesktopHealth()
-        await loadDesktop()
-        $('#setup-next-step').hidden = false
-        message.textContent = t('settings.appliedSync')
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    await withBusyButton(button, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
+            message.textContent = t('message.savedOpening')
+            await waitForDesktopHealth()
+            await loadDesktop()
+            $('#setup-next-step').hidden = false
+            message.textContent = t('settings.appliedSync')
+        } catch (error) {
+            message.textContent = localizeError(language, error)
+        }
+    })
 }
 $('#settings-form').onsubmit = async (event) => {
     event.preventDefault()
+    const button =
+        event.submitter ||
+        $('#settings-form button[type="submit"]')
     const message = $('#settings-message')
-    try {
-        const value = setupValue('settings')
-        if (!value.account) delete value.account
-        if (!value.password) delete value.password
-        const result = await desktopPost('/api/v1/desktop/settings', value)
-        message.textContent = result.restarting
-            ? t('message.savedRestarting')
-            : t('message.settingsSaved')
-        $('#settings-password').value = ''
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    await withBusyButton(button, async () => {
+        try {
+            const value = setupValue('settings')
+            if (!value.account) delete value.account
+            if (!value.password) delete value.password
+            const result = await desktopPost('/api/v1/desktop/settings', value)
+            message.textContent = result.restarting
+                ? t('message.savedRestarting')
+                : t('message.settingsSaved')
+            $('#settings-password').value = ''
+        } catch (error) {
+            message.textContent = localizeError(language, error)
+        }
+    })
 }
 $('#open-data').onclick = () =>
     desktopPost('/api/v1/desktop/open-directory', { kind: 'data' })

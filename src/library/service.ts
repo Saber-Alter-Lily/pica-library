@@ -129,6 +129,7 @@ import { evaluateP3PromotionGateV5 } from '../recommendation-v5/promotion-gate'
 import { buildVisualRepresentationQcV5 } from '../recommendation-v5/visual-representation-qc'
 import { buildVisualAuthorAtlasV5 } from '../recommendation-v5/visual-author-atlas'
 import { buildVisualStyleFamiliesV5 } from '../recommendation-v5/visual-style-families'
+import { buildVisualCandidateCoverageV5 } from '../recommendation-v5/visual-candidate-coverage'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -451,6 +452,19 @@ export class LibraryService {
                 )
             )
         )
+        const visualCoverage = buildVisualCandidateCoverageV5({
+            ranked: ranking.rows,
+            diversified: diversity.rows,
+            embeddings: this.database.listVisualEmbeddings(),
+            catalog,
+            analysisBudget: Math.max(
+                0,
+                Math.min(
+                    100,
+                    Math.floor(Number(input.visualAnalysisBudget) || 24)
+                )
+            )
+        })
         const cycleId = `v5-shadow:${randomUUID()}`
         const modelVersion = shadowPipelineModelVersionV5()
         const audit = this.database.saveV3CandidatePool({
@@ -480,6 +494,7 @@ export class LibraryService {
                 hygieneTelemetry: hygiene.telemetry,
                 rankingTelemetry: ranking.telemetry,
                 diversityTelemetry: diversity.telemetry,
+                visualCandidateCoverage: visualCoverage,
                 diversifiedBatch: diversity.rows.map(
                     (row) => ({
                         comicId: row.comic.comicId,
@@ -513,6 +528,7 @@ export class LibraryService {
             hygiene,
             ranking,
             diversity,
+            visualCoverage,
             executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
             trigger: 'EXPLICIT_CONFIRMATION' as const,
             providerRouteSummary: plan.summary,

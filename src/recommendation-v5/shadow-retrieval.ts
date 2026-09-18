@@ -31,6 +31,8 @@ export interface ShadowCandidateEvidenceV5 {
     families: string[]
     sourceLayers: string[]
     precisions: string[]
+    providerRanks: number[]
+    bestProviderRank: number | null
     maxPriority: number
 }
 
@@ -77,7 +79,8 @@ function readiness(count: number) {
 }
 
 function evidenceFromRoute(
-    route: CompiledProviderRouteV5
+    route: CompiledProviderRouteV5,
+    providerRank: number | null
 ): ShadowCandidateEvidenceV5 {
     return {
         routeIds: [route.routeId],
@@ -86,13 +89,17 @@ function evidenceFromRoute(
         families: [route.family],
         sourceLayers: [route.sourceLayer],
         precisions: [route.precision],
+        providerRanks:
+            providerRank === null ? [] : [providerRank],
+        bestProviderRank: providerRank,
         maxPriority: route.priority
     }
 }
 
 function mergeEvidence(
     previous: ShadowCandidateEvidenceV5,
-    route: CompiledProviderRouteV5
+    route: CompiledProviderRouteV5,
+    providerRank: number | null
 ) {
     return {
         routeIds: [...new Set([...previous.routeIds, route.routeId])].sort(),
@@ -107,6 +114,18 @@ function mergeEvidence(
         precisions: [
             ...new Set([...previous.precisions, route.precision])
         ].sort(),
+        providerRanks:
+            providerRank === null
+                ? [...previous.providerRanks]
+                : [...previous.providerRanks, providerRank].sort(
+                      (a, b) => a - b
+                  ),
+        bestProviderRank:
+            providerRank === null
+                ? previous.bestProviderRank
+                : previous.bestProviderRank === null
+                  ? providerRank
+                  : Math.min(previous.bestProviderRank, providerRank),
         maxPriority: Math.max(previous.maxPriority, route.priority)
     }
 }
@@ -137,13 +156,17 @@ export async function executeShadowRetrievalV5(
         row: ShadowRouteTelemetryV5
     ) => {
         row.rawReturned += records.length
-        for (const comic of records) {
+        for (let index = 0; index < records.length; index++) {
+            const comic = records[index]
             if (!comic?.comicId) continue
+            const providerRank =
+                route.operation === 'LOCAL' ? null : index + 1
             const existing = candidates.get(comic.comicId)
             if (existing) {
                 existing.evidence = mergeEvidence(
                     existing.evidence,
-                    route
+                    route,
+                    providerRank
                 )
                 row.duplicateCount++
                 continue
@@ -151,7 +174,10 @@ export async function executeShadowRetrievalV5(
             if (candidates.size >= maxCandidates) continue
             candidates.set(comic.comicId, {
                 comic,
-                evidence: evidenceFromRoute(route)
+                evidence: evidenceFromRoute(
+                    route,
+                    providerRank
+                )
             })
             row.uniqueNew++
         }

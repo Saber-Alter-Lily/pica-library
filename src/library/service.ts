@@ -115,6 +115,7 @@ import {
 } from '../recommendation-v5/provider-query-compiler'
 import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
 import { executeShadowRetrievalV5 } from '../recommendation-v5/shadow-retrieval'
+import { rankShadowCandidatesV5 } from '../recommendation-v5/relevance-ranker'
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
@@ -346,18 +347,30 @@ export class LibraryService {
             catalog,
             state
         )
+        const timescales =
+            this.recommendationV5PreferenceTimescales(
+                appSessionId,
+                eventLimit
+            )
+        const ranking = rankShadowCandidatesV5(
+            hygiene.candidates,
+            timescales,
+            state,
+            catalog
+        )
         const cycleId = `v5-shadow:${randomUUID()}`
         const modelVersion = [
             'v5-shadow',
             plan.sourcePlannerVersion,
             plan.compilerVersion,
             result.retrievalVersion,
-            hygiene.hygieneVersion
+            hygiene.hygieneVersion,
+            ranking.rankerVersion
         ].join('/')
         const audit = this.database.saveV3CandidatePool({
             appSessionId,
             cycleId,
-            candidateIds: hygiene.candidates.map(
+            candidateIds: ranking.rows.map(
                 (item) => item.comic.comicId
             ),
             modelVersion,
@@ -370,10 +383,21 @@ export class LibraryService {
                 readiness: result.readiness,
                 rawCandidateCount: result.candidateCount,
                 hygienicCandidateCount: hygiene.outputCandidateCount,
+                rankedCandidateCount: ranking.candidateCount,
                 providerRouteSummary: plan.summary,
                 providerBudgets: plan.sourceProviderBudgets,
                 retrievalTelemetry: result.telemetry,
-                hygieneTelemetry: hygiene.telemetry
+                hygieneTelemetry: hygiene.telemetry,
+                rankingTelemetry: ranking.telemetry,
+                rankedEvidence: ranking.rows
+                    .slice(0, 100)
+                    .map((row) => ({
+                        comicId: row.comic.comicId,
+                        rank: row.rank,
+                        score: row.score,
+                        reasons: row.reasons,
+                        features: row.features
+                    }))
             }
         })
         return {
@@ -382,6 +406,7 @@ export class LibraryService {
             candidateCount: hygiene.outputCandidateCount,
             rawCandidateCount: result.candidateCount,
             hygiene,
+            ranking,
             executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
             trigger: 'EXPLICIT_CONFIRMATION' as const,
             providerRouteSummary: plan.summary,

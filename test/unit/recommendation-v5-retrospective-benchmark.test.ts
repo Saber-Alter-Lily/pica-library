@@ -100,7 +100,8 @@ describe('Recommendation V5 retrospective benchmark', () => {
             ],
             currentModelVersion: 'v5-shadow/current',
             catalogSize: 100,
-            horizonDays: 30
+            horizonDays: 30,
+            now: new Date('2026-10-02T00:00:00.000Z')
         })
 
         expect(result.benchmarkVersion).toBe(
@@ -110,6 +111,8 @@ describe('Recommendation V5 retrospective benchmark', () => {
         expect(result.servingImpact).toBe(false)
         expect(result.support).toMatchObject({
             exactRunCount: 1,
+            matureRunCount: 1,
+            immatureRunCount: 0,
             evaluableRunCount: 1,
             positiveEventCountAcrossWindows: 1,
             negativeEventCountAcrossWindows: 1
@@ -141,8 +144,10 @@ describe('Recommendation V5 retrospective benchmark', () => {
             runs: [run('2026-09-01T00:00:00.000Z')],
             events: [],
             currentModelVersion: 'v5-shadow/current',
-            catalogSize: 100
+            catalogSize: 100,
+            now: new Date('2026-10-02T00:00:00.000Z')
         })
+        expect(result.support.matureRunCount).toBe(1)
         expect(result.support.evaluableRunCount).toBe(0)
         expect(result.accuracy.ranked.hit12).toBe(0)
         expect(result.discovery.exploreHitRateAt12).toBeNull()
@@ -152,6 +157,37 @@ describe('Recommendation V5 retrospective benchmark', () => {
         expect(result.discovery.longTailCoverage).toBe(
             'NOT_YET_IDENTIFIABLE_WITH_CURRENT_LOGS'
         )
+    })
+
+    it('keeps recent positive events provisional until the full horizon matures', () => {
+        const result = buildRetrospectiveBenchmarkV5({
+            runs: [run('2026-09-01T00:00:00.000Z')],
+            events: [
+                event(
+                    'recommend_like',
+                    'b',
+                    '2026-09-02T00:00:00.000Z'
+                )
+            ],
+            currentModelVersion: 'v5-shadow/current',
+            catalogSize: 100,
+            horizonDays: 30,
+            now: new Date('2026-09-10T00:00:00.000Z')
+        })
+        expect(result.support).toMatchObject({
+            exactRunCount: 1,
+            matureRunCount: 0,
+            immatureRunCount: 1,
+            evaluableRunCount: 0,
+            positiveEventCountAcrossWindows: 1,
+            maturePositiveEventCountAcrossWindows: 0
+        })
+        expect(result.perRun[0]).toMatchObject({
+            outcomeWindowMature: false,
+            futurePositiveCount: 1,
+            evaluable: false
+        })
+        expect(result.accuracy.ranked.hit12).toBe(0)
     })
 
     it('reports EXPLORE acceptance only from evaluable explore runs', () => {
@@ -167,7 +203,8 @@ describe('Recommendation V5 retrospective benchmark', () => {
                 )
             ],
             currentModelVersion: 'v5-shadow/current',
-            catalogSize: 10
+            catalogSize: 10,
+            now: new Date('2026-10-02T00:00:00.000Z')
         })
         expect(result.discovery).toMatchObject({
             exploreEvaluableRunCount: 1,

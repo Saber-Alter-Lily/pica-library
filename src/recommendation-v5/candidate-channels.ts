@@ -9,6 +9,8 @@ import { normalizePreferenceKey } from './portable-policy'
 
 export const CANDIDATE_CHANNEL_PLANNER_VERSION =
     'candidate-channel-planner-v1'
+export const SESSION_MODE_POLICY_V5_VERSION =
+    'session-mode-policy-v1'
 
 export type CandidateChannelFamilyV5 =
     | 'TARGET'
@@ -153,6 +155,58 @@ function anchorForControl(
     }
 }
 
+export const SESSION_MODE_POLICY_V5 = {
+    DEFAULT: {
+        sourcePriorityDelta: {},
+        familyPriorityDelta: {}
+    },
+    FAMILIAR: {
+        sourcePriorityDelta: {
+            LIFETIME: 12,
+            RECENT_30D: 4
+        },
+        familyPriorityDelta: {
+            REDISCOVERY: 18,
+            EXPLORATION: -10
+        }
+    },
+    RECENT: {
+        sourcePriorityDelta: {
+            SESSION: 12,
+            RECENT_7D: 14,
+            RECENT_30D: 8,
+            LIFETIME: -8
+        },
+        familyPriorityDelta: {}
+    },
+    EXPLORE: {
+        sourcePriorityDelta: {
+            LIFETIME: -8
+        },
+        familyPriorityDelta: {
+            EXPLORATION: 34,
+            REDISCOVERY: -8
+        }
+    },
+    TARGET: {
+        sourcePriorityDelta: {},
+        familyPriorityDelta: {
+            TARGET: 30
+        }
+    }
+} as const
+
+function modeFamilyPriorityDelta(
+    mode: PortablePolicyStateV5['sessionIntent']['mode'],
+    family: CandidateChannelFamilyV5
+) {
+    const values = SESSION_MODE_POLICY_V5[mode]
+        .familyPriorityDelta as Partial<
+        Record<CandidateChannelFamilyV5, number>
+    >
+    return values[family] ?? 0
+}
+
 function basePriority(
     source: CandidateChannelSourceV5,
     mode: PortablePolicyStateV5['sessionIntent']['mode']
@@ -172,18 +226,11 @@ function basePriority(
                       ? 62
                       : 40
 
-    if (mode === 'RECENT') {
-        if (source === 'SESSION') priority += 12
-        if (source === 'RECENT_7D') priority += 14
-        if (source === 'RECENT_30D') priority += 8
-        if (source === 'LIFETIME') priority -= 8
-    } else if (mode === 'FAMILIAR') {
-        if (source === 'LIFETIME') priority += 12
-        if (source === 'RECENT_30D') priority += 4
-    } else if (mode === 'EXPLORE') {
-        if (source === 'LIFETIME') priority -= 8
-    }
-    return priority
+    const deltas = SESSION_MODE_POLICY_V5[mode]
+        .sourcePriorityDelta as Partial<
+        Record<CandidateChannelSourceV5, number>
+    >
+    return priority + (deltas[source] ?? 0)
 }
 
 function desiredProviderAllocations(
@@ -491,6 +538,7 @@ export function buildCandidateChannelPlanV5(
             sourceLayer,
             priority:
                 basePriority(sourceLayer, mode) +
+                modeFamilyPriorityDelta(mode, family) +
                 (options.priorityDelta ?? 0),
             anchors: normalizedAnchors,
             exploration: Boolean(options.exploration),
@@ -662,8 +710,7 @@ export function buildCandidateChannelPlanV5(
             'TARGET',
             'EXPLICIT_SESSION',
             [anchor],
-            'SESSION_TARGET',
-            { priorityDelta: 30 }
+            'SESSION_TARGET'
         )
     }
 
@@ -719,8 +766,7 @@ export function buildCandidateChannelPlanV5(
             [],
             'LOCAL_REDISCOVERY',
             {
-                localCandidateIds: rediscovery,
-                priorityDelta: mode === 'FAMILIAR' ? 18 : 0
+                localCandidateIds: rediscovery
             }
         )
 
@@ -766,8 +812,7 @@ export function buildCandidateChannelPlanV5(
             ],
             'PROFILE_TAIL_EXPLORATION',
             {
-                exploration: true,
-                priorityDelta: mode === 'EXPLORE' ? 34 : 0
+                exploration: true
             }
         )
     }
@@ -867,6 +912,14 @@ export function buildCandidateChannelPlanV5(
         servingImpact: false,
         providerFailureIsolation: true,
         sessionMode: mode,
+        sessionModePolicy: {
+            version: SESSION_MODE_POLICY_V5_VERSION,
+            mode,
+            sourcePriorityDelta:
+                SESSION_MODE_POLICY_V5[mode].sourcePriorityDelta,
+            familyPriorityDelta:
+                SESSION_MODE_POLICY_V5[mode].familyPriorityDelta
+        },
         providerBudgets: {
             pica: {
                 eligible: providerEligibility.pica,

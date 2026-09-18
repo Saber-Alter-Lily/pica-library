@@ -362,6 +362,19 @@ body.reader-active .reader-header {
     font-size: 12px;
 }
 
+.a83-connection-head {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.a83-connection-head h3,
+.a83-connection-head p {
+    margin-top: 0;
+}
+
 .mobile-pair-value {
     display: flex;
     gap: 10px;

@@ -22,6 +22,7 @@
 - P2A-3 增加可逆人工身份裁决：同一作品 / 不同版本 / 保持分离均独立持久化；只有“保持分离”立即进入高权限去重保护，其余裁决暂不改写 serving 或创建 binding。
 - P2A-4 增加 Work 物化预览：把已裁决 SAME_WORK / EDITION_VARIANT 关系按传递连通性组织成候选 Work 组，并检测组内 KEEP_SEPARATE 冲突；当前仅预览，仍不写入 Work/Edition/Upload binding。
 - P2A-5 增加 Controlled Materialization Dry-run：在任何真实绑定前生成确定性的 Work / Edition / Upload 计划，读取既有 binding 并输出拟新建/复用/变更动作、原绑定回滚信息、Edition 分区不确定性与冲突阻断；当前 `writeEnabled=false`，无执行绑定入口。
+- P2A-6 增加 prepare-only transaction contract：Dry-run 计划绑定 SHA-256 digest，Desktop CSRF 路径要求精确 plan version/digest、显式确认 token 与幂等 request key；新增 materialization audit ledger，但 `executionEnabled=false`、`applyEndpoint=null`，仍不能写入 Work/Edition/Upload binding。
 
 ## v0.4.0 — 多来源与统一语义
 

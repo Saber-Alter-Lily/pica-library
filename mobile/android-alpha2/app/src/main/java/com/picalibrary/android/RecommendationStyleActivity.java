@@ -4,26 +4,155 @@ import android.app.*;
 import android.content.*;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.*;
 import org.json.JSONObject;
 
-/** Recommendation feedback + Desktop-backed visual-style controls. Android never runs the visual model locally. */
+/**
+ * Android recommendation hub. Runtime recommendation is local; Desktop is only
+ * the source of heavy Visual/Foundation artifacts and optional provider relay.
+ */
 public final class RecommendationStyleActivity extends Activity {
     private LinearLayout content;
-    private JSONObject visual;
+    private JSONObject desktopVisual;
     private boolean loading,destroyed;
 
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);renderShell();}
-    @Override protected void onResume(){super.onResume();renderContent();if(BridgeStore.paired(this))loadVisual();}
+    @Override public void onCreate(Bundle saved){
+        super.onCreate(saved);Ui.applyWindow(this);renderShell();
+    }
+    @Override protected void onResume(){
+        super.onResume();renderContent();
+        if(BridgeStore.paired(this))loadDesktopVisual(false);
+    }
     @Override protected void onDestroy(){destroyed=true;super.onDestroy();}
 
-    private void renderShell(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"推荐与画风",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,12),Ui.dp(this,14),Ui.dp(this,24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();renderContent();}
+    private void renderShell(){
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
+        root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
+        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));
+        bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
+        bar.addView(Ui.text(this,"推荐与画风",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
+        ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,12),Ui.dp(this,14),Ui.dp(this,24));scroll.addView(content);
+        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();renderContent();
+    }
 
-    private void renderContent(){if(content==null)return;content.removeAllViews();boolean reasons=RecommendationFeedbackStore.askReasons(this);content.addView(SettingsRow.row(this,"反馈原因",reasons?"开启":"关闭",v->{RecommendationFeedbackStore.setAskReasons(this,!RecommendationFeedbackStore.askReasons(this));renderContent();}));content.addView(SettingsRow.row(this,"推荐偏好控制","电脑主计算 · 手机离线轻量更新",v->startActivity(new Intent(this,RecommendationControlActivity.class))));LinearLayout info=SettingsRow.panel(this,null);info.addView(Ui.text(this,"画风分析由 Windows / Desktop 完成。手机不会下载或运行 DINOv2；连接电脑后可读取视觉索引并控制是否让画风参与推荐排序。",13,Ui.MUTED,false));content.addView(info);if(!BridgeStore.paired(this)){LinearLayout card=SettingsRow.panel(this,null);card.addView(SettingsRow.statusLine(this,"桌面连接",Ui.text(this,"未连接",13,Ui.MUTED,true)));content.addView(card);content.addView(Ui.button(this,"连接电脑",v->startActivity(new Intent(this,PairingActivity.class)),false),new LinearLayout.LayoutParams(-1,-2));return;}if(visual==null){LinearLayout card=SettingsRow.panel(this,null);card.addView(SettingsRow.statusLine(this,"桌面视觉状态",Ui.text(this,loading?"读取中":"待读取",13,Ui.MUTED,true)));content.addView(card);content.addView(Ui.button(this,"刷新",v->loadVisual(),false),new LinearLayout.LayoutParams(-1,-2));return;}JSONObject settings=visual.optJSONObject("settings");boolean enabled=settings!=null&&settings.optBoolean("enabled",false);String mode=settings==null?"SHADOW":settings.optString("rerankMode","SHADOW");int indexed=visual.optInt("indexedCount",0),target=visual.optInt("targetCount",0),body=visual.optInt("bodyCount",0),cover=visual.optInt("coverCount",0);JSONObject profile=visual.optJSONObject("profile");int positive=profile==null?0:profile.optJSONArray("positivePrototypes")==null?0:profile.optJSONArray("positivePrototypes").length();int negative=profile==null?0:profile.optJSONArray("negativePrototypes")==null?0:profile.optJSONArray("negativePrototypes").length();LinearLayout card=SettingsRow.panel(this,null);card.addView(SettingsRow.statusLine(this,"画风信号",Ui.text(this,enabled?"已启用":"已关闭",13,enabled?SettingsRow.statusColor("可用"):Ui.MUTED,true)));card.addView(SettingsRow.statusLine(this,"推荐接入",Ui.text(this,modeLabel(mode),13,Ui.TEXT,true)));card.addView(SettingsRow.statusLine(this,"视觉索引",Ui.text(this,indexed+" / "+target,13,Ui.TEXT,true)));card.addView(SettingsRow.statusLine(this,"正文 / 封面向量",Ui.text(this,body+" / "+cover,13,Ui.MUTED,true)));card.addView(SettingsRow.statusLine(this,"正向 / 负向画风中心",Ui.text(this,positive+" / "+negative,13,Ui.MUTED,true)));content.addView(card);LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);actions.addView(Ui.button(this,enabled?"关闭画风信号":"启用画风信号",v->updateVisual(!enabled,null),true));Ui.gap(actions,this,8);actions.addView(Ui.button(this,"切换接入模式",v->chooseMode(mode),true));content.addView(actions);Ui.gap(content,this,8);content.addView(Ui.button(this,"刷新桌面状态",v->loadVisual(),false),new LinearLayout.LayoutParams(-1,-2));TextView note=Ui.text(this,"建立 / 补全视觉索引仍需在 Windows 端“推荐与画风”页面执行，因为模型运行在桌面浏览器。",12,Ui.MUTED,false);note.setPadding(0,Ui.dp(this,10),0,0);content.addView(note);}
+    private void renderContent(){
+        if(content==null)return;content.removeAllViews();
+        NativeRecommendationStore.Snapshot runtime=NativeRecommendationStore.load(this);
+        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
 
-    private String modeLabel(String value){if("LIVE".equals(value))return "Live · 低权重参与排序";if("OFF".equals(value))return "关闭排序影响";return "Shadow · 只计算不改排序";}
-    private void chooseMode(String current){String[] labels={"关闭排序影响","Shadow · 只计算不改排序","Live · 低权重参与排序"};String[] values={"OFF","SHADOW","LIVE"};int checked="OFF".equals(current)?0:"LIVE".equals(current)?2:1;new AlertDialog.Builder(this).setTitle("推荐接入模式").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateVisual(null,values[w]);}).setNegativeButton("取消",null).show();}
-    private void loadVisual(){if(loading||!BridgeStore.paired(this))return;loading=true;renderContent();new Thread(()->{try{JSONObject value=BridgeClient.visualStatus(this);runOnUiThread(()->{if(destroyed)return;loading=false;visual=value;renderContent();});}catch(Exception e){runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"无法读取桌面画风状态":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});}}).start();}
-    private void updateVisual(Boolean enabled,String mode){if(loading)return;loading=true;new Thread(()->{try{JSONObject value=BridgeClient.updateVisualSettings(this,enabled,mode);runOnUiThread(()->{if(destroyed)return;loading=false;visual=value;renderContent();});}catch(Exception e){runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"更新失败":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});}}).start();}
+        LinearLayout runtimeCard=SettingsRow.panel(this,null);
+        runtimeCard.addView(Ui.headingWithInfo(this,"本机推荐",17,"手机与电脑的当前推荐列表互不覆盖；同步只交换长期偏好、反馈、候选基础和 Desktop 预计算数据。"));
+        runtimeCard.addView(SettingsRow.statusLine(this,"手机 Cycle",Ui.text(this,runtime.cycleId.isEmpty()?"尚未生成":shortId(runtime.cycleId),12,Ui.MUTED,true)));
+        runtimeCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.text(this,portable.available()?portable.candidates.size()+" 个 · "+shortId(portable.reservoirGeneration):"尚未同步",12,Ui.MUTED,true)));
+        content.addView(runtimeCard);
+
+        content.addView(SettingsRow.row(this,"推荐画像","长期 / 最近 / 本次 / 当前构成",v->startActivity(new Intent(this,RecommendationProfileActivity.class))));
+        content.addView(SettingsRow.row(this,"人工调整",RecommendationPolicyStore.pendingControlCount(this)>0?"有 "+RecommendationPolicyStore.pendingControlCount(this)+" 项待同步":"1–10 档 / 屏蔽 / 本次想看",v->startActivity(new Intent(this,RecommendationControlActivity.class))));
+        content.addView(SettingsRow.row(this,"推荐同步",BridgeStore.paired(this)?"与 Desktop 比较并双向合并":"未连接电脑",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
+        boolean reasons=RecommendationFeedbackStore.askReasons(this);
+        content.addView(SettingsRow.row(this,"反馈原因",reasons?"开启":"关闭",v->{RecommendationFeedbackStore.setAskReasons(this,!RecommendationFeedbackStore.askReasons(this));renderContent();}));
+
+        LinearLayout visual=SettingsRow.panel(this,null);
+        visual.addView(Ui.headingWithInfo(this,"画风基础",17,"DINOv2、全库向量和作者画风原型继续在 Windows 端批量处理；手机只使用同步后的轻量 Visual affinity 独立排序。"));
+        visual.addView(SettingsRow.statusLine(this,"手机 Visual Generation",Ui.text(this,portable.visualGeneration.isEmpty()?"尚未同步":shortId(portable.visualGeneration),12,Ui.MUTED,true)));
+        int covered=0;for(PortableRecommendationPackageStore.Candidate row:portable.candidates)if(row.visualAvailable)covered++;
+        visual.addView(SettingsRow.statusLine(this,"候选 Visual 覆盖",Ui.text(this,covered+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
+        visual.addView(SettingsRow.statusLine(this,"手机画风接入",Ui.text(this,MobileVisualPolicyStore.label(this),12,Ui.MUTED,true)));
+        visual.addView(Ui.button(this,"调整手机画风接入模式",v->chooseMobileVisualMode(),true),new LinearLayout.LayoutParams(-1,-2));
+        content.addView(visual);
+
+        if(BridgeStore.paired(this)){
+            String state=desktopVisual==null?(loading?"读取中":"待读取"):desktopVisual.optInt("indexedCount",0)+" / "+desktopVisual.optInt("targetCount",0);
+            content.addView(SettingsRow.row(this,"Desktop 画风状态（高级）",state,v->showDesktopVisualActions()));
+            content.addView(Ui.button(this,"同步推荐基础数据",v->syncFoundation(),false),new LinearLayout.LayoutParams(-1,-2));
+        }else{
+            content.addView(Ui.button(this,"连接电脑以同步 Visual / Canonical / 候选基础",v->startActivity(new Intent(this,PairingActivity.class)),false),new LinearLayout.LayoutParams(-1,-2));
+        }
+    }
+
+    private String shortId(String value){return value==null||value.isEmpty()?"无":value.substring(0,Math.min(10,value.length()));}
+
+    private void syncFoundation(){
+        if(loading||!BridgeStore.paired(this))return;loading=true;renderContent();
+        new Thread(()->{
+            try{
+                BridgeClient.recommendationPortablePackage(this,500);
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,"推荐基础数据已同步；当前手机推荐周期未被替换",Toast.LENGTH_LONG).show();renderContent();});
+            }catch(Exception e){
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"基础数据同步失败":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
+            }
+        }).start();
+    }
+
+    private void loadDesktopVisual(boolean feedback){
+        if(loading||!BridgeStore.paired(this))return;loading=true;
+        new Thread(()->{
+            try{
+                JSONObject value=BridgeClient.visualStatus(this);
+                runOnUiThread(()->{if(destroyed)return;loading=false;desktopVisual=value;renderContent();});
+            }catch(Exception e){
+                runOnUiThread(()->{if(destroyed)return;loading=false;if(feedback)Toast.makeText(this,e.getMessage()==null?"无法读取 Desktop 画风状态":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
+            }
+        }).start();
+    }
+
+    private void chooseMobileVisualMode(){
+        String current=MobileVisualPolicyStore.mode(this);
+        String[] labels={"关闭","Shadow · 只计算不改本机排序","Live · 低权重参与本机排序"};
+        String[] values={MobileVisualPolicyStore.OFF,MobileVisualPolicyStore.SHADOW,MobileVisualPolicyStore.LIVE};
+        int checked=MobileVisualPolicyStore.OFF.equals(current)?0:MobileVisualPolicyStore.LIVE.equals(current)?2:1;
+        new AlertDialog.Builder(this)
+            .setTitle("手机画风接入模式")
+            .setSingleChoiceItems(labels,checked,(d,w)->{
+                d.dismiss();
+                MobileVisualPolicyStore.setMode(this,values[w]);
+                renderContent();
+                if(NativeRecommendationStore.load(this).available()){
+                    NativeRecommendationJobs.refresh(this);
+                    Toast.makeText(this,"手机画风模式已更新，正在独立生成新的推荐周期",Toast.LENGTH_LONG).show();
+                }
+            })
+            .setNegativeButton("取消",null)
+            .show();
+    }
+
+    private void showDesktopVisualActions(){
+        if(desktopVisual==null){loadDesktopVisual(true);return;}
+        JSONObject settings=desktopVisual.optJSONObject("settings");
+        boolean enabled=settings!=null&&settings.optBoolean("enabled",false);
+        String mode=settings==null?"SHADOW":settings.optString("rerankMode","SHADOW");
+        String[] labels={
+            "刷新 Desktop 状态",
+            enabled?"关闭 Desktop 画风信号":"启用 Desktop 画风信号",
+            "Desktop 接入模式 · "+mode
+        };
+        new AlertDialog.Builder(this)
+            .setTitle("Desktop 画风实验设置")
+            .setItems(labels,(d,w)->{
+                if(w==0)loadDesktopVisual(true);
+                else if(w==1)updateDesktopVisual(!enabled,null);
+                else chooseDesktopMode(mode);
+            })
+            .setNegativeButton("关闭",null)
+            .show();
+    }
+
+    private void chooseDesktopMode(String current){
+        String[] labels={"关闭排序影响","Shadow · 只计算","Live · 低权重参与"};
+        String[] values={"OFF","SHADOW","LIVE"};
+        int checked="OFF".equals(current)?0:"LIVE".equals(current)?2:1;
+        new AlertDialog.Builder(this).setTitle("Desktop 推荐接入模式").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w]);}).setNegativeButton("取消",null).show();
+    }
+
+    private void updateDesktopVisual(Boolean enabled,String mode){
+        if(loading)return;loading=true;
+        new Thread(()->{
+            try{
+                JSONObject value=BridgeClient.updateVisualSettings(this,enabled,mode);
+                runOnUiThread(()->{if(destroyed)return;loading=false;desktopVisual=value;renderContent();});
+            }catch(Exception e){
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"更新失败":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
+            }
+        }).start();
+    }
 }

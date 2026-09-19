@@ -83,6 +83,7 @@ export interface PortablePolicySnapshotV5 extends PortablePolicyStateV5 {
         owned: number
         favorites: number
         controls: number
+        blockedTargets: number
         hardSuppressed: number
         seenFacts: number
         ownedOverrides: number
@@ -527,13 +528,16 @@ export function portablePolicySnapshotV5(state: PortablePolicyStateV5, catalog: 
         ...state,
         inferred: portableInferredSignalsV5(
             catalog,
-            120,
+            500,
             state.tasteExcludedComicIds
         ),
         counts: {
             owned: catalog.filter(isOwnedComicV5).length,
             favorites: catalog.filter((comic) => comic.isFavorite).length,
             controls: state.controls.length,
+            blockedTargets: state.controls.filter(
+                (control) => control.direction === 'BLOCK'
+            ).length,
             hardSuppressed: state.hardSuppressComicIds.length,
             seenFacts: state.seenComicIds.length,
             ownedOverrides: state.ownedComicIds.length,

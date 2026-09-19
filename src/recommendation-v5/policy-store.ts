@@ -6,6 +6,7 @@ import {
     activeTemporarySuppressionsV5,
     defaultPortablePolicyStateV5,
     normalizeControlV5,
+    normalizePreferenceKey,
     portablePolicySnapshotV5,
     type PortablePolicyStateV5,
     type PreferenceControlV5,
@@ -16,6 +17,10 @@ import {
     type SessionIntentMode,
     upsertControlV5
 } from './portable-policy'
+import {
+    applyConflictResolutionsV1,
+    previewMobileRecommendationSyncV1
+} from './mobile-sync'
 
 interface MobileFeedbackMutationV5 {
     comicId?: unknown
@@ -26,13 +31,21 @@ interface MobileFeedbackMutationV5 {
 export interface MobileRecommendationSyncV5 {
     deviceId?: unknown
     mutationId?: unknown
+    baseRevision?: unknown
+    baseControls?: unknown
     controls?: unknown
+    /** Legacy clients only. V1 paired-runtime session intent stays device local. */
     sessionIntent?: unknown
     feedback?: unknown
+    events?: unknown
     suppressComicIds?: unknown
     clearSuppressComicIds?: unknown
     tasteExcludedComicIds?: unknown
     clearTasteExcludedComicIds?: unknown
+    itemDispositions?: unknown
+    catalogEvidence?: unknown
+    resolutions?: unknown
+    syncSchemaVersion?: unknown
 }
 
 function stringArray(value: unknown) {
@@ -357,6 +370,30 @@ export class RecommendationPolicyStoreV5 {
         return this.snapshot()
     }
 
+
+    setExplicitDistinctPair(
+        leftComicId: string,
+        rightComicId: string,
+        distinct: boolean
+    ) {
+        const left = normalizePreferenceKey(leftComicId)
+        const right = normalizePreferenceKey(rightComicId)
+        if (!left || !right || left === right)
+            throw new Error('Two distinct comic ids are required')
+        const pair = [left, right].sort().join('\u0000')
+        const previous = this.state()
+        const values = new Set(previous.explicitDistinctPairs)
+        if (distinct) values.add(pair)
+        else values.delete(pair)
+        this.save({
+            ...previous,
+            revision: previous.revision + 1,
+            updatedAt: new Date().toISOString(),
+            explicitDistinctPairs: [...values].sort()
+        })
+        return this.snapshot()
+    }
+
     private applyFeedback(
         feedback: MobileFeedbackMutationV5,
         deviceId: string,
@@ -390,6 +427,65 @@ export class RecommendationPolicyStoreV5 {
             })
     }
 
+    private applyPortableEvent(
+        value: Record<string, unknown>,
+        deviceId: string,
+        mutationId: string,
+        index: number
+    ) {
+        const eventType = String(value.eventType ?? '')
+        if (
+            ![
+                'recommend_impression',
+                'recommend_detail_open',
+                'reader_complete'
+            ].includes(eventType)
+        )
+            return
+        const comicId = String(value.comicId ?? '').trim()
+        if (!comicId) return
+        const eventId = String(value.eventId ?? '').trim().slice(0, 200)
+        this.database.recordUserEvent({
+            eventType: eventType as
+                | 'recommend_impression'
+                | 'recommend_detail_open'
+                | 'reader_complete',
+            comicId,
+            source: 'android-sync-v5',
+            occurredAt: String(value.occurredAt ?? ''),
+            metadata: {
+                deviceId,
+                mutationId,
+                portable: true
+            },
+            dedupeKey: eventId
+                ? `v5-mobile-event:${deviceId}:${eventId}`
+                : `v5-mobile:${deviceId}:${mutationId}:${index}:event`
+        })
+    }
+
+    previewMobile(input: MobileRecommendationSyncV5) {
+        const state = this.state()
+        return {
+            ...previewMobileRecommendationSyncV1({
+                baseRevision: input.baseRevision,
+                desktopRevision: state.revision,
+                baseControls: input.baseControls,
+                desktopControls: state.controls,
+                androidControls: input.controls,
+                feedback: input.feedback,
+                events: input.events,
+                suppressComicIds: input.suppressComicIds,
+                clearSuppressComicIds: input.clearSuppressComicIds,
+                tasteExcludedComicIds: input.tasteExcludedComicIds,
+                clearTasteExcludedComicIds: input.clearTasteExcludedComicIds,
+                itemDispositions: input.itemDispositions,
+                catalogEvidence: input.catalogEvidence
+            }),
+            snapshot: this.snapshot()
+        }
+    }
+
     mergeMobile(input: MobileRecommendationSyncV5) {
         const deviceId = String(input.deviceId ?? '').trim().slice(0, 160)
         const mutationId = String(input.mutationId ?? '').trim().slice(0, 200)
@@ -397,30 +493,59 @@ export class RecommendationPolicyStoreV5 {
             throw new Error('deviceId and mutationId are required for recommendation sync')
         let state = this.state()
         const previousRevision = state.deviceSyncRevisions[deviceId] ?? 0
-        const controls = Array.isArray(input.controls) ? input.controls : []
-        for (const item of controls) {
-            if (!item || typeof item !== 'object') continue
-            const row = item as Record<string, unknown>
+        const preview = previewMobileRecommendationSyncV1({
+            baseRevision: input.baseRevision,
+            desktopRevision: state.revision,
+            baseControls: input.baseControls,
+            desktopControls: state.controls,
+            androidControls: input.controls,
+            feedback: input.feedback,
+            events: input.events,
+            suppressComicIds: input.suppressComicIds,
+            clearSuppressComicIds: input.clearSuppressComicIds,
+            tasteExcludedComicIds: input.tasteExcludedComicIds,
+            clearTasteExcludedComicIds: input.clearTasteExcludedComicIds,
+            itemDispositions: input.itemDispositions,
+            catalogEvidence: input.catalogEvidence
+        })
+        const resolved = applyConflictResolutionsV1({
+            androidControls: input.controls,
+            conflicts: preview.conflicts,
+            resolutions: input.resolutions
+        })
+        if (resolved.unresolved.length)
+            return {
+                acknowledgedMutationId: null,
+                requiresResolution: true,
+                preview,
+                conflicts: resolved.unresolved,
+                snapshot: this.snapshot()
+            }
+        const controls = resolved.controls
+        for (const row of controls) {
             const targetType = validTargetType(row.targetType)
             if (!targetType) continue
             state = upsertControlV5(
                 state,
                 normalizeControlV5({
                     targetType,
-                    key: String(row.key ?? ''),
-                    label: String(row.label ?? row.key ?? ''),
-                    direction: validDirection(row.direction),
-                    levelDelta:
-                        row.levelDelta === undefined
-                            ? undefined
-                            : Number(row.levelDelta),
-                    scope: validScope(row.scope),
+                    key: row.key,
+                    label: row.label,
+                    direction: row.direction,
+                    levelDelta: row.levelDelta,
+                    scope: row.scope,
                     source: 'ANDROID',
                     updatedAt: new Date().toISOString()
                 })
             )
         }
-        if (input.sessionIntent && typeof input.sessionIntent === 'object') {
+        // syncSchemaVersion >= 1 keeps Session Intent device-local.
+        // Legacy clients keep the old behavior for backward compatibility.
+        if (
+            Number(input.syncSchemaVersion ?? 0) < 1 &&
+            input.sessionIntent &&
+            typeof input.sessionIntent === 'object'
+        ) {
             const raw = input.sessionIntent as Record<string, unknown>
             const targetType = validTargetType(raw.targetType)
             const mode = validSessionMode(raw.mode)
@@ -459,6 +584,80 @@ export class RecommendationPolicyStoreV5 {
             updatedAt: new Date().toISOString()
         }
         this.save(state)
+        const catalogEvidence = Array.isArray(input.catalogEvidence)
+            ? input.catalogEvidence
+            : []
+        const catalogRecords = catalogEvidence.flatMap((item) => {
+            if (!item || typeof item !== 'object') return []
+            const row = item as Record<string, unknown>
+            const comicId = String(row.comicId ?? '').trim()
+            const title = String(row.title ?? '').trim()
+            if (!comicId || !title) return []
+            const stringList = (value: unknown) =>
+                Array.isArray(value)
+                    ? value.map(String).map((v) => v.trim()).filter(Boolean)
+                    : []
+            const provider = String(row.providerId ?? '')
+            const providerId =
+                provider === 'pica' || provider === 'eh'
+                    ? (provider as 'pica' | 'eh')
+                    : undefined
+            const canonicalAuthor = String(
+                row.canonicalAuthor ?? ''
+            ).trim()
+            const providerRemoteId = String(
+                row.providerRemoteId ?? ''
+            ).trim()
+            const coverUrl = String(row.coverUrl ?? '').trim()
+            return [
+                {
+                    comicId,
+                    title,
+                    author:
+                        canonicalAuthor ||
+                        String(row.author ?? ''),
+                    ...(providerId ? { providerId } : {}),
+                    ...(providerRemoteId
+                        ? { providerRemoteId }
+                        : {}),
+                    tags: stringList(row.tags),
+                    categories: stringList(row.categories),
+                    finished: Boolean(row.finished),
+                    pagesCount: Math.max(
+                        0,
+                        Math.floor(Number(row.pagesCount) || 0)
+                    ),
+                    totalLikes: Math.max(
+                        0,
+                        Math.floor(Number(row.totalLikes) || 0)
+                    ),
+                    totalViews: Math.max(
+                        0,
+                        Math.floor(Number(row.totalViews) || 0)
+                    ),
+                    ...(coverUrl ? { coverUrl } : {})
+                }
+            ]
+        })
+        if (catalogRecords.length)
+            this.database.importCatalog(
+                catalogRecords,
+                'android-recommendation-sync'
+            )
+        const dispositions = Array.isArray(input.itemDispositions)
+            ? input.itemDispositions
+            : []
+        dispositions.forEach((item) => {
+            if (!item || typeof item !== 'object') return
+            const row = item as Record<string, unknown>
+            this.setItemDisposition({
+                comicId: row.comicId,
+                reason: row.reason,
+                active: row.active,
+                durationDays: row.durationDays,
+                source: 'ANDROID'
+            })
+        })
         const feedback = Array.isArray(input.feedback) ? input.feedback : []
         feedback.forEach((item, index) => {
             if (item && typeof item === 'object')
@@ -469,8 +668,20 @@ export class RecommendationPolicyStoreV5 {
                     index
                 )
         })
+        const events = Array.isArray(input.events) ? input.events : []
+        events.forEach((item, index) => {
+            if (item && typeof item === 'object')
+                this.applyPortableEvent(
+                    item as Record<string, unknown>,
+                    deviceId,
+                    mutationId,
+                    index
+                )
+        })
         return {
             acknowledgedMutationId: mutationId,
+            requiresResolution: false,
+            preview,
             deviceRevision: state.deviceSyncRevisions[deviceId],
             snapshot: this.snapshot()
         }

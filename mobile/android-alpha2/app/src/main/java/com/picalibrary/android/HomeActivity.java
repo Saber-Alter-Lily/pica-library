@@ -20,7 +20,7 @@ public final class HomeActivity extends Activity {
 
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);themeKey=ThemeStore.effectiveKey(this);prefs=getSharedPreferences("alpha81-ui",MODE_PRIVATE);collectionMode=UnifiedComicCollectionAdapter.normalizeMode(prefs.getInt("collectionMode",UnifiedComicCollectionAdapter.MODE_GRID_MEDIUM));activeShelfId=prefs.getString("activeShelfId","");librarySpec=UnifiedFilterStore.load(getSharedPreferences("library-display",MODE_PRIVATE));librarySpec.favoriteOnly=false;if(saved!=null){current=ShellPolicy.clampTab(saved.getInt("tab",0));showingShelves=saved.getBoolean("shelves",false);libraryQuery=saved.getString("libraryQuery","");int[] sy=saved.getIntArray("tabScrollY"),sp=saved.getIntArray("tabListPosition"),so=saved.getIntArray("tabListOffset");if(sy!=null&&sy.length==4)System.arraycopy(sy,0,tabScrollY,0,4);if(sp!=null&&sp.length==4)System.arraycopy(sp,0,tabListPosition,0,4);if(so!=null&&so.length==4)System.arraycopy(so,0,tabListOffset,0,4);}else current=ShellPolicy.clampTab(getIntent().getIntExtra("tab",0));renderShell();show();}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);showingShelves=false;current=ShellPolicy.clampTab(intent.getIntExtra("tab",0));renderShell();show();}
-    @Override protected void onResume(){super.onResume();String key=ThemeStore.effectiveKey(this);if(!key.equals(themeKey)){themeKey=key;Ui.applyWindow(this);renderShell();show();return;}if(body!=null)show();}
+    @Override protected void onResume(){super.onResume();RecommendationSyncActivity.maybeOfferOnConnection(this);String key=ThemeStore.effectiveKey(this);if(!key.equals(themeKey)){themeKey=key;Ui.applyWindow(this);renderShell();show();return;}if(body!=null)show();}
     @Override protected void onSaveInstanceState(Bundle out){captureCurrentViewport();out.putInt("tab",current);out.putBoolean("shelves",showingShelves);out.putString("libraryQuery",libraryQuery);out.putIntArray("tabScrollY",tabScrollY);out.putIntArray("tabListPosition",tabListPosition);out.putIntArray("tabListOffset",tabListOffset);super.onSaveInstanceState(out);}
     @Override protected void onPause(){captureCurrentViewport();super.onPause();}
     @Override protected void onDestroy(){++serial;if(pending!=null)pending.cancel(true);worker.shutdownNow();super.onDestroy();}
@@ -36,6 +36,7 @@ public final class HomeActivity extends Activity {
     private void restoreListPosition(RecyclerView v,int tab){int position=Math.max(0,tabListPosition[tab]),offset=tabListOffset[tab];v.post(()->{RecyclerView.LayoutManager raw=v.getLayoutManager();if(raw instanceof LinearLayoutManager)((LinearLayoutManager)raw).scrollToPositionWithOffset(position,offset);});}
     private void setCollectionLayout(RecyclerView v,int mode){if(mode==UnifiedComicCollectionAdapter.MODE_LIST)v.setLayoutManager(new LinearLayoutManager(this));else v.setLayoutManager(new GridLayoutManager(this,Math.max(2,mode)));v.setItemAnimator(null);}
     private void open(UnifiedCatalogStore.Entry e){Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",e.id);i.putExtra("title",e.title);i.putExtra("author",e.displayAuthor());startActivity(i);}
+    private void openRecommendation(UnifiedCatalogStore.Entry e){RecommendationEvidenceStore.recordDetailOpen(this,e.id,e.displayAuthor(),e.tags,e.categories);open(e);}
 
     private void library(){LinearLayout p=page(false);Button history=compact("历史",v->startActivity(new Intent(this,HistoryActivity.class)));history.setSingleLine(true);Button more=compact("⋮",v->showLibraryMenu());more.setSingleLine(true);titleRow(p,"我的书库",history,more);EditText search=new EditText(this);search.setSingleLine(true);search.setHint("搜索标题 / 作者 / 标签 / 分类");search.setText(libraryQuery);search.setImeOptions(EditorInfo.IME_ACTION_SEARCH);Ui.styleField(search,this);search.setOnEditorActionListener((v,id,event)->{if(id==EditorInfo.IME_ACTION_SEARCH){libraryQuery=v.getText().toString().trim();show();return true;}return false;});LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.setMargins(0,Ui.dp(this,8),0,Ui.dp(this,6));p.addView(search,sp);LinearLayout tools=new LinearLayout(this);tools.setGravity(Gravity.CENTER_VERTICAL);Button filter=compact("筛选"+(librarySpec.activeCount()>0?" · "+librarySpec.activeCount():""),v->UnifiedLibraryFilterDialog.show(this,librarySpec,libraryFacets,next->{librarySpec=next;librarySpec.favoriteOnly=false;UnifiedFilterStore.save(getSharedPreferences("library-display",MODE_PRIVATE),next);show();}));filter.setSingleLine(true);tools.addView(filter);Ui.gap(tools,this,6);Button sort=compact(UnifiedLibraryFilter.sortLabel(librarySpec.sort)+" ▾",v->chooseLibrarySort());sort.setSingleLine(true);tools.addView(sort);TextView count=Ui.text(this,"",12.5f,Ui.MUTED,false);count.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-1,1);cp.setMargins(Ui.dp(this,8),0,0,0);tools.addView(count,cp);p.addView(tools);RecyclerView list=collection(p,collectionMode);renderLibrary(list,count);refreshLibrary(false);}
     private void showLibraryMenu(){String[] labels={"书架","刷新书库","显示方式"};new AlertDialog.Builder(this).setTitle("书库").setItems(labels,(d,w)->{if(w==0){showingShelves=true;show();}else if(w==1)refreshLibrary(true);else chooseCollectionMode();}).setNegativeButton("取消",null).show();}
@@ -50,11 +51,83 @@ public final class HomeActivity extends Activity {
     private void deleteShelf(ShelfStore.Shelf shelf){new AlertDialog.Builder(this).setTitle("删除“"+shelf.name+"”？").setMessage("只删除书架，不删除漫画。") .setNegativeButton("取消",null).setPositiveButton("删除",(d,w)->{ShelfStore.delete(this,shelf.id);activeShelfId="";syncShelves();show();}).show();}
     private void syncShelves(){if(!BridgeStore.paired(this))return;worker.submit(()->{try{BridgeClient.device(this);ShelfStore.syncWithDesktop(this);runOnUiThread(()->{if(showingShelves&&!isDestroyed())show();});}catch(Exception ignored){}});}
 
-    private void recommendations(){LinearLayout p=page(true);RecommendationProgressPanel progress=new RecommendationProgressPanel(this,()->{if(current==1&&!isDestroyed()&&!isFinishing())show();});Button preferences=compact("偏好",v->startActivity(new Intent(this,RecommendationControlActivity.class)));ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新推荐",v->refreshRecommendations(progress));titleRow(p,"为你推荐",preferences,refresh);p.addView(progress);NativeRecommendationStore.Snapshot stored=NativeRecommendationStore.load(this),snapshot=RecommendationPolicyStore.applyLocalPolicy(this,stored);if(!snapshot.available()){String message=stored.available()?"当前同步候选已被你的反馈或屏蔽规则耗尽。":"还没有可用的推荐缓存。";TextView t=Ui.text(this,message,14,Ui.MUTED,false);t.setPadding(0,Ui.dp(this,20),0,Ui.dp(this,10));p.addView(t);if(BridgeStore.paired(this))p.addView(compact("从电脑同步并重算",v->refreshRecommendations(progress)));else if(PicaAccountStore.load(this).configured())p.addView(compact("本机生成备用推荐",v->{NativeRecommendationJobs.refresh(this);progress.begin();}));else p.addView(compact("连接电脑",v->startActivity(new Intent(this,PairingActivity.class))));return;}String source=stored.readiness.startsWith("DESKTOP_SYNCED")?"桌面完整计算结果 · 手机离线轻量重排":"手机本机备用推荐";TextView sourceView=Ui.text(this,source,12,Ui.MUTED,false);sourceView.setPadding(0,0,0,Ui.dp(this,6));p.addView(sourceView);LinearLayout pager=new LinearLayout(this);pager.setGravity(Gravity.CENTER_VERTICAL);pager.addView(compact("上一批",v->{RecommendationPolicyStore.moveVisibleBatch(this,-1);show();}),new LinearLayout.LayoutParams(0,-2,1));TextView batch=Ui.text(this,"第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批",13,Ui.MUTED,false);batch.setGravity(Gravity.CENTER);pager.addView(batch,new LinearLayout.LayoutParams(0,-1,1));pager.addView(compact("下一批",v->{RecommendationPolicyStore.moveVisibleBatch(this,1);show();}),new LinearLayout.LayoutParams(0,-2,1));p.addView(pager);UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);for(NativeRecommendationStore.Item item:snapshot.current()){UnifiedCatalogStore.Entry e=catalog.byId.get(item.comicId);if(e==null){e=new UnifiedCatalogStore.Entry(item.comicId,item.title,item.author);e.tags.addAll(item.tags);e.categories.addAll(item.categories);}LinearLayout card=Ui.card(this);card.setOrientation(LinearLayout.HORIZONTAL);ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(Ui.PLACEHOLDER);card.addView(cover,new LinearLayout.LayoutParams(Ui.dp(this,86),Ui.dp(this,122)));LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,12),0,0,0);copy.addView(Ui.text(this,item.title,16,Ui.TEXT,true));copy.addView(Ui.text(this,item.author,12,Ui.MUTED,false));TextView why=Ui.text(this,item.reason,12,Ui.PRIMARY,false);why.setPadding(0,Ui.dp(this,6),0,0);copy.addView(why);LinearLayout feedback=new LinearLayout(this);feedback.setPadding(0,Ui.dp(this,8),0,0);feedback.addView(compact("👍 喜欢",v->recommendationFeedback(item,"like")));Ui.gap(feedback,this,6);feedback.addView(compact("👎 不喜欢",v->recommendationFeedback(item,"dislike")));copy.addView(feedback);card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));UnifiedCatalogStore.Entry target=e;card.setOnClickListener(v->open(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);p.addView(card);}NativeRecommendationStore.markSeen(this,snapshot.current());}
+    private void recommendations(){
+        LinearLayout p=page(true);
+        RecommendationProgressPanel progress=new RecommendationProgressPanel(this,()->{if(current==1&&!isDestroyed()&&!isFinishing())show();});
+        Button preferences=compact("画像 / 调整",v->startActivity(new Intent(this,RecommendationStyleActivity.class)));
+        ImageButton refresh=Ui.iconButton(this,R.drawable.ic_refresh_24,"重新生成手机推荐",v->refreshRecommendations(progress));
+        titleRow(p,"为你推荐",preferences,refresh);
+        p.addView(progress);
 
-    private void refreshRecommendations(RecommendationProgressPanel progress){if(BridgeStore.paired(this)){Toast.makeText(this,"已交给电脑重算，完成后会回写手机缓存",Toast.LENGTH_SHORT).show();worker.submit(()->{try{BridgeClient.syncRecommendationState(this,true);runOnUiThread(()->{if(!isDestroyed()&&!isFinishing())show();});}catch(Exception e){runOnUiThread(()->Toast.makeText(this,e.getMessage()==null?"桌面重算失败；保留现有离线缓存":e.getMessage(),Toast.LENGTH_LONG).show());}});return;}NativeRecommendationStore.Snapshot cached=NativeRecommendationStore.load(this);if(cached.available()){Toast.makeText(this,"已按本机偏好重新排序现有缓存",Toast.LENGTH_SHORT).show();show();return;}if(PicaAccountStore.load(this).configured()){NativeRecommendationJobs.refresh(this);progress.begin();return;}Toast.makeText(this,"请先连接电脑；没有缓存时才需要本机账号生成备用推荐",Toast.LENGTH_LONG).show();}
+        NativeRecommendationStore.Snapshot stored=NativeRecommendationStore.load(this);
+        NativeRecommendationStore.Snapshot snapshot=RecommendationPolicyStore.applyLocalPolicy(this,stored);
+        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
 
-    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);if(!RecommendationFeedbackStore.askReasons(this)){show();return;}String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?"为什么喜欢？（可选）":"为什么不喜欢？（可选）").setMultiChoiceItems(labels,checked,(d,which,value)->checked[which]=value).setNegativeButton("跳过",(d,w)->show()).setPositiveButton("保存原因",(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen")||reasons.contains("repetitive"))RecommendationPolicyStore.suppress(this,item.comicId,true);show();}).setOnCancelListener(d->show()).show();}
+        LinearLayout statusCard=SettingsRow.panel(this,null);
+        statusCard.addView(SettingsRow.statusLine(this,"运行节点",Ui.text(this,"Android 本机",12,Ui.TEXT,true)));
+        statusCard.addView(SettingsRow.statusLine(this,"当前 Cycle",Ui.text(this,stored.cycleId.isEmpty()?"尚未生成":stored.cycleId.substring(0,Math.min(12,stored.cycleId.length())),12,Ui.MUTED,true)));
+        statusCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.text(this,portable.available()?portable.candidates.size()+" 个 · "+portable.reservoirGeneration.substring(0,Math.min(8,portable.reservoirGeneration.length())):"尚未同步",12,Ui.MUTED,true)));
+        statusCard.addView(SettingsRow.statusLine(this,"本次 Session",Ui.text(this,RecommendationEvidenceStore.sessionCount(this)+" 条行为 · 仅手机",12,Ui.MUTED,true)));
+        p.addView(statusCard);
+
+        if(!snapshot.available()){
+            TextView t=Ui.text(this,stored.available()?"当前候选已被本机反馈或屏蔽规则耗尽。":"还没有手机本地推荐周期。",14,Ui.MUTED,false);
+            t.setPadding(0,Ui.dp(this,12),0,Ui.dp(this,10));p.addView(t);
+            boolean canRun=PicaClient.available(this)||portable.available();
+            if(canRun){
+                p.addView(compact("生成手机推荐",v->{NativeRecommendationJobs.refresh(this);progress.begin();}));
+            }else if(BridgeStore.paired(this)){
+                p.addView(compact("同步候选基础",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
+            }else{
+                p.addView(compact("连接电脑或配置在线来源",v->startActivity(new Intent(this,PairingActivity.class))));
+            }
+            return;
+        }
+
+        TextView sourceView=Ui.text(this,"手机独立排序 · Lifetime / Recent / Session / Explicit"+(portable.available()?" · 已接入同步候选基础":""),12,Ui.MUTED,false);
+        sourceView.setPadding(0,0,0,Ui.dp(this,6));p.addView(sourceView);
+        LinearLayout pager=new LinearLayout(this);pager.setGravity(Gravity.CENTER_VERTICAL);
+        pager.addView(compact("上一批",v->{RecommendationPolicyStore.moveVisibleBatch(this,-1);show();}),new LinearLayout.LayoutParams(0,-2,1));
+        TextView batch=Ui.text(this,"第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批",13,Ui.MUTED,false);batch.setGravity(Gravity.CENTER);pager.addView(batch,new LinearLayout.LayoutParams(0,-1,1));
+        pager.addView(compact("下一批",v->{RecommendationPolicyStore.moveVisibleBatch(this,1);show();}),new LinearLayout.LayoutParams(0,-2,1));
+        p.addView(pager);
+
+        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
+        for(NativeRecommendationStore.Item item:snapshot.current()){
+            UnifiedCatalogStore.Entry e=catalog.byId.get(item.comicId);
+            if(e==null){e=new UnifiedCatalogStore.Entry(item.comicId,item.title,item.author);e.tags.addAll(item.tags);e.categories.addAll(item.categories);}
+            LinearLayout card=Ui.card(this);card.setOrientation(LinearLayout.HORIZONTAL);
+            ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(Ui.PLACEHOLDER);card.addView(cover,new LinearLayout.LayoutParams(Ui.dp(this,86),Ui.dp(this,122)));
+            LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,12),0,0,0);
+            copy.addView(Ui.text(this,item.title,16,Ui.TEXT,true));copy.addView(Ui.text(this,item.author,12,Ui.MUTED,false));
+            TextView why=Ui.text(this,item.reason,12,Ui.PRIMARY,false);why.setPadding(0,Ui.dp(this,6),0,0);copy.addView(why);
+            LinearLayout feedback=new LinearLayout(this);feedback.setPadding(0,Ui.dp(this,8),0,0);
+            feedback.addView(compact("👍 喜欢",v->recommendationFeedback(item,"like")));Ui.gap(feedback,this,6);
+            feedback.addView(compact("👎 不喜欢",v->recommendationFeedback(item,"dislike")));Ui.gap(feedback,this,6);
+            UnifiedCatalogStore.Entry target=e;
+            feedback.addView(compact("⚙ 调节",v->RecommendationItemControlDialog.show(this,target,this::show)));copy.addView(feedback);
+            card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);p.addView(card);
+        }
+        NativeRecommendationStore.markSeen(this,snapshot.current());
+    }
+
+    private void refreshRecommendations(RecommendationProgressPanel progress){
+        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
+        if(PicaClient.available(this)||portable.available()){
+            NativeRecommendationJobs.refresh(this);
+            progress.begin();
+            Toast.makeText(this,"手机正在独立生成新的推荐周期",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if(BridgeStore.paired(this)){
+            Toast.makeText(this,"先同步候选基础；同步不会替换当前手机推荐周期",Toast.LENGTH_LONG).show();
+            startActivity(new Intent(this,RecommendationSyncActivity.class));
+            return;
+        }
+        Toast.makeText(this,"请先连接电脑或配置可用的在线来源",Toast.LENGTH_LONG).show();
+    }
+
+    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);if(!RecommendationFeedbackStore.askReasons(this)){show();return;}String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?"为什么喜欢？（可选）":"为什么不喜欢？（可选）").setMultiChoiceItems(labels,checked,(d,which,value)->checked[which]=value).setNegativeButton("跳过",(d,w)->show()).setPositiveButton("保存原因",(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,30);if(reasons.contains("repetitive"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"duplicate",true,30);show();}).setOnCancelListener(d->show()).show();}
 
     private void onlineEntry(){LinearLayout p=page(true);titleRow(p,"在线");p.addView(Ui.button(this,"进入在线",v->startActivity(new Intent(this,PicaBrowseActivity.class)),false));}
     private void settingsEntry(){LinearLayout p=page(true);titleRow(p,"设置");p.addView(Ui.button(this,"打开设置",v->startActivity(new Intent(this,SettingsActivity.class)),false));}

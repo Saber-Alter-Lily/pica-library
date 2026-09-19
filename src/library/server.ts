@@ -52,6 +52,9 @@ export interface DesktopServerController {
     ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
+    exportRecommendationAudit?: (
+        input?: Record<string, unknown>
+    ) => Promise<Record<string, unknown>>
     syncAndExportBrowserLitePackage?: () => Promise<Record<string, unknown>>
     openBrowserLite?: () => Promise<void>
     openDirectory: (kind: string) => Promise<void>
@@ -363,6 +366,72 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/recommendation-v5/provider-routes' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5ProviderRoutes(
+                        url.searchParams.get('appSessionId'),
+                        Number(url.searchParams.get('limit') ?? 5000)
+                    )
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/candidate-channels' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5CandidateChannels(
+                        url.searchParams.get('appSessionId'),
+                        Number(url.searchParams.get('limit') ?? 5000)
+                    )
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/serving-composition' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationServingCompositionV3()
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/preference-timescales' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5PreferenceTimescales(
+                        url.searchParams.get('appSessionId'),
+                        Number(url.searchParams.get('limit') ?? 5000)
+                    )
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/behavior-evidence' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5BehaviorEvidence(
+                        Number(url.searchParams.get('limit') ?? 5000)
+                    )
+                )
+
+            if (
+                url.pathname ===
                     '/api/v1/recommendation-v5/work-identity/audit' &&
                 request.method === 'GET'
             )
@@ -398,6 +467,275 @@ export async function startLibraryServer(options: {
                     200,
                     options.service.recommendationV5RefreshWorkIdentityEvidence(
                         Number(input.limit ?? 500)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/review' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityReview(
+                        Number(url.searchParams.get('limit') ?? 200)
+                    )
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/materialization-plan' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityMaterializationPlan()
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/advanced-learning-gate' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5AdvancedLearningGate(
+                        url.searchParams.get('direction'),
+                        url.searchParams.get('baselineVersion'),
+                        url.searchParams.get('candidateVersion'),
+                        Number(url.searchParams.get('limit') ?? 1000),
+                        Number(url.searchParams.get('horizonDays') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/versions' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5BenchmarkVersions(
+                        Number(url.searchParams.get('limit') ?? 1000)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/compare' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5BenchmarkComparison(
+                        String(url.searchParams.get('baselineVersion') ?? ''),
+                        String(url.searchParams.get('candidateVersion') ?? ''),
+                        Number(url.searchParams.get('limit') ?? 1000),
+                        Number(url.searchParams.get('horizonDays') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/summary' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5EvaluationSummary(
+                        Number(url.searchParams.get('limit') ?? 200),
+                        Number(url.searchParams.get('horizonDays') ?? 30),
+                        Number(url.searchParams.get('steerabilityStep') ?? 3),
+                        Number(url.searchParams.get('steerabilityTargetLimit') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/steerability' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5SteerabilityAudit(
+                        Number(url.searchParams.get('step') ?? 3),
+                        Number(url.searchParams.get('targetLimit') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/evaluation/retrospective' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5RetrospectiveBenchmark(
+                        Number(url.searchParams.get('limit') ?? 200),
+                        Number(url.searchParams.get('horizonDays') ?? 30)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/visual-activation-gate' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5VisualActivationGate(
+                        Number(url.searchParams.get('limit') ?? 100)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/promotion-gate' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5P3PromotionGate(
+                        Number(url.searchParams.get('limit') ?? 100)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/shadow-runs' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5ShadowRuns(
+                        Number(url.searchParams.get('limit') ?? 50)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/shadow-retrieval' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    await options.service.runRecommendationV5ShadowRetrieval(
+                        input
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/work-identity/materialization/runs' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityMaterializationRuns(
+                        Number(url.searchParams.get('limit') ?? 100)
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/work-identity/materialization/prepare' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.prepareRecommendationV5WorkIdentityMaterialization(
+                        input
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/decision' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                return json(
+                    response,
+                    200,
+                    options.service.updateRecommendationV5WorkIdentityDecision(
+                        input
                     )
                 )
             }
@@ -592,6 +930,45 @@ export async function startLibraryServer(options: {
                 request.method === 'GET'
             )
                 return json(response, 200, options.service.visualIndexStatus())
+            if (
+                url.pathname === '/api/v1/visual/representation-qc' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.visualRepresentationQc(
+                        Number(url.searchParams.get('maxPairSamples') ?? 4000),
+                        Number(url.searchParams.get('maxAnchors') ?? 120)
+                    )
+                )
+            if (
+                url.pathname === '/api/v1/visual/author-atlas' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.visualAuthorAtlas(
+                        Number(url.searchParams.get('minWorksPerAuthor') ?? 2),
+                        Number(url.searchParams.get('maxGraphAuthors') ?? 600),
+                        Number(url.searchParams.get('neighborLimit') ?? 8)
+                    )
+                )
+            if (
+                url.pathname === '/api/v1/visual/style-families' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.visualStyleFamilies(
+                        Number(url.searchParams.get('minWorksPerAuthor') ?? 2),
+                        Number(url.searchParams.get('maxAuthors') ?? 300),
+                        Number(url.searchParams.get('mutualK') ?? 2),
+                        Number(url.searchParams.get('minimumSimilarity') ?? -1)
+                    )
+                )
             if (
                 url.pathname === '/api/v1/visual/settings' &&
                 request.method === 'POST'
@@ -958,6 +1335,23 @@ export async function startLibraryServer(options: {
                 return json(response, 200, {
                     path: await options.desktop.chooseFolder()
                 })
+            }
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/export-audit' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.exportRecommendationAudit)
+                    return json(response, 409, {
+                        error: 'Recommendation audit export is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    await options.desktop.exportRecommendationAudit(
+                        await body(request)
+                    )
+                )
             }
             if (
                 url.pathname === '/api/v1/desktop/export-browser-lite' &&

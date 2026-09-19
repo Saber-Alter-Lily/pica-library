@@ -40,6 +40,21 @@ final class RecommendationFeedbackStore {
     static JSONArray dirtyPayload(Context context){JSONArray out=new JSONArray();SharedPreferences p=prefs(context);for(String key:p.getAll().keySet()){if(!key.startsWith(DIRTY)||!p.getBoolean(key,false))continue;String id=key.substring(DIRTY.length());String sentiment=RecommendationFeedbackStore.sentiment(context,id);if(!"like".equals(sentiment)&&!"dislike".equals(sentiment))continue;JSONObject row=new JSONObject();try{row.put("comicId",id);row.put("sentiment",sentiment);row.put("reasons",new JSONArray(RecommendationFeedbackStore.reasons(context,id)));row.put("updatedAt",p.getString(UPDATED+id,""));out.put(row);}catch(Exception ignored){}}return out;}
     static void clearDirty(Context context){SharedPreferences p=prefs(context);SharedPreferences.Editor edit=p.edit();for(String key:p.getAll().keySet())if(key.startsWith(DIRTY))edit.remove(key);edit.apply();}
 
+    static synchronized void importSynced(Context context,JSONArray rows){
+        if(rows==null)return;SharedPreferences p=prefs(context);SharedPreferences.Editor edit=p.edit();
+        for(int i=0;i<rows.length();i++){
+            JSONObject row=rows.optJSONObject(i);if(row==null)continue;
+            String id=cleanId(row.optString("comicId","")),value=row.optString("sentiment","").trim().toLowerCase(Locale.ROOT);
+            if(id.isEmpty()||(!"like".equals(value)&&!"dislike".equals(value))||p.getBoolean(DIRTY+id,false))continue;
+            String remoteAt=row.optString("occurredAt",""),localAt=p.getString(UPDATED+id,"");
+            if(localAt!=null&&!localAt.isEmpty()&&!remoteAt.isEmpty()&&localAt.compareTo(remoteAt)>0)continue;
+            LinkedHashSet<String> reasons=new LinkedHashSet<>();
+            JSONArray raw=row.optJSONArray("reasons");if(raw!=null)for(int j=0;j<raw.length();j++){String reason=raw.optString(j,"").trim();if(!reason.isEmpty())reasons.add(reason);}
+            edit.putString(SENTIMENT+id,value).putString(UPDATED+id,remoteAt).putStringSet(REASONS+id,reasons).remove(DIRTY+id);
+        }
+        edit.apply();
+    }
+
     static boolean askReasons(Context context){return prefs(context).getBoolean(ASK_REASONS,false);}
     static void setAskReasons(Context context,boolean enabled){prefs(context).edit().putBoolean(ASK_REASONS,enabled).apply();}
 }

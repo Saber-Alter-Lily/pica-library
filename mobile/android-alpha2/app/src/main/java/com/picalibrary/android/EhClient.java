@@ -18,6 +18,12 @@ final class EhClient {
     private final Context context;
     EhClient(Context context){this.context=context.getApplicationContext();}
 
+    private static final String RELAY_PAGE_PREFIX="pica-desktop-eh:";
+    private boolean localAccountConfigured(){return EhAccountStore.load(context).configured();}
+    private boolean desktopAccountConfigured(){return BridgeStore.paired(context)&&DesktopAccountStatusStore.load(context).ehConfigured;}
+    private boolean useDesktopAccountRelay(){return !localAccountConfigured()&&desktopAccountConfigured();}
+    static boolean accountAvailable(Context context){Context app=context.getApplicationContext();return EhAccountStore.load(app).configured()||(BridgeStore.paired(app)&&DesktopAccountStatusStore.load(app).ehConfigured);}
+
     static final class Comic {
         final String id,remoteId,title,alternateTitle,author,circle,coverUrl,category,uploader,completionStatus,surface;
         final List<String> tags,rawTags,authors;
@@ -53,16 +59,65 @@ final class EhClient {
 
     private List<Comic> gdata(List<String[]> refs,String surface) throws Exception {List<Comic> out=new ArrayList<>();int batch=0;for(int offset=0;offset<refs.size();offset+=25){JSONArray ids=new JSONArray();for(int i=offset;i<Math.min(offset+25,refs.size());i++){String[] ref=refs.get(i);JSONArray pair=new JSONArray();pair.put(Long.parseLong(ref[0]));pair.put(ref[1]);ids.put(pair);}JSONObject request=new JSONObject();request.put("method","gdata");request.put("gidlist",ids);request.put("namespace",1);JSONArray rows=postJson(request).optJSONArray("gmetadata");if(rows==null)throw new IOException("E-H 元数据响应格式异常");for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);if(row!=null&&!row.has("error"))out.add(parseComic(row,surface));}batch++;if(offset+25<refs.size())Thread.sleep(batch%4==0?5000:250);}return out;}
     private Comic parseComic(JSONObject row,String surface){long gid=row.optLong("gid");String token=row.optString("token","").toLowerCase(Locale.ROOT);String id="eh:"+gid+":"+token;JSONArray arr=row.optJSONArray("tags");List<String> raw=new ArrayList<>(),tags=new ArrayList<>(),authors=new ArrayList<>(),groups=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){String value=arr.optString(i,"");addUnique(raw,value);addUnique(tags,tagValue(value));String ns=tagNamespace(value);if("artist".equals(ns))addUnique(authors,tagValue(value));if("group".equals(ns))addUnique(groups,tagValue(value));}String uploader=row.optString("uploader","");String author=!authors.isEmpty()?authors.get(0):!groups.isEmpty()?groups.get(0):uploader;double rating;try{rating=Double.parseDouble(row.optString("rating","NaN"));}catch(Exception e){rating=Double.NaN;}String cover=row.optString("thumb","");try{if(!cover.isEmpty())cover=publicHttps(cover).toString();}catch(Exception e){cover="";}return new Comic(id,gid+":"+token,row.optString("title","E-H Gallery "+gid),row.optString("title_jpn",""),author,groups.isEmpty()?"":groups.get(0),cover,row.optString("category",""),uploader,"UNKNOWN",tags,raw,authors,Math.max(0,row.optInt("filecount",0)),rating,row.optLong("posted",0),row.optLong("filesize",0),surface);}
+    private static List<String> jsonStrings(JSONArray arr){ArrayList<String> out=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){String value=arr.optString(i,"").trim();if(!value.isEmpty()&&!out.contains(value))out.add(value);}return out;}
+    private Comic relayComic(JSONObject row,String fallbackSurface){
+        if(row==null)return null;
+        String id=row.optString("comicId",""),remote=row.optString("providerRemoteId","");
+        String title=row.optString("title",id.isEmpty()?"E-H Gallery":id);
+        List<String> alternates=jsonStrings(row.optJSONArray("alternateTitles"));
+        List<String> authors=jsonStrings(row.optJSONArray("authors"));
+        List<String> tags=jsonStrings(row.optJSONArray("tags"));
+        ArrayList<String> rawTags=new ArrayList<>();
+        JSONArray canonical=row.optJSONArray("canonicalTags");
+        if(canonical!=null)for(int i=0;i<canonical.length();i++){JSONObject tag=canonical.optJSONObject(i);if(tag!=null)addUnique(rawTags,tag.optString("raw",""));}
+        JSONObject meta=row.optJSONObject("providerMetadata");
+        if(rawTags.isEmpty()&&meta!=null){JSONArray raw=meta.optJSONArray("rawTags");if(raw!=null)rawTags.addAll(jsonStrings(raw));}
+        List<String> categories=jsonStrings(row.optJSONArray("categories"));
+        String surface=fallbackSurface;
+        if(meta!=null){String preferred=meta.optString("preferredSurface","");if("eh".equals(preferred)||"exh".equals(preferred))surface=preferred;}
+        long posted=0L;String created=row.optString("createdAt","");if(!created.isEmpty())try{posted=java.time.Instant.parse(created).getEpochSecond();}catch(Exception ignored){}
+        long filesize=meta==null?0L:meta.optLong("filesize",0L);
+        return new Comic(
+            id,
+            remote,
+            title,
+            alternates.isEmpty()?"":alternates.get(0),
+            row.optString("author",""),
+            row.optString("circle",""),
+            row.optString("coverUrl",""),
+            categories.isEmpty()?"":categories.get(0),
+            row.optString("uploader",""),
+            row.optString("completionStatus","UNKNOWN"),
+            tags,
+            rawTags,
+            authors,
+            Math.max(0,row.optInt("pagesCount",0)),
+            row.optDouble("rating",Double.NaN),
+            posted,
+            Math.max(0L,filesize),
+            surface
+        );
+    }
+    private List<Comic> relayComics(JSONObject root,String surface){
+        ArrayList<Comic> out=new ArrayList<>();JSONArray arr=root==null?null:root.optJSONArray("comics");if(arr!=null)for(int i=0;i<arr.length();i++){Comic comic=relayComic(arr.optJSONObject(i),surface);if(comic!=null&&!comic.id.isEmpty())out.add(comic);}return out;
+    }
+    private static List<String> relayCategories(EhOnlineFilterSpec spec){
+        ArrayList<String> out=new ArrayList<>();if(spec==null||spec.includeCategories==EhOnlineFilterSpec.ALL)return out;
+        int[] bits=EhOnlineFilterSpec.categoryBits();String[] values={"Doujinshi","Manga","Artist CG","Game CG","Image Set","Cosplay","Asian Porn","Non-H","Western","Misc"};
+        for(int i=0;i<bits.length&&i<values.length;i++)if((spec.includeCategories&bits[i])!=0)out.add(values[i]);return out;
+    }
+    private static String relayMode(EhOnlineFilterSpec.Mode mode){return mode==null?"latest":mode.name().toLowerCase(Locale.ROOT);}
+
     private static LinkedHashMap<String,String[]> extractGalleryRefs(String html,int limit){Pattern p=Pattern.compile("(?:(?:https?:)?//(?:e-hentai\\.org|exhentai\\.org))?/g/(\\d+)/([0-9a-fA-F]{10})/",Pattern.CASE_INSENSITIVE);Matcher m=p.matcher(html==null?"":html);LinkedHashMap<String,String[]> refs=new LinkedHashMap<>();while(m.find()&&(limit<=0||refs.size()<limit)){String gid=m.group(1),token=m.group(2).toLowerCase(Locale.ROOT);refs.put(gid+":"+token,new String[]{gid,token});}return refs;}
-    private EhCapabilityStore.Snapshot requireExhAvailable(){if(!EhAccountStore.load(context).configured())throw new SecurityException("ExH 需要先连接 E-H 账号");EhCapabilityStore.Snapshot capability=EhCapabilityStore.refresh(context,false);if(capability.available())return capability;if(capability.state==EhCapabilityStore.State.NETWORK_ERROR)throw new SecurityException("ExH 当前状态暂无法确认");throw new SecurityException("ExH 当前不可访问");}
+    private EhCapabilityStore.Snapshot requireExhAvailable(){if(!accountAvailable(context))throw new SecurityException("ExH 需要先连接 E-H 账号或已登录的 Desktop");EhCapabilityStore.Snapshot capability=EhCapabilityStore.refresh(context,false);if(capability.available())return capability;if(capability.state==EhCapabilityStore.State.NETWORK_ERROR)throw new SecurityException("ExH 当前状态暂无法确认");throw new SecurityException("ExH 当前不可访问");}
 
     List<Comic> search(String query) throws Exception {return search(query,"eh");}
     List<Comic> search(String query,String surface) throws Exception {EhOnlineFilterSpec spec=new EhOnlineFilterSpec();spec.freeText=query==null?"":query;return browse(spec,surface);}
-    List<Comic> browse(EhOnlineFilterSpec spec,String surface) throws Exception {paceSearch();if(spec==null)spec=new EhOnlineFilterSpec();boolean exh="exh".equals(surface);if(exh)requireExhAvailable();boolean needsAccount=spec.mode==EhOnlineFilterSpec.Mode.WATCHED||spec.mode==EhOnlineFilterSpec.Mode.FAVORITES;if(needsAccount&&!EhAccountStore.load(context).configured())throw new SecurityException("此 E-H 浏览方式需要登录账号");String url=spec.buildUrl(surface);String html=(exh||needsAccount)?accountText(url):text(url);LinkedHashMap<String,String[]> refs=extractGalleryRefs(html,50);return refs.isEmpty()?Collections.emptyList():gdata(new ArrayList<>(refs.values()),surface);}
+    List<Comic> browse(EhOnlineFilterSpec spec,String surface) throws Exception {if(spec==null)spec=new EhOnlineFilterSpec();boolean exh="exh".equals(surface);boolean needsAccount=spec.mode==EhOnlineFilterSpec.Mode.WATCHED||spec.mode==EhOnlineFilterSpec.Mode.FAVORITES;if(exh)requireExhAvailable();if(needsAccount&&!accountAvailable(context))throw new SecurityException("此 E-H 浏览方式需要登录账号或已登录的 Desktop");if(useDesktopAccountRelay()&&(exh||needsAccount)){JSONObject root=BridgeClient.ehRelaySearch(context,surface,spec.freeText,spec.includeTags,relayCategories(spec),relayMode(spec.mode),spec.toplist,spec.language,spec.excludeTags,spec.minRating,spec.pageFrom,spec.pageTo,50);return relayComics(root,surface);}paceSearch();String url=spec.buildUrl(surface);String html=(exh||needsAccount)?accountText(url):text(url);LinkedHashMap<String,String[]> refs=extractGalleryRefs(html,50);return refs.isEmpty()?Collections.emptyList():gdata(new ArrayList<>(refs.values()),surface);}
     Comic comic(String comicId) throws Exception {return comic(comicId,"eh");}
-    Comic comic(String comicId,String surface) throws Exception {String[] ref=parseId(comicId);List<Comic> values=gdata(Collections.singletonList(ref),surface);if(values.isEmpty())throw new IOException("E-H 未返回画廊元数据");return values.get(0);}
+    Comic comic(String comicId,String surface) throws Exception {if("exh".equals(surface)&&useDesktopAccountRelay()){Comic value=relayComic(BridgeClient.ehRelayComic(context,comicId,surface).optJSONObject("comic"),surface);if(value==null)throw new IOException("Desktop 未返回 E-H 画廊元数据");return value;}String[] ref=parseId(comicId);List<Comic> values=gdata(Collections.singletonList(ref),surface);if(values.isEmpty())throw new IOException("E-H 未返回画廊元数据");return values.get(0);}
     List<Episode> episodes(String comicId) throws Exception {return episodes(comicId,"eh");}
-    List<Episode> episodes(String comicId,String surface) throws Exception {Comic comic=comic(comicId,surface);String[] ref=parseId(comicId);return Collections.singletonList(new Episode("eh-"+ref[0],comic.title,1));}
+    List<Episode> episodes(String comicId,String surface) throws Exception {if("exh".equals(surface)&&useDesktopAccountRelay()){JSONArray arr=BridgeClient.ehRelayEpisodes(context,comicId,surface).optJSONArray("episodes");ArrayList<Episode> out=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o!=null)out.add(new Episode(o.optString("id",""),o.optString("title","章节"),o.optInt("order",i+1)));}return out;}Comic comic=comic(comicId,surface);String[] ref=parseId(comicId);return Collections.singletonList(new Episode("eh-"+ref[0],comic.title,1));}
 
     private int cachedPageCount(String comicId){UnifiedCatalogStore.Entry cached=UnifiedCatalogStore.load(context).byId.get(comicId);return cached==null?0:Math.max(0,cached.knownPictures);}
     List<Page> pages(String comicId) throws Exception {return pages(comicId,cachedPageCount(comicId),"eh");}
@@ -70,6 +125,7 @@ final class EhClient {
     List<Page> pages(String comicId,int expectedPages) throws Exception {return pages(comicId,expectedPages,"eh");}
     List<Page> pages(String comicId,int expectedPages,String surface) throws Exception {
         boolean exh="exh".equals(surface);if(exh)requireExhAvailable();
+        if(exh&&useDesktopAccountRelay()){JSONArray arr=BridgeClient.ehRelayPages(context,comicId,surface).optJSONArray("pages");ArrayList<Page> out=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i);if(o==null)continue;String locator=o.optString("locator","");if(locator.isEmpty())continue;out.add(new Page(o.optString("id","eh-page-"+(i+1)),RELAY_PAGE_PREFIX+locator,o.optInt("position",i)+1));}return out;}
         int expected=Math.max(0,expectedPages);if(expected==0)expected=Math.max(0,comic(comicId,surface).pagesCount);
         String origin=exh?EXH_ORIGIN:ORIGIN;String[] ref=parseId(comicId);long gid=Long.parseLong(ref[0]);LinkedHashMap<String,String> urls=new LinkedHashMap<>();
         for(int page=0;page<100;page++){
@@ -91,9 +147,10 @@ final class EhClient {
         return new ArrayList<>(out.values());
     }
 
-    void verifyAccount() throws Exception {accountText(ORIGIN+"/favorites.php?favcat=all");}
+    void verifyAccount() throws Exception {if(useDesktopAccountRelay()){BridgeClient.ehRelaySearch(context,"eh","",Collections.emptyList(),Collections.emptyList(),"favorites","11","",Collections.emptyList(),0,0,0,1);return;}accountText(ORIGIN+"/favorites.php?favcat=all");}
     List<Comic> favoritesAll() throws Exception {return favoritesSnapshot().comics;}
     EhFavoriteSync favoritesSnapshot() throws Exception {
+        if(useDesktopAccountRelay()){JSONObject root=BridgeClient.ehRelayFavoritesSnapshot(context);List<Comic> comics=relayComics(root,"eh");ArrayList<EhFavoriteSync.Item> items=new ArrayList<>();JSONArray rawItems=root.optJSONArray("items");if(rawItems!=null)for(int i=0;i<rawItems.length();i++){JSONObject row=rawItems.optJSONObject(i);if(row==null)continue;String comicId=row.optString("comicId","");if(!comicId.isEmpty())items.add(new EhFavoriteSync.Item(comicId,row.optInt("slot",-1),row.optString("note","")));}ArrayList<String> categoryNames=new ArrayList<>();JSONArray rawNames=root.optJSONArray("categoryNames");if(rawNames!=null)for(int i=0;i<rawNames.length();i++)categoryNames.add(rawNames.optString(i,"Favorites "+i));while(categoryNames.size()<10)categoryNames.add("Favorites "+categoryNames.size());int[] counts=new int[10];JSONArray rawCounts=root.optJSONArray("categoryCounts");if(rawCounts!=null)for(int i=0;i<Math.min(10,rawCounts.length());i++)counts[i]=Math.max(0,rawCounts.optInt(i,0));return new EhFavoriteSync(comics,items,categoryNames,counts);}
         verifyAccount();List<String> categoryNames=parseFavoriteCategoryNames(accountText(ORIGIN+"/uconfig.php"));LinkedHashMap<String,String[]> refs=new LinkedHashMap<>();LinkedHashMap<String,FavoriteMeta> metaById=new LinkedHashMap<>();Set<String> cursors=new HashSet<>();String url=ORIGIN+"/favorites.php?favcat=all";Pattern next=Pattern.compile("(?:\\?|&amp;|&)next=(\\d+)");
         for(int page=0;page<200;page++){String html=accountText(url);refs.putAll(extractGalleryRefs(html,0));parseFavoriteRows(html,categoryNames,metaById);Matcher nm=next.matcher(html);String cursor="";if(nm.find())cursor=nm.group(1);if(cursor.isEmpty()||!cursors.add(cursor))break;url=ORIGIN+"/favorites.php?favcat=all&next="+URLEncoder.encode(cursor,"UTF-8");Thread.sleep(250);}
         List<Comic> comics=refs.isEmpty()?Collections.emptyList():gdata(new ArrayList<>(refs.values()),"eh");ArrayList<EhFavoriteSync.Item> items=new ArrayList<>();int[] counts=new int[10];for(Comic comic:comics){FavoriteMeta meta=metaById.get(comic.id);int slot=meta==null?-1:meta.slot;String note=meta==null?"":meta.note;items.add(new EhFavoriteSync.Item(comic.id,slot,note));if(slot>=0&&slot<10)counts[slot]++;}return new EhFavoriteSync(comics,items,categoryNames,counts);
@@ -103,6 +160,7 @@ final class EhClient {
     private static String attribute(String tag,String name){Matcher m=Pattern.compile("\\b"+Pattern.quote(name)+"\\s*=\\s*[\"']([^\"']*)[\"']",Pattern.CASE_INSENSITIVE).matcher(tag==null?"":tag);return m.find()?m.group(1):"";}
 
     String probeExH(){
+        if(useDesktopAccountRelay())try{return BridgeClient.ehRelayExhCapability(context).optString("capability","UNAVAILABLE");}catch(Exception e){return "NETWORK_ERROR";}
         if(!EhAccountStore.load(context).configured())return "UNAVAILABLE";
         try{String result=probeExHOnce();if("RETRY".equals(result))result=probeExHOnce();return "RETRY".equals(result)?"UNAVAILABLE":result;}
         catch(SocketTimeoutException|UnknownHostException|ConnectException|SSLException e){return "NETWORK_ERROR";}
@@ -124,10 +182,11 @@ final class EhClient {
     private static String responseCookie(HttpURLConnection c,String name){Map<String,List<String>> headers=c.getHeaderFields();if(headers==null)return "";for(Map.Entry<String,List<String>> entry:headers.entrySet()){if(entry.getKey()==null||!"set-cookie".equalsIgnoreCase(entry.getKey())||entry.getValue()==null)continue;for(String raw:entry.getValue()){if(raw==null)continue;for(String part:raw.split(";")){String item=part.trim();int at=item.indexOf('=');if(at<=0)continue;if(name.equalsIgnoreCase(item.substring(0,at).trim()))return item.substring(at+1).trim();break;}}}return "";}
 
     void setRemoteFavorite(String comicId,boolean desired) throws Exception {setRemoteFavorite(comicId,desired?0:-1,"");}
-    void setRemoteFavorite(String comicId,int slot,String note) throws Exception {if(!EhAccountStore.load(context).configured())throw new SecurityException("尚未配置 E-H 会话");if(slot<-1||slot>9)throw new IllegalArgumentException("无效的 E-H 收藏分类");String[] ref=parseId(comicId);String url=ORIGIN+"/gallerypopups.php?gid="+URLEncoder.encode(ref[0],"UTF-8")+"&t="+URLEncoder.encode(ref[1],"UTF-8")+"&act=addfav";HttpURLConnection c=open(url,"POST","text/html,*/*;q=0.8");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/x-www-form-urlencoded");String favcat=slot<0?"favdel":String.valueOf(slot);String form="favcat="+URLEncoder.encode(favcat,"UTF-8")+"&favnote="+URLEncoder.encode(note==null?"":note,"UTF-8")+"&apply="+URLEncoder.encode("Apply Changes","UTF-8")+"&update=1";try(OutputStream out=c.getOutputStream()){out.write(form.getBytes(StandardCharsets.UTF_8));}try{int status=c.getResponseCode();URL end=c.getURL();if(status==401||status==403||end.getPath().contains("bounce_login")||end.getHost().startsWith("forums."))throw new SecurityException("E-H 会话无效或已过期");if(status<200||status>=300)throw new IOException("E-H 收藏更新 HTTP "+status);try{read(c.getInputStream(),1024*1024);}catch(Exception ignored){}}finally{c.disconnect();}}
+    void setRemoteFavorite(String comicId,int slot,String note) throws Exception {if(useDesktopAccountRelay()){BridgeClient.ehRelayFavorite(context,comicId,slot>=0,slot<0?0:slot,note==null?"":note);return;}if(!EhAccountStore.load(context).configured())throw new SecurityException("尚未配置 E-H 会话");if(slot<-1||slot>9)throw new IllegalArgumentException("无效的 E-H 收藏分类");String[] ref=parseId(comicId);String url=ORIGIN+"/gallerypopups.php?gid="+URLEncoder.encode(ref[0],"UTF-8")+"&t="+URLEncoder.encode(ref[1],"UTF-8")+"&act=addfav";HttpURLConnection c=open(url,"POST","text/html,*/*;q=0.8");c.setDoOutput(true);c.setRequestProperty("Content-Type","application/x-www-form-urlencoded");String favcat=slot<0?"favdel":String.valueOf(slot);String form="favcat="+URLEncoder.encode(favcat,"UTF-8")+"&favnote="+URLEncoder.encode(note==null?"":note,"UTF-8")+"&apply="+URLEncoder.encode("Apply Changes","UTF-8")+"&update=1";try(OutputStream out=c.getOutputStream()){out.write(form.getBytes(StandardCharsets.UTF_8));}try{int status=c.getResponseCode();URL end=c.getURL();if(status==401||status==403||end.getPath().contains("bounce_login")||end.getHost().startsWith("forums."))throw new SecurityException("E-H 会话无效或已过期");if(status<200||status>=300)throw new IOException("E-H 收藏更新 HTTP "+status);try{read(c.getInputStream(),1024*1024);}catch(Exception ignored){}}finally{c.disconnect();}}
 
     HttpURLConnection thumbnail(String url) throws Exception {HttpURLConnection c=(HttpURLConnection)publicHttps(url).openConnection();c.setConnectTimeout(8000);c.setReadTimeout(15000);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept","image/*");c.setRequestProperty("Referer",ORIGIN+"/");c.setRequestProperty("User-Agent",UA);c.setUseCaches(false);return c;}
     HttpURLConnection image(String pageUrl) throws Exception {
+        if(pageUrl!=null&&pageUrl.startsWith(RELAY_PAGE_PREFIX))return BridgeClient.ehRelayImage(context,pageUrl.substring(RELAY_PAGE_PREFIX.length()));
         URL page=new URL(pageUrl);String host=page.getHost()==null?"":page.getHost().toLowerCase(Locale.ROOT);boolean exh="exhentai.org".equals(host);if(!"https".equalsIgnoreCase(page.getProtocol())||(!"e-hentai.org".equals(host)&&!exh)||!page.getPath().matches("^/s/[0-9a-fA-F]+/\\d+-\\d+$"))throw new SecurityException("无效的 E-H 图片页");
         String html=exh?accountText(page.toString()):text(page.toString());Matcher first=Pattern.compile("<img[^>]+id=[\"']img[\"'][^>]+src=[\"']([^\"']+)[\"']",Pattern.CASE_INSENSITIVE).matcher(html);Matcher second=Pattern.compile("<img[^>]+src=[\"']([^\"']+)[\"'][^>]+id=[\"']img[\"']",Pattern.CASE_INSENSITIVE).matcher(html);String imageUrl=first.find()?first.group(1):second.find()?second.group(1):"";if(imageUrl.isEmpty())throw new IOException("E-H 图片页没有可读取图片");URL resolved=new URL(page,decodeHtml(imageUrl));URL image=publicHttps(resolved.toString());HttpURLConnection c=(HttpURLConnection)image.openConnection();c.setConnectTimeout(8000);c.setReadTimeout(20000);c.setInstanceFollowRedirects(true);c.setRequestProperty("Accept","image/*");c.setRequestProperty("Referer",page.toString());c.setRequestProperty("User-Agent",UA);String cookie=cookieHeader(image.getHost());if(!cookie.isEmpty())c.setRequestProperty("Cookie",cookie);c.setUseCaches(false);return c;
     }

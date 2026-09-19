@@ -177,7 +177,8 @@ export class LibraryDatabase {
             'work_editions',
             'work_upload_bindings',
             'work_identity_evidence',
-            'work_identity_decisions'
+            'work_identity_decisions',
+            'work_identity_materialization_runs'
         ]
         const tables = new Set(
             (
@@ -233,9 +234,162 @@ export class LibraryDatabase {
                     ? scalarCount(
                           'SELECT COUNT(*) AS count FROM work_identity_decisions'
                       )
+                    : 0,
+                materializationRuns: tables.has(
+                    'work_identity_materialization_runs'
+                )
+                    ? scalarCount(
+                          'SELECT COUNT(*) AS count FROM work_identity_materialization_runs'
+                      )
                     : 0
             }
         }
+    }
+
+    listWorkIdentityBindings(limit = 5000) {
+        const bounded = Math.max(1, Math.min(10000, Math.floor(limit)))
+        const rows = this.db
+            .prepare(
+                `SELECT b.*, c.title AS comic_title,
+                        w.preferred_title AS work_title,
+                        e.label AS edition_label,
+                        e.language AS edition_language,
+                        e.edition_kind AS edition_kind
+                 FROM work_upload_bindings b
+                 JOIN comics c ON c.id = b.comic_id
+                 JOIN canonical_works w ON w.id = b.work_id
+                 LEFT JOIN work_editions e ON e.id = b.edition_id
+                 ORDER BY b.updated_at DESC, b.comic_id
+                 LIMIT ?`
+            )
+            .all(bounded) as SqlRow[]
+        return rows.map((row) => ({
+            comicId: String(row.comic_id),
+            comicTitle: String(row.comic_title ?? ''),
+            workId: String(row.work_id),
+            workTitle: String(row.work_title ?? ''),
+            editionId: row.edition_id ? String(row.edition_id) : null,
+            editionLabel: row.edition_label
+                ? String(row.edition_label)
+                : '',
+            editionLanguage: row.edition_language
+                ? String(row.edition_language)
+                : null,
+            editionKind: row.edition_kind
+                ? String(row.edition_kind)
+                : null,
+            bindingStatus: String(row.binding_status ?? ''),
+            confidence: numberValue(row.confidence),
+            resolverVersion: String(row.resolver_version ?? ''),
+            evidence: jsonObject(row.evidence_json),
+            createdAt: String(row.created_at),
+            updatedAt: String(row.updated_at)
+        }))
+    }
+
+    private workIdentityMaterializationRun(row: SqlRow) {
+        return {
+            id: String(row.id),
+            requestKey: String(row.request_key),
+            planVersion: String(row.plan_version),
+            planDigest: String(row.plan_digest),
+            status: String(row.status) as
+                | 'PREPARED'
+                | 'APPLIED'
+                | 'ROLLED_BACK'
+                | 'FAILED',
+            plan: jsonObject(row.plan_json),
+            beforeState: jsonObject(row.before_state_json),
+            afterState: jsonObject(row.after_state_json),
+            error: String(row.error ?? ''),
+            createdAt: String(row.created_at),
+            updatedAt: String(row.updated_at)
+        }
+    }
+
+    prepareWorkIdentityMaterializationRun(input: {
+        requestKey: string
+        planVersion: string
+        planDigest: string
+        plan: Record<string, unknown>
+    }) {
+        const requestKey = String(input.requestKey ?? '').trim()
+        const planVersion = String(input.planVersion ?? '').trim()
+        const planDigest = String(input.planDigest ?? '')
+            .trim()
+            .toLowerCase()
+        if (
+            requestKey.length < 8 ||
+            requestKey.length > 160 ||
+            !/^[a-zA-Z0-9._:-]+$/.test(requestKey)
+        )
+            throw new Error('Invalid materialization request key')
+        if (!planVersion || planVersion.length > 120)
+            throw new Error('Invalid materialization plan version')
+        if (!/^[a-f0-9]{64}$/.test(planDigest))
+            throw new Error('Invalid materialization plan digest')
+
+        const existing = this.db
+            .prepare(
+                'SELECT * FROM work_identity_materialization_runs WHERE request_key = ?'
+            )
+            .get(requestKey) as SqlRow | undefined
+        if (existing) {
+            if (
+                String(existing.plan_version) !== planVersion ||
+                String(existing.plan_digest) !== planDigest
+            )
+                throw new Error(
+                    'Materialization request key was already used for a different plan'
+                )
+            return {
+                ...this.workIdentityMaterializationRun(existing),
+                idempotentReplay: true
+            }
+        }
+
+        const id = randomUUID()
+        const now = new Date().toISOString()
+        this.db
+            .prepare(
+                `INSERT INTO work_identity_materialization_runs(
+                    id, request_key, plan_version, plan_digest, status,
+                    plan_json, before_state_json, after_state_json, error,
+                    created_at, updated_at
+                 ) VALUES (?, ?, ?, ?, 'PREPARED', ?, '{}', '{}', '', ?, ?)`
+            )
+            .run(
+                id,
+                requestKey,
+                planVersion,
+                planDigest,
+                JSON.stringify(input.plan ?? {}),
+                now,
+                now
+            )
+        const created = this.db
+            .prepare(
+                'SELECT * FROM work_identity_materialization_runs WHERE id = ?'
+            )
+            .get(id) as SqlRow
+        return {
+            ...this.workIdentityMaterializationRun(created),
+            idempotentReplay: false
+        }
+    }
+
+    listWorkIdentityMaterializationRuns(limit = 100) {
+        const bounded = Math.max(1, Math.min(1000, Math.floor(limit)))
+        return (
+            this.db
+                .prepare(
+                    `SELECT *
+                     FROM work_identity_materialization_runs
+                     ORDER BY updated_at DESC, id
+                     LIMIT ?`
+                )
+                .all(bounded) as SqlRow[]
+        ).map((row) => this.workIdentityMaterializationRun(row))
     }
 
     saveWorkIdentityEvidence(
@@ -345,6 +499,112 @@ export class LibraryDatabase {
             resolverVersion: String(row.resolver_version),
             evidence: jsonObject(row.evidence_json),
             createdAt: String(row.created_at)
+        }))
+    }
+
+
+    saveWorkIdentityDecision(input: {
+        leftComicId: string
+        rightComicId: string
+        decision: 'SAME_WORK' | 'EDITION_VARIANT' | 'KEEP_SEPARATE'
+        source?: string
+        note?: string
+    }) {
+        const left = String(input.leftComicId ?? '').trim()
+        const right = String(input.rightComicId ?? '').trim()
+        if (!left || !right || left === right)
+            throw new Error('Two distinct comic ids are required')
+        const [leftComicId, rightComicId] = [left, right].sort()
+        const decision = String(input.decision ?? '')
+        if (
+            !['SAME_WORK', 'EDITION_VARIANT', 'KEEP_SEPARATE'].includes(
+                decision
+            )
+        )
+            throw new Error('Unknown work identity decision')
+        const now = new Date().toISOString()
+        const existing = this.db
+            .prepare(
+                'SELECT id, created_at FROM work_identity_decisions WHERE left_comic_id = ? AND right_comic_id = ?'
+            )
+            .get(leftComicId, rightComicId) as SqlRow | undefined
+        const id = existing ? String(existing.id) : randomUUID()
+        const createdAt = existing ? String(existing.created_at) : now
+        this.db
+            .prepare(
+                `INSERT INTO work_identity_decisions(
+                    id, left_comic_id, right_comic_id, decision, source, note,
+                    created_at, updated_at
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(left_comic_id, right_comic_id)
+                 DO UPDATE SET
+                    decision = excluded.decision,
+                    source = excluded.source,
+                    note = excluded.note,
+                    updated_at = excluded.updated_at`
+            )
+            .run(
+                id,
+                leftComicId,
+                rightComicId,
+                decision,
+                String(input.source ?? 'USER').slice(0, 80),
+                String(input.note ?? '').slice(0, 500),
+                createdAt,
+                now
+            )
+        return this.listWorkIdentityDecisions(5000).find(
+            (item) =>
+                item.leftComicId === leftComicId &&
+                item.rightComicId === rightComicId
+        )!
+    }
+
+    clearWorkIdentityDecision(leftId: string, rightId: string) {
+        const left = String(leftId ?? '').trim()
+        const right = String(rightId ?? '').trim()
+        if (!left || !right || left === right)
+            throw new Error('Two distinct comic ids are required')
+        const [leftComicId, rightComicId] = [left, right].sort()
+        const result = this.db
+            .prepare(
+                'DELETE FROM work_identity_decisions WHERE left_comic_id = ? AND right_comic_id = ?'
+            )
+            .run(leftComicId, rightComicId)
+        return {
+            leftComicId,
+            rightComicId,
+            removed: Number(result.changes ?? 0) > 0
+        }
+    }
+
+    listWorkIdentityDecisions(limit = 500) {
+        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
+        const rows = this.db
+            .prepare(
+                `SELECT d.*, lc.title AS left_title,
+                        rc.title AS right_title
+                 FROM work_identity_decisions d
+                 JOIN comics lc ON lc.id = d.left_comic_id
+                 JOIN comics rc ON rc.id = d.right_comic_id
+                 ORDER BY d.updated_at DESC, d.left_comic_id, d.right_comic_id
+                 LIMIT ?`
+            )
+            .all(bounded) as SqlRow[]
+        return rows.map((row) => ({
+            id: String(row.id),
+            leftComicId: String(row.left_comic_id),
+            rightComicId: String(row.right_comic_id),
+            leftTitle: String(row.left_title ?? ''),
+            rightTitle: String(row.right_title ?? ''),
+            decision: String(row.decision) as
+                | 'SAME_WORK'
+                | 'EDITION_VARIANT'
+                | 'KEEP_SEPARATE',
+            source: String(row.source ?? ''),
+            note: String(row.note ?? ''),
+            createdAt: String(row.created_at),
+            updatedAt: String(row.updated_at)
         }))
     }
 
@@ -799,6 +1059,8 @@ export class LibraryDatabase {
                       : null,
                   cycleId: String(row.recommendation_cycle_id),
                   generatedAt: String(row.generated_at),
+                  expiresAt: row.expires_at ? String(row.expires_at) : null,
+                  modelVersion: String(row.model_version ?? ''),
                   candidateIds: jsonArray(row.candidate_ids_json),
                   telemetry: JSON.parse(
                       String(row.telemetry_json ?? '{}')
@@ -818,6 +1080,34 @@ export class LibraryDatabase {
             )
             .get(cycleId) as SqlRow | undefined
         return row ? this.getV3CandidatePool(String(row.id)) : null
+    }
+
+    listCandidatePoolsByModelVersionPrefix(
+        prefix: string,
+        limit = 50
+    ) {
+        const value = String(prefix ?? '').trim()
+        // Composite V5 shadow model identities include every pipeline component
+        // and can legitimately exceed the older 160-character guard.
+        if (!value || value.length > 512)
+            throw new Error('Invalid candidate-pool model prefix')
+        const rows = this.db
+            .prepare(
+                `SELECT id FROM recommendation_v3_candidate_pools
+                 WHERE substr(model_version, 1, length(?)) = ?
+                 ORDER BY generated_at DESC, id
+                 LIMIT ?`
+            )
+            .all(
+                value,
+                value,
+                Math.max(1, Math.min(500, Math.floor(limit)))
+            ) as SqlRow[]
+        return rows
+            .map((row) => this.getV3CandidatePool(String(row.id)))
+            .filter(
+                (row): row is NonNullable<typeof row> => Boolean(row)
+            )
     }
 
     updateV3CandidatePoolState(

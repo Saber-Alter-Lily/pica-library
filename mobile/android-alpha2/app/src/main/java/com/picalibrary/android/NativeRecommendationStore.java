@@ -37,8 +37,8 @@ final class NativeRecommendationStore {
 
     static synchronized Snapshot nextBatch(Context context){Snapshot s=load(context);if(s.batches.isEmpty())return s;markCurrent(s);s.batchIndex=(s.batchIndex+1)%s.batches.size();save(context,s);return s;}
     static synchronized Snapshot previousBatch(Context context){Snapshot s=load(context);if(s.batches.isEmpty())return s;markCurrent(s);s.batchIndex=(s.batchIndex-1+s.batches.size())%s.batches.size();save(context,s);return s;}
-    static synchronized void markCurrentSeen(Context context){Snapshot s=load(context);if(!s.available())return;markCurrent(s);save(context,s);}
-    static synchronized void markSeen(Context context,Collection<Item> items){Snapshot s=load(context);if(items!=null)for(Item item:items)if(item!=null&&!item.comicId.isEmpty())s.displayedIds.add(item.comicId);save(context,s);}
+    static synchronized void markCurrentSeen(Context context){Snapshot s=load(context);if(!s.available())return;for(Item item:s.current())if(item!=null&&!item.comicId.isEmpty()&&s.displayedIds.add(item.comicId))RecommendationEvidenceStore.recordImpression(context,item);save(context,s);}
+    static synchronized void markSeen(Context context,Collection<Item> items){Snapshot s=load(context);if(items!=null)for(Item item:items)if(item!=null&&!item.comicId.isEmpty()&&s.displayedIds.add(item.comicId))RecommendationEvidenceStore.recordImpression(context,item);save(context,s);}
     static boolean favoriteFingerprintMatches(Snapshot snapshot,String fingerprint){return snapshot!=null&&snapshot.available()&&fingerprint!=null&&!fingerprint.isEmpty()&&fingerprint.equals(snapshot.favoriteFingerprint);}
     static synchronized void markFavoriteChange(Context context){Snapshot current=load(context);if(!current.available())return;markCurrent(current);current.readiness="STALE_FAVORITES";save(context,current);}
     static synchronized void invalidateIfFavoriteFingerprintChanged(Context context,String fingerprint){Snapshot current=load(context);if(favoriteFingerprintMatches(current,fingerprint))return;markFavoriteChange(context);}

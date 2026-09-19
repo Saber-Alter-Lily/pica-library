@@ -36,6 +36,8 @@ const state = {
     recommendationBatchId: null,
     recommendationManagedV3: false,
     recommendationPending: false,
+    syncPending: false,
+    searchPending: false,
     recommendationFeedback: {},
     recommendationFeedbackReasonsEnabled:
         localStorage.getItem('pica-recommend-feedback-reasons') === 'true',
@@ -89,6 +91,7 @@ const state = {
         dirty: false
     }
 }
+window.picaAppSessionId = state.appSessionId
 let desktop = null
 let language = resolveLanguage(
     localStorage,
@@ -96,10 +99,83 @@ let language = resolveLanguage(
 )
 let downloadPoll = null
 let downloadPollBusy = false
+let importPending = false
 let activeView = 'home'
+const viewScrollPositions = new Map()
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
+
+function askConfirm(message, title = t('common.confirmAction')) {
+    const dialog = $('#app-confirm-dialog')
+    if (!dialog) return Promise.resolve(window.confirm(message))
+    if (dialog.open) dialog.close('cancel')
+    $('#app-confirm-title').textContent = title
+    $('#app-confirm-message').textContent = message
+    dialog.returnValue = 'cancel'
+    return new Promise((resolve) => {
+        dialog.addEventListener(
+            'close',
+            () => resolve(dialog.returnValue === 'confirm'),
+            { once: true }
+        )
+        dialog.showModal()
+        requestAnimationFrame(() => $('#app-confirm-submit')?.focus())
+    })
+}
+
+function askText(
+    title,
+    initialValue = '',
+    label = t('common.name')
+) {
+    const dialog = $('#app-prompt-dialog')
+    if (!dialog)
+        return Promise.resolve(
+            window.prompt(title, initialValue)?.trim() || null
+        )
+    if (dialog.open) dialog.close('cancel')
+    $('#app-prompt-title').textContent = title || t('common.enterValue')
+    const labelNode = $('#app-prompt-label')
+    if (labelNode?.firstChild) labelNode.firstChild.textContent = label
+    const input = $('#app-prompt-input')
+    input.value = initialValue
+    $('#app-prompt-message').textContent = ''
+    dialog.returnValue = 'cancel'
+    return new Promise((resolve) => {
+        dialog.addEventListener(
+            'close',
+            () => {
+                const value = input.value.trim()
+                resolve(
+                    dialog.returnValue === 'confirm' && value
+                        ? value
+                        : null
+                )
+            },
+            { once: true }
+        )
+        dialog.showModal()
+        requestAnimationFrame(() => {
+            input.focus()
+            input.select()
+        })
+    })
+}
+
+window.picaConfirmAction = askConfirm
+window.picaPromptText = askText
+
+async function withBusyButton(button, work) {
+    if (!button || button.disabled) return undefined
+    button.disabled = true
+    try {
+        return await work()
+    } finally {
+        button.disabled = false
+    }
+}
+
 const escapeHtml = (value) =>
     String(value ?? '').replace(
         /[&<>"']/g,
@@ -158,6 +234,25 @@ $('#mobile-bridge-refresh')?.addEventListener('click', async () => {
         $('#mobile-bridge-state').textContent = localizeError(language, error)
     }
 })
+async function copyMobileBridgeValue(selector, successKey) {
+    const value = $(selector)?.textContent?.trim()
+    if (!value) return
+    try {
+        await navigator.clipboard.writeText(value)
+        $('#mobile-bridge-state').textContent = t(successKey)
+    } catch {
+        $('#mobile-bridge-state').textContent = t('mobile.copyFailed')
+    }
+}
+$('#mobile-bridge-copy-address')?.addEventListener('click', () =>
+    void copyMobileBridgeValue('#mobile-bridge-address', 'mobile.copiedAddress')
+)
+$('#mobile-bridge-copy-code')?.addEventListener('click', () =>
+    void copyMobileBridgeValue('#mobile-bridge-code', 'mobile.copiedCode')
+)
+$('#mobile-bridge-copy-link')?.addEventListener('click', () =>
+    void copyMobileBridgeValue('#mobile-bridge-pair-link', 'mobile.copiedLink')
+)
 applyLanguage(language)
 
 async function api(path, options) {
@@ -220,6 +315,8 @@ const desktopPost = (path, value = {}) =>
         body: JSON.stringify(value)
     })
 
+window.picaDesktopPost = desktopPost
+
 function setupValue(prefix) {
     return {
         account: $(`#${prefix}-account`).value,
@@ -231,15 +328,23 @@ function setupValue(prefix) {
 }
 
 function activateView(id) {
-    if (id === 'reader' && activeView !== 'reader')
-        state.reader.originView = activeView
+    const previousView = activeView
+    if (previousView && previousView !== 'reader')
+        viewScrollPositions.set(previousView, Math.max(0, window.scrollY))
+    if (id === 'reader' && previousView !== 'reader')
+        state.reader.originView = previousView
     activeView = id
-    $$('.view').forEach((view) =>
+    document.querySelectorAll('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
     )
-    $$('nav button').forEach((item) =>
+    document.querySelectorAll('nav button').forEach((item) =>
         item.classList.toggle('active', item.dataset.view === id)
     )
+    document.body.classList.toggle('reader-active', id === 'reader')
+    requestAnimationFrame(() => {
+        if (id === 'reader') window.scrollTo(0, 0)
+        else window.scrollTo(0, viewScrollPositions.get(id) ?? 0)
+    })
 }
 
 async function chooseFolder(prefix) {
@@ -260,9 +365,29 @@ function renderMobileBridge() {
     panel.hidden = false
     stateLabel.textContent = t('mobile.bridgeStarted')
     const addresses = Array.isArray(mobile.addresses) ? mobile.addresses : []
+    const address = addresses[0] || ''
+    const pairingCode = mobile.pairingCode || ''
     $('#mobile-bridge-address').textContent =
-        addresses[0] || t('mobile.port', { port: mobile.port })
-    $('#mobile-bridge-code').textContent = mobile.pairingCode || '------'
+        address || t('mobile.port', { port: mobile.port })
+    $('#mobile-bridge-code').textContent = pairingCode || '------'
+    const pairLink =
+        address && pairingCode
+            ? `picalibrary://pair?host=${encodeURIComponent(address)}&code=${encodeURIComponent(pairingCode)}`
+            : ''
+    const pairLinkNode = $('#mobile-bridge-pair-link')
+    if (pairLinkNode) pairLinkNode.textContent = pairLink
+    const qr = $('#mobile-bridge-qr')
+    if (qr) {
+        qr.replaceChildren()
+        if (pairLink && typeof window.QRCode === 'function') {
+            new window.QRCode(qr, {
+                text: pairLink,
+                width: 184,
+                height: 184,
+                correctLevel: window.QRCode.CorrectLevel.M
+            })
+        }
+    }
     const expiry = mobile.pairingExpiresAt ? new Date(mobile.pairingExpiresAt) : null
     $('#mobile-bridge-expiry').textContent = expiry && Number.isFinite(expiry.getTime())
         ? t('mobile.expires', { time: expiry.toLocaleTimeString() })
@@ -270,8 +395,16 @@ function renderMobileBridge() {
     const devices = Array.isArray(mobile.pairedDevices)
         ? mobile.pairedDevices
         : []
+    const deviceCount = $('#mobile-bridge-device-count')
+    if (deviceCount) deviceCount.textContent = String(devices.length)
     $('#mobile-bridge-devices').textContent = devices.length
-        ? t('mobile.paired', { devices: devices.map((item) => item.deviceName).join(', ') })
+        ? devices.map((item) => {
+            const seen = item.lastSeenAt ? new Date(item.lastSeenAt) : null
+            const suffix = seen && Number.isFinite(seen.getTime())
+                ? ` · ${t('mobile.lastSeen', { time: seen.toLocaleString() })}`
+                : ''
+            return `${item.deviceName}${suffix}`
+        }).join('；')
         : t('mobile.noDevices')
 }
 
@@ -393,7 +526,9 @@ async function applyStagedUpdate(
     if (!value) return
     if (
         !skipConfirm &&
-        !window.confirm(t('update.confirm', { version: value.targetVersion }))
+        !(await askConfirm(
+            t('update.confirm', { version: value.targetVersion })
+        ))
     )
         return
     await desktopPost('/api/v1/update/apply', { id: value.id })
@@ -430,33 +565,35 @@ $('#update-file').onchange = (event) => {
             renderUpdateProgress({ phase: 'failed' })
         })
 }
-$('#update-check').onclick = async () => {
+$('#update-check').onclick = async (event) => {
     const message = $('#update-message')
     if (!desktop) {
         message.textContent = t('update.localOnly')
         return
     }
-    message.textContent = t('update.checking')
-    try {
-        const value = await api('/api/v1/update/check')
-        if (value.status === 'current') {
-            message.textContent = t('update.current')
-            return
-        }
-        if (value.status === 'full-install') {
-            message.innerHTML = t('update.fullFound', {
+    await withBusyButton(event.currentTarget, async () => {
+        message.textContent = t('update.checking')
+        try {
+            const value = await api('/api/v1/update/check')
+            if (value.status === 'current') {
+                message.textContent = t('update.current')
+                return
+            }
+            if (value.status === 'full-install') {
+                message.innerHTML = t('update.fullFound', {
+                    version: escapeHtml(value.version),
+                    url: escapeHtml(value.releaseUrl)
+                })
+                return
+            }
+            message.innerHTML = t('update.incrementalFound', {
                 version: escapeHtml(value.version),
                 url: escapeHtml(value.releaseUrl)
             })
-            return
+        } catch (error) {
+            message.textContent = localizeError(language, error)
         }
-        message.innerHTML = t('update.incrementalFound', {
-            version: escapeHtml(value.version),
-            url: escapeHtml(value.releaseUrl)
-        })
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    })
 }
 $('#update-one-click').onclick = async () => {
     const button = $('#update-one-click')
@@ -481,9 +618,9 @@ $('#update-one-click').onclick = async () => {
             return
         }
         if (
-            !window.confirm(
+            !(await askConfirm(
                 t('update.oneClickConfirm', { version: available.version })
-            )
+            ))
         )
             return
         message.textContent = t('update.downloading', {
@@ -586,15 +723,21 @@ async function waitForDesktopHealth(timeoutMs = 30000) {
 }
 
 async function testDesktop(prefix) {
+    const button = $(`#${prefix}-test`)
     const message = $(`#${prefix}-message`)
-    message.textContent = t('message.testing')
-    try {
-        await desktopPost('/api/v1/desktop/test-connection', setupValue(prefix))
-        message.textContent = t('message.connectionSuccess')
-        if (prefix === 'setup') $('#setup-next-step').hidden = false
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    await withBusyButton(button, async () => {
+        message.textContent = t('message.testing')
+        try {
+            await desktopPost(
+                '/api/v1/desktop/test-connection',
+                setupValue(prefix)
+            )
+            message.textContent = t('message.connectionSuccess')
+            if (prefix === 'setup') $('#setup-next-step').hidden = false
+        } catch (error) {
+            message.textContent = localizeError(language, error)
+        }
+    })
 }
 
 $('#setup-folder').onclick = () => chooseFolder('setup')
@@ -612,60 +755,95 @@ $('#setup-test').onclick = () => testDesktop('setup')
 $('#settings-test').onclick = () => testDesktop('settings')
 $('#setup-form').onsubmit = async (event) => {
     event.preventDefault()
+    const button =
+        event.submitter ||
+        $('#setup-form button[type="submit"]')
     const message = $('#setup-message')
-    try {
-        await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
-        message.textContent = t('message.savedOpening')
-        await waitForDesktopHealth()
-        await loadDesktop()
-        $('#setup-next-step').hidden = false
-        message.textContent = t('settings.appliedSync')
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    await withBusyButton(button, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/settings', setupValue('setup'))
+            message.textContent = t('message.savedOpening')
+            await waitForDesktopHealth()
+            await loadDesktop()
+            $('#setup-next-step').hidden = false
+            message.textContent = t('settings.appliedSync')
+        } catch (error) {
+            message.textContent = localizeError(language, error)
+        }
+    })
 }
 $('#settings-form').onsubmit = async (event) => {
     event.preventDefault()
+    const button =
+        event.submitter ||
+        $('#settings-form button[type="submit"]')
     const message = $('#settings-message')
-    try {
-        const value = setupValue('settings')
-        if (!value.account) delete value.account
-        if (!value.password) delete value.password
-        const result = await desktopPost('/api/v1/desktop/settings', value)
-        message.textContent = result.restarting
-            ? t('message.savedRestarting')
-            : t('message.settingsSaved')
-        $('#settings-password').value = ''
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
-}
-$('#open-data').onclick = () =>
-    desktopPost('/api/v1/desktop/open-directory', { kind: 'data' })
-$('#open-logs').onclick = () =>
-    desktopPost('/api/v1/desktop/open-directory', { kind: 'logs' })
-$('#export-browser-lite').onclick = async () => {
-    const message = $('#browser-lite-export-message')
-    message.textContent = t('message.browserLiteExporting')
-    try {
-        const result = await desktopPost('/api/v1/desktop/export-browser-lite')
-        if (result.cancelled) {
-            message.textContent = t('message.browserLiteExportCancelled')
-            return
+    await withBusyButton(button, async () => {
+        try {
+            const value = setupValue('settings')
+            if (!value.account) delete value.account
+            if (!value.password) delete value.password
+            const result = await desktopPost('/api/v1/desktop/settings', value)
+            message.textContent = result.restarting
+                ? t('message.savedRestarting')
+                : t('message.settingsSaved')
+            $('#settings-password').value = ''
+        } catch (error) {
+            message.textContent = localizeError(language, error)
         }
-        message.textContent = t('message.browserLiteExported')
-        $('#open-browser-lite-export').hidden = false
-        desktop.lastExportAt = result.generatedAt
-        renderTimestamps()
-    } catch (error) {
-        message.textContent = String(error?.message || error).includes(
-            'There is no library data to export yet'
-        )
-            ? t('message.browserLiteExportEmpty')
-            : t('message.browserLiteExportFailed')
-    }
+    })
 }
-$('#sync-export-browser-lite').onclick = async () => {
+async function openDesktopDirectory(kind, button, message) {
+    await withBusyButton(button, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/open-directory', { kind })
+        } catch (error) {
+            if (message)
+                message.textContent = localizeError(language, error)
+        }
+    })
+}
+$('#open-data').onclick = (event) =>
+    void openDesktopDirectory(
+        'data',
+        event.currentTarget,
+        $('#settings-message')
+    )
+$('#open-logs').onclick = (event) =>
+    void openDesktopDirectory(
+        'logs',
+        event.currentTarget,
+        $('#settings-message')
+    )
+$('#export-browser-lite').onclick = async (event) => {
+    const message = $('#browser-lite-export-message')
+    await withBusyButton(event.currentTarget, async () => {
+        message.textContent = t('message.browserLiteExporting')
+        try {
+            const result = await desktopPost(
+                '/api/v1/desktop/export-browser-lite'
+            )
+            if (result.cancelled) {
+                message.textContent = t('message.browserLiteExportCancelled')
+                return
+            }
+            message.textContent = t('message.browserLiteExported')
+            $('#open-browser-lite-export').hidden = false
+            desktop.lastExportAt = result.generatedAt
+            renderTimestamps()
+        } catch (error) {
+            message.textContent = String(error?.message || error).includes(
+                'There is no library data to export yet'
+            )
+                ? t('message.browserLiteExportEmpty')
+                : t('message.browserLiteExportFailed')
+        }
+    })
+}
+$('#sync-export-browser-lite').onclick = async (event) => {
+    const button = event.currentTarget
+    if (button.disabled) return
+    button.disabled = true
     const message = $('#browser-lite-export-message')
     message.textContent = t('bundle.syncExporting')
     const phases = {
@@ -709,51 +887,81 @@ $('#sync-export-browser-lite').onclick = async () => {
     } finally {
         clearInterval(progressTimer)
         clearProgress($('#download-operation'))
+        button.disabled = false
     }
 }
-$('#open-browser-lite-export').onclick = () =>
-    desktopPost('/api/v1/desktop/open-directory', {
-        kind: 'browser-lite-export'
+$('#open-browser-lite-export').onclick = (event) =>
+    void openDesktopDirectory(
+        'browser-lite-export',
+        event.currentTarget,
+        $('#browser-lite-export-message')
+    )
+$('#open-browser-lite').onclick = async (event) => {
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/open-browser-lite')
+        } catch (error) {
+            $('#browser-lite-export-message').textContent =
+                localizeError(language, error)
+        }
     })
-$('#open-browser-lite').onclick = () =>
-    desktopPost('/api/v1/desktop/open-browser-lite')
-$('#detect-proxy').onclick = async () => {
-    try {
-        const result = await desktopPost(
-            '/api/v1/desktop/detect-proxy',
-            setupValue('setup')
-        )
-        $('#setup-message').textContent = result.candidates?.length
-            ? `Detected ${result.candidates.map((item) => item.url).join(', ')}`
-            : 'No local proxy detected.'
-        if (result.candidates?.[0] && !result.candidates[0].url.includes('***'))
-            $('#setup-proxy').value = result.candidates[0].url
-    } catch (error) {
-        $('#setup-message').textContent = localizeError(language, error)
-    }
 }
-$('#settings-detect-proxy').onclick = async () => {
+$('#detect-proxy').onclick = async (event) => {
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            const result = await desktopPost(
+                '/api/v1/desktop/detect-proxy',
+                setupValue('setup')
+            )
+            $('#setup-message').textContent = result.candidates?.length
+                ? `Detected ${result.candidates.map((item) => item.url).join(', ')}`
+                : 'No local proxy detected.'
+            if (
+                result.candidates?.[0] &&
+                !result.candidates[0].url.includes('***')
+            )
+                $('#setup-proxy').value = result.candidates[0].url
+        } catch (error) {
+            $('#setup-message').textContent = localizeError(language, error)
+        }
+    })
+}
+$('#settings-detect-proxy').onclick = async (event) => {
     const message = $('#settings-message')
-    try {
-        const value = setupValue('settings')
-        if (!value.account) delete value.account
-        if (!value.password) delete value.password
-        const result = await desktopPost('/api/v1/desktop/detect-proxy', value)
-        const usable = result.candidates?.find((item) => item.usable)
-        message.textContent = usable
-            ? t('proxy.detected', { url: usable.url })
-            : result.candidates?.length
-              ? t('proxy.localUnavailable')
-              : t('proxy.none')
-        if (usable && !usable.url.includes('***'))
-            $('#settings-proxy').value = usable.url
-    } catch (error) {
-        message.textContent = localizeError(language, error)
-    }
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            const value = setupValue('settings')
+            if (!value.account) delete value.account
+            if (!value.password) delete value.password
+            const result = await desktopPost(
+                '/api/v1/desktop/detect-proxy',
+                value
+            )
+            const usable = result.candidates?.find((item) => item.usable)
+            message.textContent = usable
+                ? t('proxy.detected', { url: usable.url })
+                : result.candidates?.length
+                  ? t('proxy.localUnavailable')
+                  : t('proxy.none')
+            if (usable && !usable.url.includes('***'))
+                $('#settings-proxy').value = usable.url
+        } catch (error) {
+            message.textContent = localizeError(language, error)
+        }
+    })
 }
-$('#exit-app').onclick = async () => {
-    await desktopPost('/api/v1/desktop/shutdown')
-    document.body.innerHTML = `<main><article class="notice"><strong>${t('message.stopped')}</strong><p>${t('message.closeTab')}</p></article></main>`
+$('#exit-app').onclick = async (event) => {
+    if (!(await askConfirm(t('settings.exitConfirm')))) return
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            await desktopPost('/api/v1/desktop/shutdown')
+            document.body.innerHTML =
+                `<main><article class="notice"><strong>${t('message.stopped')}</strong><p>${t('message.closeTab')}</p></article></main>`
+        } catch (error) {
+            $('#settings-message').textContent =
+                localizeError(language, error)
+        }
+    })
 }
 
 function replaceLiteState(value) {
@@ -1001,6 +1209,13 @@ function renderComics(records = state.records) {
             </article>`
         )
         .join('')
+    if (!page.length)
+        $('#comic-grid').innerHTML =
+            `<article class="ux-empty-state">${escapeHtml(
+                state.records.length
+                    ? t('library.noMatches')
+                    : t('library.empty')
+            )}</article>`
     $('#comic-rows').innerHTML = page
         .map(
             (comic) => `<tr data-comic-id="${escapeHtml(comic.comicId)}" data-is-favorite="${comic.isFavorite ? 'true' : 'false'}">
@@ -1016,6 +1231,13 @@ function renderComics(records = state.records) {
             </tr>`
         )
         .join('')
+    if (!page.length)
+        $('#comic-rows').innerHTML =
+            `<tr><td colspan="7"><div class="ux-empty-state">${escapeHtml(
+                state.records.length
+                    ? t('library.noMatches')
+                    : t('library.empty')
+            )}</div></td></tr>`
     $('#library-count').textContent = t('message.libraryCount', {
         shown: page.length,
         total: state.libraryQueryResult?.total ?? state.visible.length
@@ -1497,7 +1719,7 @@ async function loadShelves() {
         state.shelves
             .map(
                 (shelf) =>
-                    `<button class="shelf-card" data-shelf-open="${escapeHtml(shelf.id)}"><strong>${escapeHtml(shelf.name)}</strong><span>${t('shelf.count', { count: Number(shelf.count) })}</span></button>`
+                    `<button class="shelf-card ${shelf.id === state.activeShelfId ? 'active' : ''}" aria-current="${shelf.id === state.activeShelfId ? 'true' : 'false'}" data-shelf-open="${escapeHtml(shelf.id)}"><strong>${escapeHtml(shelf.name)}</strong><span>${t('shelf.count', { count: Number(shelf.count) })}</span></button>`
             )
             .join('') || `<article class="notice">${t('shelf.empty')}</article>`
     $('#shelf-dialog-select').innerHTML = state.shelves
@@ -1511,6 +1733,11 @@ async function loadShelves() {
 async function openShelf(shelfId) {
     const value = await api(`/api/v1/shelves/${encodeURIComponent(shelfId)}`)
     state.activeShelfId = shelfId
+    $$('#shelf-list [data-shelf-open]').forEach((button) => {
+        const active = button.dataset.shelfOpen === shelfId
+        button.classList.toggle('active', active)
+        button.setAttribute('aria-current', String(active))
+    })
     const shelf = value.shelf
     if (!shelf) throw new Error(t('shelf.notFound'))
     $('#shelf-detail').innerHTML =
@@ -1540,7 +1767,7 @@ let pendingShelfAction = null
 async function chooseShelf(count, action) {
     await loadShelves()
     if (!state.shelves.length) {
-        const name = window.prompt(t('shelf.createPrompt'))
+        const name = await askText(t('shelf.createPrompt'))
         if (!name) return
         await post('/api/v1/shelves', { name })
         await loadShelves()
@@ -1606,7 +1833,7 @@ async function loadJobs() {
             const eta = job.bytesPerSecond && job.expectedBytes > job.bytes
                 ? `${Math.ceil((job.expectedBytes - job.bytes) / job.bytesPerSecond)}s` : '—'
             return `<article class="list-item download-job-card" data-job-status="${job.status}">
-                <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ETA ${eta} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
+                <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ${t('downloads.eta', { value: eta })} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
                 <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">${t('action.pause')}</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">${t('action.resume')}</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">${t('action.retry')}</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">${t('action.cancel')}</button>` : ''}</div>
             </article>`
         }).join('')
@@ -1662,13 +1889,17 @@ async function loadPreviewCacheStats() {
     }
 }
 
-$('#preview-cache-clear').onclick = async () => {
-    try {
-        await post('/api/v1/previews/cache/clear', {})
-        await loadPreviewCacheStats()
-    } catch (error) {
-        $('#preview-cache-stats').textContent = localizeError(language, error)
-    }
+$('#preview-cache-clear').onclick = async (event) => {
+    await withBusyButton(event.currentTarget, async () => {
+        try {
+            await post('/api/v1/previews/cache/clear', {})
+            $('#preview-cache-stats').textContent = t('preview.cacheCleared')
+            await loadPreviewCacheStats()
+        } catch (error) {
+            $('#preview-cache-stats').textContent =
+                localizeError(language, error)
+        }
+    })
 }
 
 function recommendationRecord(comicId, context) {
@@ -1833,6 +2064,34 @@ let readerComicRequest = 0
 function readerApiRoot() {
     return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
 }
+
+function readerReadableChapters() {
+    return (state.reader.chapters || []).filter(
+        (item) => state.reader.online || item.downloadedPictures > 0
+    )
+}
+
+function updateReaderChapterNavigation() {
+    const readable = readerReadableChapters()
+    const index = readable.findIndex(
+        (item) => item.id === state.reader.episodeId
+    )
+    const previous = $('#reader-prev-chapter')
+    const next = $('#reader-next-chapter')
+    if (previous) previous.disabled = index <= 0
+    if (next) next.disabled = index < 0 || index >= readable.length - 1
+    $$('#reader-chapters [data-reader-episode]').forEach((button) => {
+        const active = button.dataset.readerEpisode === state.reader.episodeId
+        button.classList.toggle('active', active)
+        button.setAttribute('aria-current', String(active))
+    })
+}
+
+function scrollReaderViewportToTop() {
+    const target = $('#reader-pages')
+    if (!target) return
+    target.scrollIntoView({ block: 'start' })
+}
 function renderReaderPages() {
     const reader = state.reader
     if (!reader.chapter) return
@@ -1966,6 +2225,9 @@ async function openReaderChapter(episodeId) {
     state.reader.dirty = false
     renderReaderChapterHeading()
     renderReaderPages()
+    updateReaderChapterNavigation()
+    if ($('#reader-mode').value !== 'vertical')
+        requestAnimationFrame(() => scrollReaderViewportToTop())
     $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
     } catch (error) {
         if (requestId === readerChapterRequest)
@@ -2045,6 +2307,13 @@ async function openReaderComic(comicId, online = false) {
     }
 }
 
+document.addEventListener('pica-open-reader', (event) => {
+    const detail = event instanceof CustomEvent ? event.detail : null
+    const comicId = String(detail?.comicId || '').trim()
+    if (!comicId) return
+    void openReaderComic(comicId, detail?.online !== false)
+})
+
 function moveReader(delta) {
     const total = state.reader.chapter?.pages?.length || 0
     if (!total || $('#reader-mode').value === 'vertical') return
@@ -2061,7 +2330,27 @@ $('#reader-chapters').onclick = (event) => {
     const episodeId = event.target.dataset.readerEpisode
     if (episodeId) void openReaderChapter(episodeId)
 }
-$('#reader-mode').onchange = renderReaderPages
+$('#reader-prev-chapter').onclick = () => {
+    const readable = readerReadableChapters()
+    const index = readable.findIndex(
+        (item) => item.id === state.reader.episodeId
+    )
+    if (index > 0) void openReaderChapter(readable[index - 1].id)
+}
+$('#reader-next-chapter').onclick = () => {
+    const readable = readerReadableChapters()
+    const index = readable.findIndex(
+        (item) => item.id === state.reader.episodeId
+    )
+    if (index >= 0 && index < readable.length - 1)
+        void openReaderChapter(readable[index + 1].id)
+}
+$('#reader-mode').onchange = () => {
+    renderReaderPages()
+    updateReaderChapterNavigation()
+    if ($('#reader-mode').value !== 'vertical')
+        requestAnimationFrame(() => scrollReaderViewportToTop())
+}
 $('#reader-direction').onchange = renderReaderPages
 $('#reader-fit').onchange = renderReaderPages
 $('#reader-fullscreen').onclick = () =>
@@ -2072,12 +2361,36 @@ async function exitReader() {
     readerComicRequest++
     readerChapterRequest++
     await flushReaderProgress()
+    if (document.fullscreenElement)
+        await document.exitFullscreen().catch(() => undefined)
     if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
     readerScrollHandler = null
-    document.body.classList.remove('reader-active')
     activateView(state.reader.originView || 'downloaded')
 }
 $('#reader-exit').onclick = () => void exitReader()
+document.addEventListener('keydown', (event) => {
+    if (activeView !== 'reader') return
+    const target = event.target
+    if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLSelectElement ||
+        target instanceof HTMLTextAreaElement
+    )
+        return
+    if (event.key === 'Escape' && !document.fullscreenElement) {
+        event.preventDefault()
+        void exitReader()
+        return
+    }
+    if ($('#reader-mode').value === 'vertical') return
+    if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+        event.preventDefault()
+        moveReader(-1)
+    } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
+        event.preventDefault()
+        moveReader(1)
+    }
+})
 async function exportReaderArchive(format) {
     try {
         const value = await post(`/api/v1/reader/export-${format}`, {
@@ -2091,7 +2404,7 @@ async function exportReaderArchive(format) {
             bytes: formatBytes(value.bytes)
         })
         if (
-            window.confirm(
+            await askConfirm(
                 t('reader.openExport', {
                     format: format.toUpperCase()
                 })
@@ -2110,15 +2423,6 @@ window.addEventListener('pagehide', () => void flushReaderProgress(true))
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushReaderProgress(true)
 })
-document.addEventListener('keydown', (event) => {
-    if (activeView !== 'reader') return
-    if (event.key === 'ArrowLeft' || event.key === 'PageUp') moveReader(-1)
-    if (event.key === 'ArrowRight' || event.key === 'PageDown') moveReader(1)
-    if (event.key === 'Escape' && !document.fullscreenElement) {
-        void exitReader()
-    }
-})
-
 async function loadDownloaded() {
     if (state.mode === 'lite') return
     const records = await api('/api/v1/downloaded')
@@ -2170,6 +2474,8 @@ async function enqueue(ids, source) {
 function renderAll(summary) {
     $('#browser-lite-onboarding').hidden =
         state.mode !== 'lite' || state.records.length > 0
+    $('#home-mode-notice').hidden = state.mode !== 'lite'
+    $('#clear-lite-state').hidden = state.mode !== 'lite'
     renderSummary(summary)
     renderFilterFacets()
     renderComics()
@@ -2199,13 +2505,7 @@ function renderAll(summary) {
 $$('nav [data-view], [data-go]').forEach((button) =>
     button.addEventListener('click', () => {
         const id = button.dataset.view || button.dataset.go
-        activeView = id
-        $$('.view').forEach((view) =>
-            view.classList.toggle('active', view.id === id)
-        )
-        $$('nav button').forEach((item) =>
-            item.classList.toggle('active', item.dataset.view === id)
-        )
+        activateView(id)
         if (id === 'downloads') loadJobs()
         else if (downloadPoll) {
             clearInterval(downloadPoll)
@@ -2215,7 +2515,6 @@ $$('nav [data-view], [data-go]').forEach((button) =>
         if (id === 'shelves') void loadShelves()
         if (id === 'settings') void loadPreviewCacheStats()
         if (id === 'chronicle') void loadChronicle()
-        document.body.classList.toggle('reader-active', id === 'reader')
     })
 )
 
@@ -2413,8 +2712,12 @@ $('#downloaded-cover-toggle').onchange = (event) => {
 }
 $('#pending-only').onchange = renderAuthors
 async function importSelectedFile() {
-    const file = $('#import-file').files[0]
+    if (importPending) return
+    const input = $('#import-file')
+    const file = input.files[0]
     if (!file) return
+    importPending = true
+    input.disabled = true
     try {
         setProgress($('#library-operation'), t('message.importRead'), 0, 0)
         const text = await file.text()
@@ -2458,6 +2761,9 @@ async function importSelectedFile() {
     } catch (error) {
         clearProgress($('#library-operation'))
         $('#import-result').textContent = localizeError(language, error)
+    } finally {
+        importPending = false
+        input.disabled = false
     }
 }
 $('#import-button').onclick = importSelectedFile
@@ -2465,6 +2771,15 @@ $('#import-file').onchange = importSelectedFile
 $('#onboarding-import').onclick = () => $('#import-file').click()
 $('#lite-reimport').onclick = () => $('#import-file').click()
 async function syncFavorites(message = $('#import-result'), mode = 'quick') {
+    if (state.syncPending) return
+    state.syncPending = true
+    const syncButtons = [
+        $('#sync-button'),
+        $('#full-sync-button'),
+        $('#home-sync'),
+        $('#setup-sync')
+    ].filter(Boolean)
+    syncButtons.forEach((button) => (button.disabled = true))
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.syncNeedsEngine'))
@@ -2524,6 +2839,9 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
     } catch (error) {
         clearProgress($('#library-operation'))
         message.textContent = localizeError(language, error)
+    } finally {
+        state.syncPending = false
+        syncButtons.forEach((button) => (button.disabled = false))
     }
 }
 $('#sync-button').onclick = () => syncFavorites()
@@ -2539,6 +2857,7 @@ $('#setup-sync').onclick = async () => {
 $('#setup-sync-later').onclick = () => location.assign('/')
 $('#clear-lite-state').onclick = async () => {
     if (state.mode !== 'lite') return
+    if (!(await askConfirm(t('home.clearConfirm')))) return
     await clearLiteState()
     replaceLiteState(emptyLiteState())
     renderAll()
@@ -2574,12 +2893,12 @@ $('#library-add-filtered-shelf').onclick = () => {
     void chooseShelf(total, async (shelfId) => {
         const shelf = state.shelves.find((item) => item.id === shelfId)
         if (
-            !window.confirm(
+            !(await askConfirm(
                 t('shelf.addFilteredConfirm', {
                     count: total,
                     name: shelf?.name || ''
                 })
-            )
+            ))
         )
             return
         return post(
@@ -2615,7 +2934,7 @@ $('#search-add-shelf').onclick = () => {
     )
 }
 $('#shelf-create').onclick = async () => {
-    const name = window.prompt(t('shelf.namePrompt'))
+    const name = await askText(t('shelf.namePrompt'))
     if (!name) return
     try {
         await post('/api/v1/shelves', { name })
@@ -2635,7 +2954,7 @@ $('#shelf-detail').onclick = async (event) => {
     const read = event.target.dataset.shelfRead
     const download = event.target.dataset.shelfDownload
     if (rename) {
-        const name = window.prompt(t('shelf.renamePrompt'))
+        const name = await askText(t('shelf.renamePrompt'))
         if (name) {
             await mutate(
                 `/api/v1/shelves/${encodeURIComponent(rename)}`,
@@ -2648,7 +2967,7 @@ $('#shelf-detail').onclick = async (event) => {
             await openShelf(rename)
         }
     } else if (removeShelf) {
-        if (!window.confirm(t('shelf.deleteConfirm'))) return
+        if (!(await askConfirm(t('shelf.deleteConfirm')))) return
         await mutate(
             `/api/v1/shelves/${encodeURIComponent(removeShelf)}`,
             'DELETE'
@@ -2669,6 +2988,11 @@ $('#shelf-detail').onclick = async (event) => {
     else if (download) await enqueue([download], 'shelf')
 }
 $('#search-button').onclick = async () => {
+    if (state.searchPending) return
+    state.searchPending = true
+    const searchButton = $('#search-button')
+    searchButton.disabled = true
+    $('#search-message').textContent = t('message.searching')
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.searchNeedsEngine'))
@@ -2703,11 +3027,19 @@ $('#search-button').onclick = async () => {
         state.searchResults = records
         clearSelection('search')
         renderResultCards(records, '#search-results')
+        if (!records.length)
+            $('#search-results').innerHTML =
+                `<article class="ux-empty-state">${escapeHtml(
+                    t('search.empty')
+                )}</article>`
         $('#search-message').textContent = t('message.searchCount', {
             count: records.length
         })
     } catch (error) {
         $('#search-message').textContent = localizeError(language, error)
+    } finally {
+        state.searchPending = false
+        searchButton.disabled = false
     }
 }
 $('#recommend-button').onclick = async () => {
@@ -2746,7 +3078,7 @@ $('#recommend-button').onclick = async () => {
     }
 }
 $('#recommend-restart').onclick = async () => {
-    if (!window.confirm(t('recommend.restartConfirm'))) return
+    if (!(await askConfirm(t('recommend.restartConfirm')))) return
     try {
         if (state.recommendationPending) return
         state.recommendationPending = true
@@ -2994,22 +3326,36 @@ $('#performance-profile').onchange = () => {
         $('#performance-profile').value !== 'custom'
 }
 $('#run-jobs').onclick = async () => {
+    const button = $('#run-jobs')
+    if (button.disabled) return
     if (state.mode === 'lite') {
         downloadJson('download-plan.json', portablePlan())
         return
     }
-    const profile = $('#performance-profile').value
-    const runtime = { profile }
-    if (profile === 'custom') {
-        Object.assign(runtime, {
-            jobConcurrency: Number($('#custom-jobs').value),
-            globalMediaConcurrency: Number($('#custom-media').value),
-            requestIntervalMs: Number($('#custom-interval').value),
-            maxRetries: Number($('#custom-retries').value)
-        })
+    button.disabled = true
+    setProgress(
+        $('#download-operation'),
+        t('downloads.starting'),
+        0,
+        0
+    )
+    try {
+        const profile = $('#performance-profile').value
+        const runtime = { profile }
+        if (profile === 'custom') {
+            Object.assign(runtime, {
+                jobConcurrency: Number($('#custom-jobs').value),
+                globalMediaConcurrency: Number($('#custom-media').value),
+                requestIntervalMs: Number($('#custom-interval').value),
+                maxRetries: Number($('#custom-retries').value)
+            })
+        }
+        await post('/api/v1/downloads/run', runtime)
+        await loadJobs()
+    } finally {
+        clearProgress($('#download-operation'))
+        button.disabled = false
     }
-    await post('/api/v1/downloads/run', runtime)
-    await loadJobs()
 }
 $('#job-list').onclick = async (event) => {
     if (!event.target.dataset.jobAction || state.mode !== 'connected') return
@@ -3019,12 +3365,12 @@ $('#job-list').onclick = async (event) => {
         )
         if (
             job &&
-            !window.confirm(
+            !(await askConfirm(
                 t('downloads.cancelConfirm', {
                     completed: job.progressCompleted,
                     total: job.progressTotal || '—'
                 })
-            )
+            ))
         )
             return
     }
@@ -3034,43 +3380,45 @@ $('#job-list').onclick = async (event) => {
     )
     await loadJobs()
 }
-$('#check-updates').onclick = async () => {
+async function runMaintenanceAction(button, output, work) {
+    if (button.disabled) return
+    button.disabled = true
+    output.textContent = t('maintenance.working')
     try {
-        $('#update-result').textContent = JSON.stringify(
-            await post('/api/v1/maintenance/updates', {}),
-            null,
-            2
-        )
+        output.textContent = JSON.stringify(await work(), null, 2)
     } catch (error) {
-        $('#update-result').textContent = localizeError(language, error)
+        output.textContent = localizeError(language, error)
+    } finally {
+        button.disabled = false
     }
 }
-$('#scan-repair').onclick = async () => {
-    try {
-        $('#repair-result').textContent = JSON.stringify(
-            await post('/api/v1/maintenance/repair', {}),
-            null,
-            2
-        )
-    } catch (error) {
-        $('#repair-result').textContent = localizeError(language, error)
-    }
-}
-$('#run-health').onclick = async () => {
-    $('#health-result').textContent = JSON.stringify(
-        state.mode === 'connected'
-            ? await api('/api/v1/status')
-            : {
-                  mode: 'lite',
-                  records: state.records.length,
-                  recommendations: state.recommendations.length,
-                  queue: state.queue.length,
-                  storage: 'IndexedDB'
-              },
-        null,
-        2
+$('#check-updates').onclick = () =>
+    void runMaintenanceAction(
+        $('#check-updates'),
+        $('#update-result'),
+        () => post('/api/v1/maintenance/updates', {})
     )
-}
+$('#scan-repair').onclick = () =>
+    void runMaintenanceAction(
+        $('#scan-repair'),
+        $('#repair-result'),
+        () => post('/api/v1/maintenance/repair', {})
+    )
+$('#run-health').onclick = () =>
+    void runMaintenanceAction(
+        $('#run-health'),
+        $('#health-result'),
+        async () =>
+            state.mode === 'connected'
+                ? api('/api/v1/status')
+                : {
+                      mode: 'lite',
+                      records: state.records.length,
+                      recommendations: state.recommendations.length,
+                      queue: state.queue.length,
+                      storage: 'IndexedDB'
+                  }
+    )
 $('#author-list').onclick = async (event) => {
     const decision = event.target.dataset.decision
     if (!decision) return
@@ -3114,7 +3462,7 @@ function renderChronicleLegacy(snapshot) {
     if (!snapshot) return
     const metric = (label, value) =>
         `<div class="chronicle-metric"><strong>${chronicleEscape(value)}</strong><span>${chronicleEscape(label)}</span></div>`
-    content.innerHTML = `<article class="chronicle-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.hero')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric('Tags', snapshot.globalStats.tags)}${metric('Interests', snapshot.tasteClusters.length)}</div><small>${t('chronicle.local')}</small></article>
+    content.innerHTML = `<article class="chronicle-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.hero')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.tagsMetric'), snapshot.globalStats.tags)}${metric(t('chronicle.interestsMetric'), snapshot.tasteClusters.length)}</div><small>${t('chronicle.local')}</small></article>
     <article class="chronicle-section chronicle-page"><h2>${t('chronicle.keywords')}</h2><div class="chronicle-tags">${snapshot.tagPreferences
         .slice(0, 20)
         .map(
@@ -3201,7 +3549,7 @@ function renderChronicleLegacy(snapshot) {
         .join(
             ''
         )}</div><div class="chronicle-subsection"><h2>${t('chronicle.future')}</h2><p>${t('chronicle.futureNote')}</p><ol class="chronicle-flow"><li>${t('chronicle.futureLifetime')}</li><li>${t('chronicle.futureRecent')}</li><li>${t('chronicle.futureBalance')}</li></ol><p>${t('chronicle.futureSafety')}</p></div></article>
-    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.about')}</h2><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><p>${t('chronicle.definition')}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · Generated locally by Pica Library</small><h3>${t('chronicle.return')}</h3></article>`
+    <article class="chronicle-section chronicle-page"><h2>${t('chronicle.about')}</h2><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><p>${t('chronicle.definition')}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · ${t('chronicle.generatedLocally')}</small><h3>${t('chronicle.return')}</h3></article>`
 }
 
 function chronicleFacetLabel(facet) {
@@ -3403,7 +3751,7 @@ function renderChronicleV2(snapshot) {
         )
         .join('')
 
-    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
+    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">01</p><h2>${t('chronicle.keywordsV2')}</h2></div></div><div class="atlas-keyword-groups">${keywordGroups}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">02</p><h2>${t('chronicle.themes')}</h2></div><p>${t('chronicle.themesNote')}</p></div><div class="atlas-themes">${themes}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">03</p><h2>${t('chronicle.universe')}</h2></div><p>${t('chronicle.universeNoteV2')}</p></div>${renderChronicleUniverse(snapshot)}</article>
@@ -3411,7 +3759,7 @@ function renderChronicleV2(snapshot) {
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">05</p><h2>${t('chronicle.familiarV2')}</h2></div></div><div class="chronicle-preference-grid atlas-preference-grid"><section><h3>${t('chronicle.fandoms')}</h3>${preferenceList(snapshot.fandomPreferences)}</section><section><h3>${t('chronicle.authors')}</h3>${preferenceList(snapshot.authorPreferences)}</section><section><h3>${t('chronicle.circles')}</h3>${preferenceList(snapshot.circlePreferences)}</section></div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">06</p><h2>${t('chronicle.combinationsV2')}</h2></div><p>${t('chronicle.combinationsNoteV2')}</p></div><div class="atlas-combinations">${combinations || `<div class="atlas-empty">${t('chronicle.noCombinations')}</div>`}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">07</p><h2>${t('chronicle.styleV2')}</h2></div></div><div class="atlas-style-grid">${style}</div></article>
-    <article class="chronicle-section chronicle-page atlas-about"><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · Generated locally by Pica Library</small></article>`
+    <article class="chronicle-section chronicle-page atlas-about"><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · ${t('chronicle.generatedLocally')}</small></article>`
 }
 
 function renderChronicle(snapshot) {
@@ -3616,7 +3964,7 @@ function buildChroniclePrintV2(snapshot) {
     root.innerHTML = `<section class="rc-sheet">
         <div class="rc-hero">
             <div class="rc-brand"><img src="./pica-library-icon.svg" alt=""><div><p>PICA LIBRARY · COLLECTION PROFILE</p><h1>${chronicleEscape(profileResult)}</h1><span>${chronicleEscape(profileDescription)}</span></div></div>
-            <div class="rc-metrics">${metric('Favorites', snapshot.favoriteCount)}${metric('Authors', snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div>
+            <div class="rc-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div>
         </div>
 
         <section class="rc-panel rc-semantic"><div class="rc-panel-title"><small>01</small><h2>${t('chronicle.preferenceMap')}</h2></div><div class="rc-facet-stack">${semanticBands}</div></section>
@@ -3628,7 +3976,7 @@ function buildChroniclePrintV2(snapshot) {
         <section class="rc-footer-panel rc-footer-combos"><h2>${t('chronicle.combinationsV2')}</h2><div class="rc-combos">${combos}</div></section>
         <section class="rc-footer-panel rc-footer-traits"><h2>${t('chronicle.styleV2')}</h2><div class="rc-traits">${styles}</div></section>
 
-        <div class="rc-meta"><span>Pica Library · Snapshot v${chronicleEscape(snapshot.snapshotVersion)}</span><small>${chronicleEscape(String(snapshot.generatedAt || '').slice(0, 10))} · Generated locally</small></div>
+        <div class="rc-meta"><span>Pica Library · ${t('chronicle.snapshotLabel')} v${chronicleEscape(snapshot.snapshotVersion)}</span><small>${chronicleEscape(String(snapshot.generatedAt || '').slice(0, 10))} · ${t('chronicle.generatedLocallyShort')}</small></div>
     </section>`
     return root
 }

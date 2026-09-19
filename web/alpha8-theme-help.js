@@ -7,7 +7,6 @@ const CREATOR_MAX_TOTAL_BYTES = 5 * 1024 * 1024
 const THEME_MAX_BYTES = 24 * 1024 * 1024
 const referenceFiles = []
 const progressHeads = new WeakMap()
-const viewScroll = new Map()
 let desktopStatus = null
 let activeDescriptor = null
 let progressTimer = null
@@ -15,7 +14,7 @@ let recommendationTimer = null
 let recommendationCompletionTimer = null
 let recommendationWatchBaselineCycleId = null
 let recommendationWatchStartedAt = 0
-let lastActiveView = $('.view.active')?.id || 'home'
+let decorationQueued = false
 
 function escapeHtml(value) {
     return String(value ?? '').replace(
@@ -206,16 +205,15 @@ function acceptReferences(files) {
 }
 
 function studioMarkup() {
-    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div>
-<p>只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。</p>
+    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><div class="help-heading"><h3>个性化装扮</h3><button type="button" class="info-tip" aria-label="查看个性化装扮说明" data-info-tip="只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。">!</button></div></div><span class="a83-state a83-good">已解锁</span></div>
 <div class="a85-steps"><span class="a85-step">1 · 描述与参考图</span><span class="a85-step">2 · 导出 ZIP 给 AI</span><span class="a85-step">3 · 导入 AI 返回包</span><span class="a85-step">4 · 自动同步手机</span></div>
 <div class="a85-workflow">
-<section class="a85-box"><h4>制作装扮 · Theme Creator Kit</h4><p class="status">主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。</p>
+<section class="a85-box"><div class="help-heading"><h4>制作装扮 · Theme Creator Kit</h4><button type="button" class="info-tip" aria-label="查看 Theme Creator Kit 说明" data-info-tip="主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。">!</button></div>
 <textarea id="a85-description" maxlength="4000" placeholder="例如：紫发二次元漫画向导，星空与白猫，薰衣草紫为主色，整体轻盈、可爱，但不要遮抢漫画封面。"></textarea>
 <label class="a85-upload" id="a85-reference-drop"><strong>上传角色 / 风格参考图</strong><br><span>PNG / JPEG / WebP · 最多 4 张</span><input id="a85-reference-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
 <div id="a85-reference-grid" class="a85-reference-grid"></div><p id="a85-reference-message" class="status"></p>
 <div class="a83-row"><button id="a85-export" type="button" class="primary">导出给 AI</button><a class="button-link" href="./theme-pack-creator-prompt.txt" download>查看固定提示词</a><a class="button-link" href="./theme-pack-spec-v1.txt" download>查看装扮规范</a></div><p id="a85-export-message" class="status"></p></section>
-<section class="a85-box"><h4>导入并应用</h4><p class="status">把 AI 返回的 <code>.pica-theme</code> 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。</p>
+<section class="a85-box"><div class="help-heading"><h4>导入并应用</h4><button type="button" class="info-tip" aria-label="查看装扮导入说明" data-info-tip="把 AI 返回的 .pica-theme 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。">!</button></div>
 <label class="a85-theme-drop" id="a85-theme-drop"><strong>拖入 AI 返回的装扮包</strong><br><span>或点击选择文件 · 上限 24 MiB</span><input id="a85-theme-input" type="file" accept=".pica-theme,.zip,application/zip" hidden></label>
 <p id="a85-import-message" class="status"></p><div id="a85-theme-list"></div><div class="a85-mobile-note" id="a85-mobile-note">手机与电脑在同一局域网重新配对/同步一次后，会自动取得 Desktop 的已安装装扮，并跟随当前启用的装扮。</div></section>
 </div>`
@@ -851,6 +849,22 @@ function renderEmptyArt() {
     })
 }
 
+function scheduleThemeDecoration() {
+    if (
+        decorationQueued ||
+        !activeDescriptor ||
+        document.visibilityState === 'hidden'
+    )
+        return
+    decorationQueued = true
+    requestAnimationFrame(() => {
+        decorationQueued = false
+        if (!activeDescriptor || document.visibilityState === 'hidden') return
+        decorateProgress()
+        renderEmptyArt()
+    })
+}
+
 function setupRuntimeObservers() {
     ensureRecommendationProgress()
     $('#recommend-button')?.addEventListener(
@@ -863,39 +877,60 @@ function setupRuntimeObservers() {
         startRecommendationWatch,
         true
     )
-    window.addEventListener(
-        'scroll',
-        () => viewScroll.set(lastActiveView, window.scrollY),
-        { passive: true }
-    )
-    const viewObserver = new MutationObserver(() => {
-        const active = $('.view.active')?.id
-        if (!active || active === lastActiveView) return
-        lastActiveView = active
-        const restore = viewScroll.get(active) || 0
-        requestAnimationFrame(() =>
-            window.scrollTo({ top: restore, left: 0, behavior: 'auto' })
-        )
-    })
-    $$('.view').forEach((view) =>
-        viewObserver.observe(view, {
-            attributes: true,
-            attributeFilter: ['class']
-        })
-    )
+
+    // Main app.js owns view navigation and scroll restoration. Theme support
+    // must never maintain a competing scroll-position system.
     const themeObserver = new MutationObserver(() => {
-        if (activeDescriptor) applyDescriptor(activeDescriptor)
+        if (activeDescriptor) {
+            applyDescriptor(activeDescriptor)
+            scheduleThemeDecoration()
+        }
     })
     themeObserver.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ['data-pica-theme']
     })
-    progressTimer = setInterval(() => {
-        if (activeDescriptor) {
-            decorateProgress()
-            renderEmptyArt()
-        }
-    }, 650)
+
+    const decorationObserver = new MutationObserver((mutations) => {
+        const relevant = mutations.some((mutation) => {
+            const target =
+                mutation.target instanceof Element
+                    ? mutation.target
+                    : mutation.target.parentElement
+            return (
+                !target?.closest?.('.a85-progress-head') &&
+                !target?.classList?.contains('a85-empty-art')
+            )
+        })
+        if (relevant) scheduleThemeDecoration()
+    })
+    for (const selector of [
+        '#recommend',
+        '#downloads',
+        '#library',
+        '#downloaded'
+    ]) {
+        const root = $(selector)
+        if (!root) continue
+        decorationObserver.observe(root, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'hidden', 'style', 'value']
+        })
+    }
+    window.addEventListener('resize', scheduleThemeDecoration, {
+        passive: true
+    })
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible')
+            scheduleThemeDecoration()
+    })
+
+    // Low-frequency fallback only. Normal updates are driven by the observer
+    // above, so themed pages no longer rescan the DOM every 650 ms.
+    progressTimer = setInterval(scheduleThemeDecoration, 2500)
+    scheduleThemeDecoration()
 }
 
 async function bootstrap() {

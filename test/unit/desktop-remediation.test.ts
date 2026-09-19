@@ -40,7 +40,7 @@ describe('desktop remediation boundaries', () => {
             ),
             'utf8'
         )
-        expect(mainSource.match(/env: sanitizedChildEnv\(\)/g)).toHaveLength(5)
+        expect(mainSource.match(/env: sanitizedChildEnv\(\)/g)).toHaveLength(6)
         expect(mainSource).toContain(
             'if (currentUrl !== previousUrl) browser(currentUrl)'
         )

@@ -95,6 +95,51 @@ describe('E-H provider mapping', () => {
         expect(request.gidlist).toEqual([[123, 'abcdef1234']])
     })
 
+    it('preserves favorite category names, slots and notes in account snapshots', async () => {
+        const mock = vi
+            .fn()
+            .mockResolvedValueOnce(
+                new Response(
+                    '<input type="text" name="favorite_0" value="最喜欢"><input value="待看" name="favorite_1" type="text">',
+                    { status: 200, headers: { 'content-type': 'text/html' } }
+                )
+            )
+            .mockResolvedValueOnce(
+                new Response(
+                    '<div id="posted_123" title="待看"></div><div id="favnote_123">稍后阅读</div><a href="/g/123/abcdef1234/">favorite</a>',
+                    { status: 200, headers: { 'content-type': 'text/html' } }
+                )
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ gmetadata: [metadata()] }), {
+                    status: 200,
+                    headers: { 'content-type': 'application/json' }
+                })
+            )
+        globalThis.fetch = mock as typeof fetch
+        const provider = new EhProvider({
+            memberId: '1',
+            passHash: 'hash'
+        })
+        const snapshot = await provider.favoriteSnapshot()
+        expect(snapshot.comics).toHaveLength(1)
+        expect(snapshot.categoryNames.slice(0, 2)).toEqual([
+            '最喜欢',
+            '待看'
+        ])
+        expect(snapshot.items).toEqual([
+            {
+                comicId: 'eh:123:abcdef1234',
+                slot: 1,
+                note: '稍后阅读'
+            }
+        ])
+        expect(snapshot.categoryCounts[1]).toBe(1)
+        expect(mock).toHaveBeenCalledTimes(3)
+        const accountHeaders = new Headers(mock.mock.calls[0][1]?.headers)
+        expect(accountHeaders.get('cookie')).toContain('ipb_member_id=1')
+    })
+
     it('stores stable image-page locators and resolves temporary image URLs only at fetch time', async () => {
         const imageBytes = new Uint8Array([1, 2, 3, 4])
         const mock = vi

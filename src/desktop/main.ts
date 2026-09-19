@@ -16,6 +16,7 @@ import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
 import { UpdateManager } from '../update/manager'
+import { EcosystemPackStore } from '../ecosystem/pack-store'
 import { PersonalizationService } from '../services/personalization-service'
 import { GitHubAccountAuthService } from '../services/github-account-auth'
 import { DesktopEhWebLogin, type EhCapturedSession } from './eh-web-login'
@@ -71,6 +72,7 @@ const updateManager = new UpdateManager({
     desktopEntryPath: process.argv[1],
     instanceFile: paths.instance
 })
+const ecosystemPacks = new EcosystemPackStore(paths.packs, PRODUCT_VERSION)
 const personalization = new PersonalizationService(
     path.join(paths.runtimeState, 'personalization'),
     path.join(applicationRoot, 'web')
@@ -80,6 +82,7 @@ for (const directory of [
     paths.root,
     paths.data,
     paths.cache,
+    paths.packs,
     paths.logs,
     paths.runtimeState
 ])
@@ -414,6 +417,7 @@ function openDirectory(kind: string) {
         data: config?.libraryDirectory ?? paths.data,
         logs: paths.logs,
         personalization: personalization.root,
+        packs: paths.packs,
         ...(lastBrowserLiteExportDirectory
             ? { 'browser-lite-export': lastBrowserLiteExportDirectory }
             : {})
@@ -916,6 +920,7 @@ async function startEngine(preferredPort: number) {
         },
         openBrowserLite: async () => { browser(`${currentUrl}/?mode=browser-lite`) },
         openDirectory,
+        ecosystemPackInventory: () => ecosystemPacks.inventory(),
         checkForUpdate: async () => updateManager.checkForUpdate(),
         stageUpdate: async (name, value) => updateManager.stage(name, value),
         applyUpdate: async (id) => {

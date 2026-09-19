@@ -1507,6 +1507,7 @@ export class LibraryService {
         const pool = cycleId
             ? this.database.latestV3CandidatePool(cycleId)
             : null
+        const catalog = this.database.listComics({ limit: 10000 })
         const rawRecords = pool
             ? this.database.recommendationRecords(
                   pool.candidateIds.slice(0, bounded * 2)
@@ -1514,7 +1515,7 @@ export class LibraryService {
             : []
         const filtered = filterCandidatesAgainstOwnedV5(
             rawRecords,
-            this.database.listComics({ limit: 10000 }),
+            catalog,
             policy
         ).rows.slice(0, bounded)
 
@@ -1540,6 +1541,33 @@ export class LibraryService {
                 }
             ]
         })
+        const allIdentityBindings = this.database.listWorkIdentityBindings(10000)
+        const portableIdentityIds = new Set([
+            ...filtered.map((row) => row.comic.comicId),
+            ...catalog
+                .filter((comic) =>
+                    Boolean(
+                        comic.isFavorite ||
+                            comic.inLibrary ||
+                            comic.downloadedPictures > 0
+                    )
+                )
+                .map((comic) => comic.comicId)
+        ])
+        const identityBindings = allIdentityBindings
+            .filter((binding) => portableIdentityIds.has(binding.comicId))
+            .map((binding) => ({
+                comicId: binding.comicId,
+                workId: binding.workId,
+                workTitle: binding.workTitle,
+                editionId: binding.editionId,
+                editionLabel: binding.editionLabel,
+                editionLanguage: binding.editionLanguage,
+                editionKind: binding.editionKind,
+                bindingStatus: binding.bindingStatus,
+                confidence: binding.confidence,
+                resolverVersion: binding.resolverVersion
+            }))
         const visualStatus = this.visualIndexStatus()
         const visualGeneration = createHash('sha256')
             .update(
@@ -1559,6 +1587,7 @@ export class LibraryService {
                 JSON.stringify({
                     resolverVersion: WORK_IDENTITY_RESOLVER_VERSION,
                     explicitDistinctPairs: policy.explicitDistinctPairs,
+                    identityBindings,
                     authors: this.database
                         .listAuthors()
                         .map((author) => [
@@ -1608,7 +1637,8 @@ export class LibraryService {
                 visualModelId: visualStatus.modelId,
                 visualModelVersion: visualStatus.modelVersion,
                 visualSamplingPolicyVersion:
-                    visualStatus.samplingPolicyVersion
+                    visualStatus.samplingPolicyVersion,
+                identityBindings
             },
             reservoir: {
                 generation: reservoirGeneration,

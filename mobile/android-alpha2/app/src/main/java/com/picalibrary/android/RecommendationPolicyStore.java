@@ -88,8 +88,12 @@ final class RecommendationPolicyStore {
         return false;
     }
 
+    private static double controlMagnitude(JSONObject row,boolean session){
+        if(row!=null&&row.has("levelDelta"))return Math.min(0.27,Math.abs(row.optInt("levelDelta",0))*0.03);
+        return session?0.12:0.08;
+    }
     static double adjustment(Context c,PicaClient.Comic comic){
-        JSONObject state=snapshot(c);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(comic,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));if("MORE".equals(direction))score+=session?0.12:0.08;else if("LESS".equals(direction))score-=session?0.12:0.08;}
+        JSONObject state=snapshot(c);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(comic,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
         JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&matches(comic,intent.optString("targetType"),intent.optString("key")))score+=0.16;
         return Math.max(-0.30,Math.min(0.30,score));
     }
@@ -99,7 +103,7 @@ final class RecommendationPolicyStore {
     }
 
     private static double adjustment(JSONObject state,NativeRecommendationStore.Item item){
-        double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(item,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));if("MORE".equals(direction))score+=session?0.12:0.08;else if("LESS".equals(direction))score-=session?0.12:0.08;}
+        double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(item,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
         JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&matches(item,intent.optString("targetType"),intent.optString("key")))score+=0.16;
         return Math.max(-0.30,Math.min(0.30,score));
     }

@@ -45,6 +45,9 @@ describe('Alpha8.11 no-payment release baseline', () => {
         const gradle = read('mobile/android-alpha2/app/build.gradle')
         const [major, minor, patch] = pkg.version.split('.').map(Number)
         expect(major * 1000000 + minor * 1000 + patch).toBeGreaterThanOrEqual(3011)
-        expect(Number(gradle.match(/versionCode\s+(\d+)/)?.[1])).toBeGreaterThanOrEqual(38)
+        const androidVersionCode = Number(
+            gradle.match(/PICA_ANDROID_VERSION_CODE'\)\s*\?:\s*'(\d+)'/)?.[1] || 0
+        )
+        expect(androidVersionCode).toBeGreaterThanOrEqual(38)
     })
 })

@@ -18,7 +18,8 @@ const COPY = {
         unavailable: '当前不可用',
         checking: '正在检查…',
         check: '检查连接状态',
-        failed: '状态读取失败'
+        failed: '状态读取失败',
+        probeHelp: '网络探测只会在你点击检查时运行。'
     },
     en: {
         title: 'Connection status',
@@ -34,7 +35,8 @@ const COPY = {
         unavailable: 'Currently unavailable',
         checking: 'Checking…',
         check: 'Check connections',
-        failed: 'Failed to read status'
+        failed: 'Failed to read status',
+        probeHelp: 'Network checks run only when requested.'
     }
 }
 
@@ -107,9 +109,9 @@ function renderConfigured(snapshot = connectionSnapshot) {
     const mobileConfigured = Boolean(snapshot.mobileBridge?.enabled)
     panel.innerHTML = `
         <div class="a83-connection-head">
-            <div>
+            <div class="help-heading">
                 <h3>${text('title')}</h3>
-                <p class="status">${language() === 'en' ? 'Network checks run only when requested.' : '网络探测只会在你点击检查时运行。'}</p>
+                <button type="button" class="info-tip" aria-label="${text('title')}" data-info-tip="${text('probeHelp')}">!</button>
             </div>
             <button type="button" id="a83-check-connections" ${checkingConnections ? 'disabled' : ''}>
                 ${checkingConnections ? text('checking') : text('check')}

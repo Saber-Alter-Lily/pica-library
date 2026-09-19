@@ -71,6 +71,9 @@ public final class RecommendationProfileActivity extends Activity {
         }
         content.addView(lifetime);
 
+        addBehaviorSignals("最近 30 天主要兴趣",RecommendationEvidenceStore.topSignals(this,false,8),"来自手机本地行为与已同步的 Desktop 最近行为；单纯曝光不作为正向兴趣。");
+        addBehaviorSignals("本次会话兴趣",RecommendationEvidenceStore.topSignals(this,true,8),"只统计当前 Android 进程 Session；不会同步成另一端的 Session Intent。");
+
         LinearLayout composition=SettingsRow.panel(this,null);
         composition.addView(Ui.text(this,"当前手机推荐构成",17,Ui.TEXT,true));
         if(!runtime.available())composition.addView(Ui.text(this,"尚未生成手机本地推荐周期。",12,Ui.MUTED,false));
@@ -82,16 +85,24 @@ public final class RecommendationProfileActivity extends Activity {
             }
             for(Map.Entry<String,Integer> row:families.entrySet())
                 composition.addView(SettingsRow.statusLine(this,familyLabel(row.getKey()),Ui.text(this,row.getValue()+" 本",12,Ui.MUTED,true)));
+            LinkedHashSet<String> reasons=new LinkedHashSet<>();for(NativeRecommendationStore.Item item:runtime.current()){String reason=item.reason==null?"":item.reason.trim();if(!reason.isEmpty())reasons.add(reason);if(reasons.size()>=5)break;}
+            if(!reasons.isEmpty()){composition.addView(Ui.text(this,"主要依据",13,Ui.TEXT,true));for(String reason:reasons)composition.addView(Ui.text(this,"• "+reason,12,Ui.MUTED,false));}
         }
         content.addView(composition);
 
         LinearLayout visual=SettingsRow.panel(this,null);
-        visual.addView(Ui.text(this,"Visual 基础",17,Ui.TEXT,true));
+        visual.addView(Ui.headingWithInfo(this,"Visual 基础",17,"画风向量与大批量学习仍由 Desktop 完成；手机只消费同步后的轻量 affinity，不运行 DINOv2。"));
         visual.addView(SettingsRow.statusLine(this,"Generation",Ui.text(this,portable.visualGeneration.isEmpty()?"尚未同步":shortId(portable.visualGeneration),12,Ui.MUTED,true)));
         int visualCount=0;for(PortableRecommendationPackageStore.Candidate row:portable.candidates)if(row.visualAvailable)visualCount++;
         visual.addView(SettingsRow.statusLine(this,"候选覆盖",Ui.text(this,visualCount+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
-        visual.addView(Ui.text(this,"画风向量与大批量学习仍由 Desktop 完成；手机只消费同步后的轻量信号，不运行 DINOv2。",12,Ui.MUTED,false));
         content.addView(visual);
+    }
+
+    private void addBehaviorSignals(String title,List<RecommendationEvidenceStore.Signal> rows,String help){
+        LinearLayout panel=SettingsRow.panel(this,null);panel.addView(Ui.headingWithInfo(this,title,17,help));
+        if(rows==null||rows.isEmpty())panel.addView(Ui.text(this,"暂无足够正向行为证据",12,Ui.MUTED,false));
+        else for(RecommendationEvidenceStore.Signal row:rows)panel.addView(SettingsRow.statusLine(this,row.kind+" · "+row.label,Ui.text(this,row.support+" 次",12,Ui.MUTED,true)));
+        content.addView(panel);
     }
 
     private String shortId(String value){return value==null||value.isEmpty()?"无":value.substring(0,Math.min(10,value.length()));}

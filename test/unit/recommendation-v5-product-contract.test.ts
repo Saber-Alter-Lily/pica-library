@@ -549,16 +549,21 @@ describe('Recommendation V5 portable product contract', () => {
         expect(coordinator).toContain('servingFilteredCount')
     })
 
-    it('uses the same portable policy to re-rank cached Android recommendations offline', () => {
+    it('uses the same portable policy to re-rank the independent Android runtime offline', () => {
         const home = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java')
         const store = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java')
         const cache = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationStore.java')
+        const engine = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java')
         expect(home).toContain('RecommendationPolicyStore.applyLocalPolicy')
-        expect(home).toContain('桌面完整计算结果 · 手机离线轻量重排')
+        expect(home).toContain('手机独立排序')
+        expect(home).toContain('Android 本机')
+        expect(home).not.toContain('DESKTOP_SYNCED')
         expect(store).toContain('applyLocalPolicy')
         expect(store).toContain('adjustment(current,item)-adjustment(baseline,item)')
         expect(store).toContain('moveVisibleBatch')
         expect(cache).toContain('final List<String> tags,categories')
+        expect(engine).toContain('PORTABLE_RESERVOIR')
+        expect(engine).toContain('RecommendationEvidenceStore.sessionAdjustment')
     })
 
     it('adds read-only Visual V1 representation QC before any P4 activation', () => {

@@ -73,7 +73,7 @@ public final class SettingsActivity extends Activity {
         content.addView(SettingsRow.row(this,"连接电脑",paired?"已连接":"未连接",v->startActivity(new Intent(this,PairingActivity.class))));
         content.addView(SettingsRow.row(this,"存储与下载","",v->startActivity(new Intent(this,StorageHubActivity.class))));
         content.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
-        content.addView(SettingsRow.row(this,"推荐与画风",paired?"桌面联动":"本机反馈",v->startActivity(new Intent(this,RecommendationStyleActivity.class))));
+        content.addView(SettingsRow.row(this,"推荐与画风",paired?"独立运行 · 可同步":"本机独立运行",v->startActivity(new Intent(this,RecommendationStyleActivity.class))));
         content.addView(SettingsRow.row(this,"数据与缓存","",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
         content.addView(SettingsRow.row(this,"软件更新","",v->startActivity(new Intent(this,UpdateActivity.class))));
         content.addView(SettingsRow.row(this,"关于","",v->startActivity(new Intent(this,AboutActivity.class))));

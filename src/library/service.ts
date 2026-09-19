@@ -1859,6 +1859,15 @@ export class LibraryService {
         return this.providerService().syncEhFavorites()
     }
 
+    async mobileEhRelayFavoritesSnapshot() {
+        const snapshot = await this.ehProvider.favoriteSnapshot()
+        const records = snapshot.comics.map((comic) =>
+            this.recordForOnlineSource(comic, 'eh')
+        )
+        this.database.syncEhFavorites(records)
+        return snapshot
+    }
+
     async mobileEhRelaySearch(input: SearchRequest) {
         const surface: EhSurface = input.surface === 'exh' ? 'exh' : 'eh'
         const comics = await this.ehProvider.search({

@@ -66,7 +66,7 @@ final class PortableRecommendationPackageStore {
 
     static final class Snapshot {
         int schemaVersion=1,policyRevision;
-        String generatedAt="",engineVersion="",visualGeneration="",
+        String generatedAt="",engineVersion="",portablePolicyGeneration="",visualGeneration="",
             canonicalGeneration="",behaviorGeneration="",reservoirGeneration="",sourceCycleId="";
         final List<Candidate> candidates=new ArrayList<>();
         final Map<String,Candidate> candidateById=new LinkedHashMap<>();
@@ -127,6 +127,7 @@ final class PortableRecommendationPackageStore {
         JSONObject foundation=root.optJSONObject("foundation");
         if(foundation!=null){
             out.policyRevision=foundation.optInt("policyRevision",0);
+            out.portablePolicyGeneration=foundation.optString("portablePolicyGeneration","");
             out.visualGeneration=foundation.optString("visualGeneration","");
             out.canonicalGeneration=foundation.optString("canonicalGeneration","");
             JSONArray bindings=foundation.optJSONArray("identityBindings");

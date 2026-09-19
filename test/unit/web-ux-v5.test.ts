@@ -371,6 +371,60 @@ describe('V5 Web UX audit contract', () => {
         expect(gradle).toContain('com.journeyapps:zxing-android-embedded:4.3.0')
     })
 
+    it('keeps connection and recommendation explanations compact and layered', () => {
+        const index = read('web/index.html')
+        const controls = read('web/recommendation-v5-beta.js')
+        const polish = read('web/ui-polish-v5.css')
+        const info = read('web/info-tip-v1.js')
+        expect(index).toContain('class="mobile-pair-method"')
+        expect(index).toContain('<strong>扫码连接</strong>')
+        expect(index).toContain('<strong>手动连接</strong>')
+        expect(index).toContain('<strong>配对链接</strong>')
+        expect(index).toContain('<strong>已配对设备</strong>')
+        expect(index).toContain('class="info-tip"')
+        expect(controls).toContain('V5_FACET_SUPERGROUPS')
+        expect(controls).toContain('class="v5-major-group"')
+        expect(controls).toContain('class="v5-facet-scroll"')
+        expect(controls).toContain('rows.map(signalRow).join')
+        expect(controls).not.toContain('rows.slice(0,12)')
+        expect(polish).toContain('.mobile-pair-method')
+        expect(controls).toContain('overscroll-behavior:contain')
+        expect(info).toContain("const selector='.info-tip[data-info-tip]'")
+        expect(info).toContain("event.key==='Escape'")
+    })
+
+    it('separates final serving composition from shadow planner telemetry', () => {
+        const controls = read('web/recommendation-v5-beta.js')
+        const service = read('src/library/service.ts')
+        const server = read('src/library/server.ts')
+        expect(controls).toContain('当前实际推荐构成')
+        expect(controls).toContain('V5 Shadow 规划（实验）')
+        expect(controls).toContain('servingImpact=false')
+        expect(controls).toContain('renderServingOverview()')
+        expect(service).toContain('recommendationServingCompositionV3()')
+        expect(server).toContain(
+            '/api/v1/recommendation-v5/serving-composition'
+        )
+    })
+
+    it('binds recommendation timescales and audit export to the active app session', () => {
+        const app = read('web/app.js')
+        const controls = read('web/recommendation-v5-beta.js')
+        const main = read('src/desktop/main.ts')
+        expect(app).toContain('window.picaAppSessionId = state.appSessionId')
+        expect(controls).toContain("query.set('appSessionId', appSessionId)")
+        expect(controls).toContain(
+            '{ appSessionId: window.picaAppSessionId || null }'
+        )
+        expect(main).toContain(
+            "const appSessionId = String(input.appSessionId ?? '').trim() || null"
+        )
+        expect(main).toContain(
+            'recommendationV5PreferenceTimescales(\n                appSessionId'
+        )
+        expect(main).toContain("'serving_composition.json'")
+    })
+
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'

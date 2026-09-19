@@ -303,6 +303,175 @@ async function setSession(signal) {
     } catch (error) { showStatus(error.message, true) }
 }
 
+function lifetimeSignals() {
+    const inferred = Array.isArray(V5.snapshot?.inferred)
+        ? V5.snapshot.inferred.map((item) => ({ ...item }))
+        : []
+    const byId = new Map(inferred.map((item) => [signalId(item), item]))
+    const lifetime = V5.timescales?.layers?.inferred?.lifetime
+    const total = Math.max(1, Number(lifetime?.positiveItemCount || 0))
+    const add = (targetType, facet, rows) => {
+        for (const row of Array.isArray(rows) ? rows : []) {
+            const item = {
+                targetType,
+                key: row.key,
+                label: row.label || row.key,
+                supportCount: Number(row.supportItems || 0),
+                supportShare: Number(row.supportItems || 0) / total,
+                facet,
+                behaviorDerived: true,
+                behaviorScore: Number(row.score || 0)
+            }
+            const id = signalId(item)
+            if (!byId.has(id)) byId.set(id, item)
+        }
+    }
+    add('AUTHOR', 'CREATOR_ENTITY', lifetime?.positive?.authors)
+    add('TAG', 'RAW_TAG', lifetime?.positive?.tags)
+    add('CATEGORY', 'CATEGORY', lifetime?.positive?.categories)
+    return [...byId.values()]
+}
+
+function preferenceWindowChips(window) {
+    if (!window) return '<span class="status">暂无足够行为证据</span>'
+    const rows = [
+        ...(window.positive?.authors || []).map((item) => ({ ...item, kind: '作者' })),
+        ...(window.positive?.tags || []).map((item) => ({ ...item, kind: '标签' })),
+        ...(window.positive?.categories || []).map((item) => ({ ...item, kind: '分类' }))
+    ]
+        .sort((a,b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.supportItems || 0) - Number(a.supportItems || 0))
+        .slice(0, 8)
+    if (!rows.length) return '<span class="status">暂无足够行为证据</span>'
+    return rows.map((item) =>
+        `<span class="v5-interest-chip"><small>${esc(item.kind)}</small><strong>${esc(item.label)}</strong><span>${Number(item.supportItems || 0)} 本</span></span>`
+    ).join('')
+}
+
+function renderProfileOverview() {
+    const target = document.querySelector('#v5-profile-overview')
+    if (!target) return
+    const inferred = V5.timescales?.layers?.inferred || {}
+    const counts = V5.snapshot?.counts || {}
+    const card = (title, note, window) => `
+        <section class="v5-overview-card">
+            <h5>${esc(title)}</h5>
+            <p class="status">${esc(note)}</p>
+            <div class="v5-interest-chips">${preferenceWindowChips(window)}</div>
+        </section>`
+    target.innerHTML =
+        `<section class="v5-overview-card"><h5>数据基础</h5>
+            <p><strong>${Number(counts.favorites || 0)}</strong> 本收藏参与长期画像</p>
+            <p><strong>${Number(counts.owned || 0)}</strong> 本已拥有 / 已入库用于去重与 Ownership</p>
+            <p><strong>${Number(inferred.lifetime?.positiveItemCount || 0)}</strong> 本作品形成正向行为证据</p>
+        </section>` +
+        card('长期兴趣', '收藏 + 历史行为的累计理解', inferred.lifetime) +
+        card('最近 30 天', '用于识别近期兴趣变化，不覆盖长期偏好', inferred.days30) +
+        card('本次会话', '仅反映本次打开应用后的有效行为', inferred.session)
+}
+
+function renderCompositionOverview() {
+    const target = document.querySelector('#v5-composition-overview')
+    if (!target) return
+    const plan = V5.channels
+    if (!plan) {
+        target.innerHTML = '<p class="status">当前没有可读取的推荐规划。</p>'
+        return
+    }
+    const channels = Array.isArray(plan.channels)
+        ? plan.channels.filter((item) => item.enabled)
+        : []
+    const sourceLabels = {
+        EXPLICIT_SESSION: '本次明确指定',
+        EXPLICIT_PERSISTENT: '你的长期调整',
+        SESSION: '本次行为',
+        RECENT_7D: '最近 7 天',
+        RECENT_30D: '最近 30 天',
+        LIFETIME: '长期兴趣',
+        SYSTEM: '系统探索 / 重发现'
+    }
+    const familyLabels = {
+        TARGET: '定向目标', AUTHOR: '作者', FANDOM: '作品 / IP',
+        TAG: '标签', CATEGORY: '分类', RELATED: '相似作品',
+        EXPLORATION: '探索', REDISCOVERY: '旧藏重发现', VISUAL: '画风'
+    }
+    const sourceCounts = new Map()
+    for (const channel of channels)
+        sourceCounts.set(channel.sourceLayer, (sourceCounts.get(channel.sourceLayer) || 0) + 1)
+    const sourceHtml = [...sourceCounts.entries()]
+        .sort((a,b) => b[1]-a[1])
+        .map(([key,count]) => `<p><strong>${esc(sourceLabels[key] || key)}</strong> · ${count} 条通道</p>`)
+        .join('') || '<p class="status">暂无启用通道</p>'
+    const familyHtml = Object.entries(plan.summary?.families || {})
+        .filter(([,count]) => Number(count) > 0)
+        .sort((a,b) => Number(b[1])-Number(a[1]))
+        .map(([key,count]) => `<span class="v5-interest-chip"><strong>${esc(familyLabels[key] || key)}</strong><span>${Number(count)}</span></span>`)
+        .join('') || '<span class="status">暂无</span>'
+    const providerHtml = Object.entries(plan.providerBudgets || {})
+        .map(([key,value]) => `<p><strong>${esc(key.toUpperCase())}</strong> · ${Number(value?.plannedRequests || 0)} / ${Number(value?.maxRequests || 0)} 次请求${value?.eligible ? '' : ' · 当前不可用'}</p>`)
+        .join('')
+    const anchors = channels
+        .flatMap((channel) => (channel.anchors || []).map((anchor) => ({
+            label: anchor.label || anchor.key,
+            family: channel.family,
+            priority: Number(channel.priority || 0)
+        })))
+        .sort((a,b) => b.priority-a.priority)
+        .filter((item,index,array) => array.findIndex((other) => webNorm(other.label)===webNorm(item.label))===index)
+        .slice(0,8)
+        .map((item) => `<span class="v5-interest-chip"><small>${esc(familyLabels[item.family] || item.family)}</small><strong>${esc(item.label)}</strong></span>`)
+        .join('') || '<span class="status">暂无明确锚点</span>'
+    target.innerHTML = `
+        <section class="v5-compose-card"><h5>来源层</h5>${sourceHtml}</section>
+        <section class="v5-compose-card"><h5>召回通道</h5><div class="v5-interest-chips">${familyHtml}</div></section>
+        <section class="v5-compose-card"><h5>Provider 预算</h5>${providerHtml}</section>
+        <section class="v5-compose-card"><h5>本轮主要锚点</h5><div class="v5-interest-chips">${anchors}</div></section>`
+}
+
+function updatePendingBar() {
+    const bar = document.querySelector('#v5-pending-bar')
+    const count = document.querySelector('#v5-pending-count')
+    if (!bar || !count) return
+    const pending = V5.draftLevels.size
+    bar.hidden = pending === 0
+    count.textContent = `已修改 ${pending} 项 · 尚未保存`
+}
+
+async function saveDraftLevels() {
+    if (V5.busy || !V5.draftLevels.size) return
+    V5.busy = true
+    const button = document.querySelector('#v5-pending-save')
+    if (button) button.disabled = true
+    try {
+        for (const [id, desiredValue] of V5.draftLevels) {
+            const signal = V5.signalById.get(id)
+            if (!signal) continue
+            const baseline = baselineLevel(signal)
+            const desired = webClampLevel(desiredValue)
+            const delta = desired - baseline
+            const direction = delta > 0 ? 'MORE' : delta < 0 ? 'LESS' : 'DEFAULT'
+            V5.snapshot = await post('/api/v1/recommendation-v5/control', {
+                targetType: signal.targetType,
+                key: signal.key,
+                label: signal.label,
+                direction,
+                levelDelta: delta,
+                scope: 'PERSISTENT'
+            })
+        }
+        V5.draftLevels.clear()
+        V5.manualSignal = null
+        showToast('偏好调整已保存；后续完整重算会同时影响召回与排序。', 'positive')
+        await loadPolicy()
+    } catch (error) {
+        showStatus(`保存偏好失败：${error.message}`, true)
+        showToast(`保存失败：${error.message}`, 'negative')
+    } finally {
+        V5.busy = false
+        if (button) button.disabled = false
+        updatePendingBar()
+    }
+}
+
 function signalRow(signal) {
     const current = controlFor(signal)
     const baseline = baselineLevel(signal)
@@ -312,7 +481,7 @@ function signalRow(signal) {
     const delta = Number(current?.levelDelta ?? legacyDelta)
     return `<div class="v5-signal-row" data-v5-signal="${esc(signalId(signal))}">
         <div class="v5-signal-copy"><strong>${esc(signal.label)}</strong>
-        <span class="status">${signal.manual ? '系统尚未形成稳定判断' : `收藏支持 ${Number(signal.supportCount || 0)} 本`}</span></div>
+        <span class="status">${signal.manual ? '系统尚未形成稳定判断' : signal.behaviorDerived ? `长期行为支持 ${Number(signal.supportCount || 0)} 本` : `收藏支持 ${Number(signal.supportCount || 0)} 本`}</span></div>
         <div class="v5-range-wrap">
             <input type="range" min="1" max="10" step="1" value="${level}" data-v5-level="${esc(signalId(signal))}" ${blocked ? 'disabled' : ''} />
             <span class="v5-range-value" data-v5-level-value="${esc(signalId(signal))}">${blocked ? '已屏蔽' : `${level}/10`}</span>
@@ -331,7 +500,7 @@ function renderPolicy() {
     if (!V5.snapshot) return
     const counts = V5.snapshot.counts || {}
     showStatus(
-        `已学习 ${Number(counts.owned || 0)} 本 · 你调整 ${Number(counts.controls || 0)} 项 · 已屏蔽 ${Number(counts.hardSuppressed || 0)} 项`
+        `已拥有 ${Number(counts.owned || 0)} 本 · 收藏 ${Number(counts.favorites || 0)} 本 · 你调整 ${Number(counts.controls || 0)} 项 · 已屏蔽 ${Number(counts.hardSuppressed || 0)} 项`
     )
     const technical = document.querySelector('#v5-policy-tech')
     if (technical)
@@ -343,8 +512,11 @@ function renderPolicy() {
         sessionLabel.textContent = intent.mode === 'TARGET'
             ? `本次想看：${intent.label || intent.key || ''}` : '本次想看：默认'
     }
-    const inferred = Array.isArray(V5.snapshot.inferred) ? V5.snapshot.inferred : []
+    const inferred = lifetimeSignals()
     V5.signalById = new Map(inferred.map((item) => [signalId(item), item]))
+    if (V5.manualSignal) V5.signalById.set(signalId(V5.manualSignal), V5.manualSignal)
+    renderProfileOverview()
+    renderCompositionOverview()
     const filtered = inferred.filter((item) =>
         !V5.search || `${item.label} ${item.key} ${item.targetType} ${item.facet || ''}`.toLocaleLowerCase().includes(V5.search)
     )
@@ -355,20 +527,11 @@ function renderPolicy() {
         rows.push(item); groups.set(facet, rows)
     }
     const manualSignal =
-        !filtered.length && V5.search
-            ? {
-                  targetType: 'TAG',
-                  key: webNorm(V5.search),
-                  label: V5.search,
-                  supportCount: 0,
-                  supportShare: 0,
-                  facet: 'RAW_TAG',
-                  baselineLevel: 5,
-                  manual: true,
-                  systemUnknown: true
-              }
+        V5.manualSignal &&
+        V5.search &&
+        webNorm(V5.manualSignal.key) === webNorm(V5.search)
+            ? V5.manualSignal
             : null
-    if (manualSignal) V5.signalById.set(signalId(manualSignal), manualSignal)
     const groupRows = [...groups.entries()].sort((a,b) => {
         const ai = V5_FACET_ORDER.indexOf(a[0]), bi = V5_FACET_ORDER.indexOf(b[0])
         return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || facetLabel(a[0]).localeCompare(facetLabel(b[0]))
@@ -383,31 +546,63 @@ function renderPolicy() {
         <div class="v5-facet-body">${visible.map(signalRow).join('')}
         ${visible.length < rows.length ? `<p class="status">另有 ${rows.length-visible.length} 项；可用上方搜索定位。</p>` : ''}</div></details>`
     }).join('') : manualSignal
-        ? `<div class="v5-help"><strong>系统还没有对“${esc(V5.search)}”形成稳定判断。</strong> 你仍可以把它作为标签直接设置；5/10 只是中性起点，不代表系统认为你只喜欢 5 分。若它其实是作者或分类，请清空搜索后从对应分组选择。</div><div class="v5-facet-group"><div class="v5-facet-body">${signalRow(manualSignal)}</div></div>`
-        : '<p class="status">当前还没有可展示的系统画像。先完成收藏同步或生成一次推荐画像。</p>'
+        ? `<div class="v5-help"><strong>已确认把“${esc(V5.search)}”作为自定义标签微调。</strong> 5/10 是中性起点；修改后仍需点击“保存调整”。</div><div class="v5-facet-group"><div class="v5-facet-body">${signalRow(manualSignal)}</div></div>`
+        : V5.search
+          ? `<div class="v5-search-empty"><strong>没有找到“${esc(V5.search)}”</strong><p class="status">系统不会因为输入文字就自动创建偏好。确认它确实是标签后再添加。</p><button type="button" data-v5-add-custom-tag>作为标签添加</button></div>`
+          : '<p class="status">当前还没有可展示的系统画像。收藏和真实使用行为会继续积累；也可以稍后刷新查看。</p>'
 
     document.querySelectorAll('[data-v5-level]').forEach((input) => {
         input.addEventListener('input', () => {
             const id=input.dataset.v5Level
+            const signal=V5.signalById.get(id)
             const output=document.querySelector(`[data-v5-level-value="${CSS.escape(id)}"]`)
             if(output) output.textContent=`${input.value}/10`
-        })
-        input.addEventListener('change', () => {
-            const signal=V5.signalById.get(input.dataset.v5Level)
-            if(signal) void setLevel(signal, Number(input.value))
+            if(signal) {
+                const persisted = (() => {
+                    const draft = V5.draftLevels.get(id)
+                    V5.draftLevels.delete(id)
+                    const value = currentLevel(signal)
+                    if (draft !== undefined) V5.draftLevels.set(id, draft)
+                    return value
+                })()
+                const next = Number(input.value)
+                if (next === persisted) V5.draftLevels.delete(id)
+                else V5.draftLevels.set(id, next)
+                updatePendingBar()
+            }
         })
     })
     document.querySelectorAll('[data-v5-session-target]').forEach(button => button.addEventListener('click', () => {
         const signal=V5.signalById.get(button.dataset.v5SessionTarget); if(signal) void setSession(signal)
     }))
     document.querySelectorAll('[data-v5-reset]').forEach(button => button.addEventListener('click', () => {
-        const signal=V5.signalById.get(button.dataset.v5Reset); if(signal) void setLevel(signal, baselineLevel(signal))
+        const signal=V5.signalById.get(button.dataset.v5Reset)
+        if (!signal) return
+        V5.draftLevels.set(signalId(signal), baselineLevel(signal))
+        renderPolicy()
     }))
     document.querySelectorAll('[data-v5-block]').forEach(button => button.addEventListener('click', async () => {
         const signal=V5.signalById.get(button.dataset.v5Block); if(!signal) return
         const result=await setControl(signal,'BLOCK')
         if(result) showToast(`已屏蔽「${signal.label}」，完整重算和后续展示都会硬排除。`,'negative')
     }))
+
+    document.querySelector('[data-v5-add-custom-tag]')?.addEventListener('click', () => {
+        V5.manualSignal = {
+            targetType: 'TAG',
+            key: webNorm(V5.search),
+            label: V5.search,
+            supportCount: 0,
+            supportShare: 0,
+            facet: 'RAW_TAG',
+            baselineLevel: 5,
+            manual: true,
+            systemUnknown: true
+        }
+        V5.signalById.set(signalId(V5.manualSignal), V5.manualSignal)
+        renderPolicy()
+    })
+    updatePendingBar()
 
     const controls=Array.isArray(V5.snapshot.controls)?V5.snapshot.controls:[]
     const controlTarget=document.querySelector('#v5-control-list')
@@ -418,8 +613,11 @@ function renderPolicy() {
             return `<span class="v5-control-chip"><strong>${esc(item.label)}</strong><span>${esc(current)}</span><button type="button" data-v5-control-reset="${esc(signalId(signal))}">恢复系统判断</button></span>`
         }).join(''):'<p class="status">目前没有手动覆盖，完全使用系统推断。</p>'
         document.querySelectorAll('[data-v5-control-reset]').forEach(button=>button.addEventListener('click',()=>{
-            const signal=V5.signalById.get(button.dataset.v5ControlReset)||controls.filter(item=>`${item.targetType}:${item.key}`===button.dataset.v5ControlReset).map(item=>({...item,supportCount:0,supportShare:0,baselineLevel:1}))[0]
-            if(signal) void setLevel(signal, baselineLevel(signal))
+            const signal=V5.signalById.get(button.dataset.v5ControlReset)||controls.filter(item=>`${item.targetType}:${item.key}`===button.dataset.v5ControlReset).map(item=>({...item,supportCount:0,supportShare:0,baselineLevel:5,manual:true}))[0]
+            if(!signal) return
+            V5.signalById.set(signalId(signal),signal)
+            V5.draftLevels.set(signalId(signal), baselineLevel(signal))
+            renderPolicy()
         }))
     }
 }
@@ -427,8 +625,16 @@ function renderPolicy() {
 async function loadPolicy() {
     ensurePanel()
     try {
-        V5.snapshot = await request('/api/v1/recommendation-v5')
-        renderPolicy(); decorateRecommendationCards()
+        const [snapshot, timescales, channels] = await Promise.all([
+            request('/api/v1/recommendation-v5'),
+            request('/api/v1/recommendation-v5/preference-timescales?limit=5000'),
+            request('/api/v1/recommendation-v5/candidate-channels?limit=5000')
+        ])
+        V5.snapshot = snapshot
+        V5.timescales = timescales
+        V5.channels = channels
+        renderPolicy()
+        decorateRecommendationCards()
     } catch (error) { showStatus(`推荐控制中心暂不可用：${error.message}`, true) }
 }
 

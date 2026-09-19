@@ -52,6 +52,7 @@ export interface DesktopServerController {
     ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
+    exportRecommendationAudit?: () => Promise<Record<string, unknown>>
     syncAndExportBrowserLitePackage?: () => Promise<Record<string, unknown>>
     openBrowserLite?: () => Promise<void>
     openDirectory: (kind: string) => Promise<void>
@@ -1321,6 +1322,21 @@ export async function startLibraryServer(options: {
                 return json(response, 200, {
                     path: await options.desktop.chooseFolder()
                 })
+            }
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/export-audit' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop?.exportRecommendationAudit)
+                    return json(response, 409, {
+                        error: 'Recommendation audit export is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    await options.desktop.exportRecommendationAudit()
+                )
             }
             if (
                 url.pathname === '/api/v1/desktop/export-browser-lite' &&

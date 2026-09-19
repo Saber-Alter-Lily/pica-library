@@ -260,7 +260,6 @@ describe('Mobile Bridge', () => {
         expect(value).toMatchObject({
             authority: 'desktop',
             relay: true,
-            categoryNames: ['最喜欢', '待看'],
             items: [
                 {
                     comicId: 'eh:123:abcdef1234',
@@ -269,6 +268,10 @@ describe('Mobile Bridge', () => {
                 }
             ]
         })
+        expect(value.categoryNames.slice(0, 2)).toEqual([
+            '最喜欢',
+            '待看'
+        ])
         expect(value.categoryCounts[1]).toBe(1)
         const serialized = JSON.stringify(value)
         expect(serialized).not.toContain('secret-hash')

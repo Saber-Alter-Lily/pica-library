@@ -57,6 +57,8 @@ public final class RecommendationStyleActivity extends Activity {
         visual.addView(SettingsRow.statusLine(this,"手机 Visual Generation",Ui.text(this,portable.visualGeneration.isEmpty()?"尚未同步":shortId(portable.visualGeneration),12,Ui.MUTED,true)));
         int covered=0;for(PortableRecommendationPackageStore.Candidate row:portable.candidates)if(row.visualAvailable)covered++;
         visual.addView(SettingsRow.statusLine(this,"候选 Visual 覆盖",Ui.text(this,covered+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
+        visual.addView(SettingsRow.statusLine(this,"手机画风接入",Ui.text(this,MobileVisualPolicyStore.label(this),12,Ui.MUTED,true)));
+        visual.addView(Ui.button(this,"调整手机画风接入模式",v->chooseMobileVisualMode(),true),new LinearLayout.LayoutParams(-1,-2));
         content.addView(visual);
 
         if(BridgeStore.paired(this)){
@@ -92,6 +94,26 @@ public final class RecommendationStyleActivity extends Activity {
                 runOnUiThread(()->{if(destroyed)return;loading=false;if(feedback)Toast.makeText(this,e.getMessage()==null?"无法读取 Desktop 画风状态":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
             }
         }).start();
+    }
+
+    private void chooseMobileVisualMode(){
+        String current=MobileVisualPolicyStore.mode(this);
+        String[] labels={"关闭","Shadow · 只计算不改本机排序","Live · 低权重参与本机排序"};
+        String[] values={MobileVisualPolicyStore.OFF,MobileVisualPolicyStore.SHADOW,MobileVisualPolicyStore.LIVE};
+        int checked=MobileVisualPolicyStore.OFF.equals(current)?0:MobileVisualPolicyStore.LIVE.equals(current)?2:1;
+        new AlertDialog.Builder(this)
+            .setTitle("手机画风接入模式")
+            .setSingleChoiceItems(labels,checked,(d,w)->{
+                d.dismiss();
+                MobileVisualPolicyStore.setMode(this,values[w]);
+                renderContent();
+                if(NativeRecommendationStore.load(this).available()){
+                    NativeRecommendationJobs.refresh(this);
+                    Toast.makeText(this,"手机画风模式已更新，正在独立生成新的推荐周期",Toast.LENGTH_LONG).show();
+                }
+            })
+            .setNegativeButton("取消",null)
+            .show();
     }
 
     private void showDesktopVisualActions(){

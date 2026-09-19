@@ -38,7 +38,7 @@ public final class RecommendationControlActivity extends Activity {
         JSONObject state=RecommendationPolicyStore.snapshot(this),intent=state.optJSONObject("sessionIntent");
         JSONObject counts=state.optJSONObject("counts");
         LinearLayout intro=SettingsRow.panel(this,null);
-        intro.addView(Ui.text(this,"1–10 档与屏蔽会立即影响手机自己的下一次排序；不会自动覆盖电脑。连接后可在“推荐同步”里查看两边差异并决定是否合并。",12,Ui.MUTED,false));
+        intro.addView(Ui.headingWithInfo(this,"调整规则",16,"1–10 档与屏蔽会立即影响手机自己的下一次排序；不会自动覆盖电脑。连接后可在“推荐同步”里查看两边差异并决定是否合并。本次想看只属于当前手机 Session。"));
         intro.addView(SettingsRow.statusLine(this,"Portable Policy",Ui.text(this,"revision "+state.optInt("revision",0),12,Ui.MUTED,true)));
         intro.addView(SettingsRow.statusLine(this,"待同步人工调整",Ui.text(this,RecommendationPolicyStore.pendingControlCount(this)+" 项",12,RecommendationPolicyStore.pendingControlCount(this)>0?Ui.PRIMARY:Ui.MUTED,true)));
         String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";

@@ -492,10 +492,25 @@ function renderServingOverview() {
     const chips = families.map(([key,count]) =>
         `<span class="v5-interest-chip"><strong>${esc(familyLabels[key] || key)}</strong><span>${Number(count)} 本</span></span>`
     ).join('') || '<span class="status">当前批次没有可用归因</span>'
-    if (summary)
+    const intents = Array.isArray(serving.primaryIntents)
+        ? serving.primaryIntents.filter((item) => Number(item?.count || 0) > 0)
+        : []
+    const intentChips = intents.slice(0, 8).map((item) => {
+        const labels = Array.isArray(item.anchors) ? item.anchors.filter(Boolean).slice(0, 3) : []
+        const label = labels.length
+            ? labels.join(' + ')
+            : familyLabels[item.type] || item.type || '其他'
+        return `<span class="v5-interest-chip"><small>${esc(familyLabels[item.type] || item.type || '来源')}</small><strong>${esc(label)}</strong><span>${Number(item.count || 0)} 本</span></span>`
+    }).join('') || '<span class="status">当前批次没有可展示的具体意图锚点</span>'
+    if (summary) {
+        const intentSummary = intents.slice(0,3).map((item) => {
+            const labels = Array.isArray(item.anchors) ? item.anchors.filter(Boolean) : []
+            return labels[0] || familyLabels[item.type] || item.type || '其他'
+        }).filter(Boolean)
         summary.textContent =
-            `第 ${Number(serving.batchIndex || 0) + 1} 批 · ${Number(serving.itemCount || 0)} 本 · ` +
-            families.slice(0,3).map(([key,count]) => `${familyLabels[key] || key} ${count}`).join(' · ')
+            `第 ${Number(serving.batchIndex || 0) + 1} 批 · ${Number(serving.itemCount || 0)} 本` +
+            (intentSummary.length ? ` · 主要：${intentSummary.join(' · ')}` : '')
+    }
     target.innerHTML = `
         <section class="v5-compose-card">
             <div class="v5-heading-inline"><h5>当前批次</h5>${infoButton('这是 Final V3 已经实际分配并落盘的当前 serving 批次；打开本页不会生成或切换批次。')}</div>
@@ -504,6 +519,10 @@ function renderServingOverview() {
         <section class="v5-compose-card">
             <div class="v5-heading-inline"><h5>实际来源构成</h5>${infoButton('按当前批次每本作品的 primaryFamily 汇总，表示这批实际展示结果主要由哪些推荐意图贡献。')}</div>
             <div class="v5-interest-chips">${chips}</div>
+        </section>
+        <section class="v5-compose-card">
+            <div class="v5-heading-inline"><h5>实际主要锚点</h5>${infoButton('这些锚点来自当前 serving 批次真正使用的 primaryIntent，而不是 V5 Shadow 的实验规划。')}</div>
+            <div class="v5-interest-chips">${intentChips}</div>
         </section>`
 }
 

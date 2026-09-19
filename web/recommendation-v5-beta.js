@@ -201,8 +201,7 @@ function ensurePanel() {
     panel.className = 'panel'
     panel.innerHTML = `
         <div class="v5-head">
-            <div><h3>推荐偏好</h3>
-            <p>系统会根据收藏和后续使用自动学习；只有判断不准确时才需要手动纠正。</p></div>
+            <div class="v5-heading-inline"><h3>推荐偏好</h3>${infoButton('系统会根据收藏和后续真实使用自动学习；只有判断不准确时才需要手动纠正。')}</div>
             <div class="actions">
                 <button id="v5-policy-refresh" type="button">刷新</button>
                 <button id="v5-audit-export" type="button">导出推荐审计数据</button>
@@ -211,25 +210,45 @@ function ensurePanel() {
         </div>
         <p id="v5-policy-status" class="status">正在读取推荐偏好…</p>
         <details class="v5-policy-tech">
-            <summary>策略信息</summary>
+            <summary>策略信息 ${infoButton('这里显示推荐策略版本和 revision，主要用于排障与审计。')}</summary>
             <code id="v5-policy-tech"></code>
         </details>
         <div class="v5-session-row">
             <span id="v5-session-status" class="status">本次想看：默认</span>
             <button id="v5-session-reset" type="button" class="v5-compact">清除本次想看</button>
         </div>
-        <div class="v5-section-heading"><div><h4>你的推荐画像</h4><p class="status">先看系统目前如何理解你的长期、近期与本次兴趣，再决定是否需要微调。</p></div></div>
-        <div id="v5-profile-overview" class="v5-overview-grid"></div>
-        <div class="v5-section-heading"><div><h4>当前推荐构成</h4><p class="status">展示当前规划实际启用的来源层、召回通道和 Provider 请求预算；不使用虚构百分比。</p></div></div>
-        <div id="v5-composition-overview" class="v5-compose-grid"></div>
-        <h4>你的调整</h4>
-        <div id="v5-control-list" class="v5-control-list"></div>
-        <details class="v5-help v5-help-details">
-            <summary><strong>1–10 档怎么理解？</strong></summary>
-            <p><strong>1 = 尽量少推荐，10 = 非常喜欢。</strong> 不修改时由系统根据收藏与后续行为自动判断；“本次想看”只影响当前会话，“屏蔽”则是硬排除。</p>
-            <p class="status">详细页的滑杆先进入待保存状态，可一次修改多项后统一保存或撤销。</p>
+
+        <details id="v5-profile-section" class="v5-overview-section">
+            <summary>
+                <strong>你的推荐画像</strong>
+                <span id="v5-profile-summary" class="v5-summary-note"></span>
+                ${infoButton('这里汇总长期兴趣、最近 30 天和当前会话。长期画像不会因为短期浏览被直接覆盖。')}
+            </summary>
+            <div id="v5-profile-overview" class="v5-overview-grid"></div>
         </details>
-        <div class="v5-section-heading"><div><h4>完整画像与微调 · 1–10 档</h4><p class="status">默认按作者、IP、标签和分类分组浏览；也可以明确查找某个偏好。</p></div></div>
+
+        <details id="v5-serving-section" class="v5-overview-section">
+            <summary>
+                <strong>当前实际推荐构成</strong>
+                <span id="v5-serving-summary" class="v5-summary-note"></span>
+                ${infoButton('这里读取已经落盘并实际展示的 Final V3 当前批次，不会因为打开本页而重新分配推荐。')}
+            </summary>
+            <div id="v5-serving-overview" class="v5-compose-grid"></div>
+        </details>
+
+        <details id="v5-shadow-section" class="v5-overview-section">
+            <summary>
+                <strong>V5 Shadow 规划（实验）</strong>
+                <span id="v5-shadow-summary" class="v5-summary-note"></span>
+                ${infoButton('这是 V5 候选召回实验规划，servingImpact=false；它不是当前实际展示给你的推荐批次。')}
+            </summary>
+            <div id="v5-composition-overview" class="v5-compose-grid"></div>
+        </details>
+
+        <div class="v5-heading-inline"><h4>你的调整</h4>${infoButton('这里仅显示你主动覆盖系统判断的项目。屏蔽偏好和屏蔽具体作品会分别统计。')}</div>
+        <div id="v5-control-list" class="v5-control-list"></div>
+
+        <div class="v5-heading-inline"><h4>完整画像与微调 · 1–10 档</h4>${infoButton('1 表示尽量少推荐，10 表示非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好。')}</div>
         <div class="v5-search-row">
             <label>查找一个具体偏好
                 <input id="v5-policy-search" placeholder="作者、IP、标签或分类，例如：巨乳" />
@@ -259,7 +278,7 @@ function ensurePanel() {
         try {
             const result = await window.picaDesktopPost(
                 '/api/v1/desktop/recommendation-v5/export-audit',
-                {}
+                { appSessionId: window.picaAppSessionId || null }
             )
             if (result?.cancelled) {
                 showToast('已取消导出。')

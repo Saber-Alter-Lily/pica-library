@@ -927,6 +927,7 @@ describe('Recommendation V5 portable product contract', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhCapabilityStore.java'
         )
         expect(server).toContain('/mobile/v1/provider/eh/search')
+        expect(server).toContain('/mobile/v1/provider/eh/favorites-snapshot')
         expect(server).toContain('/mobile/v1/provider/eh/page-image')
         expect(server).toContain('/mobile/v1/provider/eh/favorite')
         expect(client).toContain(
@@ -939,6 +940,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(client).toContain('BridgeClient.ehRelayPages')
         expect(client).toContain('BridgeClient.ehRelayImage')
         expect(bridge).toContain('/mobile/v1/provider/eh/search')
+        expect(bridge).toContain('/mobile/v1/provider/eh/favorites-snapshot')
         expect(bridge).toContain('/mobile/v1/provider/eh/page-image')
         expect(capability).toContain('EhClient.accountAvailable(app)')
         expect(server).not.toContain('ipb_pass_hash')

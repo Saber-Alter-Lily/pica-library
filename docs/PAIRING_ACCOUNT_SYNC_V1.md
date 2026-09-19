@@ -1,6 +1,6 @@
 # Desktop ↔ Android Pairing and Account-State Sync V1
 
-Status: development baseline; paired account state is implemented, credential handoff is intentionally not enabled.
+Status: development baseline; paired account state and Desktop-backed Pica relay are implemented, credential handoff remains intentionally disabled.
 
 ## Goals
 
@@ -40,6 +40,26 @@ Android caches these booleans and shows statuses such as **已由 Desktop 连接
 
 No account identifier, password, API token, E-H cookie, GitHub credential, or WebDAV secret is returned.
 
+## Desktop-backed Pica relay
+
+When Android is paired, has no phone-local Pica account, and the mirrored Desktop account state says Pica is configured, Android can use the existing authenticated Mobile Bridge as a provider relay.
+
+Current relay coverage includes:
+
+- Pica search and category/tag browse;
+- favorites listing;
+- leaderboard and related works;
+- comic metadata;
+- chapter and page metadata;
+- favorite add/remove mutation using Desktop's existing idempotent confirmation logic;
+- online reader and Android recommendation code paths through the shared `PicaClient` fallback.
+
+The local phone account remains higher priority. If a phone-local Pica session exists, Android keeps using it directly and does not route ordinary Pica requests through Desktop.
+
+The relay sends provider results and user-requested actions over the paired bridge. It does **not** send the Pica email, password, provider authorization token, E-H cookies, or other long-lived provider credentials to Android.
+
+If Desktop is offline, relay calls fail closed. A phone-local Pica account remains the optional offline/direct-provider path.
+
 ## Why credentials are not copied yet
 
 The current Mobile Bridge is a LAN HTTP transport protected by a random bearer pairing token. That is sufficient for the existing local library/reader contract, but it is not an acceptable channel for automatically copying long-lived provider secrets.
@@ -62,7 +82,7 @@ The preferred end state is:
 1. QR pairing establishes the Desktop identity and short-lived bootstrap secret.
 2. The paired channel is upgraded to authenticated encrypted transport.
 3. Desktop remains the primary account authority.
-4. Android uses a Desktop provider relay while Desktop is reachable, avoiding duplicate provider login.
+4. Android uses the implemented Desktop Pica provider relay while Desktop is reachable, avoiding duplicate Pica login; equivalent account-required E-H/ExH relay coverage remains a later security/product phase.
 5. Only if offline direct-provider access is explicitly requested should a revocable encrypted session handoff be considered.
 6. Provider passwords should not be replicated merely for convenience.
 

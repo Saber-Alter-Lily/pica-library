@@ -204,6 +204,11 @@ final class BridgeClient {
     static JSONObject recommendationPortablePackage(Context c,int limit) throws Exception {
         JSONObject value=new JSONObject(get(c,"/mobile/v1/recommendation/v5/portable-package?limit="+Math.max(24,Math.min(1000,limit))));
         PortableRecommendationPackageStore.save(c,value);
+        JSONObject behavior=value.optJSONObject("behavior");
+        if(behavior!=null){
+            RecommendationFeedbackStore.importSynced(c,behavior.optJSONArray("feedback"));
+            RecommendationEvidenceStore.importSynced(c,behavior.optJSONArray("recentEvents"));
+        }
         return value;
     }
     static JSONObject syncRecommendationState(Context c) throws Exception{return syncRecommendationState(c,false,null);}

@@ -52,6 +52,10 @@ For v0.4.0 → next stable, the updater/release channel must select a full appli
 
 A generic incremental ZIP must not bypass the compatibility rule merely because each database migration is individually additive.
 
+For the first stable release whose schema/API is not incrementally compatible with public v0.4.0, the Release must not expose a legacy generic `Pica-Library-v<target>-update.zip` that v0.4.0 would mistake for an applicable incremental package. The safe direct-v0.4 signal is the absence of that generic asset, causing the shipped client to report `full-install` and point to the official Release/full Windows ZIP.
+
+Future compatible clients may use source-scoped assets such as `Pica-Library-v0.5.1-update-from-v0.5.0.zip`. Newer clients prefer the scoped asset; public v0.4.0 ignores that naming pattern.
+
 ### W2. Database migration
 
 The public v0.4.0 schema 9 database must migrate in order through every current migration.

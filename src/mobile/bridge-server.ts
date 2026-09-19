@@ -216,6 +216,7 @@ export async function startMobileBridge(options: {
     host?: string
     port?: number
     stateFile?: string
+    accountStatus?: () => Record<string, unknown>
 }) {
     const host = options.host ?? '0.0.0.0'
     const requestedPort = options.port ?? 7788
@@ -334,6 +335,19 @@ export async function startMobileBridge(options: {
             if (!device)
                 return json(response, 401, {
                     error: 'Mobile device is not paired'
+                })
+
+            if (
+                url.pathname === '/mobile/v1/accounts/status' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    transport: 'paired-mobile-bridge',
+                    ...(options.accountStatus?.() ?? {
+                        pica: { configured: false },
+                        eh: { configured: false }
+                    })
                 })
 
             if (

@@ -19,12 +19,13 @@ import org.json.*;
 public final class RecommendationControlActivity extends Activity {
     private LinearLayout content;
     private EditText search;
+    private String activeQuery="";
     private JSONObject manualSignal;
     private final Set<String> expanded=new LinkedHashSet<>();
     private final Set<String> expandedFacets=new LinkedHashSet<>();
 
     @Override public void onCreate(Bundle state){
-        super.onCreate(state);Ui.applyWindow(this);expanded.add("people");renderShell();
+        super.onCreate(state);Ui.applyWindow(this);expanded.add("people");activeQuery=getIntent().getStringExtra("query");if(activeQuery==null)activeQuery="";renderShell();
     }
     @Override protected void onResume(){super.onResume();render();}
 
@@ -61,12 +62,12 @@ public final class RecommendationControlActivity extends Activity {
         content.addView(actions);Ui.gap(content,this,10);
 
         LinearLayout find=SettingsRow.panel(this,null);
-        search=new EditText(this);search.setSingleLine(true);search.setHint("查找作者、IP、标签或分类");
+        search=new EditText(this);search.setSingleLine(true);search.setHint("查找作者、IP、标签或分类");search.setText(activeQuery);
         find.addView(search,new LinearLayout.LayoutParams(-1,-2));
-        find.addView(Ui.button(this,"查找",v->{manualSignal=null;renderSignals(search.getText().toString().trim());},true));
+        find.addView(Ui.button(this,"查找",v->{manualSignal=null;activeQuery=search.getText().toString().trim();renderSignals(activeQuery);},true));
         content.addView(find);
 
-        renderSignals("");
+        renderSignals(activeQuery);
     }
 
     private static final class FacetGroup {
@@ -80,7 +81,7 @@ public final class RecommendationControlActivity extends Activity {
         int size(){int count=0;for(FacetGroup facet:facets.values())count+=facet.rows.size();return count;}
     }
 
-    private String currentQuery(){return search==null?"":search.getText().toString().trim();}
+    private String currentQuery(){if(search!=null)activeQuery=search.getText().toString().trim();return activeQuery;}
 
     private void renderSignals(String query){
         while(content.getChildCount()>4)content.removeViewAt(content.getChildCount()-1);

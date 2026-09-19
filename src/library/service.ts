@@ -8,7 +8,14 @@ import {
     parseEhTag,
     type EhSession
 } from '../providers/eh-provider'
-import type { EhBrowseMode, EhSurface, OnlineSource, SearchRequest } from '../providers/types'
+import {
+    providerComicToRecord,
+    type EhBrowseMode,
+    type EhSurface,
+    type OnlineSource,
+    type ProviderComic,
+    type SearchRequest
+} from '../providers/types'
 import type { Comic, Episode, Picture } from '../types'
 import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
@@ -1725,6 +1732,31 @@ export class LibraryService {
                 embeddingKind: item.embedding.embeddingKind
             }))
             .filter((item) => item.comic)
+    }
+
+    private recordForOnlineSource(
+        comic: ProviderComic,
+        source: OnlineSource
+    ): FavoriteRecord {
+        const record = providerComicToRecord(comic)
+        if (source === 'pica') return record
+        const previous =
+            this.database.getComic(record.comicId)?.providerMetadata ?? {}
+        const known = new Set<string>([
+            ...(Array.isArray(previous.knownSurfaces)
+                ? previous.knownSurfaces.map(String)
+                : []),
+            source
+        ])
+        record.providerMetadata = {
+            ...previous,
+            ...record.providerMetadata,
+            preferredSurface: source,
+            knownSurfaces: [...known].filter(
+                (item) => item === 'eh' || item === 'exh'
+            )
+        }
+        return record
     }
 
     constructor(

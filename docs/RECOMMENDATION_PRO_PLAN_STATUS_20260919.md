@@ -317,9 +317,20 @@ User-private recommendation state is explicitly not a Pack.
 Dedicated preservation test and pre-migration backup requirement exist.
 
 ### Full application upgrade path
-**PARTIAL**
+**PARTIAL / PUBLIC-v0.4 SAFE PATH DEFINED**
 
-Contract is frozen, but the production update flow still needs its final one-click full-package implementation/UX.
+Implemented/defined:
+
+- public v0.4.0 incompatible schema jumps are classified as full-application upgrades;
+- generic incompatible update ZIP generation is blocked;
+- newer clients can prefer source-scoped incremental assets;
+- public v0.4.0 can safely fall back to the official Release/full-package path while preserving the external data home.
+
+Still required:
+
+- production full-package replacement acceptance on a real v0.4.0 installation;
+- future-client true one-click full-package updater PoC;
+- Velopack is the preferred open-source PoC candidate after the next stable baseline, not a dependency for the current acceptance cycle.
 
 ### Android public v0.4.0 → next stable
 **PARTIAL / RELEASE BLOCKER**

@@ -17,6 +17,8 @@ final class RecommendationPolicyStore {
     private static final String PREFS="recommendation-policy-v5";
     private static final String SNAPSHOT="snapshot";
     private static final String CACHE_BASELINE="cacheBaseline";
+    private static final String BASE_SNAPSHOT="lastSyncedBaseSnapshot";
+    private static final String LOCAL_SESSION="localSessionIntent";
     private static final String DIRTY_CONTROLS="dirtyControls";
     private static final String DIRTY_SESSION="dirtySessionIntent";
     private static final String DIRTY_SUPPRESS="dirtySuppress";
@@ -31,9 +33,15 @@ final class RecommendationPolicyStore {
     private static String now(){return Instant.now().toString();}
     private static boolean listContains(Collection<String> values,String wanted){if(values==null)return false;for(String value:values)if(norm(value).equals(wanted))return true;return false;}
 
-    static JSONObject snapshot(Context c){return parseObject(prefs(c).getString(SNAPSHOT,"{}"));}
+    private static JSONObject remoteSnapshot(Context c){return parseObject(prefs(c).getString(SNAPSHOT,"{}"));}
+    private static JSONObject localSessionIntent(Context c){String raw=prefs(c).getString(LOCAL_SESSION,"");if(raw==null||raw.isEmpty()){JSONObject value=new JSONObject();try{value.put("mode","DEFAULT");value.put("source","ANDROID");value.put("updatedAt",now());}catch(Exception ignored){}return value;}return parseObject(raw);}
+    static JSONObject snapshot(Context c){JSONObject value=parseObject(remoteSnapshot(c).toString());try{value.put("sessionIntent",localSessionIntent(c));}catch(Exception ignored){}return value;}
     static void saveSnapshot(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(SNAPSHOT,value.toString()).apply();}
-    static int revision(Context c){return snapshot(c).optInt("revision",0);}
+    static void saveSyncedBase(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(BASE_SNAPSHOT,value.toString()).apply();}
+    static JSONObject syncedBase(Context c){String raw=prefs(c).getString(BASE_SNAPSHOT,"");return raw==null||raw.isEmpty()?new JSONObject():parseObject(raw);}
+    static int revision(Context c){return remoteSnapshot(c).optInt("revision",0);}
+    static boolean hasPendingPortableChanges(Context c){return parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")).length()>0||RecommendationFeedbackStore.dirtyPayload(c).length()>0||parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")).length()>0;}
+    static int pendingControlCount(Context c){return parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")).length();}
     static JSONArray inferred(Context c){JSONArray arr=snapshot(c).optJSONArray("inferred");return arr==null?new JSONArray():arr;}
     static JSONArray controls(Context c){JSONArray arr=snapshot(c).optJSONArray("controls");return arr==null?new JSONArray():arr;}
     static JSONObject cacheBaseline(Context c){String raw=prefs(c).getString(CACHE_BASELINE,"");return raw==null||raw.isEmpty()?snapshot(c):parseObject(raw);}
@@ -98,15 +106,16 @@ final class RecommendationPolicyStore {
 
     static void moveVisibleBatch(Context c,int delta){NativeRecommendationStore.Snapshot source=NativeRecommendationStore.load(c),visible=applyLocalPolicy(c,source);int count=visible.batches.size();if(count<=0||delta==0)return;source.batchIndex=Math.floorMod(visible.batchIndex+delta,count);NativeRecommendationStore.save(c,source);}
 
-    static void setLocalControl(Context c,String targetType,String key,String label,String direction,String scope){
+    static void setLocalControl(Context c,String targetType,String key,String label,String direction,String scope){setLocalControl(c,targetType,key,label,direction,scope,null);}
+    static void setLocalControl(Context c,String targetType,String key,String label,String direction,String scope,Integer levelDelta){
         String type=targetType==null?"":targetType.trim().toUpperCase(Locale.ROOT),cleanKey=norm(key),dir=direction==null?"DEFAULT":direction.trim().toUpperCase(Locale.ROOT);if(cleanKey.isEmpty())return;
         JSONObject state=snapshot(c);JSONArray current=state.optJSONArray("controls");if(current==null)current=new JSONArray();JSONArray next=new JSONArray();String identity=type+":"+cleanKey;for(int i=0;i<current.length();i++){JSONObject row=current.optJSONObject(i);if(row==null)continue;String id=row.optString("targetType")+":"+norm(row.optString("key"));if(!identity.equals(id))next.put(row);}
-        JSONObject mutation=new JSONObject();try{mutation.put("targetType",type);mutation.put("key",cleanKey);mutation.put("label",label==null?key:label);mutation.put("direction",dir);mutation.put("scope","SESSION".equals(scope)?"SESSION":"PERSISTENT");mutation.put("source","ANDROID");mutation.put("updatedAt",now());if(!"DEFAULT".equals(dir))next.put(new JSONObject(mutation.toString()));state.put("controls",next);state.put("updatedAt",now());}catch(Exception e){throw new IllegalStateException("无法更新本机推荐偏好",e);}saveSnapshot(c,state);
+        JSONObject mutation=new JSONObject();try{mutation.put("targetType",type);mutation.put("key",cleanKey);mutation.put("label",label==null?key:label);mutation.put("direction",dir);if(levelDelta!=null&&!"BLOCK".equals(dir))mutation.put("levelDelta",Math.max(-9,Math.min(9,levelDelta.intValue())));mutation.put("scope","SESSION".equals(scope)?"SESSION":"PERSISTENT");mutation.put("source","ANDROID");mutation.put("updatedAt",now());if(!"DEFAULT".equals(dir))next.put(new JSONObject(mutation.toString()));state.put("controls",next);state.put("updatedAt",now());}catch(Exception e){throw new IllegalStateException("无法更新本机推荐偏好",e);}saveSnapshot(c,state);
         JSONArray dirty=parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]"));JSONArray filtered=new JSONArray();for(int i=0;i<dirty.length();i++){JSONObject row=dirty.optJSONObject(i);if(row==null)continue;String id=row.optString("targetType")+":"+norm(row.optString("key"));if(!identity.equals(id))filtered.put(row);}filtered.put(mutation);prefs(c).edit().putString(DIRTY_CONTROLS,filtered.toString()).putString(MUTATION_ID,UUID.randomUUID().toString()).apply();
     }
 
     static void setLocalSessionIntent(Context c,String targetType,String key,String label){
-        String type=targetType==null?"":targetType.trim().toUpperCase(Locale.ROOT),cleanKey=norm(key);JSONObject intent=new JSONObject();try{if(type.isEmpty()||cleanKey.isEmpty()){intent.put("mode","DEFAULT");}else{intent.put("mode","TARGET");intent.put("targetType",type);intent.put("key",cleanKey);intent.put("label",label==null?key:label);}intent.put("source","ANDROID");intent.put("updatedAt",now());JSONObject state=snapshot(c);state.put("sessionIntent",intent);state.put("updatedAt",now());saveSnapshot(c,state);}catch(Exception e){throw new IllegalStateException("无法更新本次推荐意图",e);}prefs(c).edit().putString(DIRTY_SESSION,intent.toString()).putString(MUTATION_ID,UUID.randomUUID().toString()).apply();
+        String type=targetType==null?"":targetType.trim().toUpperCase(Locale.ROOT),cleanKey=norm(key);JSONObject intent=new JSONObject();try{if(type.isEmpty()||cleanKey.isEmpty()){intent.put("mode","DEFAULT");}else{intent.put("mode","TARGET");intent.put("targetType",type);intent.put("key",cleanKey);intent.put("label",label==null?key:label);}intent.put("source","ANDROID");intent.put("updatedAt",now());}catch(Exception e){throw new IllegalStateException("无法更新本次推荐意图",e);}prefs(c).edit().putString(LOCAL_SESSION,intent.toString()).remove(DIRTY_SESSION).apply();
     }
 
     static void clearLocalSessionIntent(Context c){setLocalSessionIntent(c,"","","");}
@@ -116,8 +125,12 @@ final class RecommendationPolicyStore {
         String addKey=value?DIRTY_SUPPRESS:DIRTY_CLEAR_SUPPRESS,removeKey=value?DIRTY_CLEAR_SUPPRESS:DIRTY_SUPPRESS;LinkedHashSet<String> add=new LinkedHashSet<>(),remove=new LinkedHashSet<>();JSONArray a=parseArray(prefs(c).getString(addKey,"[]")),r=parseArray(prefs(c).getString(removeKey,"[]"));for(int i=0;i<a.length();i++)add.add(a.optString(i));for(int i=0;i<r.length();i++)remove.add(r.optString(i));add.add(id);remove.remove(id);prefs(c).edit().putString(addKey,new JSONArray(add).toString()).putString(removeKey,new JSONArray(remove).toString()).putString(MUTATION_ID,UUID.randomUUID().toString()).apply();
     }
 
-    static JSONObject syncPayload(Context c){JSONObject body=new JSONObject();try{body.put("deviceId",DeviceIdentity.id(c));String mutation=prefs(c).getString(MUTATION_ID,"");if(mutation==null||mutation.isEmpty())mutation=UUID.randomUUID().toString();body.put("mutationId",mutation);body.put("controls",parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")));String session=prefs(c).getString(DIRTY_SESSION,"");if(session!=null&&!session.isEmpty())body.put("sessionIntent",parseObject(session));body.put("feedback",RecommendationFeedbackStore.dirtyPayload(c));body.put("suppressComicIds",parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")));body.put("clearSuppressComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")));}catch(Exception e){throw new IllegalStateException("无法生成推荐同步载荷",e);}return body;}
+    static JSONObject syncPayload(Context c){JSONObject body=new JSONObject();try{body.put("syncSchemaVersion",1);body.put("deviceId",DeviceIdentity.id(c));String mutation=prefs(c).getString(MUTATION_ID,"");if(mutation==null||mutation.isEmpty())mutation=UUID.randomUUID().toString();body.put("mutationId",mutation);JSONObject base=syncedBase(c);body.put("baseRevision",base.optInt("revision",0));JSONArray baseControls=base.optJSONArray("controls");body.put("baseControls",baseControls==null?new JSONArray():baseControls);body.put("controls",parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")));body.put("feedback",RecommendationFeedbackStore.dirtyPayload(c));body.put("events",RecommendationEvidenceStore.dirtyPayload(c));body.put("suppressComicIds",parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")));body.put("clearSuppressComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")));}catch(Exception e){throw new IllegalStateException("无法生成推荐同步载荷",e);}return body;}
 
-    static void acknowledge(Context c,JSONObject response,String expectedMutationId){String acknowledged=response==null?"":response.optString("acknowledgedMutationId","");if(expectedMutationId!=null&&!expectedMutationId.isEmpty()&&!expectedMutationId.equals(acknowledged))throw new IllegalStateException("电脑未确认本次推荐同步");JSONObject value=response==null?null:response.optJSONObject("snapshot");if(value!=null)saveSnapshot(c,value);prefs(c).edit().remove(DIRTY_CONTROLS).remove(DIRTY_SESSION).remove(DIRTY_SUPPRESS).remove(DIRTY_CLEAR_SUPPRESS).remove(MUTATION_ID).apply();RecommendationFeedbackStore.clearDirty(c);}
+    static JSONObject previewPayload(Context c){return syncPayload(c);}
+
+    static void seedRemoteSnapshot(Context c,JSONObject value){if(value==null)return;if(!hasPendingPortableChanges(c)){saveSnapshot(c,value);saveSyncedBase(c,value);markCacheBaseline(c);}}
+
+    static void acknowledge(Context c,JSONObject response,String expectedMutationId){if(response!=null&&response.optBoolean("requiresResolution",false))throw new IllegalStateException("存在需要人工处理的推荐偏好冲突");String acknowledged=response==null?"":response.optString("acknowledgedMutationId","");if(expectedMutationId!=null&&!expectedMutationId.isEmpty()&&!expectedMutationId.equals(acknowledged))throw new IllegalStateException("电脑未确认本次推荐同步");JSONObject value=response==null?null:response.optJSONObject("snapshot");if(value!=null){saveSnapshot(c,value);saveSyncedBase(c,value);saveCacheBaseline(c,value);}prefs(c).edit().remove(DIRTY_CONTROLS).remove(DIRTY_SESSION).remove(DIRTY_SUPPRESS).remove(DIRTY_CLEAR_SUPPRESS).remove(MUTATION_ID).apply();RecommendationFeedbackStore.clearDirty(c);RecommendationEvidenceStore.clearDirty(c);}
     static void acknowledge(Context c,JSONObject response){acknowledge(c,response,response==null?"":response.optString("acknowledgedMutationId",""));}
 }

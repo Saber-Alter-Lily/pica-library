@@ -103,8 +103,10 @@ public final class HomeActivity extends Activity {
             TextView why=Ui.text(this,item.reason,12,Ui.PRIMARY,false);why.setPadding(0,Ui.dp(this,6),0,0);copy.addView(why);
             LinearLayout feedback=new LinearLayout(this);feedback.setPadding(0,Ui.dp(this,8),0,0);
             feedback.addView(compact("👍 喜欢",v->recommendationFeedback(item,"like")));Ui.gap(feedback,this,6);
-            feedback.addView(compact("👎 不喜欢",v->recommendationFeedback(item,"dislike")));copy.addView(feedback);
-            card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));UnifiedCatalogStore.Entry target=e;card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);p.addView(card);
+            feedback.addView(compact("👎 不喜欢",v->recommendationFeedback(item,"dislike")));Ui.gap(feedback,this,6);
+            UnifiedCatalogStore.Entry target=e;
+            feedback.addView(compact("⚙ 调节",v->RecommendationItemControlDialog.show(this,target,this::show)));copy.addView(feedback);
+            card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);p.addView(card);
         }
         NativeRecommendationStore.markSeen(this,snapshot.current());
     }
@@ -125,7 +127,7 @@ public final class HomeActivity extends Activity {
         Toast.makeText(this,"请先连接电脑或配置可用的在线来源",Toast.LENGTH_LONG).show();
     }
 
-    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);if(!RecommendationFeedbackStore.askReasons(this)){show();return;}String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?"为什么喜欢？（可选）":"为什么不喜欢？（可选）").setMultiChoiceItems(labels,checked,(d,which,value)->checked[which]=value).setNegativeButton("跳过",(d,w)->show()).setPositiveButton("保存原因",(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen")||reasons.contains("repetitive"))RecommendationPolicyStore.suppress(this,item.comicId,true);show();}).setOnCancelListener(d->show()).show();}
+    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);if(!RecommendationFeedbackStore.askReasons(this)){show();return;}String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?"为什么喜欢？（可选）":"为什么不喜欢？（可选）").setMultiChoiceItems(labels,checked,(d,which,value)->checked[which]=value).setNegativeButton("跳过",(d,w)->show()).setPositiveButton("保存原因",(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,30);if(reasons.contains("repetitive"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"duplicate",true,30);show();}).setOnCancelListener(d->show()).show();}
 
     private void onlineEntry(){LinearLayout p=page(true);titleRow(p,"在线");p.addView(Ui.button(this,"进入在线",v->startActivity(new Intent(this,PicaBrowseActivity.class)),false));}
     private void settingsEntry(){LinearLayout p=page(true);titleRow(p,"设置");p.addView(Ui.button(this,"打开设置",v->startActivity(new Intent(this,SettingsActivity.class)),false));}

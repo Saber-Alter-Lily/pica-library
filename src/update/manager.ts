@@ -12,6 +12,10 @@ import { sanitizedChildEnv } from '../desktop/child-process'
 import { applicationFetch } from './application-fetch'
 import { classifyUpdateCompatibility } from './compatibility'
 import { normalizeUpdatePath, updaterSelfReplacement } from './path-safety'
+import {
+    selectReleaseUpdateAsset,
+    updateAssetNamesForChecksums
+} from './release-assets'
 import type {
     StagedUpdate,
     UpdateManifest,
@@ -319,14 +323,16 @@ export class UpdateManager {
                 if (!release.draft && !release.prerelease) {
                     const releaseUrl = release.html_url ??
                         `https://github.com/${officialRepository}/releases/tag/${encodeURIComponent(tag)}`
-                    const updateAsset = release.assets?.find((item) =>
-                        /^Pica-Library-v\d+\.\d+\.\d+-update\.zip$/.test(String(item.name ?? ''))
+                    const updateAsset = selectReleaseUpdateAsset(
+                        release.assets,
+                        version,
+                        this.options.currentVersion
                     )
                     return this.availableFromRelease(
                         version,
                         releaseUrl,
                         updateAsset?.name,
-                        updateAsset?.browser_download_url
+                        updateAsset?.url
                     )
                 }
             }
@@ -347,14 +353,17 @@ export class UpdateManager {
             const match = finalUrl.match(/\/releases\/download\/v(\d+\.\d+\.\d+)\/SHA256SUMS\.txt(?:\?|$)/)
             if (!match) throw new Error('could not resolve latest version from checksum redirect')
             const version = match[1]
-            const assetName = `Pica-Library-v${version}-update.zip`
-            const checksum = this.shaFromSums(await sumsResponse.text(), assetName)
+            const sums = await sumsResponse.text()
+            const assetName = updateAssetNamesForChecksums(
+                version,
+                this.options.currentVersion
+            ).find((name) => this.shaFromSums(sums, name))
             const releaseUrl = `https://github.com/${officialRepository}/releases/tag/v${version}`
             return this.availableFromRelease(
                 version,
                 releaseUrl,
-                checksum ? assetName : undefined,
-                checksum
+                assetName,
+                assetName
                     ? `https://github.com/${officialRepository}/releases/download/v${version}/${assetName}`
                     : undefined
             )

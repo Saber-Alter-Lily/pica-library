@@ -35,7 +35,7 @@ public final class RecommendationSyncActivity extends Activity {
     private void render(){
         if(content==null)return;content.removeAllViews();
         LinearLayout principle=SettingsRow.panel(this,null);
-        principle.addView(Ui.text(this,"电脑和手机各自拥有独立推荐周期。同步的是长期偏好、反馈、可复用候选与 Desktop 预计算基础，不会把当前推荐列表或“本次想看”覆盖到另一端。",13,Ui.MUTED,false));
+        principle.addView(Ui.headingWithInfo(this,"同步规则",16,"电脑和手机各自拥有独立推荐周期。同步的是长期偏好、反馈、可复用候选与 Desktop 预计算基础，不会把当前推荐列表或“本次想看”覆盖到另一端。"));
         content.addView(principle);Ui.gap(content,this,10);
 
         if(!BridgeStore.paired(this)){

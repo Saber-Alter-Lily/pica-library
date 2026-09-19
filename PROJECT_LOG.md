@@ -8,6 +8,15 @@
 
 ### Recommendation V5 / Visual V1
 
+- 2026-09-19 实际使用反馈轮：推荐画像页继续收敛信息密度。画像、当前实际推荐构成、V5 Shadow 实验规划均可独立折叠；20+ facet 再聚合为“人物与作品 / 内容与剧情 / 外观与画风 / 行为与偏好 / 形式与其他”五个大组，各 facet 使用固定高度内部滚动查看全部条目，不再只展示前 12 项后强迫搜索。
+- 修复 Recommendation V5 Session 证据链：Web 当前 `appSessionId` 接入 timescale/channel 读取与推荐审计导出；首份真实审计包中“Session=0”不再被误解释为无会话行为。
+- 新增只读 Final V3 serving composition：普通页面展示已经实际落盘的当前推荐批次来源构成；V5 candidate-channel 继续明确标注 Shadow / `servingImpact=false`，避免把实验规划冒充正式推荐来源。
+- 推荐审计导出升级 schema v2：加入 `serving_composition.json` 和 manifest `appSessionId`；继续只导出 allowlist 推荐/行为数据，不含 Pica/E-H/GitHub/WebDAV 秘密、Cookie/Token、漫画图片或下载文件。
+- 偏好屏蔽统计拆分为“屏蔽偏好”和“屏蔽作品”，修复 AUTHOR/TAG BLOCK 已存在却被首页显示为“已屏蔽 0 项”的口径错误。
+- Desktop 手机连接改为二维码 / 手动地址+配对码 / Deep Link / 已配对设备四个折叠区域；说明文案开始迁移到统一 InfoTip，而不是长期占用页面的 muted 灰字。
+- Android“连接电脑”增加应用内扫一扫入口，复用开源 JourneyApps ZXing Android Embedded；扫描结果只接受 `picalibrary://pair` 配对 Deep Link。
+- 修复同一手机反复配对产生多个同名设备：Android 发送稳定 `DeviceIdentity`，Desktop 对同一 device ID 轮换 token 并撤销旧 token；旧数据的同名重复项在状态展示层合并。
+- 本轮按实机数据积累约束只推进开发分支、测试与日志，暂不生成或要求安装新的 Windows/Android 测试包。
 - 推荐偏好页升级为“画像 → 当前推荐构成 → 人工微调”三层：长期/近30天/本次行为画像先展示，当前启用的来源层、召回通道、Provider 请求预算和主要锚点可见；不再要求用户先猜标签再搜索。
 - 1–10 偏好调整改为批量暂存后统一保存/撤销；具体偏好搜索改为按钮或 Enter 明确提交，搜索未命中时必须再次确认“作为标签添加”，不再把输入文字自动写成 TAG 控制。
 - 增加一键推荐审计导出 ZIP：导出 policy、timescale、candidate-channel、behavior evidence、user events、shadow runs、evaluation 和最小 catalog；明确排除 Pica/E-H/GitHub/WebDAV 凭据、Cookie/Token 与漫画图片/下载文件。

@@ -68,7 +68,7 @@ public final class RecommendationControlActivity extends Activity {
 
     private void renderSignals(String query){
         while(content.getChildCount()>4)content.removeViewAt(content.getChildCount()-1);
-        JSONArray inferred=RecommendationPolicyStore.inferred(this);
+        JSONArray inferred=RecommendationLocalProfile.inferred(this);
         if(inferred.length()==0){
             content.addView(Ui.text(this,BridgeStore.paired(this)?"尚未取得完整画像。先到“推荐同步”同步基础数据。":"尚未同步 Desktop 长期画像；手机仍会使用本地收藏和行为运行推荐。",13,Ui.MUTED,false));
             return;

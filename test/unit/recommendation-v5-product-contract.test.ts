@@ -6,17 +6,23 @@ const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('Recommendation V5 portable product contract', () => {
-    it('keeps Desktop as the heavy-compute recommendation authority and exports a non-mutating portable cache', () => {
+    it('keeps Desktop heavy compute portable without replacing Android runtime cycles', () => {
         const bridge = read('src/mobile/bridge-server.ts')
-        const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')
+        const service = read('src/library/service.ts')
         const client = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java')
-        expect(bridge).toContain('/mobile/v1/recommendation/v5/sync')
-        expect(bridge).toContain('/mobile/v1/recommendations/cache')
-        expect(coordinator).toContain('portable(limit =')
+        const engine = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java')
+        expect(bridge).toContain('/mobile/v1/recommendation/v5/sync-preview')
+        expect(bridge).toContain('/mobile/v1/recommendation/v5/portable-package')
+        expect(service).toContain('recommendationPortablePackageV5')
+        expect(service).toContain('visualGeneration')
+        expect(service).toContain('canonicalGeneration')
+        expect(service).toContain('reservoirGeneration')
+        expect(client).toContain('recommendationPortablePackage')
         expect(client).toContain('syncRecommendationState')
-        expect(client).toContain('DESKTOP_SYNCED_V5_PORTABLE')
-        expect(client).toContain('policyBaseline')
-        expect(coordinator).toContain('portableBaseline')
+        expect(client).not.toContain('DESKTOP_SYNCED_V5_PORTABLE')
+        expect(engine).toContain('PORTABLE_RESERVOIR')
+        expect(engine).toContain('RecommendationEvidenceStore.sessionAdjustment')
+        expect(engine).toContain('PortableRecommendationPackageStore.visualAdjustment')
     })
 
     it('exposes user-steerable persistent and session policy on Desktop and Android', () => {
@@ -33,8 +39,11 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('1 = 尽量少推荐，10 = 非常喜欢')
         expect(web).toContain('系统未判断 · 5/10 为中性起点')
         expect(web).toContain('恢复系统判断')
-        expect(activity).toContain('本次想看这类')
-        expect(store).toContain('DIRTY_SESSION')
+        expect(activity).toContain('本次想看')
+        expect(activity).toContain('仅本机')
+        expect(store).toContain('LOCAL_SESSION')
+        expect(store).toContain('syncSchemaVersion')
+        expect(store).not.toContain('body.put("sessionIntent"')
     })
 
     it('renders classified 10-step Desktop controls and explicit feedback acknowledgement', () => {
@@ -947,25 +956,27 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).not.toContain('cf_clearance')
     })
 
-    it('acknowledges Android pairing before optional background recommendation sync', () => {
+    it('prompts recommendation sync after pairing instead of overwriting Android runtime', () => {
         const pairing = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
+        )
+        const sync = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationSyncActivity.java'
         )
         const saved = pairing.indexOf('BridgeStore.save(this,h,token,name)')
         const accountState = pairing.indexOf(
             'DesktopAccountStatusStore.save(this,BridgeClient.accountStatus(this))'
         )
         const success = pairing.indexOf('配对成功 · 已同步 Desktop 账号连接状态')
-        const backgroundSync = pairing.indexOf(
-            'BridgeClient.syncRecommendationState(this,false)'
-        )
         expect(saved).toBeGreaterThanOrEqual(0)
         expect(accountState).toBeGreaterThan(saved)
         expect(success).toBeGreaterThan(accountState)
-        expect(backgroundSync).toBeGreaterThan(success)
+        expect(pairing).toContain('RecommendationSyncActivity.offerAfterPairing(this)')
         expect(pairing).not.toContain(
-            'BridgeClient.syncRecommendationState(this,true)'
+            'BridgeClient.syncRecommendationState(this,false)'
         )
+        expect(sync).toContain('两端推荐周期保持独立')
+        expect(sync).toContain('双向同步')
     })
 
     it('makes work-identity review visual, detail-capable and undecided-first', () => {
@@ -992,12 +1003,17 @@ describe('Recommendation V5 portable product contract', () => {
         )
     })
 
-    it('queues mobile feedback and validates acknowledgement before clearing dirty state', () => {
+    it('queues mobile evidence and clears it only after explicit sync acknowledgement', () => {
         const feedback = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationFeedbackStore.java')
-        const pairing = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java')
+        const evidence = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationEvidenceStore.java')
+        const bridge = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java')
+        const sync = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationSyncActivity.java')
         const store = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java')
         expect(feedback).toContain('dirtyPayload')
-        expect(pairing).toContain('syncRecommendationState')
+        expect(evidence).toContain('dirtyPayload')
+        expect(bridge).toContain('syncRecommendationState')
+        expect(sync).toContain('BridgeClient.syncRecommendationState')
         expect(store).toContain('电脑未确认本次推荐同步')
+        expect(store).toContain('RecommendationEvidenceStore.clearDirty')
     })
 })

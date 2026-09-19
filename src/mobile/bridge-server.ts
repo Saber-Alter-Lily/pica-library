@@ -597,9 +597,12 @@ export async function startMobileBridge(options: {
                         error: 'Pica comic id is required'
                     })
                 const desired = input.desired === true
-                const result = await options.service
-                    .providerService()
-                    .setFavorite(comicId, desired)
+                const provider = options.service.providerService()
+                // Ensure the Desktop catalog contains the target before
+                // ProviderService updates favorite membership. The relay may
+                // act on a comic first discovered only on Android.
+                await provider.getComicDetails(comicId)
+                const result = await provider.setFavorite(comicId, desired)
                 return json(response, 200, {
                     authority: 'desktop',
                     relay: true,

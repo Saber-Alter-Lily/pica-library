@@ -301,7 +301,7 @@ V1 manifest and architecture now cover:
 
 Remaining:
 - **implemented:** read-only Pack inventory/loader + Desktop inspection API;
-- compatibility UI;
+- **implemented:** read-only Settings compatibility/integrity status UI;
 - shadow consumption;
 - standard signature verification;
 - key rotation;

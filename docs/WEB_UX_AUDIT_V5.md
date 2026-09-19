@@ -75,7 +75,8 @@ Observed on the existing user-installed beta; development changes in this sectio
 - **Pairing hierarchy:** Desktop pairing is split into QR (recommended), manual address/code, deep-link fallback, and paired devices. QR generation remains fully local.
 - **Android scanner:** Android uses the open-source JourneyApps ZXing Android Embedded scanner and only accepts `picalibrary://pair` QR payloads.
 - **Duplicate paired devices:** Android now sends the existing stable app-local `DeviceIdentity`; Desktop replaces/revokes prior tokens for the same stable device and collapses legacy duplicate-name rows in display.
-- **Release discipline:** no new user package is produced during this live-use accumulation window. Changes remain on the development branch until the user returns the formal test dataset.
+- **Release discipline:** CI may continue producing unpublished validation artifacts, but no new package is handed to the user and no upgrade is requested during this live-use accumulation window. Changes remain on the development branch until the formal test dataset is returned.
+- **InfoTip rollout:** the compact circular “!” help control now covers the main page headings, Settings explanatory panels, connection probing, WebDAV flow, Recommendation V5 and Theme Studio. Hover/focus previews the explanation and click pins it; status/error/warning/security messages are not hidden behind help controls.
 
 ## Manual QA gates for this pass
 

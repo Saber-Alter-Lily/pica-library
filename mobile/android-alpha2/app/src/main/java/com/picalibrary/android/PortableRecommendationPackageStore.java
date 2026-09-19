@@ -69,10 +69,17 @@ final class PortableRecommendationPackageStore {
         String generatedAt="",engineVersion="",visualGeneration="",
             canonicalGeneration="",behaviorGeneration="",reservoirGeneration="",sourceCycleId="";
         final List<Candidate> candidates=new ArrayList<>();
+        final Map<String,Candidate> candidateById=new LinkedHashMap<>();
         final Map<String,Identity> identityByComic=new LinkedHashMap<>();
         boolean available(){return !reservoirGeneration.isEmpty()&&!candidates.isEmpty();}
         String workId(String comicId){Identity value=identityByComic.get(comicId);return value==null?"":value.workId;}
         int identityBindingCount(){return identityByComic.size();}
+        double visualAdjustment(String comicId){
+            Candidate row=candidateById.get(comicId);if(row==null||!row.visualAvailable)return 0d;
+            double maximum="LOCAL_PAGES".equals(row.visualSource)?0.10:"REMOTE_PAGES".equals(row.visualSource)?0.08:0.03;
+            double centered=(Math.max(0d,Math.min(1d,row.visualAffinity))-0.5d)*2d;
+            return centered*maximum*Math.max(0d,Math.min(1d,row.visualConfidence));
+        }
     }
 
     private PortableRecommendationPackageStore(){}
@@ -159,7 +166,7 @@ final class PortableRecommendationPackageStore {
             JSONObject row=candidates.optJSONObject(i);if(row==null)continue;
             String id=row.optString("comicId","").trim();if(id.isEmpty())continue;
             JSONObject v=visual.get(id);
-            out.candidates.add(new Candidate(
+            Candidate candidate=new Candidate(
                 id,row.optString("providerId",""),row.optString("title",id),
                 row.optString("author",""),row.optString("canonicalAuthor",""),
                 row.optString("coverUrl",""),strings(row.optJSONArray("tags")),
@@ -172,22 +179,13 @@ final class PortableRecommendationPackageStore {
                 v==null?0d:v.optDouble("affinity",0d),
                 v==null?0d:v.optDouble("confidence",0d),
                 v==null?"":v.optString("sourceKind","")
-            ));
+            );
+            out.candidates.add(candidate);out.candidateById.put(id,candidate);
         }
         return out;
     }
 
-    static double visualAdjustment(Context context,String comicId){
-        Snapshot snapshot=load(context);
-        for(Candidate row:snapshot.candidates){
-            if(!row.comicId.equals(comicId)||!row.visualAvailable)continue;
-            double maximum="LOCAL_PAGES".equals(row.visualSource)?0.10:
-                "REMOTE_PAGES".equals(row.visualSource)?0.08:0.03;
-            double centered=(Math.max(0d,Math.min(1d,row.visualAffinity))-0.5d)*2d;
-            return centered*maximum*Math.max(0d,Math.min(1d,row.visualConfidence));
-        }
-        return 0d;
-    }
+    static double visualAdjustment(Context context,String comicId){return load(context).visualAdjustment(comicId);}
 
     static Set<String> missingVisualIds(Context context,int limit){
         LinkedHashSet<String> out=new LinkedHashSet<>();

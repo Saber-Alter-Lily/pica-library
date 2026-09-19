@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
+import { EhProvider } from '../../src/providers/eh-provider'
 import {
     startMobileBridge,
     type MobileBridgeController
@@ -168,6 +169,118 @@ describe('Mobile Bridge', () => {
         database.close()
     })
 
+
+    it('relays E-H favorite organization without returning account cookies', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-mobile-eh-relay-'))
+        roots.push(root)
+        const database = new LibraryDatabase(path.join(root, 'library.db'))
+        let call = 0
+        const ehFetch = async () => {
+            call += 1
+            if (call === 1)
+                return new Response(
+                    '<input type="text" name="favorite_0" value="最喜欢"><input type="text" name="favorite_1" value="待看">',
+                    { status: 200 }
+                )
+            if (call === 2)
+                return new Response(
+                    '<div id="posted_123" title="待看"></div><div id="favnote_123">稍后阅读</div><a href="/g/123/abcdef1234/">favorite</a>',
+                    { status: 200 }
+                )
+            return new Response(
+                JSON.stringify({
+                    gmetadata: [
+                        {
+                            gid: 123,
+                            token: 'abcdef1234',
+                            title: 'Relay E-H',
+                            category: 'Doujinshi',
+                            uploader: 'tester',
+                            posted: '1700000000',
+                            filecount: '2',
+                            rating: '4.5',
+                            tags: ['artist:alice']
+                        }
+                    ]
+                }),
+                {
+                    status: 200,
+                    headers: { 'content-type': 'application/json' }
+                }
+            )
+        }
+        const ehProvider = new EhProvider(
+            {
+                memberId: '1',
+                passHash: 'secret-hash'
+            },
+            ehFetch as typeof fetch
+        )
+        const service = new LibraryService(
+            database,
+            root,
+            undefined,
+            ehProvider
+        )
+        const bridge = await startMobileBridge({
+            database,
+            service,
+            host: '127.0.0.1',
+            port: 0,
+            stateFile: path.join(root, 'mobile-state.json'),
+            accountStatus: () => ({
+                pica: { configured: false },
+                eh: { configured: true }
+            })
+        })
+        bridges.push(bridge)
+        const host = bridge.status().addresses[0]
+        const paired = await fetch(`${host}/mobile/v1/pair`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                code: bridge.status().pairingCode,
+                deviceId: 'eh-relay-device',
+                deviceName: 'E-H Relay Android'
+            })
+        })
+        const token = String(
+            ((await paired.json()) as { token: string }).token
+        )
+        const response = await fetch(
+            `${host}/mobile/v1/provider/eh/favorites-snapshot`,
+            {
+                headers: {
+                    authorization: `Bearer ${token}`
+                }
+            }
+        )
+        expect(response.status).toBe(200)
+        const value = await response.json()
+        expect(value).toMatchObject({
+            authority: 'desktop',
+            relay: true,
+            categoryNames: ['最喜欢', '待看'],
+            items: [
+                {
+                    comicId: 'eh:123:abcdef1234',
+                    slot: 1,
+                    note: '稍后阅读'
+                }
+            ]
+        })
+        expect(value.categoryCounts[1]).toBe(1)
+        const serialized = JSON.stringify(value)
+        expect(serialized).not.toContain('secret-hash')
+        expect(serialized).not.toMatch(
+            /ipb_member_id|ipb_pass_hash|igneous|cf_clearance/i
+        )
+        expect(database.hasFavoriteMembership(
+            'eh:123:abcdef1234',
+            'eh-favorite'
+        )).toBe(true)
+        database.close()
+    })
 
     it('relays Pica through Desktop without exposing provider credentials', async () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-mobile-relay-'))

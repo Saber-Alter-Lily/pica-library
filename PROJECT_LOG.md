@@ -8,6 +8,11 @@
 
 ### Recommendation V5 / Visual V1
 
+- 推荐偏好页升级为“画像 → 当前推荐构成 → 人工微调”三层：长期/近30天/本次行为画像先展示，当前启用的来源层、召回通道、Provider 请求预算和主要锚点可见；不再要求用户先猜标签再搜索。
+- 1–10 偏好调整改为批量暂存后统一保存/撤销；具体偏好搜索改为按钮或 Enter 明确提交，搜索未命中时必须再次确认“作为标签添加”，不再把输入文字自动写成 TAG 控制。
+- 增加一键推荐审计导出 ZIP：导出 policy、timescale、candidate-channel、behavior evidence、user events、shadow runs、evaluation 和最小 catalog；明确排除 Pica/E-H/GitHub/WebDAV 凭据、Cookie/Token 与漫画图片/下载文件。
+- Desktop 手机连接增加本地生成二维码与 `picalibrary://pair` 深链，复用 Android 已有深链配对协议；二维码由仓库内 MIT qrcodejs 本地渲染，不调用第三方二维码服务。
+- Desktop↔Android 配对后自动同步 Pica/E-H“是否已连接”的非秘密状态；Android 设置页显示“已由 Desktop 连接”，Desktop-backed 功能不再因为手机没有本地账号而误导用户重复登录。当前 LAN Bridge 仍为 HTTP，因此密码/Cookie/长期 Token 不跨端复制，后续先完成加密传输/设备身份再考虑 Provider relay 或可撤销 session handoff。
 - 建立 V5 Portable Policy：Desktop 负责完整画像、跨 Provider 召回与重计算；Android 接收候选缓存与策略基线，离线仅做轻量增量调整，下一次配对再双向合并。
 - 新作发现增加第一版 owned/work-level suppression：收藏、书库、已下载视为 owned，并用归一标题 + 作者 + 页数识别高置信跨来源同作品。
 - 显式偏好从“多一点 / 少一点”升级为基于收藏画像的 1–10 档控制；系统基准由收藏支持数和占比推导，用户调整同时可影响排序与后续完整召回。

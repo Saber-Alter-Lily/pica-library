@@ -197,8 +197,28 @@ final class BridgeClient {
     static List<RecommendationItem> recommendations(Context c,int limit) throws Exception{return recommendationBatch(c,limit).items;}
     static RecommendationBatch recommendationBatch(Context c,int limit) throws Exception {return parseRecommendationBatch(new JSONObject(get(c,"/mobile/v1/recommendations?limit="+limit)),"recommendations");}
     static RecommendationBatch recommendationCache(Context c,int limit) throws Exception {return parseRecommendationBatch(new JSONObject(get(c,"/mobile/v1/recommendations/cache?limit="+limit)),"items");}
-    static JSONObject syncRecommendationState(Context c) throws Exception{return syncRecommendationState(c,false);}
-    static JSONObject syncRecommendationState(Context c,boolean recompute) throws Exception {JSONObject payload=RecommendationPolicyStore.syncPayload(c);payload.put("recompute",recompute);String mutationId=payload.optString("mutationId","");JSONObject response=new JSONObject(post(c,"/mobile/v1/recommendation/v5/sync",payload,recompute?180000:30000));RecommendationPolicyStore.acknowledge(c,response,mutationId);RecommendationBatch desktop=recommendationCache(c,NativeRecommendationPolicy.BATCH_SIZE*NativeRecommendationPolicy.MAX_BATCHES);if(desktop.items.isEmpty())desktop=recommendationBatch(c,NativeRecommendationPolicy.BATCH_SIZE);if(!desktop.items.isEmpty()){NativeRecommendationStore.Snapshot snapshot=new NativeRecommendationStore.Snapshot();snapshot.cycleId="desktop-sync-"+System.currentTimeMillis();snapshot.generatedAt=java.time.Instant.now().toString();snapshot.readiness="DESKTOP_SYNCED_V5_PORTABLE";snapshot.candidateCount=desktop.items.size();snapshot.batchIndex=0;List<NativeRecommendationStore.Item> batch=new ArrayList<>();for(RecommendationItem item:desktop.items){batch.add(new NativeRecommendationStore.Item(item.id,item.title,item.author,item.reason,"DESKTOP","",item.score,item.tags,item.categories));if(batch.size()>=NativeRecommendationPolicy.BATCH_SIZE){snapshot.batches.add(batch);batch=new ArrayList<>();}}if(!batch.isEmpty())snapshot.batches.add(batch);NativeRecommendationStore.save(c,snapshot);if(desktop.policyBaseline!=null)RecommendationPolicyStore.saveCacheBaseline(c,desktop.policyBaseline);}return response;}
+    static JSONObject recommendationSyncPreview(Context c) throws Exception {
+        JSONObject payload=RecommendationPolicyStore.previewPayload(c);
+        return new JSONObject(post(c,"/mobile/v1/recommendation/v5/sync-preview",payload,30000));
+    }
+    static JSONObject recommendationPortablePackage(Context c,int limit) throws Exception {
+        JSONObject value=new JSONObject(get(c,"/mobile/v1/recommendation/v5/portable-package?limit="+Math.max(24,Math.min(1000,limit))));
+        PortableRecommendationPackageStore.save(c,value);
+        return value;
+    }
+    static JSONObject syncRecommendationState(Context c) throws Exception{return syncRecommendationState(c,false,null);}
+    static JSONObject syncRecommendationState(Context c,boolean recompute) throws Exception{return syncRecommendationState(c,recompute,null);}
+    static JSONObject syncRecommendationState(Context c,boolean recompute,JSONArray resolutions) throws Exception {
+        JSONObject payload=RecommendationPolicyStore.syncPayload(c);
+        if(resolutions!=null)payload.put("resolutions",resolutions);
+        payload.put("recompute",recompute);
+        String mutationId=payload.optString("mutationId","");
+        JSONObject response=new JSONObject(post(c,"/mobile/v1/recommendation/v5/sync",payload,recompute?180000:30000));
+        if(response.optBoolean("requiresResolution",false))return response;
+        RecommendationPolicyStore.acknowledge(c,response,mutationId);
+        try{recommendationPortablePackage(c,500);}catch(Exception ignored){}
+        return response;
+    }
     static JSONObject recommendationPolicy(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/recommendation/v5/snapshot"));}
     static JSONObject visualStatus(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/visual/status"));}
     static JSONObject updateVisualSettings(Context c,Boolean enabled,String rerankMode) throws Exception {JSONObject body=new JSONObject();if(enabled!=null)body.put("enabled",enabled.booleanValue());if(rerankMode!=null&&!rerankMode.isEmpty())body.put("rerankMode",rerankMode);return new JSONObject(post(c,"/mobile/v1/visual/settings",body));}

@@ -58,6 +58,53 @@ final class BridgeClient {
     static String post(Context c,String path,JSONObject value,int readTimeoutMs) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");HttpURLConnection con=open(host,path,BridgeStore.token(c),"POST");con.setReadTimeout(Math.max(12000,readTimeoutMs));con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json; charset=utf-8");try(OutputStream out=con.getOutputStream()){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}return read(con);}
     static JSONObject pair(Context c,String host,String code) throws Exception {HttpURLConnection con=open(host,"/mobile/v1/pair","","POST");con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json; charset=utf-8");JSONObject body=new JSONObject();body.put("code",code);body.put("deviceId",DeviceIdentity.id(c));body.put("deviceName",Build.MANUFACTURER+" "+Build.MODEL);try(OutputStream out=con.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}return new JSONObject(read(con));}
 
+    static JSONObject picaRelaySearch(Context c,String keyword,int page,String sort,List<String> categories) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("keyword",keyword==null?"":keyword);
+        body.put("page",Math.max(1,page));
+        body.put("sort",sort==null?"ld":sort);
+        body.put("categories",new JSONArray(categories==null?new ArrayList<>():categories));
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/search",body));
+    }
+    static JSONObject picaRelayBrowse(Context c,String category,String tag,String sort,int page) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("category",category==null?"":category);
+        body.put("tag",tag==null?"":tag);
+        body.put("sort",sort==null?"ld":sort);
+        body.put("page",Math.max(1,page));
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/browse",body));
+    }
+    static JSONObject picaRelayFavorites(Context c,int page,String sort) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("page",Math.max(1,page));
+        body.put("sort",sort==null?"dd":sort);
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/favorites",body));
+    }
+    static JSONObject picaRelayLeaderboard(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/leaderboard"));
+    }
+    static JSONObject picaRelayCategories(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/categories"));
+    }
+    static JSONObject picaRelayComic(Context c,String comicId) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/comic/"+enc(comicId)));
+    }
+    static JSONObject picaRelayEpisodes(Context c,String comicId) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/episodes/"+enc(comicId)));
+    }
+    static JSONObject picaRelayPages(Context c,String comicId,int order) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/pages/"+enc(comicId)+"/"+Math.max(1,order)));
+    }
+    static JSONObject picaRelayRelated(Context c,String comicId) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/related/"+enc(comicId)));
+    }
+    static JSONObject picaRelayFavorite(Context c,String comicId,boolean desired) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("comicId",comicId);
+        body.put("desired",desired);
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/favorite",body));
+    }
+
     static List<ComicItem> library(Context c, String scope, int limit) throws Exception {return library(c,scope,limit,"","latest");}
     static List<ComicItem> library(Context c, String scope, int limit, String text, String sort) throws Exception {
         String path="/mobile/v1/library?scope="+enc(scope)+"&limit="+limit+"&sort="+enc(sort==null?"latest":sort);if(text!=null&&!text.trim().isEmpty())path+="&text="+enc(text.trim());JSONObject root=new JSONObject(get(c,path));JSONArray items=root.optJSONArray("items");List<ComicItem> out=new ArrayList<>();if(items!=null) for(int i=0;i<items.length();i++){JSONObject o=items.optJSONObject(i); if(o==null)continue;out.add(new ComicItem(o.optString("comicId"),o.optString("title","未命名漫画"),o.optString("author","未知作者"),o.optString("coverPath","/mobile/v1/covers/"+o.optString("comicId")),o.optInt("downloadedPictures",0)));}return out;

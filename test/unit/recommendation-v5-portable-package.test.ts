@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
+import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-store'
 
 describe('Recommendation V5 portable mobile package', () => {
     it('exports reusable candidates and generations without copying the current batch or raw visual vectors', () => {
@@ -90,5 +91,68 @@ describe('Recommendation V5 portable mobile package', () => {
             database.close()
             fs.rmSync(dir, { recursive: true, force: true })
         }
+
+
+    it('keeps portable policy generation stable across Session-only changes but advances for durable controls', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-policy-gen-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.db'))
+        try {
+            database.importCatalog(
+                [
+                    {
+                        comicId: 'candidate-a',
+                        title: 'Candidate A',
+                        author: 'Author A',
+                        tags: ['tag-a'],
+                        categories: ['短篇'],
+                        finished: true
+                    }
+                ],
+                'test:discover'
+            )
+            const cycleId = 'policy-gen-cycle'
+            database.saveV3CandidatePool({
+                id: 'policy-gen-pool',
+                cycleId,
+                candidateIds: ['candidate-a'],
+                telemetry: { state: 'ACTIVE' }
+            })
+            database.setAppState('recommendation.v3.activeCycle.v1', {
+                schemaVersion: 1,
+                activeCycleId: cycleId,
+                activeBatchIndex: 0
+            })
+            const service = new LibraryService(database, dir)
+            const store = new RecommendationPolicyStoreV5(database)
+
+            const baseline = service.recommendationPortablePackageV5(100)
+            store.setSessionIntent({
+                mode: 'TARGET',
+                targetType: 'TAG',
+                key: 'session-only',
+                label: '本次想看'
+            })
+            const sessionOnly = service.recommendationPortablePackageV5(100)
+            expect(
+                sessionOnly.foundation.portablePolicyGeneration
+            ).toBe(baseline.foundation.portablePolicyGeneration)
+
+            store.setControl({
+                targetType: 'TAG',
+                key: 'tag-a',
+                label: 'tag-a',
+                direction: 'MORE',
+                levelDelta: 2,
+                scope: 'PERSISTENT'
+            })
+            const durable = service.recommendationPortablePackageV5(100)
+            expect(
+                durable.foundation.portablePolicyGeneration
+            ).not.toBe(baseline.foundation.portablePolicyGeneration)
+        } finally {
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
     })
 })

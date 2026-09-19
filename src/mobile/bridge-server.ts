@@ -611,6 +611,203 @@ export async function startMobileBridge(options: {
             }
 
             if (
+                url.pathname === '/mobile/v1/provider/eh/search' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const surface = input.surface === 'exh' ? 'exh' : 'eh'
+                const requestedMode = String(input.ehMode ?? 'latest')
+                const ehMode = [
+                    'latest',
+                    'popular',
+                    'favorites',
+                    'watched',
+                    'toplist'
+                ].includes(requestedMode)
+                    ? requestedMode
+                    : 'latest'
+                const comics = await options.service.mobileEhRelaySearch({
+                    keyword: String(input.keyword ?? '').trim().slice(0, 500),
+                    tags: stringArray(input.tags).slice(0, 30),
+                    categories: stringArray(input.categories).slice(0, 20),
+                    limit: boundedInt(
+                        String(input.limit ?? ''),
+                        50,
+                        1,
+                        100
+                    ),
+                    surface,
+                    ehMode: ehMode as
+                        | 'latest'
+                        | 'popular'
+                        | 'favorites'
+                        | 'watched'
+                        | 'toplist',
+                    ehToplist: String(input.ehToplist ?? '11').slice(0, 8),
+                    ehLanguage: String(input.ehLanguage ?? '').trim().slice(0, 80),
+                    ehExcludeTags: stringArray(input.ehExcludeTags).slice(0, 30),
+                    ehMinRating: Number(input.ehMinRating ?? 0),
+                    ehPageFrom: Number(input.ehPageFrom ?? 0),
+                    ehPageTo: Number(input.ehPageTo ?? 0)
+                })
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/exh-capability' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    capability:
+                        await options.service.mobileEhRelayProbeExH()
+                })
+
+            const ehComicRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/eh\/comic\/([^/]+)$/
+            )
+            if (ehComicRoute && request.method === 'GET') {
+                const comicId = safePathSegment(ehComicRoute[1]).trim()
+                const surface =
+                    url.searchParams.get('surface') === 'exh' ? 'exh' : 'eh'
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'E-H comic id is required'
+                    })
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    comic:
+                        await options.service.mobileEhRelayDetails(
+                            comicId,
+                            surface
+                        )
+                })
+            }
+
+            const ehEpisodesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/eh\/episodes\/([^/]+)$/
+            )
+            if (ehEpisodesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(ehEpisodesRoute[1]).trim()
+                const surface =
+                    url.searchParams.get('surface') === 'exh' ? 'exh' : 'eh'
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'E-H comic id is required'
+                    })
+                const episodes =
+                    await options.service.mobileEhRelayEpisodes(
+                        comicId,
+                        surface
+                    )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    episodes: episodes.map((episode) => ({
+                        id: episode.id || episode._id || '',
+                        title: episode.title,
+                        order: episode.order
+                    }))
+                })
+            }
+
+            const ehPagesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/eh\/pages\/([^/]+)$/
+            )
+            if (ehPagesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(ehPagesRoute[1]).trim()
+                const surface =
+                    url.searchParams.get('surface') === 'exh' ? 'exh' : 'eh'
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'E-H comic id is required'
+                    })
+                const episodes =
+                    await options.service.mobileEhRelayEpisodes(
+                        comicId,
+                        surface
+                    )
+                const episode = episodes[0]
+                if (!episode)
+                    return json(response, 404, {
+                        error: 'E-H episode was not found'
+                    })
+                const pages = await options.service.mobileEhRelayPages(
+                    comicId,
+                    episode,
+                    surface
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    pages: pages.map((page, index) => ({
+                        id: page.id || `eh-page-${index + 1}`,
+                        locator: page.url,
+                        name: page.name,
+                        position: index
+                    }))
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/page-image' &&
+                request.method === 'GET'
+            ) {
+                const locator = String(
+                    url.searchParams.get('locator') ?? ''
+                ).trim()
+                if (
+                    !locator.startsWith('eh-page:') ||
+                    locator.length > 4096
+                )
+                    return json(response, 400, {
+                        error: 'Valid E-H page locator is required'
+                    })
+                const image =
+                    await options.service.mobileEhRelayFetchPage(locator)
+                response.writeHead(200, {
+                    'content-type': image.contentType,
+                    'content-length': String(image.data.byteLength),
+                    'cache-control': 'private, max-age=3600',
+                    'x-content-type-options': 'nosniff'
+                })
+                response.end(image.data)
+                return
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/favorite' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const comicId = String(input.comicId ?? '').trim()
+                if (!comicId.startsWith('eh:'))
+                    return json(response, 400, {
+                        error: 'Valid E-H comic id is required'
+                    })
+                const result =
+                    await options.service.mobileEhRelaySetFavorite(
+                        comicId,
+                        input.desired === true
+                    )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    ...result
+                })
+            }
+
+            if (
                 url.pathname === '/mobile/v1/recommendation/v5/snapshot' &&
                 request.method === 'GET'
             )

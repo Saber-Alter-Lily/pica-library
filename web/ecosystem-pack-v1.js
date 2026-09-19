@@ -102,7 +102,7 @@ $('#ecosystem-packs-refresh')?.addEventListener('click', () => void refresh())
 $('#ecosystem-packs-open')?.addEventListener('click', async () => {
     const message = $('#ecosystem-packs-message')
     try {
-        const response = await fetch('/api/v1/desktop/open', {
+        const response = await fetch('/api/v1/desktop/open-directory', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ kind: 'packs' })

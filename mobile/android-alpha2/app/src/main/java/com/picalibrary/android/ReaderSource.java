@@ -73,7 +73,7 @@ final class PicaReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     PicaReaderSource(Context context){this.context=context.getApplicationContext();this.client=new PicaClient(this.context);}
     public String kind(){return "pica";}
-    public String scope(){PicaAccountStore.Session session=PicaAccountStore.load(context);return ReaderPolicy.hash("pica\n"+session.account);}
+    public String scope(){PicaAccountStore.Session session=PicaAccountStore.load(context);String identity=!session.account.isEmpty()?session.account:BridgeStore.paired(context)&&DesktopAccountStatusStore.load(context).picaConfigured?"desktop-relay:"+BridgeStore.host(context):"anonymous";return ReaderPolicy.hash("pica\n"+identity);}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
         PicaClient.Comic comic=client.comic(comicId);comicTitle=comic.title;author=comic.author;List<PicaClient.Episode> remote=client.episodes(comicId);List<BridgeClient.ChapterItem> out=new ArrayList<>();episodes.clear();knownChapters.clear();
         for(PicaClient.Episode episode:remote){episodes.put(episode.id,episode);BridgeClient.ChapterItem item=new BridgeClient.ChapterItem(episode.id,episode.title,episode.order,1);knownChapters.put(item.id,item);out.add(item);}return out;

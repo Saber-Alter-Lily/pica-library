@@ -123,6 +123,14 @@ describe('public v0.4.0 to next-release database preservation', () => {
                 ) VALUES (?, 'pica:favorites', ?, ?)
             `)
             .run('comic-v040', now, now)
+        for (const reason of ['pica-favorite', 'download', 'shelf'])
+            v040
+                .prepare(`
+                    INSERT INTO library_membership(
+                        comic_id, reason, created_at, updated_at
+                    ) VALUES ('comic-v040', ?, ?, ?)
+                `)
+                .run(reason, now, now)
         v040
             .prepare(`
                 INSERT INTO shelves(

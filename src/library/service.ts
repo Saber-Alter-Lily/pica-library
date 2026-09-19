@@ -313,6 +313,96 @@ export class LibraryService {
         }
     }
 
+    recommendationServingCompositionV3() {
+        const state = this.database.getAppState<{
+            schemaVersion?: number
+            activeCycleId?: string | null
+            activeBatchIndex?: number
+        }>('recommendation.v3.activeCycle.v1')
+        const cycleId = String(state?.activeCycleId ?? '').trim()
+        if (!cycleId)
+            return {
+                available: false,
+                source: 'final-v3-serving',
+                cycleId: null,
+                batchId: null,
+                batchIndex: null,
+                itemCount: 0,
+                primaryFamilies: {},
+                reasonCodes: {}
+            }
+        const pool = this.database.latestV3CandidatePool(cycleId)
+        if (!pool)
+            return {
+                available: false,
+                source: 'final-v3-serving',
+                cycleId,
+                batchId: null,
+                batchIndex: null,
+                itemCount: 0,
+                primaryFamilies: {},
+                reasonCodes: {}
+            }
+        const batches = this.database.listV3Batches(pool.id)
+        const requestedIndex = Number(state?.activeBatchIndex ?? -1)
+        const batch =
+            (requestedIndex >= 0
+                ? batches.find((item) => item.batchIndex === requestedIndex)
+                : undefined) ?? batches.at(-1)
+        if (!batch)
+            return {
+                available: false,
+                source: 'final-v3-serving',
+                cycleId,
+                poolId: pool.id,
+                batchId: null,
+                batchIndex: null,
+                itemCount: 0,
+                primaryFamilies: {},
+                reasonCodes: {}
+            }
+        const rawItems = Array.isArray(batch.evidence?.items)
+            ? (batch.evidence.items as Array<Record<string, unknown>>)
+            : []
+        const familyCounts: Record<string, number> = {}
+        const reasonCounts: Record<string, number> = {}
+        for (const item of rawItems) {
+            const family = String(item.primaryFamily ?? 'UNATTRIBUTED')
+            familyCounts[family] = (familyCounts[family] ?? 0) + 1
+            const reasons = Array.isArray(item.reasonCodes)
+                ? item.reasonCodes.map(String)
+                : []
+            for (const reason of reasons)
+                reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1
+        }
+        return {
+            available: true,
+            source: 'final-v3-serving',
+            cycleId,
+            poolId: pool.id,
+            poolState: String(pool.telemetry?.state ?? ''),
+            batchId: batch.id,
+            batchIndex: batch.batchIndex,
+            contextId: batch.contextId,
+            generatedAt: batch.generatedAt,
+            itemCount: batch.itemIds.length,
+            primaryFamilies: familyCounts,
+            reasonCodes: reasonCounts,
+            items: rawItems.map((item) => ({
+                comicId: String(item.comicId ?? ''),
+                rawRank: Number(item.rawRank ?? 0),
+                rawRankerScore: Number(item.rawRankerScore ?? 0),
+                primaryIntentId: String(item.primaryIntentId ?? ''),
+                primaryFamily: String(item.primaryFamily ?? 'UNATTRIBUTED'),
+                relatedOnly: Boolean(item.relatedOnly),
+                recentlyDisplayed: Boolean(item.recentlyDisplayed),
+                reasonCodes: Array.isArray(item.reasonCodes)
+                    ? item.reasonCodes.map(String)
+                    : []
+            }))
+        }
+    }
+
     async runRecommendationV5ShadowRetrieval(
         input: Record<string, unknown>
     ) {

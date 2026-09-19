@@ -795,10 +795,17 @@ export async function startMobileBridge(options: {
                     return json(response, 400, {
                         error: 'Valid E-H comic id is required'
                     })
+                const category = Math.max(
+                    0,
+                    Math.min(9, Math.floor(Number(input.category) || 0))
+                )
+                const note = String(input.note ?? '').slice(0, 200)
                 const result =
                     await options.service.mobileEhRelaySetFavorite(
                         comicId,
-                        input.desired === true
+                        input.desired === true,
+                        category,
+                        note
                     )
                 return json(response, 200, {
                     authority: 'desktop',

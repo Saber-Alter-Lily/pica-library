@@ -20,8 +20,9 @@ final class NativeRecommendationPolicy {
         if("CREATOR".equals(family))return 1;
         if("SEMANTIC_CONJUNCTION".equals(family))return 2;
         if("SEMANTIC_ANCHOR".equals(family))return 3;
-        if("EXPLORATION".equals(family))return 4;
-        if("RELATED".equals(family))return 5;
+        if("PORTABLE_RESERVOIR".equals(family))return 4;
+        if("EXPLORATION".equals(family))return 5;
+        if("RELATED".equals(family))return 6;
         return 99;
     }
 

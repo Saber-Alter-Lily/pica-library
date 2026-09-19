@@ -1,7 +1,8 @@
 import { PRODUCT_VERSION } from './version'
+import { latestMigrationVersion } from './storage/sqlite/migrations'
 
 export const APP_API_VERSION = 2
-export const DATABASE_SCHEMA_VERSION = 8
+export const DATABASE_SCHEMA_VERSION = latestMigrationVersion
 export const BUNDLE_FORMAT_VERSION = 1
 export const UPDATE_MANIFEST_VERSION = 1
 export const READER_API_VERSION = 1

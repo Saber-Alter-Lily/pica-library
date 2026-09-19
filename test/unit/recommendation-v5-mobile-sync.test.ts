@@ -112,7 +112,10 @@ describe('Recommendation V5 mobile three-way sync', () => {
                 { eventType: 'reader_complete', comicId: 'c' }
             ],
             suppressComicIds: ['d'],
-            tasteExcludedComicIds: ['e']
+            tasteExcludedComicIds: ['e'],
+            itemDispositions: [
+                { comicId: 'f', reason: 'temporary', active: true }
+            ]
         })
         expect(preview).toMatchObject({
             androidControlChanges: 0,
@@ -121,6 +124,7 @@ describe('Recommendation V5 mobile three-way sync', () => {
             eventChanges: 2,
             suppressChanges: 1,
             tasteExclusionChanges: 1,
+            dispositionChanges: 1,
             hasPortableChanges: true
         })
     })

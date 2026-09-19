@@ -101,7 +101,9 @@ export function computePackContentRoot(files: EcosystemPackFile[]) {
             sha256: String(file.sha256).toLowerCase(),
             size: Number(file.size)
         }))
-        .sort((left, right) => left.path.localeCompare(right.path))
+        .sort((left, right) =>
+            left.path === right.path ? 0 : left.path < right.path ? -1 : 1
+        )
         .map((file) => `${file.path}\t${file.sha256}\t${file.size}`)
         .join('\n')
     return createHash('sha256').update(canonical, 'utf8').digest('hex')

@@ -52,7 +52,9 @@ export interface DesktopServerController {
     ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
-    exportRecommendationAudit?: () => Promise<Record<string, unknown>>
+    exportRecommendationAudit?: (
+        input?: Record<string, unknown>
+    ) => Promise<Record<string, unknown>>
     syncAndExportBrowserLitePackage?: () => Promise<Record<string, unknown>>
     openBrowserLite?: () => Promise<void>
     openDirectory: (kind: string) => Promise<void>
@@ -388,6 +390,17 @@ export async function startLibraryServer(options: {
                         url.searchParams.get('appSessionId'),
                         Number(url.searchParams.get('limit') ?? 5000)
                     )
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/serving-composition' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationServingCompositionV3()
                 )
 
             if (
@@ -1335,7 +1348,9 @@ export async function startLibraryServer(options: {
                 return json(
                     response,
                     200,
-                    await options.desktop.exportRecommendationAudit()
+                    await options.desktop.exportRecommendationAudit(
+                        await body(request)
+                    )
                 )
             }
             if (

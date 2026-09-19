@@ -58,6 +58,23 @@ final class NativeRecommendationEngine {
             }
         }
         if(portable.available()){Route reservoirRoute=new Route("PORTABLE_RESERVOIR","PORTABLE_RESERVOIR","PORTABLE_RESERVOIR","RESERVOIR","","","");List<PicaClient.Comic> reservoirDocs=new ArrayList<>();Map<String,Integer> reservoirRank=new HashMap<>();for(PortableRecommendationPackageStore.Candidate row:portable.candidates){PicaClient.Comic comic=row.asComic();reservoirDocs.add(comic);reservoirRank.put(comic.id,row.desktopPoolRank);}addCandidates(candidates,allFavoriteIds,registry,reservoirDocs,reservoirRoute,0);for(Candidate candidate:candidates.values())if(candidate.families.contains("PORTABLE_RESERVOIR"))candidate.bestProviderRank=Math.min(candidate.bestProviderRank,reservoirRank.getOrDefault(candidate.comic.id,Integer.MAX_VALUE));}
+        if(portable.identityBindingCount()>0){
+            Set<String> ownedWorks=new HashSet<>();
+            for(String ownedId:allFavoriteIds){String workId=portable.workId(ownedId);if(!workId.isEmpty())ownedWorks.add(workId);}
+            Map<String,String> selectedByWork=new HashMap<>();
+            List<String> removeIds=new ArrayList<>();
+            for(Map.Entry<String,Candidate> row:candidates.entrySet()){
+                String comicId=row.getKey(),workId=portable.workId(comicId);
+                if(workId.isEmpty())continue;
+                if(ownedWorks.contains(workId)){removeIds.add(comicId);continue;}
+                String previousId=selectedByWork.get(workId);
+                if(previousId==null){selectedByWork.put(workId,comicId);continue;}
+                Candidate previous=candidates.get(previousId),current=row.getValue();
+                boolean replace=current.bestProviderRank<previous.bestProviderRank||(current.bestProviderRank==previous.bestProviderRank&&comicId.compareTo(previousId)<0);
+                if(replace){removeIds.add(previousId);selectedByWork.put(workId,comicId);}else removeIds.add(comicId);
+            }
+            for(String removeId:removeIds)candidates.remove(removeId);
+        }
         List<PicaClient.Comic> picaDiscovered=new ArrayList<>();for(Candidate candidate:candidates.values())if(!candidate.comic.id.startsWith("eh:"))picaDiscovered.add(candidate.comic);UnifiedPicaCatalogSync.mergeAll(app,picaDiscovered);UnifiedEhCatalogSync.mergeAll(app,ehDiscovered);
 
         emit(progress,"正在使用冻结兼容 Ranker 排序",0,candidates.size());Map<String,Intent> intentMap=new HashMap<>();for(Intent intent:intents)intentMap.put(intent.id,intent);List<Ranked> ranked=new ArrayList<>();int rankedDone=0;

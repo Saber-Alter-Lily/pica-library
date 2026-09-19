@@ -45,7 +45,11 @@ describe('Mobile Bridge', () => {
             service,
             host: '127.0.0.1',
             port: 0,
-            stateFile: path.join(root, 'mobile-state.json')
+            stateFile: path.join(root, 'mobile-state.json'),
+            accountStatus: () => ({
+                pica: { configured: true },
+                eh: { configured: true }
+            })
         })
         bridges.push(bridge)
         const status = bridge.status()
@@ -64,6 +68,21 @@ describe('Mobile Bridge', () => {
         )
         expect(token.length).toBeGreaterThan(20)
         const headers = { authorization: `Bearer ${token}` }
+        const accountStatus = await fetch(
+            `${host}/mobile/v1/accounts/status`,
+            { headers }
+        )
+        expect(accountStatus.status).toBe(200)
+        const accountValue = await accountStatus.json()
+        expect(accountValue).toMatchObject({
+            authority: 'desktop',
+            pica: { configured: true },
+            eh: { configured: true }
+        })
+        expect(JSON.stringify(accountValue)).not.toMatch(
+            /password|passHash|cookie|token/i
+        )
+
         const library = await fetch(
             `${host}/mobile/v1/library?scope=favorites&limit=20`,
             { headers }

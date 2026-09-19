@@ -136,7 +136,7 @@ describe('Recommendation V5 mobile three-way sync', () => {
             catalogEvidenceChanges: 1,
             hasPortableChanges: true
         })
-
+    })
 
     it('merges mobile semantic item dispositions and taste exclusion without creating a dislike', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-mobile-semantic-'))
@@ -211,6 +211,5 @@ describe('Recommendation V5 mobile three-way sync', () => {
             database.close()
             fs.rmSync(dir, { recursive: true, force: true })
         }
-    })
     })
 })

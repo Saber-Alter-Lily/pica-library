@@ -29,6 +29,7 @@ public final class RecommendationProfileActivity extends Activity {
         if(content==null)return;content.removeAllViews();
         JSONObject policy=RecommendationPolicyStore.snapshot(this);
         JSONObject counts=policy.optJSONObject("counts");
+        JSONArray localControls=RecommendationPolicyStore.controls(this);
         UnifiedCatalogStore.Snapshot localCatalog=UnifiedCatalogStore.load(this);
         int localFavorites=0,localOwned=0;
         for(UnifiedCatalogStore.Entry entry:localCatalog.entries()){
@@ -50,7 +51,7 @@ public final class RecommendationProfileActivity extends Activity {
         LinearLayout evidence=SettingsRow.panel(this,null);
         evidence.addView(Ui.text(this,"画像证据",17,Ui.TEXT,true));
         evidence.addView(SettingsRow.statusLine(this,"手机收藏 / 已拥有",Ui.text(this,localFavorites+" / "+localOwned,12,Ui.MUTED,true)));
-        if(counts!=null)evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.text(this,counts.optInt("controls",0)+" 项",12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.text(this,localControls.length()+" 项",12,Ui.MUTED,true)));
         evidence.addView(SettingsRow.statusLine(this,"最近 30 天行为",Ui.text(this,RecommendationEvidenceStore.recentCount(this)+" 条 · 本机 + 已同步",12,Ui.MUTED,true)));
         evidence.addView(SettingsRow.statusLine(this,"本次手机 Session",Ui.text(this,RecommendationEvidenceStore.sessionCount(this)+" 条",12,Ui.MUTED,true)));
         JSONObject intent=policy.optJSONObject("sessionIntent");

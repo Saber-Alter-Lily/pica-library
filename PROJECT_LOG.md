@@ -8,6 +8,8 @@
 
 ### Recommendation V5 / Visual V1
 
+- Desktop-backed Provider Relay 扩展到 E-H / ExH：手机未配置本机 E-H Cookie 但已配对且 Desktop 已登录时，Watched、Favorites、ExH capability/search、E-H/ExH 详情/页列表/在线阅读和云收藏 mutation 均通过已认证 Mobile Bridge 执行；公开 E-H 搜索仍可由手机直接访问。Relay 不下发 `ipb_member_id`、`ipb_pass_hash`、`igneous`、`cf_clearance`。
+- E-H Desktop relay 的收藏同步保留 10 个原生收藏槽的用户自定义名称、slot、count 与 note，不再退化成“只有全部收藏”；手机本机会话仍优先，Desktop 离线时公开 E-H 仍可直连，账号能力则 fail closed 或使用用户显式配置的手机本机会话。
 - Desktop↔Android 账号复用进入 Provider Relay 阶段：手机无本机 Pica 账号但已配对且 Desktop 已登录时，`PicaClient` 自动以 Desktop Mobile Bridge 为后备来源，覆盖搜索/浏览/收藏列表/排行榜/相关作品/详情/章节/页列表及收藏增删；本机账号存在时仍优先直连。Relay 只传 Provider 结果和用户操作，不把 Pica 邮箱、密码、authorization token 或 E-H Cookie 复制到手机。
 - Android Pica 账号页在 Desktop-backed 状态下默认显示“已由 Desktop 连接”，不再直接要求重复登录；只有用户明确需要“电脑关闭后手机仍直连”时才展开配置手机本机账号。在线浏览、作者作品刷新、详情、Reader、阅读历史、封面补全和手机推荐入口均已识别 Desktop-backed Pica 可用性。
 - 2026-09-19 当前实机测试轮判定为 `SUFFICIENT_FOR_PRODUCT_AND_TELEMETRY_ITERATION`：现有真实数据已覆盖推荐曝光、批次展示、详情打开、Like/Dislike、收藏/行为证据、Shadow 运行、审计导出与跨会话 ID，可用于继续修 UI、数据契约、会话归因、serving/Shadow 口径和跨端连接；继续在旧 Beta 上积累同类数据的边际价值已较低。
@@ -27,7 +29,7 @@
 - 1–10 偏好调整改为批量暂存后统一保存/撤销；具体偏好搜索改为按钮或 Enter 明确提交，搜索未命中时必须再次确认“作为标签添加”，不再把输入文字自动写成 TAG 控制。
 - 增加一键推荐审计导出 ZIP：导出 policy、timescale、candidate-channel、behavior evidence、user events、shadow runs、evaluation 和最小 catalog；明确排除 Pica/E-H/GitHub/WebDAV 凭据、Cookie/Token 与漫画图片/下载文件。
 - Desktop 手机连接增加本地生成二维码与 `picalibrary://pair` 深链，复用 Android 已有深链配对协议；二维码由仓库内 MIT qrcodejs 本地渲染，不调用第三方二维码服务。
-- Desktop↔Android 配对后自动同步 Pica/E-H“是否已连接”的非秘密状态；Android 设置页显示“已由 Desktop 连接”，Desktop-backed 功能不再因为手机没有本地账号而误导用户重复登录。当前 LAN Bridge 仍为 HTTP，因此密码/Cookie/长期 Token 不跨端复制，后续先完成加密传输/设备身份再考虑 Provider relay 或可撤销 session handoff。
+- Desktop↔Android 配对后自动同步 Pica/E-H“是否已连接”的非秘密状态；Android 设置页显示“已由 Desktop 连接”，并通过已认证 Mobile Bridge 复用 Desktop 的 Pica 与账号型 E-H/ExH 能力。密码/Cookie/长期 Provider Token 不跨端复制；若未来需要电脑离线时仍自动继承账号，再单独评估加密、可撤销 session handoff。
 - 建立 V5 Portable Policy：Desktop 负责完整画像、跨 Provider 召回与重计算；Android 接收候选缓存与策略基线，离线仅做轻量增量调整，下一次配对再双向合并。
 - 新作发现增加第一版 owned/work-level suppression：收藏、书库、已下载视为 owned，并用归一标题 + 作者 + 页数识别高置信跨来源同作品。
 - 显式偏好从“多一点 / 少一点”升级为基于收藏画像的 1–10 档控制；系统基准由收藏支持数和占比推导，用户调整同时可影响排序与后续完整召回。

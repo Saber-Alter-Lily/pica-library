@@ -8,8 +8,8 @@ import {
     parseEhTag,
     type EhSession
 } from '../providers/eh-provider'
-import type { EhBrowseMode, OnlineSource } from '../providers/types'
-import type { Comic, Picture } from '../types'
+import type { EhBrowseMode, EhSurface, OnlineSource, SearchRequest } from '../providers/types'
+import type { Comic, Episode, Picture } from '../types'
 import { LibraryDatabase } from './database'
 import { normalizeAuthorKey } from './author'
 import { safeRasterContentType, trustedCoverUrl } from './cover-url'
@@ -1825,6 +1825,80 @@ export class LibraryService {
 
     syncEhFavorites() {
         return this.providerService().syncEhFavorites()
+    }
+
+    async mobileEhRelaySearch(input: SearchRequest) {
+        const surface: EhSurface = input.surface === 'exh' ? 'exh' : 'eh'
+        const comics = await this.ehProvider.search({
+            ...input,
+            surface,
+            limit: Math.max(
+                1,
+                Math.min(100, Math.floor(Number(input.limit) || 50))
+            )
+        })
+        if (comics.length)
+            this.database.importCatalog(
+                comics.map((comic) =>
+                    this.recordForOnlineSource(comic, surface)
+                ),
+                `${surface}:mobile-relay-search`
+            )
+        return comics
+    }
+
+    async mobileEhRelayDetails(comicId: string, surface: EhSurface) {
+        const comic = await this.ehProvider.detailsOnSurface(
+            comicId,
+            surface
+        )
+        this.database.importCatalog(
+            [this.recordForOnlineSource(comic, surface)],
+            `${surface}:mobile-relay-details`
+        )
+        return comic
+    }
+
+    mobileEhRelayEpisodes(comicId: string, surface: EhSurface) {
+        return this.ehProvider.episodesOnSurface(comicId, surface)
+    }
+
+    mobileEhRelayPages(
+        comicId: string,
+        episode: Episode,
+        surface: EhSurface
+    ) {
+        return this.ehProvider.pagesOnSurface(comicId, episode, surface)
+    }
+
+    mobileEhRelayFetchPage(
+        locator: string,
+        maxBytes = 20 * 1024 * 1024
+    ) {
+        return this.ehProvider.fetchPage(locator, maxBytes)
+    }
+
+    mobileEhRelayProbeExH() {
+        return this.ehProvider.probeExHentai()
+    }
+
+    async mobileEhRelaySetFavorite(
+        comicId: string,
+        desired: boolean
+    ) {
+        if (!this.ehProvider.hasSession())
+            throw new Error('E-H account session is not configured')
+        if (!this.database.getComic(comicId)) {
+            const comic = await this.ehProvider.detailsOnSurface(
+                comicId,
+                'eh'
+            )
+            this.database.importCatalog(
+                [this.recordForOnlineSource(comic, 'eh')],
+                'eh:mobile-relay-favorite'
+            )
+        }
+        return this.providerService().setFavorite(comicId, desired)
     }
 
     async cover(comicId: string) {

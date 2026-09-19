@@ -414,13 +414,16 @@ function installEhAccountFlow() {
 
 function installRemoteStorageFlow() {
     const panel = ux$('#settings-remote-storage')
-    const actions = panel?.querySelector('.actions')
-    if (!panel || !actions || panel.querySelector('.ux-flow-hint')) return
-    const hint = document.createElement('p')
-    hint.className = 'status ux-flow-hint'
-    hint.dataset.uxCopy = 'remoteFlow'
-    hint.textContent = uxText('remoteFlow')
-    actions.insertAdjacentElement('beforebegin', hint)
+    if (!panel || panel.dataset.uxRemoteFlowHelp) return
+    panel.dataset.uxRemoteFlowHelp = '1'
+    const help = panel.querySelector('.info-tip[data-info-tip]')
+    if (!help) return
+    help.dataset.uxTipCopy = 'remoteFlow'
+    const existing = help.dataset.infoTip || ''
+    const flow = uxText('remoteFlow')
+    help.dataset.infoTip = existing.includes(flow)
+        ? existing
+        : `${existing} ${flow}`.trim()
 }
 
 function installGlobalNavMetrics() {
@@ -489,15 +492,20 @@ function installExperimentHub() {
         details = document.createElement('details')
         details.id = 'v5-experiment-tools'
         const summary = document.createElement('summary')
-        summary.dataset.uxCopy = 'experimentTools'
-        summary.textContent = uxText('experimentTools')
-        const intro = document.createElement('p')
-        intro.className = 'ux-experiment-intro'
-        intro.dataset.uxCopy = 'experimentIntro'
-        intro.textContent = uxText('experimentIntro')
+        const label = document.createElement('span')
+        label.dataset.uxCopy = 'experimentTools'
+        label.textContent = uxText('experimentTools')
+        const help = document.createElement('button')
+        help.type = 'button'
+        help.className = 'info-tip'
+        help.textContent = '!'
+        help.setAttribute('aria-label', uxText('experimentTools'))
+        help.dataset.uxTipCopy = 'experimentIntro'
+        help.dataset.infoTip = uxText('experimentIntro')
+        summary.append(label, help)
         const body = document.createElement('div')
         body.className = 'ux-experiment-body'
-        details.append(summary, intro, body)
+        details.append(summary, body)
         host.appendChild(details)
     }
     const body = details.querySelector('.ux-experiment-body')
@@ -535,6 +543,8 @@ function installDialogBehavior() {
 function refreshUxCopy() {
     for (const node of uxAll('[data-ux-copy]'))
         node.textContent = uxText(node.dataset.uxCopy)
+    for (const node of uxAll('[data-ux-tip-copy]'))
+        node.dataset.infoTip = uxText(node.dataset.uxTipCopy)
 }
 
 function installObservers() {

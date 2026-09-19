@@ -1491,7 +1491,8 @@ export class LibraryService {
                 engineVersion: portable.engineVersion,
                 foundation: portable.foundation,
                 reservoirGeneration: portable.reservoir.generation,
-                reservoirCount: portable.reservoir.count
+                reservoirCount: portable.reservoir.count,
+                behaviorGeneration: portable.behavior.generation
             }
         }
     }
@@ -1568,6 +1569,55 @@ export class LibraryService {
                 confidence: binding.confidence,
                 resolverVersion: binding.resolverVersion
             }))
+        const catalogById = new Map(
+            catalog.map((comic) => [comic.comicId, comic] as const)
+        )
+        const feedbackSnapshot = this.database
+            .recommendationFeedback()
+            .slice(0, 500)
+            .map((item) => ({
+                comicId: item.comicId,
+                sentiment: item.sentiment,
+                reasons: item.reasons,
+                occurredAt: item.occurredAt
+            }))
+        const recentCutoff =
+            Date.now() - 30 * 24 * 60 * 60 * 1000
+        const recentEvents = this.database
+            .listUserEvents({ limit: 5000 })
+            .filter(
+                (event) =>
+                    Boolean(event.comicId) &&
+                    event.source !== 'android-sync-v5' &&
+                    [
+                        'recommend_impression',
+                        'recommend_detail_open',
+                        'reader_complete'
+                    ].includes(event.eventType) &&
+                    Date.parse(event.occurredAt) >= recentCutoff
+            )
+            .slice(-500)
+            .map((event) => {
+                const comic = catalogById.get(String(event.comicId))
+                return {
+                    eventId: `desktop:${event.id}`,
+                    eventType: event.eventType,
+                    comicId: String(event.comicId),
+                    occurredAt: event.occurredAt,
+                    author: comic?.canonicalAuthor ?? comic?.author ?? '',
+                    tags: comic?.tags ?? [],
+                    categories: comic?.categories ?? []
+                }
+            })
+        const behaviorGeneration = createHash('sha256')
+            .update(
+                JSON.stringify({
+                    feedback: feedbackSnapshot,
+                    recentEvents
+                })
+            )
+            .digest('hex')
+            .slice(0, 24)
         const visualStatus = this.visualIndexStatus()
         const visualGeneration = createHash('sha256')
             .update(
@@ -1654,6 +1704,11 @@ export class LibraryService {
                 indexedCount: visualStatus.indexedCount,
                 targetCount: visualStatus.targetCount,
                 signals: visualRows
+            },
+            behavior: {
+                generation: behaviorGeneration,
+                feedback: feedbackSnapshot,
+                recentEvents
             }
         }
     }

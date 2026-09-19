@@ -33,15 +33,22 @@ final class RecommendationLocalProfile {
     static JSONArray inferred(Context context){
         Context app=context.getApplicationContext();
         LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
-        JSONArray remote=RecommendationPolicyStore.inferred(app);
-        for(int i=0;i<remote.length();i++){
-            JSONObject row=remote.optJSONObject(i);if(row==null)continue;
-            String type=row.optString("targetType","TAG"),key=row.optString("key","");
-            if(!key.isEmpty())try{merged.put(id(type,key),new JSONObject(row.toString()));}catch(Exception ignored){}
+        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(app);
+        JSONObject remoteSnapshot=RecommendationPolicyStore.snapshot(app),remoteCounts=remoteSnapshot.optJSONObject("counts");
+        int remoteFavorites=remoteCounts==null?0:remoteCounts.optInt("favorites",0),localFavorites=0;
+        for(UnifiedCatalogStore.Entry entry:catalog.entries())if(entry.favorite)localFavorites++;
+        boolean localLifetimeAuthoritative=localFavorites>0&&(remoteFavorites<=0||localFavorites>=Math.ceil(remoteFavorites*0.90d));
+        if(!localLifetimeAuthoritative){
+            JSONArray remote=RecommendationPolicyStore.inferred(app);
+            for(int i=0;i<remote.length();i++){
+                JSONObject row=remote.optJSONObject(i);if(row==null)continue;
+                String type=row.optString("targetType","TAG"),key=row.optString("key","");
+                if(!key.isEmpty())try{merged.put(id(type,key),new JSONObject(row.toString()));}catch(Exception ignored){}
+            }
         }
 
         List<UnifiedCatalogStore.Entry> positives=new ArrayList<>();
-        for(UnifiedCatalogStore.Entry entry:UnifiedCatalogStore.load(app).entries())
+        for(UnifiedCatalogStore.Entry entry:catalog.entries())
             if((entry.favorite||RecommendationFeedbackStore.isLiked(app,entry.id))&&!RecommendationPolicyStore.tasteExcluded(app,entry.id))positives.add(entry);
         if(positives.isEmpty())return new JSONArray(merged.values());
 
@@ -69,8 +76,6 @@ final class RecommendationLocalProfile {
         int total=Math.max(1,positives.size());
         for(Signal signal:local.values()){
             int support=signal.ids.size();double share=(double)support/(double)total;
-            JSONObject prior=merged.get(id(signal.targetType,signal.key));
-            if(prior!=null&&prior.optInt("supportCount",0)>support)continue;
             JSONObject row=new JSONObject();
             try{
                 row.put("targetType",signal.targetType);

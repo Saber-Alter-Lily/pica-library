@@ -302,17 +302,21 @@ describe('V5 Web UX audit contract', () => {
     it('shows an inspectable recommendation profile before explicit batch edits', () => {
         const controls = read('web/recommendation-v5-beta.js')
         expect(controls).toContain('你的推荐画像')
-        expect(controls).toContain('当前推荐构成')
+        expect(controls).toContain('当前实际推荐构成')
         expect(controls).toContain('完整画像与微调')
         expect(controls).toContain('id="v5-policy-search-submit"')
         expect(controls).toContain('id="v5-pending-save"')
         expect(controls).toContain('id="v5-pending-discard"')
         expect(controls).toContain('async function saveDraftLevels()')
         expect(controls).toContain(
-            "/api/v1/recommendation-v5/preference-timescales?limit=5000"
+            "/api/v1/recommendation-v5/preference-timescales?"
         )
         expect(controls).toContain(
-            "/api/v1/recommendation-v5/candidate-channels?limit=5000"
+            "/api/v1/recommendation-v5/candidate-channels?"
+        )
+        expect(controls).toContain("query.set('appSessionId', appSessionId)")
+        expect(controls).toContain(
+            "/api/v1/recommendation-v5/serving-composition"
         )
         expect(controls).toContain('作为标签添加')
         expect(controls).not.toContain(
@@ -330,7 +334,7 @@ describe('V5 Web UX audit contract', () => {
         const main = read('src/desktop/main.ts')
         const server = read('src/library/server.ts')
         const controls = read('web/recommendation-v5-beta.js')
-        expect(main).toContain('exportRecommendationAudit: async () =>')
+        expect(main).toContain('exportRecommendationAudit: async (input = {}) =>')
         expect(main).toContain("'behavior_evidence_v5.json'")
         expect(main).toContain("'user_events.json'")
         expect(main).toContain("'shadow_runs.json'")
@@ -359,6 +363,12 @@ describe('V5 Web UX audit contract', () => {
         )
         expect(license).toContain('The MIT License')
         expect(license).toContain('Copyright (c) 2012 davidshimjs')
+        const pairing = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java')
+        const gradle = read('mobile/android-alpha2/app/build.gradle')
+        expect(pairing).toContain('扫一扫连接')
+        expect(pairing).toContain('IntentIntegrator')
+        expect(pairing).toContain('"picalibrary".equalsIgnoreCase')
+        expect(gradle).toContain('com.journeyapps:zxing-android-embedded:4.3.0')
     })
 
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {

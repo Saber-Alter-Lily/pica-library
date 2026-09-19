@@ -16,7 +16,8 @@
 - Desktop 手机连接改为二维码 / 手动地址+配对码 / Deep Link / 已配对设备四个折叠区域；说明文案开始迁移到统一 InfoTip，而不是长期占用页面的 muted 灰字。
 - Android“连接电脑”增加应用内扫一扫入口，复用开源 JourneyApps ZXing Android Embedded；扫描结果只接受 `picalibrary://pair` 配对 Deep Link。
 - 修复同一手机反复配对产生多个同名设备：Android 发送稳定 `DeviceIdentity`，Desktop 对同一 device ID 轮换 token 并撤销旧 token；旧数据的同名重复项在状态展示层合并。
-- 本轮按实机数据积累约束只推进开发分支、测试与日志，暂不生成或要求安装新的 Windows/Android 测试包。
+- 本轮按实机数据积累约束只推进开发分支、测试与日志；CI 可继续生成未发布构建用于自动验证，但不向用户交付、不要求安装新的 Windows/Android 测试包，直到本轮正式测试数据回收后再统一出候选版。
+- 全站说明文案开始统一迁移到圆形“!” InfoTip：Desktop 支持鼠标悬停/键盘聚焦与点击固定展开，普通首页、漫画库、书架、推荐、在线发现、下载、设置、连接状态、WebDAV、Theme Studio 等说明不再长期占用灰色副文案；实时状态、错误、警告和安全信息继续直接显示。
 - 推荐偏好页升级为“画像 → 当前推荐构成 → 人工微调”三层：长期/近30天/本次行为画像先展示，当前启用的来源层、召回通道、Provider 请求预算和主要锚点可见；不再要求用户先猜标签再搜索。
 - 1–10 偏好调整改为批量暂存后统一保存/撤销；具体偏好搜索改为按钮或 Enter 明确提交，搜索未命中时必须再次确认“作为标签添加”，不再把输入文字自动写成 TAG 控制。
 - 增加一键推荐审计导出 ZIP：导出 policy、timescale、candidate-channel、behavior evidence、user events、shadow runs、evaluation 和最小 catalog；明确排除 Pica/E-H/GitHub/WebDAV 凭据、Cookie/Token 与漫画图片/下载文件。

@@ -171,6 +171,7 @@ function ensurePanel() {
             <p>系统会根据收藏和后续使用自动学习；只有判断不准确时才需要手动纠正。</p></div>
             <div class="actions">
                 <button id="v5-policy-refresh" type="button">刷新</button>
+                <button id="v5-audit-export" type="button">导出推荐审计数据</button>
                 <button id="v5-policy-rebuild" type="button" class="primary">重新生成推荐</button>
             </div>
         </div>
@@ -213,6 +214,33 @@ function ensurePanel() {
     `
     anchor.insertAdjacentElement('afterend', panel)
     panel.querySelector('#v5-policy-refresh').addEventListener('click', loadPolicy)
+    panel.querySelector('#v5-audit-export').addEventListener('click', async (event) => {
+        const button = event.currentTarget
+        if (button.disabled) return
+        if (typeof window.picaDesktopPost !== 'function') {
+            showToast('推荐审计导出仅在 Windows / Desktop 模式可用。', 'negative')
+            return
+        }
+        button.disabled = true
+        try {
+            const result = await window.picaDesktopPost(
+                '/api/v1/desktop/recommendation-v5/export-audit',
+                {}
+            )
+            if (result?.cancelled) {
+                showToast('已取消导出。')
+                return
+            }
+            showToast(
+                `已导出 ${result?.fileName || '推荐审计数据包'} · ${Math.round(Number(result?.sizeBytes || 0) / 1024)} KB`,
+                'positive'
+            )
+        } catch (error) {
+            showToast(`导出失败：${error.message}`, 'negative')
+        } finally {
+            button.disabled = false
+        }
+    })
     panel.querySelector('#v5-policy-rebuild').addEventListener('click', () => {
         const button = document.querySelector('#recommend-restart')
         if (button) button.click()

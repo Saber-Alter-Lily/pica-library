@@ -184,6 +184,18 @@ describe('Android independent recommendation runtime and sync UI', () => {
         )
     })
 
+    it('returns phone-discovered recommendation metadata with portable evidence, not ranked answers', () => {
+        const store = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java'
+        )
+        const server = read('src/recommendation-v5/policy-store.ts')
+        expect(store).toContain('catalogEvidencePayload')
+        expect(store).toContain('body.put("catalogEvidence"')
+        expect(server).toContain('input.catalogEvidence')
+        expect(server).toContain("'android-recommendation-sync'")
+        expect(store).not.toContain('current recommendation batch')
+    })
+
     it('imports Desktop feedback and recent evidence without echoing it as a local Session', () => {
         const bridge = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java'

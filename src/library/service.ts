@@ -1884,11 +1884,14 @@ export class LibraryService {
 
     async mobileEhRelaySetFavorite(
         comicId: string,
-        desired: boolean
+        desired: boolean,
+        category = 0,
+        note = ''
     ) {
         if (!this.ehProvider.hasSession())
             throw new Error('E-H account session is not configured')
-        if (!this.database.getComic(comicId)) {
+        let before = this.database.getComic(comicId)
+        if (!before) {
             const comic = await this.ehProvider.detailsOnSurface(
                 comicId,
                 'eh'
@@ -1897,8 +1900,40 @@ export class LibraryService {
                 [this.recordForOnlineSource(comic, 'eh')],
                 'eh:mobile-relay-favorite'
             )
+            before = this.database.getComic(comicId)
         }
-        return this.providerService().setFavorite(comicId, desired)
+        if (!before) throw new Error('E-H comic could not be persisted')
+        const beforeRemote = this.database.hasFavoriteMembership(
+            comicId,
+            'eh-favorite'
+        )
+        if (beforeRemote === desired)
+            return {
+                changed: false,
+                isFavorite: before.isFavorite,
+                already: true,
+                remote: true,
+                category,
+                note
+            }
+        await this.ehProvider.setRemoteFavorite(
+            comicId,
+            desired,
+            category,
+            note
+        )
+        const after = this.database.setEhFavoriteState(
+            comicId,
+            desired
+        )
+        return {
+            changed: true,
+            isFavorite: Boolean(after?.isFavorite),
+            already: false,
+            remote: true,
+            category,
+            note
+        }
     }
 
     async cover(comicId: string) {

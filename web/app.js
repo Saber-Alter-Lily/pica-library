@@ -91,6 +91,7 @@ const state = {
         dirty: false
     }
 }
+window.picaAppSessionId = state.appSessionId
 let desktop = null
 let language = resolveLanguage(
     localStorage,

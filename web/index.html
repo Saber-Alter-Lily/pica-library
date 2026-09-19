@@ -155,9 +155,9 @@
             </section>
             <section id="home" class="view active">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>开始使用</h2>
-                        <p>网页轻量查看，连接本地服务后同步、搜索和下载。</p>
+                        <button type="button" class="info-tip" aria-label="查看开始使用说明" data-info-tip="网页轻量查看；连接本地服务后可以同步、搜索和下载。">i</button>
                     </div>
                     <button id="clear-lite-state">清空本地数据</button>
                 </div>
@@ -211,19 +211,18 @@
                     </p>
                 </article>
                 <article id="home-mode-notice" class="notice">
-                    <strong>两种模式</strong>
-                    <p>
-                        Browser Lite
-                        把导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号不会写入导出包。
-                    </p>
+                    <div class="help-heading">
+                        <strong>两种模式</strong>
+                        <button type="button" class="info-tip" aria-label="查看模式说明" data-info-tip="Browser Lite 把导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号不会写入导出包。">i</button>
+                    </div>
                 </article>
             </section>
 
             <section id="library" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>Library</h2>
-                        <p>筛选、核对并选择需要下载的作品。</p>
+                        <button type="button" class="info-tip" aria-label="查看漫画库说明" data-info-tip="在这里筛选、核对和整理本地漫画库，并选择需要下载的作品。">i</button>
                     </div>
                     <div class="actions">
                         <input
@@ -389,9 +388,9 @@
 
             <section id="shelves" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>书架</h2>
-                        <p>本地整理空间；不会改变 Pica 收藏或删除下载文件。</p>
+                        <button type="button" class="info-tip" aria-label="查看书架说明" data-info-tip="书架是本地整理空间；新建、重命名或删除书架不会改变 Pica 收藏，也不会删除下载文件。">i</button>
                     </div>
                     <button id="shelf-create" class="primary">
                         + 新建书架
@@ -449,9 +448,9 @@
                 </div>
                 <div id="recommend" class="tab active">
                     <div class="page-heading">
-                        <div>
+                        <div class="help-heading">
                             <h2>专属推荐</h2>
-                            <p>展示可解释的作者、社团、标签和分类偏好。</p>
+                            <button type="button" class="info-tip" aria-label="查看专属推荐说明" data-info-tip="推荐会结合作者、作品/IP、标签、分类、真实使用行为和你的显式调整，并保留可解释的推荐依据。">i</button>
                         </div>
                         <button id="recommend-button" class="primary">
                             查看推荐
@@ -508,9 +507,9 @@
                 </div>
                 <div id="search" class="tab">
                     <div class="page-heading">
-                        <div>
+                        <div class="help-heading">
                             <h2>在线发现</h2>
-                            <p>Pica 与 E-H 共用本地书库；E-H 公共搜索无需额外账号。</p>
+                            <button type="button" class="info-tip" aria-label="查看在线发现说明" data-info-tip="Pica 与 E-H 共用本地书库；E-H 公共搜索无需额外账号，ExH 和云收藏等能力按账号状态启用。">i</button>
                         </div>
                     </div>
                     <div class="toolbar">
@@ -592,9 +591,9 @@
 
             <section id="downloads" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>Downloads</h2>
-                        <p>本地与 GitHub 任务使用同一套持久化队列语义。</p>
+                        <button type="button" class="info-tip" aria-label="查看下载任务说明" data-info-tip="本地与 GitHub 下载任务使用同一套持久化队列语义；任务状态会保留并可恢复。">i</button>
                     </div>
                     <div class="actions">
                         <button
@@ -664,9 +663,9 @@
 
             <section id="downloaded" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>Downloaded</h2>
-                        <p>包含至少一个真实存在的本地下载文件。</p>
+                        <button type="button" class="info-tip" aria-label="查看已下载说明" data-info-tip="这里只显示至少存在一个真实本地下载文件的漫画。">i</button>
                     </div>
                     <div
                         class="view-controls responsive-toolbar"

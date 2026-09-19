@@ -682,3 +682,22 @@ body.reader-active .reader-header {
         flex: 1 1 180px;
     }
 }
+
+#mobile-bridge-qr {
+    width: fit-content;
+    max-width: 100%;
+    padding: 10px;
+    border: 1px solid var(--ux-line);
+    border-radius: 14px;
+    background: #fff;
+}
+#mobile-bridge-qr img,
+#mobile-bridge-qr canvas {
+    display: block;
+    max-width: 100%;
+    height: auto !important;
+}
+#mobile-bridge-pair-link {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}

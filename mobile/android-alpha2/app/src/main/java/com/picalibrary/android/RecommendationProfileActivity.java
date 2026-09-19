@@ -29,6 +29,12 @@ public final class RecommendationProfileActivity extends Activity {
         if(content==null)return;content.removeAllViews();
         JSONObject policy=RecommendationPolicyStore.snapshot(this);
         JSONObject counts=policy.optJSONObject("counts");
+        UnifiedCatalogStore.Snapshot localCatalog=UnifiedCatalogStore.load(this);
+        int localFavorites=0,localOwned=0;
+        for(UnifiedCatalogStore.Entry entry:localCatalog.entries()){
+            if(entry.favorite)localFavorites++;
+            if(entry.favorite||entry.inShelf||entry.phoneDownloaded||entry.desktopDownloaded||entry.remoteAvailable)localOwned++;
+        }
         NativeRecommendationStore.Snapshot runtime=NativeRecommendationStore.load(this);
         PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
 
@@ -43,10 +49,8 @@ public final class RecommendationProfileActivity extends Activity {
 
         LinearLayout evidence=SettingsRow.panel(this,null);
         evidence.addView(Ui.text(this,"画像证据",17,Ui.TEXT,true));
-        if(counts!=null){
-            evidence.addView(SettingsRow.statusLine(this,"收藏 / 已拥有",Ui.text(this,counts.optInt("favorites",0)+" / "+counts.optInt("owned",0),12,Ui.MUTED,true)));
-            evidence.addView(SettingsRow.statusLine(this,"人工调整",Ui.text(this,counts.optInt("controls",0)+" 项",12,Ui.MUTED,true)));
-        }
+        evidence.addView(SettingsRow.statusLine(this,"手机收藏 / 已拥有",Ui.text(this,localFavorites+" / "+localOwned,12,Ui.MUTED,true)));
+        if(counts!=null)evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.text(this,counts.optInt("controls",0)+" 项",12,Ui.MUTED,true)));
         evidence.addView(SettingsRow.statusLine(this,"最近 30 天本机行为",Ui.text(this,RecommendationEvidenceStore.recentCount(this)+" 条",12,Ui.MUTED,true)));
         evidence.addView(SettingsRow.statusLine(this,"本次手机 Session",Ui.text(this,RecommendationEvidenceStore.sessionCount(this)+" 条",12,Ui.MUTED,true)));
         JSONObject intent=policy.optJSONObject("sessionIntent");
@@ -54,7 +58,7 @@ public final class RecommendationProfileActivity extends Activity {
         evidence.addView(SettingsRow.statusLine(this,"本次想看",Ui.text(this,session+" · 仅手机",12,Ui.MUTED,true)));
         content.addView(evidence);
 
-        JSONArray inferred=RecommendationPolicyStore.inferred(this);
+        JSONArray inferred=RecommendationLocalProfile.inferred(this);
         LinearLayout lifetime=SettingsRow.panel(this,null);
         lifetime.addView(Ui.text(this,"长期主要兴趣",17,Ui.TEXT,true));
         int top=Math.min(10,inferred.length());

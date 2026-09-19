@@ -172,4 +172,31 @@ describe('local incremental update package builder', () => {
             ).toThrow()
         }
     })
+
+    it('refuses to build an unusable direct incremental package from public v0.4.0 to the current schema', () => {
+        const directory = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-update-build-')
+        )
+        directories.push(directory)
+        const source = fullPackage(
+            directory,
+            'Pica-Library-v0.4.0-windows-x64.zip',
+            '1'.repeat(40),
+            'old'
+        )
+        const target = fullPackage(
+            directory,
+            'Pica-Library-v0.5.0-windows-x64.zip',
+            '2'.repeat(40),
+            'new'
+        )
+        expect(() =>
+            buildLocalUpdatePackage(
+                source,
+                target,
+                path.join(directory, 'v040-direct-update.zip')
+            )
+        ).toThrow(/public v0\.4\.0.*full application upgrade path/i)
+    })
+
 })

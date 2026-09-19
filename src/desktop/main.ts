@@ -758,9 +758,10 @@ async function startEngine(preferredPort: number) {
                 sourceSyncedAt: lastSync?.finishedAt ?? null
             }
         },
-        exportRecommendationAudit: async () => {
+        exportRecommendationAudit: async (input = {}) => {
             if (!database || !service) throw new Error('Library is not ready')
             const generatedAt = new Date().toISOString()
+            const appSessionId = String(input.appSessionId ?? '').trim() || null
             const events = database.listUserEvents({ limit: 10000 })
             const catalog = database.listComics({ limit: 10000 }).map((comic) => ({
                 comicId: comic.comicId,
@@ -778,14 +779,16 @@ async function startEngine(preferredPort: number) {
             }))
             const policy = service.recommendationV5Snapshot()
             const timescales = service.recommendationV5PreferenceTimescales(
-                null,
+                appSessionId,
                 10000
             )
             const behavior = service.recommendationV5BehaviorEvidence(10000)
             const channels = service.recommendationV5CandidateChannels(
-                null,
+                appSessionId,
                 10000
             )
+            const servingComposition =
+                service.recommendationServingCompositionV3()
             const shadowRuns = service.recommendationV5ShadowRuns(500)
             const evaluation = service.recommendationV5EvaluationSummary(
                 500,
@@ -794,16 +797,18 @@ async function startEngine(preferredPort: number) {
                 50
             )
             const manifest = {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 kind: 'pica-library-recommendation-audit',
                 generatedAt,
                 productVersion: PRODUCT_VERSION,
                 sourceSha: currentSourceSha ?? null,
+                appSessionId,
                 includes: [
                     'manifest.json',
                     'policy_snapshot.json',
                     'preference_timescales.json',
                     'candidate_channels.json',
+                    'serving_composition.json',
                     'behavior_evidence_v5.json',
                     'user_events.json',
                     'shadow_runs.json',
@@ -831,6 +836,7 @@ async function startEngine(preferredPort: number) {
             addJson('policy_snapshot.json', policy)
             addJson('preference_timescales.json', timescales)
             addJson('candidate_channels.json', channels)
+            addJson('serving_composition.json', servingComposition)
             addJson('behavior_evidence_v5.json', behavior)
             addJson('user_events.json', events)
             addJson('shadow_runs.json', shadowRuns)
@@ -843,6 +849,9 @@ async function startEngine(preferredPort: number) {
                         'Pica Library Recommendation Audit Export',
                         '',
                         'This package contains allowlisted recommendation and interaction audit data only.',
+                        'preference_timescales.json is generated for the appSessionId recorded in manifest.json when the export is requested from the active Web session.',
+                        'candidate_channels.json describes the V5 shadow planner and is not the serving recommendation batch.',
+                        'serving_composition.json describes the persisted Final V3 serving batch without allocating or regenerating a recommendation batch.',
                         'It intentionally excludes account passwords, provider tokens/cookies, GitHub credentials, WebDAV credentials, comic images, and downloaded manga files.',
                         'Share this ZIP only when you intentionally want another person or analysis tool to review recommendation behavior.',
                         ''

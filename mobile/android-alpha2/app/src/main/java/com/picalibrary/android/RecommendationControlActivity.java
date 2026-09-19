@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.*;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.*;
 import androidx.core.widget.NestedScrollView;
@@ -143,9 +144,17 @@ public final class RecommendationControlActivity extends Activity {
 
     private void addFacetWindow(LinearLayout parent,List<JSONObject> rows){
         NestedScrollView scroll=new NestedScrollView(this);
-        scroll.setNestedScrollingEnabled(true);
+        scroll.setNestedScrollingEnabled(false);
         scroll.setFillViewport(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        scroll.setOnTouchListener((view,event)->{
+            int action=event.getActionMasked();
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)
+                view.getParent().requestDisallowInterceptTouchEvent(true);
+            else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)
+                view.getParent().requestDisallowInterceptTouchEvent(false);
+            return false;
+        });
         LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);
         for(JSONObject row:rows)renderSignal(list,row);
         scroll.addView(list,new NestedScrollView.LayoutParams(-1,-2));

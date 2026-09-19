@@ -188,7 +188,7 @@ function facetSupergroup(facet) {
         V5_FACET_SUPERGROUPS.at(-1)
 }
 function infoButton(text, label='查看说明') {
-    return `<button type="button" class="info-tip" aria-label="${esc(label)}" data-info-tip="${esc(text)}">i</button>`
+    return `<button type="button" class="info-tip" aria-label="${esc(label)}" data-info-tip="${esc(text)}">!</button>`
 }
 
 function ensurePanel() {

@@ -40,14 +40,17 @@ public final class RecommendationControlActivity extends Activity {
     private void render(){
         if(content==null)return;content.removeAllViews();
         JSONObject state=RecommendationPolicyStore.snapshot(this),intent=state.optJSONObject("sessionIntent");
-        JSONObject counts=state.optJSONObject("counts");
+        JSONArray currentControls=RecommendationPolicyStore.controls(this);
+        int blockedTargets=0;for(int i=0;i<currentControls.length();i++){JSONObject row=currentControls.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction")))blockedTargets++;}
+        JSONArray hardSuppressed=state.optJSONArray("hardSuppressComicIds");
+        int hardSuppressedCount=hardSuppressed==null?0:hardSuppressed.length();
         LinearLayout intro=SettingsRow.panel(this,null);
         intro.addView(Ui.headingWithInfo(this,"调整规则",16,"1–10 档与屏蔽会立即影响手机自己的下一次排序；不会自动覆盖电脑。连接后可在“推荐同步”里查看两边差异并决定是否合并。本次想看只属于当前手机 Session。"));
         intro.addView(SettingsRow.statusLine(this,"Portable Policy",Ui.text(this,"revision "+state.optInt("revision",0),12,Ui.MUTED,true)));
         intro.addView(SettingsRow.statusLine(this,"待同步人工调整",Ui.text(this,RecommendationPolicyStore.pendingControlCount(this)+" 项",12,RecommendationPolicyStore.pendingControlCount(this)>0?Ui.PRIMARY:Ui.MUTED,true)));
         String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";
         intro.addView(SettingsRow.statusLine(this,"本次想看",Ui.text(this,session+" · 仅本机",12,Ui.MUTED,true)));
-        if(counts!=null)intro.addView(SettingsRow.statusLine(this,"屏蔽偏好 / 作品",Ui.text(this,counts.optInt("blockedTargets",0)+" / "+counts.optInt("hardSuppressed",0),12,Ui.MUTED,true)));
+        intro.addView(SettingsRow.statusLine(this,"屏蔽偏好 / 作品",Ui.text(this,blockedTargets+" / "+hardSuppressedCount,12,Ui.MUTED,true)));
         content.addView(intro);
 
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);

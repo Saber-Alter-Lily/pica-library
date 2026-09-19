@@ -37,3 +37,7 @@ ZIP 根必须包含 `update-manifest.json`，字段为：
 健康检查失败时恢复备份、移除本次新增文件、恢复删除项并重启旧版。Library DB、DPAPI 凭据、书架、阅读进度、下载、设置和漫画目录从不进入替换集合。新程序迁移数据库前另建 migration backup。
 
 `requiresFullInstall: true` 时只显示完整安装提示和 GitHub Release 入口，禁止危险的部分应用。
+
+## Schema authority
+
+`databaseSchemaVersion` 必须来自 SQLite migration 的唯一权威 `latestMigrationVersion`，不得再维护一个手写的平行 schema 常量。发布 Gate 必须断言 `DATABASE_SCHEMA_VERSION === latestMigrationVersion`。历史 public v0.4.0 实际已执行 migration 9，但旧 capabilities 常量仍为 8；该漂移只作为兼容性历史记录，不得复制到后续版本。

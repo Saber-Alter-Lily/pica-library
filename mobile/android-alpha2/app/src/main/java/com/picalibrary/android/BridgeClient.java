@@ -80,8 +80,8 @@ final class BridgeClient {
         body.put("sort",sort==null?"dd":sort);
         return new JSONObject(post(c,"/mobile/v1/provider/pica/favorites",body));
     }
-    static JSONObject picaRelayLeaderboard(Context c) throws Exception {
-        return new JSONObject(get(c,"/mobile/v1/provider/pica/leaderboard"));
+    static JSONObject picaRelayLeaderboard(Context c,String range) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/leaderboard?tt="+enc(range==null?"H24":range)));
     }
     static JSONObject picaRelayCategories(Context c) throws Exception {
         return new JSONObject(get(c,"/mobile/v1/provider/pica/categories"));

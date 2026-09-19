@@ -91,7 +91,7 @@ describe('Recommendation V5 portable mobile package', () => {
             database.close()
             fs.rmSync(dir, { recursive: true, force: true })
         }
-
+    })
 
     it('keeps portable policy generation stable across Session-only changes but advances for durable controls', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-policy-gen-'))
@@ -153,6 +153,5 @@ describe('Recommendation V5 portable mobile package', () => {
             database.close()
             fs.rmSync(dir, { recursive: true, force: true })
         }
-    })
     })
 })

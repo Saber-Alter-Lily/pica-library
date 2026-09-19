@@ -611,6 +611,21 @@ export async function startMobileBridge(options: {
             }
 
             if (
+                url.pathname === '/mobile/v1/provider/eh/favorites-snapshot' &&
+                request.method === 'GET'
+            ) {
+                return json(
+                    response,
+                    200,
+                    {
+                        authority: 'desktop',
+                        relay: true,
+                        ...(await options.service.mobileEhRelayFavoritesSnapshot())
+                    }
+                )
+            }
+
+            if (
                 url.pathname === '/mobile/v1/provider/eh/search' &&
                 request.method === 'POST'
             ) {

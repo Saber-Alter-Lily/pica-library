@@ -435,13 +435,20 @@ function renderProfileOverview() {
     const counts = V5.snapshot?.counts || {}
     const summary = document.querySelector('#v5-profile-summary')
     if (summary) {
-        const recent = preferenceWindowChips(inferred.days30)
-            .replace(/<[^>]+>/g,' ')
-            .replace(/\s+/g,' ')
-            .trim()
+        const topLifetime = [
+            ...(inferred.lifetime?.positive?.authors || []),
+            ...(inferred.lifetime?.positive?.tags || []),
+            ...(inferred.lifetime?.positive?.categories || [])
+        ]
+            .sort((a,b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.supportItems || 0) - Number(a.supportItems || 0))
+            .filter((item,index,array) =>
+                array.findIndex((other) => webNorm(other.label || other.key) === webNorm(item.label || item.key)) === index
+            )
+            .slice(0, 4)
+            .map((item) => item.label || item.key)
         summary.textContent =
-            `${Number(counts.favorites || 0)} 本收藏 · ${Number(inferred.lifetime?.positiveItemCount || 0)} 本正向证据` +
-            (recent && !recent.includes('暂无') ? ' · 最近 30 天有新行为' : '')
+            `${Number(counts.favorites || 0)} 本收藏` +
+            (topLifetime.length ? ` · 主要：${topLifetime.join(' · ')}` : '')
     }
     const card = (title, help, window) => `
         <section class="v5-overview-card">

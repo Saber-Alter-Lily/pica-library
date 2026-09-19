@@ -418,8 +418,9 @@ function installRemoteStorageFlow() {
     panel.dataset.uxRemoteFlowHelp = '1'
     const help = panel.querySelector('.info-tip[data-info-tip]')
     if (!help) return
-    help.dataset.uxTipCopy = 'remoteFlow'
     const existing = help.dataset.infoTip || ''
+    help.dataset.uxBaseInfoTip = existing
+    help.dataset.uxTipCopy = 'remoteFlow'
     const flow = uxText('remoteFlow')
     help.dataset.infoTip = existing.includes(flow)
         ? existing
@@ -543,8 +544,11 @@ function installDialogBehavior() {
 function refreshUxCopy() {
     for (const node of uxAll('[data-ux-copy]'))
         node.textContent = uxText(node.dataset.uxCopy)
-    for (const node of uxAll('[data-ux-tip-copy]'))
-        node.dataset.infoTip = uxText(node.dataset.uxTipCopy)
+    for (const node of uxAll('[data-ux-tip-copy]')) {
+        const translated = uxText(node.dataset.uxTipCopy)
+        const base = node.dataset.uxBaseInfoTip || ''
+        node.dataset.infoTip = base ? `${base} ${translated}`.trim() : translated
+    }
 }
 
 function installObservers() {

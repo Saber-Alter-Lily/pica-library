@@ -10,6 +10,7 @@ import {
 } from '../app-capabilities'
 import { sanitizedChildEnv } from '../desktop/child-process'
 import { applicationFetch } from './application-fetch'
+import { classifyUpdateCompatibility } from './compatibility'
 import { normalizeUpdatePath, updaterSelfReplacement } from './path-safety'
 import type {
     StagedUpdate,
@@ -166,14 +167,6 @@ export interface UpdateManagerOptions {
     desktopEntryPath: string
     instanceFile: string
     fetchImplementation?: typeof fetch
-}
-
-function compatibilityRequiresFullInstall(manifest: UpdateManifest) {
-    return (
-        manifest.appApiVersion !== APP_API_VERSION ||
-        manifest.databaseSchemaVersion < DATABASE_SCHEMA_VERSION ||
-        manifest.databaseSchemaVersion > DATABASE_SCHEMA_VERSION + 1
-    )
 }
 
 export class UpdateManager {
@@ -379,12 +372,26 @@ export class UpdateManager {
             const archiveHash = sha256(buffer)
         const zip = new AdmZip(buffer)
         const manifest = readManifest(zip)
+        const compatibility = classifyUpdateCompatibility({
+            currentAppApiVersion: APP_API_VERSION,
+            currentDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION,
+            targetAppApiVersion: manifest.appApiVersion,
+            targetDatabaseSchemaVersion: manifest.databaseSchemaVersion,
+            updaterHelperChanged: updaterSelfReplacement([
+                ...manifest.files.map((item) => String(item.path ?? '')),
+                ...manifest.deletions
+            ])
+        })
+        if (compatibility.kind === 'UNSUPPORTED')
+            throw new Error(
+                'Database schema downgrade is not supported by automatic updates'
+            )
         if (
-            compatibilityRequiresFullInstall(manifest) &&
+            compatibility.kind === 'FULL_APPLICATION' &&
             !manifest.requiresFullInstall
         )
             throw new Error(
-                'Update API or database compatibility requires a full install'
+                'Update compatibility requires a full application install'
             )
         if (
             !exactSourceMatches(

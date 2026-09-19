@@ -249,6 +249,9 @@ $('#mobile-bridge-copy-address')?.addEventListener('click', () =>
 $('#mobile-bridge-copy-code')?.addEventListener('click', () =>
     void copyMobileBridgeValue('#mobile-bridge-code', 'mobile.copiedCode')
 )
+$('#mobile-bridge-copy-link')?.addEventListener('click', () =>
+    void copyMobileBridgeValue('#mobile-bridge-pair-link', 'mobile.copiedLink')
+)
 applyLanguage(language)
 
 async function api(path, options) {
@@ -361,9 +364,29 @@ function renderMobileBridge() {
     panel.hidden = false
     stateLabel.textContent = t('mobile.bridgeStarted')
     const addresses = Array.isArray(mobile.addresses) ? mobile.addresses : []
+    const address = addresses[0] || ''
+    const pairingCode = mobile.pairingCode || ''
     $('#mobile-bridge-address').textContent =
-        addresses[0] || t('mobile.port', { port: mobile.port })
-    $('#mobile-bridge-code').textContent = mobile.pairingCode || '------'
+        address || t('mobile.port', { port: mobile.port })
+    $('#mobile-bridge-code').textContent = pairingCode || '------'
+    const pairLink =
+        address && pairingCode
+            ? `picalibrary://pair?host=${encodeURIComponent(address)}&code=${encodeURIComponent(pairingCode)}`
+            : ''
+    const pairLinkNode = $('#mobile-bridge-pair-link')
+    if (pairLinkNode) pairLinkNode.textContent = pairLink
+    const qr = $('#mobile-bridge-qr')
+    if (qr) {
+        qr.replaceChildren()
+        if (pairLink && typeof window.QRCode === 'function') {
+            new window.QRCode(qr, {
+                text: pairLink,
+                width: 184,
+                height: 184,
+                correctLevel: window.QRCode.CorrectLevel.M
+            })
+        }
+    }
     const expiry = mobile.pairingExpiresAt ? new Date(mobile.pairingExpiresAt) : null
     $('#mobile-bridge-expiry').textContent = expiry && Number.isFinite(expiry.getTime())
         ? t('mobile.expires', { time: expiry.toLocaleTimeString() })

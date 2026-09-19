@@ -915,6 +915,36 @@ describe('Recommendation V5 portable product contract', () => {
         expect(browse).toContain('PicaClient.available(this)')
     })
 
+    it('reuses Desktop E-H and ExH account capabilities without cookie handoff', () => {
+        const server = read('src/mobile/bridge-server.ts')
+        const client = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhClient.java'
+        )
+        const bridge = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java'
+        )
+        const capability = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhCapabilityStore.java'
+        )
+        expect(server).toContain('/mobile/v1/provider/eh/search')
+        expect(server).toContain('/mobile/v1/provider/eh/page-image')
+        expect(server).toContain('/mobile/v1/provider/eh/favorite')
+        expect(client).toContain(
+            'private boolean useDesktopAccountRelay()'
+        )
+        expect(client).toContain(
+            'static boolean accountAvailable(Context context)'
+        )
+        expect(client).toContain('BridgeClient.ehRelaySearch')
+        expect(client).toContain('BridgeClient.ehRelayPages')
+        expect(client).toContain('BridgeClient.ehRelayImage')
+        expect(bridge).toContain('/mobile/v1/provider/eh/search')
+        expect(bridge).toContain('/mobile/v1/provider/eh/page-image')
+        expect(capability).toContain('EhClient.accountAvailable(app)')
+        expect(server).not.toContain('ipb_pass_hash')
+        expect(server).not.toContain('cf_clearance')
+    })
+
     it('acknowledges Android pairing before optional background recommendation sync', () => {
         const pairing = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'

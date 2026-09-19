@@ -398,7 +398,7 @@ The current read-only `EcosystemPackStore`:
 
 Still remaining for E2 product completion:
 
-- expose the inventory through a read-only Desktop API/UI;
+- **implemented:** read-only Desktop API `GET /api/v1/desktop/ecosystem/packs`;
 - define the user-visible compatibility/error presentation;
 - keep activation impossible until the later shadow phase.
 

@@ -760,3 +760,24 @@ body.reader-active .reader-header {
     font-weight:700;
     letter-spacing:.16em;
 }
+
+/* Compact explanatory affordance ---------------------------------------- */
+.help-heading {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+.help-heading > h2,
+.help-heading > h3,
+.help-heading > h4,
+.help-heading > h5,
+.help-heading > span {
+    margin: 0;
+}
+.compact-help {
+    width: fit-content;
+    margin: 8px 0;
+    font-size: 0.9rem;
+    font-weight: 650;
+}

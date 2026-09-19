@@ -146,7 +146,7 @@ describe('Recommendation V5 serving composition', () => {
                 servingFilteredCount: 1,
                 primaryFamilies: { CREATOR: 1 }
             })
-            expect(result.items.map((item) => item.comicId)).toEqual(['keep'])
+            expect((result.items ?? []).map((item) => item.comicId)).toEqual(['keep'])
             expect(result.primaryIntents).toMatchObject([
                 {
                     intentId: 'CREATOR:keep',

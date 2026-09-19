@@ -886,6 +886,35 @@ describe('Recommendation V5 portable product contract', () => {
         expect(visual).toContain("VISUAL_MODEL_ID = 'onnx-community/dinov2-small'")
     })
 
+    it('uses paired Desktop as a credential-free Pica relay while preserving local-account priority', () => {
+        const server = read('src/mobile/bridge-server.ts')
+        const client = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaClient.java'
+        )
+        const bridge = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java'
+        )
+        const browse = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java'
+        )
+        expect(server).toContain('/mobile/v1/provider/pica/search')
+        expect(server).toContain('/mobile/v1/provider/pica/favorite')
+        expect(server).toContain("authority: 'desktop'")
+        expect(server).toContain('relay: true')
+        expect(server).not.toContain('pica_password')
+        expect(client).toContain(
+            'private boolean useDesktopRelay(){return !localConfigured()&&desktopRelayConfigured();}'
+        )
+        expect(client).toContain(
+            'static boolean available(Context context)'
+        )
+        expect(client).toContain('BridgeClient.picaRelaySearch')
+        expect(client).toContain('BridgeClient.picaRelayFavorite')
+        expect(bridge).toContain('/mobile/v1/provider/pica/search')
+        expect(bridge).toContain('/mobile/v1/provider/pica/favorite')
+        expect(browse).toContain('PicaClient.available(this)')
+    })
+
     it('acknowledges Android pairing before optional background recommendation sync', () => {
         const pairing = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'

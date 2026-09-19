@@ -435,6 +435,47 @@ describe('UpdateManager', () => {
         })
     })
 
+    it('prefers a source-scoped official incremental asset for newer clients', async () => {
+        const releaseUrl =
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.1'
+        const scopedName =
+            'Pica-Library-v0.5.1-update-from-v0.5.0.zip'
+        const legacyName = 'Pica-Library-v0.5.1-update.zip'
+        const fetchImplementation = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        tag_name: 'v0.5.1',
+                        html_url: releaseUrl,
+                        draft: false,
+                        prerelease: false,
+                        assets: [
+                            {
+                                name: legacyName,
+                                browser_download_url:
+                                    `${releaseUrl}/download/${legacyName}`
+                            },
+                            {
+                                name: scopedName,
+                                browser_download_url:
+                                    `${releaseUrl}/download/${scopedName}`
+                            }
+                        ]
+                    }),
+                    { status: 200 }
+                )
+        ) as unknown as typeof fetch
+        await expect(
+            manager('0.5.0', fetchImplementation).checkForUpdate()
+        ).resolves.toEqual({
+            status: 'incremental',
+            version: '0.5.1',
+            releaseUrl,
+            assetName: scopedName,
+            assetUrl: `${releaseUrl}/download/${scopedName}`
+        })
+    })
+
     it('offers only a stable official incremental update asset', async () => {
         const releaseUrl =
             'https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.2.1'

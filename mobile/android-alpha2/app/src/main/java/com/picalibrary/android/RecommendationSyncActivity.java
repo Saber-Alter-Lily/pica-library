@@ -53,11 +53,13 @@ public final class RecommendationSyncActivity extends Activity {
         JSONArray conflicts=preview.optJSONArray("conflicts");int conflictCount=conflicts==null?0:conflicts.length();
         JSONObject remote=preview.optJSONObject("remotePackage"),foundation=remote==null?null:remote.optJSONObject("foundation");
         PortableRecommendationPackageStore.Snapshot local=PortableRecommendationPackageStore.load(this);
+        String remotePolicy=foundation==null?"":foundation.optString("portablePolicyGeneration","");
         String remoteVisual=foundation==null?"":foundation.optString("visualGeneration","");
         String remoteCanonical=foundation==null?"":foundation.optString("canonicalGeneration","");
         String remoteReservoir=remote==null?"":remote.optString("reservoirGeneration","");
         String remoteBehavior=remote==null?"":remote.optString("behaviorGeneration","");
         boolean packageChanged=
+            (!remotePolicy.isEmpty()&&!remotePolicy.equals(local.portablePolicyGeneration))||
             (!remoteVisual.isEmpty()&&!remoteVisual.equals(local.visualGeneration))||
             (!remoteCanonical.isEmpty()&&!remoteCanonical.equals(local.canonicalGeneration))||
             (!remoteReservoir.isEmpty()&&!remoteReservoir.equals(local.reservoirGeneration))||
@@ -71,6 +73,7 @@ public final class RecommendationSyncActivity extends Activity {
 
         LinearLayout versions=SettingsRow.panel(this,null);
         versions.addView(Ui.text(this,"可复用基础",16,Ui.TEXT,true));
+        versions.addView(SettingsRow.statusLine(this,"Portable Policy",Ui.text(this,shortId(local.portablePolicyGeneration)+" → "+shortId(remotePolicy),12,Ui.MUTED,true)));
         versions.addView(SettingsRow.statusLine(this,"Visual",Ui.text(this,shortId(local.visualGeneration)+" → "+shortId(remoteVisual),12,Ui.MUTED,true)));
         versions.addView(SettingsRow.statusLine(this,"Canonical",Ui.text(this,shortId(local.canonicalGeneration)+" → "+shortId(remoteCanonical),12,Ui.MUTED,true)));
         versions.addView(SettingsRow.statusLine(this,"候选池",Ui.text(this,shortId(local.reservoirGeneration)+" → "+shortId(remoteReservoir),12,Ui.MUTED,true)));
@@ -172,6 +175,7 @@ public final class RecommendationSyncActivity extends Activity {
     private static String promptSignature(
         JSONObject value,
         boolean packageChanged,
+        String remotePolicy,
         String remoteVisual,
         String remoteCanonical,
         String remoteReservoir,
@@ -192,7 +196,7 @@ public final class RecommendationSyncActivity extends Activity {
             value.optInt("suppressChanges",0)+":"+
             value.optInt("tasteExclusionChanges",0)+":"+
             value.optInt("dispositionChanges",0)+":"+
-            packageChanged+":"+remoteVisual+":"+remoteCanonical+":"+remoteReservoir+":"+remoteBehavior+":"+conflictIds;
+            packageChanged+":"+remotePolicy+":"+remoteVisual+":"+remoteCanonical+":"+remoteReservoir+":"+remoteBehavior+":"+conflictIds;
     }
 
     private static void offerIfChanged(Activity activity,boolean force){
@@ -201,11 +205,13 @@ public final class RecommendationSyncActivity extends Activity {
                 JSONObject value=BridgeClient.recommendationSyncPreview(activity);
                 JSONObject remote=value.optJSONObject("remotePackage"),foundation=remote==null?null:remote.optJSONObject("foundation");
                 PortableRecommendationPackageStore.Snapshot local=PortableRecommendationPackageStore.load(activity);
+                String remotePolicy=foundation==null?"":foundation.optString("portablePolicyGeneration","");
                 String remoteVisual=foundation==null?"":foundation.optString("visualGeneration","");
                 String remoteCanonical=foundation==null?"":foundation.optString("canonicalGeneration","");
                 String remoteReservoir=remote==null?"":remote.optString("reservoirGeneration","");
                 String remoteBehavior=remote==null?"":remote.optString("behaviorGeneration","");
                 boolean packageChanged=remote!=null&&(
+                    (!remotePolicy.isEmpty()&&!remotePolicy.equals(local.portablePolicyGeneration))||
                     !remoteReservoir.equals(local.reservoirGeneration)||
                     (!remoteVisual.isEmpty()&&!remoteVisual.equals(local.visualGeneration))||
                     (!remoteCanonical.isEmpty()&&!remoteCanonical.equals(local.canonicalGeneration))||
@@ -214,7 +220,7 @@ public final class RecommendationSyncActivity extends Activity {
                 JSONArray conflicts=value.optJSONArray("conflicts");
                 int changes=value.optInt("androidControlChanges",0)+value.optInt("desktopControlChanges",0)+value.optInt("feedbackChanges",0)+value.optInt("eventChanges",0)+value.optInt("suppressChanges",0)+value.optInt("tasteExclusionChanges",0)+value.optInt("dispositionChanges",0);
                 if(changes==0&&!packageChanged)return;
-                String signature=promptSignature(value,packageChanged,remoteVisual,remoteCanonical,remoteReservoir,remoteBehavior);
+                String signature=promptSignature(value,packageChanged,remotePolicy,remoteVisual,remoteCanonical,remoteReservoir,remoteBehavior);
                 synchronized(RecommendationSyncActivity.class){
                     if(!force&&signature.equals(lastPromptSignature))return;
                     lastPromptSignature=signature;

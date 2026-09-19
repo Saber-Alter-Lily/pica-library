@@ -76,6 +76,8 @@ final class RecommendationLocalProfile {
         int total=Math.max(1,positives.size());
         for(Signal signal:local.values()){
             int support=signal.ids.size();double share=(double)support/(double)total;
+            JSONObject prior=merged.get(id(signal.targetType,signal.key));
+            if(!localLifetimeAuthoritative&&prior!=null&&prior.optInt("supportCount",0)>support)continue;
             JSONObject row=new JSONObject();
             try{
                 row.put("targetType",signal.targetType);

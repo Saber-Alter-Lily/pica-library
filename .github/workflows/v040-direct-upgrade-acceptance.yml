@@ -40,6 +40,8 @@ jobs:
           pnpm exec vitest run \
             test/integration/v040-upgrade-preservation.test.ts \
             test/integration/migrations.test.ts \
+            test/unit/database-schema-authority.test.ts \
+            test/unit/update-compatibility.test.ts \
             test/unit/update-manager.test.ts \
             test/unit/update-manager-release-fallback.test.ts \
             test/unit/update-package-builder.test.ts

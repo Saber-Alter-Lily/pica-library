@@ -8,6 +8,17 @@
 
 ### Recommendation V5 / Visual V1
 
+- Desktop↔Android 推荐进入“双独立运行节点”基线：两端不再同步当前 cycle/batch/session answer；Android 使用自己的 `NativeRecommendationStore/Engine` 独立生成批次，Desktop 只提供 Portable Foundation、Canonical Work bindings、候选 reservoir、Visual affinity 与可移植行为/偏好。同步后两端 cycle 不同属于正常状态。
+- 新增 Recommendation Sync V1 三层契约：Foundation Baseline（Desktop→Android）、Portable User State（双向）、Runtime State（设备本地）。`本次想看`/当前批次/当前页面永不跨端覆盖；持久 1–10、MORE/LESS/BLOCK、Like/Dislike、语义作品状态、口味画像排除和有界 Recent evidence 可同步。
+- Android 完成三方偏好冲突检测：以上次共同 snapshot 为 base；同一显式偏好在 Desktop/Android 并发改成不同值时必须人工选择“使用电脑/使用手机”，不按时间戳静默覆盖、不取平均。普通无冲突行为按 event/mutation identity 合并。
+- Android 推荐 UI 对齐 Desktop 信息架构但保持移动端交互：推荐画像显示 Lifetime / 最近30天 / 当前手机 Session / 当前本机推荐构成与主要依据；人工调整使用五个大组→具体 facet 两级折叠、约 5 行高内滚动窗口、1–10 SeekBar、BLOCK、本次想看、显式搜索及“作为标签添加”确认。
+- Android 增加语义化单作品推荐控制：推荐卡片和漫画详情可执行作者调整/BLOCK、已经看过、已经拥有、重复上传、30 天临时隐藏，以及“保留收藏但不用于推荐口味”；这些状态与 Dislike 分离并可在下次连接时同步。
+- Android 1–10 调整与 Desktop 对齐 `levelDelta × 0.03`、上限 0.27 的幅度语义；本机修改立即影响手机排序，之后才由 Recommendation Sync 合并到 Desktop。
+- Portable Foundation 进一步版本化：新增 session-independent `portablePolicyGeneration`，并分别跟踪 Visual、Canonical、Behavior、Candidate Reservoir generation，避免 Desktop Session 改动触发伪同步提示。
+- Portable Candidate Reservoir 不携带 Desktop 当前推荐答案；Android 将其与本机 Provider 候选合并，再用 Lifetime/Recent/Session/Explicit/Visual 本地重排。Canonical Work bindings 用于 Android work-level owned/duplicate suppression。
+- Visual 保持“Desktop 重计算、Android 轻消费”：Desktop 负责 DINOv2/全库 embedding/作者 prototype 等重任务；Android 只同步 compact affinity/coverage，并拥有设备本地 OFF/SHADOW/LIVE 开关，默认 SHADOW，切换不会改变 Desktop Visual 模式。
+- Android 新增本地推荐行为 ledger：recommend impression（cycle 内去重）、推荐详情打开、reader complete；Desktop Recent evidence 可同步为非 Session、非 dirty 历史，Android 本地事件可回传 Desktop，避免双向 echo。
+- 新增双客户端正式验收清单 `docs/RECOMMENDATION_TWO_CLIENT_ACCEPTANCE_V1.md`，覆盖 runtime independence、Session isolation、三方冲突、语义 item controls、Portable reservoir、Visual/Canonical、Provider Relay、重连提示与数据保留。该验收不等同于 V5 质量 promotion。
 - Android 推荐架构从“Desktop 结果缓存/轻量重排”升级为真正的独立运行节点：Desktop 与 Android 各自持有独立 cycle/batch/session，连接同步不会再把 Desktop 当前推荐列表覆盖到手机；手机可结合本地 Lifetime / Recent / Session / Explicit 状态独立生成新周期。
 - 冻结 `RECOMMENDATION_SYNC_V1` 三层契约：Foundation Baseline 仅 Desktop→Android，Portable User State 双向合并，Runtime State 永不跨端覆盖；`本次想看` 明确保持设备本地。
 - 新增 Desktop→Android Portable Foundation Package：同步 bounded candidate reservoir、Visual generation/每候选轻量 affinity、Canonical Work/Edition bindings 与版本号；手机不下载/运行 DINOv2，也不重做全库 Canonical Identity，只消费已计算结果。

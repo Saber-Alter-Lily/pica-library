@@ -91,6 +91,51 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(ui).toContain('setText("!")')
     })
 
+    it('aligns item semantics and taste exclusion with Desktop without turning them into dislikes', () => {
+        const policy = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java'
+        )
+        const dialog = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationItemControlDialog.java'
+        )
+        const detail = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java'
+        )
+        const home = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+        )
+        expect(policy).toContain('setTasteExcluded')
+        expect(policy).toContain('setItemDisposition')
+        expect(policy).toContain('tasteExcludedComicIds')
+        expect(policy).toContain('itemDispositions')
+        expect(dialog).toContain('保留收藏，但不用于推荐口味')
+        expect(dialog).toContain('已经看过')
+        expect(dialog).toContain('已经拥有')
+        expect(dialog).toContain('重复上传')
+        expect(dialog).toContain('暂时不想看（30 天）')
+        expect(detail).toContain('RecommendationItemControlDialog.show')
+        expect(home).toContain('⚙ 调节')
+        expect(home).toContain(
+            'RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen"'
+        )
+    })
+
+    it('shows lifetime recent session and current-runtime structure on Android', () => {
+        const profile = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationProfileActivity.java'
+        )
+        const evidence = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationEvidenceStore.java'
+        )
+        expect(profile).toContain('长期主要兴趣')
+        expect(profile).toContain('最近 30 天主要兴趣')
+        expect(profile).toContain('本次会话兴趣')
+        expect(profile).toContain('当前手机推荐构成')
+        expect(profile).toContain('主要依据')
+        expect(evidence).toContain('topSignals')
+        expect(evidence).toContain('"recommend_impression"')
+    })
+
     it('uses Desktop heavy Visual only as a compact portable signal', () => {
         const engine = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java'

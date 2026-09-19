@@ -1,6 +1,6 @@
 # Desktop ↔ Android Pairing and Account-State Sync V1
 
-Status: development baseline; paired account state and Desktop-backed Pica relay are implemented, credential handoff remains intentionally disabled.
+Status: development baseline; paired account state plus Desktop-backed Pica and E-H/ExH relay are implemented, credential handoff remains intentionally disabled.
 
 ## Goals
 
@@ -60,6 +60,25 @@ The relay sends provider results and user-requested actions over the paired brid
 
 If Desktop is offline, relay calls fail closed. A phone-local Pica account remains the optional offline/direct-provider path.
 
+## Desktop-backed E-H / ExH relay
+
+When Android has no phone-local E-H session but is paired to a Desktop with an active E-H account, account-required E-H and ExH operations use the same authenticated Mobile Bridge instead of copying cookies to the phone.
+
+Current relay coverage includes:
+
+- Watched and account Favorites browsing;
+- E-H favorite snapshot synchronization, including the 10 original favorite category names, slots, counts and notes;
+- ExH capability probing and ExH search/browse;
+- E-H/ExH comic metadata, chapter and page discovery;
+- image-page resolution through Desktop for account-gated ExH reading;
+- E-H remote favorite add/remove/category mutation.
+
+Public E-H browsing remains direct on Android because it does not require an account. A phone-local E-H session remains higher priority when configured.
+
+The relay never returns `ipb_member_id`, `ipb_pass_hash`, `igneous`, `cf_clearance` or any equivalent provider cookie to Android.
+
+If Desktop is offline, account-gated E-H/ExH relay calls fail closed. Public E-H remains available directly, while a phone-local session is the optional path for account features without Desktop.
+
 ## Why credentials are not copied yet
 
 The current Mobile Bridge is a LAN HTTP transport protected by a random bearer pairing token. That is sufficient for the existing local library/reader contract, but it is not an acceptable channel for automatically copying long-lived provider secrets.
@@ -82,7 +101,7 @@ The preferred end state is:
 1. QR pairing establishes the Desktop identity and short-lived bootstrap secret.
 2. The paired channel is upgraded to authenticated encrypted transport.
 3. Desktop remains the primary account authority.
-4. Android uses the implemented Desktop Pica provider relay while Desktop is reachable, avoiding duplicate Pica login; equivalent account-required E-H/ExH relay coverage remains a later security/product phase.
+4. Android uses the implemented Desktop provider relays while Desktop is reachable: Pica plus account-required E-H/ExH operations avoid duplicate login without moving provider secrets.
 5. Only if offline direct-provider access is explicitly requested should a revocable encrypted session handoff be considered.
 6. Provider passwords should not be replicated merely for convenience.
 

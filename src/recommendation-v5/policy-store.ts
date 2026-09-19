@@ -42,6 +42,7 @@ export interface MobileRecommendationSyncV5 {
     clearSuppressComicIds?: unknown
     tasteExcludedComicIds?: unknown
     clearTasteExcludedComicIds?: unknown
+    itemDispositions?: unknown
     resolutions?: unknown
     syncSchemaVersion?: unknown
 }
@@ -476,7 +477,8 @@ export class RecommendationPolicyStoreV5 {
                 suppressComicIds: input.suppressComicIds,
                 clearSuppressComicIds: input.clearSuppressComicIds,
                 tasteExcludedComicIds: input.tasteExcludedComicIds,
-                clearTasteExcludedComicIds: input.clearTasteExcludedComicIds
+                clearTasteExcludedComicIds: input.clearTasteExcludedComicIds,
+                itemDispositions: input.itemDispositions
             }),
             snapshot: this.snapshot()
         }
@@ -500,7 +502,8 @@ export class RecommendationPolicyStoreV5 {
             suppressComicIds: input.suppressComicIds,
             clearSuppressComicIds: input.clearSuppressComicIds,
             tasteExcludedComicIds: input.tasteExcludedComicIds,
-            clearTasteExcludedComicIds: input.clearTasteExcludedComicIds
+            clearTasteExcludedComicIds: input.clearTasteExcludedComicIds,
+            itemDispositions: input.itemDispositions
         })
         const resolved = applyConflictResolutionsV1({
             androidControls: input.controls,
@@ -578,6 +581,20 @@ export class RecommendationPolicyStoreV5 {
             updatedAt: new Date().toISOString()
         }
         this.save(state)
+        const dispositions = Array.isArray(input.itemDispositions)
+            ? input.itemDispositions
+            : []
+        dispositions.forEach((item) => {
+            if (!item || typeof item !== 'object') return
+            const row = item as Record<string, unknown>
+            this.setItemDisposition({
+                comicId: row.comicId,
+                reason: row.reason,
+                active: row.active,
+                durationDays: row.durationDays,
+                source: 'ANDROID'
+            })
+        })
         const feedback = Array.isArray(input.feedback) ? input.feedback : []
         feedback.forEach((item, index) => {
             if (item && typeof item === 'object')

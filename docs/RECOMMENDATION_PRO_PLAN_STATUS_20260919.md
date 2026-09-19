@@ -289,7 +289,7 @@ Remaining:
 ## 12. Recommendation Ecosystem
 
 ### Pack architecture
-**IMPLEMENTED CONTRACT / NO RUNTIME ACTIVATION**
+**IMPLEMENTED CONTRACT + READ-ONLY INVENTORY / NO RUNTIME ACTIVATION**
 
 V1 manifest and architecture now cover:
 
@@ -300,7 +300,7 @@ V1 manifest and architecture now cover:
 - Recommendation Policy.
 
 Remaining:
-- read-only Pack inventory/loader;
+- **implemented:** read-only Pack inventory/loader + Desktop inspection API;
 - compatibility UI;
 - shadow consumption;
 - standard signature verification;

@@ -395,8 +395,16 @@ function renderMobileBridge() {
     const devices = Array.isArray(mobile.pairedDevices)
         ? mobile.pairedDevices
         : []
+    const deviceCount = $('#mobile-bridge-device-count')
+    if (deviceCount) deviceCount.textContent = String(devices.length)
     $('#mobile-bridge-devices').textContent = devices.length
-        ? t('mobile.paired', { devices: devices.map((item) => item.deviceName).join(', ') })
+        ? devices.map((item) => {
+            const seen = item.lastSeenAt ? new Date(item.lastSeenAt) : null
+            const suffix = seen && Number.isFinite(seen.getTime())
+                ? ` · 最近 ${seen.toLocaleString()}`
+                : ''
+            return `${item.deviceName}${suffix}`
+        }).join('；')
         : t('mobile.noDevices')
 }
 

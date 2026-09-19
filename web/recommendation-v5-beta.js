@@ -433,29 +433,81 @@ function renderProfileOverview() {
     if (!target) return
     const inferred = V5.timescales?.layers?.inferred || {}
     const counts = V5.snapshot?.counts || {}
-    const card = (title, note, window) => `
+    const summary = document.querySelector('#v5-profile-summary')
+    if (summary) {
+        const recent = preferenceWindowChips(inferred.days30)
+            .replace(/<[^>]+>/g,' ')
+            .replace(/\s+/g,' ')
+            .trim()
+        summary.textContent =
+            `${Number(counts.favorites || 0)} 本收藏 · ${Number(inferred.lifetime?.positiveItemCount || 0)} 本正向证据` +
+            (recent && !recent.includes('暂无') ? ' · 最近 30 天有新行为' : '')
+    }
+    const card = (title, help, window) => `
         <section class="v5-overview-card">
-            <h5>${esc(title)}</h5>
-            <p class="status">${esc(note)}</p>
+            <div class="v5-heading-inline"><h5>${esc(title)}</h5>${infoButton(help)}</div>
             <div class="v5-interest-chips">${preferenceWindowChips(window)}</div>
         </section>`
     target.innerHTML =
-        `<section class="v5-overview-card"><h5>数据基础</h5>
-            <p><strong>${Number(counts.favorites || 0)}</strong> 本收藏参与长期画像</p>
-            <p><strong>${Number(counts.owned || 0)}</strong> 本已拥有 / 已入库用于去重与 Ownership</p>
+        `<section class="v5-overview-card">
+            <div class="v5-heading-inline"><h5>数据基础</h5>${infoButton('收藏用于长期画像；Ownership 用于避免把已经拥有的作品继续当作新作推荐；正向行为证据还可以来自 Like、阅读等真实使用。')}</div>
+            <p><strong>${Number(counts.favorites || 0)}</strong> 本收藏</p>
+            <p><strong>${Number(counts.owned || 0)}</strong> 本已拥有 / 已入库</p>
             <p><strong>${Number(inferred.lifetime?.positiveItemCount || 0)}</strong> 本作品形成正向行为证据</p>
         </section>` +
-        card('长期兴趣', '收藏 + 历史行为的累计理解', inferred.lifetime) +
-        card('最近 30 天', '用于识别近期兴趣变化，不覆盖长期偏好', inferred.days30) +
-        card('本次会话', '仅反映本次打开应用后的有效行为', inferred.session)
+        card('长期兴趣', '累计收藏和历史行为形成的长期偏好层。', inferred.lifetime) +
+        card('最近 30 天', '近期层用于识别最近兴趣变化，不会直接覆盖长期画像。', inferred.days30) +
+        card('本次会话', '只统计当前这次打开应用后、appSessionId 相同的有效行为。', inferred.session)
+}
+
+function renderServingOverview() {
+    const target = document.querySelector('#v5-serving-overview')
+    const summary = document.querySelector('#v5-serving-summary')
+    if (!target) return
+    const serving = V5.serving
+    if (!serving?.available) {
+        if (summary) summary.textContent = '尚无已落盘的当前批次'
+        target.innerHTML = '<p class="status">还没有可读取的实际 serving 批次。</p>'
+        return
+    }
+    const familyLabels = {
+        FANDOM: '作品 / IP',
+        CREATOR: '作者',
+        SEMANTIC_CONJUNCTION: '组合偏好',
+        SEMANTIC_ANCHOR: '标签 / 题材',
+        EXPLORATION: '探索',
+        RELATED: '相似作品',
+        UNATTRIBUTED: '其他'
+    }
+    const families = Object.entries(serving.primaryFamilies || {})
+        .filter(([,count]) => Number(count) > 0)
+        .sort((a,b) => Number(b[1])-Number(a[1]))
+    const chips = families.map(([key,count]) =>
+        `<span class="v5-interest-chip"><strong>${esc(familyLabels[key] || key)}</strong><span>${Number(count)} 本</span></span>`
+    ).join('') || '<span class="status">当前批次没有可用归因</span>'
+    if (summary)
+        summary.textContent =
+            `第 ${Number(serving.batchIndex || 0) + 1} 批 · ${Number(serving.itemCount || 0)} 本 · ` +
+            families.slice(0,3).map(([key,count]) => `${familyLabels[key] || key} ${count}`).join(' · ')
+    target.innerHTML = `
+        <section class="v5-compose-card">
+            <div class="v5-heading-inline"><h5>当前批次</h5>${infoButton('这是 Final V3 已经实际分配并落盘的当前 serving 批次；打开本页不会生成或切换批次。')}</div>
+            <p><strong>第 ${Number(serving.batchIndex || 0) + 1} 批</strong> · ${Number(serving.itemCount || 0)} 本</p>
+        </section>
+        <section class="v5-compose-card">
+            <div class="v5-heading-inline"><h5>实际来源构成</h5>${infoButton('按当前批次每本作品的 primaryFamily 汇总，表示这批实际展示结果主要由哪些推荐意图贡献。')}</div>
+            <div class="v5-interest-chips">${chips}</div>
+        </section>`
 }
 
 function renderCompositionOverview() {
     const target = document.querySelector('#v5-composition-overview')
+    const summary = document.querySelector('#v5-shadow-summary')
     if (!target) return
     const plan = V5.channels
     if (!plan) {
-        target.innerHTML = '<p class="status">当前没有可读取的推荐规划。</p>'
+        if (summary) summary.textContent = '暂无 Shadow 规划'
+        target.innerHTML = '<p class="status">当前没有可读取的 V5 Shadow 规划。</p>'
         return
     }
     const channels = Array.isArray(plan.channels)
@@ -482,9 +534,10 @@ function renderCompositionOverview() {
         .sort((a,b) => b[1]-a[1])
         .map(([key,count]) => `<p><strong>${esc(sourceLabels[key] || key)}</strong> · ${count} 条通道</p>`)
         .join('') || '<p class="status">暂无启用通道</p>'
-    const familyHtml = Object.entries(plan.summary?.families || {})
+    const familyEntries = Object.entries(plan.summary?.families || {})
         .filter(([,count]) => Number(count) > 0)
         .sort((a,b) => Number(b[1])-Number(a[1]))
+    const familyHtml = familyEntries
         .map(([key,count]) => `<span class="v5-interest-chip"><strong>${esc(familyLabels[key] || key)}</strong><span>${Number(count)}</span></span>`)
         .join('') || '<span class="status">暂无</span>'
     const providerHtml = Object.entries(plan.providerBudgets || {})
@@ -501,11 +554,14 @@ function renderCompositionOverview() {
         .slice(0,8)
         .map((item) => `<span class="v5-interest-chip"><small>${esc(familyLabels[item.family] || item.family)}</small><strong>${esc(item.label)}</strong></span>`)
         .join('') || '<span class="status">暂无明确锚点</span>'
+    if (summary)
+        summary.textContent =
+            `${Number(plan.summary?.enabledChannelCount || channels.length)} 条实验通道 · servingImpact=${String(plan.servingImpact)}`
     target.innerHTML = `
         <section class="v5-compose-card"><h5>来源层</h5>${sourceHtml}</section>
         <section class="v5-compose-card"><h5>召回通道</h5><div class="v5-interest-chips">${familyHtml}</div></section>
         <section class="v5-compose-card"><h5>Provider 预算</h5>${providerHtml}</section>
-        <section class="v5-compose-card"><h5>本轮主要锚点</h5><div class="v5-interest-chips">${anchors}</div></section>`
+        <section class="v5-compose-card"><h5>实验主要锚点</h5><div class="v5-interest-chips">${anchors}</div></section>`
 }
 
 function updatePendingBar() {

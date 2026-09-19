@@ -90,9 +90,9 @@ final class RecommendationPolicyStore {
     }
 
     /**
-     * Cheap offline V5 operation only. Source order is the Desktop/native heavy ranking.
-     * We convert that baked order to a percentile baseline and apply only policy delta,
-     * so a synced MORE/LESS/TARGET is not counted for a second time on Android.
+     * Cheap offline V5 operation only. Source order is the Android runtime ranking.
+     * CACHE_BASELINE is frozen when that runtime cycle is built. Later local or synced
+     * policy changes are applied as deltas until Android explicitly builds a new cycle.
      */
     static NativeRecommendationStore.Snapshot applyLocalPolicy(Context c,NativeRecommendationStore.Snapshot source){
         NativeRecommendationStore.Snapshot out=new NativeRecommendationStore.Snapshot();if(source==null)return out;
@@ -129,8 +129,8 @@ final class RecommendationPolicyStore {
 
     static JSONObject previewPayload(Context c){return syncPayload(c);}
 
-    static void seedRemoteSnapshot(Context c,JSONObject value){if(value==null)return;if(!hasPendingPortableChanges(c)){saveSnapshot(c,value);saveSyncedBase(c,value);markCacheBaseline(c);}}
+    static void seedRemoteSnapshot(Context c,JSONObject value){if(value==null)return;if(!hasPendingPortableChanges(c)){saveSnapshot(c,value);saveSyncedBase(c,value);}}
 
-    static void acknowledge(Context c,JSONObject response,String expectedMutationId){if(response!=null&&response.optBoolean("requiresResolution",false))throw new IllegalStateException("存在需要人工处理的推荐偏好冲突");String acknowledged=response==null?"":response.optString("acknowledgedMutationId","");if(expectedMutationId!=null&&!expectedMutationId.isEmpty()&&!expectedMutationId.equals(acknowledged))throw new IllegalStateException("电脑未确认本次推荐同步");JSONObject value=response==null?null:response.optJSONObject("snapshot");if(value!=null){saveSnapshot(c,value);saveSyncedBase(c,value);saveCacheBaseline(c,value);}prefs(c).edit().remove(DIRTY_CONTROLS).remove(DIRTY_SESSION).remove(DIRTY_SUPPRESS).remove(DIRTY_CLEAR_SUPPRESS).remove(MUTATION_ID).apply();RecommendationFeedbackStore.clearDirty(c);RecommendationEvidenceStore.clearDirty(c);}
+    static void acknowledge(Context c,JSONObject response,String expectedMutationId){if(response!=null&&response.optBoolean("requiresResolution",false))throw new IllegalStateException("存在需要人工处理的推荐偏好冲突");String acknowledged=response==null?"":response.optString("acknowledgedMutationId","");if(expectedMutationId!=null&&!expectedMutationId.isEmpty()&&!expectedMutationId.equals(acknowledged))throw new IllegalStateException("电脑未确认本次推荐同步");JSONObject value=response==null?null:response.optJSONObject("snapshot");if(value!=null){saveSnapshot(c,value);saveSyncedBase(c,value);}prefs(c).edit().remove(DIRTY_CONTROLS).remove(DIRTY_SESSION).remove(DIRTY_SUPPRESS).remove(DIRTY_CLEAR_SUPPRESS).remove(MUTATION_ID).apply();RecommendationFeedbackStore.clearDirty(c);RecommendationEvidenceStore.clearDirty(c);}
     static void acknowledge(Context c,JSONObject response){acknowledge(c,response,response==null?"":response.optString("acknowledgedMutationId",""));}
 }

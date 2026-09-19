@@ -597,15 +597,29 @@ export class RecommendationPolicyStoreV5 {
                 Array.isArray(value)
                     ? value.map(String).map((v) => v.trim()).filter(Boolean)
                     : []
+            const provider = String(row.providerId ?? '')
+            const providerId =
+                provider === 'pica' || provider === 'eh'
+                    ? (provider as 'pica' | 'eh')
+                    : undefined
+            const canonicalAuthor = String(
+                row.canonicalAuthor ?? ''
+            ).trim()
+            const providerRemoteId = String(
+                row.providerRemoteId ?? ''
+            ).trim()
+            const coverUrl = String(row.coverUrl ?? '').trim()
             return [
                 {
                     comicId,
                     title,
-                    author: String(row.author ?? ''),
-                    canonicalAuthor: String(row.canonicalAuthor ?? '') || null,
-                    providerId: String(row.providerId ?? '') || null,
-                    providerRemoteId:
-                        String(row.providerRemoteId ?? '') || null,
+                    author:
+                        canonicalAuthor ||
+                        String(row.author ?? ''),
+                    ...(providerId ? { providerId } : {}),
+                    ...(providerRemoteId
+                        ? { providerRemoteId }
+                        : {}),
                     tags: stringList(row.tags),
                     categories: stringList(row.categories),
                     finished: Boolean(row.finished),
@@ -621,7 +635,7 @@ export class RecommendationPolicyStoreV5 {
                         0,
                         Math.floor(Number(row.totalViews) || 0)
                     ),
-                    coverUrl: String(row.coverUrl ?? '') || null
+                    ...(coverUrl ? { coverUrl } : {})
                 }
             ]
         })

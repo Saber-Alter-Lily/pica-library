@@ -57,14 +57,22 @@ export function normalizeSyncControlV1(
     const type = targetType(raw.targetType)
     const key = String(raw.key ?? '').trim()
     if (!type || !key) return null
+    const rawDirection = String(raw.direction ?? 'DEFAULT')
+    const direction = ['LESS', 'DEFAULT', 'MORE', 'BLOCK'].includes(
+        rawDirection
+    )
+        ? (rawDirection as PreferenceControlV5['direction'])
+        : 'DEFAULT'
+    const scope: PreferenceControlV5['scope'] =
+        String(raw.scope ?? '') === 'SESSION' ? 'SESSION' : 'PERSISTENT'
     return normalizeControlV5({
         targetType: type,
         key,
         label: String(raw.label ?? key),
-        direction: raw.direction,
+        direction,
         levelDelta:
             raw.levelDelta === undefined ? undefined : Number(raw.levelDelta),
-        scope: raw.scope,
+        scope,
         source,
         updatedAt: String(raw.updatedAt ?? '')
     })

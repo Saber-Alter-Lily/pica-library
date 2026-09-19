@@ -1039,6 +1039,13 @@
                             <div id="mobile-bridge-code" style="font-size:2rem;font-weight:700;letter-spacing:.18em"></div>
                             <button id="mobile-bridge-copy-code" type="button">复制配对码</button>
                         </div>
+                        <p><strong>扫码连接</strong></p>
+                        <div id="mobile-bridge-qr" aria-label="手机配对二维码"></div>
+                        <p class="status">二维码只在本机生成，不会把电脑地址或配对码发送到第三方服务。可直接用手机系统相机扫描。</p>
+                        <div class="mobile-pair-value">
+                            <code id="mobile-bridge-pair-link"></code>
+                            <button id="mobile-bridge-copy-link" type="button">复制配对链接</button>
+                        </div>
                         <p id="mobile-bridge-expiry" class="status"></p>
                         <p id="mobile-bridge-devices" class="status"></p>
                         <p class="status">首次连接如 Windows 弹出防火墙提示，请允许“专用网络”。</p>
@@ -1131,6 +1138,7 @@
                 </div>
             </article>
         </template>
+        <script src="./vendor/qrcode.min.js"></script>
         <script type="module" src="./app.js"></script>
         <script type="module" src="./alpha7-cloud.js"></script>
         <script type="module" src="./alpha8-product.js"></script>

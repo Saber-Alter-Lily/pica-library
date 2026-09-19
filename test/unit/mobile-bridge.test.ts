@@ -168,4 +168,166 @@ describe('Mobile Bridge', () => {
         database.close()
     })
 
+
+    it('relays Pica through Desktop without exposing provider credentials', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-mobile-relay-'))
+        roots.push(root)
+        const database = new LibraryDatabase(path.join(root, 'library.db'))
+        let favorite = false
+        const fakePica = {
+            Order: {
+                default: 'ua',
+                latest: 'dd',
+                oldest: 'da',
+                loved: 'ld',
+                point: 'vd'
+            },
+            async search(keyword: string, page: number) {
+                return {
+                    page,
+                    pages: 1,
+                    total: 1,
+                    docs: [
+                        {
+                            _id: 'relay-comic',
+                            title: `Relay ${keyword}`,
+                            author: 'Desktop Author',
+                            description: '',
+                            chineseTeam: '',
+                            created_at: '',
+                            updated_at: '',
+                            finished: true,
+                            totalViews: 5,
+                            categories: ['短篇'],
+                            totalLikes: 9,
+                            tags: ['relay-tag'],
+                            isFavourite: favorite
+                        }
+                    ]
+                }
+            },
+            async comicInfo() {
+                return {
+                    _id: 'relay-comic',
+                    title: 'Relay Comic',
+                    author: 'Desktop Author',
+                    description: '',
+                    chineseTeam: '',
+                    created_at: '',
+                    updated_at: '',
+                    finished: true,
+                    totalViews: 5,
+                    categories: ['短篇'],
+                    totalLikes: 9,
+                    tags: ['relay-tag'],
+                    isFavourite: favorite
+                }
+            },
+            async fav() {
+                favorite = !favorite
+                return {}
+            }
+        }
+        const service = new LibraryService(
+            database,
+            root,
+            fakePica as never
+        )
+        const bridge = await startMobileBridge({
+            database,
+            service,
+            host: '127.0.0.1',
+            port: 0,
+            stateFile: path.join(root, 'mobile-state.json'),
+            accountStatus: () => ({
+                pica: { configured: true },
+                eh: { configured: false }
+            })
+        })
+        bridges.push(bridge)
+        const host = bridge.status().addresses[0]
+
+        const denied = await fetch(
+            `${host}/mobile/v1/provider/pica/search`,
+            {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ keyword: 'test', page: 1 })
+            }
+        )
+        expect(denied.status).toBe(401)
+
+        const paired = await fetch(`${host}/mobile/v1/pair`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                code: bridge.status().pairingCode,
+                deviceId: 'relay-device',
+                deviceName: 'Relay Android'
+            })
+        })
+        const token = String(
+            ((await paired.json()) as { token: string }).token
+        )
+        const headers = {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json'
+        }
+
+        const search = await fetch(
+            `${host}/mobile/v1/provider/pica/search`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    keyword: 'test',
+                    page: 1,
+                    sort: 'ld',
+                    categories: []
+                })
+            }
+        )
+        expect(search.status).toBe(200)
+        const searchValue = await search.json()
+        expect(searchValue).toMatchObject({
+            authority: 'desktop',
+            relay: true,
+            comics: {
+                page: 1,
+                total: 1,
+                docs: [
+                    {
+                        _id: 'relay-comic',
+                        title: 'Relay test'
+                    }
+                ]
+            }
+        })
+        expect(JSON.stringify(searchValue)).not.toMatch(
+            /password|authorization|providerToken|cookie/i
+        )
+
+        const mutate = await fetch(
+            `${host}/mobile/v1/provider/pica/favorite`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    comicId: 'relay-comic',
+                    desired: true
+                })
+            }
+        )
+        expect(mutate.status).toBe(200)
+        expect(await mutate.json()).toMatchObject({
+            authority: 'desktop',
+            relay: true,
+            changed: true,
+            isFavorite: true
+        })
+        expect(favorite).toBe(true)
+
+        database.close()
+    })
+
 })

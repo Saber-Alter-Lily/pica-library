@@ -173,6 +173,43 @@ describe('Recommendation V5 portable policy', () => {
         expect(preferenceAdjustmentV5(target, state).blocked).toBe(true)
     })
 
+    it('reports blocked preference targets separately from hard-suppressed comics', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-counts-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        try {
+            database.importCatalog(
+                [
+                    {
+                        comicId: 'comic-a',
+                        title: 'A',
+                        author: 'Artist A',
+                        tags: ['tag-a'],
+                        categories: [],
+                        finished: true
+                    }
+                ],
+                'test'
+            )
+            const store = new RecommendationPolicyStoreV5(database)
+            store.setControl({
+                targetType: 'AUTHOR',
+                key: 'Artist A',
+                label: 'Artist A',
+                direction: 'BLOCK',
+                scope: 'PERSISTENT'
+            })
+            store.suppressComic('comic-b', true)
+            expect(store.snapshot().counts).toMatchObject({
+                controls: 1,
+                blockedTargets: 1,
+                hardSuppressed: 1
+            })
+        } finally {
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
+
     it('removes an explicit override when direction returns to default', () => {
         let state = defaultPortablePolicyStateV5()
         state = upsertControlV5(state, normalizeControlV5({ targetType: 'TAG', key: 'A', direction: 'MORE' }))

@@ -6,6 +6,7 @@ on:
       - 'src/library/database.ts'
       - 'src/storage/sqlite/migrations.ts'
       - 'src/update/**'
+      - 'test/unit/update-release-assets.test.ts'
       - 'scripts/build-local-update-package.ts'
       - 'mobile/android-alpha2/app/build.gradle'
       - 'test/integration/v040-upgrade-preservation.test.ts'
@@ -44,7 +45,8 @@ jobs:
             test/unit/update-compatibility.test.ts \
             test/unit/update-manager.test.ts \
             test/unit/update-manager-release-fallback.test.ts \
-            test/unit/update-package-builder.test.ts
+            test/unit/update-package-builder.test.ts \
+            test/unit/update-release-assets.test.ts
           git diff --check
 
   public-windows-baseline:

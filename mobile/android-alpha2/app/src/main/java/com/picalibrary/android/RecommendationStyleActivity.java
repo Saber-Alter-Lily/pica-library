@@ -41,8 +41,7 @@ public final class RecommendationStyleActivity extends Activity {
         PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
 
         LinearLayout runtimeCard=SettingsRow.panel(this,null);
-        runtimeCard.addView(Ui.text(this,"本机推荐",17,Ui.TEXT,true));
-        runtimeCard.addView(Ui.text(this,"手机与电脑的当前推荐列表互不覆盖；同步只交换长期偏好、反馈、候选基础和 Desktop 预计算数据。",12,Ui.MUTED,false));
+        runtimeCard.addView(Ui.headingWithInfo(this,"本机推荐",17,"手机与电脑的当前推荐列表互不覆盖；同步只交换长期偏好、反馈、候选基础和 Desktop 预计算数据。"));
         runtimeCard.addView(SettingsRow.statusLine(this,"手机 Cycle",Ui.text(this,runtime.cycleId.isEmpty()?"尚未生成":shortId(runtime.cycleId),12,Ui.MUTED,true)));
         runtimeCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.text(this,portable.available()?portable.candidates.size()+" 个 · "+shortId(portable.reservoirGeneration):"尚未同步",12,Ui.MUTED,true)));
         content.addView(runtimeCard);
@@ -54,11 +53,10 @@ public final class RecommendationStyleActivity extends Activity {
         content.addView(SettingsRow.row(this,"反馈原因",reasons?"开启":"关闭",v->{RecommendationFeedbackStore.setAskReasons(this,!RecommendationFeedbackStore.askReasons(this));renderContent();}));
 
         LinearLayout visual=SettingsRow.panel(this,null);
-        visual.addView(Ui.text(this,"画风基础",17,Ui.TEXT,true));
+        visual.addView(Ui.headingWithInfo(this,"画风基础",17,"DINOv2、全库向量和作者画风原型继续在 Windows 端批量处理；手机只使用同步后的轻量 Visual affinity 独立排序。"));
         visual.addView(SettingsRow.statusLine(this,"手机 Visual Generation",Ui.text(this,portable.visualGeneration.isEmpty()?"尚未同步":shortId(portable.visualGeneration),12,Ui.MUTED,true)));
         int covered=0;for(PortableRecommendationPackageStore.Candidate row:portable.candidates)if(row.visualAvailable)covered++;
         visual.addView(SettingsRow.statusLine(this,"候选 Visual 覆盖",Ui.text(this,covered+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
-        visual.addView(Ui.text(this,"DINOv2、全库向量和作者画风原型继续在 Windows 端批量处理；手机使用同步后的轻量 Visual affinity 独立排序。",12,Ui.MUTED,false));
         content.addView(visual);
 
         if(BridgeStore.paired(this)){

@@ -67,7 +67,7 @@ final class PortableRecommendationPackageStore {
     static final class Snapshot {
         int schemaVersion=1,policyRevision;
         String generatedAt="",engineVersion="",visualGeneration="",
-            canonicalGeneration="",reservoirGeneration="",sourceCycleId="";
+            canonicalGeneration="",behaviorGeneration="",reservoirGeneration="",sourceCycleId="";
         final List<Candidate> candidates=new ArrayList<>();
         final Map<String,Identity> identityByComic=new LinkedHashMap<>();
         boolean available(){return !reservoirGeneration.isEmpty()&&!candidates.isEmpty();}
@@ -139,6 +139,8 @@ final class PortableRecommendationPackageStore {
                 ));
             }
         }
+        JSONObject behavior=root.optJSONObject("behavior");
+        if(behavior!=null)out.behaviorGeneration=behavior.optString("generation","");
         JSONObject reservoir=root.optJSONObject("reservoir");
         if(reservoir!=null){
             out.reservoirGeneration=reservoir.optString("generation","");

@@ -98,7 +98,7 @@ public class PairingActivity extends Activity {
     private void scanPairingCode(){
         if(pairing)return;
         IntentIntegrator integrator=new IntentIntegrator(this);
-        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE_TYPES);
+        integrator.setDesiredBarcodeFormats(java.util.Collections.singleton("QR_CODE"));
         integrator.setPrompt("扫描电脑端 Pica Library 配对二维码");
         integrator.setBeepEnabled(false);
         integrator.setOrientationLocked(false);

@@ -78,6 +78,19 @@ Observed on the existing user-installed beta; development changes in this sectio
 - **Release discipline:** CI may continue producing unpublished validation artifacts, but no new package is handed to the user and no upgrade is requested during this live-use accumulation window. Changes remain on the development branch until the formal test dataset is returned.
 - **InfoTip rollout:** the compact circular “!” help control now covers the main page headings, Settings explanatory panels, connection probing, WebDAV flow, Recommendation V5 and Theme Studio. Hover/focus previews the explanation and click pins it; status/error/warning/security messages are not hidden behind help controls.
 
+## Test-round disposition
+
+Current installed-beta data is sufficient to stop waiting on the old build and continue product/telemetry development.
+
+- Product/UX/telemetry iteration: **SUFFICIENT**
+- Audit-export contract review: **SUFFICIENT_WITH_KNOWN_GAPS**, with the identified gaps already addressed in the development branch
+- Formal recommendation-quality claim or serving promotion: **NOT SUFFICIENT**
+- Advanced-learning escalation (LTR / Bandit / Active Learning): **NOT SUFFICIENT**
+
+The next candidate should be treated as a targeted acceptance build rather than another long pre-upgrade accumulation phase. The acceptance focus is: active Session attribution, audit schema v2 + Final V3 serving composition, Android in-app QR scan, stable-device re-pair dedupe, nested facet scrolling, and InfoTip interaction.
+
+Long-horizon future-outcome evidence continues accumulating independently and must not block ordinary product fixes.
+
 ## Manual QA gates for this pass
 
 - Opening any normal page must not run V5 evaluation, Visual QC or provider shadow work.

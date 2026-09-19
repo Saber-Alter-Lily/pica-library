@@ -10,6 +10,7 @@
 
 - 启动 v0.4.0 → 下一正式版直升验收：冻结 public Schema 9 作为兼容基线，新增 Schema 9→当前版本的数据保留回归测试与独立 CI Gate；Windows 采用“完整应用替换、用户数据目录保留”路线，Android 正式发布必须满足同 package ID、versionCode>42、同签名证书并完成原地安装验收。
 - 启动 Recommendation Ecosystem Pack V1 E1 Contract：参考成熟开源项目的 manifest/entity/device-identity 思路，将 Canonical Knowledge、Provider Intelligence、Tag/Alias、Visual Intelligence、Recommendation Policy 设计为版本化声明式 Pack；新增 manifest 类型、payload 路径安全、SHA-256 content root、dependency/publisher 校验，但本阶段不加载 Pack、不改变 serving。
+- Recommendation Ecosystem Pack V1 推进到 E2 只读库存基础：Desktop 数据目录新增独立 `packs/`，逐字节校验 Pack manifest/payload/大小/SHA-256/目录身份与最低应用版本，并提供只读 inventory API；仍无 activate/apply/promote 路由，不读取 Pack 内容改变推荐结果。
 - Pack/生态路线明确不采用混淆或隐藏 ranker 作为“防抄”手段；核心优势转向长期维护的跨 Provider canonical knowledge、Visual QC/compatibility、用户私有状态、跨端 portable foundation 与 evaluation ledger，同时保持 MIT 核心和 local-first 数据边界。
 
 - Desktop↔Android 推荐进入“双独立运行节点”基线：两端不再同步当前 cycle/batch/session answer；Android 使用自己的 `NativeRecommendationStore/Engine` 独立生成批次，Desktop 只提供 Portable Foundation、Canonical Work bindings、候选 reservoir、Visual affinity 与可移植行为/偏好。同步后两端 cycle 不同属于正常状态。

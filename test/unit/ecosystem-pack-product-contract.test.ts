@@ -22,6 +22,18 @@ describe('Recommendation Ecosystem Pack read-only product contract', () => {
         )
     })
 
+    it('shows only a read-only Pack status surface in Settings', () => {
+        const html = fs.readFileSync('web/index.html', 'utf8')
+        const ui = fs.readFileSync('web/ecosystem-pack-v1.js', 'utf8')
+
+        expect(html).toContain('id="settings-ecosystem-packs"')
+        expect(html).toContain('id="ecosystem-packs-refresh"')
+        expect(html).toContain('id="ecosystem-packs-list"')
+        expect(ui).toContain("fetch('/api/v1/desktop/ecosystem/packs'")
+        expect(ui).toContain("fetch('/api/v1/desktop/open-directory'")
+        expect(ui).not.toMatch(/activate|apply|promote/i)
+    })
+
     it('does not add Pack activation or recommendation mutation routes', () => {
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
         const store = fs.readFileSync('src/ecosystem/pack-store.ts', 'utf8')

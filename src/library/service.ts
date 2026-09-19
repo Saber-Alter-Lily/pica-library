@@ -364,10 +364,23 @@ export class LibraryService {
         const rawItems = Array.isArray(batch.evidence?.items)
             ? (batch.evidence.items as Array<Record<string, unknown>>)
             : []
+        const catalog = this.database.listComics({ limit: 10000 })
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const servingRows = filterCandidatesAgainstOwnedV5(
+            this.database.recommendationRecords(batch.itemIds),
+            catalog,
+            policy
+        ).rows
+        const servingIds = new Set(
+            servingRows.map((row) => String(row.comic.comicId))
+        )
+        const servedItems = rawItems.filter((item) =>
+            servingIds.has(String(item.comicId ?? ''))
+        )
         const familyCounts: Record<string, number> = {}
         const reasonCounts: Record<string, number> = {}
         const intentCounts: Record<string, number> = {}
-        for (const item of rawItems) {
+        for (const item of servedItems) {
             const family = String(item.primaryFamily ?? 'UNATTRIBUTED')
             familyCounts[family] = (familyCounts[family] ?? 0) + 1
             const intentId = String(item.primaryIntentId ?? '').trim()
@@ -441,11 +454,13 @@ export class LibraryService {
             batchIndex: batch.batchIndex,
             contextId: batch.contextId,
             generatedAt: batch.generatedAt,
-            itemCount: batch.itemIds.length,
+            itemCount: servingIds.size,
+            allocatedItemCount: batch.itemIds.length,
+            servingFilteredCount: batch.itemIds.length - servingIds.size,
             primaryFamilies: familyCounts,
             primaryIntents,
             reasonCodes: reasonCounts,
-            items: rawItems.map((item) => ({
+            items: servedItems.map((item) => ({
                 comicId: String(item.comicId ?? ''),
                 rawRank: Number(item.rawRank ?? 0),
                 rawRankerScore: Number(item.rawRankerScore ?? 0),

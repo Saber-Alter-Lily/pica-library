@@ -105,6 +105,68 @@ final class BridgeClient {
         return new JSONObject(post(c,"/mobile/v1/provider/pica/favorite",body));
     }
 
+    static JSONObject ehRelaySearch(
+        Context c,
+        String surface,
+        String keyword,
+        List<String> tags,
+        List<String> categories,
+        String mode,
+        String toplist,
+        String language,
+        List<String> excludeTags,
+        int minRating,
+        int pageFrom,
+        int pageTo,
+        int limit
+    ) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("surface","exh".equals(surface)?"exh":"eh");
+        body.put("keyword",keyword==null?"":keyword);
+        body.put("tags",new JSONArray(tags==null?new ArrayList<>():tags));
+        body.put("categories",new JSONArray(categories==null?new ArrayList<>():categories));
+        body.put("ehMode",mode==null?"latest":mode);
+        body.put("ehToplist",toplist==null?"11":toplist);
+        body.put("ehLanguage",language==null?"":language);
+        body.put("ehExcludeTags",new JSONArray(excludeTags==null?new ArrayList<>():excludeTags));
+        body.put("ehMinRating",Math.max(0,minRating));
+        body.put("ehPageFrom",Math.max(0,pageFrom));
+        body.put("ehPageTo",Math.max(0,pageTo));
+        body.put("limit",Math.max(1,Math.min(100,limit)));
+        return new JSONObject(post(c,"/mobile/v1/provider/eh/search",body,45000));
+    }
+    static JSONObject ehRelayExhCapability(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/exh-capability"));
+    }
+    static JSONObject ehRelayComic(Context c,String comicId,String surface) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/comic/"+enc(comicId)+"?surface="+enc("exh".equals(surface)?"exh":"eh")));
+    }
+    static JSONObject ehRelayEpisodes(Context c,String comicId,String surface) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/episodes/"+enc(comicId)+"?surface="+enc("exh".equals(surface)?"exh":"eh")));
+    }
+    static JSONObject ehRelayPages(Context c,String comicId,String surface) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/pages/"+enc(comicId)+"?surface="+enc("exh".equals(surface)?"exh":"eh")));
+    }
+    static JSONObject ehRelayFavorite(Context c,String comicId,boolean desired) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("comicId",comicId);
+        body.put("desired",desired);
+        return new JSONObject(post(c,"/mobile/v1/provider/eh/favorite",body,45000));
+    }
+    static HttpURLConnection ehRelayImage(Context c,String locator) throws Exception {
+        String host=BridgeStore.host(c);
+        if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");
+        HttpURLConnection con=open(
+            host,
+            "/mobile/v1/provider/eh/page-image?locator="+enc(locator),
+            BridgeStore.token(c),
+            "GET"
+        );
+        con.setReadTimeout(30000);
+        con.setRequestProperty("Accept","image/*");
+        return con;
+    }
+
     static List<ComicItem> library(Context c, String scope, int limit) throws Exception {return library(c,scope,limit,"","latest");}
     static List<ComicItem> library(Context c, String scope, int limit, String text, String sort) throws Exception {
         String path="/mobile/v1/library?scope="+enc(scope)+"&limit="+limit+"&sort="+enc(sort==null?"latest":sort);if(text!=null&&!text.trim().isEmpty())path+="&text="+enc(text.trim());JSONObject root=new JSONObject(get(c,path));JSONArray items=root.optJSONArray("items");List<ComicItem> out=new ArrayList<>();if(items!=null) for(int i=0;i<items.length();i++){JSONObject o=items.optJSONObject(i); if(o==null)continue;out.add(new ComicItem(o.optString("comicId"),o.optString("title","未命名漫画"),o.optString("author","未知作者"),o.optString("coverPath","/mobile/v1/covers/"+o.optString("comicId")),o.optInt("downloadedPictures",0)));}return out;

@@ -58,6 +58,7 @@ export interface DesktopServerController {
     syncAndExportBrowserLitePackage?: () => Promise<Record<string, unknown>>
     openBrowserLite?: () => Promise<void>
     openDirectory: (kind: string) => Promise<void>
+    ecosystemPackInventory?: () => unknown
     checkForUpdate?: () => Promise<Record<string, unknown>>
     stageUpdate?: (
         name: string,
@@ -1085,6 +1086,20 @@ export async function startLibraryServer(options: {
                 request.method === 'POST'
             )
                 return json(response, 200, visualStyleService.clear())
+            if (
+                url.pathname === '/api/v1/desktop/ecosystem/packs' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop?.ecosystemPackInventory)
+                    return json(response, 409, {
+                        error: 'Ecosystem Pack inventory is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.desktop.ecosystemPackInventory()
+                )
+            }
             if (
                 url.pathname === '/api/v1/update/check' &&
                 request.method === 'GET' &&

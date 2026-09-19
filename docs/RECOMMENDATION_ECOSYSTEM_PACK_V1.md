@@ -373,10 +373,34 @@ No runtime activation.
 
 ### E2 — Read-only loader
 
-- discover local Packs;
-- validate manifest/digests;
-- display Pack inventory and compatibility;
-- no recommendation mutation.
+Implementation status: **foundation implemented**.
+
+Local inventory layout:
+
+```text
+<packs-root>/
+  <packId>/
+    <generation>/
+      pack.json
+      payload/
+        ...
+```
+
+The current read-only `EcosystemPackStore`:
+
+- discovers local Pack generations;
+- validates manifest identity against directory identity;
+- verifies declared file sizes and SHA-256 bytes;
+- rejects undeclared payload files and symbolic-link payloads;
+- evaluates `minimumAppVersion` compatibility;
+- reports all current Packs as `LOCAL_UNSIGNED`;
+- returns inventory metadata only and never returns/activates recommendation payload content.
+
+Still remaining for E2 product completion:
+
+- expose the inventory through a read-only Desktop API/UI;
+- define the user-visible compatibility/error presentation;
+- keep activation impossible until the later shadow phase.
 
 ### E3 — Canonical/Provider shadow consumption
 

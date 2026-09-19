@@ -10,6 +10,8 @@ import org.json.*;
 
 /** Explicit Desktop↔Android recommendation sync center. Runtime cycles stay independent. */
 public final class RecommendationSyncActivity extends Activity {
+    private static long lastAutomaticCheckAt;
+    private static String lastPromptSignature="";
     private LinearLayout content;
     private JSONObject preview;
     private boolean loading,destroyed;
@@ -154,19 +156,62 @@ public final class RecommendationSyncActivity extends Activity {
     }
 
     static void offerAfterPairing(Activity activity){
+        offerIfChanged(activity,true);
+    }
+
+    static void maybeOfferOnConnection(Activity activity){
+        long now=System.currentTimeMillis();
+        if(!BridgeStore.paired(activity)||now-lastAutomaticCheckAt<60000L)return;
+        lastAutomaticCheckAt=now;
+        offerIfChanged(activity,false);
+    }
+
+    private static String promptSignature(
+        JSONObject value,
+        boolean packageChanged,
+        String remoteVisual,
+        String remoteCanonical,
+        String remoteReservoir
+    ){
+        JSONArray conflicts=value.optJSONArray("conflicts");
+        StringBuilder conflictIds=new StringBuilder();
+        if(conflicts!=null)for(int i=0;i<conflicts.length();i++){
+            JSONObject row=conflicts.optJSONObject(i);
+            if(row!=null)conflictIds.append(row.optString("identity","")).append('|');
+        }
+        return value.optInt("baseRevision",0)+":"+
+            value.optInt("desktopRevision",0)+":"+
+            value.optInt("androidControlChanges",0)+":"+
+            value.optInt("desktopControlChanges",0)+":"+
+            value.optInt("feedbackChanges",0)+":"+
+            value.optInt("eventChanges",0)+":"+
+            value.optInt("suppressChanges",0)+":"+
+            value.optInt("tasteExclusionChanges",0)+":"+
+            packageChanged+":"+remoteVisual+":"+remoteCanonical+":"+remoteReservoir+":"+conflictIds;
+    }
+
+    private static void offerIfChanged(Activity activity,boolean force){
         new Thread(()->{
             try{
                 JSONObject value=BridgeClient.recommendationSyncPreview(activity);
                 JSONObject remote=value.optJSONObject("remotePackage"),foundation=remote==null?null:remote.optJSONObject("foundation");
                 PortableRecommendationPackageStore.Snapshot local=PortableRecommendationPackageStore.load(activity);
+                String remoteVisual=foundation==null?"":foundation.optString("visualGeneration","");
+                String remoteCanonical=foundation==null?"":foundation.optString("canonicalGeneration","");
+                String remoteReservoir=remote==null?"":remote.optString("reservoirGeneration","");
                 boolean packageChanged=remote!=null&&(
-                    !remote.optString("reservoirGeneration","").equals(local.reservoirGeneration)||
-                    (foundation!=null&&!foundation.optString("visualGeneration","").equals(local.visualGeneration))||
-                    (foundation!=null&&!foundation.optString("canonicalGeneration","").equals(local.canonicalGeneration))
+                    !remoteReservoir.equals(local.reservoirGeneration)||
+                    (!remoteVisual.isEmpty()&&!remoteVisual.equals(local.visualGeneration))||
+                    (!remoteCanonical.isEmpty()&&!remoteCanonical.equals(local.canonicalGeneration))
                 );
                 JSONArray conflicts=value.optJSONArray("conflicts");
                 int changes=value.optInt("androidControlChanges",0)+value.optInt("desktopControlChanges",0)+value.optInt("feedbackChanges",0)+value.optInt("eventChanges",0)+value.optInt("suppressChanges",0)+value.optInt("tasteExclusionChanges",0);
                 if(changes==0&&!packageChanged)return;
+                String signature=promptSignature(value,packageChanged,remoteVisual,remoteCanonical,remoteReservoir);
+                synchronized(RecommendationSyncActivity.class){
+                    if(!force&&signature.equals(lastPromptSignature))return;
+                    lastPromptSignature=signature;
+                }
                 activity.runOnUiThread(()->{
                     if(activity.isFinishing()||activity.isDestroyed())return;
                     int conflictCount=conflicts==null?0:conflicts.length();

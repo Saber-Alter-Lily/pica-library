@@ -391,7 +391,9 @@ export class UpdateManager {
             !manifest.requiresFullInstall
         )
             throw new Error(
-                'Update compatibility requires a full application install'
+                compatibility.reason === 'UPDATER_HELPER_CHANGED'
+                    ? 'Updater replacement requires a full install'
+                    : 'Update compatibility requires a full application install'
             )
         if (
             !exactSourceMatches(

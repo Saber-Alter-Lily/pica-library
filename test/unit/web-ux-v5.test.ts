@@ -425,6 +425,16 @@ describe('V5 Web UX audit contract', () => {
         expect(main).toContain("'serving_composition.json'")
     })
 
+    it('keeps info-tip controls visually compact under theme button overrides', () => {
+        const css = read('web/info-tip-v1.css')
+        const product = read('web/alpha8-product.js')
+        expect(product).toContain('min-height:44px!important')
+        expect(css).toContain('min-height:20px !important')
+        expect(css).toContain('padding:0 !important')
+        expect(css).toContain('border-radius:999px !important')
+        expect(css).toContain('background:transparent !important')
+    })
+
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'

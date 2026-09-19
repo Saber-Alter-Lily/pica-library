@@ -30,11 +30,11 @@ Every surface is reviewed for:
 | Settings hub | IMPLEMENTED_NEEDS_QA | Normal settings separated from collapsed Experiment & Diagnostics area; sidebar now uses keyboard-accessible tab semantics |
 | Pica account/proxy | IMPLEMENTED_NEEDS_QA | File/log/exit utilities demoted; dangerous actions retain warning styling across light/dark themes |
 | E-H / ExH | IMPLEMENTED_NEEDS_QA | Web login + cloud favorites remain primary; manual Cookie, re-verify, ExH probe and destructive session clear are secondary; duplicate submission guarded |
-| Mobile bridge | MANUAL_QA + PLANNED_QR | Current fallback adds Copy address/code with localized feedback; QR-first remains the next separate pairing feature |
+| Mobile bridge | IMPLEMENTED_NEEDS_QA | Pairing methods are separated into collapsible QR/manual/deep-link/device sections; Android adds in-app QR scan; stable device identity prevents repeated pairing rows |
 | Remote storage | IMPLEMENTED_NEEDS_QA | User-facing copy simplified; Test → Save → Scan → Sync sequence shown; test/save/plan/sync all protected against duplicate submission |
 | Software update | IMPLEMENTED_NEEDS_QA | One-click update remains primary; local ZIP advanced; duplicate legacy update poller removed so alpha8-update-ui is sole status authority |
 | Maintenance | IMPLEMENTED_NEEDS_QA | Existing task tabs retained; empty outputs hidden and long actions disabled while running |
-| Recommendation V5 controls | IMPLEMENTED_NEEDS_QA | Renamed to user-facing Recommendation Preferences; user adjustments first; policy internals collapsed; unknown preference shown as unknown with neutral 5/10 start |
+| Recommendation V5 controls | IMPLEMENTED_NEEDS_QA | Profile/serving/shadow summaries are separately collapsible; facets have a second grouping layer and bounded internal scroll; session attribution and BLOCK counts are corrected |
 | Visual V1 QC | IMPLEMENTED_NEEDS_QA | Moved under Experiment & Diagnostics; heavy work remains manual-only |
 | Work identity P2A | IMPLEMENTED_NEEDS_QA | Moved under Experiment & Diagnostics; covers/details/reader links and undecided-first ordering retained |
 | V5 Evaluation | IMPLEMENTED_NEEDS_QA | Human-readable progress first; immature outcomes excluded; gates/version/LTR collapsed under advanced details |
@@ -60,6 +60,22 @@ Every surface is reviewed for:
 - Recommendation audit export is an explicit Desktop action that writes an allowlisted ZIP and excludes provider credentials, tokens/cookies and manga files.
 - Mobile pairing now exposes a locally generated QR deep link; the QR payload never leaves the device for rendering.
 - Paired Android devices mirror only non-secret Desktop provider connection state. Credential/session handoff remains disabled until the Mobile Bridge transport is hardened.
+
+## 2026-09-19 live-use feedback round
+
+Observed on the existing user-installed beta; development changes in this section are intentionally not packaged for the user yet.
+
+- **Audit export review:** package structure and credential exclusions passed, but the first package exposed three semantic gaps: Session was generated with `appSessionId=null`; V5 Shadow candidate-channel planning was labelled as current recommendation composition; and the headline “blocked” count only represented comic hard-suppression, not BLOCK preference controls.
+- **Session fix:** the Web app exposes the active app-session ID to Recommendation V5; timescale/channel reads and the explicit audit export now carry that session ID.
+- **Serving vs Shadow:** a new read-only Final V3 serving-composition snapshot reads the persisted current batch without allocating or regenerating recommendations. Ordinary UI labels this as “当前实际推荐构成”; V5 candidate-channel planning is explicitly labelled Shadow/experimental.
+- **Audit schema v2:** adds `serving_composition.json` and records the active `appSessionId` in `manifest.json`; README explains that `candidate_channels.json` is Shadow planning rather than serving.
+- **BLOCK semantics:** policy snapshots now expose `blockedTargets` separately from `hardSuppressed`; UI reports “屏蔽偏好” and “屏蔽作品” separately.
+- **Profile density:** the flat facet list is grouped into five higher-level groups. Each facet renders its complete set inside a bounded 5–6 row scroll region with `overscroll-behavior: contain`, so scrolling the facet does not chain to the page.
+- **Compact help:** a reusable info-tip component supports hover/focus on desktop and click/pinned display on touch/click surfaces. Recommendation and Mobile Bridge explanatory copy is being migrated from always-visible muted paragraphs to this component; state/error/warning text remains visible.
+- **Pairing hierarchy:** Desktop pairing is split into QR (recommended), manual address/code, deep-link fallback, and paired devices. QR generation remains fully local.
+- **Android scanner:** Android uses the open-source JourneyApps ZXing Android Embedded scanner and only accepts `picalibrary://pair` QR payloads.
+- **Duplicate paired devices:** Android now sends the existing stable app-local `DeviceIdentity`; Desktop replaces/revokes prior tokens for the same stable device and collapses legacy duplicate-name rows in display.
+- **Release discipline:** no new user package is produced during this live-use accumulation window. Changes remain on the development branch until the user returns the formal test dataset.
 
 ## Manual QA gates for this pass
 

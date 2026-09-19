@@ -43,6 +43,7 @@ export interface MobileRecommendationSyncV5 {
     tasteExcludedComicIds?: unknown
     clearTasteExcludedComicIds?: unknown
     itemDispositions?: unknown
+    catalogEvidence?: unknown
     resolutions?: unknown
     syncSchemaVersion?: unknown
 }
@@ -478,7 +479,8 @@ export class RecommendationPolicyStoreV5 {
                 clearSuppressComicIds: input.clearSuppressComicIds,
                 tasteExcludedComicIds: input.tasteExcludedComicIds,
                 clearTasteExcludedComicIds: input.clearTasteExcludedComicIds,
-                itemDispositions: input.itemDispositions
+                itemDispositions: input.itemDispositions,
+                catalogEvidence: input.catalogEvidence
             }),
             snapshot: this.snapshot()
         }
@@ -503,7 +505,8 @@ export class RecommendationPolicyStoreV5 {
             clearSuppressComicIds: input.clearSuppressComicIds,
             tasteExcludedComicIds: input.tasteExcludedComicIds,
             clearTasteExcludedComicIds: input.clearTasteExcludedComicIds,
-            itemDispositions: input.itemDispositions
+            itemDispositions: input.itemDispositions,
+            catalogEvidence: input.catalogEvidence
         })
         const resolved = applyConflictResolutionsV1({
             androidControls: input.controls,
@@ -581,6 +584,52 @@ export class RecommendationPolicyStoreV5 {
             updatedAt: new Date().toISOString()
         }
         this.save(state)
+        const catalogEvidence = Array.isArray(input.catalogEvidence)
+            ? input.catalogEvidence
+            : []
+        const catalogRecords = catalogEvidence.flatMap((item) => {
+            if (!item || typeof item !== 'object') return []
+            const row = item as Record<string, unknown>
+            const comicId = String(row.comicId ?? '').trim()
+            const title = String(row.title ?? '').trim()
+            if (!comicId || !title) return []
+            const stringList = (value: unknown) =>
+                Array.isArray(value)
+                    ? value.map(String).map((v) => v.trim()).filter(Boolean)
+                    : []
+            return [
+                {
+                    comicId,
+                    title,
+                    author: String(row.author ?? ''),
+                    canonicalAuthor: String(row.canonicalAuthor ?? '') || null,
+                    providerId: String(row.providerId ?? '') || null,
+                    providerRemoteId:
+                        String(row.providerRemoteId ?? '') || null,
+                    tags: stringList(row.tags),
+                    categories: stringList(row.categories),
+                    finished: Boolean(row.finished),
+                    pagesCount: Math.max(
+                        0,
+                        Math.floor(Number(row.pagesCount) || 0)
+                    ),
+                    totalLikes: Math.max(
+                        0,
+                        Math.floor(Number(row.totalLikes) || 0)
+                    ),
+                    totalViews: Math.max(
+                        0,
+                        Math.floor(Number(row.totalViews) || 0)
+                    ),
+                    coverUrl: String(row.coverUrl ?? '') || null
+                }
+            ]
+        })
+        if (catalogRecords.length)
+            this.database.importCatalog(
+                catalogRecords,
+                'android-recommendation-sync'
+            )
         const dispositions = Array.isArray(input.itemDispositions)
             ? input.itemDispositions
             : []

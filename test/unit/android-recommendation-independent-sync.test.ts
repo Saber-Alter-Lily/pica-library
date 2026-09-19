@@ -101,9 +101,13 @@ describe('Android independent recommendation runtime and sync UI', () => {
         const hub = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
         )
+        const mobileVisual = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MobileVisualPolicyStore.java'
+        )
         expect(engine).toContain(
             'portable.visualAdjustment'
         )
+        expect(engine).toContain('MobileVisualPolicyStore.live(app)')
         expect(engine).toContain('PORTABLE_RESERVOIR')
         expect(engine).toContain('portable.workId')
         expect(portable).toContain('identityByComic')
@@ -113,6 +117,9 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(hub).toContain(
             'DINOv2、全库向量和作者画风原型继续在 Windows 端批量处理'
         )
+        expect(hub).toContain('手机画风接入模式')
+        expect(mobileVisual).toContain('SHADOW')
+        expect(mobileVisual).toContain('static boolean live')
     })
 
     it('keeps the baked Android runtime policy baseline stable when Desktop state syncs', () => {

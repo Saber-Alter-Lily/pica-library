@@ -45,8 +45,10 @@ export interface EcosystemPackManifestV1 {
 
 const sha256Pattern = /^[0-9a-f]{64}$/
 const identifierPattern = /^[a-z0-9]+(?:[._-][a-z0-9]+)+$/
-const forbiddenPackPath =
-    /(^|/)(?:credentials?|cookies?|tokens?|secrets?|downloads?|logs?|private)(?:/|$)|(^|/).env(?:.|$)|.(?:db|sqlite)(?:-|$)/i
+const forbiddenPackPath = new RegExp(
+    String.raw\`(^|/)(?:credentials?|cookies?|tokens?|secrets?|downloads?|logs?|private)(?:/|$)|(^|/)\\.env(?:\\.|$)|\\.(?:db|sqlite)(?:-|$)\`,
+    'i'
+)
 
 function nonEmpty(value: unknown, field: string) {
     const text = String(value ?? '').trim()

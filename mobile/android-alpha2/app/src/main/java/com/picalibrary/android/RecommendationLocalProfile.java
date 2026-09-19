@@ -85,6 +85,20 @@ final class RecommendationLocalProfile {
             }catch(Exception ignored){}
         }
 
+        JSONArray controls=RecommendationPolicyStore.controls(app);
+        for(int i=0;i<controls.length();i++){
+            JSONObject control=controls.optJSONObject(i);if(control==null)continue;
+            String type=control.optString("targetType","TAG"),key=control.optString("key",""),identity=id(type,key);
+            if(key.isEmpty()||merged.containsKey(identity))continue;
+            JSONObject row=new JSONObject();
+            try{
+                row.put("targetType",type);row.put("key",key);row.put("label",control.optString("label",key));
+                row.put("facet","AUTHOR".equals(type)?"CREATOR_ENTITY":"CATEGORY".equals(type)?"CATEGORY":"FANDOM".equals(type)?"FANDOM_IP":"STYLE_FAMILY".equals(type)?"VISUAL_STYLE":"RAW_TAG");
+                row.put("supportCount",0);row.put("supportShare",0);row.put("baselineLevel",5);row.put("manual",true);row.put("systemUnknown",true);
+                merged.put(identity,row);
+            }catch(Exception ignored){}
+        }
+
         List<JSONObject> rows=new ArrayList<>(merged.values());
         rows.sort((a,b)->{
             int support=Integer.compare(b.optInt("supportCount",0),a.optInt("supportCount",0));

@@ -179,7 +179,32 @@ final class RecommendationPolicyStore {
         return false;
     }
 
-    static JSONObject syncPayload(Context c){JSONObject body=new JSONObject();try{body.put("syncSchemaVersion",1);body.put("deviceId",DeviceIdentity.id(c));String mutation=prefs(c).getString(MUTATION_ID,"");if(mutation==null||mutation.isEmpty())mutation=UUID.randomUUID().toString();body.put("mutationId",mutation);JSONObject base=syncedBase(c);body.put("baseRevision",base.optInt("revision",0));JSONArray baseControls=base.optJSONArray("controls");body.put("baseControls",baseControls==null?new JSONArray():baseControls);body.put("controls",parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")));body.put("feedback",RecommendationFeedbackStore.dirtyPayload(c));body.put("events",RecommendationEvidenceStore.dirtyPayload(c));body.put("suppressComicIds",parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")));body.put("clearSuppressComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")));body.put("tasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_TASTE,"[]")));body.put("clearTasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_TASTE,"[]")));body.put("itemDispositions",parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]")));}catch(Exception e){throw new IllegalStateException("无法生成推荐同步载荷",e);}return body;}
+    private static JSONArray catalogEvidencePayload(Context c){
+        LinkedHashSet<String> ids=new LinkedHashSet<>();
+        JSONArray feedback=RecommendationFeedbackStore.dirtyPayload(c);
+        for(int i=0;i<feedback.length();i++){JSONObject row=feedback.optJSONObject(i);if(row!=null){String id=row.optString("comicId","").trim();if(!id.isEmpty())ids.add(id);}}
+        JSONArray events=RecommendationEvidenceStore.dirtyPayload(c);
+        for(int i=0;i<events.length();i++){JSONObject row=events.optJSONObject(i);if(row!=null){String id=row.optString("comicId","").trim();if(!id.isEmpty())ids.add(id);}}
+        for(String key:new String[]{DIRTY_SUPPRESS,DIRTY_CLEAR_SUPPRESS,DIRTY_TASTE,DIRTY_CLEAR_TASTE}){
+            JSONArray values=parseArray(prefs(c).getString(key,"[]"));for(int i=0;i<values.length();i++){String id=values.optString(i,"").trim();if(!id.isEmpty())ids.add(id);}
+        }
+        JSONArray dispositions=parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]"));
+        for(int i=0;i<dispositions.length();i++){JSONObject row=dispositions.optJSONObject(i);if(row!=null){String id=row.optString("comicId","").trim();if(!id.isEmpty())ids.add(id);}}
+        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(c);JSONArray out=new JSONArray();
+        for(String id:ids){
+            UnifiedCatalogStore.Entry entry=catalog.byId.get(id);if(entry==null)continue;
+            JSONObject row=new JSONObject();try{
+                row.put("comicId",entry.id);row.put("providerId",entry.providerId);row.put("providerRemoteId",entry.providerRemoteId);
+                row.put("title",entry.title);row.put("author",entry.author);row.put("canonicalAuthor",entry.canonicalAuthor);
+                row.put("tags",new JSONArray(entry.tags));row.put("categories",new JSONArray(entry.categories));row.put("finished",entry.finished);
+                row.put("pagesCount",Math.max(entry.knownPictures,Math.max(entry.remotePageCount,entry.desktopDownloadedPictures)));
+                row.put("totalLikes",entry.totalLikes);row.put("totalViews",entry.totalViews);row.put("coverUrl",entry.bestCoverUrl());out.put(row);
+            }catch(Exception ignored){}
+        }
+        return out;
+    }
+
+    static JSONObject syncPayload(Context c){JSONObject body=new JSONObject();try{body.put("syncSchemaVersion",1);body.put("deviceId",DeviceIdentity.id(c));String mutation=prefs(c).getString(MUTATION_ID,"");if(mutation==null||mutation.isEmpty())mutation=UUID.randomUUID().toString();body.put("mutationId",mutation);JSONObject base=syncedBase(c);body.put("baseRevision",base.optInt("revision",0));JSONArray baseControls=base.optJSONArray("controls");body.put("baseControls",baseControls==null?new JSONArray():baseControls);body.put("controls",parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")));body.put("feedback",RecommendationFeedbackStore.dirtyPayload(c));body.put("events",RecommendationEvidenceStore.dirtyPayload(c));body.put("suppressComicIds",parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")));body.put("clearSuppressComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")));body.put("tasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_TASTE,"[]")));body.put("clearTasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_TASTE,"[]")));body.put("itemDispositions",parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]")));body.put("catalogEvidence",catalogEvidencePayload(c));}catch(Exception e){throw new IllegalStateException("无法生成推荐同步载荷",e);}return body;}
 
     static JSONObject previewPayload(Context c){return syncPayload(c);}
 

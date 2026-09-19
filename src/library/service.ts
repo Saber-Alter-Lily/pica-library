@@ -1627,7 +1627,12 @@ export class LibraryService {
                     samplingPolicyVersion: visualStatus.samplingPolicyVersion,
                     profileVersion: visualStatus.profileVersion,
                     indexedCount: visualStatus.indexedCount,
-                    profileGeneratedAt: profile?.generatedAt ?? null
+                    profile: profile
+                        ? {
+                              ...profile,
+                              generatedAt: undefined
+                          }
+                        : null
                 })
             )
             .digest('hex')

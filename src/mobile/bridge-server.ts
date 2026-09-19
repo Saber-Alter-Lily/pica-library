@@ -24,6 +24,8 @@ import { PersonalizationService } from '../services/personalization-service'
 
 interface PersistedDevice {
     tokenHash: string
+    /** Stable app-local Android identity. Legacy rows may omit it. */
+    deviceId?: string
     deviceName: string
     pairedAt: string
     lastSeenAt: string
@@ -313,12 +315,31 @@ export async function startMobileBridge(options: {
 
                 const token = randomBytes(32).toString('base64url')
                 const nowIso = new Date().toISOString()
+                const deviceName = String(
+                    input.deviceName ?? 'Android device'
+                ).slice(0, 120)
+                const deviceId = String(input.deviceId ?? '')
+                    .trim()
+                    .slice(0, 160)
+                let pairedAt = nowIso
+                if (deviceId) {
+                    for (const [hash, existing] of devices) {
+                        const sameStableDevice =
+                            existing.deviceId === deviceId
+                        const sameLegacyName =
+                            !existing.deviceId &&
+                            existing.deviceName === deviceName
+                        if (!sameStableDevice && !sameLegacyName) continue
+                        if (existing.pairedAt < pairedAt)
+                            pairedAt = existing.pairedAt
+                        devices.delete(hash)
+                    }
+                }
                 const device: PersistedDevice = {
                     tokenHash: tokenHash(token),
-                    deviceName: String(
-                        input.deviceName ?? 'Android device'
-                    ).slice(0, 120),
-                    pairedAt: nowIso,
+                    ...(deviceId ? { deviceId } : {}),
+                    deviceName,
+                    pairedAt,
                     lastSeenAt: nowIso
                 }
                 devices.set(device.tokenHash, device)
@@ -759,11 +780,29 @@ export async function startMobileBridge(options: {
             addresses: privateIpv4Addresses(host, actualPort),
             pairingCode,
             pairingExpiresAt: new Date(pairingExpiresAt).toISOString(),
-            pairedDevices: [...devices.values()].map((device) => ({
-                deviceName: device.deviceName,
-                pairedAt: device.pairedAt,
-                lastSeenAt: device.lastSeenAt
-            }))
+            pairedDevices: (() => {
+                const visible = new Map<string, PersistedDevice>()
+                for (const device of devices.values()) {
+                    const key = device.deviceId
+                        ? `id:${device.deviceId}`
+                        : `legacy-name:${device.deviceName}`
+                    const current = visible.get(key)
+                    if (
+                        !current ||
+                        current.lastSeenAt < device.lastSeenAt
+                    )
+                        visible.set(key, device)
+                }
+                return [...visible.values()]
+                    .sort((a, b) =>
+                        b.lastSeenAt.localeCompare(a.lastSeenAt)
+                    )
+                    .map((device) => ({
+                        deviceName: device.deviceName,
+                        pairedAt: device.pairedAt,
+                        lastSeenAt: device.lastSeenAt
+                    }))
+            })()
         }
     }
 

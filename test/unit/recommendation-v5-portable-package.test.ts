@@ -75,6 +75,11 @@ describe('Recommendation V5 portable mobile package', () => {
             expect(first.foundation.visualGeneration).toMatch(/^[0-9a-f]{24}$/)
             expect(first.foundation.canonicalGeneration).toMatch(/^[0-9a-f]{24}$/)
             expect(first.engineVersion).toBe('portable-v5-runtime-v1')
+            expect(first.foundation.identityBindings).toEqual([])
+            expect(first.behavior).toMatchObject({
+                feedback: [],
+                recentEvents: []
+            })
             const serialized = JSON.stringify(first)
             expect(serialized).not.toContain('"vector"')
             expect(serialized).not.toContain('"embedding":[')

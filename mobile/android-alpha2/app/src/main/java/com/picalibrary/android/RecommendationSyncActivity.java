@@ -48,7 +48,7 @@ public final class RecommendationSyncActivity extends Activity {
             return;
         }
 
-        int android=preview.optInt("androidControlChanges",0)+preview.optInt("feedbackChanges",0)+preview.optInt("eventChanges",0)+preview.optInt("suppressChanges",0)+preview.optInt("tasteExclusionChanges",0);
+        int android=preview.optInt("androidControlChanges",0)+preview.optInt("feedbackChanges",0)+preview.optInt("eventChanges",0)+preview.optInt("suppressChanges",0)+preview.optInt("tasteExclusionChanges",0)+preview.optInt("dispositionChanges",0);
         int desktop=preview.optInt("desktopControlChanges",0);
         JSONArray conflicts=preview.optJSONArray("conflicts");int conflictCount=conflicts==null?0:conflicts.length();
         JSONObject remote=preview.optJSONObject("remotePackage"),foundation=remote==null?null:remote.optJSONObject("foundation");
@@ -191,6 +191,7 @@ public final class RecommendationSyncActivity extends Activity {
             value.optInt("eventChanges",0)+":"+
             value.optInt("suppressChanges",0)+":"+
             value.optInt("tasteExclusionChanges",0)+":"+
+            value.optInt("dispositionChanges",0)+":"+
             packageChanged+":"+remoteVisual+":"+remoteCanonical+":"+remoteReservoir+":"+remoteBehavior+":"+conflictIds;
     }
 
@@ -211,7 +212,7 @@ public final class RecommendationSyncActivity extends Activity {
                     (!remoteBehavior.isEmpty()&&!remoteBehavior.equals(local.behaviorGeneration))
                 );
                 JSONArray conflicts=value.optJSONArray("conflicts");
-                int changes=value.optInt("androidControlChanges",0)+value.optInt("desktopControlChanges",0)+value.optInt("feedbackChanges",0)+value.optInt("eventChanges",0)+value.optInt("suppressChanges",0)+value.optInt("tasteExclusionChanges",0);
+                int changes=value.optInt("androidControlChanges",0)+value.optInt("desktopControlChanges",0)+value.optInt("feedbackChanges",0)+value.optInt("eventChanges",0)+value.optInt("suppressChanges",0)+value.optInt("tasteExclusionChanges",0)+value.optInt("dispositionChanges",0);
                 if(changes==0&&!packageChanged)return;
                 String signature=promptSignature(value,packageChanged,remoteVisual,remoteCanonical,remoteReservoir,remoteBehavior);
                 synchronized(RecommendationSyncActivity.class){

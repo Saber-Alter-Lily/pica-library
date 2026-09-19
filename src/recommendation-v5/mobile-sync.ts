@@ -38,6 +38,7 @@ export interface MobileSyncPreviewV1 {
     suppressChanges: number
     tasteExclusionChanges: number
     dispositionChanges: number
+    catalogEvidenceChanges: number
     conflicts: MobileSyncConflictV1[]
     hasPortableChanges: boolean
 }
@@ -125,6 +126,7 @@ export function previewMobileRecommendationSyncV1(input: {
     tasteExcludedComicIds?: unknown
     clearTasteExcludedComicIds?: unknown
     itemDispositions?: unknown
+    catalogEvidence?: unknown
 }): MobileSyncPreviewV1 {
     const baseRevision = Math.max(0, Math.floor(Number(input.baseRevision) || 0))
     const base = mapControls(input.baseControls, 'DESKTOP')
@@ -181,6 +183,7 @@ export function previewMobileRecommendationSyncV1(input: {
         count(input.tasteExcludedComicIds) +
         count(input.clearTasteExcludedComicIds)
     const dispositionChanges = count(input.itemDispositions)
+    const catalogEvidenceChanges = count(input.catalogEvidence)
     const androidControlChanges = android.size
     return {
         schemaVersion: MOBILE_RECOMMENDATION_SYNC_SCHEMA_V1,
@@ -193,6 +196,7 @@ export function previewMobileRecommendationSyncV1(input: {
         suppressChanges,
         tasteExclusionChanges,
         dispositionChanges,
+        catalogEvidenceChanges,
         conflicts: conflicts.sort((a, b) =>
             a.identity.localeCompare(b.identity)
         ),
@@ -203,7 +207,8 @@ export function previewMobileRecommendationSyncV1(input: {
                 eventChanges +
                 suppressChanges +
                 tasteExclusionChanges +
-                dispositionChanges >
+                dispositionChanges +
+                catalogEvidenceChanges >
             0
     }
 }

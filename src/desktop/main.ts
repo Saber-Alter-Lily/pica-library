@@ -965,7 +965,21 @@ async function startEngine(preferredPort: number) {
             service: service!,
             host: '0.0.0.0',
             port: 7788,
-            stateFile: path.join(paths.runtimeState, 'mobile-bridge.json')
+            stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
+            accountStatus: () => ({
+                pica: {
+                    configured: Boolean(
+                        credentials?.account?.trim() &&
+                            credentials?.password
+                    )
+                },
+                eh: {
+                    configured: Boolean(
+                        credentials?.ehMemberId &&
+                            credentials?.ehPassHash
+                    )
+                }
+            })
         })
         const mobile = mobileBridge.status()
         log.write(

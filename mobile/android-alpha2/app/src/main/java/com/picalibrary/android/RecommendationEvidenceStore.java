@@ -75,6 +75,28 @@ final class RecommendationEvidenceStore {
         record(c,"reader_complete",comicId,author,tags,categories);
     }
 
+    static synchronized void importSynced(Context c,JSONArray rows){
+        if(rows==null||rows.length()==0)return;
+        JSONArray existing=load(c);LinkedHashSet<String> known=new LinkedHashSet<>();
+        ArrayList<JSONObject> values=new ArrayList<>();
+        for(int i=0;i<existing.length();i++){JSONObject row=existing.optJSONObject(i);if(row==null)continue;values.add(row);String eventId=row.optString("eventId","");if(!eventId.isEmpty())known.add(eventId);}
+        for(int i=0;i<rows.length();i++){
+            JSONObject raw=rows.optJSONObject(i);if(raw==null)continue;
+            String eventId=raw.optString("eventId","").trim(),type=raw.optString("eventType","").trim(),comicId=raw.optString("comicId","").trim();
+            if(eventId.isEmpty()||known.contains(eventId)||comicId.isEmpty()||!Arrays.asList("recommend_impression","recommend_detail_open","reader_complete").contains(type))continue;
+            JSONObject row=new JSONObject();
+            try{
+                row.put("eventId",eventId);row.put("eventType",type);row.put("comicId",comicId);
+                row.put("author",raw.optString("author",""));row.put("tags",raw.optJSONArray("tags")==null?new JSONArray():raw.optJSONArray("tags"));
+                row.put("categories",raw.optJSONArray("categories")==null?new JSONArray():raw.optJSONArray("categories"));
+                row.put("occurredAt",raw.optString("occurredAt",""));row.put("sessionId","DESKTOP_SYNC");row.put("dirty",false);
+                values.add(row);known.add(eventId);
+            }catch(Exception ignored){}
+        }
+        values.sort((a,b)->a.optString("occurredAt","").compareTo(b.optString("occurredAt","")));
+        JSONArray next=new JSONArray();int start=Math.max(0,values.size()-MAX_EVENTS);for(int i=start;i<values.size();i++)next.put(values.get(i));save(c,next);
+    }
+
     static synchronized JSONArray dirtyPayload(Context c){
         JSONArray out=new JSONArray(),events=load(c);
         for(int i=0;i<events.length();i++){

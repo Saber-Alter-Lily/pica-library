@@ -30,6 +30,20 @@ ZIP 根必须包含 `update-manifest.json`，字段为：
 
 兼容性检查使用当前构建自身的 App API 与数据库 Schema：App API 必须保持相同；数据库 Schema 允许保持不变或前进一个有序迁移版本。API 变化、Schema 降级或跨越多个 Schema 版本必须声明 `requiresFullInstall: true`，否则更新包在暂存前即被拒绝。删除项与替换项使用相同的路径、用户数据禁区和 updater 自更新规则。
 
+## Release 资产命名与旧客户端兼容
+
+正式增量包优先使用来源作用域名称：
+
+`Pica-Library-v<target>-update-from-v<source>.zip`
+
+新版客户端会先查找精确来源作用域资产，再兼容旧的通用名称：
+
+`Pica-Library-v<target>-update.zip`
+
+当一个新版本与 public v0.4.0 不满足增量兼容条件时，**不得发布会被 v0.4.0 旧 updater 误识别的通用 `-update.zip`**。只发布完整 Windows 包时，v0.4.0 会进入其已实现的 `full-install` 路径并显示官方 Release 入口；这比发布一个随后必然在 source/schema 校验阶段失败的通用增量包更安全。
+
+来源作用域命名的目的不是绕过 manifest 校验：包内部 `sourceVersionRange` 仍必须精确匹配，官方 Release digest/SHA-256 校验仍必须通过。
+
 ## 暂存、应用和回滚
 
 主进程验证并解压到独立 staging，用户显式点击“更新并重启”后才生成 instruction 并启动外部 updater。updater 等主进程退出，备份所有受影响应用文件，替换/删除，再启动目标版并通过 `/api/v1/capabilities` 校验目标版本。

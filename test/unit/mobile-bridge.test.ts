@@ -330,4 +330,230 @@ describe('Mobile Bridge', () => {
         database.close()
     })
 
+
+    it('relays account-required E-H and ExH operations without copying cookies', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-mobile-eh-relay-'))
+        roots.push(root)
+        const database = new LibraryDatabase(path.join(root, 'library.db'))
+        let favorite = false
+        const comic = {
+            providerId: 'eh',
+            providerRemoteId: '123:aaaaaaaaaa',
+            comicId: 'eh:123:aaaaaaaaaa',
+            title: 'Desktop ExH Relay',
+            alternateTitles: [],
+            author: 'Relay Artist',
+            authors: ['Relay Artist'],
+            circle: null,
+            description: '',
+            chineseTeam: '',
+            categories: ['Manga'],
+            tags: ['relay'],
+            canonicalTags: [
+                {
+                    raw: 'artist:relay artist',
+                    namespace: 'artist',
+                    value: 'relay artist',
+                    facet: 'CREATOR'
+                }
+            ],
+            completionStatus: 'UNKNOWN',
+            pagesCount: 1,
+            coverUrl: 'https://ehgt.org/example.jpg',
+            rating: 4.5,
+            uploader: 'tester',
+            providerMetadata: {
+                preferredSurface: 'exh',
+                knownSurfaces: ['exh']
+            }
+        }
+        const fakeEh = {
+            hasSession: () => true,
+            async search() {
+                return [comic]
+            },
+            async probeExHentai() {
+                return 'AVAILABLE'
+            },
+            async detailsOnSurface() {
+                return comic
+            },
+            async episodesOnSurface() {
+                return [
+                    {
+                        id: 'eh-123',
+                        title: 'Desktop ExH Relay',
+                        order: 1,
+                        updated_at: ''
+                    }
+                ]
+            },
+            async pagesOnSurface() {
+                return [
+                    {
+                        id: 'eh-123-1',
+                        name: '0001.jpg',
+                        path: 'https://exhentai.org/s/hash/123-1',
+                        fileServer: 'https://exhentai.org',
+                        url: 'eh-page:test-locator',
+                        epTitle: 'Desktop ExH Relay',
+                        media: {
+                            originalName: '0001.jpg',
+                            path: 'https://exhentai.org/s/hash/123-1',
+                            fileServer: 'https://exhentai.org'
+                        }
+                    }
+                ]
+            },
+            async fetchPage(locator: string) {
+                expect(locator).toBe('eh-page:test-locator')
+                return {
+                    data: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+                    contentType: 'image/jpeg'
+                }
+            },
+            async setRemoteFavorite(
+                _comicId: string,
+                desired: boolean
+            ) {
+                favorite = desired
+                return {
+                    changed: true,
+                    isFavorite: desired,
+                    category: 0,
+                    note: ''
+                }
+            }
+        }
+        const service = new LibraryService(
+            database,
+            root,
+            undefined,
+            fakeEh as never
+        )
+        const bridge = await startMobileBridge({
+            database,
+            service,
+            host: '127.0.0.1',
+            port: 0,
+            stateFile: path.join(root, 'mobile-state.json'),
+            accountStatus: () => ({
+                pica: { configured: false },
+                eh: { configured: true }
+            })
+        })
+        bridges.push(bridge)
+        const host = bridge.status().addresses[0]
+        const paired = await fetch(`${host}/mobile/v1/pair`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                code: bridge.status().pairingCode,
+                deviceId: 'eh-relay-device',
+                deviceName: 'Relay Android'
+            })
+        })
+        const token = String(
+            ((await paired.json()) as { token: string }).token
+        )
+        const headers = {
+            authorization: `Bearer ${token}`,
+            'content-type': 'application/json'
+        }
+
+        const search = await fetch(
+            `${host}/mobile/v1/provider/eh/search`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    surface: 'exh',
+                    ehMode: 'watched',
+                    keyword: '',
+                    tags: [],
+                    categories: [],
+                    limit: 20
+                })
+            }
+        )
+        expect(search.status).toBe(200)
+        const searchValue = await search.json()
+        expect(searchValue).toMatchObject({
+            authority: 'desktop',
+            relay: true,
+            surface: 'exh',
+            comics: [
+                {
+                    comicId: 'eh:123:aaaaaaaaaa',
+                    title: 'Desktop ExH Relay'
+                }
+            ]
+        })
+        expect(JSON.stringify(searchValue)).not.toMatch(
+            /ipb_pass_hash|ipb_member_id|igneous|cf_clearance|cookie/i
+        )
+
+        const capability = await fetch(
+            `${host}/mobile/v1/provider/eh/exh-capability`,
+            { headers }
+        )
+        expect(await capability.json()).toMatchObject({
+            authority: 'desktop',
+            relay: true,
+            capability: 'AVAILABLE'
+        })
+
+        const pages = await fetch(
+            `${host}/mobile/v1/provider/eh/pages/${encodeURIComponent(
+                'eh:123:aaaaaaaaaa'
+            )}?surface=exh`,
+            { headers }
+        )
+        expect(await pages.json()).toMatchObject({
+            pages: [
+                {
+                    id: 'eh-123-1',
+                    locator: 'eh-page:test-locator',
+                    position: 0
+                }
+            ]
+        })
+
+        const image = await fetch(
+            `${host}/mobile/v1/provider/eh/page-image?locator=${encodeURIComponent(
+                'eh-page:test-locator'
+            )}`,
+            { headers: { authorization: `Bearer ${token}` } }
+        )
+        expect(image.status).toBe(200)
+        expect(image.headers.get('content-type')).toBe('image/jpeg')
+        expect(new Uint8Array(await image.arrayBuffer())).toEqual(
+            new Uint8Array([0xff, 0xd8, 0xff, 0xd9])
+        )
+
+        const mutate = await fetch(
+            `${host}/mobile/v1/provider/eh/favorite`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    comicId: 'eh:123:aaaaaaaaaa',
+                    desired: true,
+                    category: 0,
+                    note: ''
+                })
+            }
+        )
+        expect(mutate.status).toBe(200)
+        expect(await mutate.json()).toMatchObject({
+            authority: 'desktop',
+            relay: true,
+            changed: true,
+            isFavorite: true
+        })
+        expect(favorite).toBe(true)
+
+        database.close()
+    })
+
 })

@@ -1,8 +1,9 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Server } from 'node:http'
+import AdmZip from 'adm-zip'
 import { LibraryDatabase } from '../library/database'
 import {
     startLibraryServer,
@@ -378,6 +379,36 @@ async function chooseBrowserLitePackagePath() {
     })
 }
 
+
+async function chooseRecommendationAuditPath(generatedAt: string) {
+    if (process.platform !== 'win32') return null
+    const stamp = generatedAt.replace(/[:.]/g, '-')
+    const fileName = `Pica-Library-Recommendation-Audit-${stamp}.zip`
+    const escaped = fileName.replaceAll("'", "''")
+    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='${escaped}';$d.Filter='ZIP files (*.zip)|*.zip';$d.DefaultExt='zip';$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
+    const powershell = windowsExecutable(
+        'System32',
+        'WindowsPowerShell',
+        'v1.0',
+        'powershell.exe'
+    )
+    return await new Promise<string | null>((resolve, reject) => {
+        const child = spawn(
+            powershell,
+            ['-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-Command', script],
+            { windowsHide: true, env: sanitizedChildEnv() }
+        )
+        let output = ''
+        child.stdout.on('data', (chunk) => (output += String(chunk)))
+        child.once('error', reject)
+        child.once('exit', (code) =>
+            code === 0
+                ? resolve(output.trim() || null)
+                : reject(new Error('File picker failed'))
+        )
+    })
+}
+
 function openDirectory(kind: string) {
     const allowed: Record<string, string> = {
         data: config?.libraryDirectory ?? paths.data,
@@ -725,6 +756,110 @@ async function startEngine(preferredPort: number) {
                 fileName: 'pica-library-bundle.json',
                 generatedAt: lastBrowserLiteExportAt,
                 sourceSyncedAt: lastSync?.finishedAt ?? null
+            }
+        },
+        exportRecommendationAudit: async () => {
+            if (!database || !service) throw new Error('Library is not ready')
+            const generatedAt = new Date().toISOString()
+            const events = database.listUserEvents({ limit: 10000 })
+            const catalog = database.listComics({ limit: 10000 }).map((comic) => ({
+                comicId: comic.comicId,
+                title: comic.title,
+                author: comic.author,
+                canonicalAuthor: comic.canonicalAuthor ?? null,
+                tags: comic.tags,
+                categories: comic.categories,
+                providerId: comic.providerId ?? null,
+                isFavorite: comic.isFavorite,
+                inLibrary: comic.inLibrary,
+                downloadedPictures: comic.downloadedPictures,
+                firstSeenAt: comic.firstSeenAt,
+                lastSeenAt: comic.lastSeenAt
+            }))
+            const policy = service.recommendationV5Snapshot()
+            const timescales = service.recommendationV5PreferenceTimescales(
+                null,
+                10000
+            )
+            const behavior = service.recommendationV5BehaviorEvidence(10000)
+            const channels = service.recommendationV5CandidateChannels(
+                null,
+                10000
+            )
+            const shadowRuns = service.recommendationV5ShadowRuns(500)
+            const evaluation = service.recommendationV5EvaluationSummary(
+                500,
+                30,
+                3,
+                50
+            )
+            const manifest = {
+                schemaVersion: 1,
+                kind: 'pica-library-recommendation-audit',
+                generatedAt,
+                productVersion: PRODUCT_VERSION,
+                sourceSha: currentSourceSha ?? null,
+                includes: [
+                    'manifest.json',
+                    'policy_snapshot.json',
+                    'preference_timescales.json',
+                    'candidate_channels.json',
+                    'behavior_evidence_v5.json',
+                    'user_events.json',
+                    'shadow_runs.json',
+                    'evaluation_snapshot.json',
+                    'catalog_minimal.json',
+                    'README.txt'
+                ],
+                excludes: [
+                    'pica_password',
+                    'pica_token',
+                    'eh_cookies',
+                    'github_token',
+                    'webdav_credentials',
+                    'comic_images',
+                    'downloaded_files'
+                ]
+            }
+            const zip = new AdmZip()
+            const addJson = (name: string, value: unknown) =>
+                zip.addFile(
+                    name,
+                    Buffer.from(JSON.stringify(value, null, 2), 'utf8')
+                )
+            addJson('manifest.json', manifest)
+            addJson('policy_snapshot.json', policy)
+            addJson('preference_timescales.json', timescales)
+            addJson('candidate_channels.json', channels)
+            addJson('behavior_evidence_v5.json', behavior)
+            addJson('user_events.json', events)
+            addJson('shadow_runs.json', shadowRuns)
+            addJson('evaluation_snapshot.json', evaluation)
+            addJson('catalog_minimal.json', catalog)
+            zip.addFile(
+                'README.txt',
+                Buffer.from(
+                    [
+                        'Pica Library Recommendation Audit Export',
+                        '',
+                        'This package contains allowlisted recommendation and interaction audit data only.',
+                        'It intentionally excludes account passwords, provider tokens/cookies, GitHub credentials, WebDAV credentials, comic images, and downloaded manga files.',
+                        'Share this ZIP only when you intentionally want another person or analysis tool to review recommendation behavior.',
+                        ''
+                    ].join('\n'),
+                    'utf8'
+                )
+            )
+            const buffer = zip.toBuffer()
+            const file = await chooseRecommendationAuditPath(generatedAt)
+            if (!file) return { success: false, cancelled: true }
+            fs.writeFileSync(file, buffer)
+            return {
+                success: true,
+                fileName: path.basename(file),
+                generatedAt,
+                sizeBytes: buffer.byteLength,
+                sha256: createHash('sha256').update(buffer).digest('hex')
             }
         },
         syncAndExportBrowserLitePackage: async () => {

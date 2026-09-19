@@ -52,6 +52,16 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
     await page.locator('button[data-go="library"]').click()
     await expect(page.locator('#library')).toHaveClass(/\bactive\b/)
 
+    const help = page.locator('#library .info-tip').first()
+    await expect(help).toBeVisible()
+    await help.hover()
+    const popover = page.locator('#pica-info-tip-popover')
+    await expect(popover).toHaveAttribute('data-open', 'true')
+    await help.click()
+    await expect(popover).toHaveAttribute('data-pinned', 'true')
+    await page.keyboard.press('Escape')
+    await expect(popover).toHaveAttribute('data-open', 'false')
+
     expect(pageErrors, pageErrors.join('\n\n')).toEqual([])
     expect(consoleErrors, consoleErrors.join('\n\n')).toEqual([])
 })

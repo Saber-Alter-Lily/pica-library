@@ -248,7 +248,7 @@ function ensurePanel() {
         <div class="v5-heading-inline"><h4>你的调整</h4>${infoButton('这里仅显示你主动覆盖系统判断的项目。屏蔽偏好和屏蔽具体作品会分别统计。')}</div>
         <div id="v5-control-list" class="v5-control-list"></div>
 
-        <div class="v5-heading-inline"><h4>完整画像与微调 · 1–10 档</h4>${infoButton('1 表示尽量少推荐，10 表示非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好。')}</div>
+        <div class="v5-heading-inline"><h4>完整画像与微调 · 1–10 档</h4>${infoButton('1 = 尽量少推荐，10 = 非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好。')}</div>
         <div class="v5-search-row">
             <label>查找一个具体偏好
                 <input id="v5-policy-search" placeholder="作者、IP、标签或分类，例如：巨乳" />

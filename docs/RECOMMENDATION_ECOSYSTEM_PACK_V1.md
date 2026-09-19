@@ -399,7 +399,7 @@ The current read-only `EcosystemPackStore`:
 Still remaining for E2 product completion:
 
 - **implemented:** read-only Desktop API `GET /api/v1/desktop/ecosystem/packs`;
-- define the user-visible compatibility/error presentation;
+- **implemented:** default-collapsed Settings status surface for Pack ID / generation / type / integrity / compatibility, with refresh and local-folder access only;
 - keep activation impossible until the later shadow phase.
 
 ### E3 — Canonical/Provider shadow consumption

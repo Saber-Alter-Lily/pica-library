@@ -1,4 +1,9 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { LibraryDatabase } from '../../src/library/database'
+import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-store'
 import {
     applyConflictResolutionsV1,
     previewMobileRecommendationSyncV1
@@ -127,5 +132,59 @@ describe('Recommendation V5 mobile three-way sync', () => {
             dispositionChanges: 1,
             hasPortableChanges: true
         })
+
+
+    it('merges mobile semantic item dispositions and taste exclusion without creating a dislike', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v5-mobile-semantic-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.db'))
+        try {
+            database.importCatalog(
+                [
+                    {
+                        comicId: 'comic-a',
+                        title: 'Comic A',
+                        author: 'Author A',
+                        tags: ['tag-a'],
+                        categories: ['短篇'],
+                        finished: true
+                    }
+                ],
+                'test'
+            )
+            const store = new RecommendationPolicyStoreV5(database)
+            const result = store.mergeMobile({
+                deviceId: 'android-test',
+                mutationId: 'mutation-semantic-1',
+                syncSchemaVersion: 1,
+                baseRevision: 0,
+                baseControls: [],
+                controls: [],
+                tasteExcludedComicIds: ['comic-a'],
+                itemDispositions: [
+                    {
+                        comicId: 'comic-a',
+                        reason: 'already_seen',
+                        active: true
+                    }
+                ]
+            })
+            expect(result.requiresResolution).toBe(false)
+            const state = store.state()
+            expect(state.tasteExcludedComicIds).toContain('comic-a')
+            expect(state.seenComicIds).toContain('comic-a')
+            expect(database.recommendationFeedback()).toEqual([])
+            expect(
+                database
+                    .listUserEvents({
+                        eventType: 'recommendation_item_disposition',
+                        comicId: 'comic-a'
+                    })
+                    .map((event) => event.metadata.reason)
+            ).toContain('already_seen')
+        } finally {
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
     })
 })

@@ -10,6 +10,7 @@
 
 - 启动 v0.4.0 → 下一正式版直升验收：冻结 public Schema 9 作为兼容基线，新增 Schema 9→当前版本的数据保留回归测试与独立 CI Gate；Windows 采用“完整应用替换、用户数据目录保留”路线，Android 正式发布必须满足同 package ID、versionCode>42、同签名证书并完成原地安装验收。
 - 升级审计发现并修复 schema authority 漂移：public v0.4.0 实际已迁移到 9 但 capabilities 仍声明 8，当前开发实际到 13 也仍声明 8；现改为 `DATABASE_SCHEMA_VERSION = latestMigrationVersion`，更新 manifest、capabilities 与兼容判断统一引用 migration 权威。
+- 正式更新资产开始区分来源版本：新版客户端优先识别 `Pica-Library-v<target>-update-from-v<source>.zip`，再兼容旧通用 `-update.zip`；跨 Schema 的下一正式版不得发布会被 public v0.4.0 误判为可增量更新的通用 ZIP，使旧客户端明确进入已有的完整安装 Release 路径。
 - 启动 Recommendation Ecosystem Pack V1 E1 Contract：参考成熟开源项目的 manifest/entity/device-identity 思路，将 Canonical Knowledge、Provider Intelligence、Tag/Alias、Visual Intelligence、Recommendation Policy 设计为版本化声明式 Pack；新增 manifest 类型、payload 路径安全、SHA-256 content root、dependency/publisher 校验，但本阶段不加载 Pack、不改变 serving。
 - Recommendation Ecosystem Pack V1 推进到 E2 只读库存基础：Desktop 数据目录新增独立 `packs/`，逐字节校验 Pack manifest/payload/大小/SHA-256/目录身份与最低应用版本，并提供只读 inventory API；仍无 activate/apply/promote 路由，不读取 Pack 内容改变推荐结果。
 - Pack E2 增加默认折叠的只读“推荐生态包状态”界面：仅显示 Pack ID、generation、类型、完整性、兼容性与错误，并支持重新检查/打开本地目录；当前无安装、启用、应用、promote 操作，不影响 Recommendation serving。

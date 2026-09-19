@@ -80,6 +80,9 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(controls).toContain('行为与偏好')
         expect(controls).toContain('形式与其他')
         expect(controls).toContain('SeekBar')
+        expect(controls).toContain('NestedScrollView')
+        expect(controls).toContain('expandedFacets')
+        expect(controls).toContain('作为标签添加')
         expect(controls).toContain('本次想看')
         expect(hub).toContain('推荐画像')
         expect(hub).toContain('人工调整')
@@ -102,12 +105,35 @@ describe('Android independent recommendation runtime and sync UI', () => {
             'PortableRecommendationPackageStore.visualAdjustment'
         )
         expect(engine).toContain('PORTABLE_RESERVOIR')
+        expect(engine).toContain('portable.workId')
+        expect(portable).toContain('identityByComic')
         expect(portable).toContain('visualAffinity')
         expect(portable).not.toContain('float[] vector')
         expect(portable).not.toContain('double[] vector')
         expect(hub).toContain(
             'DINOv2、全库向量和作者画风原型继续在 Windows 端批量处理'
         )
+    })
+
+    it('imports Desktop feedback and recent evidence without echoing it as a local Session', () => {
+        const bridge = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java'
+        )
+        const feedback = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationFeedbackStore.java'
+        )
+        const evidence = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationEvidenceStore.java'
+        )
+        const sync = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationSyncActivity.java'
+        )
+        expect(bridge).toContain('RecommendationFeedbackStore.importSynced')
+        expect(bridge).toContain('RecommendationEvidenceStore.importSynced')
+        expect(feedback).toContain('p.getBoolean(DIRTY+id,false)')
+        expect(evidence).toContain('row.put("sessionId","DESKTOP_SYNC")')
+        expect(evidence).toContain('row.put("dirty",false)')
+        expect(sync).toContain('behaviorGeneration')
     })
 
     it('registers the new mobile recommendation surfaces and prompts after pairing', () => {

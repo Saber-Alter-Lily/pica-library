@@ -120,6 +120,9 @@ describe('Recommendation V5 mobile three-way sync', () => {
             tasteExcludedComicIds: ['e'],
             itemDispositions: [
                 { comicId: 'f', reason: 'temporary', active: true }
+            ],
+            catalogEvidence: [
+                { comicId: 'g', title: 'G', author: 'Author G' }
             ]
         })
         expect(preview).toMatchObject({
@@ -130,6 +133,7 @@ describe('Recommendation V5 mobile three-way sync', () => {
             suppressChanges: 1,
             tasteExclusionChanges: 1,
             dispositionChanges: 1,
+            catalogEvidenceChanges: 1,
             hasPortableChanges: true
         })
 
@@ -166,6 +170,21 @@ describe('Recommendation V5 mobile three-way sync', () => {
                         reason: 'already_seen',
                         active: true
                     }
+                ],
+                catalogEvidence: [
+                    {
+                        comicId: 'phone-only',
+                        title: 'Phone Only',
+                        author: 'Phone Author',
+                        canonicalAuthor: 'Phone Author',
+                        providerId: 'pica',
+                        providerRemoteId: 'phone-only',
+                        tags: ['phone-tag'],
+                        categories: ['短篇'],
+                        pagesCount: 20,
+                        totalLikes: 5,
+                        totalViews: 30
+                    }
                 ]
             })
             expect(result.requiresResolution).toBe(false)
@@ -181,6 +200,13 @@ describe('Recommendation V5 mobile three-way sync', () => {
                     })
                     .map((event) => event.metadata.reason)
             ).toContain('already_seen')
+            expect(database.getComic('phone-only')).toMatchObject({
+                comicId: 'phone-only',
+                title: 'Phone Only',
+                author: 'Phone Author',
+                providerId: 'pica',
+                tags: ['phone-tag']
+            })
         } finally {
             database.close()
             fs.rmSync(dir, { recursive: true, force: true })

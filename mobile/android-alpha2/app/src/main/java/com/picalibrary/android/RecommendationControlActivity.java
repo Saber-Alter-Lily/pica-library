@@ -18,6 +18,7 @@ import org.json.*;
 public final class RecommendationControlActivity extends Activity {
     private LinearLayout content;
     private EditText search;
+    private JSONObject manualSignal;
     private final Set<String> expanded=new LinkedHashSet<>();
     private final Set<String> expandedFacets=new LinkedHashSet<>();
 
@@ -58,7 +59,7 @@ public final class RecommendationControlActivity extends Activity {
         LinearLayout find=SettingsRow.panel(this,null);
         search=new EditText(this);search.setSingleLine(true);search.setHint("查找作者、IP、标签或分类");
         find.addView(search,new LinearLayout.LayoutParams(-1,-2));
-        find.addView(Ui.button(this,"查找",v->renderSignals(search.getText().toString().trim()),true));
+        find.addView(Ui.button(this,"查找",v->{manualSignal=null;renderSignals(search.getText().toString().trim());},true));
         content.addView(find);
 
         renderSignals("");
@@ -103,6 +104,12 @@ public final class RecommendationControlActivity extends Activity {
             if(bucket==null){bucket=new FacetGroup(facetId,facetLabel);group.facets.put(facetId,bucket);}
             bucket.rows.add(row);
         }
+        if(manualSignal!=null&&!q.isEmpty()&&manualSignal.optString("label","").toLowerCase(Locale.ROOT).contains(q)){
+            String type=manualSignal.optString("targetType","TAG"),facet=manualSignal.optString("facet","RAW_TAG");
+            String groupId=groupFor(facet,type);Group group=groups.get(groupId);
+            String facetId=facetIdentity(facet,type),facetLabel=facetLabel(facet,type);
+            FacetGroup bucket=group.facets.get(facetId);if(bucket==null){bucket=new FacetGroup(facetId,facetLabel);group.facets.put(facetId,bucket);}bucket.rows.add(manualSignal);
+        }
         for(Group group:groups.values()){
             if(group.size()==0)continue;
             boolean open=!q.isEmpty()||expanded.contains(group.id);
@@ -122,7 +129,12 @@ public final class RecommendationControlActivity extends Activity {
         }
         if(!q.isEmpty()){
             boolean any=false;for(Group group:groups.values())if(group.size()>0){any=true;break;}
-            if(!any)content.addView(Ui.text(this,"没有找到“"+query+"”。手机不会因为输入文字就自动创建新标签。",13,Ui.MUTED,false));
+            if(!any){
+                LinearLayout empty=SettingsRow.panel(this,null);
+                empty.addView(Ui.text(this,"没有找到“"+query+"”。系统不会因为输入文字就自动创建偏好。",13,Ui.MUTED,false));
+                empty.addView(Ui.button(this,"作为标签添加",v->{JSONObject row=new JSONObject();try{row.put("targetType","TAG");row.put("key",normalize(query));row.put("label",query);row.put("facet","RAW_TAG");row.put("supportCount",0);row.put("supportShare",0);row.put("baselineLevel",5);row.put("manual",true);row.put("systemUnknown",true);manualSignal=row;}catch(Exception ignored){}renderSignals(query);},true));
+                content.addView(empty);
+            }
         }
     }
 
@@ -153,7 +165,7 @@ public final class RecommendationControlActivity extends Activity {
         heading.addView(Ui.text(this,label,15,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
         TextView value=Ui.text(this,blocked?"已屏蔽":current+"/10",13,blocked?Ui.BAD:Ui.PRIMARY,true);heading.addView(value);
         card.addView(heading);
-        card.addView(Ui.text(this,typeLabel(type)+" · 系统 "+baseline+"/10 · 证据 "+row.optInt("supportCount",0)+" 本",11.5f,Ui.MUTED,false));
+        card.addView(Ui.text(this,typeLabel(type)+" · "+(row.optBoolean("systemUnknown",false)?"系统未判断 · 5/10 中性起点":"系统 "+baseline+"/10 · 证据 "+row.optInt("supportCount",0)+" 本"),11.5f,Ui.MUTED,false));
 
         SeekBar slider=new SeekBar(this);slider.setMax(9);slider.setProgress(current-1);slider.setEnabled(!blocked);
         final int base=baseline;

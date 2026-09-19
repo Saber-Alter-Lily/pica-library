@@ -559,7 +559,7 @@ export class UpdateManager {
 }
 
 export const updateInternals = {
-    compatibilityRequiresFullInstall,
+    classifyUpdateCompatibility,
     exactSourceMatches,
     prerelease,
     stableVersionParts,

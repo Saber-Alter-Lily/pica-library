@@ -6,6 +6,8 @@ def previewKeystorePath = System.getenv('ANDROID_PREVIEW_KEYSTORE_PATH')
 def previewKeystorePassword = System.getenv('ANDROID_PREVIEW_KEYSTORE_PASSWORD')
 def previewSigningConfigured = previewKeystorePath != null && !previewKeystorePath.isBlank() &&
         previewKeystorePassword != null && !previewKeystorePassword.isBlank()
+def buildVersionCode = Integer.parseInt(System.getenv('PICA_ANDROID_VERSION_CODE') ?: '42')
+def buildVersionName = System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.1.0-alpha8.15-multi-provider'
 
 android {
     namespace 'com.picalibrary.android'
@@ -15,8 +17,8 @@ android {
         applicationId 'com.picalibrary.android'
         minSdk 28
         targetSdk 35
-        versionCode 42
-        versionName '0.1.0-alpha8.15-multi-provider'
+        versionCode buildVersionCode
+        versionName buildVersionName
         manifestPlaceholders = [
                 appLabel  : 'Pica Library',
                 pairScheme: 'picalibrary'

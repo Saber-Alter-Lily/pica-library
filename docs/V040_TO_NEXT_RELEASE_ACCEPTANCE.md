@@ -9,12 +9,13 @@ Public v0.4.0 is the compatibility baseline for the next stable release.
 Known baseline:
 
 - Windows public version: `0.4.0`.
-- Desktop database schema: `9`.
+- Desktop database migration state: `9`.
+- Legacy v0.4.0 updater/capabilities declaration: `DATABASE_SCHEMA_VERSION = 8` (stale authority drift discovered during this audit).
 - Android package: `com.picalibrary.android`.
 - Android public versionCode: `42`.
 - Mutable Windows data lives outside the application directory under `%LOCALAPPDATA%\Pica Library`.
 
-The current development database schema is newer than v0.4.0. Therefore a direct upgrade must be treated as a data-preserving full-application replacement, not as an ordinary single-schema incremental patch.
+The current development database schema is newer than v0.4.0. Current code now derives the advertised schema directly from `latestMigrationVersion`, so the stale dual-maintenance bug cannot silently recur. Therefore a direct upgrade must be treated as a data-preserving full-application replacement, not as an ordinary single-schema incremental patch.
 
 ## Product requirement
 

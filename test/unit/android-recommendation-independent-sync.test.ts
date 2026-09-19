@@ -102,7 +102,7 @@ describe('Android independent recommendation runtime and sync UI', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
         )
         expect(engine).toContain(
-            'PortableRecommendationPackageStore.visualAdjustment'
+            'portable.visualAdjustment'
         )
         expect(engine).toContain('PORTABLE_RESERVOIR')
         expect(engine).toContain('portable.workId')

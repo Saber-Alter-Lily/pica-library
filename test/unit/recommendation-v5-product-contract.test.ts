@@ -22,7 +22,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(client).not.toContain('DESKTOP_SYNCED_V5_PORTABLE')
         expect(engine).toContain('PORTABLE_RESERVOIR')
         expect(engine).toContain('RecommendationEvidenceStore.sessionAdjustment')
-        expect(engine).toContain('PortableRecommendationPackageStore.visualAdjustment')
+        expect(engine).toContain('portable.visualAdjustment')
+        expect(engine).toContain('MobileVisualPolicyStore.live(app)')
     })
 
     it('exposes user-steerable persistent and session policy on Desktop and Android', () => {

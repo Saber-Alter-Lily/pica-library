@@ -149,7 +149,6 @@ public class PairingActivity extends Activity {
                     status.setText("配对成功 · 已同步 Desktop 账号连接状态");
                     offerFavoriteImport();
                 });
-                try{BridgeClient.syncRecommendationState(this,false);}catch(Exception ignored){}
                 try{ShelfStore.syncWithDesktop(this);}catch(Exception ignored){}
                 SupporterSyncJobs.enqueue(this);
             }catch(Exception e){
@@ -169,7 +168,7 @@ public class PairingActivity extends Activity {
             .setNeutralButton("仅同步收藏",(d,w)->syncFavorites(false))
             .setNegativeButton("稍后",(d,w)->{
                 Toast.makeText(this,"配对成功",Toast.LENGTH_SHORT).show();
-                finish();
+                offerRecommendationSync();
             })
             .setCancelable(false)
             .show();
@@ -183,7 +182,12 @@ public class PairingActivity extends Activity {
             covers?"正在后台同步收藏和封面":"正在后台同步收藏",
             Toast.LENGTH_SHORT
         ).show();
-        finish();
+        offerRecommendationSync();
+    }
+
+    private void offerRecommendationSync(){
+        status.setText("配对成功 · 推荐运行保持两端独立，可选择同步偏好与基础数据");
+        RecommendationSyncActivity.offerAfterPairing(this);
     }
 
     private void handleDeepLink(Uri u){

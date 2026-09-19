@@ -516,23 +516,18 @@ export class RecommendationPolicyStoreV5 {
                 snapshot: this.snapshot()
             }
         const controls = resolved.controls
-        for (const item of controls) {
-            if (!item || typeof item !== 'object') continue
-            const row = item as Record<string, unknown>
+        for (const row of controls) {
             const targetType = validTargetType(row.targetType)
             if (!targetType) continue
             state = upsertControlV5(
                 state,
                 normalizeControlV5({
                     targetType,
-                    key: String(row.key ?? ''),
-                    label: String(row.label ?? row.key ?? ''),
-                    direction: validDirection(row.direction),
-                    levelDelta:
-                        row.levelDelta === undefined
-                            ? undefined
-                            : Number(row.levelDelta),
-                    scope: validScope(row.scope),
+                    key: row.key,
+                    label: row.label,
+                    direction: row.direction,
+                    levelDelta: row.levelDelta,
+                    scope: row.scope,
                     source: 'ANDROID',
                     updatedAt: new Date().toISOString()
                 })

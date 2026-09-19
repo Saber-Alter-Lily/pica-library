@@ -205,16 +205,15 @@ function acceptReferences(files) {
 }
 
 function studioMarkup() {
-    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div>
-<p>只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。</p>
+    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><div class="help-heading"><h3>个性化装扮</h3><button type="button" class="info-tip" aria-label="查看个性化装扮说明" data-info-tip="只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。">!</button></div></div><span class="a83-state a83-good">已解锁</span></div>
 <div class="a85-steps"><span class="a85-step">1 · 描述与参考图</span><span class="a85-step">2 · 导出 ZIP 给 AI</span><span class="a85-step">3 · 导入 AI 返回包</span><span class="a85-step">4 · 自动同步手机</span></div>
 <div class="a85-workflow">
-<section class="a85-box"><h4>制作装扮 · Theme Creator Kit</h4><p class="status">主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。</p>
+<section class="a85-box"><div class="help-heading"><h4>制作装扮 · Theme Creator Kit</h4><button type="button" class="info-tip" aria-label="查看 Theme Creator Kit 说明" data-info-tip="主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。">!</button></div>
 <textarea id="a85-description" maxlength="4000" placeholder="例如：紫发二次元漫画向导，星空与白猫，薰衣草紫为主色，整体轻盈、可爱，但不要遮抢漫画封面。"></textarea>
 <label class="a85-upload" id="a85-reference-drop"><strong>上传角色 / 风格参考图</strong><br><span>PNG / JPEG / WebP · 最多 4 张</span><input id="a85-reference-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
 <div id="a85-reference-grid" class="a85-reference-grid"></div><p id="a85-reference-message" class="status"></p>
 <div class="a83-row"><button id="a85-export" type="button" class="primary">导出给 AI</button><a class="button-link" href="./theme-pack-creator-prompt.txt" download>查看固定提示词</a><a class="button-link" href="./theme-pack-spec-v1.txt" download>查看装扮规范</a></div><p id="a85-export-message" class="status"></p></section>
-<section class="a85-box"><h4>导入并应用</h4><p class="status">把 AI 返回的 <code>.pica-theme</code> 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。</p>
+<section class="a85-box"><div class="help-heading"><h4>导入并应用</h4><button type="button" class="info-tip" aria-label="查看装扮导入说明" data-info-tip="把 AI 返回的 .pica-theme 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。">!</button></div>
 <label class="a85-theme-drop" id="a85-theme-drop"><strong>拖入 AI 返回的装扮包</strong><br><span>或点击选择文件 · 上限 24 MiB</span><input id="a85-theme-input" type="file" accept=".pica-theme,.zip,application/zip" hidden></label>
 <p id="a85-import-message" class="status"></p><div id="a85-theme-list"></div><div class="a85-mobile-note" id="a85-mobile-note">手机与电脑在同一局域网重新配对/同步一次后，会自动取得 Desktop 的已安装装扮，并跟随当前启用的装扮。</div></section>
 </div>`

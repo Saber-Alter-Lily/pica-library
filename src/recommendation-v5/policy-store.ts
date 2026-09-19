@@ -17,6 +17,10 @@ import {
     type SessionIntentMode,
     upsertControlV5
 } from './portable-policy'
+import {
+    applyConflictResolutionsV1,
+    previewMobileRecommendationSyncV1
+} from './mobile-sync'
 
 interface MobileFeedbackMutationV5 {
     comicId?: unknown
@@ -27,13 +31,19 @@ interface MobileFeedbackMutationV5 {
 export interface MobileRecommendationSyncV5 {
     deviceId?: unknown
     mutationId?: unknown
+    baseRevision?: unknown
+    baseControls?: unknown
     controls?: unknown
+    /** Legacy clients only. V1 paired-runtime session intent stays device local. */
     sessionIntent?: unknown
     feedback?: unknown
+    events?: unknown
     suppressComicIds?: unknown
     clearSuppressComicIds?: unknown
     tasteExcludedComicIds?: unknown
     clearTasteExcludedComicIds?: unknown
+    resolutions?: unknown
+    syncSchemaVersion?: unknown
 }
 
 function stringArray(value: unknown) {
@@ -415,6 +425,63 @@ export class RecommendationPolicyStoreV5 {
             })
     }
 
+    private applyPortableEvent(
+        value: Record<string, unknown>,
+        deviceId: string,
+        mutationId: string,
+        index: number
+    ) {
+        const eventType = String(value.eventType ?? '')
+        if (
+            ![
+                'recommend_impression',
+                'recommend_detail_open',
+                'reader_complete'
+            ].includes(eventType)
+        )
+            return
+        const comicId = String(value.comicId ?? '').trim()
+        if (!comicId) return
+        const eventId = String(value.eventId ?? '').trim().slice(0, 200)
+        this.database.recordUserEvent({
+            eventType: eventType as
+                | 'recommend_impression'
+                | 'recommend_detail_open'
+                | 'reader_complete',
+            comicId,
+            source: 'android-sync-v5',
+            occurredAt: String(value.occurredAt ?? ''),
+            metadata: {
+                deviceId,
+                mutationId,
+                portable: true
+            },
+            dedupeKey: eventId
+                ? `v5-mobile-event:${deviceId}:${eventId}`
+                : `v5-mobile:${deviceId}:${mutationId}:${index}:event`
+        })
+    }
+
+    previewMobile(input: MobileRecommendationSyncV5) {
+        const state = this.state()
+        return {
+            ...previewMobileRecommendationSyncV1({
+                baseRevision: input.baseRevision,
+                desktopRevision: state.revision,
+                baseControls: input.baseControls,
+                desktopControls: state.controls,
+                androidControls: input.controls,
+                feedback: input.feedback,
+                events: input.events,
+                suppressComicIds: input.suppressComicIds,
+                clearSuppressComicIds: input.clearSuppressComicIds,
+                tasteExcludedComicIds: input.tasteExcludedComicIds,
+                clearTasteExcludedComicIds: input.clearTasteExcludedComicIds
+            }),
+            snapshot: this.snapshot()
+        }
+    }
+
     mergeMobile(input: MobileRecommendationSyncV5) {
         const deviceId = String(input.deviceId ?? '').trim().slice(0, 160)
         const mutationId = String(input.mutationId ?? '').trim().slice(0, 200)
@@ -422,7 +489,33 @@ export class RecommendationPolicyStoreV5 {
             throw new Error('deviceId and mutationId are required for recommendation sync')
         let state = this.state()
         const previousRevision = state.deviceSyncRevisions[deviceId] ?? 0
-        const controls = Array.isArray(input.controls) ? input.controls : []
+        const preview = previewMobileRecommendationSyncV1({
+            baseRevision: input.baseRevision,
+            desktopRevision: state.revision,
+            baseControls: input.baseControls,
+            desktopControls: state.controls,
+            androidControls: input.controls,
+            feedback: input.feedback,
+            events: input.events,
+            suppressComicIds: input.suppressComicIds,
+            clearSuppressComicIds: input.clearSuppressComicIds,
+            tasteExcludedComicIds: input.tasteExcludedComicIds,
+            clearTasteExcludedComicIds: input.clearTasteExcludedComicIds
+        })
+        const resolved = applyConflictResolutionsV1({
+            androidControls: input.controls,
+            conflicts: preview.conflicts,
+            resolutions: input.resolutions
+        })
+        if (resolved.unresolved.length)
+            return {
+                acknowledgedMutationId: null,
+                requiresResolution: true,
+                preview,
+                conflicts: resolved.unresolved,
+                snapshot: this.snapshot()
+            }
+        const controls = resolved.controls
         for (const item of controls) {
             if (!item || typeof item !== 'object') continue
             const row = item as Record<string, unknown>
@@ -445,7 +538,13 @@ export class RecommendationPolicyStoreV5 {
                 })
             )
         }
-        if (input.sessionIntent && typeof input.sessionIntent === 'object') {
+        // syncSchemaVersion >= 1 keeps Session Intent device-local.
+        // Legacy clients keep the old behavior for backward compatibility.
+        if (
+            Number(input.syncSchemaVersion ?? 0) < 1 &&
+            input.sessionIntent &&
+            typeof input.sessionIntent === 'object'
+        ) {
             const raw = input.sessionIntent as Record<string, unknown>
             const targetType = validTargetType(raw.targetType)
             const mode = validSessionMode(raw.mode)
@@ -494,8 +593,20 @@ export class RecommendationPolicyStoreV5 {
                     index
                 )
         })
+        const events = Array.isArray(input.events) ? input.events : []
+        events.forEach((item, index) => {
+            if (item && typeof item === 'object')
+                this.applyPortableEvent(
+                    item as Record<string, unknown>,
+                    deviceId,
+                    mutationId,
+                    index
+                )
+        })
         return {
             acknowledgedMutationId: mutationId,
+            requiresResolution: false,
+            preview,
             deviceRevision: state.deviceSyncRevisions[deviceId],
             snapshot: this.snapshot()
         }

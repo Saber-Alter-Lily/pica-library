@@ -91,6 +91,16 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(ui).toContain('setText("!")')
     })
 
+    it('uses Desktop-equivalent 1-10 levelDelta magnitudes on Android', () => {
+        const store = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java'
+        )
+        expect(store).toContain(
+            'Math.min(0.27,Math.abs(row.optInt("levelDelta",0))*0.03)'
+        )
+        expect(store).toContain('double magnitude=controlMagnitude')
+    })
+
     it('aligns item semantics and taste exclusion with Desktop without turning them into dislikes', () => {
         const policy = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java'

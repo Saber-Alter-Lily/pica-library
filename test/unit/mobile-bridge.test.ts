@@ -115,4 +115,57 @@ describe('Mobile Bridge', () => {
         })
         database.close()
     })
+
+    it('collapses repeated pairing for the same stable Android device and revokes the old token', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-mobile-device-'))
+        roots.push(root)
+        const database = new LibraryDatabase(path.join(root, 'library.db'))
+        const service = new LibraryService(database, root)
+        const bridge = await startMobileBridge({
+            database,
+            service,
+            host: '127.0.0.1',
+            port: 0,
+            stateFile: path.join(root, 'mobile-state.json')
+        })
+        bridges.push(bridge)
+        const host = bridge.status().addresses[0]
+
+        const pair = async (code: string) => {
+            const response = await fetch(`${host}/mobile/v1/pair`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    code,
+                    deviceId: 'android-stable-test-device',
+                    deviceName: 'HONOR PTP-AN10'
+                })
+            })
+            expect(response.status).toBe(200)
+            return String(((await response.json()) as { token: string }).token)
+        }
+
+        const firstToken = await pair(bridge.status().pairingCode)
+        expect(bridge.status().pairedDevices).toHaveLength(1)
+
+        const secondToken = await pair(bridge.status().pairingCode)
+        expect(secondToken).not.toBe(firstToken)
+        expect(bridge.status().pairedDevices).toHaveLength(1)
+        expect(bridge.status().pairedDevices[0].deviceName).toBe(
+            'HONOR PTP-AN10'
+        )
+
+        const stale = await fetch(`${host}/mobile/v1/device`, {
+            headers: { authorization: `Bearer ${firstToken}` }
+        })
+        expect(stale.status).toBe(401)
+
+        const current = await fetch(`${host}/mobile/v1/device`, {
+            headers: { authorization: `Bearer ${secondToken}` }
+        })
+        expect(current.status).toBe(200)
+
+        database.close()
+    })
+
 })

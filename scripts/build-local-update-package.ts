@@ -11,6 +11,8 @@ import {
     normalizeUpdatePath,
     updaterSelfReplacement
 } from '../src/update/path-safety'
+import { classifyUpdateCompatibility } from '../src/update/compatibility'
+import { releasedUpdateBaseline } from '../src/update/released-baselines'
 import type { UpdateManifest } from '../src/update/types'
 
 function sha256(value: Buffer) {
@@ -138,10 +140,31 @@ export function buildLocalUpdatePackage(
                 ...unsafeDeleted
             ].join(', ')}`
         )
-    if (updaterSelfReplacement(changed.map(([name]) => name)))
+    const updaterChanged = updaterSelfReplacement(
+        changed.map(([name]) => name)
+    )
+    if (updaterChanged)
         throw new Error(
             'Updater helper changed; requiresFullInstall must be used'
         )
+
+    const releasedBaseline = source.stable
+        ? releasedUpdateBaseline(sourceVersion)
+        : null
+    if (releasedBaseline) {
+        const compatibility = classifyUpdateCompatibility({
+            currentAppApiVersion: releasedBaseline.appApiVersion,
+            currentDatabaseSchemaVersion:
+                releasedBaseline.advertisedDatabaseSchemaVersion,
+            targetAppApiVersion: APP_API_VERSION,
+            targetDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION,
+            updaterHelperChanged: updaterChanged
+        })
+        if (compatibility.kind !== 'INCREMENTAL')
+            throw new Error(
+                `Incremental update from public v${sourceVersion} is not compatible (${compatibility.reason}); use a full application upgrade path`
+            )
+    }
     const manifest: UpdateManifest = {
         manifestVersion: 1,
         packageType:

@@ -42,7 +42,7 @@ final class RecommendationLocalProfile {
 
         List<UnifiedCatalogStore.Entry> positives=new ArrayList<>();
         for(UnifiedCatalogStore.Entry entry:UnifiedCatalogStore.load(app).entries())
-            if(entry.favorite||RecommendationFeedbackStore.isLiked(app,entry.id))positives.add(entry);
+            if((entry.favorite||RecommendationFeedbackStore.isLiked(app,entry.id))&&!RecommendationPolicyStore.tasteExcluded(app,entry.id))positives.add(entry);
         if(positives.isEmpty())return new JSONArray(merged.values());
 
         MobileTagRegistry registry=null;try{registry=MobileTagRegistry.load(app);}catch(Exception ignored){}

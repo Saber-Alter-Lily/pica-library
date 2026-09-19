@@ -4,7 +4,9 @@ import android.app.*;
 import android.content.*;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.*;
+import androidx.core.widget.NestedScrollView;
 import java.util.*;
 import org.json.*;
 
@@ -17,6 +19,7 @@ public final class RecommendationControlActivity extends Activity {
     private LinearLayout content;
     private EditText search;
     private final Set<String> expanded=new LinkedHashSet<>();
+    private final Set<String> expandedFacets=new LinkedHashSet<>();
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);Ui.applyWindow(this);expanded.add("people");renderShell();
@@ -61,10 +64,18 @@ public final class RecommendationControlActivity extends Activity {
         renderSignals("");
     }
 
-    private static final class Group {
+    private static final class FacetGroup {
         final String id,label;final List<JSONObject> rows=new ArrayList<>();
-        Group(String id,String label){this.id=id;this.label=label;}
+        FacetGroup(String id,String label){this.id=id;this.label=label;}
     }
+    private static final class Group {
+        final String id,label;
+        final LinkedHashMap<String,FacetGroup> facets=new LinkedHashMap<>();
+        Group(String id,String label){this.id=id;this.label=label;}
+        int size(){int count=0;for(FacetGroup facet:facets.values())count+=facet.rows.size();return count;}
+    }
+
+    private String currentQuery(){return search==null?"":search.getText().toString().trim();}
 
     private void renderSignals(String query){
         while(content.getChildCount()>4)content.removeViewAt(content.getChildCount()-1);
@@ -84,22 +95,49 @@ public final class RecommendationControlActivity extends Activity {
             JSONObject row=inferred.optJSONObject(i);if(row==null)continue;
             String label=row.optString("label",row.optString("key",""));
             if(!q.isEmpty()&&!label.toLowerCase(Locale.ROOT).contains(q))continue;
-            String group=groupFor(row.optString("facet",""),row.optString("targetType",""));
-            groups.get(group).rows.add(row);
+            String type=row.optString("targetType","TAG"),facet=row.optString("facet","");
+            String groupId=groupFor(facet,type);
+            Group group=groups.get(groupId);
+            String facetId=facetIdentity(facet,type),facetLabel=facetLabel(facet,type);
+            FacetGroup bucket=group.facets.get(facetId);
+            if(bucket==null){bucket=new FacetGroup(facetId,facetLabel);group.facets.put(facetId,bucket);}
+            bucket.rows.add(row);
         }
         for(Group group:groups.values()){
-            if(group.rows.isEmpty())continue;
+            if(group.size()==0)continue;
             boolean open=!q.isEmpty()||expanded.contains(group.id);
             LinearLayout section=SettingsRow.panel(this,null);
-            Button header=Ui.button(this,(open?"▾ ":"▸ ")+group.label+" · "+group.rows.size()+" 项",v->{if(expanded.contains(group.id))expanded.remove(group.id);else expanded.add(group.id);render();},true);
+            Button header=Ui.button(this,(open?"▾ ":"▸ ")+group.label+" · "+group.size()+" 项",v->{if(expanded.contains(group.id))expanded.remove(group.id);else expanded.add(group.id);renderSignals(currentQuery());},true);
             section.addView(header,new LinearLayout.LayoutParams(-1,-2));
-            if(open)for(JSONObject row:group.rows)renderSignal(section,row);
+            if(open){
+                for(FacetGroup facet:group.facets.values()){
+                    String expansionId=group.id+":"+facet.id;
+                    boolean facetOpen=!q.isEmpty()||expandedFacets.contains(expansionId);
+                    Button facetHeader=Ui.button(this,(facetOpen?"▾ ":"▸ ")+facet.label+" · "+facet.rows.size()+" 项",v->{if(expandedFacets.contains(expansionId))expandedFacets.remove(expansionId);else expandedFacets.add(expansionId);renderSignals(currentQuery());},true);
+                    LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,-2);fp.setMargins(0,Ui.dp(this,5),0,0);section.addView(facetHeader,fp);
+                    if(facetOpen)addFacetWindow(section,facet.rows);
+                }
+            }
             content.addView(section);
         }
         if(!q.isEmpty()){
-            boolean any=false;for(Group group:groups.values())if(!group.rows.isEmpty()){any=true;break;}
+            boolean any=false;for(Group group:groups.values())if(group.size()>0){any=true;break;}
             if(!any)content.addView(Ui.text(this,"没有找到“"+query+"”。手机不会因为输入文字就自动创建新标签。",13,Ui.MUTED,false));
         }
+    }
+
+    private void addFacetWindow(LinearLayout parent,List<JSONObject> rows){
+        NestedScrollView scroll=new NestedScrollView(this);
+        scroll.setNestedScrollingEnabled(true);
+        scroll.setFillViewport(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        LinearLayout list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);
+        for(JSONObject row:rows)renderSignal(list,row);
+        scroll.addView(list,new NestedScrollView.LayoutParams(-1,-2));
+        int visible=Math.min(5,Math.max(1,rows.size()));
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,rows.size()>5?Ui.dp(this,visible*118):LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0,Ui.dp(this,4),0,Ui.dp(this,4));
+        parent.addView(scroll,lp);
     }
 
     private void renderSignal(LinearLayout parent,JSONObject row){
@@ -122,14 +160,14 @@ public final class RecommendationControlActivity extends Activity {
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser)value.setText((progress+1)+"/10");}
             public void onStartTrackingTouch(SeekBar bar){}
-            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress()+1,delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);render();}
+            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress()+1,delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);renderSignals(currentQuery());}
         });
         card.addView(slider);
 
         LinearLayout buttons=new LinearLayout(this);buttons.setGravity(Gravity.CENTER_VERTICAL);
-        buttons.addView(Ui.button(this,blocked?"取消屏蔽":"屏蔽",v->{RecommendationPolicyStore.setLocalControl(this,type,key,label,blocked?"DEFAULT":"BLOCK","PERSISTENT",null);render();},true),new LinearLayout.LayoutParams(0,-2,1));
+        buttons.addView(Ui.button(this,blocked?"取消屏蔽":"屏蔽",v->{RecommendationPolicyStore.setLocalControl(this,type,key,label,blocked?"DEFAULT":"BLOCK","PERSISTENT",null);renderSignals(currentQuery());},true),new LinearLayout.LayoutParams(0,-2,1));
         Ui.gap(buttons,this,6);
-        buttons.addView(Ui.button(this,"本次想看",v->{RecommendationPolicyStore.setLocalSessionIntent(this,type,key,label);render();},true),new LinearLayout.LayoutParams(0,-2,1));
+        buttons.addView(Ui.button(this,"本次想看",v->{RecommendationPolicyStore.setLocalSessionIntent(this,type,key,label);renderSignals(currentQuery());},true),new LinearLayout.LayoutParams(0,-2,1));
         card.addView(buttons);
         parent.addView(card);
     }
@@ -145,6 +183,17 @@ public final class RecommendationControlActivity extends Activity {
     }
     private String normalize(String value){return value==null?"":value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+"," ");}
     private String typeLabel(String type){if("AUTHOR".equals(type))return "作者";if("CATEGORY".equals(type))return "分类";if("FANDOM".equals(type))return "作品 / IP";if("STYLE_FAMILY".equals(type))return "画风族";return "标签";}
+    private String facetIdentity(String facet,String type){if("AUTHOR".equals(type)||"CATEGORY".equals(type)||"FANDOM".equals(type)||"STYLE_FAMILY".equals(type))return type;return facet==null||facet.isEmpty()?"OTHER":facet;}
+    private String facetLabel(String facet,String type){
+        if("AUTHOR".equals(type))return "作者";if("CATEGORY".equals(type))return "分类";if("FANDOM".equals(type))return "作品 / IP";if("STYLE_FAMILY".equals(type))return "画风族";
+        if("FANDOM_CHARACTER".equals(facet))return "角色";if("GENRE_THEME".equals(facet))return "题材 / 类型";if("STORY_TROPE".equals(facet))return "剧情 / 设定";
+        if("RELATIONSHIP".equals(facet)||"RELATIONSHIP_TROPE".equals(facet))return "人物关系";if("IDENTITY_ROLE".equals(facet)||"CHARACTER_IDENTITY_ROLE".equals(facet))return "身份 / 职业";
+        if("SPECIES_FANTASY".equals(facet))return "种族 / 幻想";if("APPEARANCE_TRAIT".equals(facet)||"APPEARANCE_OUTFIT".equals(facet))return "外观 / 服装";
+        if("BODY_ATTRIBUTE".equals(facet)||"CHARACTER_BODY_ATTRIBUTE".equals(facet))return "身体特征";if("SETTING_LOCATION".equals(facet))return "场景 / 地点";
+        if("SEXUAL_BEHAVIOR".equals(facet)||"CONTENT_BEHAVIOR".equals(facet))return "行为";if("FETISH_TROPE".equals(facet))return "偏好 / 情境";
+        if("PHYSIOLOGY_STATE".equals(facet))return "生理状态";if("CONTROL_COERCION".equals(facet))return "支配 / 控制";if("VISUAL_STYLE".equals(facet))return "画风";
+        if("AUDIENCE_ORIENTATION".equals(facet))return "受众倾向";if("FORMAT".equals(facet))return "形式";return "其他标签";
+    }
     private String groupFor(String facet,String type){
         if("AUTHOR".equals(type)||"FANDOM".equals(type)||Arrays.asList("CREATOR_ENTITY","FANDOM_IP","FANDOM_CHARACTER","IDENTITY_ROLE","CHARACTER_IDENTITY_ROLE","SPECIES_FANTASY","RELATIONSHIP","RELATIONSHIP_TROPE","AUDIENCE_ORIENTATION").contains(facet))return "people";
         if(Arrays.asList("CATEGORY","GENRE_THEME","STORY_TROPE","SETTING_LOCATION","PHYSIOLOGY_STATE").contains(facet))return "content";

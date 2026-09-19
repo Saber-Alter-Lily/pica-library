@@ -9,10 +9,14 @@ describe('account onboarding distribution candidate', () => {
             'utf8'
         )
         expect(pkg.version).toBe('0.4.0')
-        expect(gradle).toContain('versionCode 42')
         expect(gradle).toContain(
-            "versionName '0.1.0-alpha8.15-multi-provider'"
+            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '42'"
         )
+        expect(gradle).toContain('versionCode buildVersionCode')
+        expect(gradle).toContain(
+            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.1.0-alpha8.15-multi-provider'"
+        )
+        expect(gradle).toContain('versionName buildVersionName')
     })
 
     it('requires the checksum-verified official v0.3.14 base without replacing the launcher', () => {

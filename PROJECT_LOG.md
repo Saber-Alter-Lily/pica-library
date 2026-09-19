@@ -8,6 +8,8 @@
 
 ### Recommendation V5 / Visual V1
 
+- Desktop↔Android 账号复用进入 Provider Relay 阶段：手机无本机 Pica 账号但已配对且 Desktop 已登录时，`PicaClient` 自动以 Desktop Mobile Bridge 为后备来源，覆盖搜索/浏览/收藏列表/排行榜/相关作品/详情/章节/页列表及收藏增删；本机账号存在时仍优先直连。Relay 只传 Provider 结果和用户操作，不把 Pica 邮箱、密码、authorization token 或 E-H Cookie 复制到手机。
+- Android Pica 账号页在 Desktop-backed 状态下默认显示“已由 Desktop 连接”，不再直接要求重复登录；只有用户明确需要“电脑关闭后手机仍直连”时才展开配置手机本机账号。在线浏览、作者作品刷新、详情、Reader、阅读历史、封面补全和手机推荐入口均已识别 Desktop-backed Pica 可用性。
 - 2026-09-19 当前实机测试轮判定为 `SUFFICIENT_FOR_PRODUCT_AND_TELEMETRY_ITERATION`：现有真实数据已覆盖推荐曝光、批次展示、详情打开、Like/Dislike、收藏/行为证据、Shadow 运行、审计导出与跨会话 ID，可用于继续修 UI、数据契约、会话归因、serving/Shadow 口径和跨端连接；继续在旧 Beta 上积累同类数据的边际价值已较低。
 - 同一测试轮仍为 `INSUFFICIENT_FOR_FORMAL_RECOMMENDER_PROMOTION`：当前 Shadow run 数量和成熟 future-outcome 窗口不足，不能据此宣称 V5 推荐质量优于现有 serving、不能做正式模型 promotion，也不能触发 LTR/Bandit/Active Learning。研发推进与长期 benchmark 解耦，不再为等待 30 天 outcome maturity 阻塞产品修复。
 - 下一阶段采用“候选版短验收 → 继续真实使用积累”的节奏：下一候选只需重点验证 Session 非零、audit schema v2/serving_composition、内置扫码、设备去重、折叠/内部滚动与 InfoTip；通过后继续日常使用，长期准确率证据后台自然成熟。

@@ -14,6 +14,10 @@ import org.json.JSONObject;
  * synced later without syncing the current recommendation batch.
  */
 final class RecommendationEvidenceStore {
+    static final class Signal {
+        final String kind,label;final int score,support;
+        Signal(String kind,String label,int score,int support){this.kind=kind;this.label=label;this.score=score;this.support=support;}
+    }
     private static final String PREFS="recommendation-evidence-v1";
     private static final String EVENTS="events";
     private static final int MAX_EVENTS=1000;
@@ -156,6 +160,25 @@ final class RecommendationEvidenceStore {
             score+=Math.min(weight*0.6,overlap(comic.categories,strings(row.optJSONArray("categories")))*weight*0.2);
         }
         double cap=sessionOnly?0.15:0.10;return Math.max(-cap,Math.min(cap,score));
+    }
+
+    static List<Signal> topSignals(Context c,boolean sessionOnly,int limit){
+        JSONArray events=load(c);LinkedHashMap<String,Integer> score=new LinkedHashMap<>(),support=new LinkedHashMap<>();long max=30L*24L*60L*60L*1000L;
+        for(int i=0;i<events.length();i++){
+            JSONObject row=events.optJSONObject(i);if(row==null)continue;
+            if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.optString("sessionId","")))continue;
+            if(!sessionOnly&&ageMillis(row)>max)continue;
+            String type=row.optString("eventType","");int weight="reader_complete".equals(type)?3:"recommend_detail_open".equals(type)?1:0;if(weight<=0)continue;
+            addSignal(score,support,"作者",row.optString("author",""),weight);
+            for(String tag:strings(row.optJSONArray("tags")))addSignal(score,support,"标签",tag,weight);
+            for(String category:strings(row.optJSONArray("categories")))addSignal(score,support,"分类",category,weight);
+        }
+        ArrayList<Signal> rows=new ArrayList<>();for(Map.Entry<String,Integer> item:score.entrySet()){String[] parts=item.getKey().split("\u0000",2);if(parts.length==2)rows.add(new Signal(parts[0],parts[1],item.getValue(),support.getOrDefault(item.getKey(),0)));}
+        rows.sort((a,b)->{int by=Integer.compare(b.score,a.score);if(by!=0)return by;int sup=Integer.compare(b.support,a.support);return sup!=0?sup:a.label.compareToIgnoreCase(b.label);});
+        return rows.subList(0,Math.min(Math.max(0,limit),rows.size()));
+    }
+    private static void addSignal(Map<String,Integer> score,Map<String,Integer> support,String kind,String label,int weight){
+        String clean=label==null?"":label.trim();if(clean.isEmpty())return;String key=kind+"\u0000"+clean;score.put(key,score.getOrDefault(key,0)+weight);support.put(key,support.getOrDefault(key,0)+1);
     }
 
     static int recentCount(Context c){

@@ -28,7 +28,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain('/api/v1/recommendation-v5/control')
         expect(server).toContain('/api/v1/recommendation-v5/session')
         expect(index).toContain('recommendation-v5-beta.js')
-        expect(web).toContain('系统主要兴趣 · 1–10 档')
+        expect(web).toContain('你的推荐画像')
+        expect(web).toContain('完整画像与微调 · 1–10 档')
         expect(web).toContain('1 = 尽量少推荐，10 = 非常喜欢')
         expect(web).toContain('系统未判断 · 5/10 为中性起点')
         expect(web).toContain('恢复系统判断')
@@ -890,12 +891,16 @@ describe('Recommendation V5 portable product contract', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
         )
         const saved = pairing.indexOf('BridgeStore.save(this,h,token,name)')
-        const success = pairing.indexOf('配对成功 · 后台正在同步推荐状态')
+        const accountState = pairing.indexOf(
+            'DesktopAccountStatusStore.save(this,BridgeClient.accountStatus(this))'
+        )
+        const success = pairing.indexOf('配对成功 · 已同步 Desktop 账号连接状态')
         const backgroundSync = pairing.indexOf(
             'BridgeClient.syncRecommendationState(this,false)'
         )
         expect(saved).toBeGreaterThanOrEqual(0)
-        expect(success).toBeGreaterThan(saved)
+        expect(accountState).toBeGreaterThan(saved)
+        expect(success).toBeGreaterThan(accountState)
         expect(backgroundSync).toBeGreaterThan(success)
         expect(pairing).not.toContain(
             'BridgeClient.syncRecommendationState(this,true)'

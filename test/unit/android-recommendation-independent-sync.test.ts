@@ -115,6 +115,23 @@ describe('Android independent recommendation runtime and sync UI', () => {
         )
     })
 
+    it('keeps the baked Android runtime policy baseline stable when Desktop state syncs', () => {
+        const store = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java'
+        )
+        const engine = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java'
+        )
+        expect(engine).toContain('RecommendationPolicyStore.markCacheBaseline(app)')
+        const acknowledge = store.slice(
+            store.indexOf('static void acknowledge(Context c,JSONObject response,String expectedMutationId)')
+        )
+        expect(acknowledge).not.toContain('saveCacheBaseline(c,value)')
+        expect(store).toContain(
+            'adjustment(current,item)-adjustment(baseline,item)'
+        )
+    })
+
     it('imports Desktop feedback and recent evidence without echoing it as a local Session', () => {
         const bridge = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java'

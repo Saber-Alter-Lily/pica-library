@@ -8,6 +8,9 @@
 
 ### Recommendation V5 / Visual V1
 
+- 2026-09-19 当前实机测试轮判定为 `SUFFICIENT_FOR_PRODUCT_AND_TELEMETRY_ITERATION`：现有真实数据已覆盖推荐曝光、批次展示、详情打开、Like/Dislike、收藏/行为证据、Shadow 运行、审计导出与跨会话 ID，可用于继续修 UI、数据契约、会话归因、serving/Shadow 口径和跨端连接；继续在旧 Beta 上积累同类数据的边际价值已较低。
+- 同一测试轮仍为 `INSUFFICIENT_FOR_FORMAL_RECOMMENDER_PROMOTION`：当前 Shadow run 数量和成熟 future-outcome 窗口不足，不能据此宣称 V5 推荐质量优于现有 serving、不能做正式模型 promotion，也不能触发 LTR/Bandit/Active Learning。研发推进与长期 benchmark 解耦，不再为等待 30 天 outcome maturity 阻塞产品修复。
+- 下一阶段采用“候选版短验收 → 继续真实使用积累”的节奏：下一候选只需重点验证 Session 非零、audit schema v2/serving_composition、内置扫码、设备去重、折叠/内部滚动与 InfoTip；通过后继续日常使用，长期准确率证据后台自然成熟。
 - 2026-09-19 实际使用反馈轮：推荐画像页继续收敛信息密度。画像、当前实际推荐构成、V5 Shadow 实验规划均可独立折叠；20+ facet 再聚合为“人物与作品 / 内容与剧情 / 外观与画风 / 行为与偏好 / 形式与其他”五个大组，各 facet 使用固定高度内部滚动查看全部条目，不再只展示前 12 项后强迫搜索。
 - 修复 Recommendation V5 Session 证据链：Web 当前 `appSessionId` 接入 timescale/channel 读取与推荐审计导出；首份真实审计包中“Session=0”不再被误解释为无会话行为。
 - 新增只读 Final V3 serving composition：普通页面展示已经实际落盘的当前推荐批次来源构成；V5 candidate-channel 继续明确标注 Shadow / `servingImpact=false`，避免把实验规划冒充正式推荐来源。

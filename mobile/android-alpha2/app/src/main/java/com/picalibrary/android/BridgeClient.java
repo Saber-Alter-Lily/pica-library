@@ -135,6 +135,9 @@ final class BridgeClient {
         body.put("limit",Math.max(1,Math.min(100,limit)));
         return new JSONObject(post(c,"/mobile/v1/provider/eh/search",body,45000));
     }
+    static JSONObject ehRelayFavoritesSnapshot(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/favorites-snapshot"));
+    }
     static JSONObject ehRelayExhCapability(Context c) throws Exception {
         return new JSONObject(get(c,"/mobile/v1/provider/eh/exh-capability"));
     }

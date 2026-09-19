@@ -66,9 +66,9 @@ describe('Recommendation V5 portable mobile package', () => {
             expect(first.foundation.visualGeneration).toMatch(/^[0-9a-f]{24}$/)
             expect(first.foundation.canonicalGeneration).toMatch(/^[0-9a-f]{24}$/)
             expect(first.engineVersion).toBe('portable-v5-runtime-v1')
-            expect(JSON.stringify(first)).not.toMatch(
-                /"vector"|"embedding"s*:s*[/
-            )
+            const serialized = JSON.stringify(first)
+            expect(serialized).not.toContain('"vector"')
+            expect(serialized).not.toContain('"embedding":[')
             expect(JSON.stringify(first)).not.toMatch(
                 /password|passHash|authorization|cookie/i
             )

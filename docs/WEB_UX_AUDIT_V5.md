@@ -1,6 +1,6 @@
 # Web UX Audit — V5 Development
 
-Status: third implementation pass complete; awaiting manual QA on the current beta build. This document tracks product UX, not scientific/recommendation promotion.
+Status: fourth implementation pass in validation; recommendation profile dashboard, audit export and QR pairing/account-state sync added. This document tracks product UX, not scientific/recommendation promotion.
 
 ## Audit rules
 
@@ -55,6 +55,11 @@ Every surface is reviewed for:
 - Theme/Visual/settings observers are coalesced and themed progress decoration uses event-driven updates with a low-frequency fallback instead of 650 ms full-page rescans.
 - File import is one-step (`choose → import`) with duplicate execution locked; settings, connection, update, export and cache actions expose busy/failed states.
 - E-H secondary actions are visually separated from the primary web-login and cloud-favorites workflow, and long-running account actions reject duplicate clicks.
+- Recommendation Preferences now opens with an inspectable long-term/recent/session profile and current candidate-channel composition before detailed controls.
+- Detailed 1–10 sliders are staged locally and require explicit Save; search requires Search/Enter, and an unknown term is never auto-created as a tag without confirmation.
+- Recommendation audit export is an explicit Desktop action that writes an allowlisted ZIP and excludes provider credentials, tokens/cookies and manga files.
+- Mobile pairing now exposes a locally generated QR deep link; the QR payload never leaves the device for rendering.
+- Paired Android devices mirror only non-secret Desktop provider connection state. Credential/session handoff remains disabled until the Mobile Bridge transport is hardened.
 
 ## Manual QA gates for this pass
 

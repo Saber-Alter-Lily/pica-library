@@ -18,7 +18,18 @@ The current development database schema is newer than v0.4.0. Therefore a direct
 
 ## Product requirement
 
-The user experience may still be one-click, but the implementation must preserve this separation:
+### Shipped-v0.4 constraint
+
+Public v0.4.0 can detect that a newer release requires a full install, but its already-shipped updater cannot automatically replace a complete application package. That limitation cannot be retrofitted into an installed v0.4.0 binary after publication.
+
+Therefore there are only two honest compatibility paths:
+
+1. **Direct full-package path** — v0.4.0 opens the official next-stable Release/full ZIP; the user extracts/replaces application files once while the external data home remains untouched.
+2. **Optional bridge path** — only if a separately published bridge release is designed and validated before the next stable rollout. The bridge must itself be acceptable to the v0.4.0 incremental updater (including Schema 9 → at most 10), must not replace the legacy updater helper, and may then add future full-package update capability.
+
+Do not claim that public v0.4.0 already supports a one-click full-package replacement. Future clients may implement that capability using an updater kept outside/reliably independent from the application tree, following the same general separation used by mature open-source Windows updaters.
+
+Regardless of UI, the implementation must preserve this separation:
 
 ```text
 old application files
@@ -169,7 +180,28 @@ The next stable release is blocked if any of the following is true:
 
 ## Release strategy
 
-Preferred release behavior:
+### Public v0.4.0 direct path
+
+If no validated bridge release is deliberately shipped, the supported direct path is:
+
+```text
+v0.4.0
+  ↓ check update
+next stable requires full package
+  ↓ official Release/full ZIP
+close old application
+  ↓ replace application directory only
+preserve %LOCALAPPDATA%\Pica Library
+  ↓ launch new version
+schema 9 → current migrations
+  ↓ health/data verification
+```
+
+This is a one-time application replacement, not a data migration/re-import and not an uninstall.
+
+### Future-client preferred behavior
+
+Once a client ships a separately testable full-package updater helper, later releases may provide:
 
 ```text
 v0.4.0

@@ -1481,7 +1481,19 @@ export class LibraryService {
     }
 
     previewMobileRecommendationV5(input: MobileRecommendationSyncV5) {
-        return new RecommendationPolicyStoreV5(this.database).previewMobile(input)
+        const preview = new RecommendationPolicyStoreV5(
+            this.database
+        ).previewMobile(input)
+        const portable = this.recommendationPortablePackageV5(24)
+        return {
+            ...preview,
+            remotePackage: {
+                engineVersion: portable.engineVersion,
+                foundation: portable.foundation,
+                reservoirGeneration: portable.reservoir.generation,
+                reservoirCount: portable.reservoir.count
+            }
+        }
     }
 
     recommendationPortablePackageV5(limit = 500) {

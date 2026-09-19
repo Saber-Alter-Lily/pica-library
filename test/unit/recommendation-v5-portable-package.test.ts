@@ -63,6 +63,15 @@ describe('Recommendation V5 portable mobile package', () => {
             expect(first.reservoir.generation).toBe(
                 second.reservoir.generation
             )
+            expect(first.foundation.visualGeneration).toBe(
+                second.foundation.visualGeneration
+            )
+            expect(first.foundation.canonicalGeneration).toBe(
+                second.foundation.canonicalGeneration
+            )
+            expect(first.behavior.generation).toBe(
+                second.behavior.generation
+            )
             expect(first.foundation.visualGeneration).toMatch(/^[0-9a-f]{24}$/)
             expect(first.foundation.canonicalGeneration).toMatch(/^[0-9a-f]{24}$/)
             expect(first.engineVersion).toBe('portable-v5-runtime-v1')

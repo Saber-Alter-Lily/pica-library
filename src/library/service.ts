@@ -366,15 +366,71 @@ export class LibraryService {
             : []
         const familyCounts: Record<string, number> = {}
         const reasonCounts: Record<string, number> = {}
+        const intentCounts: Record<string, number> = {}
         for (const item of rawItems) {
             const family = String(item.primaryFamily ?? 'UNATTRIBUTED')
             familyCounts[family] = (familyCounts[family] ?? 0) + 1
+            const intentId = String(item.primaryIntentId ?? '').trim()
+            if (intentId)
+                intentCounts[intentId] = (intentCounts[intentId] ?? 0) + 1
             const reasons = Array.isArray(item.reasonCodes)
                 ? item.reasonCodes.map(String)
                 : []
             for (const reason of reasons)
                 reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1
         }
+        const rawIntentPlan = Array.isArray(
+            (pool.telemetry as { intentPlan?: unknown[] })?.intentPlan
+        )
+            ? ((pool.telemetry as { intentPlan?: unknown[] }).intentPlan ?? [])
+            : []
+        const intentPlan = new Map(
+            rawIntentPlan.flatMap((value) => {
+                if (!value || typeof value !== 'object') return []
+                const row = value as Record<string, unknown>
+                const intentId = String(row.intentId ?? '').trim()
+                if (!intentId) return []
+                const anchors = Array.isArray(row.anchors)
+                    ? row.anchors.flatMap((anchor) => {
+                          if (!anchor || typeof anchor !== 'object') return []
+                          const item = anchor as Record<string, unknown>
+                          const label = String(
+                              item.canonicalLabel ??
+                                  item.providerQueryLabel ??
+                                  item.canonicalKey ??
+                                  ''
+                          ).trim()
+                          return label ? [label] : []
+                      })
+                    : []
+                const explanation =
+                    row.explanation &&
+                    typeof row.explanation === 'object'
+                        ? (row.explanation as Record<string, unknown>)
+                        : {}
+                return [
+                    [
+                        intentId,
+                        {
+                            type: String(row.type ?? 'UNATTRIBUTED'),
+                            anchors,
+                            shortReason: String(
+                                explanation.shortReason ?? ''
+                            ).trim()
+                        }
+                    ] as const
+                ]
+            })
+        )
+        const primaryIntents = Object.entries(intentCounts)
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([intentId, count]) => ({
+                intentId,
+                count,
+                type: intentPlan.get(intentId)?.type ?? 'UNATTRIBUTED',
+                anchors: intentPlan.get(intentId)?.anchors ?? [],
+                shortReason: intentPlan.get(intentId)?.shortReason ?? ''
+            }))
         return {
             available: true,
             source: 'final-v3-serving',
@@ -387,6 +443,7 @@ export class LibraryService {
             generatedAt: batch.generatedAt,
             itemCount: batch.itemIds.length,
             primaryFamilies: familyCounts,
+            primaryIntents,
             reasonCodes: reasonCounts,
             items: rawItems.map((item) => ({
                 comicId: String(item.comicId ?? ''),

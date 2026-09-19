@@ -1618,6 +1618,36 @@ export class LibraryService {
             )
             .digest('hex')
             .slice(0, 24)
+        const portablePolicyGeneration = createHash('sha256')
+            .update(
+                JSON.stringify({
+                    controls: policy.controls
+                        .filter((control) => control.scope === 'PERSISTENT')
+                        .map((control) => ({
+                            targetType: control.targetType,
+                            key: control.key,
+                            direction: control.direction,
+                            levelDelta: control.levelDelta ?? null,
+                            scope: control.scope
+                        })),
+                    hardSuppressComicIds: policy.hardSuppressComicIds,
+                    seenComicIds: policy.seenComicIds,
+                    ownedComicIds: policy.ownedComicIds,
+                    duplicateReportComicIds:
+                        policy.duplicateReportComicIds,
+                    temporarySuppressions:
+                        policy.temporarySuppressions.map((item) => ({
+                            comicId: item.comicId,
+                            expiresAt: item.expiresAt
+                        })),
+                    tasteExcludedComicIds:
+                        policy.tasteExcludedComicIds,
+                    explicitDistinctPairs:
+                        policy.explicitDistinctPairs
+                })
+            )
+            .digest('hex')
+            .slice(0, 24)
         const visualStatus = this.visualIndexStatus()
         const visualGeneration = createHash('sha256')
             .update(
@@ -1686,6 +1716,7 @@ export class LibraryService {
             engineVersion: 'portable-v5-runtime-v1',
             foundation: {
                 policyRevision: policy.revision,
+                portablePolicyGeneration,
                 visualGeneration,
                 canonicalGeneration,
                 workIdentityResolverVersion: WORK_IDENTITY_RESOLVER_VERSION,

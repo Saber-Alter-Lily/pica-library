@@ -401,7 +401,7 @@ function renderMobileBridge() {
         ? devices.map((item) => {
             const seen = item.lastSeenAt ? new Date(item.lastSeenAt) : null
             const suffix = seen && Number.isFinite(seen.getTime())
-                ? ` · 最近 ${seen.toLocaleString()}`
+                ? ` · ${t('mobile.lastSeen', { time: seen.toLocaleString() })}`
                 : ''
             return `${item.deviceName}${suffix}`
         }).join('；')

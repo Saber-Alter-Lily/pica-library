@@ -8,6 +8,15 @@
 
 ### Recommendation V5 / Visual V1
 
+- Android 推荐架构从“Desktop 结果缓存/轻量重排”升级为真正的独立运行节点：Desktop 与 Android 各自持有独立 cycle/batch/session，连接同步不会再把 Desktop 当前推荐列表覆盖到手机；手机可结合本地 Lifetime / Recent / Session / Explicit 状态独立生成新周期。
+- 冻结 `RECOMMENDATION_SYNC_V1` 三层契约：Foundation Baseline 仅 Desktop→Android，Portable User State 双向合并，Runtime State 永不跨端覆盖；`本次想看` 明确保持设备本地。
+- 新增 Desktop→Android Portable Foundation Package：同步 bounded candidate reservoir、Visual generation/每候选轻量 affinity、Canonical Work/Edition bindings 与版本号；手机不下载/运行 DINOv2，也不重做全库 Canonical Identity，只消费已计算结果。
+- Android native ranker 接入 Portable Candidate Reservoir、Canonical work-level dedupe、Desktop 预计算 Visual affinity、本机 Recent / Session 行为与显式 1–10 控制；Desktop 离线后仍可基于已同步候选和手机本地状态独立推荐。
+- 推荐同步升级为 three-way merge：Android 保存上次共同 base，Desktop 与 Android 同时修改同一显式偏好且值不同才生成冲突；冲突必须明确“使用电脑/使用手机”，不按时间戳静默覆盖、不取平均。Like/Dislike 与可移植行为证据继续按事件合并。
+- 新增 Android“推荐同步”中心与连接后差异提示：显示手机→电脑待同步项、电脑→手机偏好/基础包变化、Visual/Canonical/Candidate/近期行为 generation 和人工冲突；无变化不弹窗，同一差异签名做节流去重。
+- Desktop 最新 Like/Dislike 与 30 天内推荐曝光/详情打开/完成阅读可作为 bounded Portable behavior 同步到手机；手机的当前 Session 不回传，Desktop 来源事件导入手机后标记为非 dirty、非本机 Session，避免回声同步。
+- Android 推荐 UI 对齐 Desktop 信息架构：增加“推荐画像 / 人工调整 / 推荐同步 / 画风基础”；人工调整采用五个大组→facet 二级折叠→固定高度内部滚动窗口，支持 1–10 档、BLOCK、本次想看、明确搜索与“作为标签添加”，内部滚动手势不会拖动外层页面。
+- Android 推荐说明统一接入轻量圆形“!”帮助按钮；实时状态、同步差异、错误与冲突仍直接展示，不隐藏在帮助层。
 - Desktop-backed Provider Relay 扩展到 E-H / ExH：手机未配置本机 E-H Cookie 但已配对且 Desktop 已登录时，Watched、Favorites、ExH capability/search、E-H/ExH 详情/页列表/在线阅读和云收藏 mutation 均通过已认证 Mobile Bridge 执行；公开 E-H 搜索仍可由手机直接访问。Relay 不下发 `ipb_member_id`、`ipb_pass_hash`、`igneous`、`cf_clearance`。
 - E-H Desktop relay 的收藏同步保留 10 个原生收藏槽的用户自定义名称、slot、count 与 note，不再退化成“只有全部收藏”；手机本机会话仍优先，Desktop 离线时公开 E-H 仍可直连，账号能力则 fail closed 或使用用户显式配置的手机本机会话。
 - Desktop↔Android 账号复用进入 Provider Relay 阶段：手机无本机 Pica 账号但已配对且 Desktop 已登录时，`PicaClient` 自动以 Desktop Mobile Bridge 为后备来源，覆盖搜索/浏览/收藏列表/排行榜/相关作品/详情/章节/页列表及收藏增删；本机账号存在时仍优先直连。Relay 只传 Provider 结果和用户操作，不把 Pica 邮箱、密码、authorization token 或 E-H Cookie 复制到手机。

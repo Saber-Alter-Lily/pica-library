@@ -1026,32 +1026,75 @@
                     <p class="status">默认只做增量同步，不删除云端独有漫画；只有整轮上传成功后才会切换到新版本。</p>
                 </article>
                 <article id="settings-mobile-bridge" class="panel">
-                    <h3>手机连接</h3>
-                    <p>让 Pica Library Android 在同一 Wi-Fi 下直接读取这台电脑的漫画库、推荐和已下载章节。</p>
+                    <div class="mobile-pair-heading">
+                        <h3>手机连接</h3>
+                        <button
+                            type="button"
+                            class="info-tip"
+                            aria-label="查看手机连接说明"
+                            data-info-tip="手机和电脑需在同一局域网。扫码、手动输入和配对链接只是三种不同的首次配对方式；配对完成后会使用设备令牌，不需要每次重新输入。首次连接如 Windows 弹出防火墙提示，请允许专用网络。"
+                        >i</button>
+                    </div>
                     <p id="mobile-bridge-state" class="status"></p>
                     <div id="mobile-bridge-details" hidden>
-                        <p><strong>电脑地址</strong></p>
-                        <div class="mobile-pair-value">
-                            <code id="mobile-bridge-address"></code>
-                            <button id="mobile-bridge-copy-address" type="button">复制地址</button>
-                        </div>
-                        <p><strong>6 位配对码</strong></p>
-                        <div class="mobile-pair-value">
-                            <div id="mobile-bridge-code" style="font-size:2rem;font-weight:700;letter-spacing:.18em"></div>
-                            <button id="mobile-bridge-copy-code" type="button">复制配对码</button>
-                        </div>
-                        <p><strong>扫码连接</strong></p>
-                        <div id="mobile-bridge-qr" aria-label="手机配对二维码"></div>
-                        <p class="status">二维码只在本机生成，不会把电脑地址或配对码发送到第三方服务。可直接用手机系统相机扫描。</p>
-                        <div class="mobile-pair-value">
-                            <code id="mobile-bridge-pair-link"></code>
-                            <button id="mobile-bridge-copy-link" type="button">复制配对链接</button>
-                        </div>
-                        <p id="mobile-bridge-expiry" class="status"></p>
-                        <p id="mobile-bridge-devices" class="status"></p>
-                        <p class="status">首次连接如 Windows 弹出防火墙提示，请允许“专用网络”。</p>
+                        <details class="mobile-pair-method" open>
+                            <summary>
+                                <strong>扫码连接</strong>
+                                <span class="mobile-pair-badge">推荐</span>
+                            </summary>
+                            <div class="mobile-pair-method-body">
+                                <div id="mobile-bridge-qr" aria-label="手机配对二维码"></div>
+                                <div class="mobile-pair-inline">
+                                    <p id="mobile-bridge-expiry" class="status"></p>
+                                    <button id="mobile-bridge-refresh" type="button">刷新配对码</button>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="mobile-pair-method">
+                            <summary><strong>手动连接</strong></summary>
+                            <div class="mobile-pair-method-body">
+                                <p><strong>电脑地址</strong></p>
+                                <div class="mobile-pair-value">
+                                    <code id="mobile-bridge-address"></code>
+                                    <button id="mobile-bridge-copy-address" type="button">复制地址</button>
+                                </div>
+                                <p><strong>6 位配对码</strong></p>
+                                <div class="mobile-pair-value">
+                                    <div id="mobile-bridge-code" class="mobile-pair-code"></div>
+                                    <button id="mobile-bridge-copy-code" type="button">复制配对码</button>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="mobile-pair-method">
+                            <summary>
+                                <strong>配对链接</strong>
+                                <button
+                                    type="button"
+                                    class="info-tip"
+                                    aria-label="查看配对链接说明"
+                                    data-info-tip="这是扫码二维码中相同的 picalibrary:// Deep Link。主要用于无法扫码时复制到手机打开，不需要日常使用。"
+                                >i</button>
+                            </summary>
+                            <div class="mobile-pair-method-body">
+                                <div class="mobile-pair-value">
+                                    <code id="mobile-bridge-pair-link"></code>
+                                    <button id="mobile-bridge-copy-link" type="button">复制配对链接</button>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="mobile-pair-method">
+                            <summary>
+                                <strong>已配对设备</strong>
+                                <span id="mobile-bridge-device-count" class="mobile-pair-badge">0</span>
+                            </summary>
+                            <div class="mobile-pair-method-body">
+                                <p id="mobile-bridge-devices" class="status"></p>
+                            </div>
+                        </details>
                     </div>
-                    <button id="mobile-bridge-refresh" type="button">生成新配对码</button>
                 </article>
                 <article class="panel preview-cache-panel">
                     <h3>预览缓存</h3>

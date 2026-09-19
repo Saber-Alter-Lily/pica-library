@@ -56,12 +56,23 @@ final class PortableRecommendationPackageStore {
         }
     }
 
+    static final class Identity {
+        final String comicId,workId,workTitle,editionId,editionLabel,bindingStatus,resolverVersion;
+        final double confidence;
+        Identity(String comicId,String workId,String workTitle,String editionId,String editionLabel,String bindingStatus,double confidence,String resolverVersion){
+            this.comicId=comicId;this.workId=workId;this.workTitle=workTitle;this.editionId=editionId;this.editionLabel=editionLabel;this.bindingStatus=bindingStatus;this.confidence=confidence;this.resolverVersion=resolverVersion;
+        }
+    }
+
     static final class Snapshot {
         int schemaVersion=1,policyRevision;
         String generatedAt="",engineVersion="",visualGeneration="",
             canonicalGeneration="",reservoirGeneration="",sourceCycleId="";
         final List<Candidate> candidates=new ArrayList<>();
+        final Map<String,Identity> identityByComic=new LinkedHashMap<>();
         boolean available(){return !reservoirGeneration.isEmpty()&&!candidates.isEmpty();}
+        String workId(String comicId){Identity value=identityByComic.get(comicId);return value==null?"":value.workId;}
+        int identityBindingCount(){return identityByComic.size();}
     }
 
     private PortableRecommendationPackageStore(){}
@@ -111,6 +122,22 @@ final class PortableRecommendationPackageStore {
             out.policyRevision=foundation.optInt("policyRevision",0);
             out.visualGeneration=foundation.optString("visualGeneration","");
             out.canonicalGeneration=foundation.optString("canonicalGeneration","");
+            JSONArray bindings=foundation.optJSONArray("identityBindings");
+            if(bindings!=null)for(int i=0;i<bindings.length();i++){
+                JSONObject row=bindings.optJSONObject(i);if(row==null)continue;
+                String comicId=row.optString("comicId","").trim(),workId=row.optString("workId","").trim();
+                if(comicId.isEmpty()||workId.isEmpty())continue;
+                out.identityByComic.put(comicId,new Identity(
+                    comicId,
+                    workId,
+                    row.optString("workTitle",""),
+                    row.optString("editionId",""),
+                    row.optString("editionLabel",""),
+                    row.optString("bindingStatus",""),
+                    row.optDouble("confidence",0d),
+                    row.optString("resolverVersion","")
+                ));
+            }
         }
         JSONObject reservoir=root.optJSONObject("reservoir");
         if(reservoir!=null){
@@ -172,6 +199,6 @@ final class PortableRecommendationPackageStore {
     static String summary(Context context){
         Snapshot s=load(context);
         if(!s.available())return "尚未同步候选基础包";
-        return s.candidates.size()+" 个候选 · Visual "+(s.visualGeneration.isEmpty()?"无":s.visualGeneration.substring(0,Math.min(8,s.visualGeneration.length())));
+        return s.candidates.size()+" 个候选 · Canonical "+s.identityBindingCount()+" · Visual "+(s.visualGeneration.isEmpty()?"无":s.visualGeneration.substring(0,Math.min(8,s.visualGeneration.length())));
     }
 }

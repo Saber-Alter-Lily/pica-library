@@ -932,6 +932,24 @@
                     <p id="visual-index-message" class="status" aria-live="polite"></p>
                     <div class="actions"><button id="visual-index-build" type="button" class="primary">建立 / 补全画风索引</button><button id="visual-index-stop" type="button" hidden>停止</button></div>
                 </article>
+                <details id="settings-ecosystem-packs" class="panel account-disclosure">
+                    <summary>
+                        <strong id="ecosystem-packs-title">推荐生态包状态</strong>
+                        · <span id="ecosystem-packs-summary">只读</span>
+                        <button
+                            type="button"
+                            class="info-tip"
+                            aria-label="查看生态包说明"
+                            data-info-tip="只检查本机生态包的版本、完整性和兼容性。当前阶段不会安装、启用或用生态包修改推荐结果。"
+                        >!</button>
+                    </summary>
+                    <div class="actions">
+                        <button id="ecosystem-packs-refresh" type="button">重新检查</button>
+                        <button id="ecosystem-packs-open" type="button">打开本地目录</button>
+                    </div>
+                    <p id="ecosystem-packs-message" class="status" role="status"></p>
+                    <div id="ecosystem-packs-list" class="list"></div>
+                </details>
                 <article id="settings-browser-lite" class="panel export-panel">
                     <div class="help-heading"><h3>Browser Lite</h3><button type="button" class="info-tip" aria-label="查看 Browser Lite 说明" data-info-tip="将当前漫画库导出为 Browser Lite 数据包，之后可在独立的 Browser Lite 网页中导入使用。">!</button></div>
                     <div class="actions">
@@ -1176,6 +1194,7 @@
         <script type="module" src="./alpha8-star-access.js"></script>
         <script type="module" src="./eh-account.js"></script>
         <script type="module" src="./recommendation-v5-beta.js"></script>
+        <script type="module" src="./ecosystem-pack-v1.js"></script>
         <script type="module" src="./ui-polish-v5.js"></script>
     </body>
 </html>

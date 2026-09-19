@@ -61,7 +61,9 @@ final class RecommendationPolicyStore {
         if("AUTHOR".equals(type))return norm(item.author).equals(wanted);
         if("CATEGORY".equals(type))return listContains(item.categories,wanted);
         if("TAG".equals(type)||"FANDOM".equals(type))return listContains(item.tags,wanted);
-        if("STYLE_FAMILY".equals(type))return norm(item.family).equals(wanted);
+        // STYLE_FAMILY is a Visual concept, not recommendation provenance
+        // such as CREATOR/RELATED. It requires a portable Visual-family binding.
+        if("STYLE_FAMILY".equals(type))return false;
         return false;
     }
 

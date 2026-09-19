@@ -71,7 +71,7 @@ jobs:
               }
             }
             $forbidden = $entries | Where-Object {
-              $_ -match '(^|/)(data|cache|downloads?|logs?|config)(/|$)' -or
+              $_ -match '^(data|cache|downloads?|logs?|config)(/|$)' -or
               $_ -match '\.(db|sqlite)(-|$)'
             }
             if ($forbidden) {

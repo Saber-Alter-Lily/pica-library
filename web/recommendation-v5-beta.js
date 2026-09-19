@@ -637,7 +637,7 @@ function renderPolicy() {
     if (!V5.snapshot) return
     const counts = V5.snapshot.counts || {}
     showStatus(
-        `已拥有 ${Number(counts.owned || 0)} 本 · 收藏 ${Number(counts.favorites || 0)} 本 · 你调整 ${Number(counts.controls || 0)} 项 · 已屏蔽 ${Number(counts.hardSuppressed || 0)} 项`
+        `已拥有 ${Number(counts.owned || 0)} 本 · 收藏 ${Number(counts.favorites || 0)} 本 · 你调整 ${Number(counts.controls || 0)} 项 · 屏蔽偏好 ${Number(counts.blockedTargets || 0)} 项 · 屏蔽作品 ${Number(counts.hardSuppressed || 0)} 本`
     )
     const technical = document.querySelector('#v5-policy-tech')
     if (technical)
@@ -653,6 +653,7 @@ function renderPolicy() {
     V5.signalById = new Map(inferred.map((item) => [signalId(item), item]))
     if (V5.manualSignal) V5.signalById.set(signalId(V5.manualSignal), V5.manualSignal)
     renderProfileOverview()
+    renderServingOverview()
     renderCompositionOverview()
     const filtered = inferred.filter((item) =>
         !V5.search || `${item.label} ${item.key} ${item.targetType} ${item.facet || ''}`.toLocaleLowerCase().includes(V5.search)
@@ -673,20 +674,49 @@ function renderPolicy() {
         const ai = V5_FACET_ORDER.indexOf(a[0]), bi = V5_FACET_ORDER.indexOf(b[0])
         return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || facetLabel(a[0]).localeCompare(facetLabel(b[0]))
     })
+    const majorGroups = new Map()
+    for (const [facet, rows] of groupRows) {
+        const major = facetSupergroup(facet)
+        const current = majorGroups.get(major.id) || {
+            ...major,
+            groups: []
+        }
+        current.groups.push([facet, rows])
+        majorGroups.set(major.id, current)
+    }
+    const orderedMajors = V5_FACET_SUPERGROUPS
+        .map((major) => majorGroups.get(major.id))
+        .filter(Boolean)
     const inferredTarget = document.querySelector('#v5-inferred-list')
-    if (inferredTarget) inferredTarget.innerHTML = groupRows.length ? groupRows.map(([facet, rows], groupIndex) => {
-        rows.sort((a,b) => baselineLevel(b)-baselineLevel(a) || Number(b.supportCount||0)-Number(a.supportCount||0) || String(a.label).localeCompare(String(b.label)))
-        const visible = V5.search ? rows : rows.slice(0,12)
-        const hasAdjusted = rows.some(row => controlFor(row))
-        return `<details class="v5-facet-group" ${V5.search || hasAdjusted || groupIndex===0 ? 'open' : ''}>
-        <summary>${esc(facetLabel(facet))}<span class="v5-facet-count">${rows.length} 项</span></summary>
-        <div class="v5-facet-body">${visible.map(signalRow).join('')}
-        ${visible.length < rows.length ? `<p class="status">另有 ${rows.length-visible.length} 项；可用上方搜索定位。</p>` : ''}</div></details>`
-    }).join('') : manualSignal
-        ? `<div class="v5-help"><strong>已确认把“${esc(V5.search)}”作为自定义标签微调。</strong> 5/10 是中性起点；修改后仍需点击“保存调整”。</div><div class="v5-facet-group"><div class="v5-facet-body">${signalRow(manualSignal)}</div></div>`
-        : V5.search
-          ? `<div class="v5-search-empty"><strong>没有找到“${esc(V5.search)}”</strong><p class="status">系统不会因为输入文字就自动创建偏好。确认它确实是标签后再添加。</p><button type="button" data-v5-add-custom-tag>作为标签添加</button></div>`
-          : '<p class="status">当前还没有可展示的系统画像。收藏和真实使用行为会继续积累；也可以稍后刷新查看。</p>'
+    if (inferredTarget) {
+        if (orderedMajors.length) {
+            inferredTarget.innerHTML = orderedMajors.map((major, majorIndex) => {
+                const total = major.groups.reduce((sum,[,rows]) => sum + rows.length, 0)
+                const hasAdjusted = major.groups.some(([,rows]) => rows.some(row => controlFor(row)))
+                const searchHit = Boolean(V5.search)
+                const facetsHtml = major.groups.map(([facet, rows], facetIndex) => {
+                    rows.sort((a,b) => baselineLevel(b)-baselineLevel(a) || Number(b.supportCount||0)-Number(a.supportCount||0) || String(a.label).localeCompare(String(b.label)))
+                    const facetAdjusted = rows.some(row => controlFor(row))
+                    return `<details class="v5-facet-group" ${searchHit || facetAdjusted || (majorIndex===0 && facetIndex===0) ? 'open' : ''}>
+                        <summary>${esc(facetLabel(facet))}<span class="v5-facet-count">${rows.length} 项</span></summary>
+                        <div class="v5-facet-body"><div class="v5-facet-scroll">${rows.map(signalRow).join('')}</div></div>
+                    </details>`
+                }).join('')
+                return `<details class="v5-major-group" ${searchHit || hasAdjusted || majorIndex===0 ? 'open' : ''}>
+                    <summary>${esc(major.label)}<span class="v5-facet-count">${total} 项</span></summary>
+                    <div class="v5-major-body">${facetsHtml}</div>
+                </details>`
+            }).join('')
+        } else if (manualSignal) {
+            inferredTarget.innerHTML =
+                `<div class="v5-help"><strong>已确认把“${esc(V5.search)}”作为自定义标签微调。</strong> 5/10 是中性起点；修改后仍需点击“保存调整”。</div><div class="v5-facet-group"><div class="v5-facet-body"><div class="v5-facet-scroll">${signalRow(manualSignal)}</div></div></div>`
+        } else if (V5.search) {
+            inferredTarget.innerHTML =
+                `<div class="v5-search-empty"><strong>没有找到“${esc(V5.search)}”</strong><button type="button" class="info-tip" data-info-tip="系统不会因为输入文字就自动创建偏好。确认它确实是标签后再添加。">i</button><p><button type="button" data-v5-add-custom-tag>作为标签添加</button></p></div>`
+        } else {
+            inferredTarget.innerHTML = '<p class="status">当前还没有可展示的系统画像。</p>'
+        }
+    }
 
     document.querySelectorAll('[data-v5-level]').forEach((input) => {
         input.addEventListener('input', () => {
@@ -762,14 +792,19 @@ function renderPolicy() {
 async function loadPolicy() {
     ensurePanel()
     try {
-        const [snapshot, timescales, channels] = await Promise.all([
+        const appSessionId = String(window.picaAppSessionId || '').trim()
+        const query = new URLSearchParams({ limit: '5000' })
+        if (appSessionId) query.set('appSessionId', appSessionId)
+        const [snapshot, timescales, channels, serving] = await Promise.all([
             request('/api/v1/recommendation-v5'),
-            request('/api/v1/recommendation-v5/preference-timescales?limit=5000'),
-            request('/api/v1/recommendation-v5/candidate-channels?limit=5000')
+            request(`/api/v1/recommendation-v5/preference-timescales?${query}`),
+            request(`/api/v1/recommendation-v5/candidate-channels?${query}`),
+            request('/api/v1/recommendation-v5/serving-composition')
         ])
         V5.snapshot = snapshot
         V5.timescales = timescales
         V5.channels = channels
+        V5.serving = serving
         renderPolicy()
         decorateRecommendationCards()
     } catch (error) { showStatus(`推荐控制中心暂不可用：${error.message}`, true) }

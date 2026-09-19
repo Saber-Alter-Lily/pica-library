@@ -747,8 +747,7 @@
                 <div id="updates" class="tab active">
                     <div class="page-heading">
                         <div>
-                            <h2>更新检测</h2>
-                            <p>默认只检查已经建立本地下载状态的漫画。</p>
+                            <div class="help-heading"><h2>更新检测</h2><button type="button" class="info-tip" aria-label="查看更新检测说明" data-info-tip="默认只检查已经建立本地下载状态的漫画。">i</button></div>
                         </div>
                         <button id="check-updates" class="primary">
                             检查下载内容更新
@@ -761,17 +760,13 @@
                         <div class="section-heading">
                             <div>
                                 <p class="eyebrow">本地更新</p>
-                                <h3>更新</h3>
+                                <div class="help-heading"><h3>更新</h3><button type="button" class="info-tip" aria-label="查看软件更新说明" data-info-tip="可直接检查并安装官方更新，也可以拖入或选择本地更新 ZIP 包。">i</button></div>
                             </div>
                             <span
                                 id="update-current-version"
                                 class="mode"
                             ></span>
                         </div>
-                        <p>
-                            可直接检查并安装官方更新，也可以拖入或选择本地更新
-                            ZIP 包。
-                        </p>
                         <label
                             id="update-dropzone"
                             class="update-dropzone"
@@ -827,8 +822,7 @@
                 <div id="repair" class="tab">
                     <div class="page-heading">
                         <div>
-                            <h2>文件修复</h2>
-                            <p>扫描缺失、空文件和失败记录。</p>
+                            <div class="help-heading"><h2>文件修复</h2><button type="button" class="info-tip" aria-label="查看文件修复说明" data-info-tip="扫描缺失、空文件和失败记录。">i</button></div>
                         </div>
                         <button id="scan-repair" class="primary">
                             扫描问题
@@ -839,8 +833,7 @@
                 <div id="authors" class="tab">
                     <div class="page-heading">
                         <div>
-                            <h2>作者归一</h2>
-                            <p>自动建议只作为候选，合并决定由用户确认。</p>
+                            <div class="help-heading"><h2>作者归一</h2><button type="button" class="info-tip" aria-label="查看作者归一说明" data-info-tip="自动建议只作为候选，合并决定由用户确认。">i</button></div>
                         </div>
                     </div>
                     <label
@@ -852,8 +845,7 @@
                 <div id="health" class="tab">
                     <div class="page-heading">
                         <div>
-                            <h2>健康检查</h2>
-                            <p>确认模式、数据统计和服务可用性。</p>
+                            <div class="help-heading"><h2>健康检查</h2><button type="button" class="info-tip" aria-label="查看健康检查说明" data-info-tip="确认模式、数据统计和服务可用性。">i</button></div>
                         </div>
                         <button id="run-health" class="primary">
                             运行检查
@@ -865,8 +857,7 @@
             <section id="settings" class="view">
                 <div class="page-heading">
                     <div>
-                        <h2>Settings</h2>
-                        <p>Manage this Windows installation.</p>
+                        <div class="help-heading"><h2>Settings</h2><button type="button" class="info-tip" aria-label="Settings help" data-info-tip="Manage this Windows installation.">i</button></div>
                     </div>
                     <span id="settings-version" class="mode"></span>
                 </div>
@@ -930,25 +921,20 @@
                     </div>
                 </form>
                 <article id="settings-recommendation-v4" class="panel">
-                    <h3>推荐反馈与画风推荐 · Beta</h3>
-                    <p>喜欢/不喜欢会立即记录。反馈原因始终可选；关闭后不会弹出原因面板。</p>
+                    <div class="help-heading"><h3>推荐反馈与画风推荐 · Beta</h3><button type="button" class="info-tip" aria-label="查看推荐反馈说明" data-info-tip="喜欢/不喜欢会立即记录。反馈原因始终可选；关闭后不会弹出原因面板。">i</button></div>
                     <label class="toggle-row"><input id="recommend-feedback-reasons-toggle" type="checkbox" /> 喜欢/不喜欢后询问可选原因</label>
                     <hr />
                     <label class="toggle-row"><input id="visual-enabled" type="checkbox" /> 启用画风信号</label>
                     <label>画风取样来源<select id="visual-sampling-mode"><option value="local_only">仅本地已下载正文</option><option value="standard">本地 + 在线收藏少量正文</option><option value="cover_only">仅封面（低置信度）</option></select></label>
                     <label>推荐接入模式<select id="visual-rerank-mode"><option value="OFF">关闭排序影响</option><option value="SHADOW">Shadow：只计算不改排序</option><option value="LIVE">Live：低权重参与排序</option></select></label>
-                    <p class="status">视觉模型在本机浏览器运行；首次使用会下载 Transformers.js 与 DINOv2 Small 模型。漫画页面仅从本机 Pica Library 服务读取，不上传给模型服务。</p>
+                    <div class="help-heading compact-help"><span>画风模型</span><button type="button" class="info-tip" aria-label="查看画风模型说明" data-info-tip="视觉模型在本机浏览器运行；首次使用会下载 Transformers.js 与 DINOv2 Small 模型。漫画页面仅从本机 Pica Library 服务读取，不上传给模型服务。">i</button></div>
                     <p id="visual-index-status" class="status">尚未读取画风索引。</p>
                     <progress id="visual-index-progress" max="1" value="0" hidden></progress>
                     <p id="visual-index-message" class="status" aria-live="polite"></p>
                     <div class="actions"><button id="visual-index-build" type="button" class="primary">建立 / 补全画风索引</button><button id="visual-index-stop" type="button" hidden>停止</button></div>
                 </article>
                 <article id="settings-browser-lite" class="panel export-panel">
-                    <h3>Browser Lite</h3>
-                    <p>
-                        将当前漫画库导出为 Browser Lite 数据包，之后可在独立的
-                        Browser Lite 网页中导入使用。
-                    </p>
+                    <div class="help-heading"><h3>Browser Lite</h3><button type="button" class="info-tip" aria-label="查看 Browser Lite 说明" data-info-tip="将当前漫画库导出为 Browser Lite 数据包，之后可在独立的 Browser Lite 网页中导入使用。">i</button></div>
                     <div class="actions">
                         <button
                             id="export-browser-lite"
@@ -975,8 +961,7 @@
                     ></p>
                 </article>
                 <details id="settings-eh-account" class="panel account-disclosure">
-                    <summary><strong>E-Hentai / ExHentai 账号</strong> · 可选增强</summary>
-                    <p>E-H 公共搜索、阅读和下载无需登录。推荐使用“网页登录”：Pica Library 会打开独立的 E-H 官方登录窗口，登录成功后自动检测、验证并加密保存会话；账号密码始终只提交给 E-H 官方页面。手动 Cookie 导入仅作为高级兜底。</p>
+                    <summary><strong>E-Hentai / ExHentai 账号</strong> · 可选增强 <button type="button" class="info-tip" aria-label="查看 E-H 账号说明" data-info-tip="E-H 公共搜索、阅读和下载无需登录。推荐使用网页登录：Pica Library 会打开独立的 E-H 官方登录窗口，登录成功后自动检测、验证并加密保存会话；账号密码始终只提交给 E-H 官方页面。手动 Cookie 导入仅作为高级兜底。">i</button></summary>
                     <p id="eh-account-state" class="status"></p>
                     <details class="account-advanced">
                         <summary>高级 · 手动导入官方站点会话</summary>
@@ -1001,8 +986,7 @@
                     <p id="eh-account-message" class="status" role="status"></p>
                 </details>
                 <article id="settings-remote-storage" class="panel">
-                    <h3>远程存储 · WebDAV</h3>
-                    <p>把电脑已下载的漫画增量同步到 WebDAV。同步完成后，即使电脑关机，手机也可以继续从远程存储读取。</p>
+                    <div class="help-heading"><h3>远程存储 · WebDAV</h3><button type="button" class="info-tip" aria-label="查看 WebDAV 说明" data-info-tip="把电脑已下载的漫画增量同步到 WebDAV。同步完成后，即使电脑关机，手机也可以继续从远程存储读取。默认只做增量同步，不删除云端独有漫画；只有整轮上传成功后才会切换到新版本。">i</button></div>
                     <p id="remote-storage-state" class="status"></p>
                     <div class="settings-form">
                         <label class="wide">WebDAV 地址<input id="remote-webdav-url" placeholder="https://dav.example.com/path" /></label>
@@ -1023,7 +1007,7 @@
                         <p class="status">预计上传 <span id="remote-plan-pages">0</span> 页 · <span id="remote-plan-bytes">0 B</span></p>
                         <div id="remote-plan-list"></div>
                     </div>
-                    <p class="status">默认只做增量同步，不删除云端独有漫画；只有整轮上传成功后才会切换到新版本。</p>
+
                 </article>
                 <article id="settings-mobile-bridge" class="panel">
                     <div class="mobile-pair-heading">

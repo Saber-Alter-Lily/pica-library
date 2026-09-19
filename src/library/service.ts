@@ -96,6 +96,8 @@ import {
     buildVisualPreferenceProfile,
     cosineSimilarity,
     metadataFeedbackAdjustment,
+    selectPreferredVisualEmbeddings,
+    visualAffinity,
     rerankWithVisualStyle,
     VISUAL_MODEL_ID,
     VISUAL_MODEL_VERSION,
@@ -1476,6 +1478,142 @@ export class LibraryService {
 
     mergeMobileRecommendationV5(input: MobileRecommendationSyncV5) {
         return new RecommendationPolicyStoreV5(this.database).mergeMobile(input)
+    }
+
+    previewMobileRecommendationV5(input: MobileRecommendationSyncV5) {
+        return new RecommendationPolicyStoreV5(this.database).previewMobile(input)
+    }
+
+    recommendationPortablePackageV5(limit = 500) {
+        const bounded = Math.max(24, Math.min(1000, Math.floor(limit)))
+        const policyStore = new RecommendationPolicyStoreV5(this.database)
+        const policy = policyStore.state()
+        const active = this.database.getAppState<{
+            activeCycleId?: string | null
+        }>('recommendation.v3.activeCycle.v1')
+        const cycleId = String(active?.activeCycleId ?? '').trim()
+        const pool = cycleId
+            ? this.database.latestV3CandidatePool(cycleId)
+            : null
+        const rawRecords = pool
+            ? this.database.recommendationRecords(
+                  pool.candidateIds.slice(0, bounded * 2)
+              )
+            : []
+        const filtered = filterCandidatesAgainstOwnedV5(
+            rawRecords,
+            this.database.listComics({ limit: 10000 }),
+            policy
+        ).rows.slice(0, bounded)
+
+        const profile = this.visualPreferenceProfile()
+        const preferred = selectPreferredVisualEmbeddings(
+            this.database.listVisualEmbeddings(
+                filtered.map((row) => row.comic.comicId)
+            )
+        )
+        const visualRows = filtered.flatMap((row) => {
+            const embedding = preferred.get(row.comic.comicId)
+            if (!embedding || !profile) return []
+            const affinity = visualAffinity(embedding, profile)
+            return [
+                {
+                    comicId: row.comic.comicId,
+                    affinity: affinity.affinity,
+                    positiveSimilarity: affinity.positiveSimilarity,
+                    negativeSimilarity: affinity.negativeSimilarity,
+                    confidence: embedding.confidence,
+                    sourceKind: embedding.sourceKind,
+                    embeddingKind: embedding.embeddingKind
+                }
+            ]
+        })
+        const visualStatus = this.visualIndexStatus()
+        const visualGeneration = createHash('sha256')
+            .update(
+                JSON.stringify({
+                    modelId: visualStatus.modelId,
+                    modelVersion: visualStatus.modelVersion,
+                    samplingPolicyVersion: visualStatus.samplingPolicyVersion,
+                    profileVersion: visualStatus.profileVersion,
+                    indexedCount: visualStatus.indexedCount,
+                    profileGeneratedAt: profile?.generatedAt ?? null
+                })
+            )
+            .digest('hex')
+            .slice(0, 24)
+        const canonicalGeneration = createHash('sha256')
+            .update(
+                JSON.stringify({
+                    resolverVersion: WORK_IDENTITY_RESOLVER_VERSION,
+                    explicitDistinctPairs: policy.explicitDistinctPairs,
+                    authors: this.database
+                        .listAuthors()
+                        .map((author) => [
+                            author.id,
+                            author.canonicalName,
+                            author.reviewStatus
+                        ])
+                })
+            )
+            .digest('hex')
+            .slice(0, 24)
+        const candidates = filtered.map(({ comic }, index) => ({
+            comicId: comic.comicId,
+            providerId: comic.providerId ?? null,
+            providerRemoteId: comic.providerRemoteId ?? null,
+            title: comic.title,
+            author: comic.author,
+            canonicalAuthor: comic.canonicalAuthor ?? null,
+            tags: comic.tags,
+            categories: comic.categories,
+            pagesCount: comic.pagesCount ?? null,
+            totalLikes: comic.totalLikes ?? null,
+            totalViews: comic.totalViews ?? null,
+            coverUrl: comic.coverUrl ?? null,
+            desktopPoolRank: index + 1
+        }))
+        const reservoirGeneration = createHash('sha256')
+            .update(
+                JSON.stringify({
+                    cycleId: cycleId || null,
+                    poolId: pool?.id ?? null,
+                    generatedAt: pool?.generatedAt ?? null,
+                    ids: candidates.map((item) => item.comicId)
+                })
+            )
+            .digest('hex')
+            .slice(0, 24)
+        return {
+            schemaVersion: 1,
+            generatedAt: new Date().toISOString(),
+            engineVersion: 'portable-v5-runtime-v1',
+            foundation: {
+                policyRevision: policy.revision,
+                visualGeneration,
+                canonicalGeneration,
+                workIdentityResolverVersion: WORK_IDENTITY_RESOLVER_VERSION,
+                visualModelId: visualStatus.modelId,
+                visualModelVersion: visualStatus.modelVersion,
+                visualSamplingPolicyVersion:
+                    visualStatus.samplingPolicyVersion
+            },
+            reservoir: {
+                generation: reservoirGeneration,
+                sourceCycleId: cycleId || null,
+                sourcePoolId: pool?.id ?? null,
+                sourceGeneratedAt: pool?.generatedAt ?? null,
+                count: candidates.length,
+                candidates
+            },
+            visual: {
+                generation: visualGeneration,
+                profileVersion: visualStatus.profileVersion,
+                indexedCount: visualStatus.indexedCount,
+                targetCount: visualStatus.targetCount,
+                signals: visualRows
+            }
+        }
     }
 
     visualSettings() {

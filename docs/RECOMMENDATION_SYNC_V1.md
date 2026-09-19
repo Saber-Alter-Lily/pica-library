@@ -1,6 +1,6 @@
 # Recommendation Desktop ↔ Android Sync Contract V1
 
-Status: frozen development contract for the next paired-client acceptance build.
+Status: implemented development contract; awaiting paired Windows + Android acceptance testing.
 
 ## Product rule
 
@@ -32,13 +32,15 @@ Both devices may independently create durable user intent.
 
 Included:
 
-- persistent 1–10 preference corrections;
+- persistent 1–10 preference corrections, with the same levelDelta magnitude semantics on both clients;
 - MORE / LESS / BLOCK controls;
 - Like / Dislike and optional reasons;
-- permanent item suppression;
-- taste-profile exclusions;
-- durable recent exposure summaries where applicable;
+- semantic item dispositions: already seen / already owned / duplicate report / temporary suppression with expiry;
+- taste-profile exclusions that keep the favorite but remove it from taste inference;
+- bounded durable/recent exposure/detail/read-complete evidence;
 - other explicitly portable recommendation evidence.
+
+Current Android behavior applies these changes immediately to the phone's own ranking/profile, queues the portable mutation locally, and only merges it into Desktop after explicit sync.
 
 Sync uses a common base snapshot plus per-device mutation journal. A conflict exists when Desktop and Android both changed the same explicit preference after their last common base and the resulting values differ.
 
@@ -59,6 +61,8 @@ Never synchronized as authoritative state:
 - current session exposures before they become portable recent evidence.
 
 A sync must never replace the recommendation list currently being viewed on the other device.
+
+Android now owns its own cycle/batch store and can regenerate from its local library/provider access plus the synced candidate reservoir. Desktop and Android are therefore expected to have different cycle IDs and potentially different ranked results after a successful sync.
 
 ## Portable Candidate Reservoir
 
@@ -86,7 +90,10 @@ Android receives a compact generation:
 - model / model-version / sampling-policy identifiers;
 - Visual profile generation;
 - per-candidate Visual affinity and confidence for candidates with known embeddings;
-- coverage metadata.
+- coverage metadata;
+- canonical Work/Edition bindings needed for work-level ownership/deduplication.
+
+The Android Visual serving switch is device-local and defaults to **SHADOW**. OFF / SHADOW / LIVE changes the phone's own ranking behavior only; it does not change Desktop Visual serving mode.
 
 Missing Visual data never blocks recommendation. A candidate without Visual data is ranked using non-Visual features.
 
@@ -111,6 +118,8 @@ Actions:
 - 稍后.
 
 If conflicts exist, resolving them is required before those conflicting explicit controls are applied. Non-conflicting durable evidence remains safe to merge.
+
+The comparison uses a common synced base. Session-only changes are excluded from the portable policy generation so a Desktop Session change cannot create a false cross-device sync prompt. Durable policy, Visual, Canonical, behavior and candidate-reservoir generations are tracked separately.
 
 ## Security
 

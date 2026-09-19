@@ -550,13 +550,6 @@ body.reader-active .reader-header {
     width: 100%;
 }
 
-.ux-flow-hint {
-    margin: 10px 0 6px;
-    padding: 8px 10px;
-    border-radius: 10px;
-    background: #f7f8fc;
-}
-
 .output:empty {
     display: none;
 }

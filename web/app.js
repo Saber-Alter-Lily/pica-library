@@ -311,6 +311,8 @@ const desktopPost = (path, value = {}) =>
         body: JSON.stringify(value)
     })
 
+window.picaDesktopPost = desktopPost
+
 function setupValue(prefix) {
     return {
         account: $(`#${prefix}-account`).value,

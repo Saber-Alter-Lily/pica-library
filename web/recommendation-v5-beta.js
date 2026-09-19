@@ -1,8 +1,25 @@
-const V5={snapshot:null,timescales:null,channels:null,search:'',busy:false,signalById:new Map(),quickSignals:new Map(),draftLevels:new Map(),manualSignal:null}
+const V5={snapshot:null,timescales:null,channels:null,serving:null,search:'',busy:false,signalById:new Map(),quickSignals:new Map(),draftLevels:new Map(),manualSignal:null}
 
-const V5_FACET_LABELS={"CREATOR_ENTITY":"作者","CATEGORY":"分类","FANDOM_IP":"作品 / IP","FANDOM_CHARACTER":"角色","GENRE_THEME":"题材 / 类型","STORY_TROPE":"剧情 / 设定","RELATIONSHIP":"人物关系","IDENTITY_ROLE":"身份 / 职业","SPECIES_FANTASY":"种族 / 幻想","APPEARANCE_OUTFIT":"外观 / 服装","BODY_ATTRIBUTE":"身体特征","SETTING_LOCATION":"场景 / 地点","SEXUAL_BEHAVIOR":"行为","FETISH_TROPE":"偏好 / 情境","PHYSIOLOGY_STATE":"生理状态","CONTROL_COERCION":"支配 / 控制","RAW_TAG":"其他标签","OTHER":"其他"}
+const V5_FACET_LABELS={
+    "CREATOR_ENTITY":"作者","CATEGORY":"分类","FANDOM_IP":"作品 / IP","FANDOM_CHARACTER":"角色",
+    "GENRE_THEME":"题材 / 类型","STORY_TROPE":"剧情 / 设定","RELATIONSHIP":"人物关系",
+    "RELATIONSHIP_TROPE":"人物关系","IDENTITY_ROLE":"身份 / 职业","CHARACTER_IDENTITY_ROLE":"身份 / 职业",
+    "SPECIES_FANTASY":"种族 / 幻想","APPEARANCE_TRAIT":"外观特征","APPEARANCE_OUTFIT":"外观 / 服装",
+    "BODY_ATTRIBUTE":"身体特征","CHARACTER_BODY_ATTRIBUTE":"身体 / 外观特征","SETTING_LOCATION":"场景 / 地点",
+    "SEXUAL_BEHAVIOR":"行为","CONTENT_BEHAVIOR":"行为","FETISH_TROPE":"偏好 / 情境",
+    "PHYSIOLOGY_STATE":"生理状态","CONTROL_COERCION":"支配 / 控制",
+    "AUDIENCE_ORIENTATION":"受众方向","VISUAL_STYLE":"视觉风格","FORMAT":"作品形式",
+    "RAW_TAG":"其他标签","OTHER":"其他"
+}
 
-const V5_FACET_ORDER=["CREATOR_ENTITY","CATEGORY","FANDOM_IP","FANDOM_CHARACTER","GENRE_THEME","STORY_TROPE","RELATIONSHIP","IDENTITY_ROLE","SPECIES_FANTASY","APPEARANCE_OUTFIT","BODY_ATTRIBUTE","SETTING_LOCATION","SEXUAL_BEHAVIOR","FETISH_TROPE","PHYSIOLOGY_STATE","CONTROL_COERCION","RAW_TAG","OTHER"]
+const V5_FACET_SUPERGROUPS=[
+    {id:"people",label:"人物与作品",facets:["CREATOR_ENTITY","FANDOM_IP","FANDOM_CHARACTER","IDENTITY_ROLE","CHARACTER_IDENTITY_ROLE","SPECIES_FANTASY","RELATIONSHIP","RELATIONSHIP_TROPE","AUDIENCE_ORIENTATION"]},
+    {id:"content",label:"内容与剧情",facets:["CATEGORY","GENRE_THEME","STORY_TROPE","SETTING_LOCATION","PHYSIOLOGY_STATE"]},
+    {id:"appearance",label:"外观与画风",facets:["APPEARANCE_TRAIT","APPEARANCE_OUTFIT","BODY_ATTRIBUTE","CHARACTER_BODY_ATTRIBUTE","VISUAL_STYLE"]},
+    {id:"behavior",label:"行为与偏好",facets:["SEXUAL_BEHAVIOR","CONTENT_BEHAVIOR","FETISH_TROPE","CONTROL_COERCION"]},
+    {id:"format",label:"形式与其他",facets:["FORMAT","RAW_TAG","OTHER"]}
+]
+const V5_FACET_ORDER=V5_FACET_SUPERGROUPS.flatMap((group)=>group.facets)
 
 function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -98,6 +115,16 @@ function ensureStyles() {
 .v5-pending-bar[hidden]{display:none}.v5-pending-bar .actions{margin:0}
 .v5-section-heading{display:flex;align-items:end;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px}
 .v5-search-empty{padding:12px;border:1px dashed var(--a83-line,#ddd);border-radius:12px}
+.v5-overview-section,.v5-major-group{border:1px solid var(--a83-line,#ddd);border-radius:14px;margin:10px 0;background:color-mix(in srgb,var(--a83-surface,#fff) 98%,transparent)}
+.v5-overview-section>summary,.v5-major-group>summary{cursor:pointer;display:flex;align-items:center;gap:8px;padding:12px 14px;list-style:none;font-weight:700}
+.v5-overview-section>summary::-webkit-details-marker,.v5-major-group>summary::-webkit-details-marker{display:none}
+.v5-overview-section>summary::after,.v5-major-group>summary::after{content:'＋';margin-left:auto;opacity:.62}
+.v5-overview-section[open]>summary::after,.v5-major-group[open]>summary::after{content:'－'}
+.v5-overview-section>.v5-overview-grid,.v5-overview-section>.v5-compose-grid{margin:0;padding:0 12px 12px}
+.v5-major-body{display:grid;gap:8px;padding:0 10px 10px}
+.v5-facet-scroll{max-height:430px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;touch-action:pan-y;padding-right:4px}
+.v5-summary-note{font-size:.82rem;font-weight:500;opacity:.78;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(58vw,680px)}
+.v5-heading-inline{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 @keyframes v5toastin{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 @media(max-width:850px){.v5-signal-row{grid-template-columns:1fr}.v5-row-actions{justify-content:flex-start}.v5-range-wrap input[type=range]{min-width:120px}}
 `
@@ -156,6 +183,13 @@ function currentLevel(signal) {
 }
 
 function facetLabel(facet) { return V5_FACET_LABELS[facet] || facet || '其他' }
+function facetSupergroup(facet) {
+    return V5_FACET_SUPERGROUPS.find((group) => group.facets.includes(facet)) ||
+        V5_FACET_SUPERGROUPS.at(-1)
+}
+function infoButton(text, label='查看说明') {
+    return `<button type="button" class="info-tip" aria-label="${esc(label)}" data-info-tip="${esc(text)}">i</button>`
+}
 
 function ensurePanel() {
     ensureStyles()

@@ -147,10 +147,12 @@ final class BridgeClient {
     static JSONObject ehRelayPages(Context c,String comicId,String surface) throws Exception {
         return new JSONObject(get(c,"/mobile/v1/provider/eh/pages/"+enc(comicId)+"?surface="+enc("exh".equals(surface)?"exh":"eh")));
     }
-    static JSONObject ehRelayFavorite(Context c,String comicId,boolean desired) throws Exception {
+    static JSONObject ehRelayFavorite(Context c,String comicId,boolean desired,int category,String note) throws Exception {
         JSONObject body=new JSONObject();
         body.put("comicId",comicId);
         body.put("desired",desired);
+        body.put("category",Math.max(0,Math.min(9,category)));
+        body.put("note",note==null?"":note);
         return new JSONObject(post(c,"/mobile/v1/provider/eh/favorite",body,45000));
     }
     static HttpURLConnection ehRelayImage(Context c,String locator) throws Exception {

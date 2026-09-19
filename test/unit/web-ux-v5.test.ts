@@ -299,6 +299,68 @@ describe('V5 Web UX audit contract', () => {
         expect(app).not.toMatch(/(^|[^$])\$\([^\n]*\)\.forEach\(/m)
     })
 
+    it('shows an inspectable recommendation profile before explicit batch edits', () => {
+        const controls = read('web/recommendation-v5-beta.js')
+        expect(controls).toContain('你的推荐画像')
+        expect(controls).toContain('当前推荐构成')
+        expect(controls).toContain('完整画像与微调')
+        expect(controls).toContain('id="v5-policy-search-submit"')
+        expect(controls).toContain('id="v5-pending-save"')
+        expect(controls).toContain('id="v5-pending-discard"')
+        expect(controls).toContain('async function saveDraftLevels()')
+        expect(controls).toContain(
+            "/api/v1/recommendation-v5/preference-timescales?limit=5000"
+        )
+        expect(controls).toContain(
+            "/api/v1/recommendation-v5/candidate-channels?limit=5000"
+        )
+        expect(controls).toContain('作为标签添加')
+        expect(controls).not.toContain(
+            "webBaselineLevel(signal)"
+        )
+        expect(controls).not.toContain(
+            "webControlFor(signal)"
+        )
+        expect(controls).not.toContain(
+            "panel.querySelector('#v5-policy-search').addEventListener('input'"
+        )
+    })
+
+    it('exports a credential-free recommendation audit bundle on explicit request', () => {
+        const main = read('src/desktop/main.ts')
+        const server = read('src/library/server.ts')
+        const controls = read('web/recommendation-v5-beta.js')
+        expect(main).toContain('exportRecommendationAudit: async () =>')
+        expect(main).toContain("'behavior_evidence_v5.json'")
+        expect(main).toContain("'user_events.json'")
+        expect(main).toContain("'shadow_runs.json'")
+        expect(main).toContain("'evaluation_snapshot.json'")
+        expect(main).toContain("'catalog_minimal.json'")
+        expect(main).toContain("'pica_password'")
+        expect(main).toContain("'eh_cookies'")
+        expect(server).toContain(
+            "'/api/v1/desktop/recommendation-v5/export-audit'"
+        )
+        expect(controls).toContain('导出推荐审计数据')
+        expect(controls).toContain('window.picaDesktopPost')
+    })
+
+    it('builds pairing QR locally from the existing deep-link protocol', () => {
+        const index = read('web/index.html')
+        const app = read('web/app.js')
+        const license = read('web/vendor/qrcodejs-LICENSE.txt')
+        expect(index).toContain('./vendor/qrcode.min.js')
+        expect(index).toContain('id="mobile-bridge-qr"')
+        expect(index).toContain('id="mobile-bridge-pair-link"')
+        expect(app).toContain('picalibrary://pair?host=')
+        expect(app).toContain('new window.QRCode')
+        expect(app).not.toMatch(
+            /api\.qrserver|chart\.googleapis|quickchart.*qr/i
+        )
+        expect(license).toContain('The MIT License')
+        expect(license).toContain('Copyright (c) 2012 davidshimjs')
+    })
+
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'

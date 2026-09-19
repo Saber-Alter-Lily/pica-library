@@ -1,4 +1,4 @@
-const V5={snapshot:null,search:'',busy:false,signalById:new Map(),quickSignals:new Map()}
+const V5={snapshot:null,timescales:null,channels:null,search:'',busy:false,signalById:new Map(),quickSignals:new Map(),draftLevels:new Map(),manualSignal:null}
 
 const V5_FACET_LABELS={"CREATOR_ENTITY":"作者","CATEGORY":"分类","FANDOM_IP":"作品 / IP","FANDOM_CHARACTER":"角色","GENRE_THEME":"题材 / 类型","STORY_TROPE":"剧情 / 设定","RELATIONSHIP":"人物关系","IDENTITY_ROLE":"身份 / 职业","SPECIES_FANTASY":"种族 / 幻想","APPEARANCE_OUTFIT":"外观 / 服装","BODY_ATTRIBUTE":"身体特征","SETTING_LOCATION":"场景 / 地点","SEXUAL_BEHAVIOR":"行为","FETISH_TROPE":"偏好 / 情境","PHYSIOLOGY_STATE":"生理状态","CONTROL_COERCION":"支配 / 控制","RAW_TAG":"其他标签","OTHER":"其他"}
 
@@ -87,6 +87,17 @@ function ensureStyles() {
 .v5-toast{padding:11px 14px;border-radius:12px;background:var(--a83-surface,#fff);border:1px solid var(--a83-line,#ddd);box-shadow:0 10px 30px rgba(0,0,0,.16);animation:v5toastin .18s ease-out}
 .v5-toast.positive{border-color:color-mix(in srgb,#2e9d63 45%,var(--a83-line,#ddd))}
 .v5-toast.negative{border-color:color-mix(in srgb,#c44b4b 45%,var(--a83-line,#ddd))}
+.v5-overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:12px 0 18px}
+.v5-overview-card{border:1px solid var(--a83-line,#ddd);border-radius:14px;padding:12px;background:color-mix(in srgb,var(--a83-surface,#fff) 97%,transparent)}
+.v5-overview-card h5{margin:0 0 8px;font-size:.96rem}.v5-overview-card p{margin:5px 0}
+.v5-interest-chips{display:flex;gap:6px;flex-wrap:wrap}.v5-interest-chip{display:inline-flex;gap:5px;align-items:center;padding:5px 8px;border-radius:999px;background:color-mix(in srgb,var(--a83-accent-soft,#eef0ff) 70%,transparent);font-size:.82rem}
+.v5-compose-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0 18px}
+.v5-compose-card{border:1px solid var(--a83-line,#ddd);border-radius:12px;padding:10px 12px}.v5-compose-card p{margin:4px 0}
+.v5-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:end}.v5-search-row label{margin:0}
+.v5-pending-bar{position:sticky;bottom:12px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 0;padding:11px 13px;border:1px solid color-mix(in srgb,var(--a83-accent,#7457b9) 45%,var(--a83-line,#ddd));border-radius:14px;background:color-mix(in srgb,var(--a83-surface,#fff) 94%,var(--a83-accent-soft,#eef0ff));box-shadow:0 8px 28px rgba(0,0,0,.12)}
+.v5-pending-bar[hidden]{display:none}.v5-pending-bar .actions{margin:0}
+.v5-section-heading{display:flex;align-items:end;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px}
+.v5-search-empty{padding:12px;border:1px dashed var(--a83-line,#ddd);border-radius:12px}
 @keyframes v5toastin{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 @media(max-width:850px){.v5-signal-row{grid-template-columns:1fr}.v5-row-actions{justify-content:flex-start}.v5-range-wrap input[type=range]{min-width:120px}}
 `
@@ -134,8 +145,10 @@ function controlFor(signal) {
 }
 
 function currentLevel(signal) {
-    const baseline = webBaselineLevel(signal)
-    const control = webControlFor(signal)
+    const draft = V5.draftLevels.get(signalId(signal))
+    if (Number.isFinite(Number(draft))) return webClampLevel(draft)
+    const baseline = baselineLevel(signal)
+    const control = controlFor(signal)
     if (!control || control.direction === 'DEFAULT' || control.direction === 'BLOCK') return baseline
     if (Number.isFinite(Number(control.levelDelta)))
         return webClampLevel(baseline + Number(control.levelDelta))
@@ -170,19 +183,33 @@ function ensurePanel() {
             <span id="v5-session-status" class="status">本次想看：默认</span>
             <button id="v5-session-reset" type="button" class="v5-compact">清除本次想看</button>
         </div>
+        <div class="v5-section-heading"><div><h4>你的推荐画像</h4><p class="status">先看系统目前如何理解你的长期、近期与本次兴趣，再决定是否需要微调。</p></div></div>
+        <div id="v5-profile-overview" class="v5-overview-grid"></div>
+        <div class="v5-section-heading"><div><h4>当前推荐构成</h4><p class="status">展示当前规划实际启用的来源层、召回通道和 Provider 请求预算；不使用虚构百分比。</p></div></div>
+        <div id="v5-composition-overview" class="v5-compose-grid"></div>
         <h4>你的调整</h4>
         <div id="v5-control-list" class="v5-control-list"></div>
         <details class="v5-help v5-help-details">
             <summary><strong>1–10 档怎么理解？</strong></summary>
             <p><strong>1 = 尽量少推荐，10 = 非常喜欢。</strong> 不修改时由系统根据收藏与后续行为自动判断；“本次想看”只影响当前会话，“屏蔽”则是硬排除。</p>
-            <p class="status">召回阈值和排序偏置由系统自动处理，不需要手工维护。</p>
+            <p class="status">详细页的滑杆先进入待保存状态，可一次修改多项后统一保存或撤销。</p>
         </details>
-        <h4>系统主要兴趣 · 1–10 档</h4>
-        <p class="status">直接拖动滑杆即可纠正系统判断。清空搜索时可浏览系统当前识别到的主要作者、IP、标签和分类。</p>
-        <label>查找一个具体偏好
-            <input id="v5-policy-search" placeholder="作者、IP、标签或分类，例如：巨乳" />
-        </label>
+        <div class="v5-section-heading"><div><h4>完整画像与微调 · 1–10 档</h4><p class="status">默认按作者、IP、标签和分类分组浏览；也可以明确查找某个偏好。</p></div></div>
+        <div class="v5-search-row">
+            <label>查找一个具体偏好
+                <input id="v5-policy-search" placeholder="作者、IP、标签或分类，例如：巨乳" />
+            </label>
+            <button id="v5-policy-search-submit" type="button">查找</button>
+            <button id="v5-policy-search-clear" type="button">清空</button>
+        </div>
         <div id="v5-inferred-list" class="v5-facet-list"></div>
+        <div id="v5-pending-bar" class="v5-pending-bar" hidden>
+            <strong id="v5-pending-count">已修改 0 项</strong>
+            <div class="actions">
+                <button id="v5-pending-discard" type="button">撤销修改</button>
+                <button id="v5-pending-save" type="button" class="primary">保存调整</button>
+            </div>
+        </div>
     `
     anchor.insertAdjacentElement('afterend', panel)
     panel.querySelector('#v5-policy-refresh').addEventListener('click', loadPolicy)
@@ -198,10 +225,32 @@ function ensurePanel() {
             showToast('已清除“本次想看”，长期偏好调整保持不变。')
         } catch (error) { showStatus(error.message, true) }
     })
-    panel.querySelector('#v5-policy-search').addEventListener('input', (event) => {
-        V5.search = String(event.target.value || '').trim().toLocaleLowerCase()
+    const searchInput = panel.querySelector('#v5-policy-search')
+    const commitSearch = () => {
+        V5.search = String(searchInput.value || '').trim().toLocaleLowerCase()
+        V5.manualSignal = null
+        renderPolicy()
+    }
+    panel.querySelector('#v5-policy-search-submit').addEventListener('click', commitSearch)
+    panel.querySelector('#v5-policy-search-clear').addEventListener('click', () => {
+        searchInput.value = ''
+        V5.search = ''
+        V5.manualSignal = null
         renderPolicy()
     })
+    searchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault()
+            commitSearch()
+        }
+    })
+    panel.querySelector('#v5-pending-discard').addEventListener('click', () => {
+        V5.draftLevels.clear()
+        V5.manualSignal = null
+        renderPolicy()
+        showToast('已撤销尚未保存的偏好修改。')
+    })
+    panel.querySelector('#v5-pending-save').addEventListener('click', () => void saveDraftLevels())
 }
 
 async function setControl(signal, direction, levelDelta) {

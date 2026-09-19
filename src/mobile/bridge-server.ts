@@ -159,6 +159,22 @@ function stringArray(value: unknown) {
         : []
 }
 
+function picaSort(value: unknown, fallback = 'ld') {
+    const sort = String(value ?? '').trim()
+    return ['ua', 'dd', 'da', 'ld', 'vd'].includes(sort)
+        ? sort
+        : fallback
+}
+
+function safePathSegment(value: string) {
+    try {
+        return decodeURIComponent(value)
+    } catch {
+        return ''
+    }
+}
+
+
 function mobileFavoriteRecords(value: unknown): FavoriteRecord[] {
     if (!Array.isArray(value)) return []
     return value.flatMap((item) => {
@@ -370,6 +386,210 @@ export async function startMobileBridge(options: {
                         eh: { configured: false }
                     })
                 })
+
+            // Paired-provider relay: Android can use Desktop's authenticated
+            // Pica session without copying a password, provider token, or cookie
+            // to the phone. Every route stays behind the existing Mobile Bridge
+            // bearer authentication above.
+            if (
+                url.pathname === '/mobile/v1/provider/pica/search' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const pica = await options.service.connect()
+                const page = Math.max(
+                    1,
+                    Math.min(1000, Math.floor(Number(input.page) || 1))
+                )
+                const keyword = String(input.keyword ?? '').trim().slice(0, 500)
+                const categories = stringArray(input.categories).slice(0, 20)
+                const comics = await pica.search(
+                    keyword,
+                    page,
+                    picaSort(input.sort, pica.Order.loved),
+                    categories
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/browse' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const pica = await options.service.connect()
+                const page = Math.max(
+                    1,
+                    Math.min(1000, Math.floor(Number(input.page) || 1))
+                )
+                const comics = await pica.comicsPage(
+                    String(input.category ?? '').trim().slice(0, 200),
+                    String(input.tag ?? '').trim().slice(0, 200),
+                    picaSort(input.sort, pica.Order.loved),
+                    page
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/favorites' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const pica = await options.service.connect()
+                const page = Math.max(
+                    1,
+                    Math.min(1000, Math.floor(Number(input.page) || 1))
+                )
+                const comics = await pica.favorites(
+                    page,
+                    picaSort(input.sort, pica.Order.latest)
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/leaderboard' &&
+                request.method === 'GET'
+            ) {
+                const pica = await options.service.connect()
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics: await pica.leaderboard()
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/categories' &&
+                request.method === 'GET'
+            ) {
+                const pica = await options.service.connect()
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    ...(await pica.categories())
+                })
+            }
+
+            const picaComicRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/comic\/([^/]+)$/
+            )
+            if (picaComicRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaComicRoute[1]).trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const pica = await options.service.connect()
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comic: await pica.comicInfo(comicId)
+                })
+            }
+
+            const picaEpisodesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/episodes\/([^/]+)$/
+            )
+            if (picaEpisodesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaEpisodesRoute[1]).trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const pica = await options.service.connect()
+                const episodes = await pica.episodesAll(comicId)
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    episodes: episodes.map((episode) => ({
+                        id: episode.id || episode._id || '',
+                        title: episode.title,
+                        order: episode.order
+                    }))
+                })
+            }
+
+            const picaPagesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/pages\/([^/]+)\/(\d+)$/
+            )
+            if (picaPagesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaPagesRoute[1]).trim()
+                const order = Number(picaPagesRoute[2])
+                if (!comicId || !Number.isSafeInteger(order) || order < 1)
+                    return json(response, 400, {
+                        error: 'Valid Pica comic id and episode order are required'
+                    })
+                const pica = await options.service.connect()
+                const episodes = await pica.episodesAll(comicId)
+                const episode = episodes.find((item) => item.order === order)
+                if (!episode)
+                    return json(response, 404, {
+                        error: 'Pica episode was not found'
+                    })
+                const pages = await pica.picturesAll(comicId, episode)
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    pages: pages.map((page, index) => ({
+                        id: page.id || `p${index}`,
+                        url: page.url,
+                        name: page.name,
+                        position: index
+                    }))
+                })
+            }
+
+            const picaRelatedRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/related\/([^/]+)$/
+            )
+            if (picaRelatedRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaRelatedRoute[1]).trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const pica = await options.service.connect()
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics: await pica.related(comicId)
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/favorite' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const comicId = String(input.comicId ?? '').trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const desired = input.desired === true
+                const result = await options.service
+                    .providerService()
+                    .setFavorite(comicId, desired)
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    ...result
+                })
+            }
 
             if (
                 url.pathname === '/mobile/v1/recommendation/v5/snapshot' &&

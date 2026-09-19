@@ -840,6 +840,35 @@ export async function startMobileBridge(options: {
                 )
 
             if (
+                url.pathname === '/mobile/v1/recommendation/v5/sync-preview' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request, 512 * 1024)
+                return json(
+                    response,
+                    200,
+                    options.service.previewMobileRecommendationV5(input)
+                )
+            }
+
+            if (
+                url.pathname === '/mobile/v1/recommendation/v5/portable-package' &&
+                request.method === 'GET'
+            ) {
+                const limit = boundedInt(
+                    url.searchParams.get('limit'),
+                    500,
+                    24,
+                    1000
+                )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationPortablePackageV5(limit)
+                )
+            }
+
+            if (
                 url.pathname === '/mobile/v1/recommendation/v5/sync' &&
                 request.method === 'POST'
             ) {

@@ -465,10 +465,26 @@ export async function startMobileBridge(options: {
                 request.method === 'GET'
             ) {
                 const pica = await options.service.connect()
+                const requested = String(url.searchParams.get('tt') ?? 'H24')
+                const range = ['H24', 'D7', 'D30'].includes(requested)
+                    ? requested
+                    : 'H24'
+                const result = await pica.request<unknown>(
+                    'get',
+                    `comics/leaderboard?tt=${range}&ct=VC`
+                )
+                const comics =
+                    result &&
+                    typeof result === 'object' &&
+                    Array.isArray(
+                        (result as { comics?: unknown }).comics
+                    )
+                        ? (result as { comics: unknown[] }).comics
+                        : []
                 return json(response, 200, {
                     authority: 'desktop',
                     relay: true,
-                    comics: await pica.leaderboard()
+                    comics
                 })
             }
 

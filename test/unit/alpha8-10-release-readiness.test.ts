@@ -19,10 +19,14 @@ describe('Alpha8.10 release readiness baseline', () => {
         const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string }
         const gradle = fs.readFileSync('mobile/android-alpha2/app/build.gradle', 'utf8')
         const windows = fs.readFileSync('scripts/build-windows-package.ps1', 'utf8')
-        const versionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1] || 0)
+        const versionCode = Number(
+            gradle.match(/PICA_ANDROID_VERSION_CODE'\)\s*\?:\s*'(\d+)'/)?.[1] || 0
+        )
         expect(versionAtLeast(pkg.version, [0, 3, 10])).toBe(true)
         expect(versionCode).toBeGreaterThanOrEqual(37)
-        expect(gradle).toContain("versionName '0.1.0-alpha8.")
+        expect(gradle).toMatch(
+            /PICA_ANDROID_VERSION_NAME'\)\s*\?:\s*'0\.1\.0-alpha8\./
+        )
         expect(windows).toContain("$version -eq '0.3.10'")
         expect(windows).toContain('Pica-Library-v0.3.9-windows-x64.zip')
     })

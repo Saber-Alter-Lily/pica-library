@@ -244,15 +244,24 @@ describe('UpdateManager', () => {
         ).rejects.toThrow(/Updater replacement requires a full install/)
     })
 
-    it('requires a full install for incompatible API or database schemas', async () => {
+    it('requires a full application install for API changes or large schema jumps and blocks schema downgrade', async () => {
         for (const overrides of [
             { appApiVersion: APP_API_VERSION + 1 },
-            { databaseSchemaVersion: DATABASE_SCHEMA_VERSION - 1 },
             { databaseSchemaVersion: DATABASE_SCHEMA_VERSION + 2 }
         ])
             await expect(
                 manager().stage('update.zip', packageBuffer(overrides).buffer)
-            ).rejects.toThrow(/compatibility requires a full install/)
+            ).rejects.toThrow(/compatibility requires a full application install/i)
+
+        await expect(
+            manager().stage(
+                'update.zip',
+                packageBuffer({
+                    databaseSchemaVersion: DATABASE_SCHEMA_VERSION - 1,
+                    requiresFullInstall: true
+                }).buffer
+            )
+        ).rejects.toThrow(/schema downgrade is not supported/i)
 
         await expect(
             manager().stage(

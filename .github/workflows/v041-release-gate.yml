@@ -1,4 +1,4 @@
-# v0.4.1 release source freeze after final UI/test contract alignment
+# v0.4.1 release source freeze after formal module-name cleanup
 name: v0.4.1 Formal Release Gate
 
 on:
@@ -71,7 +71,7 @@ jobs:
           try {
             $names=@($full.Entries | ForEach-Object { $_.FullName.Replace('\\','/') })
             if($names -contains 'TEST_BUILD.txt'){ throw 'formal package contains TEST_BUILD.txt' }
-            if($names | Where-Object { $_ -match '(?i)recommendation-v5-beta|pica library dev|dev-pr' }){ throw 'formal package contains beta/dev artifact names' }
+            if($names | Where-Object { $_ -match '(?i)beta|dev-pr|test_build' }){ throw 'formal package contains beta/dev/test artifact names' }
             if(-not ($names -contains 'Pica Library.exe')){ throw 'formal launcher missing' }
             $source=$full.GetEntry('SOURCE_SHA.txt')
             if(-not $source){ throw 'SOURCE_SHA.txt missing from formal full package' }

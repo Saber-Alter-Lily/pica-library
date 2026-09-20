@@ -347,4 +347,148 @@ function Replace-ApplicationTree([string]$Root, [string]$TargetRoot) {
     Rename-Item -LiteralPath $Root -NewName (Split-Path -Leaf $BackupRoot)
     $script:ReplacementStarted = $true
 
-    New-Ite
+    New-Item -ItemType Directory -Force -Path $Root | Out-Null
+    foreach ($item in @(Get-ChildItem -LiteralPath $TargetRoot -Force)) {
+        Copy-Item -LiteralPath $item.FullName -Destination $Root -Recurse -Force
+    }
+    foreach ($relative in @('Pica Library.exe', 'runtime\node.exe', 'app\desktop.js', 'SOURCE_SHA.txt')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Root $relative))) {
+            throw "替换后的程序目录缺少 $relative"
+        }
+    }
+    Write-UpgradeLog 'New application tree copied successfully.'
+}
+
+function Wait-NewHealth {
+    $launcher = Join-Path $ResolvedOldRoot 'Pica Library.exe'
+    Start-Process -FilePath $launcher | Out-Null
+    Write-UpgradeLog 'Started v0.4.1 for health verification.'
+
+    $deadline = (Get-Date).AddSeconds(45)
+    $instance = $null
+    do {
+        Start-Sleep -Milliseconds 350
+        $instance = Read-InstanceInfo
+    } while (-not $instance -and (Get-Date) -lt $deadline)
+    if (-not $instance -or -not $instance.url) {
+        throw 'v0.4.1 启动后未发布本地实例信息。'
+    }
+
+    $base = ([string]$instance.url).TrimEnd('/')
+    $status = Invoke-RestMethod -Uri ($base + '/api/v1/status') -TimeoutSec 5
+    $caps = Invoke-RestMethod -Uri ($base + '/api/v1/capabilities') -TimeoutSec 5
+    if ([string]$status.version -ne $TargetVersion) {
+        throw "新版本健康检查返回错误版本：$($status.version)"
+    }
+    if ([string]$caps.appVersion -ne $TargetVersion) {
+        throw "新版本能力接口返回错误版本：$($caps.appVersion)"
+    }
+    if ([int]$caps.databaseSchemaVersion -ne $ExpectedDatabaseSchema) {
+        throw "数据库架构异常：$($caps.databaseSchemaVersion)"
+    }
+    Write-UpgradeLog "Health verification passed: v$TargetVersion / schema $ExpectedDatabaseSchema."
+}
+
+function Rollback-Upgrade {
+    Write-UpgradeLog 'Starting rollback.'
+    try { Request-GracefulShutdown } catch {}
+    if ($ReplacementStarted) {
+        if (Test-Path -LiteralPath $ResolvedOldRoot) {
+            Remove-Item -LiteralPath $ResolvedOldRoot -Recurse -Force
+        }
+        if ($BackupRoot -and (Test-Path -LiteralPath $BackupRoot)) {
+            Rename-Item -LiteralPath $BackupRoot -NewName (Split-Path -Leaf $ResolvedOldRoot)
+        }
+    }
+    if ($LibraryDirectory) {
+        Restore-SafetySnapshot $LibraryDirectory
+    }
+    $oldLauncher = Join-Path $ResolvedOldRoot 'Pica Library.exe'
+    if (Test-Path -LiteralPath $oldLauncher) {
+        Start-Process -FilePath $oldLauncher | Out-Null
+    }
+    Write-UpgradeLog 'Rollback completed.'
+}
+
+try {
+    Write-UpgradeLog "Pica Library upgrade assistant started. Target v$TargetVersion."
+
+    if ($OldInstallPath) {
+        $ResolvedOldRoot = Normalize-Path $OldInstallPath
+    } else {
+        $ResolvedOldRoot = Resolve-RunningInstallRoot
+        if (-not $ResolvedOldRoot) {
+            $ResolvedOldRoot = Select-OldInstallFolder
+        }
+    }
+    if (-not $ResolvedOldRoot) {
+        throw '未选择旧版程序目录。'
+    }
+
+    Validate-OldInstall $ResolvedOldRoot
+    $LibraryDirectory = Read-LibraryDirectory
+    Assert-UserDataOutsideInstall $ResolvedOldRoot $LibraryDirectory
+
+    if (-not (Confirm-Action @"
+准备执行已验证的升级：
+
+旧版：v$RequiredSourceVersion
+新版：v$TargetVersion
+旧程序目录：
+$ResolvedOldRoot
+
+用户数据目录不会被当作程序文件替换：
+$DataRoot
+
+漫画库目录：
+$LibraryDirectory
+
+继续后，助手会下载官方完整包、校验 SHA-256、关闭旧版、建立安全快照并替换程序文件。
+是否继续？
+"@)) {
+        throw '用户取消升级。'
+    }
+
+    $target = Download-And-VerifyTarget
+    Ensure-OldAppStopped $ResolvedOldRoot
+    Save-SafetySnapshot $LibraryDirectory
+    Replace-ApplicationTree $ResolvedOldRoot $target
+    Wait-NewHealth
+
+    Show-Info @"
+升级完成：Pica Library v$TargetVersion 已通过启动和数据库健康检查。
+
+用户数据目录未作为程序文件替换：
+$DataRoot
+
+旧程序备份：
+$BackupRoot
+
+升级前安全快照：
+$SnapshotRoot
+
+建议正常使用一段时间确认无误后，再手动删除旧程序备份。
+日志：
+$LogFile
+"@
+    Write-UpgradeLog 'Upgrade completed successfully.'
+    exit 0
+} catch {
+    $message = $_.Exception.Message
+    Write-UpgradeLog "ERROR: $message"
+    if ($ReplacementStarted) {
+        try {
+            Rollback-Upgrade
+            Show-ErrorBox "升级未完成，已自动恢复旧版程序和升级前数据快照。`r`n`r`n原因：$message`r`n`r`n日志：$LogFile"
+        } catch {
+            $rollbackMessage = $_.Exception.Message
+            Write-UpgradeLog "ROLLBACK ERROR: $rollbackMessage"
+            Show-ErrorBox "升级失败，并且自动回滚未能完全完成。`r`n`r`n升级错误：$message`r`n回滚错误：$rollbackMessage`r`n`r`n请不要删除任何备份目录，并保留日志：$LogFile"
+        }
+    } else {
+        Show-ErrorBox "没有修改旧程序。`r`n`r`n原因：$message`r`n`r`n日志：$LogFile"
+    }
+    exit 1
+} finally {
+    Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+}

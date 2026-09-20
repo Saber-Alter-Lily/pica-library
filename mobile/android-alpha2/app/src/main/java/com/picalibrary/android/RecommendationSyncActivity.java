@@ -36,7 +36,21 @@ public final class RecommendationSyncActivity extends Activity {
         if(content==null)return;content.removeAllViews();
         LinearLayout principle=SettingsRow.panel(this,null);
         principle.addView(Ui.headingWithInfo(this,"同步规则",16,"电脑和手机各自拥有独立推荐周期。同步的是长期偏好、反馈、可复用候选与 Desktop 预计算基础，不会把当前推荐列表或“本次想看”覆盖到另一端。"));
-        content.addView(principle);Ui.gap(content,this,10);
+        content.addView(principle);Ui.gap(content,this,8);
+
+        LinearLayout reminders=SettingsRow.panel(this,null);
+        reminders.addView(Ui.headingWithInfo(this,"连接提醒",16,"同步始终由你主动执行。这里仅控制连接时是否后台比较差异、以及是否弹出提醒；关闭后仍可随时进入本页手动检查和同步。"));
+        boolean autoCheck=RecommendationSyncPreferences.checkOnConnection(this);
+        reminders.addView(toggleRow("连接时自动检查差异",autoCheck,true,(button,checked)->{
+            RecommendationSyncPreferences.setCheckOnConnection(this,checked);render();
+        }));
+        reminders.addView(toggleRow("普通变化弹窗提醒",RecommendationSyncPreferences.alertPortableChanges(this),autoCheck,(button,checked)->{
+            RecommendationSyncPreferences.setAlertPortableChanges(this,checked);
+        }));
+        reminders.addView(toggleRow("偏好冲突弹窗提醒",RecommendationSyncPreferences.alertConflicts(this),autoCheck,(button,checked)->{
+            RecommendationSyncPreferences.setAlertConflicts(this,checked);
+        }));
+        content.addView(reminders);Ui.gap(content,this,8);
 
         if(!BridgeStore.paired(this)){
             content.addView(SettingsRow.row(this,"电脑连接","未连接",v->startActivity(new Intent(this,PairingActivity.class))));
@@ -92,6 +106,13 @@ public final class RecommendationSyncActivity extends Activity {
         content.addView(Ui.button(this,"同步后重新生成手机推荐",v->{NativeRecommendationJobs.refresh(this);Toast.makeText(this,"手机将独立生成新的推荐周期",Toast.LENGTH_SHORT).show();},true),new LinearLayout.LayoutParams(-1,-2));
     }
 
+    private LinearLayout toggleRow(String title,boolean checked,boolean enabled,CompoundButton.OnCheckedChangeListener listener){
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,Ui.dp(this,5),0,Ui.dp(this,5));
+        TextView label=Ui.text(this,title,14,enabled?Ui.TEXT:Ui.MUTED,false);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+        Switch toggle=new Switch(this);toggle.setChecked(checked);toggle.setEnabled(enabled);toggle.setOnCheckedChangeListener(listener);row.addView(toggle);
+        return row;
+    }
+
     private String shortId(String value){
         if(value==null||value.isEmpty())return "无";
         return value.substring(0,Math.min(8,value.length()));
@@ -112,8 +133,28 @@ public final class RecommendationSyncActivity extends Activity {
     private void resolveAndApply(){
         JSONArray conflicts=preview==null?null:preview.optJSONArray("conflicts");
         if(conflicts==null||conflicts.length()==0){apply(new JSONArray());return;}
-        JSONArray resolutions=new JSONArray();
-        resolveOne(conflicts,0,resolutions);
+        if(conflicts.length()==1){
+            resolveOne(conflicts,0,new JSONArray());
+            return;
+        }
+        new AlertDialog.Builder(this)
+            .setTitle(conflicts.length()+" 项偏好冲突")
+            .setMessage("无需逐项确认。可以统一采用电脑或手机的修改；只有少数冲突需要分别判断时，再选择逐项处理。")
+            .setNegativeButton("全部用电脑",(d,w)->apply(resolutionsFor(conflicts,"DESKTOP")))
+            .setNeutralButton("逐项处理",(d,w)->resolveOne(conflicts,0,new JSONArray()))
+            .setPositiveButton("全部用手机",(d,w)->apply(resolutionsFor(conflicts,"ANDROID")))
+            .show();
+    }
+
+    private JSONArray resolutionsFor(JSONArray conflicts,String choice){
+        JSONArray out=new JSONArray();
+        for(int i=0;i<conflicts.length();i++){
+            JSONObject conflict=conflicts.optJSONObject(i);
+            if(conflict==null)continue;
+            String identity=conflict.optString("identity","");
+            if(!identity.isEmpty())out.put(resolution(identity,choice));
+        }
+        return out;
     }
 
     private void resolveOne(JSONArray conflicts,int index,JSONArray resolutions){
@@ -162,14 +203,14 @@ public final class RecommendationSyncActivity extends Activity {
     }
 
     static void offerAfterPairing(Activity activity){
-        offerIfChanged(activity,true);
+        if(RecommendationSyncPreferences.checkOnConnection(activity))offerIfChanged(activity);
     }
 
     static void maybeOfferOnConnection(Activity activity){
         long now=System.currentTimeMillis();
-        if(!BridgeStore.paired(activity)||now-lastAutomaticCheckAt<60000L)return;
+        if(!BridgeStore.paired(activity)||!RecommendationSyncPreferences.checkOnConnection(activity)||now-lastAutomaticCheckAt<60000L)return;
         lastAutomaticCheckAt=now;
-        offerIfChanged(activity,false);
+        offerIfChanged(activity);
     }
 
     private static String promptSignature(
@@ -200,7 +241,7 @@ public final class RecommendationSyncActivity extends Activity {
             packageChanged+":"+remotePolicy+":"+remoteVisual+":"+remoteCanonical+":"+remoteReservoir+":"+remoteBehavior+":"+conflictIds;
     }
 
-    private static void offerIfChanged(Activity activity,boolean force){
+    private static void offerIfChanged(Activity activity){
         new Thread(()->{
             try{
                 JSONObject value=BridgeClient.recommendationSyncPreview(activity);
@@ -219,23 +260,31 @@ public final class RecommendationSyncActivity extends Activity {
                     (!remoteBehavior.isEmpty()&&!remoteBehavior.equals(local.behaviorGeneration))
                 );
                 JSONArray conflicts=value.optJSONArray("conflicts");
+                int conflictCount=conflicts==null?0:conflicts.length();
                 int changes=value.optInt("androidControlChanges",0)+value.optInt("desktopControlChanges",0)+value.optInt("feedbackChanges",0)+value.optInt("eventChanges",0)+value.optInt("suppressChanges",0)+value.optInt("tasteExclusionChanges",0)+value.optInt("dispositionChanges",0)+value.optInt("catalogEvidenceChanges",0);
-                if(changes==0&&!packageChanged)return;
+                if(changes==0&&!packageChanged&&conflictCount==0)return;
+                if(conflictCount>0){
+                    if(!RecommendationSyncPreferences.alertConflicts(activity))return;
+                }else if(!RecommendationSyncPreferences.alertPortableChanges(activity))return;
+
                 String signature=promptSignature(value,packageChanged,remotePolicy,remoteVisual,remoteCanonical,remoteReservoir,remoteBehavior);
                 synchronized(RecommendationSyncActivity.class){
-                    if(!force&&signature.equals(lastPromptSignature))return;
+                    if(signature.equals(lastPromptSignature))return;
                     lastPromptSignature=signature;
                 }
                 activity.runOnUiThread(()->{
                     if(activity.isFinishing()||activity.isDestroyed())return;
-                    int conflictCount=conflicts==null?0:conflicts.length();
-                    new AlertDialog.Builder(activity)
-                        .setTitle("发现新的推荐数据")
-                        .setMessage("两端推荐周期保持独立。"+changes+" 项可同步数据"+(packageChanged?"，Desktop 基础包有更新":"")+(conflictCount>0?"，其中 "+conflictCount+" 项需要人工选择":"")+"。")
+                    AlertDialog.Builder dialog=new AlertDialog.Builder(activity)
                         .setNegativeButton("稍后",null)
-                        .setNeutralButton("查看详情",(d,w)->activity.startActivity(new Intent(activity,RecommendationSyncActivity.class)))
-                        .setPositiveButton(conflictCount>0?"处理冲突":"双向同步",(d,w)->activity.startActivity(new Intent(activity,RecommendationSyncActivity.class)))
-                        .show();
+                        .setPositiveButton(conflictCount>0?"查看冲突":"打开推荐同步",(d,w)->activity.startActivity(new Intent(activity,RecommendationSyncActivity.class)));
+                    if(conflictCount>0){
+                        dialog.setTitle("有 "+conflictCount+" 项偏好冲突")
+                            .setMessage("电脑和手机同时修改了同一偏好。同步不会自动替你决定；打开同步页后可批量使用电脑、批量使用手机，或只对少数冲突逐项处理。");
+                    }else{
+                        dialog.setTitle("有可同步的推荐数据")
+                            .setMessage(changes+" 项长期数据可同步"+(packageChanged?"，Desktop 推荐基础也有更新":"")+"。当前推荐列表和“本次想看”不会被覆盖。");
+                    }
+                    dialog.show();
                 });
             }catch(Exception ignored){}
         }).start();

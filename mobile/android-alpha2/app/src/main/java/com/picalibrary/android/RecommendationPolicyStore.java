@@ -38,7 +38,7 @@ final class RecommendationPolicyStore {
 
     private static JSONObject remoteSnapshot(Context c){return parseObject(prefs(c).getString(SNAPSHOT,"{}"));}
     private static JSONObject localSessionIntent(Context c){String raw=prefs(c).getString(LOCAL_SESSION,"");if(raw==null||raw.isEmpty()){JSONObject value=new JSONObject();try{value.put("mode","DEFAULT");value.put("source","ANDROID");value.put("updatedAt",now());}catch(Exception ignored){}return value;}return parseObject(raw);}
-    static JSONObject snapshot(Context c){JSONObject value=parseObject(remoteSnapshot(c).toString());try{value.put("sessionIntent",localSessionIntent(c));}catch(Exception ignored){}return value;}
+    static JSONObject snapshot(Context c){JSONObject value=remoteSnapshot(c);try{value.put("sessionIntent",localSessionIntent(c));}catch(Exception ignored){}return value;}
     static void saveSnapshot(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(SNAPSHOT,value.toString()).apply();}
     static void saveSyncedBase(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(BASE_SNAPSHOT,value.toString()).apply();}
     static JSONObject syncedBase(Context c){String raw=prefs(c).getString(BASE_SNAPSHOT,"");return raw==null||raw.isEmpty()?new JSONObject():parseObject(raw);}

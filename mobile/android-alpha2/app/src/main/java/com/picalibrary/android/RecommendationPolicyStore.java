@@ -80,10 +80,12 @@ final class RecommendationPolicyStore {
     private static boolean itemSuppressed(JSONObject state,String comicId){
         return hardSuppressed(state,comicId)||arrayContains(state,"seenComicIds",comicId)||arrayContains(state,"ownedComicIds",comicId)||arrayContains(state,"duplicateReportComicIds",comicId)||temporarySuppressed(state,comicId);
     }
-    static boolean tasteExcluded(Context c,String comicId){return arrayContains(snapshot(c),"tasteExcludedComicIds",comicId);}
+    static boolean tasteExcluded(Context c,String comicId){return tasteExcluded(snapshot(c),comicId);}
+    static boolean tasteExcluded(JSONObject state,String comicId){return state!=null&&arrayContains(state,"tasteExcludedComicIds",comicId);}
 
-    static boolean blocked(Context c,PicaClient.Comic comic){
-        JSONObject state=snapshot(c);if(comic==null)return false;if(itemSuppressed(state,comic.id))return true;
+    static boolean blocked(Context c,PicaClient.Comic comic){return blocked(snapshot(c),comic);}
+    static boolean blocked(JSONObject state,PicaClient.Comic comic){
+        if(state==null)state=new JSONObject();if(comic==null)return false;if(itemSuppressed(state,comic.id))return true;
         JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction"))&&matches(comic,row.optString("targetType"),row.optString("key")))return true;}
         return false;
     }
@@ -92,8 +94,9 @@ final class RecommendationPolicyStore {
         if(row!=null&&row.has("levelDelta"))return Math.min(0.27,Math.abs(row.optInt("levelDelta",0))*0.03);
         return session?0.12:0.08;
     }
-    static double adjustment(Context c,PicaClient.Comic comic){
-        JSONObject state=snapshot(c);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(comic,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
+    static double adjustment(Context c,PicaClient.Comic comic){return adjustment(snapshot(c),comic);}
+    static double adjustment(JSONObject state,PicaClient.Comic comic){
+        if(state==null)state=new JSONObject();double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(comic,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
         JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&matches(comic,intent.optString("targetType"),intent.optString("key")))score+=0.16;
         return Math.max(-0.30,Math.min(0.30,score));
     }

@@ -17,6 +17,14 @@ export const RELEASED_UPDATE_BASELINES: Record<
         actualMigrationVersion: 9,
         notes:
             'Public v0.4.0 migrated through schema 9 but shipped a stale capabilities constant of 8.'
+    },
+    '0.4.1': {
+        version: '0.4.1',
+        appApiVersion: 2,
+        advertisedDatabaseSchemaVersion: 13,
+        actualMigrationVersion: 13,
+        notes:
+            'Public v0.4.1 is the clean schema-13/updater baseline for scoped incremental updates.'
     }
 }
 

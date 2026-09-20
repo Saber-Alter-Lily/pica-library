@@ -32,7 +32,8 @@ function webNorm(value) {
 }
 
 function webClampLevel(value) {
-    return Math.max(1, Math.min(10, Math.round(Number(value) || 1)))
+    const numeric = Number(value)
+    return Math.max(0, Math.min(10, Math.round(Number.isFinite(numeric) ? numeric : 5)))
 }
 
 async function request(path, options = {}) {
@@ -248,7 +249,7 @@ function ensurePanel() {
         <div class="v5-heading-inline"><h4>你的调整</h4>${infoButton('这里仅显示你主动覆盖系统判断的项目。屏蔽偏好和屏蔽具体作品会分别统计。')}</div>
         <div id="v5-control-list" class="v5-control-list"></div>
 
-        <div class="v5-heading-inline"><h4>完整画像与微调 · 1–10 档</h4>${infoButton('1 = 尽量少推荐，10 = 非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好。')}</div>
+        <div class="v5-heading-inline"><h4>完整画像与微调 · 0–10 档</h4>${infoButton('0 = 强烈减少，5 = 中性，10 = 非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好；0 仍是软偏好，不等同于“屏蔽”。')}</div>
         <div class="v5-search-row">
             <label>查找一个具体偏好
                 <input id="v5-policy-search" placeholder="作者、IP、标签或分类，例如：巨乳" />
@@ -646,7 +647,7 @@ function signalRow(signal) {
         <div class="v5-signal-copy"><strong>${esc(signal.label)}</strong>
         <span class="status">${signal.manual ? '系统尚未形成稳定判断' : signal.behaviorDerived ? `长期行为支持 ${Number(signal.supportCount || 0)} 本` : `收藏支持 ${Number(signal.supportCount || 0)} 本`}</span></div>
         <div class="v5-range-wrap">
-            <input type="range" min="1" max="10" step="1" value="${level}" data-v5-level="${esc(signalId(signal))}" ${blocked ? 'disabled' : ''} />
+            <input type="range" min="0" max="10" step="1" value="${level}" data-v5-level="${esc(signalId(signal))}" ${blocked ? 'disabled' : ''} />
             <span class="v5-range-value" data-v5-level-value="${esc(signalId(signal))}">${blocked ? '已屏蔽' : `${level}/10`}</span>
             <span class="v5-range-meta">${signal.manual ? '系统未判断 · 5/10 为中性起点' : `系统基准 ${baseline}/10`}${current && !blocked ? ` · 你的调整 ${delta > 0 ? '+' : ''}${delta}` : ''}</span>
         </div>
@@ -735,12 +736,12 @@ function renderPolicy() {
             }).join('')
         } else if (manualSignal) {
             inferredTarget.innerHTML =
-                `<div class="v5-help"><strong>已确认把“${esc(V5.search)}”作为自定义标签微调。</strong> 5/10 是中性起点；修改后仍需点击“保存调整”。</div><div class="v5-facet-group"><div class="v5-facet-body"><div class="v5-facet-scroll">${signalRow(manualSignal)}</div></div></div>`
+                `<div class="v5-help"><strong>已确认把“${esc(V5.search)}”作为自定义标签微调。</strong> 5/10 是中性起点，可调整到 0–10；修改后仍需点击“保存调整”。</div><div class="v5-facet-group"><div class="v5-facet-body"><div class="v5-facet-scroll">${signalRow(manualSignal)}</div></div></div>`
         } else if (V5.search) {
             inferredTarget.innerHTML =
                 `<div class="v5-search-empty"><strong>没有找到“${esc(V5.search)}”</strong><button type="button" class="info-tip" data-info-tip="系统不会因为输入文字就自动创建偏好。确认它确实是标签后再添加。">i</button><p><button type="button" data-v5-add-custom-tag>作为标签添加</button></p></div>`
         } else {
-            inferredTarget.innerHTML = '<p class="status">当前还没有可展示的系统画像。</p>'
+            inferredTarget.innerHTML = '<div class="v5-help"><strong>还没有收藏画像也可以先配置推荐。</strong> 在上方搜索标签并“作为标签添加”，从 5/10 中性起点调整到 0–10；设置为 6–10 的标签可直接作为首轮推荐召回种子。</div>'
         }
     }
 
@@ -857,13 +858,13 @@ function cardContext(card) {
 
 function quickSignal(targetType,key,label) {
     const found=[...(V5.signalById?.values()||[])].find(item=>item.targetType===targetType&&(webNorm(item.key)===webNorm(key)||webNorm(item.label)===webNorm(label)))
-    return found||{targetType,key:webNorm(key),label:label||key,supportCount:0,supportShare:0,facet:targetType==='AUTHOR'?'CREATOR_ENTITY':'OTHER',baselineLevel:1}
+    return found||{targetType,key:webNorm(key),label:label||key,supportCount:0,supportShare:0,facet:targetType==='AUTHOR'?'CREATOR_ENTITY':'OTHER',baselineLevel:5,manual:true,systemUnknown:true}
 }
 
 function quickSliderRow(signal) {
     const baseline=baselineLevel(signal), level=currentLevel(signal)
     return `<div class="v5-quick-row"><strong>${esc(signal.label)}</strong>
-    <div class="v5-range-wrap"><input type="range" min="1" max="10" step="1" value="${level}" data-v5-quick-level="${esc(signalId(signal))}" />
+    <div class="v5-range-wrap"><input type="range" min="0" max="10" step="1" value="${level}" data-v5-quick-level="${esc(signalId(signal))}" />
     <span class="v5-range-value" data-v5-quick-value="${esc(signalId(signal))}">${level}/10</span>
     <span class="v5-range-meta">系统基准 ${baseline}/10 · 收藏支持 ${Number(signal.supportCount||0)} 本</span></div>
     <div class="v5-row-actions"><button type="button" data-v5-quick-session="${esc(signalId(signal))}">本次想看</button>

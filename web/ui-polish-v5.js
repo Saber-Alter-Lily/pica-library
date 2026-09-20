@@ -358,6 +358,7 @@ function installSettingsUtilities() {
 function installUpdatePanel() {
     const panel = ux$('#settings-update')
     if (!panel || ux$('#ux-local-update-package')) return
+    panel.classList.add('ux-update-panel')
     const details = makeDetails(
         'ux-local-update-package',
         'localUpdate'
@@ -366,10 +367,14 @@ function installUpdatePanel() {
     body.classList.add('ux-local-update-body')
     moveNodes(body, [
         ux$('#update-dropzone'),
-        ux$('#update-summary'),
-        ux$('#update-apply')
+        ux$('#update-summary')
     ])
-    const actions = panel.querySelector('.actions')
+    const localActions = document.createElement('div')
+    localActions.className = 'actions ux-local-update-actions'
+    moveNodes(localActions, [ux$('#update-apply')])
+    body.appendChild(localActions)
+    const actions = panel.querySelector(':scope > .actions')
+    actions?.classList.add('ux-update-primary-actions')
     if (actions) actions.insertAdjacentElement('afterend', details)
     else panel.appendChild(details)
 }

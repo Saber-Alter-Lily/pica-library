@@ -920,12 +920,12 @@
                     </div>
                 </form>
                 <article id="settings-recommendation-v4" class="panel">
-                    <div class="help-heading"><h3>推荐反馈与画风推荐 · Beta</h3><button type="button" class="info-tip" aria-label="查看推荐反馈说明" data-info-tip="画风推荐是独立叠加模块。关闭模块时不会改变常规推荐排序；Shadow 只计算，Live 才按所选强度参与排序。喜欢/不喜欢会立即记录，反馈原因始终可选。">!</button></div>
+                    <div class="help-heading"><h3>推荐反馈与画风推荐</h3><button type="button" class="info-tip" aria-label="查看推荐反馈说明" data-info-tip="画风推荐是独立叠加模块。关闭时不改变常规推荐；“仅分析”只计算不改排序；“参与排序”才按所选强度影响推荐。喜欢/不喜欢会立即记录，反馈原因始终可选。">!</button></div>
                     <label class="toggle-row"><input id="recommend-feedback-reasons-toggle" type="checkbox" /> 喜欢/不喜欢后询问可选原因</label>
                     <hr />
                     <label class="toggle-row"><input id="visual-enabled" type="checkbox" /> 启用画风推荐模块（关闭时不影响常规推荐）</label>
                     <label>画风取样来源<select id="visual-sampling-mode"><option value="local_only">仅本地已下载正文</option><option value="standard">本地 + 在线收藏少量正文</option><option value="cover_only">仅封面（低置信度）</option></select></label>
-                    <label>推荐接入模式<select id="visual-rerank-mode"><option value="OFF">关闭排序影响</option><option value="SHADOW">Shadow：只计算不改排序</option><option value="LIVE">Live：按所选强度参与排序</option></select></label>
+                    <label>推荐接入模式<select id="visual-rerank-mode"><option value="OFF">关闭排序影响</option><option value="SHADOW">仅分析：只计算不改排序</option><option value="LIVE">参与排序：按所选强度生效</option></select></label>
                     <label>画风影响强度<select id="visual-strength"><option value="LIGHT">轻度 · 兼容旧权重</option><option value="STANDARD">标准 · 推荐</option><option value="STRONG">强 · 更强调画风</option></select></label>
                     <div class="help-heading compact-help"><span>画风模型</span><button type="button" class="info-tip" aria-label="查看画风模型说明" data-info-tip="视觉模型在本机浏览器运行；首次使用会下载 Transformers.js 与 DINOv2 Small 模型。漫画页面仅从本机 Pica Library 服务读取，不上传给模型服务。">!</button></div>
                     <p id="visual-index-status" class="status">尚未读取画风索引。</p>

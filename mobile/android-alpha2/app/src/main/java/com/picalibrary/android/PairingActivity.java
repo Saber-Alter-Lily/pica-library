@@ -1,7 +1,6 @@
 package com.picalibrary.android;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -82,7 +81,14 @@ public class PairingActivity extends Activity {
         root.addView(status);
 
         if(BridgeStore.paired(this)){
-            Ui.gap(root,this,10);
+            Ui.gap(root,this,14);
+            root.addView(Ui.headingWithInfo(this,"可选同步",16,"配对只建立连接，不会自动合并收藏、书架或推荐数据。需要时手动触发即可。推荐同步提醒也可以在“推荐同步”页关闭。"));
+            Ui.gap(root,this,6);
+            root.addView(SettingsRow.row(this,"同步收藏","不缓存封面",v->syncFavorites(false)));
+            root.addView(SettingsRow.row(this,"同步收藏和封面","后台执行",v->syncFavorites(true)));
+            root.addView(SettingsRow.row(this,"同步书架","手动",v->syncShelves()));
+            root.addView(SettingsRow.row(this,"推荐同步","手动 / 提醒可关闭",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
+            Ui.gap(root,this,8);
             root.addView(Ui.button(this,"解除配对",v->{
                 BridgeStore.clear(this);
                 DesktopAccountStatusStore.clear(this);
@@ -146,10 +152,11 @@ public class PairingActivity extends Activity {
                 }catch(Exception ignored){}
                 runOnUiThread(()->{
                     setBusy(false);
-                    status.setText("配对成功 · 已同步 Desktop 账号连接状态");
-                    offerFavoriteImport();
+                    render();
+                    status.setText("配对成功 · 内容同步均为可选");
+                    Toast.makeText(this,"配对成功",Toast.LENGTH_SHORT).show();
+                    RecommendationSyncActivity.offerAfterPairing(this);
                 });
-                try{ShelfStore.syncWithDesktop(this);}catch(Exception ignored){}
                 SupporterSyncJobs.enqueue(this);
             }catch(Exception e){
                 runOnUiThread(()->{
@@ -160,20 +167,6 @@ public class PairingActivity extends Activity {
         }).start();
     }
 
-    private void offerFavoriteImport(){
-        new AlertDialog.Builder(this)
-            .setTitle("配对成功")
-            .setMessage("是否同时缓存电脑收藏的封面？")
-            .setPositiveButton("同步收藏和封面",(d,w)->syncFavorites(true))
-            .setNeutralButton("仅同步收藏",(d,w)->syncFavorites(false))
-            .setNegativeButton("稍后",(d,w)->{
-                Toast.makeText(this,"配对成功",Toast.LENGTH_SHORT).show();
-                offerRecommendationSync();
-            })
-            .setCancelable(false)
-            .show();
-    }
-
     private void syncFavorites(boolean covers){
         FavoriteImportJobs.enqueue(this,covers);
         SupporterSyncJobs.enqueue(this);
@@ -182,12 +175,22 @@ public class PairingActivity extends Activity {
             covers?"正在后台同步收藏和封面":"正在后台同步收藏",
             Toast.LENGTH_SHORT
         ).show();
-        offerRecommendationSync();
     }
 
-    private void offerRecommendationSync(){
-        status.setText("配对成功 · 推荐运行保持两端独立，可选择同步偏好与基础数据");
-        RecommendationSyncActivity.offerAfterPairing(this);
+    private void syncShelves(){
+        if(!BridgeStore.paired(this))return;
+        status.setText("正在同步书架…");
+        new Thread(()->{
+            try{
+                ShelfStore.syncWithDesktop(this);
+                runOnUiThread(()->{
+                    status.setText("书架同步完成");
+                    Toast.makeText(this,"书架同步完成",Toast.LENGTH_SHORT).show();
+                });
+            }catch(Exception e){
+                runOnUiThread(()->status.setText("书架同步失败："+(e.getMessage()==null?"请稍后重试":e.getMessage())));
+            }
+        }).start();
     }
 
     private void handleDeepLink(Uri u){

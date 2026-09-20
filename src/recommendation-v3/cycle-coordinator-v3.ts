@@ -12,6 +12,7 @@ import {
 } from './batch-allocator-v3'
 import { RecommendationPolicyStoreV5 } from '../recommendation-v5/policy-store'
 import { filterCandidatesAgainstOwnedV5 } from '../recommendation-v5/portable-policy'
+import type { StoredComic } from '../library/types'
 
 export const CYCLE_COORDINATOR_VERSION = '3.2.0-schema8-visible-cap'
 export const MAX_VISIBLE_BATCHES_PER_CYCLE = 6
@@ -35,6 +36,17 @@ export interface BuiltRecommendationCycleV3 {
     versions: V3CycleVersions
 }
 
+interface FrozenCycleServingSnapshotV3 {
+    poolId: string
+    catalog: StoredComic[]
+    catalogById: Map<string, StoredComic>
+    eligibleRanked: RankedCandidateWithEvidenceV3[]
+    eligibleById: Map<string, RankedCandidateWithEvidenceV3>
+    intents: RecommendationIntentV3[]
+    favoriteIds: Set<string>
+    recentlyDisplayedComicIds: Set<string>
+}
+
 interface CoordinatorStateV3 {
     schemaVersion: 1
     activeCycleId: string | null
@@ -49,6 +61,7 @@ export class CycleCoordinatorV3 {
     private readonly stateKey = 'recommendation.v3.activeCycle.v1'
     private buildPromise: Promise<void> | null = null
     private readonly mutationPromises = new Map<string, Promise<unknown>>()
+    private readonly servingSnapshots = new Map<string, FrozenCycleServingSnapshotV3>()
 
     constructor(
         private readonly database: LibraryDatabase,
@@ -107,6 +120,59 @@ export class CycleCoordinatorV3 {
         )
     }
 
+    private servingSnapshot(
+        cycleId: string,
+        pool = this.pool(cycleId)
+    ): FrozenCycleServingSnapshotV3 {
+        if (!pool) throw new Error('Active V3 candidate pool is unavailable')
+        const existing = this.servingSnapshots.get(cycleId)
+        if (existing?.poolId === pool.id) return existing
+        const telemetry = pool.telemetry as {
+            intentPlan?: RecommendationIntentV3[]
+            rankedCandidates?: Array<
+                Omit<RankedCandidateWithEvidenceV3, 'comic'>
+            >
+        }
+        const catalog = this.database.listComics({ limit: 10000 })
+        const catalogById = new Map(
+            catalog.map((comic) => [comic.comicId, comic])
+        )
+        const ranked = (telemetry.rankedCandidates ?? []).flatMap((item) => {
+            const comic = catalogById.get(item.comicId)
+            return comic ? [{ ...item, comic }] : []
+        })
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const eligibleRanked = filterCandidatesAgainstOwnedV5(
+            ranked,
+            catalog,
+            policy
+        ).rows
+        const snapshot: FrozenCycleServingSnapshotV3 = {
+            poolId: pool.id,
+            catalog,
+            catalogById,
+            eligibleRanked,
+            eligibleById: new Map(
+                eligibleRanked.map((item) => [item.comicId, item])
+            ),
+            intents: telemetry.intentPlan ?? [],
+            favoriteIds: new Set(
+                catalog
+                    .filter((comic) => comic.isFavorite)
+                    .map((comic) => comic.comicId)
+            ),
+            recentlyDisplayedComicIds:
+                this.recentlyDisplayedComicIds(cycleId)
+        }
+        this.servingSnapshots.set(cycleId, snapshot)
+        while (this.servingSnapshots.size > 2) {
+            const oldest = this.servingSnapshots.keys().next().value
+            if (!oldest) break
+            this.servingSnapshots.delete(oldest)
+        }
+        return snapshot
+    }
+
     private async completeBuild(
         cycleId: string,
         requestId: string,
@@ -161,6 +227,7 @@ export class CycleCoordinatorV3 {
                     previousActive,
                     'SUPERSEDED'
                 )
+            this.servingSnapshots.clear()
             this.saveState({
                 ...current,
                 activeCycleId: cycleId,
@@ -254,15 +321,13 @@ export class CycleCoordinatorV3 {
     ) {
         const state = this.state()
         const pool = this.database.getV3CandidatePool(batch.poolId)
-        const catalog = this.database.listComics({ limit: 10000 })
-        const policy = new RecommendationPolicyStoreV5(this.database).state()
-        const serving = filterCandidatesAgainstOwnedV5(
-            this.database.recommendationRecords(batch.itemIds),
-            catalog,
-            policy
-        )
+        const snapshot = this.servingSnapshot(batch.cycleId, pool)
+        const recommendations = batch.itemIds.flatMap((id) => {
+            const item = snapshot.eligibleById.get(id)
+            return item ? [item] : []
+        })
         const exhausted =
-            serving.rows.length === 0 || pool?.telemetry.state === 'EXHAUSTED'
+            recommendations.length === 0 || pool?.telemetry.state === 'EXHAUSTED'
         return {
             ...this.status(),
             cycleId: batch.cycleId,
@@ -272,10 +337,13 @@ export class CycleCoordinatorV3 {
             contextId: batch.contextId,
             batchSize: FINAL_BATCH_SIZE,
             maxVisibleBatches: MAX_VISIBLE_BATCHES_PER_CYCLE,
-            recommendations: serving.rows,
+            recommendations,
             servingFilteredCount:
-                batch.itemIds.length - serving.rows.length,
-            servingFilterTelemetry: serving.telemetry,
+                batch.itemIds.length - recommendations.length,
+            servingFilterTelemetry: {
+                frozenCycleSnapshot: true,
+                cacheSize: snapshot.eligibleRanked.length
+            },
             evidence: batch.evidence,
             exhausted,
             cycleState: exhausted ? 'EXHAUSTED' : 'ACTIVE',
@@ -318,42 +386,16 @@ export class CycleCoordinatorV3 {
             )
             return this.responseForBatch(last)
         }
-        const telemetry = pool.telemetry as {
-            intentPlan?: RecommendationIntentV3[]
-            rankedCandidates?: Array<
-                Omit<RankedCandidateWithEvidenceV3, 'comic'>
-            >
-        }
-        const catalog = new Map(
-            this.database
-                .listComics({ limit: 10000 })
-                .map((comic) => [comic.comicId, comic])
-        )
-        const ranked = (telemetry.rankedCandidates ?? []).flatMap((item) => {
-            const comic = catalog.get(item.comicId)
-            return comic ? [{ ...item, comic }] : []
-        })
-        const favoriteIds = new Set(
-            [...catalog.values()]
-                .filter((comic) => comic.isFavorite)
-                .map((comic) => comic.comicId)
-        )
-        const policy = new RecommendationPolicyStoreV5(this.database).state()
-        const eligibleRanked = filterCandidatesAgainstOwnedV5(
-            ranked,
-            [...catalog.values()],
-            policy
-        ).rows
+        const snapshot = this.servingSnapshot(state.activeCycleId, pool)
         const allocated = allocateRecommendationBatchV3({
-            ranked: eligibleRanked,
-            intents: telemetry.intentPlan ?? [],
+            ranked: snapshot.eligibleRanked,
+            intents: snapshot.intents,
             alreadyAllocated: new Set(
                 this.database.recommendationSeen(state.activeCycleId)
             ),
-            currentFavoriteIds: favoriteIds,
-            recentlyDisplayedComicIds: this.recentlyDisplayedComicIds(
-                state.activeCycleId
-            )
+            currentFavoriteIds: snapshot.favoriteIds,
+            recentlyDisplayedComicIds:
+                snapshot.recentlyDisplayedComicIds
         })
         const batchIndex = last ? last.batchIndex + 1 : 0
         const batch = this.database.saveV3BatchAndAllocate({

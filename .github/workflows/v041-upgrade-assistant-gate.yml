@@ -40,7 +40,7 @@ jobs:
       - name: Verify one-click launcher
         shell: powershell
         run: |
-          $cmd = Get-Content -Raw -LiteralPath 'packaging\windows\upgrade-assistant-v041\升级旧版到v0.4.1.cmd'
+          $cmd = Get-Content -Raw -LiteralPath 'packaging\windows\upgrade-assistant-v041\Upgrade-Pica-Library-v0.4.1.cmd'
           if ($cmd -notmatch 'Upgrade-Pica-Library-v0\.4\.1\.ps1') { throw 'CMD launcher target missing' }
           if ($cmd -notmatch 'ExecutionPolicy Bypass') { throw 'CMD launcher does not invoke the bundled assistant' }
           Write-Host 'CMD_LAUNCHER=PASS'

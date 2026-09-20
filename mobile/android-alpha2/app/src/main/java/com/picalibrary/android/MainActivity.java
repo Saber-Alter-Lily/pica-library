@@ -24,6 +24,8 @@ public class MainActivity extends Activity {
 
     private FrameLayout body;
     private LinearLayout nav;
+    private LinearLayout recommendationBatchList;
+    private TextView recommendationBatchStatus;
     private int current,serial,columns=2;
     private String query="",activeShelfId="";
     private SharedPreferences preferences;
@@ -72,7 +74,7 @@ public class MainActivity extends Activity {
 
     private boolean valid(int id){return id==serial&&!isFinishing()&&!isDestroyed();}
     private Button button(String label,View.OnClickListener action){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Ui.PRIMARY);b.setOnClickListener(action);return b;}
-    private void cancelPageWork(){++serial;if(pending!=null)pending.cancel(true);pending=null;if(unifiedGridAdapter!=null){unifiedGridAdapter.close();unifiedGridAdapter=null;}body.removeAllViews();}
+    private void cancelPageWork(){++serial;if(pending!=null)pending.cancel(true);pending=null;if(unifiedGridAdapter!=null){unifiedGridAdapter.close();unifiedGridAdapter=null;}recommendationBatchList=null;recommendationBatchStatus=null;body.removeAllViews();}
     private void updateNav(){for(int i=0;i<nav.getChildCount();i++)nav.getChildAt(i).setBackgroundColor(i==current?Ui.PRIMARY_SOFT:Color.TRANSPARENT);}
     private void showTab(){cancelPageWork();updateNav();if(current==0)library();else if(current==1)recommendations();else if(current==2)history();else sources();}
     private void showBookshelvesPage(){cancelPageWork();current=0;updateNav();bookshelves();}
@@ -167,15 +169,36 @@ public class MainActivity extends Activity {
 
         NativeRecommendationStore.markCurrentSeen(this);
         snapshot=NativeRecommendationStore.load(this);
-        TextView status=Ui.text(this,"手机独立 Recommendation V3/V5 Portable · "+snapshot.readiness+" · 候选 "+snapshot.candidateCount+" 本 · 第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批",13,Ui.MUTED,false);p.addView(status);
+        recommendationBatchStatus=Ui.text(this,"",13,Ui.MUTED,false);p.addView(recommendationBatchStatus);
         LinearLayout batchControls=new LinearLayout(this);p.addView(batchControls);
-        batchControls.addView(button("上一批",v->{NativeRecommendationStore.previousBatch(this);showTab();}),new LinearLayout.LayoutParams(0,-2,1));
-        batchControls.addView(button("下一批",v->{NativeRecommendationStore.nextBatch(this);showTab();}),new LinearLayout.LayoutParams(0,-2,1));
-        for(NativeRecommendationStore.Item item:snapshot.current()){
-            LinearLayout card=Ui.card(this);card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));card.addView(Ui.text(this,item.reason,12,Ui.PRIMARY,false));card.addView(Ui.text(this,item.family+" · score "+String.format(Locale.ROOT,"%.4f",item.score),10.5f,Ui.MUTED,false));card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));p.addView(card);
-        }
+        batchControls.addView(button("上一批",v->switchNativeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
+        batchControls.addView(button("下一批",v->switchNativeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
+        recommendationBatchList=new LinearLayout(this);recommendationBatchList.setOrientation(LinearLayout.VERTICAL);p.addView(recommendationBatchList);
+        renderNativeRecommendationBatch(snapshot);
     }
 
+
+    private void switchNativeRecommendationBatch(int direction){
+        if(recommendationBatchList==null||recommendationBatchStatus==null)return;
+        NativeRecommendationStore.Snapshot snapshot=direction<0?NativeRecommendationStore.previousBatch(this):NativeRecommendationStore.nextBatch(this);
+        NativeRecommendationStore.markCurrentSeen(this);
+        renderNativeRecommendationBatch(NativeRecommendationStore.load(this));
+    }
+
+    private void renderNativeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){
+        if(recommendationBatchList==null||recommendationBatchStatus==null)return;
+        recommendationBatchStatus.setText("手机独立 Recommendation V3/V5 Portable · "+snapshot.readiness+" · 候选 "+snapshot.candidateCount+" 本 · 第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批");
+        recommendationBatchList.removeAllViews();
+        for(NativeRecommendationStore.Item item:snapshot.current()){
+            LinearLayout card=Ui.card(this);
+            card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));
+            card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));
+            card.addView(Ui.text(this,item.reason,12,Ui.PRIMARY,false));
+            card.addView(Ui.text(this,item.family+" · score "+String.format(Locale.ROOT,"%.4f",item.score),10.5f,Ui.MUTED,false));
+            card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));
+            recommendationBatchList.addView(card);
+        }
+    }
 
     private void history(){
         LinearLayout p=page("继续阅读","WebDAV 便携进度 + Desktop 历史按更新时间合并",true);p.addView(button("刷新阅读记录",v->showTab()));TextView status=Ui.text(this,"正在合并阅读记录…",13,Ui.MUTED,false);p.addView(status);ProgressBar load=loading(p);final int id=serial;

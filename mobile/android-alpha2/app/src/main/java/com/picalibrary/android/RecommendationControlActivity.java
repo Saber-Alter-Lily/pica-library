@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.*;
 import androidx.core.widget.NestedScrollView;
 import java.util.*;
+import java.util.concurrent.*;
 import org.json.*;
 
 /**
@@ -21,13 +22,19 @@ public final class RecommendationControlActivity extends Activity {
     private EditText search;
     private String activeQuery="";
     private JSONObject manualSignal;
+    private JSONObject loadedState=new JSONObject();
+    private JSONArray loadedControls=new JSONArray(),loadedInferred=new JSONArray();
     private final Set<String> expanded=new LinkedHashSet<>();
     private final Set<String> expandedFacets=new LinkedHashSet<>();
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private int loadGeneration;
+    private boolean destroyed;
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);Ui.applyWindow(this);expanded.add("people");activeQuery=getIntent().getStringExtra("query");if(activeQuery==null)activeQuery="";renderShell();
     }
-    @Override protected void onResume(){super.onResume();render();}
+    @Override protected void onResume(){super.onResume();loadAsync();}
+    @Override protected void onDestroy(){destroyed=true;++loadGeneration;worker.shutdownNow();super.onDestroy();}
 
     private void renderShell(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
@@ -36,13 +43,51 @@ public final class RecommendationControlActivity extends Activity {
         bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
         bar.addView(Ui.text(this,"人工调整",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
         ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,10),Ui.dp(this,14),Ui.dp(this,28));scroll.addView(content);
-        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();render();
+        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();showLoading();
     }
 
-    private void render(){
+    private void showLoading(){
         if(content==null)return;content.removeAllViews();
-        JSONObject state=RecommendationPolicyStore.snapshot(this),intent=state.optJSONObject("sessionIntent");
-        JSONArray currentControls=RecommendationPolicyStore.controls(this);
+        LinearLayout panel=SettingsRow.panel(this,null);
+        panel.addView(Ui.text(this,"正在读取人工调整画像…",16,Ui.TEXT,true));
+        ProgressBar progress=new ProgressBar(this);progress.setIndeterminate(true);panel.addView(progress);
+        panel.addView(Ui.text(this,"偏好与标签画像在后台整理，页面不会被大 JSON 解析阻塞。",12,Ui.MUTED,false));
+        content.addView(panel);
+    }
+
+    private void loadAsync(){
+        if(content==null||destroyed)return;
+        final int generation=++loadGeneration;
+        showLoading();
+        worker.submit(()->{
+            try{
+                Context app=getApplicationContext();
+                JSONObject state=RecommendationPolicyStore.snapshot(app);
+                JSONArray controls=state.optJSONArray("controls");if(controls==null)controls=new JSONArray();
+                UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(app);
+                JSONArray inferred=RecommendationLocalProfile.inferred(app,catalog,state);
+                final JSONObject finalState=state;final JSONArray finalControls=controls,finalInferred=inferred;
+                runOnUiThread(()->{if(destroyed||generation!=loadGeneration)return;renderLoaded(finalState,finalControls,finalInferred);});
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(destroyed||generation!=loadGeneration)return;
+                    content.removeAllViews();
+                    LinearLayout panel=SettingsRow.panel(this,null);
+                    panel.addView(Ui.text(this,"人工调整读取失败",16,Ui.TEXT,true));
+                    panel.addView(Ui.text(this,e.getMessage()==null?"请返回后重试":e.getMessage(),12,Ui.MUTED,false));
+                    content.addView(panel);
+                });
+            }
+        });
+    }
+
+    private void renderLoaded(JSONObject state,JSONArray currentControls,JSONArray inferred){
+        if(content==null)return;content.removeAllViews();
+        loadedState=state==null?new JSONObject():state;
+        loadedControls=currentControls==null?new JSONArray():currentControls;
+        loadedInferred=inferred==null?new JSONArray():inferred;
+        state=loadedState;currentControls=loadedControls;
+        JSONObject intent=state.optJSONObject("sessionIntent");
         int blockedTargets=0;for(int i=0;i<currentControls.length();i++){JSONObject row=currentControls.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction")))blockedTargets++;}
         JSONArray hardSuppressed=state.optJSONArray("hardSuppressComicIds");
         int hardSuppressedCount=hardSuppressed==null?0:hardSuppressed.length();
@@ -58,7 +103,7 @@ public final class RecommendationControlActivity extends Activity {
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.addView(Ui.button(this,"推荐同步",v->startActivity(new Intent(this,RecommendationSyncActivity.class)),false),new LinearLayout.LayoutParams(0,-2,1));
         Ui.gap(actions,this,6);
-        actions.addView(Ui.button(this,"清除本次想看",v->{RecommendationPolicyStore.clearLocalSessionIntent(this);render();},true),new LinearLayout.LayoutParams(0,-2,1));
+        actions.addView(Ui.button(this,"清除本次想看",v->{RecommendationPolicyStore.clearLocalSessionIntent(this);loadAsync();},true),new LinearLayout.LayoutParams(0,-2,1));
         content.addView(actions);Ui.gap(content,this,10);
 
         LinearLayout find=SettingsRow.panel(this,null);
@@ -85,7 +130,7 @@ public final class RecommendationControlActivity extends Activity {
 
     private void renderSignals(String query){
         while(content.getChildCount()>4)content.removeViewAt(content.getChildCount()-1);
-        JSONArray inferred=RecommendationLocalProfile.inferred(this);
+        JSONArray inferred=loadedInferred==null?new JSONArray():loadedInferred;
         if(inferred.length()==0){
             content.addView(Ui.text(this,BridgeStore.paired(this)?"尚未取得完整画像。先到“推荐同步”同步基础数据。":"尚未同步 Desktop 长期画像；手机仍会使用本地收藏和行为运行推荐。",13,Ui.MUTED,false));
             return;
@@ -185,20 +230,20 @@ public final class RecommendationControlActivity extends Activity {
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser)value.setText((progress+1)+"/10");}
             public void onStartTrackingTouch(SeekBar bar){}
-            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress()+1,delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);renderSignals(currentQuery());}
+            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress()+1,delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);loadAsync();}
         });
         card.addView(slider);
 
         LinearLayout buttons=new LinearLayout(this);buttons.setGravity(Gravity.CENTER_VERTICAL);
-        buttons.addView(Ui.button(this,blocked?"取消屏蔽":"屏蔽",v->{RecommendationPolicyStore.setLocalControl(this,type,key,label,blocked?"DEFAULT":"BLOCK","PERSISTENT",null);renderSignals(currentQuery());},true),new LinearLayout.LayoutParams(0,-2,1));
+        buttons.addView(Ui.button(this,blocked?"取消屏蔽":"屏蔽",v->{RecommendationPolicyStore.setLocalControl(this,type,key,label,blocked?"DEFAULT":"BLOCK","PERSISTENT",null);loadAsync();},true),new LinearLayout.LayoutParams(0,-2,1));
         Ui.gap(buttons,this,6);
-        buttons.addView(Ui.button(this,"本次想看",v->{RecommendationPolicyStore.setLocalSessionIntent(this,type,key,label);renderSignals(currentQuery());},true),new LinearLayout.LayoutParams(0,-2,1));
+        buttons.addView(Ui.button(this,"本次想看",v->{RecommendationPolicyStore.setLocalSessionIntent(this,type,key,label);loadAsync();},true),new LinearLayout.LayoutParams(0,-2,1));
         card.addView(buttons);
         parent.addView(card);
     }
 
     private JSONObject findControl(String type,String key){
-        JSONArray controls=RecommendationPolicyStore.controls(this);
+        JSONArray controls=loadedControls==null?new JSONArray():loadedControls;
         String normalized=normalize(key);
         for(int i=0;i<controls.length();i++){
             JSONObject row=controls.optJSONObject(i);if(row==null)continue;

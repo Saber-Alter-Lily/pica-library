@@ -42,7 +42,7 @@ describe('v0.4.1 full-package update guidance', () => {
         const quick = read('docs/quick-start.zh-CN.md')
         for (const content of [guide, quick]) {
             expect(content).toContain('v0.4.0 → v0.4.1')
-            expect(content).toContain('%LOCALAPPDATA%\\Pica Library')
+            expect(content).toContain('%LOCALAPPDATA%\\\\Pica Library')
             expect(content).toContain('不需要卸载')
         }
     })

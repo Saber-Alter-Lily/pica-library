@@ -1,0 +1,117 @@
+name: Publish v0.4.1 Upgrade Assistant
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v041-upgrade-assistant-publish.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-assistant:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.4.1
+      ASSET_NAME: Pica-Library-v0.4.1-upgrade-assistant.zip
+      HASH_NAME: Pica-Library-v0.4.1-upgrade-assistant.sha256
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Validate Windows PowerShell 5 assistant
+        shell: powershell
+        run: |
+          $file = 'packaging\windows\upgrade-assistant-v041\Upgrade-Pica-Library-v0.4.1.ps1'
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $file),
+            [ref]$tokens,
+            [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw "PowerShell parser reported $($errors.Count) error(s)"
+          }
+          $source = Get-Content -Raw -LiteralPath $file
+          if ($source -notmatch "\$RequiredSourceVersion = '0\.4\.0'") { throw 'Source version pin missing' }
+          if ($source -notmatch "\$TargetVersion = '0\.4\.1'") { throw 'Target version pin missing' }
+          if ($source -notmatch '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d') { throw 'Official Windows ZIP SHA-256 pin missing' }
+          if ($source -notmatch '974d4e9b22379aeed379b71711008332acc213a4') { throw 'Target source SHA pin missing' }
+          if ($source -notmatch 'Save-SafetySnapshot') { throw 'Safety snapshot logic missing' }
+          if ($source -notmatch 'Rollback-Upgrade') { throw 'Rollback logic missing' }
+          Write-Host 'ASSISTANT_VALIDATION=PASS'
+
+      - name: Package upgrade assistant
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Compress-Archive -Path 'packaging\windows\upgrade-assistant-v041\*' -DestinationPath "artifacts\$env:ASSET_NAME" -CompressionLevel Optimal
+          $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath "artifacts\$env:ASSET_NAME").Hash.ToLowerInvariant()
+          "$hash  $env:ASSET_NAME" | Set-Content -Encoding ascii "artifacts\$env:HASH_NAME"
+          if ((Get-Item "artifacts\$env:ASSET_NAME").Length -gt 1048576) { throw 'Upgrade assistant unexpectedly exceeds 1 MiB' }
+          Write-Host "ASSISTANT_SHA256=$hash"
+
+      - name: Verify existing stable release
+        shell: powershell
+        run: |
+          $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json isDraft,isPrerelease,tagName | ConvertFrom-Json
+          if ($release.tagName -ne $env:RELEASE_TAG) { throw 'Stable release tag mismatch' }
+          if ($release.isDraft) { throw 'v0.4.1 is unexpectedly still a draft' }
+          if ($release.isPrerelease) { throw 'v0.4.1 is unexpectedly a prerelease' }
+
+      - name: Upload assistant assets
+        shell: powershell
+        run: |
+          gh release upload $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --clobber "artifacts\$env:ASSET_NAME" "artifacts\$env:HASH_NAME"
+          $assets = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          if ($assets -notcontains $env:ASSET_NAME) { throw 'Assistant ZIP was not attached to v0.4.1' }
+          if ($assets -notcontains $env:HASH_NAME) { throw 'Assistant SHA-256 file was not attached to v0.4.1' }
+
+      - name: Add assistant guidance to release notes
+        shell: powershell
+        run: |
+          $marker = '<!-- V041_UPGRADE_ASSISTANT -->'
+          $bodyLines = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json body --jq '.body'
+          $body = ($bodyLines -join [Environment]::NewLine)
+          if ($body -notmatch [regex]::Escape($marker)) {
+            $section = @"
+          $marker
+          ## Windows v0.4.0 → v0.4.1 升级助手
+
+          **推荐 v0.4.0 Windows 用户优先使用升级助手，不需要手动覆盖程序目录。**
+
+          1. 下载 `Pica-Library-v0.4.1-upgrade-assistant.zip`；
+          2. 解压到“下载”或桌面等普通文件夹；
+          3. 双击 `Upgrade-Pica-Library-v0.4.1.cmd`；
+          4. 助手会自动下载并校验官方 v0.4.1 Windows 完整包，保护 `%LOCALAPPDATA%\Pica Library`，备份旧程序和 SQLite 数据，完成替换后执行健康检查；失败时自动回滚。
+
+          如果漫画保存目录位于旧程序文件夹内部，助手会停止自动升级并提示先迁移数据。手动完整 ZIP 替换仍可作为备用方案。
+
+          ---
+          
+"@
+            $updated = $section + $body
+            $notes = Join-Path $env:RUNNER_TEMP 'v041-release-notes.md'
+            [IO.File]::WriteAllText($notes, $updated, (New-Object Text.UTF8Encoding($false)))
+            gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --notes-file $notes
+          }
+
+      - name: Final release verification
+        shell: powershell
+        run: |
+          $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --json isDraft,isPrerelease,assets,body | ConvertFrom-Json
+          if ($release.isDraft -or $release.isPrerelease) { throw 'Stable release state changed unexpectedly' }
+          $names = @($release.assets | ForEach-Object { $_.name })
+          if ($names -notcontains $env:ASSET_NAME -or $names -notcontains $env:HASH_NAME) { throw 'Published assistant assets are incomplete' }
+          if ([string]$release.body -notmatch 'V041_UPGRADE_ASSISTANT') { throw 'Release note assistant marker missing' }
+          Write-Host 'V041_UPGRADE_ASSISTANT_PUBLISHED=PASS'

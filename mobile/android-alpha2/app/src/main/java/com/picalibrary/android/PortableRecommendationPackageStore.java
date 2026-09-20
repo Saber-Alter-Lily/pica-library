@@ -74,9 +74,16 @@ final class PortableRecommendationPackageStore {
         boolean available(){return !reservoirGeneration.isEmpty()&&!candidates.isEmpty();}
         String workId(String comicId){Identity value=identityByComic.get(comicId);return value==null?"":value.workId;}
         int identityBindingCount(){return identityByComic.size();}
-        double visualAdjustment(String comicId){
+        double visualAdjustment(String comicId){return visualAdjustment(comicId,MobileVisualPolicyStore.LIGHT);}
+        double visualAdjustment(String comicId,String strength){
             Candidate row=candidateById.get(comicId);if(row==null||!row.visualAvailable)return 0d;
-            double maximum="LOCAL_PAGES".equals(row.visualSource)?0.10:"REMOTE_PAGES".equals(row.visualSource)?0.08:0.03;
+            double maximum;
+            if(MobileVisualPolicyStore.STRONG.equals(strength))
+                maximum="LOCAL_PAGES".equals(row.visualSource)?0.30:"REMOTE_PAGES".equals(row.visualSource)?0.26:0.07;
+            else if(MobileVisualPolicyStore.STANDARD.equals(strength))
+                maximum="LOCAL_PAGES".equals(row.visualSource)?0.20:"REMOTE_PAGES".equals(row.visualSource)?0.17:0.05;
+            else
+                maximum="LOCAL_PAGES".equals(row.visualSource)?0.10:"REMOTE_PAGES".equals(row.visualSource)?0.08:0.03;
             double centered=(Math.max(0d,Math.min(1d,row.visualAffinity))-0.5d)*2d;
             return centered*maximum*Math.max(0d,Math.min(1d,row.visualConfidence));
         }

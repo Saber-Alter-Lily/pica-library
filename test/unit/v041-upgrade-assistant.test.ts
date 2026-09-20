@@ -13,7 +13,7 @@ const script = fs.readFileSync(
 const launcher = fs.readFileSync(
     path.join(
         root,
-        'packaging/windows/upgrade-assistant-v041/升级旧版到v0.4.1.cmd'
+        'packaging/windows/upgrade-assistant-v041/Upgrade-Pica-Library-v0.4.1.cmd'
     ),
     'utf8'
 )

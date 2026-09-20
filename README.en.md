@@ -10,13 +10,12 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV** across discovery, fa
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.1 highlights
+## v0.4.2 highlights
 
-- **Smoother Android UI**: Library / Recommendations / Online / Settings now share one main surface; profile and adjustment data loads off the UI thread with caching.
-- **Stronger recommendations**: lighter batch switching on both platforms; visual-style recommendation is now an independent optional module with Light / Standard / Strong influence.
-- **Continuous reading**: explicit next-chapter action; history groups by comic while retaining chapter, page, and cover.
-- **Clearer mobile hierarchy**: primary groups, secondary groups, and concrete controls now use distinct visual levels.
-- **Complete upgrade path**: Android v42 upgrades in place to v43; Windows v0.4.0 → v0.4.1 has a guarded upgrade assistant with verification, backup, replacement, health checks, and rollback.
+- **Recommendation onboarding without favorites**: new users can add tags and set 0–10 preferences from a neutral 5/10; positive 6–10 tags can seed the first recommendation recall.
+- **Support the open-source project from either client**: Windows / Web and Android Settings now link to voluntary AFDIAN support for continued development, testing, and maintenance; sponsorship unlocks no extra features, content, or access.
+- **Windows update UI fix**: primary update actions, local ZIP controls, progress, and status now use separate layout regions to prevent overlap at narrower widths.
+- **One-step upgrade paths**: Windows v0.4.1 can incrementally update in-app to v0.4.2; v0.4.0 can use the v0.4.2 upgrade assistant directly; Android advances to versionCode 44 / 0.4.2.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
@@ -101,11 +100,11 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-For **v0.4.0 → v0.4.1**, download `Pica-Library-v0.4.1-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.1.cmd`. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+For **v0.4.1 → v0.4.2**, use the normal in-app updater. Users still on **v0.4.0** can download `Pica-Library-v0.4.2-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.2.cmd` to upgrade directly to v0.4.2. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing v42 installs can upgrade in place to v43 / 0.4.1 through the in-app update chain.
+Android APKs are distributed only through this repository's official Release. Existing v43 / 0.4.1 installs can upgrade in place to v44 / 0.4.2 through the in-app update chain.
 
 ## Local-first and security
 

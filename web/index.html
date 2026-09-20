@@ -759,7 +759,7 @@
                         <div class="section-heading">
                             <div>
                                 <p class="eyebrow">本地更新</p>
-                                <div class="help-heading"><h3>更新</h3><button type="button" class="info-tip" aria-label="查看软件更新说明" data-info-tip="可直接检查并安装官方更新，也可以拖入或选择本地更新 ZIP 包。">!</button></div>
+                                <div class="help-heading"><h3>更新</h3><button type="button" class="info-tip" aria-label="查看软件更新说明" data-info-tip="兼容的增量版本可以自动更新；如果当前版本必须使用完整程序包，这里会显示对应 Windows ZIP、退出旧版和保留用户数据的具体步骤。">!</button></div>
                             </div>
                             <span
                                 id="update-current-version"
@@ -771,8 +771,8 @@
                             class="update-dropzone"
                             tabindex="0"
                         >
-                            <strong>将 Pica Library 更新包拖到这里</strong>
-                            <span>或选择 Pica-Library-vX.Y.Z-update.zip</span>
+                            <strong>将兼容的 Pica Library 增量更新 ZIP 拖到这里</strong>
+                            <span>仅使用本页明确提供的更新 ZIP；完整包升级请按下方引导操作</span>
                             <input
                                 id="update-file"
                                 class="file-picker-input"
@@ -810,7 +810,7 @@
                                 class="primary"
                                 type="button"
                             >
-                                一键检查并更新
+                                检查并更新（兼容时自动）
                             </button>
                             <button id="update-apply" type="button" hidden>
                                 使用已上传更新包并重启

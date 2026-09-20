@@ -1620,6 +1620,66 @@ body.reader-active > nav {
 #update-one-click {
     min-width: 180px;
 }
+#update-message.full-install-guide {
+    display: block;
+    margin-top: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--a83-line, var(--line));
+    border-radius: 14px;
+    background: color-mix(
+        in srgb,
+        var(--a83-surface, var(--paper)) 88%,
+        #f0efe5 12%
+    );
+    color: var(--a83-text, var(--ink));
+    line-height: 1.65;
+}
+#update-message.full-install-guide > strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 1rem;
+}
+#update-message.full-install-guide .full-install-note {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--a83-muted, var(--muted));
+}
+#update-message.full-install-guide ol {
+    margin: 8px 0 12px;
+    padding-left: 1.4rem;
+}
+#update-message.full-install-guide li + li {
+    margin-top: 5px;
+}
+#update-message.full-install-guide code {
+    padding: 2px 5px;
+    border-radius: 6px;
+    background: color-mix(
+        in srgb,
+        var(--a83-surface, var(--paper)) 74%,
+        #202820 8%
+    );
+}
+.full-install-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.full-install-actions a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid var(--a83-line, var(--line));
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 700;
+}
+.full-install-actions a:first-child {
+    border-color: transparent;
+    background: var(--a83-primary, var(--green));
+    color: #fff;
+}
 
 /* Collection Atlas V2 - dedicated three-page PDF layout ------------------ */
 .chronicle-print-document {

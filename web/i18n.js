@@ -389,7 +389,9 @@ export const translations = {
         'update.checking': 'Checking the official stable release…',
         'update.current': 'You already have the latest version.',
         'update.fullFound':
-            'Found v{version}. This update requires the full installer. <a href="{url}" target="_blank" rel="noopener noreferrer">Open the official GitHub Release</a>',
+            'Found v{version}. This update requires the full Windows package.',
+        'update.fullGuide':
+            '<strong>v{version} requires the full Windows package for this upgrade.</strong><span class="full-install-note">This is a one-time replacement of application files. Your library data is stored separately.</span><ol><li><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">Download Pica-Library-v{version}-windows-x64.zip</a>.</li><li>Close Pica Library completely before replacing any program files.</li><li>Extract the ZIP to a new folder and run it, or replace the old application folder only after the old version has exited.</li><li><strong>Do not delete <code>%LOCALAPPDATA%\\Pica Library</code>.</strong> Your database, shelves, history, settings, credentials and downloaded content stay there. No uninstall or re-import is required.</li></ol><div class="full-install-actions"><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">Download Windows package</a><a href="{releaseUrl}" target="_blank" rel="noopener noreferrer">View Release & checksums</a></div>',
         'update.incrementalFound':
             'Found a compatible incremental update to v{version}. <a href="{url}" target="_blank" rel="noopener noreferrer">Download the official update package</a>, then select or drop the ZIP above.',
         'update.confirm': 'Update to {version} and restart?',
@@ -410,11 +412,12 @@ export const translations = {
         'update.panelEyebrow': 'Local update',
         'update.panelTitle': 'Update',
         'update.panelText':
-            'Install the official update directly, or drag/select a local update ZIP package.',
-        'update.drop': 'Drop the Pica Library update package here',
-        'update.choose': 'or choose Pica-Library-vX.Y.Z-update.zip',
+            'Compatible incremental releases can update automatically. If a full-package replacement is required, this page will show the exact Windows ZIP and replacement steps.',
+        'update.drop': 'Drop a compatible Pica Library incremental update ZIP here',
+        'update.choose':
+            'Use only update ZIPs explicitly offered by this page; full-package upgrades follow the guide below.',
         'update.check': 'Check for updates',
-        'update.oneClick': 'Check and update now',
+        'update.oneClick': 'Check & update (automatic when compatible)',
         'update.oneClickConfirm':
             'Update to {version} now? The app will download, validate, restart, and apply the update.',
         'update.downloading': 'Downloading official update {version}…',
@@ -1022,8 +1025,9 @@ export const translations = {
         'update.staged': '更新包已验证并暂存。确认后可更新并重启。',
         'update.checking': '正在检查官方稳定版本…',
         'update.current': '当前已是最新版本。',
-        'update.fullFound':
-            '发现 v{version}。此更新需要完整安装包。<a href="{url}" target="_blank" rel="noopener noreferrer">打开官方 GitHub Release</a>',
+        'update.fullFound': '发现 v{version}。本次需要完整 Windows 程序包。',
+        'update.fullGuide':
+            '<strong>发现 v{version}：本次需要完整 Windows 程序包升级。</strong><span class="full-install-note">这是一次程序文件替换，个人漫画库数据与程序目录分开保存。</span><ol><li><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">下载 Pica-Library-v{version}-windows-x64.zip</a>。</li><li>先完全退出 Pica Library，再处理旧程序目录。</li><li>推荐把 ZIP 解压到新文件夹后直接运行；也可以在旧版退出后，用新程序文件替换旧程序目录。</li><li><strong>不要删除 <code>%LOCALAPPDATA%\\Pica Library</code>。</strong>数据库、书架、历史、设置、账号凭据和已下载内容都保存在这里；不需要卸载，也不需要重新导入。</li></ol><div class="full-install-actions"><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">下载 Windows 完整包</a><a href="{releaseUrl}" target="_blank" rel="noopener noreferrer">查看 Release 与校验值</a></div>',
         'update.incrementalFound':
             '发现 v{version} 兼容增量更新。<a href="{url}" target="_blank" rel="noopener noreferrer">下载官方更新包</a>，然后在上方选择或拖入 ZIP。',
         'update.confirm': '确认更新到 {version} 并重启？',
@@ -1043,11 +1047,12 @@ export const translations = {
         'update.panelEyebrow': '本地更新',
         'update.panelTitle': '更新',
         'update.panelText':
-            '可直接检查并安装官方更新，也可以拖入或选择本地更新 ZIP 包。',
-        'update.drop': '将 Pica Library 更新包拖到这里',
-        'update.choose': '或选择 Pica-Library-vX.Y.Z-update.zip',
+            '兼容的增量版本可以自动更新；如果当前版本必须使用完整程序包，这里会直接显示对应 Windows ZIP 和替换步骤。',
+        'update.drop': '将兼容的 Pica Library 增量更新 ZIP 拖到这里',
+        'update.choose':
+            '仅使用本页明确提供的更新 ZIP；完整包升级请按下方引导操作。',
         'update.check': '检查更新',
-        'update.oneClick': '一键检查并更新',
+        'update.oneClick': '检查并更新（兼容时自动）',
         'update.oneClickConfirm':
             '确认立即更新到 {version}？应用会自动下载、校验、重启并应用更新。',
         'update.downloading': '正在下载官方更新 {version}…',

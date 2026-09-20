@@ -938,7 +938,8 @@ export async function startMobileBridge(options: {
                 const input = await body(request)
                 options.service.updateVisualSettings({
                     enabled: input.enabled,
-                    rerankMode: input.rerankMode
+                    rerankMode: input.rerankMode,
+                    strength: input.strength
                 })
                 return json(response, 200, options.service.visualIndexStatus())
             }

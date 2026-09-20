@@ -1,4 +1,4 @@
-# v0.4.1 release source freeze after formal module and contract cleanup
+# v0.4.1 release source freeze after final formal-module test alignment
 name: v0.4.1 Formal Release Gate
 
 on:

@@ -39,8 +39,9 @@ public final class SettingsActivity extends Activity {
         });
         LinearLayout bar=new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(Ui.dp(this,14),Ui.dp(this,10),Ui.dp(this,14),Ui.dp(this,6));
-        bar.addView(Ui.text(this,"设置",26,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
+        bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));
+        bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
+        bar.addView(Ui.text(this,"设置",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
         root.addView(bar);
         ScrollView scroll=new ScrollView(this);
         content=new LinearLayout(this);
@@ -48,7 +49,6 @@ public final class SettingsActivity extends Activity {
         content.setPadding(Ui.dp(this,14),Ui.dp(this,8),Ui.dp(this,14),Ui.dp(this,24));
         scroll.addView(content);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        root.addView(ShellNavigation.build(this,3));
         setContentView(root);
         root.requestApplyInsets();
         renderContent();

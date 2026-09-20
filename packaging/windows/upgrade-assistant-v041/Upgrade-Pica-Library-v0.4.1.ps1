@@ -392,6 +392,12 @@ function Wait-NewHealth {
 function Rollback-Upgrade {
     Write-UpgradeLog 'Starting rollback.'
     try { Request-GracefulShutdown } catch {}
+    try {
+        foreach ($process in @(Get-InstallRuntimeProcesses $ResolvedOldRoot)) {
+            Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Milliseconds 500
+    } catch {}
     if ($ReplacementStarted) {
         if (Test-Path -LiteralPath $ResolvedOldRoot) {
             Remove-Item -LiteralPath $ResolvedOldRoot -Recurse -Force

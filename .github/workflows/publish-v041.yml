@@ -1,0 +1,233 @@
+name: Publish Pica Library v0.4.1
+
+on:
+  push:
+    branches: [release/v0.4.1-gate]
+    paths:
+      - '.github/workflows/publish-v041.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  RELEASE_TARGET: '974d4e9b22379aeed379b71711008332acc213a4'
+  GATE_RUN_ID: '35515069014'
+  WINDOWS_FULL_SHA256: '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d'
+  ANDROID_APK_SHA256: 'a2eaad5002ad0e781c9ce1b1d30c84311a32845c89ba2cd48dd0a3470e67ed28'
+  EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TARGET }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pica-Library-v0.4.1-Windows-candidate
+          path: publish/windows
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.GATE_RUN_ID }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pica-Library-v0.4.1-Android-v43-candidate
+          path: publish/android
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.GATE_RUN_ID }}
+      - name: Verify gated candidate bytes and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum publish/windows/Pica-Library-v0.4.1-windows-x64.zip | awk '{print $1}')" = "$WINDOWS_FULL_SHA256"
+          test "$(sha256sum publish/android/Pica-Library-Android-v43.apk | awk '{print $1}')" = "$ANDROID_APK_SHA256"
+          test "$(tr -d '\r\n ' < publish/android/CERTIFICATE_SHA256.txt | tr 'A-F' 'a-f')" = "$EXPECTED_CERT"
+          python - <<'PY'
+          import json
+          target='974d4e9b22379aeed379b71711008332acc213a4'
+          w=json.load(open('publish/windows/BUILD_TRANSPARENCY-Windows.json',encoding='utf-8-sig'))
+          a=json.load(open('publish/android/BUILD_TRANSPARENCY-Android.json',encoding='utf-8-sig'))
+          assert w['sourceSha']==target,w
+          assert a['sourceSha']==target,a
+          assert w['baseVersion']=='0.4.0',w
+          assert w['upgradeMode']=='FULL_APPLICATION_REPLACEMENT',w
+          assert a['versionCode']==43,a
+          assert a['versionName']=='0.4.1',a
+          assert a['upgradeFromVersionCode']==42,a
+          PY
+          if unzip -Z1 publish/windows/Pica-Library-v0.4.1-windows-x64.zip | grep -Eqi 'beta|dev-pr|test_build|TEST_BUILD'; then
+            echo 'formal Windows ZIP contains beta/dev/test artifact names' >&2
+            exit 1
+          fi
+          echo 'VERIFIED_GATE_ARTIFACT_REUSE=PASS'
+
+      - name: Assemble stable release and Android OTA assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp publish/android/Pica-Library-Android-v43.apk publish/android/Pica-Library-Android-Preview.apk
+          printf '%s\n' "$EXPECTED_CERT" > publish/android/Pica-Library-Android-Preview.cert-sha256
+          python - <<'PY'
+          import json
+          manifest={
+            'versionCode':43,
+            'versionName':'0.4.1',
+            'apkUrl':'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk',
+            'sha256':'a2eaad5002ad0e781c9ce1b1d30c84311a32845c89ba2cd48dd0a3470e67ed28',
+            'releaseNotes':'v0.4.1: unified Android top-level tab switching, recommendation/profile performance fixes, faster batch paging, optional Visual-style recommendation strength, clearer disclosure hierarchy, next-chapter controls and grouped reading history.',
+            'minimumSupportedVersionCode':23,
+          }
+          open('publish/android/android-update.json','w',encoding='utf-8').write(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n')
+          w=json.load(open('publish/windows/BUILD_TRANSPARENCY-Windows.json',encoding='utf-8-sig'))
+          a=json.load(open('publish/android/BUILD_TRANSPARENCY-Android.json',encoding='utf-8-sig'))
+          out={
+            'release':'v0.4.1',
+            'sourceSha':'974d4e9b22379aeed379b71711008332acc213a4',
+            'formalGateRun':35515069014,
+            'candidateArtifactsReusedWithoutRebuild':True,
+            'desktop':w,
+            'android':a,
+          }
+          open('publish/BUILD_TRANSPARENCY.json','w',encoding='utf-8').write(json.dumps(out,ensure_ascii=False,indent=2)+'\n')
+          PY
+          (cd publish && sha256sum             windows/Pica-Library-v0.4.1-windows-x64.zip             android/Pica-Library-Android-v43.apk             android/android-update.json             android/Pica-Library-Android-Preview.cert-sha256 > SHA256SUMS.txt)
+
+          cat > publish/RELEASE_NOTES.md <<'EOF'
+          Pica Library v0.4.1 · Recommendations, Visual Style & Mobile Performance
+
+          - Android 顶层「书库 / 推荐 / 在线 / 设置」统一在同一 Home 页面原位切换；在线与设置不再使用明显不同的 Activity 转场。
+          - 修复手机端“推荐画像 / 人工调整”打开时黑屏或卡死；重型画像、书库、Portable Policy 与行为证据读取移到后台并增加热数据缓存。
+          - 推荐批次切换优化：Android 只重绘当前 12 本；Desktop 同一 cycle 复用冻结 serving snapshot，不再重复全库重建。
+          - 画风推荐成为独立可开关模块：关闭时不影响常规推荐；提供「仅分析 / 参与排序」和轻度 / 标准 / 强三档影响强度。
+          - 保留现有 DINOv2 Patch Mean 画风索引兼容；新索引可在同一次推理中附带 compact CLS / Patch Mean 双视图数据。
+          - Android 阅读器在章末增加明确的下一章入口；阅读历史按漫画聚合，保留封面、章节进度与续读位置。
+          - 折叠 UI 区分一级分组、二级分组和具体内容，减少未展开项与主标签视觉混淆。
+          - 清理正式分发中的 Beta / Dev / 测试运行痕迹；正式运行能力仅接受固定发布签名身份。
+          - Android 正式版升级为 versionCode 43 / versionName 0.4.1，包名与签名证书与 v42 保持一致，可原地升级。
+          - Windows v0.4.1 因应用运行时与升级助手发生变化，采用完整应用包替换程序目录；用户数据库、书架、历史与配置位于独立用户数据目录，Gate 已验证从 v0.4.0 替换后数据保留和真实启动。
+
+          Windows v0.4.0 用户：下载 v0.4.1 完整 Windows ZIP，退出旧版后用新版本程序目录替换旧程序目录；不要删除用户数据目录。v0.4.0 的“检查更新”会把本次更新识别为需要完整安装包，而不会误当成可自动应用的增量包。
+          Android v42 用户可通过正式 Android 更新通道直接升级到 v43。
+          EOF
+
+          cat > publish/ANDROID_PREVIEW_NOTES.md <<'EOF'
+          Android Preview v43 · Pica Library 0.4.1
+
+          统一四个顶层页签的原位切换，修复推荐画像/人工调整卡顿，优化推荐批次与行为证据热路径；画风推荐支持独立关闭和三档强度；阅读器补齐下一章，阅读历史按漫画聚合。正式包名与签名证书保持不变。
+          EOF
+
+      - name: Publish stable v0.4.1 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.4.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'v0.4.1 already exists; refusing to overwrite a stable release' >&2
+            exit 1
+          fi
+          gh release create v0.4.1 --repo "$GITHUB_REPOSITORY"             --target "$RELEASE_TARGET"             --title 'Pica Library v0.4.1 · Recommendations, Visual Style & Mobile Performance'             --notes-file publish/RELEASE_NOTES.md             publish/windows/Pica-Library-v0.4.1-windows-x64.zip             publish/android/Pica-Library-Android-v43.apk             publish/android/android-update.json             publish/android/Pica-Library-Android-Preview.cert-sha256             publish/SHA256SUMS.txt             publish/BUILD_TRANSPARENCY.json
+          gh release edit v0.4.1 --repo "$GITHUB_REPOSITORY" --latest
+
+      - name: Advance Android Preview OTA channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f android-preview "$RELEASE_TARGET"
+          git push origin refs/tags/android-preview --force
+          if gh release view android-preview --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit android-preview --repo "$GITHUB_REPOSITORY" --prerelease               --title 'Android Preview v43 · Pica Library 0.4.1'               --notes-file publish/ANDROID_PREVIEW_NOTES.md
+          else
+            gh release create android-preview --repo "$GITHUB_REPOSITORY" --target "$RELEASE_TARGET" --prerelease               --title 'Android Preview v43 · Pica Library 0.4.1'               --notes-file publish/ANDROID_PREVIEW_NOTES.md
+          fi
+          gh release upload android-preview --repo "$GITHUB_REPOSITORY"             publish/android/Pica-Library-Android-Preview.apk             publish/android/android-update.json             publish/android/Pica-Library-Android-Preview.cert-sha256             publish/android/BUILD_TRANSPARENCY-Android.json             --clobber
+
+      - name: Verify public stable and Android OTA assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest")
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v0.4.1")
+          python - "$RELEASE_TARGET" "$latest" "$release" <<'PY'
+          import json,sys
+          target=sys.argv[1]
+          latest=json.loads(sys.argv[2]); data=json.loads(sys.argv[3])
+          assert latest['tag_name']=='v0.4.1',latest['tag_name']
+          assert data['tag_name']=='v0.4.1',data
+          assert not data['draft'] and not data['prerelease'],data
+          names={x['name'] for x in data['assets']}
+          required={'Pica-Library-v0.4.1-windows-x64.zip','Pica-Library-Android-v43.apk','SHA256SUMS.txt','BUILD_TRANSPARENCY.json'}
+          assert required <= names,(required-names)
+          assert 'Pica-Library-v0.4.1-update.zip' not in names,'unexpected incremental package'
+          PY
+
+          curl -L --fail --retry 8 --retry-delay 2             'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.1/Pica-Library-v0.4.1-windows-x64.zip' -o "$RUNNER_TEMP/live-full.zip"
+          curl -L --fail --retry 8 --retry-delay 2             'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.1/Pica-Library-Android-v43.apk' -o "$RUNNER_TEMP/live-android.apk"
+          test "$(sha256sum "$RUNNER_TEMP/live-full.zip" | awk '{print $1}')" = "$WINDOWS_FULL_SHA256"
+          test "$(sha256sum "$RUNNER_TEMP/live-android.apk" | awk '{print $1}')" = "$ANDROID_APK_SHA256"
+          if unzip -Z1 "$RUNNER_TEMP/live-full.zip" | grep -Eqi 'beta|dev-pr|test_build|TEST_BUILD'; then
+            echo 'public Windows ZIP contains beta/dev/test artifact names' >&2
+            exit 1
+          fi
+
+          ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/android-preview" --jq '.object.sha')
+          test "$ref" = "$RELEASE_TARGET"
+          curl -L --fail --retry 8 --retry-delay 2             'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/android-update.json' -o "$RUNNER_TEMP/android-update.json"
+          curl -L --fail --retry 8 --retry-delay 2             'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk' -o "$RUNNER_TEMP/android-preview.apk"
+          curl -L --fail --retry 8 --retry-delay 2             'https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.cert-sha256' -o "$RUNNER_TEMP/android-cert.txt"
+          python - "$RUNNER_TEMP/android-update.json" "$RUNNER_TEMP/android-preview.apk" "$RUNNER_TEMP/android-cert.txt" "$EXPECTED_CERT" "$ANDROID_APK_SHA256" <<'PY'
+          import hashlib,json,sys
+          m=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert m['versionCode']==43,m
+          assert m['versionName']=='0.4.1',m
+          actual=hashlib.sha256(open(sys.argv[2],'rb').read()).hexdigest()
+          assert actual==m['sha256']==sys.argv[5],(actual,m)
+          assert open(sys.argv[3],encoding='utf-8').read().strip().lower()==sys.argv[4].lower()
+          PY
+          echo 'V0_4_1_PUBLICATION_AND_OTA_ASSETS=PASS'
+
+  live-windows-update-check:
+    needs: publish
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify public v0.4.0 reports v0.4.1 as full-install update
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $appRoot=Join-Path $env:RUNNER_TEMP 'pica-live-channel-v040'
+          $localApp=Join-Path $env:RUNNER_TEMP 'pica-live-localappdata'
+          New-Item -ItemType Directory -Force -Path $appRoot,$localApp | Out-Null
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-v0.4.0-windows-x64.zip' -OutFile "$env:RUNNER_TEMP\v040.zip"
+          Expand-Archive -LiteralPath "$env:RUNNER_TEMP\v040.zip" -DestinationPath $appRoot
+          $env:LOCALAPPDATA=$localApp
+          $stateRoot=Join-Path $localApp 'Pica Library'
+          New-Item -ItemType Directory -Force -Path (Join-Path $stateRoot 'data') | Out-Null
+          Set-Content -LiteralPath (Join-Path $stateRoot 'data\live-upgrade-sentinel.txt') -Value 'preserve-me' -Encoding ascii
+          $process=Start-Process -FilePath (Join-Path $appRoot 'runtime\node.exe') -ArgumentList @((Join-Path $appRoot 'app\desktop.js'),'--no-open') -WorkingDirectory $appRoot -WindowStyle Hidden -PassThru
+          $instanceFile=Join-Path $stateRoot 'runtime-state\instance.json'
+          $deadline=(Get-Date).AddSeconds(30)
+          while((Get-Date) -lt $deadline -and -not (Test-Path $instanceFile)){ Start-Sleep -Milliseconds 250 }
+          if(-not (Test-Path $instanceFile)){ throw 'v0.4.0 desktop instance did not start' }
+          $instance=Get-Content -Raw $instanceFile | ConvertFrom-Json
+          $desktop=Invoke-RestMethod -Uri "$($instance.url)/api/v1/desktop/status" -TimeoutSec 5
+          if($desktop.version -ne '0.4.0'){ throw "unexpected source version $($desktop.version)" }
+          $available=Invoke-RestMethod -Uri "$($instance.url)/api/v1/update/check" -TimeoutSec 30
+          if($available.status -ne 'full-install' -or $available.version -ne '0.4.1'){ throw "live check did not offer full-install v0.4.1: $($available | ConvertTo-Json -Compress)" }
+          if(-not $available.releaseUrl -or $available.releaseUrl -notmatch '/v0\.4\.1$'){ throw "unexpected release URL: $($available.releaseUrl)" }
+          if((Get-Content -Raw (Join-Path $stateRoot 'data\live-upgrade-sentinel.txt')).Trim() -ne 'preserve-me'){ throw 'user data sentinel changed' }
+          Stop-Process -Id ([int]$instance.pid) -Force -ErrorAction SilentlyContinue
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          Write-Host 'LIVE_V040_CHECK_OFFERS_V041_FULL_INSTALL=PASS'
+          Write-Host 'LIVE_USER_DATA_UNTOUCHED=PASS'

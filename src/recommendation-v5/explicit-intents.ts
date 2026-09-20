@@ -111,7 +111,7 @@ export function explicitRetrievalIntentsV5(
         .filter(
             (item) =>
                 item.direction === 'MORE' &&
-                (item.levelDelta === undefined || item.levelDelta >= 2) &&
+                (item.levelDelta === undefined || item.levelDelta >= 1) &&
                 item.scope === 'PERSISTENT' &&
                 item.targetType !== 'STYLE_FAMILY'
         )

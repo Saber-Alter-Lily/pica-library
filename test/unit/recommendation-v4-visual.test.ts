@@ -5,6 +5,7 @@ import {
     cosineSimilarity,
     normalizeVector,
     rerankWithVisualStyle,
+    visualSourceWeight,
     VISUAL_MODEL_ID,
     VISUAL_MODEL_VERSION,
     VISUAL_SAMPLING_POLICY_VERSION,
@@ -169,6 +170,47 @@ describe('Recommendation V4 visual style core', () => {
         expect(shadow.map((item) => item.comicId)).toEqual(['missing', 'visual'])
         expect(shadow[0].visual?.available).toBe(false)
         expect(shadow[0].visual?.shadowScore).toBeCloseTo(1)
+    })
+
+    it('keeps Visual modular and scales only LIVE influence by selected strength', () => {
+        expect(visualSourceWeight('LOCAL_PAGES', 1, 'LIGHT')).toBeCloseTo(0.1)
+        expect(visualSourceWeight('LOCAL_PAGES', 1, 'STANDARD')).toBeCloseTo(0.2)
+        expect(visualSourceWeight('LOCAL_PAGES', 1, 'STRONG')).toBeCloseTo(0.3)
+        expect(visualSourceWeight('REMOTE_PAGES', 1, 'STANDARD')).toBeCloseTo(0.17)
+        expect(visualSourceWeight('COVER_ONLY', 1, 'STRONG')).toBeCloseTo(0.07)
+
+        const profile = buildVisualPreferenceProfile({
+            embeddings: [embedding('fav', [1, 0])],
+            favoriteComicIds: new Set(['fav']),
+            feedback: []
+        })!
+        const ranked = [candidate('a', 1), candidate('b', 2)]
+        const embeddings = [embedding('fav', [1, 0]), embedding('b', [1, 0])]
+        const off = rerankWithVisualStyle({
+            ranked,
+            embeddings,
+            profile,
+            mode: 'OFF',
+            strength: 'STRONG'
+        })
+        expect(off).toEqual(ranked)
+        const light = rerankWithVisualStyle({
+            ranked,
+            embeddings,
+            profile,
+            mode: 'SHADOW',
+            strength: 'LIGHT'
+        })
+        const strong = rerankWithVisualStyle({
+            ranked,
+            embeddings,
+            profile,
+            mode: 'SHADOW',
+            strength: 'STRONG'
+        })
+        expect(strong[1].visual!.appliedWeight).toBeGreaterThan(
+            light[1].visual!.appliedWeight
+        )
     })
 
     it('can reorder in LIVE mode while SHADOW preserves baseline order', () => {

@@ -24,6 +24,8 @@ public class MainActivity extends Activity {
 
     private FrameLayout body;
     private LinearLayout nav;
+    private LinearLayout recommendationBatchList;
+    private TextView recommendationBatchStatus;
     private int current,serial,columns=2;
     private String query="",activeShelfId="";
     private SharedPreferences preferences;
@@ -72,7 +74,7 @@ public class MainActivity extends Activity {
 
     private boolean valid(int id){return id==serial&&!isFinishing()&&!isDestroyed();}
     private Button button(String label,View.OnClickListener action){Button b=new Button(this);b.setText(label);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(Ui.PRIMARY);b.setOnClickListener(action);return b;}
-    private void cancelPageWork(){++serial;if(pending!=null)pending.cancel(true);pending=null;if(unifiedGridAdapter!=null){unifiedGridAdapter.close();unifiedGridAdapter=null;}body.removeAllViews();}
+    private void cancelPageWork(){++serial;if(pending!=null)pending.cancel(true);pending=null;if(unifiedGridAdapter!=null){unifiedGridAdapter.close();unifiedGridAdapter=null;}recommendationBatchList=null;recommendationBatchStatus=null;body.removeAllViews();}
     private void updateNav(){for(int i=0;i<nav.getChildCount();i++)nav.getChildAt(i).setBackgroundColor(i==current?Ui.PRIMARY_SOFT:Color.TRANSPARENT);}
     private void showTab(){cancelPageWork();updateNav();if(current==0)library();else if(current==1)recommendations();else if(current==2)history();else sources();}
     private void showBookshelvesPage(){cancelPageWork();current=0;updateNav();bookshelves();}
@@ -83,7 +85,7 @@ public class MainActivity extends Activity {
     private ProgressBar loading(LinearLayout p){ProgressBar b=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);b.setIndeterminate(true);p.addView(b,new LinearLayout.LayoutParams(-1,Ui.dp(this,3)));return b;}
     private GridView grid(LinearLayout p){GridView g=new GridView(this);g.setNumColumns(columns);g.setHorizontalSpacing(Ui.dp(this,8));g.setVerticalSpacing(Ui.dp(this,8));g.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,12));g.setClipToPadding(false);p.addView(g,new LinearLayout.LayoutParams(-1,0,1));return g;}
 
-    private void openUnified(String comicId,String title,String author){Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",comicId);i.putExtra("title",title);i.putExtra("author",author);startActivity(i);}
+    private void openUnified(String comicId,String title,String author){UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(this).byId.get(comicId);RecommendationEvidenceStore.recordDetailOpen(this,comicId,author,entry==null?Collections.emptyList():entry.tags,entry==null?Collections.emptyList():entry.categories);Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",comicId);i.putExtra("title",title);i.putExtra("author",author);startActivity(i);}
 
     private void library(){
         LinearLayout p=page("我的书库","一个漫画只显示一次；手机、电脑、WebDAV、Pica、收藏和书架作为同一条目的属性",false);
@@ -135,44 +137,67 @@ public class MainActivity extends Activity {
     private void renderShelves(LinearLayout target,TextView status,ShelfStore.Snapshot snapshot,Map<String,RemoteLibraryClient.Comic> remote,String sourceLabel){
         target.removeAllViews();if(snapshot.shelves.isEmpty()){status.setText(sourceLabel+" · 暂无书架");return;}ShelfStore.Shelf active=null;for(ShelfStore.Shelf s:snapshot.shelves)if(s.id.equals(activeShelfId)){active=s;break;}if(active==null)active=snapshot.shelves.get(0);activeShelfId=active.id;preferences.edit().putString("activeShelfId",activeShelfId).apply();status.setText(sourceLabel+" · "+snapshot.shelves.size()+" 个书架 · "+active.items.size()+" 本");
         LinearLayout tabs=new LinearLayout(this);target.addView(tabs);for(ShelfStore.Shelf shelf:snapshot.shelves){Button b=button(shelf.name+(shelf.id.equals(active.id)?" ✓":""),v->{activeShelfId=shelf.id;preferences.edit().putString("activeShelfId",activeShelfId).apply();showBookshelvesPage();});tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));}Ui.gap(target,this,8);
-        for(ShelfStore.Item item:active.items){LinearLayout card=Ui.card(this);card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));RemoteLibraryClient.Comic cloud=remote.get(item.comicId);UnifiedCatalogStore.Entry local=UnifiedCatalogStore.load(this).byId.get(item.comicId);String availability=cloud!=null?"云端可读 · "+cloud.pageCount+" 页":local!=null&&local.phoneDownloaded?"手机已下载":item.downloadedPictures>0?"电脑已下载 · "+item.downloadedPictures+" 页":local!=null&&local.picaAvailable?"Pica 在线可读":"仅书架元数据";card.addView(Ui.text(this,availability,12,cloud!=null||local!=null&&(local.phoneDownloaded||local.picaAvailable)?Ui.PRIMARY:Ui.MUTED,false));card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));target.addView(card);}
+        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
+        for(ShelfStore.Item item:active.items){LinearLayout card=Ui.card(this);card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));RemoteLibraryClient.Comic cloud=remote.get(item.comicId);UnifiedCatalogStore.Entry local=catalog.byId.get(item.comicId);String availability=cloud!=null?"云端可读 · "+cloud.pageCount+" 页":local!=null&&local.phoneDownloaded?"手机已下载":item.downloadedPictures>0?"电脑已下载 · "+item.downloadedPictures+" 页":local!=null&&local.picaAvailable?"Pica 在线可读":"仅书架元数据";card.addView(Ui.text(this,availability,12,cloud!=null||local!=null&&(local.phoneDownloaded||local.picaAvailable)?Ui.PRIMARY:Ui.MUTED,false));card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));target.addView(card);}
     }
 
     private void recommendations(){
-        LinearLayout p=page("为你推荐","已配置 Pica 时优先使用手机原生 Recommendation V3；否则可回退到 Desktop 当前缓存批次",true);
-        PicaAccountStore.Session session=PicaAccountStore.load(this);
-        if(session.configured()){
-            NativeRecommendationStore.Snapshot snapshot=NativeRecommendationStore.load(this);
-            LinearLayout actions=new LinearLayout(this);p.addView(actions);
-            actions.addView(button(snapshot.available()?"重新生成手机推荐":"生成手机推荐",v->{NativeRecommendationJobs.refresh(this);Toast.makeText(this,"手机推荐已加入后台任务，可离开本页继续使用 App",Toast.LENGTH_LONG).show();}),new LinearLayout.LayoutParams(0,-2,1));
-            actions.addView(button("后台任务",v->startActivity(new Intent(this,TaskCenterActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
-            if(!snapshot.available()){
-                String detail=snapshot.candidateCount>0?"最近一次候选池 "+snapshot.candidateCount+" 本 · "+snapshot.readiness:"首次生成会读取 Pica 收藏、建立本机兴趣画像，并执行多路在线召回。";
-                note(p,"尚未有可显示的手机推荐批次",detail);
-                p.addView(button("浏览 Pica / 检查收藏",v->startActivity(new Intent(this,PicaBrowseActivity.class))));
-                if(BridgeStore.paired(this)){Ui.gap(p,this,10);note(p,"Desktop 备用","手机推荐尚未就绪时，仍可读取电脑 Final V3 当前缓存批次。");renderDesktopRecommendations(p);}
-                return;
-            }
-            NativeRecommendationStore.markCurrentSeen(this);
-            snapshot=NativeRecommendationStore.load(this);
-            TextView status=Ui.text(this,"手机原生 Recommendation V3 · "+snapshot.readiness+" · 候选 "+snapshot.candidateCount+" 本 · 第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批",13,Ui.MUTED,false);p.addView(status);
-            LinearLayout batchControls=new LinearLayout(this);p.addView(batchControls);
-            batchControls.addView(button("上一批",v->{NativeRecommendationStore.previousBatch(this);showTab();}),new LinearLayout.LayoutParams(0,-2,1));
-            batchControls.addView(button("下一批",v->{NativeRecommendationStore.nextBatch(this);showTab();}),new LinearLayout.LayoutParams(0,-2,1));
-            for(NativeRecommendationStore.Item item:snapshot.current()){
-                LinearLayout card=Ui.card(this);card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));card.addView(Ui.text(this,item.reason,12,Ui.PRIMARY,false));card.addView(Ui.text(this,item.family+" · score "+String.format(Locale.ROOT,"%.4f",item.score),10.5f,Ui.MUTED,false));card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));p.addView(card);
-            }
+        LinearLayout p=page("为你推荐","手机独立运行自己的推荐周期；Desktop 只同步可复用画像、候选与 Visual/Canonical 基础",true);
+        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
+        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
+        boolean hasLocalEvidence=false;
+        for(UnifiedCatalogStore.Entry entry:catalog.byId.values())if(entry.favorite||entry.inShelf||entry.phoneDownloaded||entry.desktopDownloaded||entry.remoteAvailable||RecommendationFeedbackStore.isLiked(this,entry.id)){hasLocalEvidence=true;break;}
+        boolean canRun=hasLocalEvidence&&(PicaClient.available(this)||portable.available());
+
+        NativeRecommendationStore.Snapshot snapshot=NativeRecommendationStore.load(this);
+        LinearLayout actions=new LinearLayout(this);p.addView(actions);
+        actions.addView(button(snapshot.available()?"重新生成手机推荐":"生成手机推荐",v->{NativeRecommendationJobs.refresh(this);Toast.makeText(this,"手机将独立生成新的推荐周期，可离开本页继续使用 App",Toast.LENGTH_LONG).show();}),new LinearLayout.LayoutParams(0,-2,1));
+        actions.addView(button("画像 / 调整",v->startActivity(new Intent(this,RecommendationStyleActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
+
+        if(!canRun&&!snapshot.available()){
+            note(p,"手机推荐输入还不完整","需要本地收藏/行为画像，并至少具备在线 Provider 或已同步的 Portable Candidate Reservoir。同步的是候选和知识，不会复制电脑当前推荐列表。");
+            LinearLayout setup=new LinearLayout(this);p.addView(setup);
+            setup.addView(button("推荐同步",v->startActivity(new Intent(this,RecommendationSyncActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
+            setup.addView(button("在线来源",v->startActivity(new Intent(this,PicaBrowseActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
             return;
         }
 
-        note(p,"手机原生推荐尚未启用","配置 Pica 账号后，手机会直接读取你的 Pica 收藏并在本机建立 Recommendation V3 周期，不再依赖电脑生成。");
-        LinearLayout setup=new LinearLayout(this);p.addView(setup);setup.addView(button("配置 Pica",v->startActivity(new Intent(this,PicaAccountActivity.class))),new LinearLayout.LayoutParams(0,-2,1));setup.addView(button("浏览 Pica",v->startActivity(new Intent(this,PicaBrowseActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
-        if(BridgeStore.paired(this)){Ui.gap(p,this,10);renderDesktopRecommendations(p);}else{note(p,"Desktop 备用也不可用","如暂时不配置 Pica，可配对电脑继续读取 Desktop Final V3 当前缓存批次。");p.addView(button("配对电脑",v->pair()));}
+        if(!snapshot.available()){
+            String detail=portable.available()?"已同步 "+portable.candidates.size()+" 个候选，可由手机结合本机 Recent / Session / 人工调整重新排序。":"首次生成会使用手机本地收藏和可用 Provider 建立自己的候选池。";
+            note(p,"尚未生成手机推荐周期",detail);
+            return;
+        }
+
+        NativeRecommendationStore.markCurrentSeen(this);
+        snapshot=NativeRecommendationStore.load(this);
+        recommendationBatchStatus=Ui.text(this,"",13,Ui.MUTED,false);p.addView(recommendationBatchStatus);
+        LinearLayout batchControls=new LinearLayout(this);p.addView(batchControls);
+        batchControls.addView(button("上一批",v->switchNativeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
+        batchControls.addView(button("下一批",v->switchNativeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
+        recommendationBatchList=new LinearLayout(this);recommendationBatchList.setOrientation(LinearLayout.VERTICAL);p.addView(recommendationBatchList);
+        renderNativeRecommendationBatch(snapshot);
     }
 
-    private void renderDesktopRecommendations(LinearLayout p){
-        TextView status=Ui.text(this,"正在读取 Desktop Final V3 当前缓存批次…",13,Ui.MUTED,false);p.addView(status);ProgressBar load=loading(p);final int id=serial;
-        pending=requests.submit(()->{try{BridgeClient.RecommendationBatch batch=BridgeClient.recommendationBatch(this,18);runOnUiThread(()->{if(!valid(id))return;load.setVisibility(View.GONE);status.setText(ShellPolicy.recommendationStatus(batch.source,batch.cached,batch.batchIndex,batch.maxVisibleBatches));if(batch.items.isEmpty()){note(p,"暂无 Desktop 当前批次","请先在电脑网页端生成推荐。手机不会把缺失的 Desktop 批次伪装成缓存结果。");return;}for(BridgeClient.RecommendationItem r:batch.items){LinearLayout card=Ui.card(this);card.addView(Ui.text(this,r.title,17,Ui.TEXT,true));card.addView(Ui.text(this,r.author,12,Ui.MUTED,false));card.addView(Ui.text(this,r.reason,12,Ui.PRIMARY,false));card.setOnClickListener(v->{if(!r.id.isEmpty())openUnified(r.id,r.title,r.author);});p.addView(card);}});}catch(Exception e){runOnUiThread(()->{if(valid(id)){load.setVisibility(View.GONE);status.setText("Desktop 推荐读取失败：请检查电脑连接");}});}});
+
+    private void switchNativeRecommendationBatch(int direction){
+        if(recommendationBatchList==null||recommendationBatchStatus==null)return;
+        NativeRecommendationStore.Snapshot snapshot=direction<0?NativeRecommendationStore.previousBatch(this):NativeRecommendationStore.nextBatch(this);
+        renderNativeRecommendationBatch(snapshot);
+    }
+
+    private void renderNativeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){
+        if(recommendationBatchList==null||recommendationBatchStatus==null)return;
+        recommendationBatchStatus.setText("手机独立 Recommendation V3/V5 Portable · "+snapshot.readiness+" · 候选 "+snapshot.candidateCount+" 本 · 第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批");
+        recommendationBatchList.removeAllViews();
+        for(NativeRecommendationStore.Item item:snapshot.current()){
+            LinearLayout card=Ui.card(this);
+            card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));
+            card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));
+            card.addView(Ui.text(this,item.reason,12,Ui.PRIMARY,false));
+            card.addView(Ui.text(this,item.family+" · score "+String.format(Locale.ROOT,"%.4f",item.score),10.5f,Ui.MUTED,false));
+            card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));
+            recommendationBatchList.addView(card);
+        }
     }
 
     private void history(){
@@ -191,7 +216,7 @@ public class MainActivity extends Activity {
 
         RemoteConfigStore.Config remote=RemoteConfigStore.load(this);LinearLayout cloud=Ui.card(this);cloud.addView(Ui.text(this,"WebDAV 云端",18,Ui.TEXT,true));cloud.addView(Ui.text(this,remote.configured()?"已配置 · "+remote.root:"尚未配置",13,Ui.MUTED,false));cloud.addView(Ui.text(this,"电脑关机时仍可直接读取云端漫画；云端还承载便携书架、收藏和阅读进度。",12,Ui.MUTED,false));cloud.addView(button(remote.configured()?"管理 WebDAV / 刷新便携状态":"配置 WebDAV",v->startActivity(new Intent(this,RemoteStorageActivity.class))));p.addView(cloud);
 
-        PicaAccountStore.Session session=PicaAccountStore.load(this);NativeRecommendationStore.Snapshot rec=NativeRecommendationStore.load(this);LinearLayout pica=Ui.card(this);pica.addView(Ui.text(this,"Pica 在线",18,Ui.TEXT,true));pica.addView(Ui.text(this,session.signedIn()?"已登录 · 可直接搜索、收藏、在线阅读和下载":session.configured()?"已保存账号 · 会在需要时重新登录":"尚未配置",13,Ui.MUTED,false));pica.addView(Ui.text(this,"手机直接访问 Pica，不需要 Desktop 代理。在线正文复用同一 Reader、缓存和预加载。",12,Ui.MUTED,false));if(rec.available())pica.addView(Ui.text(this,"手机推荐缓存："+rec.readiness+" · "+rec.batches.size()+" 批 · 候选 "+rec.candidateCount+" 本",12,Ui.PRIMARY,false));LinearLayout picaActions=new LinearLayout(this);picaActions.addView(button("浏览 Pica",v->startActivity(new Intent(this,PicaBrowseActivity.class))),new LinearLayout.LayoutParams(0,-2,1));picaActions.addView(button("账号",v->startActivity(new Intent(this,PicaAccountActivity.class))),new LinearLayout.LayoutParams(0,-2,1));pica.addView(picaActions);p.addView(pica);
+        PicaAccountStore.Session session=PicaAccountStore.load(this);NativeRecommendationStore.Snapshot rec=NativeRecommendationStore.load(this);LinearLayout pica=Ui.card(this);pica.addView(Ui.text(this,"Pica 在线",18,Ui.TEXT,true));pica.addView(Ui.text(this,session.signedIn()?"已登录 · 可直接搜索、收藏、在线阅读和下载":session.configured()?"已保存账号 · 会在需要时重新登录":"尚未配置",13,Ui.MUTED,false));pica.addView(Ui.text(this,PicaAccountStore.load(this).configured()?"手机本机账号优先直连 Pica。":"如电脑已登录且保持配对，手机可通过 Desktop Provider Relay 使用 Pica，不复制账号密码或 token。",12,Ui.MUTED,false));if(rec.available())pica.addView(Ui.text(this,"手机推荐缓存："+rec.readiness+" · "+rec.batches.size()+" 批 · 候选 "+rec.candidateCount+" 本",12,Ui.PRIMARY,false));LinearLayout picaActions=new LinearLayout(this);picaActions.addView(button("浏览 Pica",v->startActivity(new Intent(this,PicaBrowseActivity.class))),new LinearLayout.LayoutParams(0,-2,1));picaActions.addView(button("账号",v->startActivity(new Intent(this,PicaAccountActivity.class))),new LinearLayout.LayoutParams(0,-2,1));pica.addView(picaActions);p.addView(pica);
 
         LinearLayout downloads=Ui.card(this);downloads.addView(Ui.text(this,"后台任务与手机下载",18,Ui.TEXT,true));PhoneDownloadStore.Snapshot phone=PhoneDownloadStore.load(this);downloads.addView(Ui.text(this,phone.comics.size()+" 本手机持久下载 · 约 "+formatBytes(PhoneDownloadStore.estimatedBytes(this)),13,Ui.MUTED,false));downloads.addView(Ui.text(this,"主动下载不是缓存，不受 LRU 清理；Pica 长篇下载、封面导入和手机推荐都能脱离当前页面继续。",12,Ui.MUTED,false));LinearLayout downloadActions=new LinearLayout(this);downloadActions.addView(button("后台任务",v->startActivity(new Intent(this,TaskCenterActivity.class))),new LinearLayout.LayoutParams(0,-2,1));downloadActions.addView(button("管理已下载",v->startActivity(new Intent(this,DownloadsActivity.class))),new LinearLayout.LayoutParams(0,-2,1));downloads.addView(downloadActions);p.addView(downloads);
 

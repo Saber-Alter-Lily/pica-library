@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
@@ -25,6 +27,10 @@
         <activity android:name=".AppearanceActivity" android:exported="false" />
         <activity android:name=".ThemePackActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
+        <activity android:name=".RecommendationStyleActivity" android:exported="false" />
+        <activity android:name=".RecommendationControlActivity" android:exported="false" />
+        <activity android:name=".RecommendationProfileActivity" android:exported="false" />
+        <activity android:name=".RecommendationSyncActivity" android:exported="false" />
         <activity android:name=".StorageHubActivity" android:exported="false" />
         <activity android:name=".AboutActivity" android:exported="false" />
         <activity android:name=".StorageSettingsActivity" android:exported="false" />

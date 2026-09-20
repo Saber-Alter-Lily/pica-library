@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { StoredComic } from '../../src/library/types'
 import { LibraryDatabase } from '../../src/library/database'
 import { latestMigrationVersion } from '../../src/storage/sqlite/migrations'
@@ -458,7 +458,7 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v3-final-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
         try {
-            expect(latestMigrationVersion).toBe(9)
+            expect(latestMigrationVersion).toBeGreaterThanOrEqual(9)
             const comics = Array.from({ length: 30 }, (_, index) =>
                 comic(`c${index}`)
             )
@@ -519,6 +519,7 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
             )
             coordinator.resumeOrCreate('build-1')
             await coordinator.waitForBuild()
+            const listComicsSpy = vi.spyOn(database, 'listComics')
             const current = coordinator.current() as {
                 batchId: string
                 recommendations: unknown[]
@@ -537,12 +538,15 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
             }
             expect(repeated.batchId).toBe(next.batchId)
             expect(next.recommendations).toHaveLength(12)
+            const readsAfterFirstBatch = listComicsSpy.mock.calls.length
+            expect(readsAfterFirstBatch).toBe(1)
             const currentAfterNext = coordinator.current() as {
                 batchId: string
                 batchIndex: number
             }
             expect(currentAfterNext.batchId).toBe(next.batchId)
             expect(currentAfterNext.batchIndex).toBe(next.batchIndex)
+            expect(listComicsSpy.mock.calls.length).toBe(readsAfterFirstBatch)
             expect(
                 new Set(
                     database.recommendationSeen(

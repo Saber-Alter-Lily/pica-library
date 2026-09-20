@@ -53,7 +53,7 @@ final class CoverRepository {
         if(bitmap==null&&EhClient.isEhId(entry.id)){
             try{EhClient client=new EhClient(context);EhClient.Comic comic=client.comic(entry.id);UnifiedCatalogStore.Entry refreshed=UnifiedEhCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.thumbnail(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}catch(Exception ignored){}
         }
-        if(bitmap==null&&!EhClient.isEhId(entry.id)&&PicaAccountStore.load(context).configured()){
+        if(bitmap==null&&!EhClient.isEhId(entry.id)&&PicaClient.available(context)){
             try{PicaClient client=new PicaClient(context);PicaClient.Comic comic=client.comic(entry.id);if(comic!=null&&!comic.id.isEmpty()){UnifiedCatalogStore.Entry refreshed=UnifiedPicaCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.media(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}}catch(Exception ignored){}
         }
         if(bitmap!=null){remember(cacheKey,bitmap);save(context,cacheKey,bitmap);}return bitmap;

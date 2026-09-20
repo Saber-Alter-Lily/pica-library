@@ -36,10 +36,13 @@ final class BridgeClient {
         final ChapterItem episode;final List<PageItem> pages;final int progressIndex;
         ChapterData(ChapterItem episode, List<PageItem> pages, int progressIndex) {this.episode=episode; this.pages=pages; this.progressIndex=progressIndex;}
     }
-    static final class RecommendationItem {final String id, title, author, reason;RecommendationItem(String id,String title,String author,String reason){this.id=id;this.title=title;this.author=author;this.reason=reason;}}
+    static final class RecommendationItem {
+        final String id,title,author,reason;final double score;final List<String> tags,categories;
+        RecommendationItem(String id,String title,String author,String reason,double score,List<String> tags,List<String> categories){this.id=id;this.title=title;this.author=author;this.reason=reason;this.score=score;this.tags=tags;this.categories=categories;}
+    }
     static final class RecommendationBatch {
-        final List<RecommendationItem> items;final String source;final boolean cached;final int batchIndex, maxVisibleBatches;
-        RecommendationBatch(List<RecommendationItem> items,String source,boolean cached,int batchIndex,int maxVisibleBatches){this.items=items;this.source=source;this.cached=cached;this.batchIndex=batchIndex;this.maxVisibleBatches=maxVisibleBatches;}
+        final List<RecommendationItem> items;final String source;final boolean cached;final int batchIndex, maxVisibleBatches;final JSONObject policyBaseline;
+        RecommendationBatch(List<RecommendationItem> items,String source,boolean cached,int batchIndex,int maxVisibleBatches,JSONObject policyBaseline){this.items=items;this.source=source;this.cached=cached;this.batchIndex=batchIndex;this.maxVisibleBatches=maxVisibleBatches;this.policyBaseline=policyBaseline;}
     }
 
     private static HttpURLConnection open(String host, String path, String token, String method) throws Exception {
@@ -50,8 +53,124 @@ final class BridgeClient {
     }
     static String get(Context c, String path) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty()) throw new IllegalStateException("尚未配对 Desktop");return read(open(host,path,BridgeStore.token(c),"GET"));}
     static JSONObject device(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/device"));}
-    static String post(Context c, String path, JSONObject value) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty()) throw new IllegalStateException("尚未配对 Desktop");HttpURLConnection con=open(host,path,BridgeStore.token(c),"POST");con.setDoOutput(true); con.setRequestProperty("Content-Type","application/json; charset=utf-8");try(OutputStream out=con.getOutputStream()){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}return read(con);}
-    static JSONObject pair(String host, String code) throws Exception {HttpURLConnection con=open(host,"/mobile/v1/pair","","POST");con.setDoOutput(true); con.setRequestProperty("Content-Type","application/json; charset=utf-8");JSONObject body=new JSONObject();body.put("code",code);body.put("deviceName",Build.MANUFACTURER+" "+Build.MODEL);try(OutputStream out=con.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}return new JSONObject(read(con));}
+    static JSONObject accountStatus(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/accounts/status"));}
+    static String post(Context c,String path,JSONObject value) throws Exception{return post(c,path,value,12000);}
+    static String post(Context c,String path,JSONObject value,int readTimeoutMs) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");HttpURLConnection con=open(host,path,BridgeStore.token(c),"POST");con.setReadTimeout(Math.max(12000,readTimeoutMs));con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json; charset=utf-8");try(OutputStream out=con.getOutputStream()){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}return read(con);}
+    static JSONObject pair(Context c,String host,String code) throws Exception {HttpURLConnection con=open(host,"/mobile/v1/pair","","POST");con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json; charset=utf-8");JSONObject body=new JSONObject();body.put("code",code);body.put("deviceId",DeviceIdentity.id(c));body.put("deviceName",Build.MANUFACTURER+" "+Build.MODEL);try(OutputStream out=con.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}return new JSONObject(read(con));}
+
+    static JSONObject picaRelaySearch(Context c,String keyword,int page,String sort,List<String> categories) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("keyword",keyword==null?"":keyword);
+        body.put("page",Math.max(1,page));
+        body.put("sort",sort==null?"ld":sort);
+        body.put("categories",new JSONArray(categories==null?new ArrayList<>():categories));
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/search",body));
+    }
+    static JSONObject picaRelayBrowse(Context c,String category,String tag,String sort,int page) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("category",category==null?"":category);
+        body.put("tag",tag==null?"":tag);
+        body.put("sort",sort==null?"ld":sort);
+        body.put("page",Math.max(1,page));
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/browse",body));
+    }
+    static JSONObject picaRelayFavorites(Context c,int page,String sort) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("page",Math.max(1,page));
+        body.put("sort",sort==null?"dd":sort);
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/favorites",body));
+    }
+    static JSONObject picaRelayLeaderboard(Context c,String range) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/leaderboard?tt="+enc(range==null?"H24":range)));
+    }
+    static JSONObject picaRelayCategories(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/categories"));
+    }
+    static JSONObject picaRelayComic(Context c,String comicId) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/comic/"+enc(comicId)));
+    }
+    static JSONObject picaRelayEpisodes(Context c,String comicId) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/episodes/"+enc(comicId)));
+    }
+    static JSONObject picaRelayPages(Context c,String comicId,int order) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/pages/"+enc(comicId)+"/"+Math.max(1,order)));
+    }
+    static JSONObject picaRelayRelated(Context c,String comicId) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/pica/related/"+enc(comicId)));
+    }
+    static JSONObject picaRelayFavorite(Context c,String comicId,boolean desired) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("comicId",comicId);
+        body.put("desired",desired);
+        return new JSONObject(post(c,"/mobile/v1/provider/pica/favorite",body));
+    }
+
+    static JSONObject ehRelaySearch(
+        Context c,
+        String surface,
+        String keyword,
+        List<String> tags,
+        List<String> categories,
+        String mode,
+        String toplist,
+        String language,
+        List<String> excludeTags,
+        int minRating,
+        int pageFrom,
+        int pageTo,
+        int limit
+    ) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("surface","exh".equals(surface)?"exh":"eh");
+        body.put("keyword",keyword==null?"":keyword);
+        body.put("tags",new JSONArray(tags==null?new ArrayList<>():tags));
+        body.put("categories",new JSONArray(categories==null?new ArrayList<>():categories));
+        body.put("ehMode",mode==null?"latest":mode);
+        body.put("ehToplist",toplist==null?"11":toplist);
+        body.put("ehLanguage",language==null?"":language);
+        body.put("ehExcludeTags",new JSONArray(excludeTags==null?new ArrayList<>():excludeTags));
+        body.put("ehMinRating",Math.max(0,minRating));
+        body.put("ehPageFrom",Math.max(0,pageFrom));
+        body.put("ehPageTo",Math.max(0,pageTo));
+        body.put("limit",Math.max(1,Math.min(100,limit)));
+        return new JSONObject(post(c,"/mobile/v1/provider/eh/search",body,45000));
+    }
+    static JSONObject ehRelayFavoritesSnapshot(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/favorites-snapshot"));
+    }
+    static JSONObject ehRelayExhCapability(Context c) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/exh-capability"));
+    }
+    static JSONObject ehRelayComic(Context c,String comicId,String surface) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/comic/"+enc(comicId)+"?surface="+enc("exh".equals(surface)?"exh":"eh")));
+    }
+    static JSONObject ehRelayEpisodes(Context c,String comicId,String surface) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/episodes/"+enc(comicId)+"?surface="+enc("exh".equals(surface)?"exh":"eh")));
+    }
+    static JSONObject ehRelayPages(Context c,String comicId,String surface) throws Exception {
+        return new JSONObject(get(c,"/mobile/v1/provider/eh/pages/"+enc(comicId)+"?surface="+enc("exh".equals(surface)?"exh":"eh")));
+    }
+    static JSONObject ehRelayFavorite(Context c,String comicId,boolean desired,int category,String note) throws Exception {
+        JSONObject body=new JSONObject();
+        body.put("comicId",comicId);
+        body.put("desired",desired);
+        body.put("category",Math.max(0,Math.min(9,category)));
+        body.put("note",note==null?"":note);
+        return new JSONObject(post(c,"/mobile/v1/provider/eh/favorite",body,45000));
+    }
+    static HttpURLConnection ehRelayImage(Context c,String locator) throws Exception {
+        String host=BridgeStore.host(c);
+        if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");
+        HttpURLConnection con=open(
+            host,
+            "/mobile/v1/provider/eh/page-image?locator="+enc(locator),
+            BridgeStore.token(c),
+            "GET"
+        );
+        con.setReadTimeout(30000);
+        con.setRequestProperty("Accept","image/*");
+        return con;
+    }
 
     static List<ComicItem> library(Context c, String scope, int limit) throws Exception {return library(c,scope,limit,"","latest");}
     static List<ComicItem> library(Context c, String scope, int limit, String text, String sort) throws Exception {
@@ -72,8 +191,43 @@ final class BridgeClient {
     static Bitmap bitmap(Context c,String relative) throws Exception {String host=BridgeStore.host(c); if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");HttpURLConnection con=open(host,relative,BridgeStore.token(c),"GET");con.setReadTimeout(15000);con.setRequestProperty("Accept","image/*");try {int status=con.getResponseCode(); if(status>=400)throw new IllegalStateException("HTTP "+status);try(InputStream in=con.getInputStream()){Bitmap bitmap=BitmapFactory.decodeStream(in);if(bitmap==null)throw new IllegalStateException("图片解码失败");return bitmap;}} catch (SocketTimeoutException e) {throw new IllegalStateException("图片读取超时");} finally {con.disconnect();}}
     static void saveProgress(Context c,String comicId,String episodeId,int pageIndex){new Thread(()->{try{JSONObject body=new JSONObject(); body.put("comicId",comicId); body.put("episodeId",episodeId); body.put("pageIndex",pageIndex);post(c,"/mobile/v1/reader/progress",body);}catch(Exception ignored){}}).start();}
 
-    static List<RecommendationItem> recommendations(Context c,int limit) throws Exception {return recommendationBatch(c,limit).items;}
-    static RecommendationBatch recommendationBatch(Context c,int limit) throws Exception {JSONObject root=new JSONObject(get(c,"/mobile/v1/recommendations?limit="+limit));JSONArray arr=root.optJSONArray("recommendations"); List<RecommendationItem> out=new ArrayList<>();if(arr!=null) for(int i=0;i<arr.length();i++){JSONObject o=arr.optJSONObject(i); if(o==null)continue;JSONObject comic=o.optJSONObject("comic"); if(comic==null)comic=o;JSONArray reasons=o.optJSONArray("reasons"); String reason="为你推荐";if(reasons!=null&&reasons.length()>0)reason=reasons.optString(0,reason);out.add(new RecommendationItem(comic.optString("comicId"),comic.optString("title","未命名漫画"),comic.optString("author","未知作者"),reason));}return new RecommendationBatch(out,root.optString("source",""),root.optBoolean("cached",false),root.optInt("batchIndex",-1),root.optInt("maxVisibleBatches",0));}
+    private static List<String> jsonStrings(JSONArray arr){List<String> out=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){String value=arr.optString(i,"").trim();if(!value.isEmpty()&&!out.contains(value))out.add(value);}return out;}
+    private static RecommendationItem recommendationItem(JSONObject o){if(o==null)return null;JSONObject comic=o.optJSONObject("comic");if(comic==null)comic=o;JSONArray reasons=o.optJSONArray("reasons");String reason="为你推荐";if(reasons!=null&&reasons.length()>0)reason=reasons.optString(0,reason);double score=o.has("portableScore")?o.optDouble("portableScore",0):o.optDouble("score",0);return new RecommendationItem(comic.optString("comicId"),comic.optString("title","未命名漫画"),comic.optString("author","未知作者"),reason,score,jsonStrings(comic.optJSONArray("tags")),jsonStrings(comic.optJSONArray("categories")));}
+    private static RecommendationBatch parseRecommendationBatch(JSONObject root,String arrayKey){JSONArray arr=root.optJSONArray(arrayKey);List<RecommendationItem> out=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){RecommendationItem item=recommendationItem(arr.optJSONObject(i));if(item!=null&&!item.id.isEmpty())out.add(item);}return new RecommendationBatch(out,root.optString("source",""),root.optBoolean("cached",false),root.optInt("batchIndex",0),root.optInt("maxVisibleBatches",Math.max(1,(out.size()+NativeRecommendationPolicy.BATCH_SIZE-1)/NativeRecommendationPolicy.BATCH_SIZE)),root.optJSONObject("policyBaseline"));}
+    static List<RecommendationItem> recommendations(Context c,int limit) throws Exception{return recommendationBatch(c,limit).items;}
+    static RecommendationBatch recommendationBatch(Context c,int limit) throws Exception {return parseRecommendationBatch(new JSONObject(get(c,"/mobile/v1/recommendations?limit="+limit)),"recommendations");}
+    static RecommendationBatch recommendationCache(Context c,int limit) throws Exception {return parseRecommendationBatch(new JSONObject(get(c,"/mobile/v1/recommendations/cache?limit="+limit)),"items");}
+    static JSONObject recommendationSyncPreview(Context c) throws Exception {
+        JSONObject payload=RecommendationPolicyStore.previewPayload(c);
+        return new JSONObject(post(c,"/mobile/v1/recommendation/v5/sync-preview",payload,30000));
+    }
+    static JSONObject recommendationPortablePackage(Context c,int limit) throws Exception {
+        JSONObject value=new JSONObject(get(c,"/mobile/v1/recommendation/v5/portable-package?limit="+Math.max(24,Math.min(1000,limit))));
+        PortableRecommendationPackageStore.save(c,value);
+        JSONObject behavior=value.optJSONObject("behavior");
+        if(behavior!=null){
+            RecommendationFeedbackStore.importSynced(c,behavior.optJSONArray("feedback"));
+            RecommendationEvidenceStore.importSynced(c,behavior.optJSONArray("recentEvents"));
+        }
+        return value;
+    }
+    static JSONObject syncRecommendationState(Context c) throws Exception{return syncRecommendationState(c,false,null);}
+    static JSONObject syncRecommendationState(Context c,boolean recompute) throws Exception{return syncRecommendationState(c,recompute,null);}
+    static JSONObject syncRecommendationState(Context c,boolean recompute,JSONArray resolutions) throws Exception {
+        JSONObject payload=RecommendationPolicyStore.syncPayload(c);
+        if(resolutions!=null)payload.put("resolutions",resolutions);
+        payload.put("recompute",recompute);
+        String mutationId=payload.optString("mutationId","");
+        JSONObject response=new JSONObject(post(c,"/mobile/v1/recommendation/v5/sync",payload,recompute?180000:30000));
+        if(response.optBoolean("requiresResolution",false))return response;
+        RecommendationPolicyStore.acknowledge(c,response,mutationId);
+        try{recommendationPortablePackage(c,500);}catch(Exception ignored){}
+        return response;
+    }
+    static JSONObject recommendationPolicy(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/recommendation/v5/snapshot"));}
+    static JSONObject visualStatus(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/visual/status"));}
+    static JSONObject updateVisualSettings(Context c,Boolean enabled,String rerankMode) throws Exception {return updateVisualSettings(c,enabled,rerankMode,null);}
+    static JSONObject updateVisualSettings(Context c,Boolean enabled,String rerankMode,String strength) throws Exception {JSONObject body=new JSONObject();if(enabled!=null)body.put("enabled",enabled.booleanValue());if(rerankMode!=null&&!rerankMode.isEmpty())body.put("rerankMode",rerankMode);if(strength!=null&&!strength.isEmpty())body.put("strength",strength);return new JSONObject(post(c,"/mobile/v1/visual/settings",body));}
     static JSONObject atlas(Context c) throws Exception { return new JSONObject(get(c,"/mobile/v1/atlas")); }
     private static String enc(String value) throws Exception { return java.net.URLEncoder.encode(value==null?"":value,"UTF-8").replace("+","%20"); }
 }

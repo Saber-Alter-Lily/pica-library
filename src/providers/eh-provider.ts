@@ -26,6 +26,19 @@ export interface EhSession {
     cfClearance?: string
 }
 
+export interface EhFavoriteSnapshotItem {
+    comicId: string
+    slot: number
+    note: string
+}
+
+export interface EhFavoriteSnapshot {
+    comics: ProviderComic[]
+    items: EhFavoriteSnapshotItem[]
+    categoryNames: string[]
+    categoryCounts: number[]
+}
+
 export type ExHentaiCapability =
     | 'AVAILABLE'
     | 'UNAVAILABLE'
@@ -250,6 +263,57 @@ function nextFavoriteToken(html: string, used: Set<string>) {
         if (!used.has(token)) return token
     }
     return null
+}
+
+function htmlAttribute(tag: string, name: string) {
+    const pattern = new RegExp(
+        '\\b' + name + '\\s*=\\s*["\\\']([^"\\\']*)["\\\']',
+        'i'
+    )
+    return htmlDecode(pattern.exec(tag)?.[1] ?? '').trim()
+}
+
+function parseFavoriteCategoryNames(html: string) {
+    const names = Array.from(
+        { length: 10 },
+        (_, index) => `Favorites ${index}`
+    )
+    const pattern = /<input\b[^>]*\bname=["']favorite_(\d)["'][^>]*>/gi
+    for (const match of html.matchAll(pattern)) {
+        const slot = Number(match[1])
+        if (!Number.isInteger(slot) || slot < 0 || slot > 9) continue
+        const value = htmlAttribute(match[0], 'value')
+        if (value) names[slot] = value
+    }
+    return names
+}
+
+function parseFavoritePageMetadata(
+    html: string,
+    categoryNames: string[]
+) {
+    const notes = new Map<string, string>()
+    const notePattern =
+        /<[^>]*\bid=["']favnote_(\d+)["'][^>]*>([^<]*)</gi
+    for (const match of html.matchAll(notePattern))
+        notes.set(match[1], htmlDecode(match[2] ?? '').trim())
+
+    const metadata = new Map<
+        string,
+        { slot: number; note: string }
+    >()
+    const postedPattern =
+        /<[^>]*\bid=["']posted_(\d+)["'][^>]*>/gi
+    for (const match of html.matchAll(postedPattern)) {
+        const gid = match[1]
+        const category = htmlAttribute(match[0], 'title')
+        const slot = categoryNames.findIndex((name) => name === category)
+        metadata.set(gid, {
+            slot: slot >= 0 && slot <= 9 ? slot : -1,
+            note: notes.get(gid) ?? ''
+        })
+    }
+    return metadata
 }
 
 function accountRejected(response: Response, html: string) {
@@ -487,25 +551,79 @@ export class EhProvider implements ComicProvider {
         return { authenticated: true, visibleFavorites: galleryRefs(html).length }
     }
 
-    async favoritesAll() {
-        if (!this.session) throw new Error('E-H account session is not configured')
+    async favoriteSnapshot(): Promise<EhFavoriteSnapshot> {
+        if (!this.session)
+            throw new Error('E-H account session is not configured')
+
+        const categoryNames = parseFavoriteCategoryNames(
+            await this.authenticatedText(
+                `${GALLERY_ORIGIN}/uconfig.php`,
+                4 * 1024 * 1024
+            )
+        )
         const refs = new Map<string, GalleryRef>()
+        const favoriteMetadata = new Map<
+            string,
+            { slot: number; note: string }
+        >()
         const usedNext = new Set<string>()
         let next: string | null = null
+
         for (let page = 0; page < MAX_FAVORITE_PAGES; page++) {
             const url = new URL('/favorites.php', GALLERY_ORIGIN)
             url.searchParams.set('favcat', 'all')
             if (next) url.searchParams.set('next', next)
-            const html = await this.authenticatedText(url.toString(), 8 * 1024 * 1024)
+            const html = await this.authenticatedText(
+                url.toString(),
+                8 * 1024 * 1024
+            )
             for (const ref of galleryRefs(html))
                 refs.set(`${ref.gid}:${ref.token}`, ref)
+            for (const [gid, value] of parseFavoritePageMetadata(
+                html,
+                categoryNames
+            ))
+                favoriteMetadata.set(gid, value)
+
             const token = nextFavoriteToken(html, usedNext)
             if (!token) break
             usedNext.add(token)
             next = token
         }
+
         const metadata = await this.gdata([...refs.values()])
-        return metadata.filter((item) => !item.error).map((item) => ehMetadataToComic(item, 'eh'))
+        const comics = metadata
+            .filter((item) => !item.error)
+            .map((item) => ehMetadataToComic(item, 'eh'))
+        const categoryCounts = Array.from({ length: 10 }, () => 0)
+        const items = comics.map((comic) => {
+            const { gid } = parseEhComicId(comic.comicId)
+            const favorite = favoriteMetadata.get(String(gid))
+            const slot =
+                favorite &&
+                Number.isInteger(favorite.slot) &&
+                favorite.slot >= 0 &&
+                favorite.slot <= 9
+                    ? favorite.slot
+                    : -1
+            if (slot >= 0) categoryCounts[slot] += 1
+            return {
+                comicId: comic.comicId,
+                slot,
+                note: favorite?.note ?? ''
+            }
+        })
+
+        return {
+            comics,
+            items,
+            categoryNames,
+            categoryCounts
+        }
+    }
+
+    async favoritesAll() {
+        return (await this.favoriteSnapshot()).comics
     }
 
     async setRemoteFavorite(

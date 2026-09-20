@@ -8,6 +8,7 @@ export interface DesktopPaths {
     remoteStorageConfig: string
     data: string
     cache: string
+    packs: string
     logs: string
     runtimeState: string
     lock: string
@@ -31,6 +32,7 @@ export function desktopPaths(rootOverride?: string): DesktopPaths {
         remoteStorageConfig: path.join(local, 'config', 'remote-storage.json'),
         data: path.join(local, 'data'),
         cache: path.join(local, 'cache'),
+        packs: path.join(local, 'packs'),
         logs: path.join(local, 'logs'),
         runtimeState: path.join(local, 'runtime-state'),
         lock: path.join(local, 'runtime-state', 'instance.lock'),

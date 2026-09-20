@@ -1,0 +1,237 @@
+# v0.4.1 release source freeze after final formal-module test alignment
+name: v0.4.1 Formal Release Gate
+
+on:
+  push:
+    branches: [release/v0.4.1-gate]
+    paths:
+      - '.github/workflows/v041-release-gate.yml'
+
+permissions:
+  contents: read
+
+env:
+  DESKTOP_VERSION: '0.4.1'
+  DESKTOP_BASE_VERSION: '0.4.0'
+  DESKTOP_BASE_SHA256: '1e22df88d067c34152e1a94008fbb4c378c543fc41450768e01c25c105e698d0'
+  ANDROID_VERSION_CODE: '43'
+  ANDROID_VERSION_NAME: '0.4.1'
+  EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+
+jobs:
+  windows-upgrade:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Re-run Desktop product gates
+        shell: pwsh
+        run: |
+          pnpm type:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download and verify official v0.4.0 base
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts\release-base | Out-Null
+          $base='artifacts\release-base\Pica-Library-v0.4.0-windows-x64.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-v0.4.0-windows-x64.zip' -OutFile $base
+          $actual=(Get-FileHash -Algorithm SHA256 $base).Hash.ToLowerInvariant()
+          if($actual -ne $env:DESKTOP_BASE_SHA256){ throw "v0.4.0 base SHA-256 mismatch: $actual" }
+          Write-Host 'OFFICIAL_V0_4_0_BASE_SHA256=PASS'
+      - name: Build formal v0.4.1 full package
+        shell: pwsh
+        run: |
+          pnpm build:windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify formal Windows package cleanliness
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $full=[IO.Compression.ZipFile]::OpenRead('artifacts\Pica-Library-v0.4.1-windows-x64.zip')
+          try {
+            $names=@($full.Entries | ForEach-Object { $_.FullName.Replace('\\','/') })
+            if($names -contains 'TEST_BUILD.txt'){ throw 'formal package contains TEST_BUILD.txt' }
+            if($names | Where-Object { $_ -match '(?i)beta|dev-pr|test_build' }){ throw 'formal package contains beta/dev/test artifact names' }
+            if(-not ($names -contains 'Pica Library.exe')){ throw 'formal launcher missing' }
+            $source=$full.GetEntry('SOURCE_SHA.txt')
+            if(-not $source){ throw 'SOURCE_SHA.txt missing from formal full package' }
+            $reader=New-Object IO.StreamReader($source.Open())
+            try { $sourceSha=$reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
+            if($sourceSha -ne $env:GITHUB_SHA){ throw "full package source SHA mismatch: $sourceSha" }
+          } finally { $full.Dispose() }
+          Write-Host 'FORMAL_WINDOWS_CLEANLINESS=PASS'
+      - name: Replace v0.4.0 application tree and preserve separate user data
+        shell: pwsh
+        run: |
+          $appRoot=Join-Path $env:RUNNER_TEMP 'pica-formal-replace'
+          $targetRoot=Join-Path $env:RUNNER_TEMP 'pica-target-v041'
+          $stateRoot=Join-Path $env:RUNNER_TEMP 'pica-user-state'
+          foreach($p in @($appRoot,$targetRoot,$stateRoot)){ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $p; New-Item -ItemType Directory -Force -Path $p | Out-Null }
+          Expand-Archive -LiteralPath 'artifacts\release-base\Pica-Library-v0.4.0-windows-x64.zip' -DestinationPath $appRoot
+          Expand-Archive -LiteralPath 'artifacts\Pica-Library-v0.4.1-windows-x64.zip' -DestinationPath $targetRoot
+          New-Item -ItemType Directory -Force -Path (Join-Path $stateRoot 'data'),(Join-Path $stateRoot 'runtime-state') | Out-Null
+          Set-Content -LiteralPath (Join-Path $stateRoot 'data\upgrade-sentinel.txt') -Value 'keep-user-data-v041' -Encoding ascii
+
+          # Full application replacement deliberately touches only the program tree.
+          Get-ChildItem -LiteralPath $appRoot -Force | Remove-Item -Recurse -Force
+          Get-ChildItem -LiteralPath $targetRoot -Force | ForEach-Object { Copy-Item -Recurse -Force -LiteralPath $_.FullName -Destination $appRoot }
+
+          if((Get-Content -Raw -LiteralPath (Join-Path $stateRoot 'data\upgrade-sentinel.txt')).Trim() -ne 'keep-user-data-v041'){ throw 'user-data sentinel changed during full application replacement' }
+
+          $targetFiles=Get-ChildItem -LiteralPath $targetRoot -Recurse -File
+          foreach($file in $targetFiles){
+            $rel=[IO.Path]::GetRelativePath($targetRoot,$file.FullName).Replace('\\','/')
+            $actual=Join-Path $appRoot $rel
+            if(-not (Test-Path -LiteralPath $actual)){ throw "replaced install missing target file: $rel" }
+            $a=(Get-FileHash -Algorithm SHA256 -LiteralPath $actual).Hash
+            $b=(Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash
+            if($a -ne $b){ throw "replaced install differs from target: $rel" }
+          }
+
+          $env:PICA_LIBRARY_DESKTOP_HOME=$stateRoot
+          $process=Start-Process -FilePath (Join-Path $appRoot 'runtime\node.exe') -ArgumentList (Join-Path $appRoot 'app\desktop.js') -PassThru -WindowStyle Hidden
+          $instanceFile=Join-Path $stateRoot 'runtime-state\instance.json'
+          $deadline=(Get-Date).AddSeconds(30)
+          while((Get-Date) -lt $deadline -and -not (Test-Path -LiteralPath $instanceFile)){ Start-Sleep -Milliseconds 250 }
+          if(-not (Test-Path -LiteralPath $instanceFile)){ Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue; throw 'v0.4.1 desktop instance did not start after full replacement' }
+          $instance=Get-Content -Raw -LiteralPath $instanceFile | ConvertFrom-Json
+          $status=Invoke-RestMethod -Uri "$($instance.url)/api/v1/status" -TimeoutSec 5
+          $caps=Invoke-RestMethod -Uri "$($instance.url)/api/v1/capabilities" -TimeoutSec 5
+          if($status.version -ne '0.4.1'){ throw "replaced status version mismatch: $($status.version)" }
+          if($caps.appVersion -ne '0.4.1'){ throw "replaced capabilities version mismatch: $($caps.appVersion)" }
+          if([int]$caps.databaseSchemaVersion -ne 13){ throw "unexpected database schema after replacement: $($caps.databaseSchemaVersion)" }
+          Stop-Process -Id ([int]$instance.pid) -Force -ErrorAction SilentlyContinue
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          Write-Host 'V040_TO_V041_FULL_APPLICATION_REPLACEMENT=PASS'
+          Write-Host 'V041_REPLACED_APP_HEALTH=PASS'
+          Write-Host 'USER_DATA_PRESERVATION=PASS'
+      - name: Write Windows candidate evidence
+        shell: pwsh
+        run: |
+          $full='artifacts\Pica-Library-v0.4.1-windows-x64.zip'
+          $fullHash=(Get-FileHash -Algorithm SHA256 $full).Hash.ToLowerInvariant()
+          "$fullHash  Pica-Library-v0.4.1-windows-x64.zip" | Set-Content -Encoding ascii artifacts\SHA256SUMS-Windows.txt
+          [ordered]@{
+            release='v0.4.1-candidate'; sourceSha=$env:GITHUB_SHA; baseVersion='0.4.0'; baseSha256=$env:DESKTOP_BASE_SHA256; fullSha256=$fullHash;
+            upgradeMode='FULL_APPLICATION_REPLACEMENT';
+            upgradeValidation=@('official-v0.4.0-base-sha256','schema9-to-current-migration-regression','full-program-tree-replacement','v0.4.1-health-check','application-tree-match','user-data-preserved','formal-package-cleanliness')
+          } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 artifacts\BUILD_TRANSPARENCY-Windows.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-v0.4.1-Windows-candidate
+          path: |
+            artifacts/Pica-Library-v0.4.1-windows-x64.zip
+            artifacts/SHA256SUMS-Windows.txt
+            artifacts/BUILD_TRANSPARENCY-Windows.json
+          retention-days: 1
+          if-no-files-found: error
+
+  android-upgrade:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test and lint before signing
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Build formal v43 and verify upgrade identity from official v42
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
+          test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
+          curl -fL --retry 3 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.0/Pica-Library-Android-v42.apk' -o "$RUNNER_TEMP/Pica-Library-Android-v42.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/Pica-Library-Android-v42.apk" > "$RUNNER_TEMP/v42-cert.txt"
+          oldcert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/v42-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$oldcert" = "$EXPECTED_CERT"
+
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleRelease --no-daemon
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$RUNNER_TEMP/Pica-Library-Android-v42.apk" > "$RUNNER_TEMP/v42-package.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/v43-package.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='42'" "$RUNNER_TEMP/v42-package.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='43' versionName='0.4.1'" "$RUNNER_TEMP/v43-package.txt"
+          grep -q "application-label:'Pica Library'" "$RUNNER_TEMP/v43-package.txt"
+          if grep -qi "Pica Library Dev" "$RUNNER_TEMP/v43-package.txt"; then echo 'formal APK has Dev label' >&2; exit 1; fi
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/v43-cert.txt"
+          newcert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/v43-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$newcert" = "$EXPECTED_CERT"
+          test "$newcert" = "$oldcert"
+
+          mkdir -p publish
+          cp "$apk" publish/Pica-Library-Android-v43.apk
+          sha=$(sha256sum publish/Pica-Library-Android-v43.apk | awk '{print $1}')
+          printf '%s\n' "$newcert" > publish/CERTIFICATE_SHA256.txt
+          printf '%s  %s\n' "$sha" 'Pica-Library-Android-v43.apk' > publish/SHA256SUMS-Android.txt
+          python - "$sha" "$newcert" "$GITHUB_SHA" <<'PY'
+          import json,sys
+          sha,cert,source=sys.argv[1:]
+          out={
+            'release':'v0.4.1-candidate',
+            'versionCode':43,
+            'versionName':'0.4.1',
+            'sourceSha':source,
+            'apkSha256':sha,
+            'signerCertificateSha256':cert,
+            'upgradeFromVersionCode':42,
+            'upgradeValidation':['same-package-id','strictly-higher-version-code','same-signing-certificate','formal-label','unit-tests','lint','R8-release-build'],
+          }
+          with open('publish/BUILD_TRANSPARENCY-Android.json','w',encoding='utf-8') as f:
+              json.dump(out,f,ensure_ascii=False,indent=2)
+          PY
+          unset ANDROID_PREVIEW_KEYSTORE_PASSWORD
+          echo 'ANDROID_V42_TO_V43_IDENTITY=PASS'
+          echo 'FORMAL_ANDROID_CLEANLINESS=PASS'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-v0.4.1-Android-v43-candidate
+          path: mobile/android-alpha2/publish/
+          retention-days: 1
+          if-no-files-found: error

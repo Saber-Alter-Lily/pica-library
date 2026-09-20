@@ -7,12 +7,14 @@ const CREATOR_MAX_TOTAL_BYTES = 5 * 1024 * 1024
 const THEME_MAX_BYTES = 24 * 1024 * 1024
 const referenceFiles = []
 const progressHeads = new WeakMap()
-const viewScroll = new Map()
 let desktopStatus = null
 let activeDescriptor = null
 let progressTimer = null
 let recommendationTimer = null
-let lastActiveView = $('.view.active')?.id || 'home'
+let recommendationCompletionTimer = null
+let recommendationWatchBaselineCycleId = null
+let recommendationWatchStartedAt = 0
+let decorationQueued = false
 
 function escapeHtml(value) {
     return String(value ?? '').replace(
@@ -203,16 +205,15 @@ function acceptReferences(files) {
 }
 
 function studioMarkup() {
-    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div>
-<p>只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。</p>
+    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><div class="help-heading"><h3>个性化装扮</h3><button type="button" class="info-tip" aria-label="查看个性化装扮说明" data-info-tip="只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。">!</button></div></div><span class="a83-state a83-good">已解锁</span></div>
 <div class="a85-steps"><span class="a85-step">1 · 描述与参考图</span><span class="a85-step">2 · 导出 ZIP 给 AI</span><span class="a85-step">3 · 导入 AI 返回包</span><span class="a85-step">4 · 自动同步手机</span></div>
 <div class="a85-workflow">
-<section class="a85-box"><h4>制作装扮 · Theme Creator Kit</h4><p class="status">主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。</p>
+<section class="a85-box"><div class="help-heading"><h4>制作装扮 · Theme Creator Kit</h4><button type="button" class="info-tip" aria-label="查看 Theme Creator Kit 说明" data-info-tip="主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。">!</button></div>
 <textarea id="a85-description" maxlength="4000" placeholder="例如：紫发二次元漫画向导，星空与白猫，薰衣草紫为主色，整体轻盈、可爱，但不要遮抢漫画封面。"></textarea>
 <label class="a85-upload" id="a85-reference-drop"><strong>上传角色 / 风格参考图</strong><br><span>PNG / JPEG / WebP · 最多 4 张</span><input id="a85-reference-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
 <div id="a85-reference-grid" class="a85-reference-grid"></div><p id="a85-reference-message" class="status"></p>
 <div class="a83-row"><button id="a85-export" type="button" class="primary">导出给 AI</button><a class="button-link" href="./theme-pack-creator-prompt.txt" download>查看固定提示词</a><a class="button-link" href="./theme-pack-spec-v1.txt" download>查看装扮规范</a></div><p id="a85-export-message" class="status"></p></section>
-<section class="a85-box"><h4>导入并应用</h4><p class="status">把 AI 返回的 <code>.pica-theme</code> 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。</p>
+<section class="a85-box"><div class="help-heading"><h4>导入并应用</h4><button type="button" class="info-tip" aria-label="查看装扮导入说明" data-info-tip="把 AI 返回的 .pica-theme 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。">!</button></div>
 <label class="a85-theme-drop" id="a85-theme-drop"><strong>拖入 AI 返回的装扮包</strong><br><span>或点击选择文件 · 上限 24 MiB</span><input id="a85-theme-input" type="file" accept=".pica-theme,.zip,application/zip" hidden></label>
 <p id="a85-import-message" class="status"></p><div id="a85-theme-list"></div><div class="a85-mobile-note" id="a85-mobile-note">手机与电脑在同一局域网重新配对/同步一次后，会自动取得 Desktop 的已安装装扮，并跟随当前启用的装扮。</div></section>
 </div>`
@@ -592,8 +593,10 @@ const buildPhaseLabels = {
     profile: '分析收藏与兴趣画像',
     intents: '规划推荐方向',
     routes: '准备多路召回',
-    retrieve: '从 Pica 召回候选漫画',
-    rank: '排序与去重候选',
+    providers: '检查 Pica / E-H / ExH 可用性',
+    retrieve: '跨来源召回候选漫画',
+    rank: '排序、去重与偏好调节',
+    visual: '应用画风信号与最终重排',
     complete: '正在保存推荐结果'
 }
 
@@ -602,10 +605,16 @@ function startRecommendationWatch() {
     updateRecommendationArtwork()
     const card = $('#a85-recommend-progress')
     if (!card) return
+    if (recommendationCompletionTimer) {
+        clearTimeout(recommendationCompletionTimer)
+        recommendationCompletionTimer = null
+    }
+    recommendationWatchBaselineCycleId = null
+    recommendationWatchStartedAt = Date.now()
     card.classList.add('active')
     $('#a85-recommend-phase').textContent = '正在启动推荐生成…'
     $('#a85-recommend-detail').textContent =
-        '进度会直接显示在这里，完成后自动收起。'
+        '下方暂时保留上一轮推荐；新一轮完成后会自动切换。'
     $('#a85-recommend-line').classList.add('indeterminate')
     $('#a85-recommend-line').querySelector('span').style.width = ''
     if (recommendationTimer) clearInterval(recommendationTimer)
@@ -615,40 +624,111 @@ function startRecommendationWatch() {
 
 async function pollRecommendationProgress() {
     const card = $('#a85-recommend-progress')
-    if (!card) return
+    if (!card) return false
     try {
         const current = await api(
             '/api/v1/recommendation-sessions/status?mode=final'
         )
         const progress = current.buildProgress || {}
+        if (
+            recommendationWatchBaselineCycleId === null &&
+            current.activeCycleId
+        )
+            recommendationWatchBaselineCycleId = current.activeCycleId
         if (current.buildingCycleId) {
             card.classList.add('active')
             $('#a85-recommend-phase').textContent =
                 buildPhaseLabels[progress.phase] || '正在生成推荐…'
-            const done = Number(progress.done || 0),
-                total = Number(progress.total || 0)
+            const done = Number(progress.done || 0)
+            const total = Number(progress.total || 0)
+            const elapsed = recommendationWatchStartedAt
+                ? Math.max(
+                      0,
+                      Math.round(
+                          (Date.now() - recommendationWatchStartedAt) / 1000
+                      )
+                  )
+                : 0
             if (total > 0) {
                 const percent = Math.max(
                     0,
                     Math.min(100, Math.round((done * 100) / total))
                 )
                 $('#a85-recommend-detail').textContent =
-                    `${done} / ${total} · ${percent}%`
+                    '下方仍显示上一轮结果，完成后自动切换 · ' +
+                    done +
+                    ' / ' +
+                    total +
+                    ' · ' +
+                    percent +
+                    '% · 已用时 ' +
+                    elapsed +
+                    's'
                 $('#a85-recommend-line').classList.remove('indeterminate')
                 $('#a85-recommend-line').querySelector('span').style.width =
-                    `${percent}%`
+                    percent + '%'
             } else {
-                $('#a85-recommend-detail').textContent = '正在处理…'
+                $('#a85-recommend-detail').textContent =
+                    '后台仍在处理；下方不是新结果 · 已用时 ' +
+                    elapsed +
+                    's'
                 $('#a85-recommend-line').classList.add('indeterminate')
             }
             decorateProgress()
             return true
         }
-        card.classList.remove('active')
+
+        const watched =
+            Boolean(recommendationTimer) || recommendationWatchStartedAt > 0
         if (recommendationTimer) clearInterval(recommendationTimer)
         recommendationTimer = null
+        if (!watched) {
+            card.classList.remove('active')
+            return false
+        }
+        const elapsedMs = recommendationWatchStartedAt
+            ? Date.now() - recommendationWatchStartedAt
+            : 0
+        const changed = Boolean(
+            current.activeCycleId &&
+                (!recommendationWatchBaselineCycleId ||
+                    current.activeCycleId !==
+                        recommendationWatchBaselineCycleId)
+        )
+        if (!changed && elapsedMs < 1200) {
+            card.classList.remove('active')
+            recommendationWatchStartedAt = 0
+            return false
+        }
+        card.classList.add('active')
+        $('#a85-recommend-line').classList.remove('indeterminate')
+        $('#a85-recommend-line').querySelector('span').style.width = '100%'
+        if (changed) {
+            $('#a85-recommend-phase').textContent = '新一轮推荐已更新'
+            const shortCycle = String(current.activeCycleId || '').slice(0, 8)
+            $('#a85-recommend-detail').textContent =
+                '已切换到新结果' +
+                (shortCycle ? ' · cycle ' + shortCycle : '') +
+                ' · ' +
+                new Date().toLocaleTimeString()
+        } else {
+            $('#a85-recommend-phase').textContent =
+                '推荐生成已结束，但当前结果未切换'
+            $('#a85-recommend-detail').textContent =
+                '下方仍是上一轮结果；请查看页面错误提示后重试。'
+        }
+        decorateProgress()
+        recommendationCompletionTimer = window.setTimeout(() => {
+            card.classList.remove('active')
+            recommendationCompletionTimer = null
+        }, 4800)
+        recommendationWatchStartedAt = 0
         return false
-    } catch {
+    } catch (error) {
+        $('#a85-recommend-phase').textContent = '正在等待推荐服务响应'
+        $('#a85-recommend-detail').textContent =
+            '暂时无法读取实时进度：' +
+            String(error?.message || error)
         return false
     }
 }
@@ -769,6 +849,22 @@ function renderEmptyArt() {
     })
 }
 
+function scheduleThemeDecoration() {
+    if (
+        decorationQueued ||
+        !activeDescriptor ||
+        document.visibilityState === 'hidden'
+    )
+        return
+    decorationQueued = true
+    requestAnimationFrame(() => {
+        decorationQueued = false
+        if (!activeDescriptor || document.visibilityState === 'hidden') return
+        decorateProgress()
+        renderEmptyArt()
+    })
+}
+
 function setupRuntimeObservers() {
     ensureRecommendationProgress()
     $('#recommend-button')?.addEventListener(
@@ -781,39 +877,60 @@ function setupRuntimeObservers() {
         startRecommendationWatch,
         true
     )
-    window.addEventListener(
-        'scroll',
-        () => viewScroll.set(lastActiveView, window.scrollY),
-        { passive: true }
-    )
-    const viewObserver = new MutationObserver(() => {
-        const active = $('.view.active')?.id
-        if (!active || active === lastActiveView) return
-        lastActiveView = active
-        const restore = viewScroll.get(active) || 0
-        requestAnimationFrame(() =>
-            window.scrollTo({ top: restore, left: 0, behavior: 'auto' })
-        )
-    })
-    $$('.view').forEach((view) =>
-        viewObserver.observe(view, {
-            attributes: true,
-            attributeFilter: ['class']
-        })
-    )
+
+    // Main app.js owns view navigation and scroll restoration. Theme support
+    // must never maintain a competing scroll-position system.
     const themeObserver = new MutationObserver(() => {
-        if (activeDescriptor) applyDescriptor(activeDescriptor)
+        if (activeDescriptor) {
+            applyDescriptor(activeDescriptor)
+            scheduleThemeDecoration()
+        }
     })
     themeObserver.observe(document.documentElement, {
         attributes: true,
         attributeFilter: ['data-pica-theme']
     })
-    progressTimer = setInterval(() => {
-        if (activeDescriptor) {
-            decorateProgress()
-            renderEmptyArt()
-        }
-    }, 650)
+
+    const decorationObserver = new MutationObserver((mutations) => {
+        const relevant = mutations.some((mutation) => {
+            const target =
+                mutation.target instanceof Element
+                    ? mutation.target
+                    : mutation.target.parentElement
+            return (
+                !target?.closest?.('.a85-progress-head') &&
+                !target?.classList?.contains('a85-empty-art')
+            )
+        })
+        if (relevant) scheduleThemeDecoration()
+    })
+    for (const selector of [
+        '#recommend',
+        '#downloads',
+        '#library',
+        '#downloaded'
+    ]) {
+        const root = $(selector)
+        if (!root) continue
+        decorationObserver.observe(root, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'hidden', 'style', 'value']
+        })
+    }
+    window.addEventListener('resize', scheduleThemeDecoration, {
+        passive: true
+    })
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible')
+            scheduleThemeDecoration()
+    })
+
+    // Low-frequency fallback only. Normal updates are driven by the observer
+    // above, so themed pages no longer rescan the DOM every 650 ms.
+    progressTimer = setInterval(scheduleThemeDecoration, 2500)
+    scheduleThemeDecoration()
 }
 
 async function bootstrap() {

@@ -17,8 +17,9 @@ describe('Android side-by-side Dev package contract', () => {
     expect(manifest).toContain('android:authorities="${applicationId}.files"')
     expect(app).toContain('ApplicationInfo.FLAG_DEBUGGABLE')
     expect(app).toContain('if(!debuggable)UpdateCheckJobs.schedule(this);')
-    expect(gate).toContain('DEV_PACKAGE="com.picalibrary.android.dev"')
-    expect(gate).toContain('ApplicationInfo.FLAG_DEBUGGABLE')
+    expect(gate).not.toContain('com.picalibrary.android.dev')
+    expect(gate).not.toContain('ApplicationInfo.FLAG_DEBUGGABLE')
+    expect(gate).toContain('CERT_SHA256')
   })
 
   it('builds a no-secret short-lived Dev artifact without publication', () => {

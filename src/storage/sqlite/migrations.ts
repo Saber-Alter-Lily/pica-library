@@ -478,7 +478,191 @@ export const migrations: Migration[] = [
                    '{}', first_seen_at, last_seen_at
             FROM comics;
         `
+    },
+    {
+        version: 10,
+        name: 'recommendation_v4_visual_style',
+        up: `
+            CREATE TABLE IF NOT EXISTS visual_embeddings (
+                comic_id TEXT NOT NULL REFERENCES comics(id) ON DELETE CASCADE,
+                model_id TEXT NOT NULL,
+                model_version TEXT NOT NULL,
+                sampling_policy_version TEXT NOT NULL,
+                embedding_kind TEXT NOT NULL CHECK (embedding_kind IN ('body','cover')),
+                vector_json TEXT NOT NULL,
+                dimension INTEGER NOT NULL,
+                source_kind TEXT NOT NULL CHECK (source_kind IN ('LOCAL_PAGES','REMOTE_PAGES','COVER_ONLY')),
+                sample_count INTEGER NOT NULL DEFAULT 1,
+                confidence REAL NOT NULL DEFAULT 0,
+                generated_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY (comic_id, model_id, model_version, sampling_policy_version, embedding_kind)
+            );
+            CREATE INDEX IF NOT EXISTS idx_visual_embeddings_model
+                ON visual_embeddings(model_id, model_version, embedding_kind, generated_at);
+            CREATE INDEX IF NOT EXISTS idx_visual_embeddings_comic
+                ON visual_embeddings(comic_id, embedding_kind);
+        `
+    },
+    {
+        version: 11,
+        name: 'download_queue_scale_indexes',
+        up: `
+            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_runner_priority_created
+                ON download_jobs(status, runner, priority DESC, created_at);
+            CREATE INDEX IF NOT EXISTS idx_download_jobs_status_created
+                ON download_jobs(status, created_at DESC);
+        `
     }
+    ,
+    {
+        version: 12,
+        name: 'canonical_work_identity_foundation',
+        up: `
+            CREATE TABLE IF NOT EXISTS canonical_series (
+                id TEXT PRIMARY KEY,
+                preferred_title TEXT NOT NULL DEFAULT '',
+                normalized_title TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'CANDIDATE'
+                    CHECK (status IN ('CANDIDATE','CONFIRMED','REJECTED')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS canonical_works (
+                id TEXT PRIMARY KEY,
+                series_id TEXT REFERENCES canonical_series(id)
+                    ON DELETE SET NULL,
+                preferred_title TEXT NOT NULL,
+                normalized_title TEXT NOT NULL,
+                canonical_author_key TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'CANDIDATE'
+                    CHECK (status IN ('CANDIDATE','CONFIRMED','REJECTED')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_canonical_works_identity
+                ON canonical_works(normalized_title, canonical_author_key);
+
+            CREATE TABLE IF NOT EXISTS work_editions (
+                id TEXT PRIMARY KEY,
+                work_id TEXT NOT NULL REFERENCES canonical_works(id)
+                    ON DELETE CASCADE,
+                language TEXT,
+                edition_kind TEXT NOT NULL DEFAULT 'UNKNOWN',
+                label TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_work_editions_work
+                ON work_editions(work_id, language, edition_kind);
+
+            CREATE TABLE IF NOT EXISTS work_upload_bindings (
+                comic_id TEXT PRIMARY KEY REFERENCES comics(id)
+                    ON DELETE CASCADE,
+                work_id TEXT NOT NULL REFERENCES canonical_works(id)
+                    ON DELETE CASCADE,
+                edition_id TEXT REFERENCES work_editions(id)
+                    ON DELETE SET NULL,
+                binding_status TEXT NOT NULL
+                    CHECK (
+                        binding_status IN (
+                            'AUTO_HIGH_CONFIDENCE',
+                            'MANUAL_CONFIRMED',
+                            'REVIEW_REQUIRED'
+                        )
+                    ),
+                confidence REAL NOT NULL DEFAULT 0,
+                resolver_version TEXT NOT NULL,
+                evidence_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_work_upload_bindings_work
+                ON work_upload_bindings(work_id, binding_status);
+
+            CREATE TABLE IF NOT EXISTS work_identity_evidence (
+                id TEXT PRIMARY KEY,
+                left_comic_id TEXT NOT NULL REFERENCES comics(id)
+                    ON DELETE CASCADE,
+                right_comic_id TEXT NOT NULL REFERENCES comics(id)
+                    ON DELETE CASCADE,
+                relation TEXT NOT NULL
+                    CHECK (
+                        relation IN (
+                            'PROBABLE_SAME_WORK',
+                            'EDITION_VARIANT',
+                            'RELATED_WORK',
+                            'DISTINCT'
+                        )
+                    ),
+                confidence REAL NOT NULL DEFAULT 0,
+                resolver_version TEXT NOT NULL,
+                evidence_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                UNIQUE(left_comic_id, right_comic_id, resolver_version)
+            );
+            CREATE INDEX IF NOT EXISTS idx_work_identity_evidence_pair
+                ON work_identity_evidence(left_comic_id, right_comic_id);
+            CREATE INDEX IF NOT EXISTS idx_work_identity_evidence_relation
+                ON work_identity_evidence(relation, confidence DESC);
+
+            CREATE TABLE IF NOT EXISTS work_identity_decisions (
+                id TEXT PRIMARY KEY,
+                left_comic_id TEXT NOT NULL REFERENCES comics(id)
+                    ON DELETE CASCADE,
+                right_comic_id TEXT NOT NULL REFERENCES comics(id)
+                    ON DELETE CASCADE,
+                decision TEXT NOT NULL
+                    CHECK (
+                        decision IN (
+                            'SAME_WORK',
+                            'EDITION_VARIANT',
+                            'KEEP_SEPARATE'
+                        )
+                    ),
+                source TEXT NOT NULL DEFAULT 'USER',
+                note TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(left_comic_id, right_comic_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_work_identity_decisions_pair
+                ON work_identity_decisions(left_comic_id, right_comic_id);
+        `
+    },
+    {
+        version: 13,
+        name: 'work_identity_materialization_audit',
+        up: `
+            CREATE TABLE IF NOT EXISTS work_identity_materialization_runs (
+                id TEXT PRIMARY KEY,
+                request_key TEXT NOT NULL UNIQUE,
+                plan_version TEXT NOT NULL,
+                plan_digest TEXT NOT NULL,
+                status TEXT NOT NULL
+                    CHECK (
+                        status IN (
+                            'PREPARED',
+                            'APPLIED',
+                            'ROLLED_BACK',
+                            'FAILED'
+                        )
+                    ),
+                plan_json TEXT NOT NULL,
+                before_state_json TEXT NOT NULL DEFAULT '{}',
+                after_state_json TEXT NOT NULL DEFAULT '{}',
+                error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_work_identity_materialization_status
+                ON work_identity_materialization_runs(status, updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_work_identity_materialization_digest
+                ON work_identity_materialization_runs(plan_digest);
+        `
+    }
+
 ]
 
 export const latestMigrationVersion = Math.max(

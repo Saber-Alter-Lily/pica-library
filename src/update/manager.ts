@@ -10,7 +10,12 @@ import {
 } from '../app-capabilities'
 import { sanitizedChildEnv } from '../desktop/child-process'
 import { applicationFetch } from './application-fetch'
+import { classifyUpdateCompatibility } from './compatibility'
 import { normalizeUpdatePath, updaterSelfReplacement } from './path-safety'
+import {
+    selectReleaseUpdateAsset,
+    updateAssetNamesForChecksums
+} from './release-assets'
 import type {
     StagedUpdate,
     UpdateManifest,
@@ -168,14 +173,6 @@ export interface UpdateManagerOptions {
     fetchImplementation?: typeof fetch
 }
 
-function compatibilityRequiresFullInstall(manifest: UpdateManifest) {
-    return (
-        manifest.appApiVersion !== APP_API_VERSION ||
-        manifest.databaseSchemaVersion < DATABASE_SCHEMA_VERSION ||
-        manifest.databaseSchemaVersion > DATABASE_SCHEMA_VERSION + 1
-    )
-}
-
 export class UpdateManager {
     private staged: StagedUpdate | null = null
     readonly progressFile: string
@@ -326,14 +323,16 @@ export class UpdateManager {
                 if (!release.draft && !release.prerelease) {
                     const releaseUrl = release.html_url ??
                         `https://github.com/${officialRepository}/releases/tag/${encodeURIComponent(tag)}`
-                    const updateAsset = release.assets?.find((item) =>
-                        /^Pica-Library-v\d+\.\d+\.\d+-update\.zip$/.test(String(item.name ?? ''))
+                    const updateAsset = selectReleaseUpdateAsset(
+                        release.assets,
+                        version,
+                        this.options.currentVersion
                     )
                     return this.availableFromRelease(
                         version,
                         releaseUrl,
                         updateAsset?.name,
-                        updateAsset?.browser_download_url
+                        updateAsset?.url
                     )
                 }
             }
@@ -354,14 +353,17 @@ export class UpdateManager {
             const match = finalUrl.match(/\/releases\/download\/v(\d+\.\d+\.\d+)\/SHA256SUMS\.txt(?:\?|$)/)
             if (!match) throw new Error('could not resolve latest version from checksum redirect')
             const version = match[1]
-            const assetName = `Pica-Library-v${version}-update.zip`
-            const checksum = this.shaFromSums(await sumsResponse.text(), assetName)
+            const sums = await sumsResponse.text()
+            const assetName = updateAssetNamesForChecksums(
+                version,
+                this.options.currentVersion
+            ).find((name) => this.shaFromSums(sums, name))
             const releaseUrl = `https://github.com/${officialRepository}/releases/tag/v${version}`
             return this.availableFromRelease(
                 version,
                 releaseUrl,
-                checksum ? assetName : undefined,
-                checksum
+                assetName,
+                assetName
                     ? `https://github.com/${officialRepository}/releases/download/v${version}/${assetName}`
                     : undefined
             )
@@ -379,12 +381,28 @@ export class UpdateManager {
             const archiveHash = sha256(buffer)
         const zip = new AdmZip(buffer)
         const manifest = readManifest(zip)
+        const compatibility = classifyUpdateCompatibility({
+            currentAppApiVersion: APP_API_VERSION,
+            currentDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION,
+            targetAppApiVersion: manifest.appApiVersion,
+            targetDatabaseSchemaVersion: manifest.databaseSchemaVersion,
+            updaterHelperChanged: updaterSelfReplacement([
+                ...manifest.files.map((item) => String(item.path ?? '')),
+                ...manifest.deletions
+            ])
+        })
+        if (compatibility.kind === 'UNSUPPORTED')
+            throw new Error(
+                'Database schema downgrade is not supported by automatic updates'
+            )
         if (
-            compatibilityRequiresFullInstall(manifest) &&
+            compatibility.kind === 'FULL_APPLICATION' &&
             !manifest.requiresFullInstall
         )
             throw new Error(
-                'Update API or database compatibility requires a full install'
+                compatibility.reason === 'UPDATER_HELPER_CHANGED'
+                    ? 'Updater replacement requires a full install'
+                    : 'Update compatibility requires a full application install'
             )
         if (
             !exactSourceMatches(
@@ -552,7 +570,7 @@ export class UpdateManager {
 }
 
 export const updateInternals = {
-    compatibilityRequiresFullInstall,
+    classifyUpdateCompatibility,
     exactSourceMatches,
     prerelease,
     stableVersionParts,

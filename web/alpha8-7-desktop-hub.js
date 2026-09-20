@@ -3,9 +3,11 @@ const hub$ = (selector) => document.querySelector(selector)
 const copy = {
     'zh-CN': {
         nav: '设置',
+        sectionsLabel: '设置分区',
         title: '连接与设置',
         subtitle: '',
         general: '基本设置',
+        recommendations: '推荐与画风',
         connections: '连接与同步',
         appearance: '外观与个性化',
         storage: '下载与存储',
@@ -20,9 +22,11 @@ const copy = {
     },
     en: {
         nav: 'Settings',
+        sectionsLabel: 'Settings sections',
         title: 'Connections & Settings',
         subtitle: '',
         general: 'General',
+        recommendations: 'Recommendations & Visual Style',
         connections: 'Connections & Sync',
         appearance: 'Appearance',
         storage: 'Downloads & Storage',
@@ -129,8 +133,15 @@ function wrapDownloadFetch() {
             const source = input instanceof Request ? input.url : String(input)
             const url = new URL(source, location.href)
             const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
-            if (url.origin !== location.origin || url.pathname !== '/api/v1/downloads' || method !== 'GET' || !response.ok)
+            if (url.origin !== location.origin || method !== 'GET' || !response.ok)
                 return response
+            if (url.pathname === '/api/v1/downloads/summary') {
+                const summary = await response.clone().json()
+                lastFinishedCount = Number(summary?.finished || 0)
+                queueMicrotask(updateFinishedControl)
+                return response
+            }
+            if (url.pathname !== '/api/v1/downloads') return response
             const jobs = await response.clone().json()
             if (!Array.isArray(jobs)) return response
             lastFinishedCount = jobs.filter((job) => terminalForTaskPage(String(job?.status || ''))).length
@@ -177,6 +188,7 @@ function installDownloadHistoryControl() {
 
 const panelDefinitions = [
     ['general', 'general'],
+    ['recommendations', 'recommendations'],
     ['connections', 'connections'],
     ['appearance', 'appearance'],
     ['storage', 'storage'],
@@ -188,19 +200,34 @@ function createPanel(id) {
     const panel = document.createElement('div')
     panel.id = `a87-${id}-panel`
     panel.className = 'a87-hub-panel'
+    panel.setAttribute('role', 'tabpanel')
+    panel.setAttribute('aria-labelledby', `a87-${id}-tab`)
+    panel.tabIndex = 0
     return panel
 }
 
-function activateHubPanel(id) {
-    document.querySelectorAll('.a87-hub-panel').forEach((panel) =>
-        panel.classList.toggle('active', panel.id === `a87-${id}-panel`)
-    )
-    document.querySelectorAll('.a87-hub-nav button').forEach((button) =>
-        button.classList.toggle('active', button.dataset.hubPanel === id)
-    )
+function activateHubPanel(id, focus = false) {
+    document.querySelectorAll('.a87-hub-panel').forEach((panel) => {
+        const active = panel.id === `a87-${id}-panel`
+        panel.classList.toggle('active', active)
+        panel.hidden = !active
+    })
+    document.querySelectorAll('.a87-hub-nav button').forEach((button) => {
+        const active = button.dataset.hubPanel === id
+        button.classList.toggle('active', active)
+        button.setAttribute('aria-selected', String(active))
+        button.tabIndex = active ? 0 : -1
+        if (active && focus) button.focus()
+    })
     localStorage.setItem('pica-settings-section', id)
     if (id === 'storage') void refreshPreviewStats()
     movePersonalization()
+}
+
+function openSettingsHubPanel(id) {
+    const navButton = hub$('nav button[data-view="maintenance"]')
+    navButton?.click()
+    activateHubPanel(id)
 }
 
 function movePersonalization() {
@@ -269,7 +296,25 @@ function buildSettingsHub() {
     layout.className = 'a87-hub-layout'
     const nav = document.createElement('aside')
     nav.className = 'a87-hub-nav'
-    nav.setAttribute('aria-label', 'Settings sections')
+    nav.setAttribute('role', 'tablist')
+    nav.setAttribute('aria-orientation', 'vertical')
+    nav.setAttribute('aria-label', text().sectionsLabel)
+    nav.addEventListener('keydown', (event) => {
+        if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key))
+            return
+        const buttons = [...nav.querySelectorAll('[role="tab"]')]
+        if (!buttons.length) return
+        const current = Math.max(0, buttons.indexOf(document.activeElement))
+        let next = current
+        if (event.key === 'Home') next = 0
+        else if (event.key === 'End') next = buttons.length - 1
+        else if (event.key === 'ArrowDown' || event.key === 'ArrowRight')
+            next = (current + 1) % buttons.length
+        else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft')
+            next = (current - 1 + buttons.length) % buttons.length
+        event.preventDefault()
+        activateHubPanel(buttons[next].dataset.hubPanel, true)
+    })
     const content = document.createElement('div')
     content.className = 'a87-hub-content'
 
@@ -277,7 +322,12 @@ function buildSettingsHub() {
     for (const [id] of panelDefinitions) {
         const button = document.createElement('button')
         button.type = 'button'
+        button.id = `a87-${id}-tab`
         button.dataset.hubPanel = id
+        button.setAttribute('role', 'tab')
+        button.setAttribute('aria-controls', `a87-${id}-panel`)
+        button.setAttribute('aria-selected', 'false')
+        button.tabIndex = -1
         button.addEventListener('click', () => activateHubPanel(id))
         nav.appendChild(button)
         const panel = createPanel(id)
@@ -290,6 +340,15 @@ function buildSettingsHub() {
     settingsHeading?.remove()
     const settingsForm = hub$('#settings-form')
     if (settingsForm) panels.get('general').appendChild(settingsForm)
+
+    const ehAccount = hub$('#settings-eh-account')
+    if (ehAccount) {
+        ehAccount.open = true
+        panels.get('general').appendChild(ehAccount)
+    }
+
+    const recommendationV4 = hub$('#settings-recommendation-v4')
+    if (recommendationV4) panels.get('recommendations').appendChild(recommendationV4)
 
     for (const id of ['settings-mobile-bridge', 'settings-remote-storage', 'settings-browser-lite']) {
         const node = hub$(`#${id}`)
@@ -335,6 +394,8 @@ function refreshHubLabels() {
     const value = text()
     const maintenanceNav = hub$('nav button[data-view="maintenance"]')
     if (maintenanceNav) maintenanceNav.textContent = value.nav
+    const hubNav = hub$('.a87-hub-nav')
+    if (hubNav) hubNav.setAttribute('aria-label', value.sectionsLabel)
     const title = hub$('#a87-settings-title')
     const subtitle = hub$('#a87-settings-subtitle')
     if (title) title.textContent = value.title
@@ -353,11 +414,18 @@ function refreshHubLabels() {
 }
 
 function installObservers() {
-    const observer = new MutationObserver(() => {
-        movePersonalization()
-        const settingsNav = hub$('#settings-nav')
-        if (settingsNav) settingsNav.style.display = 'none'
-    })
+    let queued = false
+    const schedule = () => {
+        if (queued) return
+        queued = true
+        requestAnimationFrame(() => {
+            queued = false
+            movePersonalization()
+            const settingsNav = hub$('#settings-nav')
+            if (settingsNav) settingsNav.style.display = 'none'
+        })
+    }
+    const observer = new MutationObserver(schedule)
     observer.observe(document.body, { childList: true, subtree: true })
 }
 
@@ -367,6 +435,8 @@ function bootstrap() {
     buildSettingsHub()
     installDownloadHistoryControl()
     installObservers()
+    hub$('#setup-open-eh')?.addEventListener('click', () => setTimeout(() => { openSettingsHubPanel('general'); const panel = hub$('#settings-eh-account'); if (panel) { panel.open = true; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }) } }, 0))
+    hub$('#setup-open-settings')?.addEventListener('click', () => setTimeout(() => openSettingsHubPanel('general'), 0))
     hub$('#language-select')?.addEventListener('change', () => setTimeout(refreshHubLabels, 0))
     setTimeout(() => {
         buildSettingsHub()

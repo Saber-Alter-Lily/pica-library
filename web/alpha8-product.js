@@ -1,9 +1,20 @@
 const $ = (selector) => document.querySelector(selector)
 const THEME_KEY = 'pica-library-web-theme-v1'
 let desktopStatus = null
-let updateTimer = null
-let lastUpdateProgress = ''
-let lastUpdateChangeAt = 0
+
+function productLanguage() {
+    return $('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
+}
+function productText(zh, en) {
+    return productLanguage() === 'en' ? en : zh
+}
+function themeLabel(mode) {
+    return {
+        system: productText('跟随系统', 'System'),
+        light: productText('浅色', 'Light'),
+        dark: productText('深色', 'Dark')
+    }[mode] || mode
+}
 
 function injectStyles() {
     const style = document.createElement('style')
@@ -29,7 +40,8 @@ function applyTheme(mode = storedTheme()) {
     document.documentElement.dataset.picaTheme = dark ? 'dark' : 'light'
     document.querySelectorAll('.a83-theme-button').forEach((button) => {
         button.classList.toggle('active', button.dataset.theme === mode)
-        button.textContent = `${button.dataset.theme === mode ? '✓ ' : ''}${button.dataset.label}`
+        button.textContent =
+            `${button.dataset.theme === mode ? '✓ ' : ''}${themeLabel(button.dataset.theme)}`
     })
 }
 
@@ -81,11 +93,13 @@ function appearancePanel() {
     const panel = document.createElement('article')
     panel.id = 'a83-appearance'
     panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3>外观</h3><div class="a83-row"></div>`
+    panel.innerHTML = `<h3 data-a83-product-copy="appearance">${productText('外观', 'Appearance')}</h3><div class="a83-row"></div>`
     const row = panel.querySelector('.a83-row')
-    for (const [mode, label] of [['system','跟随系统'],['light','浅色'],['dark','深色']]) {
+    for (const mode of ['system','light','dark']) {
         const button = document.createElement('button')
-        button.type = 'button'; button.className = 'a83-theme-button'; button.dataset.theme = mode; button.dataset.label = label
+        button.type = 'button'
+        button.className = 'a83-theme-button'
+        button.dataset.theme = mode
         button.onclick = () => applyTheme(mode)
         row.appendChild(button)
     }
@@ -99,7 +113,7 @@ function supportPanel() {
     if (!settings || $('#a83-support')) return
     const panel = document.createElement('article')
     panel.id = 'a83-support'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3>支持项目</h3><p>感谢你使用 Pica Library。</p><div class="a83-row"><button type="button" id="a83-star">⭐ GitHub 项目主页</button></div>`
+    panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project')}</h3><p data-a83-product-copy="support-text">${productText('感谢你使用 Pica Library。', 'Thanks for using Pica Library.')}</p><div class="a83-row"><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page')}</button></div>`
     panel.querySelector('#a83-star').onclick = () => window.open('https://github.com/Saber-Alter-Lily/pica-library', '_blank', 'noopener')
     settings.appendChild(panel)
 }
@@ -150,41 +164,26 @@ async function personalizationPanel() {
     drop.addEventListener('drop',(event)=>install(event.dataTransfer?.files?.[0]))
 }
 
-function updateEnhancement() {
-    const panel = $('#settings-update')
-    if (!panel || $('#a83-update-detail')) return
-    const detail = document.createElement('div')
-    detail.id = 'a83-update-detail'; detail.className = 'a83-update-detail'; detail.textContent = '可在网页内完成检查、下载校验、应用和重启。'
-    $('#update-message')?.insertAdjacentElement('afterend', detail)
-    const retry = document.createElement('button')
-    retry.type = 'button'; retry.textContent = '重新检查'; retry.id = 'a83-update-retry'
-    retry.onclick = () => $('#update-check')?.click()
-    panel.querySelector('.actions')?.appendChild(retry)
-    const start = () => {
-        if (updateTimer) clearInterval(updateTimer)
-        lastUpdateProgress = ''; lastUpdateChangeAt = Date.now()
-        updateTimer = setInterval(pollUpdate, 650)
-        pollUpdate()
-    }
-    $('#update-one-click')?.addEventListener('click', start)
-    $('#update-apply')?.addEventListener('click', start)
-    async function pollUpdate() {
-        try {
-            const progress = await api('/api/v1/update/progress')
-            const signature = JSON.stringify(progress)
-            if (signature !== lastUpdateProgress) { lastUpdateProgress = signature; lastUpdateChangeAt = Date.now() }
-            const phase = String(progress.phase || 'idle')
-            const current = Number(progress.current || 0), total = Number(progress.total || 0)
-            const suffix = total > 0 ? ` · ${current}/${total} · ${Math.round(current/total*100)}%` : ''
-            detail.textContent = `更新状态：${phase}${suffix}`
-            detail.className = `a83-update-detail ${phase === 'failed' ? 'a83-bad' : phase === 'ready' || phase === 'complete' ? 'a83-good' : ''}`
-            const active = ['validating','extracting','applying','downloading'].includes(phase)
-            if (!active && updateTimer) { clearInterval(updateTimer); updateTimer = null }
-            if (active && Date.now() - lastUpdateChangeAt > 120000) detail.textContent += ' · 状态长时间未变化，可重新检查；程序不会覆盖用户数据。'
-        } catch (error) {
-            detail.textContent = `更新状态暂不可读：${error.message}`
-        }
-    }
+function refreshProductCopy() {
+    const appearance = $('[data-a83-product-copy="appearance"]')
+    if (appearance)
+        appearance.textContent = productText('外观', 'Appearance')
+    const supportTitle = $('[data-a83-product-copy="support-title"]')
+    if (supportTitle)
+        supportTitle.textContent = productText('支持项目', 'Support the project')
+    const supportText = $('[data-a83-product-copy="support-text"]')
+    if (supportText)
+        supportText.textContent = productText(
+            '感谢你使用 Pica Library。',
+            'Thanks for using Pica Library.'
+        )
+    const star = $('#a83-star')
+    if (star)
+        star.textContent = productText(
+            '⭐ GitHub 项目主页',
+            '⭐ GitHub project page'
+        )
+    applyTheme(storedTheme())
 }
 
 function removeSourceEntryPoints() {
@@ -195,10 +194,33 @@ function removeSourceEntryPoints() {
 }
 
 async function init() {
-    injectStyles(); applyTheme(); appearancePanel(); supportPanel(); updateEnhancement(); removeSourceEntryPoints(); await personalizationPanel()
-    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (storedTheme() === 'system') applyTheme('system') })
-    const observer = new MutationObserver(removeSourceEntryPoints)
-    observer.observe(document.body, { childList:true, subtree:true })
+    injectStyles()
+    applyTheme()
+    appearancePanel()
+    supportPanel()
+    // Software-update progress is owned exclusively by alpha8-update-ui.js.
+    // Keeping a second poller here caused duplicate status UI and network work.
+    removeSourceEntryPoints()
+    await personalizationPanel()
+    refreshProductCopy()
+    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.(
+        'change',
+        () => {
+            if (storedTheme() === 'system') applyTheme('system')
+        }
+    )
+    document.addEventListener('pica-language-change', refreshProductCopy)
+    let cleanupQueued = false
+    const scheduleSourceCleanup = () => {
+        if (cleanupQueued) return
+        cleanupQueued = true
+        requestAnimationFrame(() => {
+            cleanupQueued = false
+            removeSourceEntryPoints()
+        })
+    }
+    const observer = new MutationObserver(scheduleSourceCleanup)
+    observer.observe(document.body, { childList: true, subtree: true })
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init)

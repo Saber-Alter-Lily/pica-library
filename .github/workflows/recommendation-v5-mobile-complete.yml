@@ -1,0 +1,56 @@
+name: Complete Recommendation V5 portable mobile runtime
+
+on:
+  push:
+    branches: [feature/recommendation-v5-portable-policy]
+    paths: [.github/workflows/recommendation-v5-mobile-complete.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-validate-commit:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/recommendation-v5-portable-policy
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Apply portable recommendation runtime patches
+        run: |
+          python scripts/finish-recommendation-v5-mobile.py
+          python scripts/finish-recommendation-v5-mobile-bridge.py
+      - name: Validate TypeScript, Web and unit tests
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm type:check
+          pnpm web:check
+          pnpm test:unit
+      - name: Validate Android compile and unit tests
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      - name: Commit only validated product changes
+        run: |
+          git rm .github/workflows/recommendation-v5-mobile-complete.yml scripts/finish-recommendation-v5-mobile.py scripts/finish-recommendation-v5-mobile-bridge.py
+          git config user.name 'Saber-Alter-Lily'
+          git config user.email '3178088154@qq.com'
+          git add src/recommendation-v3/cycle-coordinator-v3.ts src/mobile/bridge-server.ts mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java mobile/android-alpha2/app/src/main/java/com/picalibrary/android/BridgeClient.java mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java
+          git diff --cached --check
+          git commit -m 'feat: complete portable recommendation runtime'
+          git push origin HEAD:feature/recommendation-v5-portable-policy

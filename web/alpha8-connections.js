@@ -1,11 +1,57 @@
 const $c = (selector) => document.querySelector(selector)
 let connectionCsrf = ''
+let connectionSnapshot = null
+let checkingConnections = false
+
+const COPY = {
+    'zh-CN': {
+        title: '连接状态',
+        config: '配置状态',
+        configured: '已配置',
+        unconfigured: '未配置',
+        notChecked: '尚未检查',
+        disconnected: '未连接',
+        listening: '监听中',
+        stopped: '未启动',
+        available: '可用',
+        reachable: '可连接',
+        unavailable: '当前不可用',
+        checking: '正在检查…',
+        check: '检查连接状态',
+        failed: '状态读取失败',
+        probeHelp: '网络探测只会在你点击检查时运行。'
+    },
+    en: {
+        title: 'Connection status',
+        config: 'Configuration',
+        configured: 'Configured',
+        unconfigured: 'Not configured',
+        notChecked: 'Not checked',
+        disconnected: 'Disconnected',
+        listening: 'Listening',
+        stopped: 'Stopped',
+        available: 'Available',
+        reachable: 'Reachable',
+        unavailable: 'Currently unavailable',
+        checking: 'Checking…',
+        check: 'Check connections',
+        failed: 'Failed to read status',
+        probeHelp: 'Network checks run only when requested.'
+    }
+}
+
+function language() {
+    return $c('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
+}
+function text(key) {
+    return COPY[language()]?.[key] || COPY['zh-CN'][key] || key
+}
 
 async function requestJson(path, init = {}) {
     const response = await fetch(path, { cache: 'no-store', ...init })
-    const text = await response.text()
+    const raw = await response.text()
     let value = null
-    try { value = text ? JSON.parse(text) : null } catch { value = { error: text } }
+    try { value = raw ? JSON.parse(raw) : null } catch { value = { error: raw } }
     if (!response.ok) throw new Error(value?.error || `HTTP ${response.status}`)
     return value
 }
@@ -15,44 +61,133 @@ async function postProbe(body) {
         connectionCsrf = current.csrfToken || ''
     }
     return requestJson('/api/v1/desktop/test-connection', {
-        method:'POST',
-        headers:{'content-type':'application/json','x-pica-csrf':connectionCsrf},
-        body:JSON.stringify(body)
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-pica-csrf': connectionCsrf
+        },
+        body: JSON.stringify(body)
     })
 }
-function pill(text, tone='muted') {
-    return `<span class="a83-state a83-${tone}">${text}</span>`
+function pill(value, tone = 'muted') {
+    return `<span class="a83-state a83-${tone}">${value}</span>`
 }
-function item(title, configured, current, currentTone) {
-    return `<div class="a83-pack"><div><strong>${title}</strong><div class="status">配置状态</div></div><div class="a83-row">${pill(configured?'已配置':'未配置',configured?'good':'muted')}${pill(current,currentTone)}</div></div>`
+function item(id, title, configured, current, currentTone) {
+    return `<div class="a83-pack" data-connection-row="${id}">
+        <div><strong>${title}</strong><div class="status">${text('config')}</div></div>
+        <div class="a83-row">
+            ${pill(configured ? text('configured') : text('unconfigured'), configured ? 'good' : 'muted')}
+            ${pill(current, currentTone)}
+        </div>
+    </div>`
 }
-async function renderConnections() {
+
+function ensurePanel() {
     const settings = $c('#settings')
-    if (!settings) return
+    if (!settings) return null
     let panel = $c('#a83-connections')
     if (!panel) {
         panel = document.createElement('article')
-        panel.id = 'a83-connections'; panel.className = 'panel a83-panel'
-        panel.innerHTML = '<h3>连接状态</h3><div id="a83-connections-body"><p class="status">正在检查…</p></div>'
+        panel.id = 'a83-connections'
+        panel.className = 'panel a83-panel'
         const form = $c('#settings-form')
         if (form) form.insertAdjacentElement('beforebegin', panel)
         else settings.prepend(panel)
     }
-    const body = panel.querySelector('#a83-connections-body')
+    return panel
+}
+
+function renderConfigured(snapshot = connectionSnapshot) {
+    const panel = ensurePanel()
+    if (!panel) return
+    if (!snapshot) {
+        panel.innerHTML = `<div class="a83-connection-head"><h3>${text('title')}</h3></div><p class="status">${text('checking')}</p>`
+        return
+    }
+    const picaConfigured = Boolean(snapshot.configured)
+    const remoteConfigured = Boolean(snapshot.remoteStorage?.configured)
+    const mobileConfigured = Boolean(snapshot.mobileBridge?.enabled)
+    panel.innerHTML = `
+        <div class="a83-connection-head">
+            <div class="help-heading">
+                <h3>${text('title')}</h3>
+                <button type="button" class="info-tip" aria-label="${text('title')}" data-info-tip="${text('probeHelp')}">!</button>
+            </div>
+            <button type="button" id="a83-check-connections" ${checkingConnections ? 'disabled' : ''}>
+                ${checkingConnections ? text('checking') : text('check')}
+            </button>
+        </div>
+        <div id="a83-connections-body">
+            ${item('pica', 'Pica', picaConfigured, picaConfigured ? text('notChecked') : text('disconnected'), picaConfigured ? 'muted' : 'muted')}
+            ${item('webdav', 'WebDAV', remoteConfigured, remoteConfigured ? text('notChecked') : text('disconnected'), remoteConfigured ? 'muted' : 'muted')}
+            ${item('mobile', language() === 'en' ? 'Phone LAN' : '手机局域网', mobileConfigured, mobileConfigured ? text('listening') : text('stopped'), mobileConfigured ? 'good' : 'muted')}
+        </div>
+    `
+    panel.querySelector('#a83-check-connections')?.addEventListener(
+        'click',
+        () => void checkConnections()
+    )
+}
+
+function setProbeResult(id, value, tone) {
+    const row = $c(`[data-connection-row="${id}"] .a83-row`)
+    if (!row?.lastElementChild) return
+    row.lastElementChild.outerHTML = pill(value, tone)
+}
+
+async function loadConnectionConfiguration() {
     try {
-        const current = await requestJson('/api/v1/desktop/status')
-        connectionCsrf = current.csrfToken || ''
-        const picaConfigured = Boolean(current.configured)
-        const remoteConfigured = Boolean(current.remoteStorage?.configured)
-        const mobileConfigured = Boolean(current.mobileBridge?.enabled)
-        body.innerHTML = item('Pica',picaConfigured,picaConfigured?'检查中':'未连接',picaConfigured?'warn':'muted') + item('WebDAV',remoteConfigured,remoteConfigured?'检查中':'未连接',remoteConfigured?'warn':'muted') + item('手机局域网',mobileConfigured,mobileConfigured?'监听中':'未启动',mobileConfigured?'good':'muted')
-        const rows = [...body.querySelectorAll('.a83-pack')]
-        if (picaConfigured) postProbe({}).then(()=>{rows[0].querySelector('.a83-row').lastElementChild.outerHTML=pill('可用','good')}).catch(()=>{rows[0].querySelector('.a83-row').lastElementChild.outerHTML=pill('当前不可用','warn')})
-        if (remoteConfigured) postProbe({remoteStorageAction:'test'}).then(()=>{rows[1].querySelector('.a83-row').lastElementChild.outerHTML=pill('可连接','good')}).catch(()=>{rows[1].querySelector('.a83-row').lastElementChild.outerHTML=pill('当前不可用','warn')})
+        connectionSnapshot = await requestJson('/api/v1/desktop/status')
+        connectionCsrf = connectionSnapshot.csrfToken || ''
+        renderConfigured()
     } catch (error) {
-        body.innerHTML = `<p class="status">状态读取失败：${error.message}</p>`
+        const panel = ensurePanel()
+        if (panel)
+            panel.innerHTML = `<h3>${text('title')}</h3><p class="status">${text('failed')}：${error.message}</p>`
     }
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderConnections)
-else renderConnections()
+async function checkConnections() {
+    if (checkingConnections) return
+    checkingConnections = true
+    renderConfigured()
+    try {
+        connectionSnapshot = await requestJson('/api/v1/desktop/status')
+        connectionCsrf = connectionSnapshot.csrfToken || ''
+        renderConfigured()
+        const picaConfigured = Boolean(connectionSnapshot.configured)
+        const remoteConfigured = Boolean(connectionSnapshot.remoteStorage?.configured)
+        if (picaConfigured) {
+            setProbeResult('pica', text('checking'), 'warn')
+            try {
+                await postProbe({})
+                setProbeResult('pica', text('available'), 'good')
+            } catch {
+                setProbeResult('pica', text('unavailable'), 'warn')
+            }
+        }
+        if (remoteConfigured) {
+            setProbeResult('webdav', text('checking'), 'warn')
+            try {
+                await postProbe({ remoteStorageAction: 'test' })
+                setProbeResult('webdav', text('reachable'), 'good')
+            } catch {
+                setProbeResult('webdav', text('unavailable'), 'warn')
+            }
+        }
+    } finally {
+        checkingConnections = false
+        const button = $c('#a83-check-connections')
+        if (button) {
+            button.disabled = false
+            button.textContent = text('check')
+        }
+    }
+}
+
+document.addEventListener('pica-language-change', () => {
+    renderConfigured()
+})
+if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', () => void loadConnectionConfiguration())
+else void loadConnectionConfiguration()

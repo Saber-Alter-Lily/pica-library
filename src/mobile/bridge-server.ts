@@ -24,6 +24,8 @@ import { PersonalizationService } from '../services/personalization-service'
 
 interface PersistedDevice {
     tokenHash: string
+    /** Stable app-local Android identity. Legacy rows may omit it. */
+    deviceId?: string
     deviceName: string
     pairedAt: string
     lastSeenAt: string
@@ -157,6 +159,22 @@ function stringArray(value: unknown) {
         : []
 }
 
+function picaSort(value: unknown, fallback = 'ld') {
+    const sort = String(value ?? '').trim()
+    return ['ua', 'dd', 'da', 'ld', 'vd'].includes(sort)
+        ? sort
+        : fallback
+}
+
+function safePathSegment(value: string) {
+    try {
+        return decodeURIComponent(value)
+    } catch {
+        return ''
+    }
+}
+
+
 function mobileFavoriteRecords(value: unknown): FavoriteRecord[] {
     if (!Array.isArray(value)) return []
     return value.flatMap((item) => {
@@ -216,6 +234,7 @@ export async function startMobileBridge(options: {
     host?: string
     port?: number
     stateFile?: string
+    accountStatus?: () => Record<string, unknown>
 }) {
     const host = options.host ?? '0.0.0.0'
     const requestedPort = options.port ?? 7788
@@ -312,12 +331,31 @@ export async function startMobileBridge(options: {
 
                 const token = randomBytes(32).toString('base64url')
                 const nowIso = new Date().toISOString()
+                const deviceName = String(
+                    input.deviceName ?? 'Android device'
+                ).slice(0, 120)
+                const deviceId = String(input.deviceId ?? '')
+                    .trim()
+                    .slice(0, 160)
+                let pairedAt = nowIso
+                if (deviceId) {
+                    for (const [hash, existing] of devices) {
+                        const sameStableDevice =
+                            existing.deviceId === deviceId
+                        const sameLegacyName =
+                            !existing.deviceId &&
+                            existing.deviceName === deviceName
+                        if (!sameStableDevice && !sameLegacyName) continue
+                        if (existing.pairedAt < pairedAt)
+                            pairedAt = existing.pairedAt
+                        devices.delete(hash)
+                    }
+                }
                 const device: PersistedDevice = {
                     tokenHash: tokenHash(token),
-                    deviceName: String(
-                        input.deviceName ?? 'Android device'
-                    ).slice(0, 120),
-                    pairedAt: nowIso,
+                    ...(deviceId ? { deviceId } : {}),
+                    deviceName,
+                    pairedAt,
                     lastSeenAt: nowIso
                 }
                 devices.set(device.tokenHash, device)
@@ -335,6 +373,576 @@ export async function startMobileBridge(options: {
                 return json(response, 401, {
                     error: 'Mobile device is not paired'
                 })
+
+            if (
+                url.pathname === '/mobile/v1/accounts/status' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    transport: 'paired-mobile-bridge',
+                    ...(options.accountStatus?.() ?? {
+                        pica: { configured: false },
+                        eh: { configured: false }
+                    })
+                })
+
+            // Paired-provider relay: Android can use Desktop's authenticated
+            // Pica session without copying a password, provider token, or cookie
+            // to the phone. Every route stays behind the existing Mobile Bridge
+            // bearer authentication above.
+            if (
+                url.pathname === '/mobile/v1/provider/pica/search' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const pica = await options.service.connect()
+                const page = Math.max(
+                    1,
+                    Math.min(1000, Math.floor(Number(input.page) || 1))
+                )
+                const keyword = String(input.keyword ?? '').trim().slice(0, 500)
+                const categories = stringArray(input.categories).slice(0, 20)
+                const comics = await pica.search(
+                    keyword,
+                    page,
+                    picaSort(input.sort, pica.Order.loved),
+                    categories
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/browse' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const pica = await options.service.connect()
+                const page = Math.max(
+                    1,
+                    Math.min(1000, Math.floor(Number(input.page) || 1))
+                )
+                const comics = await pica.comicsPage(
+                    String(input.category ?? '').trim().slice(0, 200),
+                    String(input.tag ?? '').trim().slice(0, 200),
+                    picaSort(input.sort, pica.Order.loved),
+                    page
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/favorites' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const pica = await options.service.connect()
+                const page = Math.max(
+                    1,
+                    Math.min(1000, Math.floor(Number(input.page) || 1))
+                )
+                const comics = await pica.favorites(
+                    page,
+                    picaSort(input.sort, pica.Order.latest)
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/leaderboard' &&
+                request.method === 'GET'
+            ) {
+                const pica = await options.service.connect()
+                const requested = String(url.searchParams.get('tt') ?? 'H24')
+                const range = ['H24', 'D7', 'D30'].includes(requested)
+                    ? requested
+                    : 'H24'
+                const result = await pica.request<unknown>(
+                    'get',
+                    `comics/leaderboard?tt=${range}&ct=VC`
+                )
+                const comics =
+                    result &&
+                    typeof result === 'object' &&
+                    Array.isArray(
+                        (result as { comics?: unknown }).comics
+                    )
+                        ? (result as { comics: unknown[] }).comics
+                        : []
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/categories' &&
+                request.method === 'GET'
+            ) {
+                const pica = await options.service.connect()
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    ...(await pica.categories())
+                })
+            }
+
+            const picaComicRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/comic\/([^/]+)$/
+            )
+            if (picaComicRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaComicRoute[1]).trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const pica = await options.service.connect()
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comic: await pica.comicInfo(comicId)
+                })
+            }
+
+            const picaEpisodesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/episodes\/([^/]+)$/
+            )
+            if (picaEpisodesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaEpisodesRoute[1]).trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const pica = await options.service.connect()
+                const episodes = await pica.episodesAll(comicId)
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    episodes: episodes.map((episode) => ({
+                        id: episode.id || episode._id || '',
+                        title: episode.title,
+                        order: episode.order
+                    }))
+                })
+            }
+
+            const picaPagesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/pages\/([^/]+)\/(\d+)$/
+            )
+            if (picaPagesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaPagesRoute[1]).trim()
+                const order = Number(picaPagesRoute[2])
+                if (!comicId || !Number.isSafeInteger(order) || order < 1)
+                    return json(response, 400, {
+                        error: 'Valid Pica comic id and episode order are required'
+                    })
+                const pica = await options.service.connect()
+                const episodes = await pica.episodesAll(comicId)
+                const episode = episodes.find((item) => item.order === order)
+                if (!episode)
+                    return json(response, 404, {
+                        error: 'Pica episode was not found'
+                    })
+                const pages = await pica.picturesAll(comicId, episode)
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    pages: pages.map((page, index) => ({
+                        id: page.id || `p${index}`,
+                        url: page.url,
+                        name: page.name,
+                        position: index
+                    }))
+                })
+            }
+
+            const picaRelatedRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/pica\/related\/([^/]+)$/
+            )
+            if (picaRelatedRoute && request.method === 'GET') {
+                const comicId = safePathSegment(picaRelatedRoute[1]).trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const pica = await options.service.connect()
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    comics: await pica.related(comicId)
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/pica/favorite' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const comicId = String(input.comicId ?? '').trim()
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'Pica comic id is required'
+                    })
+                const desired = input.desired === true
+                const provider = options.service.providerService()
+                // Ensure the Desktop catalog contains the target before
+                // ProviderService updates favorite membership. The relay may
+                // act on a comic first discovered only on Android.
+                await provider.getComicDetails(comicId)
+                const result = await provider.setFavorite(comicId, desired)
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    ...result
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/favorites-snapshot' &&
+                request.method === 'GET'
+            ) {
+                return json(
+                    response,
+                    200,
+                    {
+                        authority: 'desktop',
+                        relay: true,
+                        ...(await options.service.mobileEhRelayFavoritesSnapshot())
+                    }
+                )
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/search' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const surface = input.surface === 'exh' ? 'exh' : 'eh'
+                const requestedMode = String(input.ehMode ?? 'latest')
+                const ehMode = [
+                    'latest',
+                    'popular',
+                    'favorites',
+                    'watched',
+                    'toplist'
+                ].includes(requestedMode)
+                    ? requestedMode
+                    : 'latest'
+                const comics = await options.service.mobileEhRelaySearch({
+                    keyword: String(input.keyword ?? '').trim().slice(0, 500),
+                    tags: stringArray(input.tags).slice(0, 30),
+                    categories: stringArray(input.categories).slice(0, 20),
+                    limit: boundedInt(
+                        String(input.limit ?? ''),
+                        50,
+                        1,
+                        100
+                    ),
+                    surface,
+                    ehMode: ehMode as
+                        | 'latest'
+                        | 'popular'
+                        | 'favorites'
+                        | 'watched'
+                        | 'toplist',
+                    ehToplist: String(input.ehToplist ?? '11').slice(0, 8),
+                    ehLanguage: String(input.ehLanguage ?? '').trim().slice(0, 80),
+                    ehExcludeTags: stringArray(input.ehExcludeTags).slice(0, 30),
+                    ehMinRating: Number(input.ehMinRating ?? 0),
+                    ehPageFrom: Number(input.ehPageFrom ?? 0),
+                    ehPageTo: Number(input.ehPageTo ?? 0)
+                })
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    comics
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/exh-capability' &&
+                request.method === 'GET'
+            )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    capability:
+                        await options.service.mobileEhRelayProbeExH()
+                })
+
+            const ehComicRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/eh\/comic\/([^/]+)$/
+            )
+            if (ehComicRoute && request.method === 'GET') {
+                const comicId = safePathSegment(ehComicRoute[1]).trim()
+                const surface =
+                    url.searchParams.get('surface') === 'exh' ? 'exh' : 'eh'
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'E-H comic id is required'
+                    })
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    comic:
+                        await options.service.mobileEhRelayDetails(
+                            comicId,
+                            surface
+                        )
+                })
+            }
+
+            const ehEpisodesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/eh\/episodes\/([^/]+)$/
+            )
+            if (ehEpisodesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(ehEpisodesRoute[1]).trim()
+                const surface =
+                    url.searchParams.get('surface') === 'exh' ? 'exh' : 'eh'
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'E-H comic id is required'
+                    })
+                const episodes =
+                    await options.service.mobileEhRelayEpisodes(
+                        comicId,
+                        surface
+                    )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    episodes: episodes.map((episode) => ({
+                        id: episode.id || episode._id || '',
+                        title: episode.title,
+                        order: episode.order
+                    }))
+                })
+            }
+
+            const ehPagesRoute = url.pathname.match(
+                /^\/mobile\/v1\/provider\/eh\/pages\/([^/]+)$/
+            )
+            if (ehPagesRoute && request.method === 'GET') {
+                const comicId = safePathSegment(ehPagesRoute[1]).trim()
+                const surface =
+                    url.searchParams.get('surface') === 'exh' ? 'exh' : 'eh'
+                if (!comicId)
+                    return json(response, 400, {
+                        error: 'E-H comic id is required'
+                    })
+                const episodes =
+                    await options.service.mobileEhRelayEpisodes(
+                        comicId,
+                        surface
+                    )
+                const episode = episodes[0]
+                if (!episode)
+                    return json(response, 404, {
+                        error: 'E-H episode was not found'
+                    })
+                const pages = await options.service.mobileEhRelayPages(
+                    comicId,
+                    episode,
+                    surface
+                )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    surface,
+                    pages: pages.map((page, index) => ({
+                        id: page.id || `eh-page-${index + 1}`,
+                        locator: page.url,
+                        name: page.name,
+                        position: index
+                    }))
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/page-image' &&
+                request.method === 'GET'
+            ) {
+                const locator = String(
+                    url.searchParams.get('locator') ?? ''
+                ).trim()
+                if (
+                    !locator.startsWith('eh-page:') ||
+                    locator.length > 4096
+                )
+                    return json(response, 400, {
+                        error: 'Valid E-H page locator is required'
+                    })
+                const image =
+                    await options.service.mobileEhRelayFetchPage(locator)
+                response.writeHead(200, {
+                    'content-type': image.contentType,
+                    'content-length': String(image.data.byteLength),
+                    'cache-control': 'private, max-age=3600',
+                    'x-content-type-options': 'nosniff'
+                })
+                response.end(image.data)
+                return
+            }
+
+            if (
+                url.pathname === '/mobile/v1/provider/eh/favorite' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const comicId = String(input.comicId ?? '').trim()
+                if (!comicId.startsWith('eh:'))
+                    return json(response, 400, {
+                        error: 'Valid E-H comic id is required'
+                    })
+                const category = Math.max(
+                    0,
+                    Math.min(9, Math.floor(Number(input.category) || 0))
+                )
+                const note = String(input.note ?? '').slice(0, 200)
+                const result =
+                    await options.service.mobileEhRelaySetFavorite(
+                        comicId,
+                        input.desired === true,
+                        category,
+                        note
+                    )
+                return json(response, 200, {
+                    authority: 'desktop',
+                    relay: true,
+                    ...result
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/recommendation/v5/snapshot' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5Snapshot()
+                )
+
+            if (
+                url.pathname === '/mobile/v1/recommendation/v5/sync-preview' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request, 512 * 1024)
+                return json(
+                    response,
+                    200,
+                    options.service.previewMobileRecommendationV5(input)
+                )
+            }
+
+            if (
+                url.pathname === '/mobile/v1/recommendation/v5/portable-package' &&
+                request.method === 'GET'
+            ) {
+                const limit = boundedInt(
+                    url.searchParams.get('limit'),
+                    500,
+                    24,
+                    1000
+                )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationPortablePackageV5(limit)
+                )
+            }
+
+            if (
+                url.pathname === '/mobile/v1/recommendation/v5/sync' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request, 512 * 1024)
+                const merged = options.service.mergeMobileRecommendationV5(input)
+                let recommendationRefresh: Record<string, unknown> = {
+                    requested: false
+                }
+                if (input.recompute === true) {
+                    try {
+                        const deviceId = String(input.deviceId ?? 'android')
+                        const mutationId = String(input.mutationId ?? Date.now())
+                        finalRecommendationCoordinator.forceNew(
+                            `mobile-pair:${deviceId}:${mutationId}`
+                        )
+                        await finalRecommendationCoordinator.waitForBuild()
+                        recommendationRefresh = {
+                            requested: true,
+                            completed: true,
+                            status: finalRecommendationCoordinator.status()
+                        }
+                    } catch (error) {
+                        recommendationRefresh = {
+                            requested: true,
+                            completed: false,
+                            error:
+                                error instanceof Error
+                                    ? error.message
+                                    : String(error)
+                        }
+                    }
+                }
+                return json(response, 200, {
+                    ...merged,
+                    recommendationRefresh
+                })
+            }
+
+            if (
+                url.pathname === '/mobile/v1/recommendations/cache' &&
+                request.method === 'GET'
+            ) {
+                const limit = boundedInt(
+                    url.searchParams.get('limit'),
+                    72,
+                    1,
+                    120
+                )
+                return json(
+                    response,
+                    200,
+                    finalRecommendationCoordinator.portable(limit)
+                )
+            }
+
+            if (
+                url.pathname === '/mobile/v1/visual/status' &&
+                request.method === 'GET'
+            ) {
+                return json(response, 200, options.service.visualIndexStatus())
+            }
+
+            if (
+                url.pathname === '/mobile/v1/visual/settings' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                options.service.updateVisualSettings({
+                    enabled: input.enabled,
+                    rerankMode: input.rerankMode,
+                    strength: input.strength
+                })
+                return json(response, 200, options.service.visualIndexStatus())
+            }
 
             if (url.pathname === '/mobile/v1/star-access' && request.method === 'GET') {
                 const proof = personalization.starProof()
@@ -660,11 +1268,29 @@ export async function startMobileBridge(options: {
             addresses: privateIpv4Addresses(host, actualPort),
             pairingCode,
             pairingExpiresAt: new Date(pairingExpiresAt).toISOString(),
-            pairedDevices: [...devices.values()].map((device) => ({
-                deviceName: device.deviceName,
-                pairedAt: device.pairedAt,
-                lastSeenAt: device.lastSeenAt
-            }))
+            pairedDevices: (() => {
+                const visible = new Map<string, PersistedDevice>()
+                for (const device of devices.values()) {
+                    const key = device.deviceId
+                        ? `id:${device.deviceId}`
+                        : `legacy-name:${device.deviceName}`
+                    const current = visible.get(key)
+                    if (
+                        !current ||
+                        current.lastSeenAt < device.lastSeenAt
+                    )
+                        visible.set(key, device)
+                }
+                return [...visible.values()]
+                    .sort((a, b) =>
+                        b.lastSeenAt.localeCompare(a.lastSeenAt)
+                    )
+                    .map((device) => ({
+                        deviceName: device.deviceName,
+                        pairedAt: device.pairedAt,
+                        lastSeenAt: device.lastSeenAt
+                    }))
+            })()
         }
     }
 

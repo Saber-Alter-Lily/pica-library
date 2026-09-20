@@ -135,10 +135,14 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
         const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string }
         const gradle = fs.readFileSync('mobile/android-alpha2/app/build.gradle', 'utf8')
         const windows = fs.readFileSync('scripts/build-windows-package.ps1', 'utf8')
-        const androidVersionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1] ?? 0)
+        const androidVersionCode = Number(
+            gradle.match(/PICA_ANDROID_VERSION_CODE'\)\s*\?:\s*'(\d+)'/)?.[1] ?? 0
+        )
         expect(versionAtLeast(pkg.version, [0, 3, 8])).toBe(true)
         expect(androidVersionCode).toBeGreaterThanOrEqual(35)
-        expect(gradle).toContain("versionName '0.1.0-alpha8.")
+        expect(gradle).toContain(
+            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.1'"
+        )
         expect(windows).toContain("'DISCLAIMER.md'")
         expect(windows).toContain("$version -eq '0.3.8'")
     })

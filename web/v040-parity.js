@@ -305,10 +305,9 @@ async function showAuthorDirectory(name) {
 }
 async function showAuthorWorks(dialog, authorId, name) {
     const content = dialog.querySelector('.v040-dialog-content')
-    content.innerHTML = '<p>正在读取作品…</p>'
-    try {
+    const render = async (note = '') => {
         const result = await libraryQuery({scope:'catalog',authorIds:[authorId],limit:5000,offset:0,sort:'latest'})
-        content.innerHTML = `<button type="button" id="v040-author-back">← 作者目录</button><h3>${escapeHtml(name)}</h3><p class="status">${result.total} 部作品 · 默认合并 Pica 与 E-H。</p><div class="v040-author-works">${(result.items||[]).map((item)=>`<button type="button" data-work-id="${escapeHtml(item.comicId)}" data-work-title="${escapeHtml(item.title)}" data-work-provider="${escapeHtml(item.providerId||'')}"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.providerId==='eh'?'E-H':'Pica')}</span></button>`).join('')}</div>`
+        content.innerHTML = `<button type="button" id="v040-author-back">← 作者目录</button><h3>${escapeHtml(name)}</h3><p class="status" id="v040-author-refresh-state">${result.total} 部作品 · ${note || '正在联网补全 Pica / E-H 作者作品…'}</p><div class="v040-author-works">${(result.items||[]).map((item)=>`<button type="button" data-work-id="${escapeHtml(item.comicId)}" data-work-title="${escapeHtml(item.title)}" data-work-provider="${escapeHtml(item.providerId||'')}"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.providerId==='eh'?'E-H':'Pica')}</span></button>`).join('')}</div>`
         $('#v040-author-back').onclick = () => showAuthorDirectory(name)
         content.querySelectorAll('[data-work-id]').forEach((button)=>button.onclick=()=>{
             dialog.close();
@@ -317,7 +316,25 @@ async function showAuthorWorks(dialog, authorId, name) {
             const provider=$('#v040-library-provider'); if(provider) provider.value=button.dataset.workProvider==='eh'?'eh':'pica'
             $('#apply-filter')?.click()
         })
-    } catch (error) { content.innerHTML = `<p class="status">${escapeHtml(error.message)}</p>` }
+        return result
+    }
+    content.innerHTML = '<p>正在读取作品…</p>'
+    try {
+        await render()
+        const response = await rawFetch(`/api/v1/authors/${encodeURIComponent(authorId)}/refresh`, {
+            method:'POST', headers:{'content-type':'application/json'}, body:'{}'
+        })
+        const refresh = await response.json()
+        if (!response.ok) throw new Error(refresh.error || `HTTP ${response.status}`)
+        const sources = Object.entries(refresh.sources || {})
+            .map(([source,value])=>`${source.toUpperCase()}: ${Number(value?.count||0)}${value?.error?'（失败）':''}`)
+            .join(' · ')
+        await render(`在线补全完成${sources ? ` · ${sources}` : ''}`)
+    } catch (error) {
+        const state = $('#v040-author-refresh-state')
+        if (state) state.textContent = `已显示本地作品 · 在线补全失败：${error.message}`
+        else content.innerHTML = `<p class="status">${escapeHtml(error.message)}</p>`
+    }
 }
 function enhanceDetailAuthor() {
     const root = $('#recommend-detail-content')

@@ -1,8 +1,9 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Server } from 'node:http'
+import AdmZip from 'adm-zip'
 import { LibraryDatabase } from '../library/database'
 import {
     startLibraryServer,
@@ -15,8 +16,10 @@ import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
 import { UpdateManager } from '../update/manager'
+import { EcosystemPackStore } from '../ecosystem/pack-store'
 import { PersonalizationService } from '../services/personalization-service'
 import { GitHubAccountAuthService } from '../services/github-account-auth'
+import { DesktopEhWebLogin, type EhCapturedSession } from './eh-web-login'
 import {
     buildConfig,
     connectionProxy,
@@ -69,6 +72,7 @@ const updateManager = new UpdateManager({
     desktopEntryPath: process.argv[1],
     instanceFile: paths.instance
 })
+const ecosystemPacks = new EcosystemPackStore(paths.packs, PRODUCT_VERSION)
 const personalization = new PersonalizationService(
     path.join(paths.runtimeState, 'personalization'),
     path.join(applicationRoot, 'web')
@@ -78,6 +82,7 @@ for (const directory of [
     paths.root,
     paths.data,
     paths.cache,
+    paths.packs,
     paths.logs,
     paths.runtimeState
 ])
@@ -92,6 +97,7 @@ let mobileBridge: MobileBridgeController | null = null
 let database: LibraryDatabase | null = null
 let service: LibraryService | null = null
 let remoteStorageManager: RemoteStorageDesktopManager | null = null
+let ehWebLogin: DesktopEhWebLogin | null = null
 let stopping = false
 let currentUrl = ''
 let lastBrowserLiteExportDirectory: string | null = null
@@ -172,6 +178,8 @@ async function waitForHealth(url: string, timeoutMs = 30_000) {
 async function closeEngine() {
     await mobileBridge?.close()
     mobileBridge = null
+    await ehWebLogin?.cancel()
+    ehWebLogin = null
     await service?.quiesceLocalDownloads()
     if (server) {
         const closing = server
@@ -374,11 +382,42 @@ async function chooseBrowserLitePackagePath() {
     })
 }
 
+
+async function chooseRecommendationAuditPath(generatedAt: string) {
+    if (process.platform !== 'win32') return null
+    const stamp = generatedAt.replace(/[:.]/g, '-')
+    const fileName = `Pica-Library-Recommendation-Audit-${stamp}.zip`
+    const escaped = fileName.replaceAll("'", "''")
+    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='${escaped}';$d.Filter='ZIP files (*.zip)|*.zip';$d.DefaultExt='zip';$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
+    const powershell = windowsExecutable(
+        'System32',
+        'WindowsPowerShell',
+        'v1.0',
+        'powershell.exe'
+    )
+    return await new Promise<string | null>((resolve, reject) => {
+        const child = spawn(
+            powershell,
+            ['-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-Command', script],
+            { windowsHide: true, env: sanitizedChildEnv() }
+        )
+        let output = ''
+        child.stdout.on('data', (chunk) => (output += String(chunk)))
+        child.once('error', reject)
+        child.once('exit', (code) =>
+            code === 0
+                ? resolve(output.trim() || null)
+                : reject(new Error('File picker failed'))
+        )
+    })
+}
+
 function openDirectory(kind: string) {
     const allowed: Record<string, string> = {
         data: config?.libraryDirectory ?? paths.data,
         logs: paths.logs,
         personalization: personalization.root,
+        packs: paths.packs,
         ...(lastBrowserLiteExportDirectory
             ? { 'browser-lite-export': lastBrowserLiteExportDirectory }
             : {})
@@ -396,11 +435,51 @@ function openDirectory(kind: string) {
     return Promise.resolve()
 }
 
+async function persistEhSession(candidate: EhCapturedSession) {
+    if (!service) throw new Error('Library is not ready')
+    if (!candidate.memberId || !candidate.passHash)
+        throw new Error('E-H 登录会话不完整')
+    const previousSession =
+        credentials?.ehMemberId && credentials?.ehPassHash
+            ? {
+                  memberId: credentials.ehMemberId,
+                  passHash: credentials.ehPassHash,
+                  igneous: credentials.ehIgneous,
+                  cfClearance: credentials.ehCfClearance
+              }
+            : null
+    service.setEhSession(candidate)
+    try {
+        await service.verifyEhAccount()
+    } catch (error) {
+        service.setEhSession(previousSession)
+        throw error
+    }
+    const next: StoredCredentials = {
+        ...(credentials ?? { account: '', password: '' }),
+        ehMemberId: candidate.memberId,
+        ehPassHash: candidate.passHash,
+        ehIgneous: candidate.igneous,
+        ehCfClearance: candidate.cfClearance
+    }
+    credentialsStore.save(next)
+    credentials = next
+    return {
+        configured: true,
+        verified: true,
+        exHentai: await service.probeExHentai()
+    }
+}
+
 async function startEngine(preferredPort: number) {
     const dataDir = config?.libraryDirectory ?? paths.data
     fs.mkdirSync(dataDir, { recursive: true })
     database = new LibraryDatabase(path.join(dataDir, 'library.db'))
     service = new LibraryService(database, dataDir)
+    ehWebLogin = new DesktopEhWebLogin(
+        path.join(paths.runtimeState, 'eh-web-login'),
+        async (candidate) => { await persistEhSession(candidate) }
+    )
     service.setEhSession(
         credentials?.ehMemberId && credentials?.ehPassHash
             ? {
@@ -422,6 +501,19 @@ async function startEngine(preferredPort: number) {
     const csrfToken = randomBytes(32).toString('base64url')
     const desktop: DesktopServerController = {
         csrfToken,
+        startEhWebLogin: async () => {
+            if (!ehWebLogin) throw new Error('E-H 网页登录不可用')
+            return await ehWebLogin.start()
+        },
+        ehWebLoginStatus: () =>
+            ehWebLogin?.status() ?? {
+                state: 'idle',
+                message: '尚未开始网页登录'
+            },
+        cancelEhWebLogin: async () =>
+            ehWebLogin
+                ? await ehWebLogin.cancel()
+                : { state: 'cancelled', message: '网页登录已取消' },
         configured: () => Boolean(config && credentials),
         status: () => ({
             profile: config?.profile ?? 'balanced',
@@ -462,45 +554,16 @@ async function startEngine(preferredPort: number) {
             if (ehAccountAction) {
                 if (!service) throw new Error('Library is not ready')
                 if (ehAccountAction === 'save-session') {
-                    const candidate = {
+                    const candidate: EhCapturedSession = {
                         memberId: String(input.memberId ?? '').trim(),
                         passHash: String(input.passHash ?? '').trim(),
                         igneous: String(input.igneous ?? '').trim() || undefined,
                         cfClearance:
                             String(input.cfClearance ?? '').trim() || undefined
                     }
-                    const previousSession =
-                        credentials?.ehMemberId && credentials?.ehPassHash
-                            ? {
-                                  memberId: credentials.ehMemberId,
-                                  passHash: credentials.ehPassHash,
-                                  igneous: credentials.ehIgneous,
-                                  cfClearance: credentials.ehCfClearance
-                              }
-                            : null
-                    service.setEhSession(candidate)
-                    try {
-                        await service.verifyEhAccount()
-                    } catch (error) {
-                        service.setEhSession(previousSession)
-                        throw error
-                    }
-                    const next = {
-                        ...(credentials ?? { account: '', password: '' }),
-                        ehMemberId: candidate.memberId,
-                        ehPassHash: candidate.passHash,
-                        ehIgneous: candidate.igneous,
-                        ehCfClearance: candidate.cfClearance
-                    }
-                    credentialsStore.save(next)
-                    credentials = next
                     return {
                         success: true,
-                        ehAccount: {
-                            configured: true,
-                            verified: true,
-                            exHentai: await service.probeExHentai()
-                        }
+                        ehAccount: await persistEhSession(candidate)
                     }
                 }
                 if (ehAccountAction === 'clear-session') {
@@ -699,6 +762,119 @@ async function startEngine(preferredPort: number) {
                 sourceSyncedAt: lastSync?.finishedAt ?? null
             }
         },
+        exportRecommendationAudit: async (input = {}) => {
+            if (!database || !service) throw new Error('Library is not ready')
+            const generatedAt = new Date().toISOString()
+            const appSessionId = String(input.appSessionId ?? '').trim() || null
+            const events = database.listUserEvents({ limit: 10000 })
+            const catalog = database.listComics({ limit: 10000 }).map((comic) => ({
+                comicId: comic.comicId,
+                title: comic.title,
+                author: comic.author,
+                canonicalAuthor: comic.canonicalAuthor ?? null,
+                tags: comic.tags,
+                categories: comic.categories,
+                providerId: comic.providerId ?? null,
+                isFavorite: comic.isFavorite,
+                inLibrary: comic.inLibrary,
+                downloadedPictures: comic.downloadedPictures,
+                firstSeenAt: comic.firstSeenAt,
+                lastSeenAt: comic.lastSeenAt
+            }))
+            const policy = service.recommendationV5Snapshot()
+            const timescales = service.recommendationV5PreferenceTimescales(
+                appSessionId,
+                10000
+            )
+            const behavior = service.recommendationV5BehaviorEvidence(10000)
+            const channels = service.recommendationV5CandidateChannels(
+                appSessionId,
+                10000
+            )
+            const servingComposition =
+                service.recommendationServingCompositionV3()
+            const shadowRuns = service.recommendationV5ShadowRuns(500)
+            const evaluation = service.recommendationV5EvaluationSummary(
+                500,
+                30,
+                3,
+                50
+            )
+            const manifest = {
+                schemaVersion: 2,
+                kind: 'pica-library-recommendation-audit',
+                generatedAt,
+                productVersion: PRODUCT_VERSION,
+                sourceSha: currentSourceSha ?? null,
+                appSessionId,
+                includes: [
+                    'manifest.json',
+                    'policy_snapshot.json',
+                    'preference_timescales.json',
+                    'candidate_channels.json',
+                    'serving_composition.json',
+                    'behavior_evidence_v5.json',
+                    'user_events.json',
+                    'shadow_runs.json',
+                    'evaluation_snapshot.json',
+                    'catalog_minimal.json',
+                    'README.txt'
+                ],
+                excludes: [
+                    'pica_password',
+                    'pica_token',
+                    'eh_cookies',
+                    'github_token',
+                    'webdav_credentials',
+                    'comic_images',
+                    'downloaded_files'
+                ]
+            }
+            const zip = new AdmZip()
+            const addJson = (name: string, value: unknown) =>
+                zip.addFile(
+                    name,
+                    Buffer.from(JSON.stringify(value, null, 2), 'utf8')
+                )
+            addJson('manifest.json', manifest)
+            addJson('policy_snapshot.json', policy)
+            addJson('preference_timescales.json', timescales)
+            addJson('candidate_channels.json', channels)
+            addJson('serving_composition.json', servingComposition)
+            addJson('behavior_evidence_v5.json', behavior)
+            addJson('user_events.json', events)
+            addJson('shadow_runs.json', shadowRuns)
+            addJson('evaluation_snapshot.json', evaluation)
+            addJson('catalog_minimal.json', catalog)
+            zip.addFile(
+                'README.txt',
+                Buffer.from(
+                    [
+                        'Pica Library Recommendation Audit Export',
+                        '',
+                        'This package contains allowlisted recommendation and interaction audit data only.',
+                        'preference_timescales.json is generated for the appSessionId recorded in manifest.json when the export is requested from the active Web session.',
+                        'candidate_channels.json describes the V5 shadow planner and is not the serving recommendation batch.',
+                        'serving_composition.json describes the persisted Final V3 serving batch without allocating or regenerating a recommendation batch.',
+                        'It intentionally excludes account passwords, provider tokens/cookies, GitHub credentials, WebDAV credentials, comic images, and downloaded manga files.',
+                        'Share this ZIP only when you intentionally want another person or analysis tool to review recommendation behavior.',
+                        ''
+                    ].join('\n'),
+                    'utf8'
+                )
+            )
+            const buffer = zip.toBuffer()
+            const file = await chooseRecommendationAuditPath(generatedAt)
+            if (!file) return { success: false, cancelled: true }
+            fs.writeFileSync(file, buffer)
+            return {
+                success: true,
+                fileName: path.basename(file),
+                generatedAt,
+                sizeBytes: buffer.byteLength,
+                sha256: createHash('sha256').update(buffer).digest('hex')
+            }
+        },
         syncAndExportBrowserLitePackage: async () => {
             if (!database || !service) throw new Error('Library is not ready')
             try {
@@ -744,6 +920,7 @@ async function startEngine(preferredPort: number) {
         },
         openBrowserLite: async () => { browser(`${currentUrl}/?mode=browser-lite`) },
         openDirectory,
+        ecosystemPackInventory: () => ecosystemPacks.inventory(),
         checkForUpdate: async () => updateManager.checkForUpdate(),
         stageUpdate: async (name, value) => updateManager.stage(name, value),
         applyUpdate: async (id) => {
@@ -802,7 +979,21 @@ async function startEngine(preferredPort: number) {
             service: service!,
             host: '0.0.0.0',
             port: 7788,
-            stateFile: path.join(paths.runtimeState, 'mobile-bridge.json')
+            stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
+            accountStatus: () => ({
+                pica: {
+                    configured: Boolean(
+                        credentials?.account?.trim() &&
+                            credentials?.password
+                    )
+                },
+                eh: {
+                    configured: Boolean(
+                        credentials?.ehMemberId &&
+                            credentials?.ehPassHash
+                    )
+                }
+            })
         })
         const mobile = mobileBridge.status()
         log.write(

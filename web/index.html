@@ -14,6 +14,8 @@
         />
         <link rel="stylesheet" href="./styles.css" />
         <link rel="stylesheet" href="./alpha8-6.css" />
+        <link rel="stylesheet" href="./ui-polish-v5.css" />
+        <link rel="stylesheet" href="./info-tip-v1.css" />
     </head>
     <body>
         <header class="app-header">
@@ -64,6 +66,14 @@
                             <p>Your library stays on this computer.</p>
                         </div>
                     </div>
+                    <article class="notice setup-provider-entry">
+                        <strong>多来源模式 / Multi-provider</strong>
+                        <p>Pica 可以稍后配置。E-H 公共搜索、阅读和下载无需登录；如需同步 E-H 云收藏或访问 ExH，可直接配置 E-H / ExH 会话。</p>
+                        <div class="actions">
+                            <button id="setup-open-eh" type="button" class="primary">配置 E-H / ExH</button>
+                            <button id="setup-open-settings" type="button">打开账号与来源设置</button>
+                        </div>
+                    </article>
                     <form id="setup-form" class="settings-form">
                         <label
                             >Account<input
@@ -145,9 +155,9 @@
             </section>
             <section id="home" class="view active">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>开始使用</h2>
-                        <p>网页轻量查看，连接本地服务后同步、搜索和下载。</p>
+                        <button type="button" class="info-tip" aria-label="查看开始使用说明" data-info-tip="网页轻量查看；连接本地服务后可以同步、搜索和下载。">!</button>
                     </div>
                     <button id="clear-lite-state">清空本地数据</button>
                 </div>
@@ -200,20 +210,19 @@
                         也支持现有兼容的 CSV / JSON 文件。
                     </p>
                 </article>
-                <article class="notice">
-                    <strong>两种模式</strong>
-                    <p>
-                        Browser Lite
-                        把导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号不会写入导出包。
-                    </p>
+                <article id="home-mode-notice" class="notice">
+                    <div class="help-heading">
+                        <strong>两种模式</strong>
+                        <button type="button" class="info-tip" aria-label="查看模式说明" data-info-tip="Browser Lite 把导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号不会写入导出包。">!</button>
+                    </div>
                 </article>
             </section>
 
             <section id="library" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>Library</h2>
-                        <p>筛选、核对并选择需要下载的作品。</p>
+                        <button type="button" class="info-tip" aria-label="查看漫画库说明" data-info-tip="在这里筛选、核对和整理本地漫画库，并选择需要下载的作品。">!</button>
                     </div>
                     <div class="actions">
                         <input
@@ -228,7 +237,7 @@
                             for="import-file"
                             >选择数据文件</label
                         >
-                        <button id="import-button" class="primary">导入</button>
+                        <button id="import-button" class="primary" hidden>导入</button>
                         <button id="sync-button">更新收藏</button>
                         <button id="full-sync-button">完整校验收藏</button>
                     </div>
@@ -379,9 +388,9 @@
 
             <section id="shelves" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>书架</h2>
-                        <p>本地整理空间；不会改变 Pica 收藏或删除下载文件。</p>
+                        <button type="button" class="info-tip" aria-label="查看书架说明" data-info-tip="书架是本地整理空间；新建、重命名或删除书架不会改变 Pica 收藏，也不会删除下载文件。">!</button>
                     </div>
                     <button id="shelf-create" class="primary">
                         + 新建书架
@@ -439,9 +448,9 @@
                 </div>
                 <div id="recommend" class="tab active">
                     <div class="page-heading">
-                        <div>
+                        <div class="help-heading">
                             <h2>专属推荐</h2>
-                            <p>展示可解释的作者、社团、标签和分类偏好。</p>
+                            <button type="button" class="info-tip" aria-label="查看专属推荐说明" data-info-tip="推荐会结合作者、作品/IP、标签、分类、真实使用行为和你的显式调整，并保留可解释的推荐依据。">!</button>
                         </div>
                         <button id="recommend-button" class="primary">
                             查看推荐
@@ -498,9 +507,9 @@
                 </div>
                 <div id="search" class="tab">
                     <div class="page-heading">
-                        <div>
+                        <div class="help-heading">
                             <h2>在线发现</h2>
-                            <p>Pica 与 E-H 共用本地书库；E-H 公共搜索无需额外账号。</p>
+                            <button type="button" class="info-tip" aria-label="查看在线发现说明" data-info-tip="Pica 与 E-H 共用本地书库；E-H 公共搜索无需额外账号，ExH 和云收藏等能力按账号状态启用。">!</button>
                         </div>
                     </div>
                     <div class="toolbar">
@@ -546,6 +555,12 @@
                         <button id="reader-exit" class="primary">
                             ← 退出阅读
                         </button>
+                        <button id="reader-prev-chapter" type="button">
+                            ← 上一章
+                        </button>
+                        <button id="reader-next-chapter" type="button">
+                            下一章 →
+                        </button>
                         <select id="reader-mode">
                             <option value="vertical">连续纵向</option>
                             <option value="single">单页</option>
@@ -576,9 +591,9 @@
 
             <section id="downloads" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>Downloads</h2>
-                        <p>本地与 GitHub 任务使用同一套持久化队列语义。</p>
+                        <button type="button" class="info-tip" aria-label="查看下载任务说明" data-info-tip="本地与 GitHub 下载任务使用同一套持久化队列语义；任务状态会保留并可恢复。">!</button>
                     </div>
                     <div class="actions">
                         <button
@@ -648,9 +663,9 @@
 
             <section id="downloaded" class="view">
                 <div class="page-heading">
-                    <div>
+                    <div class="help-heading">
                         <h2>Downloaded</h2>
-                        <p>包含至少一个真实存在的本地下载文件。</p>
+                        <button type="button" class="info-tip" aria-label="查看已下载说明" data-info-tip="这里只显示至少存在一个真实本地下载文件的漫画。">!</button>
                     </div>
                     <div
                         class="view-controls responsive-toolbar"
@@ -731,8 +746,7 @@
                 <div id="updates" class="tab active">
                     <div class="page-heading">
                         <div>
-                            <h2>更新检测</h2>
-                            <p>默认只检查已经建立本地下载状态的漫画。</p>
+                            <div class="help-heading"><h2>更新检测</h2><button type="button" class="info-tip" aria-label="查看更新检测说明" data-info-tip="默认只检查已经建立本地下载状态的漫画。">!</button></div>
                         </div>
                         <button id="check-updates" class="primary">
                             检查下载内容更新
@@ -745,17 +759,13 @@
                         <div class="section-heading">
                             <div>
                                 <p class="eyebrow">本地更新</p>
-                                <h3>更新</h3>
+                                <div class="help-heading"><h3>更新</h3><button type="button" class="info-tip" aria-label="查看软件更新说明" data-info-tip="可直接检查并安装官方更新，也可以拖入或选择本地更新 ZIP 包。">!</button></div>
                             </div>
                             <span
                                 id="update-current-version"
                                 class="mode"
                             ></span>
                         </div>
-                        <p>
-                            可直接检查并安装官方更新，也可以拖入或选择本地更新
-                            ZIP 包。
-                        </p>
                         <label
                             id="update-dropzone"
                             class="update-dropzone"
@@ -811,8 +821,7 @@
                 <div id="repair" class="tab">
                     <div class="page-heading">
                         <div>
-                            <h2>文件修复</h2>
-                            <p>扫描缺失、空文件和失败记录。</p>
+                            <div class="help-heading"><h2>文件修复</h2><button type="button" class="info-tip" aria-label="查看文件修复说明" data-info-tip="扫描缺失、空文件和失败记录。">!</button></div>
                         </div>
                         <button id="scan-repair" class="primary">
                             扫描问题
@@ -823,8 +832,7 @@
                 <div id="authors" class="tab">
                     <div class="page-heading">
                         <div>
-                            <h2>作者归一</h2>
-                            <p>自动建议只作为候选，合并决定由用户确认。</p>
+                            <div class="help-heading"><h2>作者归一</h2><button type="button" class="info-tip" aria-label="查看作者归一说明" data-info-tip="自动建议只作为候选，合并决定由用户确认。">!</button></div>
                         </div>
                     </div>
                     <label
@@ -836,8 +844,7 @@
                 <div id="health" class="tab">
                     <div class="page-heading">
                         <div>
-                            <h2>健康检查</h2>
-                            <p>确认模式、数据统计和服务可用性。</p>
+                            <div class="help-heading"><h2>健康检查</h2><button type="button" class="info-tip" aria-label="查看健康检查说明" data-info-tip="确认模式、数据统计和服务可用性。">!</button></div>
                         </div>
                         <button id="run-health" class="primary">
                             运行检查
@@ -849,8 +856,7 @@
             <section id="settings" class="view">
                 <div class="page-heading">
                     <div>
-                        <h2>Settings</h2>
-                        <p>Manage this Windows installation.</p>
+                        <div class="help-heading"><h2>Settings</h2><button type="button" class="info-tip" aria-label="Settings help" data-info-tip="Manage this Windows installation.">!</button></div>
                     </div>
                     <span id="settings-version" class="mode"></span>
                 </div>
@@ -913,12 +919,40 @@
                         </button>
                     </div>
                 </form>
+                <article id="settings-recommendation-v4" class="panel">
+                    <div class="help-heading"><h3>推荐反馈与画风推荐</h3><button type="button" class="info-tip" aria-label="查看推荐反馈说明" data-info-tip="画风推荐是独立叠加模块。关闭时不改变常规推荐；“仅分析”只计算不改排序；“参与排序”才按所选强度影响推荐。喜欢/不喜欢会立即记录，反馈原因始终可选。">!</button></div>
+                    <label class="toggle-row"><input id="recommend-feedback-reasons-toggle" type="checkbox" /> 喜欢/不喜欢后询问可选原因</label>
+                    <hr />
+                    <label class="toggle-row"><input id="visual-enabled" type="checkbox" /> 启用画风推荐模块（关闭时不影响常规推荐）</label>
+                    <label>画风取样来源<select id="visual-sampling-mode"><option value="local_only">仅本地已下载正文</option><option value="standard">本地 + 在线收藏少量正文</option><option value="cover_only">仅封面（低置信度）</option></select></label>
+                    <label>推荐接入模式<select id="visual-rerank-mode"><option value="OFF">关闭排序影响</option><option value="SHADOW">仅分析：只计算不改排序</option><option value="LIVE">参与排序：按所选强度生效</option></select></label>
+                    <label>画风影响强度<select id="visual-strength"><option value="LIGHT">轻度 · 兼容旧权重</option><option value="STANDARD">标准 · 推荐</option><option value="STRONG">强 · 更强调画风</option></select></label>
+                    <div class="help-heading compact-help"><span>画风模型</span><button type="button" class="info-tip" aria-label="查看画风模型说明" data-info-tip="视觉模型在本机浏览器运行；首次使用会下载 Transformers.js 与 DINOv2 Small 模型。漫画页面仅从本机 Pica Library 服务读取，不上传给模型服务。">!</button></div>
+                    <p id="visual-index-status" class="status">尚未读取画风索引。</p>
+                    <progress id="visual-index-progress" max="1" value="0" hidden></progress>
+                    <p id="visual-index-message" class="status" aria-live="polite"></p>
+                    <div class="actions"><button id="visual-index-build" type="button" class="primary">建立 / 补全画风索引</button><button id="visual-index-stop" type="button" hidden>停止</button></div>
+                </article>
+                <details id="settings-ecosystem-packs" class="panel account-disclosure">
+                    <summary>
+                        <strong id="ecosystem-packs-title">推荐生态包状态</strong>
+                        · <span id="ecosystem-packs-summary">只读</span>
+                        <button
+                            type="button"
+                            class="info-tip"
+                            aria-label="查看生态包说明"
+                            data-info-tip="只检查本机生态包的版本、完整性和兼容性。当前阶段不会安装、启用或用生态包修改推荐结果。"
+                        >!</button>
+                    </summary>
+                    <div class="actions">
+                        <button id="ecosystem-packs-refresh" type="button">重新检查</button>
+                        <button id="ecosystem-packs-open" type="button">打开本地目录</button>
+                    </div>
+                    <p id="ecosystem-packs-message" class="status" role="status"></p>
+                    <div id="ecosystem-packs-list" class="list"></div>
+                </details>
                 <article id="settings-browser-lite" class="panel export-panel">
-                    <h3>Browser Lite</h3>
-                    <p>
-                        将当前漫画库导出为 Browser Lite 数据包，之后可在独立的
-                        Browser Lite 网页中导入使用。
-                    </p>
+                    <div class="help-heading"><h3>Browser Lite</h3><button type="button" class="info-tip" aria-label="查看 Browser Lite 说明" data-info-tip="将当前漫画库导出为 Browser Lite 数据包，之后可在独立的 Browser Lite 网页中导入使用。">!</button></div>
                     <div class="actions">
                         <button
                             id="export-browser-lite"
@@ -945,8 +979,7 @@
                     ></p>
                 </article>
                 <details id="settings-eh-account" class="panel account-disclosure">
-                    <summary><strong>E-Hentai / ExHentai 账号</strong> · 可选增强</summary>
-                    <p>E-H 公共搜索、阅读和下载无需登录。账号仅用于云收藏与 ExH 访问探测；Pica Library 不保存 E-H 密码，只保存你从官方站点会话中导入的 cookie，并由 Windows DPAPI 加密。</p>
+                    <summary><strong>E-Hentai / ExHentai 账号</strong> · 可选增强 <button type="button" class="info-tip" aria-label="查看 E-H 账号说明" data-info-tip="E-H 公共搜索、阅读和下载无需登录。推荐使用网页登录：Pica Library 会打开独立的 E-H 官方登录窗口，登录成功后自动检测、验证并加密保存会话；账号密码始终只提交给 E-H 官方页面。手动 Cookie 导入仅作为高级兜底。">!</button></summary>
                     <p id="eh-account-state" class="status"></p>
                     <details class="account-advanced">
                         <summary>高级 · 手动导入官方站点会话</summary>
@@ -958,7 +991,9 @@
                         </div>
                     </details>
                     <div class="actions">
-                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">打开官方登录页</a>
+                        <button id="eh-web-login-start" type="button" class="primary">网页登录（推荐）</button>
+                        <button id="eh-web-login-cancel" type="button" hidden>取消网页登录</button>
+                        <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Login" target="_blank" rel="noreferrer">默认浏览器打开官方登录页（手动）</a>
                         <a class="button-control" href="https://forums.e-hentai.org/index.php?act=Reg&amp;CODE=00" target="_blank" rel="noreferrer">打开官方注册页</a>
                         <button id="eh-account-save" type="button" class="primary">保存并验证会话</button>
                         <button id="eh-account-verify" type="button">重新验证</button>
@@ -969,8 +1004,7 @@
                     <p id="eh-account-message" class="status" role="status"></p>
                 </details>
                 <article id="settings-remote-storage" class="panel">
-                    <h3>远程存储 · WebDAV</h3>
-                    <p>把电脑已经下载的漫画增量同步到远程存储。Alpha7 使用 <code>PicaLibrary/v1</code> generation 结构；手机之后可在电脑关机时直接读取。</p>
+                    <div class="help-heading"><h3>远程存储 · WebDAV</h3><button type="button" class="info-tip" aria-label="查看 WebDAV 说明" data-info-tip="把电脑已下载的漫画增量同步到 WebDAV。同步完成后，即使电脑关机，手机也可以继续从远程存储读取。默认只做增量同步，不删除云端独有漫画；只有整轮上传成功后才会切换到新版本。">!</button></div>
                     <p id="remote-storage-state" class="status"></p>
                     <div class="settings-form">
                         <label class="wide">WebDAV 地址<input id="remote-webdav-url" placeholder="https://dav.example.com/path" /></label>
@@ -991,22 +1025,78 @@
                         <p class="status">预计上传 <span id="remote-plan-pages">0</span> 页 · <span id="remote-plan-bytes">0 B</span></p>
                         <div id="remote-plan-list"></div>
                     </div>
-                    <p class="status">默认只做增量/加法同步，不删除云端独有漫画。新 generation 完成后最后才切换 <code>current.json</code>。</p>
+
                 </article>
                 <article id="settings-mobile-bridge" class="panel">
-                    <h3>手机连接</h3>
-                    <p>让 Pica Library Android 在同一 Wi-Fi 下直接读取这台电脑的漫画库、推荐和已下载章节。</p>
+                    <div class="mobile-pair-heading">
+                        <h3>手机连接</h3>
+                        <button
+                            type="button"
+                            class="info-tip"
+                            aria-label="查看手机连接说明"
+                            data-info-tip="手机和电脑需在同一局域网。扫码、手动输入和配对链接只是三种不同的首次配对方式；配对完成后会使用设备令牌，不需要每次重新输入。首次连接如 Windows 弹出防火墙提示，请允许专用网络。"
+                        >!</button>
+                    </div>
                     <p id="mobile-bridge-state" class="status"></p>
                     <div id="mobile-bridge-details" hidden>
-                        <p><strong>电脑地址</strong></p>
-                        <code id="mobile-bridge-address"></code>
-                        <p><strong>6 位配对码</strong></p>
-                        <div id="mobile-bridge-code" style="font-size:2rem;font-weight:700;letter-spacing:.18em"></div>
-                        <p id="mobile-bridge-expiry" class="status"></p>
-                        <p id="mobile-bridge-devices" class="status"></p>
-                        <p class="status">首次连接如 Windows 弹出防火墙提示，请允许“专用网络”。</p>
+                        <details class="mobile-pair-method" open>
+                            <summary>
+                                <strong>扫码连接</strong>
+                                <span class="mobile-pair-badge">推荐</span>
+                            </summary>
+                            <div class="mobile-pair-method-body">
+                                <div id="mobile-bridge-qr" aria-label="手机配对二维码"></div>
+                                <div class="mobile-pair-inline">
+                                    <p id="mobile-bridge-expiry" class="status"></p>
+                                    <button id="mobile-bridge-refresh" type="button">刷新配对码</button>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="mobile-pair-method">
+                            <summary><strong>手动连接</strong></summary>
+                            <div class="mobile-pair-method-body">
+                                <p><strong>电脑地址</strong></p>
+                                <div class="mobile-pair-value">
+                                    <code id="mobile-bridge-address"></code>
+                                    <button id="mobile-bridge-copy-address" type="button">复制地址</button>
+                                </div>
+                                <p><strong>6 位配对码</strong></p>
+                                <div class="mobile-pair-value">
+                                    <div id="mobile-bridge-code" class="mobile-pair-code"></div>
+                                    <button id="mobile-bridge-copy-code" type="button">复制配对码</button>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="mobile-pair-method">
+                            <summary>
+                                <strong>配对链接</strong>
+                                <button
+                                    type="button"
+                                    class="info-tip"
+                                    aria-label="查看配对链接说明"
+                                    data-info-tip="这是扫码二维码中相同的 picalibrary:// Deep Link。主要用于无法扫码时复制到手机打开，不需要日常使用。"
+                                >!</button>
+                            </summary>
+                            <div class="mobile-pair-method-body">
+                                <div class="mobile-pair-value">
+                                    <code id="mobile-bridge-pair-link"></code>
+                                    <button id="mobile-bridge-copy-link" type="button">复制配对链接</button>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="mobile-pair-method">
+                            <summary>
+                                <strong>已配对设备</strong>
+                                <span id="mobile-bridge-device-count" class="mobile-pair-badge">0</span>
+                            </summary>
+                            <div class="mobile-pair-method-body">
+                                <p id="mobile-bridge-devices" class="status"></p>
+                            </div>
+                        </details>
                     </div>
-                    <button id="mobile-bridge-refresh" type="button">生成新配对码</button>
                 </article>
                 <article class="panel preview-cache-panel">
                     <h3>预览缓存</h3>
@@ -1017,6 +1107,27 @@
                 </article>
             </section>
         </main>
+        <dialog id="app-confirm-dialog" class="app-dialog ux-confirm-dialog">
+            <form method="dialog">
+                <h3 id="app-confirm-title">确认操作</h3>
+                <p id="app-confirm-message"></p>
+                <div class="actions">
+                    <button value="cancel">取消</button>
+                    <button id="app-confirm-submit" value="confirm" class="primary">确认</button>
+                </div>
+            </form>
+        </dialog>
+        <dialog id="app-prompt-dialog" class="app-dialog ux-prompt-dialog">
+            <form method="dialog">
+                <h3 id="app-prompt-title">输入内容</h3>
+                <label id="app-prompt-label">名称<input id="app-prompt-input" autocomplete="off" /></label>
+                <p id="app-prompt-message" class="status"></p>
+                <div class="actions">
+                    <button value="cancel">取消</button>
+                    <button id="app-prompt-submit" value="confirm" class="primary">确认</button>
+                </div>
+            </form>
+        </dialog>
         <dialog id="shelf-dialog" class="app-dialog">
             <form method="dialog">
                 <h3 id="shelf-dialog-title">加入书架</h3>
@@ -1035,6 +1146,21 @@
                     </button>
                 </div>
             </form>
+        </dialog>
+        <dialog id="recommend-feedback-dialog" class="app-dialog">
+            <div>
+                <h3 id="recommend-feedback-dialog-title">可选反馈原因</h3>
+                <p>不选择也没关系：喜欢/不喜欢已经记录。</p>
+                <div class="feedback-reasons">
+                    <label><input type="checkbox" value="style" /> 画风</label>
+                    <label><input type="checkbox" value="topic" /> 题材 / 标签</label>
+                    <label><input type="checkbox" value="author" /> 作者</label>
+                    <label><input type="checkbox" value="character" /> 角色 / IP</label>
+                    <label><input type="checkbox" value="already_seen" /> 已经看过</label>
+                    <label><input type="checkbox" value="repetitive" /> 推荐太重复</label>
+                </div>
+                <div class="actions"><button id="recommend-feedback-dialog-skip" type="button">跳过</button><button id="recommend-feedback-dialog-save" class="primary" type="button">保存原因</button></div>
+            </div>
         </dialog>
         <dialog id="recommend-detail-dialog" class="app-dialog detail-dialog">
             <button id="recommend-detail-close" class="dialog-close">
@@ -1058,6 +1184,8 @@
                 </div>
             </article>
         </template>
+        <script src="./vendor/qrcode.min.js"></script>
+        <script type="module" src="./info-tip-v1.js"></script>
         <script type="module" src="./app.js"></script>
         <script type="module" src="./alpha7-cloud.js"></script>
         <script type="module" src="./alpha8-product.js"></script>
@@ -1066,5 +1194,8 @@
         <script type="module" src="./alpha8-connections.js"></script>
         <script type="module" src="./alpha8-star-access.js"></script>
         <script type="module" src="./eh-account.js"></script>
+        <script type="module" src="./recommendation-v5.js"></script>
+        <script type="module" src="./ecosystem-pack-v1.js"></script>
+        <script type="module" src="./ui-polish-v5.js"></script>
     </body>
 </html>

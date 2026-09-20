@@ -244,15 +244,24 @@ describe('UpdateManager', () => {
         ).rejects.toThrow(/Updater replacement requires a full install/)
     })
 
-    it('requires a full install for incompatible API or database schemas', async () => {
+    it('requires a full application install for API changes or large schema jumps and blocks schema downgrade', async () => {
         for (const overrides of [
             { appApiVersion: APP_API_VERSION + 1 },
-            { databaseSchemaVersion: DATABASE_SCHEMA_VERSION - 1 },
             { databaseSchemaVersion: DATABASE_SCHEMA_VERSION + 2 }
         ])
             await expect(
                 manager().stage('update.zip', packageBuffer(overrides).buffer)
-            ).rejects.toThrow(/compatibility requires a full install/)
+            ).rejects.toThrow(/compatibility requires a full application install/i)
+
+        await expect(
+            manager().stage(
+                'update.zip',
+                packageBuffer({
+                    databaseSchemaVersion: DATABASE_SCHEMA_VERSION - 1,
+                    requiresFullInstall: true
+                }).buffer
+            )
+        ).rejects.toThrow(/schema downgrade is not supported/i)
 
         await expect(
             manager().stage(
@@ -423,6 +432,47 @@ describe('UpdateManager', () => {
             status: 'full-install',
             version: '0.3.0',
             releaseUrl
+        })
+    })
+
+    it('prefers a source-scoped official incremental asset for newer clients', async () => {
+        const releaseUrl =
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.1'
+        const scopedName =
+            'Pica-Library-v0.5.1-update-from-v0.5.0.zip'
+        const legacyName = 'Pica-Library-v0.5.1-update.zip'
+        const fetchImplementation = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        tag_name: 'v0.5.1',
+                        html_url: releaseUrl,
+                        draft: false,
+                        prerelease: false,
+                        assets: [
+                            {
+                                name: legacyName,
+                                browser_download_url:
+                                    `${releaseUrl}/download/${legacyName}`
+                            },
+                            {
+                                name: scopedName,
+                                browser_download_url:
+                                    `${releaseUrl}/download/${scopedName}`
+                            }
+                        ]
+                    }),
+                    { status: 200 }
+                )
+        ) as unknown as typeof fetch
+        await expect(
+            manager('0.5.0', fetchImplementation).checkForUpdate()
+        ).resolves.toEqual({
+            status: 'incremental',
+            version: '0.5.1',
+            releaseUrl,
+            assetName: scopedName,
+            assetUrl: `${releaseUrl}/download/${scopedName}`
         })
     })
 

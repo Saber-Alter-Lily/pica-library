@@ -8,6 +8,7 @@ import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
 import { Pica } from '../../src/sdk'
 import { PRODUCT_VERSION } from '../../src/version'
+import { DATABASE_SCHEMA_VERSION } from '../../src/app-capabilities'
 
 describe('local web server', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-server-'))
@@ -58,7 +59,7 @@ describe('local web server', () => {
         expect(capabilities).toMatchObject({
             appVersion: PRODUCT_VERSION,
             appApiVersion: 2,
-            databaseSchemaVersion: 8,
+            databaseSchemaVersion: DATABASE_SCHEMA_VERSION,
             updateManifestVersion: 1
         })
     })

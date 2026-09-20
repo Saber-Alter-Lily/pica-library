@@ -67,6 +67,11 @@ export interface SearchRequest {
     tags?: string[]
     categories?: string[]
     limit?: number
+    /**
+     * Optional single provider page for bounded retrieval. Existing callers
+     * that omit this keep the legacy all-pages behavior where supported.
+     */
+    page?: number
     surface?: EhSurface
     ehMode?: EhBrowseMode
     ehToplist?: string

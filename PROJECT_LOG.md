@@ -6,6 +6,15 @@
 
 > 本节记录尚未进入正式 Release 的核心研发能力。完成自动测试不等于正式发布；实机验证、合并与 Release 仍需单独授权。
 
+### Visual 模块与推荐批次性能
+
+- 画风推荐正式收敛为可独立关闭的叠加模块：OFF 时不改变常规推荐排序，SHADOW 只计算，LIVE 才参与排序；Desktop 与 Android 各自持有本地接入模式和强度，不因同步强制覆盖另一端。
+- Visual LIVE 新增轻度 / 标准 / 强三档影响强度。轻度保持旧版正文页约 8–10% 上限；标准提升至约 17–20%；强档约 26–30%；封面信号始终保持低权重，避免低置信度封面主导推荐。
+- 纠正 Visual V1 representation 定义：历史 V1 从第一版起即为 DINOv2 patch-token mean 的逐页表示再做多页稳健聚合，并非 CLS Global。现有索引继续作为权威兼容 serving 向量，不因研究结论重建。
+- 启动 Visual V2 加法式 Shadow 数据契约：同一次 DINOv2 推理同时得到 compact CLS 与 Patch Mean，两者只保存聚合向量，不保存完整 patch-token 矩阵；旧索引无需重跑即可继续工作。
+- Desktop 同一 Recommendation cycle 的批次切换改为复用冻结 serving snapshot，不再每点“下一批”都重复读取全量 catalog、重建 ranked pool 和 ownership/filter；batch allocation 只对当前 cycle 的内存候选执行。
+- Android 推荐周期本来已预生成全部批次；切换上一批 / 下一批现在只重绘批次状态和 12 张推荐卡片，不再销毁并重建整个推荐页、重复读取 Portable Candidate 包和统一书库。
+
 ### Android 阅读体验
 
 - Reader 章节末页增加显式“下一章 · 章节名”快捷入口；连续阅读与左右翻页统一使用同一章节切换逻辑，末页不再自动隐藏控制栏，最后一章明确显示“已读完”。

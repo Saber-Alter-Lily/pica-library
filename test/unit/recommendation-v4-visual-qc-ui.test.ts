@@ -6,8 +6,8 @@ const read = (path: string) => fs.readFileSync(path, 'utf8')
 describe('Visual V1 QC beta surface', () => {
     it('loads the additive QC surface without rebuilding embeddings on startup', () => {
         const runtime = read('web/visual-runtime.js')
-        const qc = read('web/visual-qc-beta.js')
-        expect(runtime).toContain("import('./visual-qc-beta.js')")
+        const qc = read('web/visual-qc.js')
+        expect(runtime).toContain("import('./visual-qc.js')")
         expect(qc).toContain("a88Api('/api/v1/visual/status')")
         expect(qc).toContain('/api/v1/visual/similar/')
         expect(qc).toContain('只读取已冻结的 Visual V1 embedding')
@@ -35,7 +35,7 @@ describe('Visual V1 QC beta surface', () => {
     })
 
     it('provides actionable pending diagnostics and persistent human QC ratings', () => {
-        const qc = read('web/visual-qc-beta.js')
+        const qc = read('web/visual-qc.js')
         expect(qc).toContain('pica-visual-qc-ratings-v1')
         expect(qc).toContain('pica-visual-index-failures-v1')
         for (const category of ['READY_TO_RETRY','NETWORK_TRANSIENT','PROVIDER_ACCESS','NO_BODY_PAGES','IMAGE_INVALID','MODEL_FAILURE','SAVE_FAILURE'])

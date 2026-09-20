@@ -7,6 +7,7 @@ import {
     normalizeLevelDeltaV5
 } from '../../src/recommendation-v5/portable-policy'
 import { explicitRetrievalIntentsV5 } from '../../src/recommendation-v5/explicit-intents'
+import { releasedUpdateBaseline } from '../../src/update/released-baselines'
 
 const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
@@ -103,4 +104,23 @@ describe('v0.4.2 product contracts', () => {
         expect(css).toContain('#settings-update .ux-local-update-actions')
         expect(css).toContain('#settings-update #a83-update-live')
     })
+    it('pins one coordinated v0.4.2 / Android 44 release and v0.4.1 incremental baseline', () => {
+        const pkg = JSON.parse(read('package.json'))
+        const gradle = read('mobile/android-alpha2/app/build.gradle')
+        const windows = read('scripts/build-windows-package.ps1')
+        expect(pkg.version).toBe('0.4.2')
+        expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '44'")
+        expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.4.2'")
+        expect(releasedUpdateBaseline('0.4.1')).toMatchObject({
+            appApiVersion: 2,
+            advertisedDatabaseSchemaVersion: 13,
+            actualMigrationVersion: 13
+        })
+        expect(windows).toContain("$version -eq '0.4.2'")
+        expect(windows).toContain('Pica-Library-v0.4.1-windows-x64.zip')
+        expect(windows).toContain(
+            '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d'
+        )
+    })
+
 })

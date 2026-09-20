@@ -164,13 +164,13 @@ public final class RecommendationControlActivity extends Activity {
             if(group.size()==0)continue;
             boolean open=!q.isEmpty()||expanded.contains(group.id);
             LinearLayout section=SettingsRow.panel(this,null);
-            Button header=Ui.button(this,(open?"▾ ":"▸ ")+group.label+" · "+group.size()+" 项",v->{if(expanded.contains(group.id))expanded.remove(group.id);else expanded.add(group.id);renderSignals(currentQuery());},true);
+            Button header=Ui.foldHeader(this,(open?"▾ ":"▸ ")+group.label+" · "+group.size()+" 项",true,v->{if(expanded.contains(group.id))expanded.remove(group.id);else expanded.add(group.id);renderSignals(currentQuery());});
             section.addView(header,new LinearLayout.LayoutParams(-1,-2));
             if(open){
                 for(FacetGroup facet:group.facets.values()){
                     String expansionId=group.id+":"+facet.id;
                     boolean facetOpen=!q.isEmpty()||expandedFacets.contains(expansionId);
-                    Button facetHeader=Ui.button(this,(facetOpen?"▾ ":"▸ ")+facet.label+" · "+facet.rows.size()+" 项",v->{if(expandedFacets.contains(expansionId))expandedFacets.remove(expansionId);else expandedFacets.add(expansionId);renderSignals(currentQuery());},true);
+                    Button facetHeader=Ui.foldHeader(this,(facetOpen?"▾ ":"▸ ")+facet.label+" · "+facet.rows.size()+" 项",false,v->{if(expandedFacets.contains(expansionId))expandedFacets.remove(expansionId);else expandedFacets.add(expansionId);renderSignals(currentQuery());});
                     LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,-2);fp.setMargins(0,Ui.dp(this,5),0,0);section.addView(facetHeader,fp);
                     if(facetOpen)addFacetWindow(section,facet.rows);
                 }

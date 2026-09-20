@@ -99,7 +99,7 @@ public final class RecommendationStyleActivity extends Activity {
 
     private void chooseMobileVisualMode(){
         String current=MobileVisualPolicyStore.mode(this);
-        String[] labels={"关闭 · 完全不影响常规推荐","Shadow · 只计算不改本机排序","Live · 按所选强度参与本机排序"};
+        String[] labels={"关闭 · 完全不影响常规推荐","仅分析 · 不改变本机排序","参与排序 · 按所选强度生效"};
         String[] values={MobileVisualPolicyStore.OFF,MobileVisualPolicyStore.SHADOW,MobileVisualPolicyStore.LIVE};
         int checked=MobileVisualPolicyStore.OFF.equals(current)?0:MobileVisualPolicyStore.LIVE.equals(current)?2:1;
         new AlertDialog.Builder(this)
@@ -150,7 +150,7 @@ public final class RecommendationStyleActivity extends Activity {
             "Desktop 画风强度 · "+strength
         };
         new AlertDialog.Builder(this)
-            .setTitle("Desktop 画风实验设置")
+            .setTitle("Desktop 画风设置")
             .setItems(labels,(d,w)->{
                 if(w==0)loadDesktopVisual(true);
                 else if(w==1)updateDesktopVisual(!enabled,null,null);
@@ -162,7 +162,7 @@ public final class RecommendationStyleActivity extends Activity {
     }
 
     private void chooseDesktopMode(String current){
-        String[] labels={"关闭排序影响","Shadow · 只计算","Live · 按所选强度参与"};
+        String[] labels={"关闭排序影响","仅分析 · 不改变排序","参与排序 · 按所选强度生效"};
         String[] values={"OFF","SHADOW","LIVE"};
         int checked="OFF".equals(current)?0:"LIVE".equals(current)?2:1;
         new AlertDialog.Builder(this).setTitle("Desktop 推荐接入模式").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w],null);}).setNegativeButton("取消",null).show();

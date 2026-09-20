@@ -4,11 +4,13 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
+import android.view.TouchDelegate;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -52,10 +54,10 @@ final class Ui {
     static void stylePill(TextView v,Context c,String label,int bg,int fg){v.setText(label);v.setTextColor(fg);v.setTypeface(Typeface.DEFAULT,Typeface.BOLD);v.setBackground(rounded(bg,14,c));v.setPadding(dp(c,10),dp(c,5),dp(c,10),dp(c,5));}
     static Button button(Context c,String label,View.OnClickListener action,boolean compact){Button b=new Button(c);b.setText(label);b.setAllCaps(false);b.setTextColor(PRIMARY);b.setTextSize(compact?13f:14f);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(c,compact?44:48));b.setMinimumHeight(dp(c,compact?44:48));b.setPadding(dp(c,compact?10:14),dp(c,7),dp(c,compact?10:14),dp(c,7));b.setBackground(rounded(ACTION,Math.min(14,ThemePackStore.cardRadiusDp(c)),c));b.setOnClickListener(action);return b;}
     static Button infoButton(Context c,String title,String message){
-        Button b=new Button(c);b.setText("!");b.setAllCaps(false);b.setTextSize(12f);b.setTextColor(MUTED);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(0);b.setMinimumHeight(0);int size=dp(c,32);b.setLayoutParams(new LinearLayout.LayoutParams(size,size));b.setPadding(0,0,0,0);b.setGravity(Gravity.CENTER);b.setBackground(outlined(SURFACE,OUTLINE,16,c));b.setContentDescription(title+"说明");b.setOnClickListener(v->new AlertDialog.Builder(c).setTitle(title).setMessage(message).setPositiveButton("知道了",null).show());return b;
+        Button b=new Button(c);b.setText("!");b.setAllCaps(false);b.setTextSize(10f);b.setTextColor(MUTED);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(0);b.setMinimumHeight(0);int size=dp(c,24);b.setLayoutParams(new LinearLayout.LayoutParams(size,size));b.setPadding(0,0,0,0);b.setGravity(Gravity.CENTER);b.setBackground(outlined(SURFACE,OUTLINE,12,c));b.setContentDescription(title+"说明");b.setOnClickListener(v->new AlertDialog.Builder(c).setTitle(title).setMessage(message).setPositiveButton("知道了",null).show());return b;
     }
     static LinearLayout headingWithInfo(Context c,String title,float sp,String help){
-        LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(text(c,title,sp,TEXT,true),new LinearLayout.LayoutParams(0,-2,1));if(help!=null&&!help.trim().isEmpty()){LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(dp(c,32),dp(c,32));hp.setMargins(dp(c,6),0,0,0);Button info=infoButton(c,title,help);info.setLayoutParams(hp);row.addView(info);}return row;
+        LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.addView(text(c,title,sp,TEXT,true),new LinearLayout.LayoutParams(0,-2,1));if(help!=null&&!help.trim().isEmpty()){LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(dp(c,24),dp(c,24));hp.setMargins(dp(c,6),0,0,0);Button info=infoButton(c,title,help);info.setLayoutParams(hp);row.addView(info);row.post(()->{Rect hit=new Rect();info.getHitRect(hit);int extra=dp(c,12);hit.inset(-extra,-extra);row.setTouchDelegate(new TouchDelegate(hit,info));});}return row;
     }
 
     static ImageButton iconButton(Context c,int icon,String description,View.OnClickListener action){ImageButton b=new ImageButton(c);int size=dp(c,48);b.setLayoutParams(new LinearLayout.LayoutParams(size,size));b.setMinimumWidth(0);b.setMinimumHeight(0);b.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));b.setImageResource(icon);b.setColorFilter(PRIMARY);b.setBackground(rounded(ACTION,14,c));b.setContentDescription(description);b.setScaleType(ImageButton.ScaleType.CENTER_INSIDE);b.setOnClickListener(action);return b;}

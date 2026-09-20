@@ -36,6 +36,7 @@
 - Android 圆形说明按钮由 32dp 缩至 24dp，字体同步收紧；通过扩展 TouchDelegate 保持约 48dp 可点击区域，不改变 Desktop 说明按钮尺寸。
 
 - 启动 v0.4.0 → 下一正式版直升验收：冻结 public Schema 9 作为兼容基线，新增 Schema 9→当前版本的数据保留回归测试与独立 CI Gate；Windows 采用“完整应用替换、用户数据目录保留”路线，Android 正式发布必须满足同 package ID、versionCode>42、同签名证书并完成原地安装验收。
+- v0.4.1 最终发布为 Windows 跨代完整包升级增加独立升级助手：`Pica-Library-v0.4.1-upgrade-assistant.zip` 仅接受 v0.4.0→v0.4.1，固定校验官方完整包 SHA-256 与目标 SOURCE_SHA；自动识别/选择旧程序目录、保护 `%LOCALAPPDATA%\\Pica Library`、检测漫画库是否误置于程序目录、建立配置与 SQLite 快照、备份旧程序树、替换后执行版本/schema 健康检查，失败时自动回滚。助手通过 Windows PowerShell 5 真实解析 Gate 后作为 v0.4.1 Release 资产发布。
 - 升级审计发现并修复 schema authority 漂移：public v0.4.0 实际已迁移到 9 但 capabilities 仍声明 8，当前开发实际到 13 也仍声明 8；现改为 `DATABASE_SCHEMA_VERSION = latestMigrationVersion`，更新 manifest、capabilities 与兼容判断统一引用 migration 权威。
 - 正式更新资产开始区分来源版本：新版客户端优先识别 `Pica-Library-v<target>-update-from-v<source>.zip`，再兼容旧通用 `-update.zip`；跨 Schema 的下一正式版不得发布会被 public v0.4.0 误判为可增量更新的通用 ZIP，使旧客户端明确进入已有的完整安装 Release 路径。
 - 启动 Recommendation Ecosystem Pack V1 E1 Contract：参考成熟开源项目的 manifest/entity/device-identity 思路，将 Canonical Knowledge、Provider Intelligence、Tag/Alias、Visual Intelligence、Recommendation Policy 设计为版本化声明式 Pack；新增 manifest 类型、payload 路径安全、SHA-256 content root、dependency/publisher 校验，但本阶段不加载 Pack、不改变 serving。

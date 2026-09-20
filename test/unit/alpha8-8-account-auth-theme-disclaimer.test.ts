@@ -140,8 +140,8 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
         )
         expect(versionAtLeast(pkg.version, [0, 3, 8])).toBe(true)
         expect(androidVersionCode).toBeGreaterThanOrEqual(35)
-        expect(gradle).toMatch(
-            /PICA_ANDROID_VERSION_NAME'\)\s*\?:\s*'0\.1\.0-alpha8\./
+        expect(gradle).toContain(
+            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.1'"
         )
         expect(windows).toContain("'DISCLAIMER.md'")
         expect(windows).toContain("$version -eq '0.3.8'")

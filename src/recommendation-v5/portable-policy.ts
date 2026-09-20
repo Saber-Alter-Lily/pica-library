@@ -28,8 +28,9 @@ export interface PreferenceControlV5 {
     source: 'DESKTOP' | 'ANDROID'
     updatedAt: string
     /**
-     * User correction relative to the collection-derived baseline, expressed
-     * in 1..10 slider steps. Legacy controls may omit this field.
+     * User correction relative to the collection-derived baseline. The
+     * product slider uses 0..10 with 5 as the neutral manual starting point;
+     * the stored delta is bounded to -10..10. Legacy controls may omit it.
      */
     levelDelta?: number
 }
@@ -134,7 +135,7 @@ export function normalizePreferenceKey(value: unknown) {
 export function normalizeLevelDeltaV5(value: unknown) {
     const numeric = Number(value)
     if (!Number.isFinite(numeric)) return undefined
-    return Math.max(-9, Math.min(9, Math.round(numeric)))
+    return Math.max(-10, Math.min(10, Math.round(numeric)))
 }
 
 export const TEMPORARY_SUPPRESSION_DAYS_V5 = 30

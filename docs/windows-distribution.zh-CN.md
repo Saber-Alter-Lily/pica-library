@@ -8,12 +8,12 @@
 
 ## 下载与启动
 
-1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases) 下载 `Pica-Library-v0.2.0-windows-x64.zip`。
+1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.1 对应 `Pica-Library-v0.4.1-windows-x64.zip`。
 2. 完整解压到一个新文件夹，不要直接在压缩软件中运行。
 3. 双击 `Pica Library.exe`。
 4. 浏览器将自动打开首次启动向导；填写 Pica 账号和密码，选择漫画保存目录与下载模式，可按需填写 HTTP/HTTPS 代理。
 
-从 v0.1.3 升级到 v0.2.0 时，请下载并解压完整的 v0.2.0 Windows ZIP。v0.1.3 无法使用新的增量更新格式；v0.2.0 将作为后续兼容版本的更新器基线。
+软件会根据当前版本与目标版本自动判断能否安全增量更新。兼容时可在网页端直接更新；不兼容时会明确显示完整 Windows ZIP、Release 校验入口与替换步骤。
 
 无需系统 Node.js、npm、pnpm、Git、命令行或管理员权限。
 
@@ -43,14 +43,21 @@
 
 ## 升级
 
-程序文件与可变数据相互分离。升级时把新版 ZIP 解压到新目录并运行其中的程序，不要覆盖正在运行的旧目录；默认情况下，原有数据库、配置、缓存和下载不会被删除。发布说明另有迁移要求时，以发布说明为准。
+打开 **设置 → 软件更新** 后先点击“检查并更新（兼容时自动）”。
+
+- **兼容增量更新**：程序会下载、校验、暂存并在确认后自动重启完成更新。
+- **完整程序包更新**：网页会显示准确的 Windows ZIP 下载按钮和替换步骤。v0.4.0 → v0.4.1 属于这一类。
+- 完整包更新时，先完全退出 Pica Library，再把新版 ZIP 解压到新目录运行；也可以在旧版退出后替换旧程序目录。
+- **不要删除 `%LOCALAPPDATA%\\Pica Library`**。数据库、书架、阅读历史、设置、账号凭据与已下载内容位于独立用户数据目录，不需要卸载或重新导入。
+
+程序文件与可变数据相互分离。发布说明另有迁移要求时，以发布说明为准。
 
 ## 校验 SHA-256
 
 从同一官方 Release 下载 `SHA256SUMS.txt`，然后在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash .\Pica-Library-v0.2.0-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\Pica-Library-v0.4.1-windows-x64.zip -Algorithm SHA256
 ```
 
 将完整校验值与发布页提供的值逐字比较，一致后再解压运行。

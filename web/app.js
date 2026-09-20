@@ -3195,6 +3195,8 @@ async function loadVisualStatus() {
             value.settings?.samplingMode || 'local_only'
         $('#visual-rerank-mode').value =
             value.settings?.rerankMode || 'SHADOW'
+        $('#visual-strength').value =
+            value.settings?.strength || 'STANDARD'
         $('#visual-index-status').textContent = t('visual.indexStatus', {
             indexed: value.indexedCount || 0,
             target: value.targetCount || 0,
@@ -3212,7 +3214,8 @@ async function saveVisualSettings() {
     await post('/api/v1/visual/settings', {
         enabled: $('#visual-enabled').checked,
         samplingMode: $('#visual-sampling-mode').value,
-        rerankMode: $('#visual-rerank-mode').value
+        rerankMode: $('#visual-rerank-mode').value,
+        strength: $('#visual-strength').value
     })
     await loadVisualStatus()
 }
@@ -3306,6 +3309,7 @@ async function buildVisualIndex() {
 $('#visual-enabled').onchange = () => void saveVisualSettings()
 $('#visual-sampling-mode').onchange = () => void saveVisualSettings()
 $('#visual-rerank-mode').onchange = () => void saveVisualSettings()
+$('#visual-strength').onchange = () => void saveVisualSettings()
 $('#visual-index-build').onclick = () => void buildVisualIndex()
 $('#visual-index-stop').onclick = () => {
     state.visualIndexStopRequested = true

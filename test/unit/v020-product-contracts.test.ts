@@ -77,7 +77,7 @@ describe('v0.2.0 product UI and documentation contracts', () => {
 
     it('contains explicit update staging, confirmation and real phase labels', () => {
         expect(html).toContain('id="update-dropzone"')
-        expect(html).toContain('将 Pica Library 更新包拖到这里')
+        expect(html).toContain('将兼容的 Pica Library 增量更新 ZIP 拖到这里')
         expect(app).toContain("'/api/v1/update/stage'")
         expect(app).toContain("'/api/v1/update/apply'")
         expect(app).toContain("'/api/v1/update/check'")

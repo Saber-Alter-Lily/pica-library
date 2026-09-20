@@ -6,6 +6,17 @@
 
 > 本节记录尚未进入正式 Release 的核心研发能力。完成自动测试不等于正式发布；实机验证、合并与 Release 仍需单独授权。
 
+### Android 稳定性与性能收敛
+
+- 修复“推荐画像”“人工调整”点击后黑屏/卡死：两个页面不再在 Activity 首帧同步解析 Unified Catalog、Portable Policy、行为证据和 inferred profile；先渲染可见骨架，再由单独后台线程读取并一次性回填 UI。
+- Recommendation Local Profile 支持复用已加载的 Catalog + Policy snapshot，避免同一页面重复读取统一书库与重复解析 Portable Policy。
+- Native Recommendation 排序改为一次 cycle 内复用单份 Policy JSON；不再为每个候选重复解析人工调整状态。
+- Recommendation Evidence 最多 1000 条事件改为进程内缓存并预解析为结构化行；Recent / Session 打分不再为每个候选重复 JSON parse 与时间戳解析。
+- Portable Candidate Package 增加进程内文件签名缓存；同一 generation 在推荐页、画像页、设置页之间切换时不再反复读取和解析整份 JSON。
+- ReaderProgress 缓存当前漫画元数据，翻页写阅读进度时不再每页重读整个 Unified Catalog。
+- Home 与 Main 两套 Android 推荐页面的批次切换都改为局部重绘 12 张卡片，不再重建整页；NativeRecommendationStore 合并批次移动与曝光持久化，减少重复磁盘读写。
+- MainActivity 书架渲染去除逐漫画读取 Unified Catalog 的 N+1 路径，改为整页只读取一次目录。
+
 ### Visual 模块与推荐批次性能
 
 - 画风推荐正式收敛为可独立关闭的叠加模块：OFF 时不改变常规推荐排序，SHADOW 只计算，LIVE 才参与排序；Desktop 与 Android 各自持有本地接入模式和强度，不因同步强制覆盖另一端。

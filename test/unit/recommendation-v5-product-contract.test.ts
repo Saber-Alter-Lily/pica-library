@@ -29,12 +29,12 @@ describe('Recommendation V5 portable product contract', () => {
     it('exposes user-steerable persistent and session policy on Desktop and Android', () => {
         const server = read('src/library/server.ts')
         const index = read('web/index.html')
-        const web = read('web/recommendation-v5-beta.js')
+        const web = read('web/recommendation-v5.js')
         const activity = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java')
         const store = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationPolicyStore.java')
         expect(server).toContain('/api/v1/recommendation-v5/control')
         expect(server).toContain('/api/v1/recommendation-v5/session')
-        expect(index).toContain('recommendation-v5-beta.js')
+        expect(index).toContain('recommendation-v5.js')
         expect(web).toContain('你的推荐画像')
         expect(web).toContain('完整画像与微调 · 1–10 档')
         expect(web).toContain('1 = 尽量少推荐，10 = 非常喜欢')
@@ -48,7 +48,7 @@ describe('Recommendation V5 portable product contract', () => {
     })
 
     it('renders classified 10-step Desktop controls and explicit feedback acknowledgement', () => {
-        const web = read('web/recommendation-v5-beta.js')
+        const web = read('web/recommendation-v5.js')
         const service = read('src/library/service.ts')
         const theme = read('web/alpha8-theme-help.js')
         expect(web).toContain('type="range"')
@@ -65,7 +65,7 @@ describe('Recommendation V5 portable product contract', () => {
     it('separates factual recommendation dispositions from taste feedback', () => {
         const policy = read('src/recommendation-v5/policy-store.ts')
         const portable = read('src/recommendation-v5/portable-policy.ts')
-        const web = read('web/recommendation-v5-beta.js')
+        const web = read('web/recommendation-v5.js')
         expect(policy).toContain('setItemDisposition')
         expect(policy).toContain('recommendation_item_disposition')
         expect(portable).toContain('seenComicIds')
@@ -78,7 +78,7 @@ describe('Recommendation V5 portable product contract', () => {
     it('supports keeping a favorite while excluding it from taste inference', () => {
         const service = read('src/library/service.ts')
         const server = read('src/library/server.ts')
-        const web = read('web/recommendation-v5-beta.js')
+        const web = read('web/recommendation-v5.js')
         const portable = read('src/recommendation-v5/portable-policy.ts')
         expect(server).toContain(
             '/api/v1/recommendation-v5/taste-exclusion'
@@ -127,7 +127,7 @@ describe('Recommendation V5 portable product contract', () => {
         const policy = read('src/recommendation-v5/policy-store.ts')
         const service = read('src/library/service.ts')
         const server = read('src/library/server.ts')
-        const web = read('web/work-identity-review-beta.js')
+        const web = read('web/work-identity-review.js')
         expect(database).toContain('saveWorkIdentityDecision')
         expect(database).toContain('clearWorkIdentityDecision')
         expect(policy).toContain('setExplicitDistinctPair')
@@ -152,7 +152,7 @@ describe('Recommendation V5 portable product contract', () => {
         const identity = read(
             'src/recommendation-v5/work-identity-foundation.ts'
         )
-        const web = read('web/work-identity-review-beta.js')
+        const web = read('web/work-identity-review.js')
         expect(database).toContain('listWorkIdentityBindings')
         expect(identity).toContain(
             "WORK_IDENTITY_MATERIALIZATION_PLAN_VERSION"
@@ -488,7 +488,7 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v5/relevance-ranker.ts'
         )
-        const web = read('web/recommendation-v5-beta.js')
+        const web = read('web/recommendation-v5.js')
         const android = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java'
         )
@@ -776,7 +776,7 @@ describe('Recommendation V5 portable product contract', () => {
         const dashboard = read(
             'web/recommendation-v5-evaluation.js'
         )
-        const beta = read('web/recommendation-v5-beta.js')
+        const beta = read('web/recommendation-v5.js')
         const server = read('src/library/server.ts')
         expect(dashboard).toContain(
             '推荐系统评估 · V5 Development'
@@ -997,7 +997,7 @@ describe('Recommendation V5 portable product contract', () => {
     })
 
     it('makes work-identity review visual, detail-capable and undecided-first', () => {
-        const web = read('web/work-identity-review-beta.js')
+        const web = read('web/work-identity-review.js')
         const app = read('web/app.js')
         expect(web).toContain('/api/v1/covers/')
         expect(web).toContain('data-v5-id-detail')
@@ -1010,7 +1010,7 @@ describe('Recommendation V5 portable product contract', () => {
     })
 
     it('makes Visual QC detail reading independent of the current page DOM', () => {
-        const qc = read('web/visual-qc-beta.js')
+        const qc = read('web/visual-qc.js')
         expect(qc).toContain("'pica-open-reader'")
         expect(qc).not.toContain(
             '当前页面没有可直接复用的在线阅读入口'

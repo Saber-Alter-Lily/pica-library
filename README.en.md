@@ -6,16 +6,16 @@ Pica Library is a local-first manga library, discovery, download, and reading ap
 
 Windows provides full management and downloading. Android provides mobile reading, online discovery, and remote access. Web/Desktop and Android share the same source model, preference semantics, recommendation logic, and reading model while adapting interaction layout to each screen.
 
-## v0.4.0 highlights
+## v0.4.1 highlights
 
-- **Online → Sources**: adds E-Hentai; ExHentai remains an optional capability under the E-H account/session.
-- **Online → E-H Browse**: Latest, Popular, Favorites, Watched, Categories, Toplists, and advanced filters.
-- **Tags**: uses EhTagTranslation for Chinese presentation while retaining canonical E-H tags as identity.
-- **Recommendations**: Pica and E-H favorites jointly build the preference profile; ExH only expands recall when available.
-- **Comic Details → Author**: adds normalized author directory and cross-source author works.
-- **Library → History**: restores reading history with time ranges, exact dates, and resume.
-- **Library → Filters**: separates storage location from content provider and keeps sorting independent.
-- **Desktop / Web**: aligns the new multi-source, author, history, and E-H interaction logic with Android.
+- **Android top-level navigation**: Library, Recommendations, Online, and Settings now switch inside one Home surface; Online and Settings no longer use visibly different Activity transitions.
+- **Android responsiveness**: recommendation profile/control data loads off the UI thread; policy, evidence, portable candidates, and hot metadata paths reuse parsed state.
+- **Recommendation batches**: Desktop reuses a frozen serving snapshot within a cycle; Android rerenders only the current 12-item batch.
+- **Visual recommendations**: independent opt-in module with Off / Analyze only / Apply modes and Light / Standard / Strong influence levels.
+- **Visual index compatibility**: existing DINOv2 Patch Mean indexes remain valid while new indexing can retain compact CLS and Patch Mean views from the same inference pass.
+- **Reader and history**: explicit next-chapter action at chapter end; history groups by comic while preserving chapter progress and covers.
+- **Mobile hierarchy**: primary disclosure groups, secondary groups, and concrete controls now use distinct typography and surfaces.
+- **Formal distribution**: Windows supports direct incremental update from v0.4.0; Android advances to versionCode 43 with the same package ID and signing identity.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 

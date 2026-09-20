@@ -74,7 +74,7 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(history).toContain('CoverRepository.load(this,cover')
     expect(history).toContain('已记录 "+chapters.size()+" 个章节')
     expect(history).toContain('setTitle(group.latest.title+" · 章节记录")')
-    expect(history).not.toContain('for(ReadingHistoryStore.Session row:rows)')
+    expect(history).not.toContain('private void addSession(')
   })
 
   it('keeps E-H browse and filter compact actions in one row', () => {

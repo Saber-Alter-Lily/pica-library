@@ -3280,7 +3280,8 @@ async function buildVisualIndex() {
                               ? 0.85
                               : 0.5,
                     metadata: {
-                        sampleIds: prepared.samples.map((item) => item.sampleId)
+                        sampleIds: prepared.samples.map((item) => item.sampleId),
+                        representations: result.representations || null
                     }
                 })
             } catch (error) {

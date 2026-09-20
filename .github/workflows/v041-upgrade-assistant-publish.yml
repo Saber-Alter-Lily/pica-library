@@ -1,0 +1,28 @@
+name: Publish v0.4.1 Upgrade Assistant
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v041-upgrade-assistant-publish.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  publish-assistant:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - name: Publish validated v0.4.1 upgrade assistant
+        shell: powershell
+        run: .\scripts\publish-v041-upgrade-assistant.ps1

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/v041-upgrade-assistant-publish.yml'
+      - 'scripts/publish-v041-upgrade-assistant.ps1'
 
 permissions:
   contents: read

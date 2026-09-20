@@ -181,8 +181,7 @@ public class MainActivity extends Activity {
     private void switchNativeRecommendationBatch(int direction){
         if(recommendationBatchList==null||recommendationBatchStatus==null)return;
         NativeRecommendationStore.Snapshot snapshot=direction<0?NativeRecommendationStore.previousBatch(this):NativeRecommendationStore.nextBatch(this);
-        NativeRecommendationStore.markCurrentSeen(this);
-        renderNativeRecommendationBatch(NativeRecommendationStore.load(this));
+        renderNativeRecommendationBatch(snapshot);
     }
 
     private void renderNativeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){

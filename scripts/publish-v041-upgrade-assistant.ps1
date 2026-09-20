@@ -40,15 +40,16 @@ if ($errors.Count -gt 0) {
 }
 
 $source = Get-Content -Raw -LiteralPath $assistantScript
-foreach ($needle in @(
-    "$" + "RequiredSourceVersion = '0.4.0'",
-    "$" + "TargetVersion = '0.4.1'",
+$requiredContracts = @(
+    '$RequiredSourceVersion = ''0.4.0''',
+    '$TargetVersion = ''0.4.1''',
     '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d',
     '974d4e9b22379aeed379b71711008332acc213a4',
     'Save-SafetySnapshot',
     'Rollback-Upgrade',
     'Assert-UserDataOutsideInstall'
-)) {
+)
+foreach ($needle in $requiredContracts) {
     if (-not $source.Contains($needle)) {
         throw "Assistant safety contract is missing: $needle"
     }

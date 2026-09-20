@@ -186,6 +186,95 @@ describe('SQLite migrations', () => {
         migrated.close()
     })
 
+    it('upgrades public v0.4.0 schema 9 state through all current migrations without data loss', () => {
+        const databaseFile = file()
+        const v040 = new DatabaseSync(databaseFile)
+        runMigrations(
+            v040,
+            migrations.filter((item) => item.version <= 9)
+        )
+        const now = '2026-09-20T00:00:00.000Z'
+        v040.prepare(
+            `INSERT INTO authors(
+                id, canonical_name, normalized_key, confidence, evidence,
+                review_status, created_at, updated_at
+            ) VALUES (?, ?, ?, 1, ?, 'approved', ?, ?)`
+        ).run('author-v040','V040 Author','v040 author','public-v0.4.0',now,now)
+        v040.prepare(
+            `INSERT INTO comics(
+                id, title, raw_author, canonical_author_id, description,
+                categories_json, tags_json, finished, is_favorite,
+                first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)`
+        ).run('comic-v040','V040 Comic','V040 Author','author-v040','preserve-v040','["category"]','["tag"]',now,now)
+        v040.prepare(
+            `INSERT INTO comic_provider_metadata(
+                comic_id, provider_id, provider_remote_id,
+                alternate_titles_json, completion_status,
+                provider_metadata_json, first_seen_at, last_seen_at
+            ) VALUES (?, 'pica', ?, '[]', 'FINISHED', '{}', ?, ?)`
+        ).run('comic-v040','remote-v040',now,now)
+        v040.prepare(
+            `INSERT INTO app_state(key,value_json,updated_at)
+             VALUES ('v040-sentinel','{"keep":true}',?)`
+        ).run(now)
+        v040.prepare(
+            `INSERT INTO user_events(
+                id, occurred_at, event_type, comic_id, metadata_json, created_at
+            ) VALUES ('event-v040',?,'recommend_detail_open','comic-v040','{}',?)`
+        ).run(now,now)
+        v040.close()
+
+        const upgraded = new LibraryDatabase(databaseFile)
+        expect(upgraded.getComic('comic-v040')).toMatchObject({
+            comicId: 'comic-v040',
+            title: 'V040 Comic',
+            author: 'V040 Author',
+            isFavorite: true
+        })
+        expect(upgraded.getAppState('v040-sentinel')).toEqual({ keep: true })
+        upgraded.close()
+
+        const verified = new DatabaseSync(databaseFile)
+        expect(
+            verified.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()
+        ).toMatchObject({ version: latestMigrationVersion })
+        expect(
+            verified.prepare('SELECT description FROM comics WHERE id = ?').get('comic-v040')
+        ).toMatchObject({ description: 'preserve-v040' })
+        expect(
+            verified.prepare('SELECT provider_remote_id FROM comic_provider_metadata WHERE comic_id = ?').get('comic-v040')
+        ).toMatchObject({ provider_remote_id: 'remote-v040' })
+        expect(
+            verified.prepare('SELECT event_type FROM user_events WHERE id = ?').get('event-v040')
+        ).toMatchObject({ event_type: 'recommend_detail_open' })
+        for (const table of [
+            'visual_embeddings',
+            'canonical_series',
+            'canonical_works',
+            'work_editions',
+            'work_upload_bindings',
+            'work_identity_evidence',
+            'work_identity_decisions',
+            'work_identity_materialization_runs'
+        ])
+            expect(
+                verified.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?").get(table)
+            ).toBeTruthy()
+        verified.close()
+
+        const backup = `${databaseFile}.pre-migration-v${latestMigrationVersion}.bak`
+        expect(fs.existsSync(backup)).toBe(true)
+        const backedUp = new DatabaseSync(backup)
+        expect(
+            backedUp.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()
+        ).toMatchObject({ version: 9 })
+        expect(
+            backedUp.prepare('SELECT description FROM comics WHERE id = ?').get('comic-v040')
+        ).toMatchObject({ description: 'preserve-v040' })
+        backedUp.close()
+    })
+
     it('upgrades public v0.1.3-style state to v0.2.0 without data loss', () => {
         const databaseFile = file()
         const legacy = new DatabaseSync(databaseFile)

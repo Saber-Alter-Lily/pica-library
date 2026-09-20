@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => fs.readFileSync(path, 'utf8')
 
-describe('Alpha8.11 no-payment release baseline', () => {
+describe('Alpha8.11 no-embedded-payment release baseline', () => {
     it('removes every bundled payment QR destination and renderer', () => {
         expect(fs.existsSync('web/support-wechat.svg')).toBe(false)
         expect(fs.existsSync('web/support-alipay.svg')).toBe(false)
@@ -24,13 +24,19 @@ describe('Alpha8.11 no-payment release baseline', () => {
         expect(gradle).not.toContain('com.google.zxing')
     })
 
-    it('keeps support non-monetary and points only to the GitHub project', () => {
+    it('allows voluntary external sponsorship without bundling payment flows or capability gates', () => {
         const desktop = read('web/alpha8-product.js')
-        const about = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AboutActivity.java')
+        const support = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SupportActivity.java')
+        const settings = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsActivity.java')
         expect(desktop).toContain('支持项目')
+        expect(desktop).toContain('https://afdian.com/a/PicaLibrary')
+        expect(desktop).toContain('赞助不会解锁额外功能、内容或权限')
+        expect(settings).toContain('SupportActivity.class')
+        expect(support).toContain('https://afdian.com/a/PicaLibrary')
+        expect(support).toContain('赞助完全自愿')
+        expect(support).toContain('不会解锁额外功能')
         expect(desktop).toContain('GitHub 项目主页')
-        expect(about).toContain('GitHub 项目主页')
-        for (const source of [desktop, about]) expect(source).not.toMatch(/赞助|捐赠|充电|收款|付款|打赏/)
+        expect(support).toContain('GitHub 项目主页')
     })
 
     it('does not market GitHub Star as the personalization selling point in release docs', () => {
@@ -40,7 +46,7 @@ describe('Alpha8.11 no-payment release baseline', () => {
         expect(docs).not.toContain('Personalization:\nThe official-build personalization gate is a GitHub Star')
     })
 
-    it('retains the no-payment baseline in subsequent versions', () => {
+    it('retains the no-embedded-payment baseline in subsequent versions', () => {
         const pkg = JSON.parse(read('package.json')) as { version: string }
         const gradle = read('mobile/android-alpha2/app/build.gradle')
         const [major, minor, patch] = pkg.version.split('.').map(Number)

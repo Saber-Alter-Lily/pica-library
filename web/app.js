@@ -487,6 +487,7 @@ function renderStagedUpdate(value) {
         }
     )}`
     $('#update-apply').hidden = Boolean(value.requiresFullInstall)
+    clearFullInstallGuide()
     $('#update-message').textContent = value.requiresFullInstall
         ? t('update.fullRequired')
         : t('update.staged')
@@ -502,6 +503,7 @@ async function stageUpdateFile(file) {
     if (!desktop) throw new Error(t('update.localOnly'))
     if (!file || !file.name.toLowerCase().endsWith('.zip'))
         throw new Error(t('update.chooseZip'))
+    clearFullInstallGuide()
     $('#update-message').textContent = t('update.validating')
     renderUpdateProgress({ phase: 'validating' })
     const response = await fetch('/api/v1/update/stage', {
@@ -536,6 +538,29 @@ async function applyStagedUpdate(
     renderUpdateProgress({ phase: 'waiting-for-exit' })
 }
 
+function fullInstallDownloadUrl(version) {
+    const encoded = encodeURIComponent(String(version || '').trim())
+    return `https://github.com/Saber-Alter-Lily/pica-library/releases/download/v${encoded}/Pica-Library-v${encoded}-windows-x64.zip`
+}
+
+function renderFullInstallGuide(value) {
+    const message = $('#update-message')
+    const version = String(value?.version || '').trim()
+    const releaseUrl =
+        String(value?.releaseUrl || '').trim() ||
+        `https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v${encodeURIComponent(version)}`
+    message.classList.add('full-install-guide')
+    message.innerHTML = t('update.fullGuide', {
+        version: escapeHtml(version),
+        downloadUrl: escapeHtml(fullInstallDownloadUrl(version)),
+        releaseUrl: escapeHtml(releaseUrl)
+    })
+}
+
+function clearFullInstallGuide() {
+    $('#update-message')?.classList.remove('full-install-guide')
+}
+
 const updateDropzone = $('#update-dropzone')
 ;['dragenter', 'dragover'].forEach((name) =>
     updateDropzone.addEventListener(name, (event) => {
@@ -567,6 +592,7 @@ $('#update-file').onchange = (event) => {
 }
 $('#update-check').onclick = async (event) => {
     const message = $('#update-message')
+    clearFullInstallGuide()
     if (!desktop) {
         message.textContent = t('update.localOnly')
         return
@@ -580,10 +606,7 @@ $('#update-check').onclick = async (event) => {
                 return
             }
             if (value.status === 'full-install') {
-                message.innerHTML = t('update.fullFound', {
-                    version: escapeHtml(value.version),
-                    url: escapeHtml(value.releaseUrl)
-                })
+                renderFullInstallGuide(value)
                 return
             }
             message.innerHTML = t('update.incrementalFound', {
@@ -598,6 +621,7 @@ $('#update-check').onclick = async (event) => {
 $('#update-one-click').onclick = async () => {
     const button = $('#update-one-click')
     const message = $('#update-message')
+    clearFullInstallGuide()
     if (!desktop) {
         message.textContent = t('update.localOnly')
         return
@@ -611,10 +635,7 @@ $('#update-one-click').onclick = async () => {
             return
         }
         if (available.status === 'full-install') {
-            message.innerHTML = t('update.fullFound', {
-                version: escapeHtml(available.version),
-                url: escapeHtml(available.releaseUrl)
-            })
+            renderFullInstallGuide(available)
             return
         }
         if (
@@ -634,10 +655,7 @@ $('#update-one-click').onclick = async () => {
             return
         }
         if (staged.status === 'full-install') {
-            message.innerHTML = t('update.fullFound', {
-                version: escapeHtml(staged.version),
-                url: escapeHtml(staged.releaseUrl)
-            })
+            renderFullInstallGuide(staged)
             renderUpdateProgress({ phase: 'idle' })
             return
         }

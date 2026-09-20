@@ -46,7 +46,7 @@ final class MobileVisualPolicyStore {
     static String label(Context c){
         String value=mode(c);
         if(OFF.equals(value))return "关闭 · 不影响常规推荐";
-        if(LIVE.equals(value))return "Live · "+strengthLabel(c)+"强度";
-        return "Shadow · 只计算不改本机排序";
+        if(LIVE.equals(value))return "参与排序 · "+strengthLabel(c)+"强度";
+        return "仅分析 · 不改变本机排序";
     }
 }

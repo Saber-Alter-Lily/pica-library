@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const source = fs.readFileSync('web/recommendation-v5-beta.js', 'utf8')
+const source = fs.readFileSync('web/recommendation-v5.js', 'utf8')
 
 describe('Recommendation V5 UI stability', () => {
     it('does not let the library MutationObserver rewrite taste controls forever', () => {

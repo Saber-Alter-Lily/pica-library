@@ -59,6 +59,24 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(history).toContain('ReaderProgress.seedOneShotPosition(this,row.comicId,row.chapterId,row.lastPage)')
   })
 
+  it('groups mobile history by comic, shows covers and preserves chapter metadata', () => {
+    const reader = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java','utf8')
+    const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
+    const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')
+    const history = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java','utf8')
+    expect(reader).toContain('chapterAdvance.setText("下一章 · "+target.title)')
+    expect(reader).toContain('progress.chapterMetadata(data.episode.id,data.episode.title,data.episode.order)')
+    expect(reader).toContain('if(atChapterEnd())setChrome(true)')
+    expect(progress).toContain('void chapterMetadata(String chapterId,String chapterTitle,int chapterOrder)')
+    expect(store).toContain('chapterOrder')
+    expect(store).toContain('o.put("chapterOrder",v.chapterOrder)')
+    expect(history).toContain('List<ComicHistory> groups=grouped(rows)')
+    expect(history).toContain('CoverRepository.load(this,cover')
+    expect(history).toContain('已记录 "+chapters.size()+" 个章节')
+    expect(history).toContain('setTitle(group.latest.title+" · 章节记录")')
+    expect(history).not.toContain('for(ReadingHistoryStore.Session row:rows)')
+  })
+
   it('keeps E-H browse and filter compact actions in one row', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java','utf8')
     expect(browse).toContain('Button browse=button("浏览"')

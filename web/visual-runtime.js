@@ -43,41 +43,42 @@ export function aggregateVisualPages(vectors) {
     return mean(ranked.slice(drop).map((row) => row.vector))
 }
 
-function tensorVector(output) {
+function tensorViews(output) {
     let value = output
     if (Array.isArray(value) && value.length === 1) value = value[0]
-    if (value?.tolist && !value.data) value = value.tolist()
+    const fromFlat = (flat, dimension, dims = []) => {
+        if (!dimension || flat.length % dimension !== 0)
+            throw new Error('视觉模型输出维度无法识别')
+        const tokens = flat.length / dimension
+        if (tokens <= 1) {
+            const vector = l2(flat.slice(0, dimension))
+            return { cls: vector, patchMean: vector, tokenCount: tokens, dims }
+        }
+        const cls = l2(flat.slice(0, dimension))
+        const averaged = Array.from({ length: dimension }, () => 0)
+        const count = tokens - 1
+        for (let token = 1; token < tokens; token++)
+            for (let index = 0; index < dimension; index++)
+                averaged[index] += flat[token * dimension + index] / count
+        return {
+            cls,
+            patchMean: l2(averaged),
+            tokenCount: tokens,
+            dims
+        }
+    }
     if (value?.data) {
         const data = Array.from(value.data, Number)
         const dims = Array.isArray(value.dims) ? value.dims.map(Number) : []
         const dimension = dims.at(-1) || 384
-        if (data.length === dimension) return l2(data)
-        if (data.length % dimension !== 0)
-            throw new Error('视觉模型输出维度无法识别')
-        const tokens = data.length / dimension
-        const averaged = Array.from({ length: dimension }, () => 0)
-        // DINO output normally contains CLS plus patch tokens. Averaging patch tokens
-        // reduces dependence on a single semantic object and better represents style.
-        const firstToken = tokens > 1 ? 1 : 0
-        const count = Math.max(1, tokens - firstToken)
-        for (let token = firstToken; token < tokens; token++)
-            for (let index = 0; index < dimension; index++)
-                averaged[index] += data[token * dimension + index] / count
-        return l2(averaged)
+        return fromFlat(data, dimension, dims)
     }
     if (Array.isArray(value)) {
         const flat = value.flat(Infinity).map(Number)
-        if (flat.length === 384) return l2(flat)
-        if (flat.length > 384 && flat.length % 384 === 0) {
-            const vectors = []
-            for (let offset = 0; offset < flat.length; offset += 384)
-                vectors.push(l2(flat.slice(offset, offset + 384)))
-            return mean(vectors.slice(vectors.length > 1 ? 1 : 0))
-        }
+        return fromFlat(flat, flat.length >= 384 && flat.length % 384 === 0 ? 384 : flat.length)
     }
     throw new Error('视觉模型没有返回可读取的 embedding')
 }
-
 async function loadExtractor(onProgress) {
     if (!extractorPromise)
         extractorPromise = (async () => {
@@ -106,21 +107,41 @@ export async function analyzeVisualSamples(samples, onProgress) {
     const usable = (samples || []).filter((sample) => sample?.url).slice(0, 6)
     if (!usable.length) throw new Error('没有可用于画风分析的页面')
     const extractor = await loadExtractor(onProgress)
-    const vectors = []
+    const clsPages = []
+    const patchMeanPages = []
+    let tokenCount = 0
     for (let index = 0; index < usable.length; index++) {
         const sample = usable[index]
         onProgress?.({ phase: 'page', current: index + 1, total: usable.length, sample })
         const output = await extractor(new URL(sample.url, location.origin).toString())
-        vectors.push(tensorVector(output))
+        const views = tensorViews(output)
+        clsPages.push(views.cls)
+        patchMeanPages.push(views.patchMean)
+        tokenCount = Math.max(tokenCount, Number(views.tokenCount || 0))
     }
-    const vector = aggregateVisualPages(vectors)
+    const patchMeanVector = aggregateVisualPages(patchMeanPages)
+    const globalClsVector = aggregateVisualPages(clsPages)
     return {
-        vector,
-        dimension: vector.length,
-        sampleCount: vectors.length,
+        // Backward-compatible serving vector. Visual V1 has always used
+        // patch-token mean per page followed by robust multi-page aggregation.
+        vector: patchMeanVector,
+        dimension: patchMeanVector.length,
+        sampleCount: patchMeanPages.length,
         modelId: VISUAL_RUNTIME.modelId,
         modelVersion: VISUAL_RUNTIME.modelVersion,
-        samplingPolicyVersion: VISUAL_RUNTIME.samplingPolicyVersion
+        samplingPolicyVersion: VISUAL_RUNTIME.samplingPolicyVersion,
+        representations: {
+            version: 'visual-representation-v2-cls-patchmean-shadow',
+            globalCls: {
+                vector: globalClsVector,
+                dimension: globalClsVector.length
+            },
+            patchMean: {
+                vector: patchMeanVector,
+                dimension: patchMeanVector.length
+            },
+            tokenCount
+        }
     }
 }
 

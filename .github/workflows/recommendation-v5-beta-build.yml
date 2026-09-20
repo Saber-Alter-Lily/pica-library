@@ -6,6 +6,7 @@ on:
       - feature/recommendation-v5-portable-policy
       - tmp-v5-p2a-decisions
       - feature/v040-upgrade-ecosystem-gate
+      - feature/visual-module-batch-speed
   pull_request:
     branches:
       - feature/recommendation-v5-portable-policy

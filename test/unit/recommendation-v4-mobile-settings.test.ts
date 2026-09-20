@@ -37,6 +37,28 @@ describe('Recommendation V4 mobile settings surface', () => {
         expect(main).not.toContain('NativeRecommendationStore.nextBatch(this);showTab()')
     })
 
+    it('loads heavy recommendation profile/control data off the UI thread and caches hot evidence', () => {
+        const profile = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationProfileActivity.java')
+        const control = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java')
+        const evidence = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationEvidenceStore.java')
+        const localProfile = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationLocalProfile.java')
+        const reader = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java')
+        const home = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java')
+        expect(profile).toContain('Executors.newSingleThreadExecutor()')
+        expect(profile).toContain('private void loadAsync()')
+        expect(profile).toContain('worker.submit')
+        expect(profile).not.toContain('renderShell();render();')
+        expect(control).toContain('Executors.newSingleThreadExecutor()')
+        expect(control).toContain('loadedInferred')
+        expect(control).toContain('RecommendationLocalProfile.inferred(app,catalog,state)')
+        expect(evidence).toContain('cachedEvents')
+        expect(evidence).toContain('cachedRaw')
+        expect(localProfile).toContain('UnifiedCatalogStore.Snapshot catalog,JSONObject remoteSnapshot')
+        expect(reader).toContain('ensureComicMetadata(comic)')
+        expect(home).toContain('switchHomeRecommendationBatch')
+        expect(home).not.toContain('RecommendationPolicyStore.moveVisibleBatch(this,1);show()')
+    })
+
     it('keeps E-H with Pica in General instead of a separate desktop account section', () => {
         const hub = read('web/alpha8-7-desktop-hub.js')
         expect(hub).not.toContain("['accounts', 'accounts']")

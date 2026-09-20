@@ -5,16 +5,32 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.*;
 import java.util.*;
+import java.util.concurrent.*;
 import org.json.*;
 
 /** Android-local recommendation profile and current runtime explanation. */
 public final class RecommendationProfileActivity extends Activity {
+    private static final class ProfileData {
+        JSONObject policy;
+        JSONArray localControls,inferred;
+        UnifiedCatalogStore.Snapshot catalog;
+        NativeRecommendationStore.Snapshot runtime;
+        PortableRecommendationPackageStore.Snapshot portable;
+        List<RecommendationEvidenceStore.Signal> recentSignals,sessionSignals;
+        int localFavorites,localOwned,recentCount,sessionCount,visualCount;
+    }
+
     private LinearLayout content;
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private int loadGeneration;
+    private boolean destroyed;
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);Ui.applyWindow(this);renderShell();
     }
-    @Override protected void onResume(){super.onResume();render();}
+    @Override protected void onResume(){super.onResume();loadAsync();}
+    @Override protected void onDestroy(){destroyed=true;++loadGeneration;worker.shutdownNow();super.onDestroy();}
+
     private void renderShell(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
@@ -22,22 +38,61 @@ public final class RecommendationProfileActivity extends Activity {
         bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
         bar.addView(Ui.text(this,"推荐画像",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
         ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,10),Ui.dp(this,14),Ui.dp(this,28));scroll.addView(content);
-        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();render();
+        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();showLoading();
     }
 
-    private void render(){
+    private void showLoading(){
         if(content==null)return;content.removeAllViews();
-        JSONObject policy=RecommendationPolicyStore.snapshot(this);
-        JSONObject counts=policy.optJSONObject("counts");
-        JSONArray localControls=RecommendationPolicyStore.controls(this);
-        UnifiedCatalogStore.Snapshot localCatalog=UnifiedCatalogStore.load(this);
-        int localFavorites=0,localOwned=0;
-        for(UnifiedCatalogStore.Entry entry:localCatalog.entries()){
-            if(entry.favorite)localFavorites++;
-            if(entry.favorite||entry.inShelf||entry.phoneDownloaded||entry.desktopDownloaded||entry.remoteAvailable)localOwned++;
-        }
-        NativeRecommendationStore.Snapshot runtime=NativeRecommendationStore.load(this);
-        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
+        LinearLayout panel=SettingsRow.panel(this,null);
+        panel.addView(Ui.text(this,"正在读取本机推荐画像…",16,Ui.TEXT,true));
+        ProgressBar progress=new ProgressBar(this);progress.setIndeterminate(true);panel.addView(progress);
+        panel.addView(Ui.text(this,"书库、行为证据和 Portable 数据在后台读取，不阻塞页面首帧。",12,Ui.MUTED,false));
+        content.addView(panel);
+    }
+
+    private void loadAsync(){
+        if(content==null||destroyed)return;
+        final int generation=++loadGeneration;
+        showLoading();
+        worker.submit(()->{
+            try{
+                Context app=getApplicationContext();
+                ProfileData data=new ProfileData();
+                data.policy=RecommendationPolicyStore.snapshot(app);
+                JSONArray controls=data.policy.optJSONArray("controls");
+                data.localControls=controls==null?new JSONArray():controls;
+                data.catalog=UnifiedCatalogStore.load(app);
+                for(UnifiedCatalogStore.Entry entry:data.catalog.entries()){
+                    if(entry.favorite)data.localFavorites++;
+                    if(entry.favorite||entry.inShelf||entry.phoneDownloaded||entry.desktopDownloaded||entry.remoteAvailable)data.localOwned++;
+                }
+                data.runtime=NativeRecommendationStore.load(app);
+                data.portable=PortableRecommendationPackageStore.load(app);
+                data.inferred=RecommendationLocalProfile.inferred(app,data.catalog,data.policy);
+                data.recentSignals=RecommendationEvidenceStore.topSignals(app,false,8);
+                data.sessionSignals=RecommendationEvidenceStore.topSignals(app,true,8);
+                data.recentCount=RecommendationEvidenceStore.recentCount(app);
+                data.sessionCount=RecommendationEvidenceStore.sessionCount(app);
+                for(PortableRecommendationPackageStore.Candidate row:data.portable.candidates)if(row.visualAvailable)data.visualCount++;
+                runOnUiThread(()->{if(destroyed||generation!=loadGeneration)return;render(data);});
+            }catch(Exception e){
+                runOnUiThread(()->{
+                    if(destroyed||generation!=loadGeneration)return;
+                    content.removeAllViews();
+                    LinearLayout panel=SettingsRow.panel(this,null);
+                    panel.addView(Ui.text(this,"推荐画像读取失败",16,Ui.TEXT,true));
+                    panel.addView(Ui.text(this,e.getMessage()==null?"请返回后重试":e.getMessage(),12,Ui.MUTED,false));
+                    content.addView(panel);
+                });
+            }
+        });
+    }
+
+    private void render(ProfileData data){
+        if(content==null)return;content.removeAllViews();
+        JSONObject policy=data.policy==null?new JSONObject():data.policy;
+        NativeRecommendationStore.Snapshot runtime=data.runtime==null?new NativeRecommendationStore.Snapshot():data.runtime;
+        PortableRecommendationPackageStore.Snapshot portable=data.portable==null?new PortableRecommendationPackageStore.Snapshot():data.portable;
 
         LinearLayout identity=SettingsRow.panel(this,null);
         identity.addView(Ui.text(this,"本机推荐运行",17,Ui.TEXT,true));
@@ -50,16 +105,16 @@ public final class RecommendationProfileActivity extends Activity {
 
         LinearLayout evidence=SettingsRow.panel(this,null);
         evidence.addView(Ui.text(this,"画像证据",17,Ui.TEXT,true));
-        evidence.addView(SettingsRow.statusLine(this,"手机收藏 / 已拥有",Ui.text(this,localFavorites+" / "+localOwned,12,Ui.MUTED,true)));
-        evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.text(this,localControls.length()+" 项",12,Ui.MUTED,true)));
-        evidence.addView(SettingsRow.statusLine(this,"最近 30 天行为",Ui.text(this,RecommendationEvidenceStore.recentCount(this)+" 条 · 本机 + 已同步",12,Ui.MUTED,true)));
-        evidence.addView(SettingsRow.statusLine(this,"本次手机 Session",Ui.text(this,RecommendationEvidenceStore.sessionCount(this)+" 条",12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"手机收藏 / 已拥有",Ui.text(this,data.localFavorites+" / "+data.localOwned,12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.text(this,(data.localControls==null?0:data.localControls.length())+" 项",12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"最近 30 天行为",Ui.text(this,data.recentCount+" 条 · 本机 + 已同步",12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"本次手机 Session",Ui.text(this,data.sessionCount+" 条",12,Ui.MUTED,true)));
         JSONObject intent=policy.optJSONObject("sessionIntent");
         String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";
         evidence.addView(SettingsRow.statusLine(this,"本次想看",Ui.text(this,session+" · 仅手机",12,Ui.MUTED,true)));
         content.addView(evidence);
 
-        JSONArray inferred=RecommendationLocalProfile.inferred(this);
+        JSONArray inferred=data.inferred==null?new JSONArray():data.inferred;
         LinearLayout lifetime=SettingsRow.panel(this,null);
         lifetime.addView(Ui.text(this,"长期主要兴趣",17,Ui.TEXT,true));
         int top=Math.min(10,inferred.length());
@@ -71,8 +126,8 @@ public final class RecommendationProfileActivity extends Activity {
         }
         content.addView(lifetime);
 
-        addBehaviorSignals("最近 30 天主要兴趣",RecommendationEvidenceStore.topSignals(this,false,8),"来自手机本地行为与已同步的 Desktop 最近行为；单纯曝光不作为正向兴趣。");
-        addBehaviorSignals("本次会话兴趣",RecommendationEvidenceStore.topSignals(this,true,8),"只统计当前 Android 进程 Session；不会同步成另一端的 Session Intent。");
+        addBehaviorSignals("最近 30 天主要兴趣",data.recentSignals,"来自手机本地行为与已同步的 Desktop 最近行为；单纯曝光不作为正向兴趣。");
+        addBehaviorSignals("本次会话兴趣",data.sessionSignals,"只统计当前 Android 进程 Session；不会同步成另一端的 Session Intent。");
 
         LinearLayout composition=SettingsRow.panel(this,null);
         composition.addView(Ui.text(this,"当前手机推荐构成",17,Ui.TEXT,true));
@@ -93,8 +148,7 @@ public final class RecommendationProfileActivity extends Activity {
         LinearLayout visual=SettingsRow.panel(this,null);
         visual.addView(Ui.headingWithInfo(this,"Visual 基础",17,"画风向量与大批量学习仍由 Desktop 完成；手机只消费同步后的轻量 affinity，不运行 DINOv2。"));
         visual.addView(SettingsRow.statusLine(this,"Generation",Ui.text(this,portable.visualGeneration.isEmpty()?"尚未同步":shortId(portable.visualGeneration),12,Ui.MUTED,true)));
-        int visualCount=0;for(PortableRecommendationPackageStore.Candidate row:portable.candidates)if(row.visualAvailable)visualCount++;
-        visual.addView(SettingsRow.statusLine(this,"候选覆盖",Ui.text(this,visualCount+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
+        visual.addView(SettingsRow.statusLine(this,"候选覆盖",Ui.text(this,data.visualCount+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
         content.addView(visual);
     }
 

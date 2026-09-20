@@ -535,19 +535,65 @@ body.reader-active .reader-header {
     margin: 0;
 }
 
-#settings-form > .actions.wide + #ux-settings-utilities,
-#settings-update #ux-local-update-package {
+#settings-form > .actions.wide + #ux-settings-utilities {
     margin-top: 10px;
+}
+
+#settings-update.ux-update-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+#settings-update.ux-update-panel > * {
+    min-width: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+#settings-update .ux-update-primary-actions,
+#settings-update .ux-local-update-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    position: static;
+}
+#settings-update .ux-update-primary-actions > *,
+#settings-update .ux-local-update-actions > * {
+    flex: 0 1 auto;
+    max-width: 100%;
+}
+#settings-update #update-progress,
+#settings-update #update-message,
+#settings-update #a83-update-live,
+#settings-update #ux-local-update-package {
+    position: static;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+}
+#settings-update #update-message:empty {
+    display: none;
 }
 
 .ux-local-update-body {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
+    min-width: 0;
 }
-
 .ux-local-update-body #update-dropzone,
 .ux-local-update-body #update-summary {
+    box-sizing: border-box;
     width: 100%;
+    min-width: 0;
+}
+@media (max-width: 620px) {
+    #settings-update .ux-update-primary-actions > button,
+    #settings-update .ux-local-update-actions > button {
+        flex: 1 1 100%;
+        width: 100%;
+    }
 }
 
 .output:empty {

@@ -92,7 +92,7 @@ public final class RecommendationControlActivity extends Activity {
         JSONArray hardSuppressed=state.optJSONArray("hardSuppressComicIds");
         int hardSuppressedCount=hardSuppressed==null?0:hardSuppressed.length();
         LinearLayout intro=SettingsRow.panel(this,null);
-        intro.addView(Ui.headingWithInfo(this,"调整规则",16,"1–10 档与屏蔽会立即影响手机自己的下一次排序；不会自动覆盖电脑。连接后可在“推荐同步”里查看两边差异并决定是否合并。本次想看只属于当前手机 Session。"));
+        intro.addView(Ui.headingWithInfo(this,"调整规则",16,"0–10 档与屏蔽会立即影响手机自己的下一次排序；5 是中性起点，0 是最强软减少但不等于屏蔽。没有收藏画像时也可以自行添加标签建立初始推荐。连接后可在“推荐同步”里查看两边差异并决定是否合并。本次想看只属于当前手机 Session。"));
         intro.addView(SettingsRow.statusLine(this,"Portable Policy",Ui.text(this,"revision "+state.optInt("revision",0),12,Ui.MUTED,true)));
         intro.addView(SettingsRow.statusLine(this,"待同步人工调整",Ui.text(this,RecommendationPolicyStore.pendingControlCount(this)+" 项",12,RecommendationPolicyStore.pendingControlCount(this)>0?Ui.PRIMARY:Ui.MUTED,true)));
         String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";
@@ -132,8 +132,10 @@ public final class RecommendationControlActivity extends Activity {
         while(content.getChildCount()>4)content.removeViewAt(content.getChildCount()-1);
         JSONArray inferred=loadedInferred==null?new JSONArray():loadedInferred;
         if(inferred.length()==0){
-            content.addView(Ui.text(this,BridgeStore.paired(this)?"尚未取得完整画像。先到“推荐同步”同步基础数据。":"尚未同步 Desktop 长期画像；手机仍会使用本地收藏和行为运行推荐。",13,Ui.MUTED,false));
-            return;
+            LinearLayout onboarding=SettingsRow.panel(this,null);
+            onboarding.addView(Ui.text(this,"还没有收藏画像也可以先配置推荐",14,Ui.TEXT,true));
+            onboarding.addView(Ui.text(this,"在上方搜索标签并点击“作为标签添加”，从 5/10 中性起点调整到 0–10。设置为 6–10 的标签会直接作为首轮推荐召回种子。",12,Ui.MUTED,false));
+            content.addView(onboarding);
         }
         String q=query==null?"":query.trim().toLowerCase(Locale.ROOT);
         LinkedHashMap<String,Group> groups=new LinkedHashMap<>();
@@ -212,11 +214,11 @@ public final class RecommendationControlActivity extends Activity {
 
     private void renderSignal(LinearLayout parent,JSONObject row){
         String type=row.optString("targetType","TAG"),key=row.optString("key",""),label=row.optString("label",key);
-        int baseline=Math.max(1,Math.min(10,row.optInt("baselineLevel",5)));
+        int baseline=Math.max(0,Math.min(10,row.optInt("baselineLevel",5)));
         JSONObject control=findControl(type,key);
         boolean blocked=control!=null&&"BLOCK".equals(control.optString("direction"));
         int current=baseline;
-        if(control!=null&&control.has("levelDelta"))current=Math.max(1,Math.min(10,baseline+control.optInt("levelDelta",0)));
+        if(control!=null&&control.has("levelDelta"))current=Math.max(0,Math.min(10,baseline+control.optInt("levelDelta",0)));
 
         LinearLayout card=Ui.card(this);
         LinearLayout heading=new LinearLayout(this);heading.setGravity(Gravity.CENTER_VERTICAL);
@@ -225,12 +227,12 @@ public final class RecommendationControlActivity extends Activity {
         card.addView(heading);
         card.addView(Ui.text(this,typeLabel(type)+" · "+(row.optBoolean("systemUnknown",false)?"系统未判断 · 5/10 中性起点":"系统 "+baseline+"/10 · 证据 "+row.optInt("supportCount",0)+" 本"),11.5f,Ui.MUTED,false));
 
-        SeekBar slider=new SeekBar(this);slider.setMax(9);slider.setProgress(current-1);slider.setEnabled(!blocked);
+        SeekBar slider=new SeekBar(this);slider.setMax(10);slider.setProgress(current);slider.setEnabled(!blocked);
         final int base=baseline;
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-            public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser)value.setText((progress+1)+"/10");}
+            public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser)value.setText(progress+"/10");}
             public void onStartTrackingTouch(SeekBar bar){}
-            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress()+1,delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);loadAsync();}
+            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress(),delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);loadAsync();}
         });
         card.addView(slider);
 

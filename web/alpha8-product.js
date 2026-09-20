@@ -113,7 +113,8 @@ function supportPanel() {
     if (!settings || $('#a83-support')) return
     const panel = document.createElement('article')
     panel.id = 'a83-support'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project')}</h3><p data-a83-product-copy="support-text">${productText('感谢你使用 Pica Library。', 'Thanks for using Pica Library.')}</p><div class="a83-row"><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page')}</button></div>`
+    panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project')}</h3><p data-a83-product-copy="support-text">${productText('Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。', 'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.')}</p><div class="a83-row"><button type="button" id="a83-afdian">${productText('❤ 爱发电支持', '❤ Support on AFDIAN')}</button><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page')}</button></div>`
+    panel.querySelector('#a83-afdian').onclick = () => window.open('https://afdian.com/a/PicaLibrary', '_blank', 'noopener')
     panel.querySelector('#a83-star').onclick = () => window.open('https://github.com/Saber-Alter-Lily/pica-library', '_blank', 'noopener')
     settings.appendChild(panel)
 }
@@ -174,8 +175,14 @@ function refreshProductCopy() {
     const supportText = $('[data-a83-product-copy="support-text"]')
     if (supportText)
         supportText.textContent = productText(
-            '感谢你使用 Pica Library。',
-            'Thanks for using Pica Library.'
+            'Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。',
+            'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.'
+        )
+    const afdian = $('#a83-afdian')
+    if (afdian)
+        afdian.textContent = productText(
+            '❤ 爱发电支持',
+            '❤ Support on AFDIAN'
         )
     const star = $('#a83-star')
     if (star)

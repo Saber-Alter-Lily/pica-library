@@ -15,7 +15,7 @@ Windows provides full management and downloading. Android provides mobile readin
 - **Visual index compatibility**: existing DINOv2 Patch Mean indexes remain valid while new indexing can retain compact CLS and Patch Mean views from the same inference pass.
 - **Reader and history**: explicit next-chapter action at chapter end; history groups by comic while preserving chapter progress and covers.
 - **Mobile hierarchy**: primary disclosure groups, secondary groups, and concrete controls now use distinct typography and surfaces.
-- **Formal distribution**: Windows supports direct incremental update from v0.4.0; Android advances to versionCode 43 with the same package ID and signing identity.
+- **Formal distribution**: Windows upgrades from v0.4.0 by replacing the full application package while preserving the separate user-data directory; Android advances to versionCode 43 with the same package ID and signing identity.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 

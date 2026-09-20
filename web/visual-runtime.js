@@ -149,4 +149,4 @@ export function resetVisualRuntimeForTest() {
     extractorPromise = null
 }
 // Visual V1 QC is an additive beta surface; it never rebuilds embeddings on load.
-void import('./visual-qc-beta.js').catch(() => undefined)
+void import('./visual-qc.js').catch(() => undefined)

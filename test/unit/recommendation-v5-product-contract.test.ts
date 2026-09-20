@@ -962,27 +962,38 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).not.toContain('cf_clearance')
     })
 
-    it('prompts recommendation sync after pairing instead of overwriting Android runtime', () => {
+    it('keeps post-pairing sync optional instead of overwriting Android runtime', () => {
         const pairing = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PairingActivity.java'
         )
         const sync = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationSyncActivity.java'
         )
+        const prefs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationSyncPreferences.java'
+        )
         const saved = pairing.indexOf('BridgeStore.save(this,h,token,name)')
         const accountState = pairing.indexOf(
             'DesktopAccountStatusStore.save(this,BridgeClient.accountStatus(this))'
         )
-        const success = pairing.indexOf('配对成功 · 已同步 Desktop 账号连接状态')
+        const success = pairing.indexOf('配对成功 · 内容同步均为可选')
         expect(saved).toBeGreaterThanOrEqual(0)
         expect(accountState).toBeGreaterThan(saved)
         expect(success).toBeGreaterThan(accountState)
         expect(pairing).toContain('RecommendationSyncActivity.offerAfterPairing(this)')
+        expect(pairing).toContain('同步书架')
+        expect(pairing).not.toContain('offerFavoriteImport')
+        expect(pairing).not.toContain(
+            'try{ShelfStore.syncWithDesktop(this);}catch'
+        )
         expect(pairing).not.toContain(
             'BridgeClient.syncRecommendationState(this,false)'
         )
-        expect(sync).toContain('两端推荐周期保持独立')
-        expect(sync).toContain('双向同步')
+        expect(sync).toContain('电脑和手机各自拥有独立推荐周期')
+        expect(sync).toContain('同步始终由你主动执行')
+        expect(sync).toContain('全部用电脑')
+        expect(sync).toContain('全部用手机')
+        expect(prefs).toContain('getBoolean(ALERT_PORTABLE_CHANGES,false)')
     })
 
     it('makes work-identity review visual, detail-capable and undecided-first', () => {

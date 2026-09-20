@@ -55,6 +55,15 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(sync).toContain('两端推荐周期保持独立')
         expect(sync).toContain('maybeOfferOnConnection')
         expect(sync).toContain('lastPromptSignature')
+        expect(sync).toContain('连接时自动检查差异')
+        expect(sync).toContain('普通变化弹窗提醒')
+        expect(sync).toContain('偏好冲突弹窗提醒')
+        expect(sync).toContain('RecommendationSyncPreferences.alertPortableChanges')
+        expect(sync).toContain('RecommendationSyncPreferences.alertConflicts')
+        expect(sync).toContain('全部用电脑')
+        expect(sync).toContain('全部用手机')
+        expect(sync).toContain('逐项处理')
+        expect(sync).not.toContain('conflictCount>0?"处理冲突":"双向同步"')
     })
 
     it('exposes mobile profile, grouped 1-10 controls and compact help', () => {
@@ -89,6 +98,23 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(hub).toContain('推荐同步')
         expect(ui).toContain('static Button infoButton')
         expect(ui).toContain('setText("!")')
+        expect(ui).toContain('int size=dp(c,24)')
+        expect(ui).toContain('new TouchDelegate(hit,info)')
+    })
+
+
+    it('keeps ordinary sync differences quiet by default while preserving optional conflict alerts', () => {
+        const prefs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationSyncPreferences.java'
+        )
+        expect(prefs).toContain(
+            'getBoolean(ALERT_PORTABLE_CHANGES,false)'
+        )
+        expect(prefs).toContain('getBoolean(ALERT_CONFLICTS,true)')
+        expect(prefs).toContain('getBoolean(CHECK_ON_CONNECTION,true)')
+        expect(prefs).toContain(
+            '/** Background compare only. It never applies a sync. */'
+        )
     })
 
     it('uses Desktop-equivalent 1-10 levelDelta magnitudes on Android', () => {
@@ -227,7 +253,7 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(sync).toContain('behaviorGeneration')
     })
 
-    it('registers the new mobile recommendation surfaces and prompts after pairing', () => {
+    it('registers mobile recommendation surfaces while keeping post-pairing content sync opt-in', () => {
         const manifest = read(
             'mobile/android-alpha2/app/src/main/AndroidManifest.xml'
         )
@@ -239,6 +265,15 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(manifest).toContain('.RecommendationControlActivity')
         expect(pairing).toContain(
             'RecommendationSyncActivity.offerAfterPairing(this)'
+        )
+        expect(pairing).toContain('同步收藏')
+        expect(pairing).toContain('同步书架')
+        expect(pairing).toContain('推荐同步')
+        expect(pairing).toContain('内容同步均为可选')
+        expect(pairing).not.toContain('offerFavoriteImport')
+        expect(pairing).not.toContain('setCancelable(false)')
+        expect(pairing).not.toContain(
+            'try{ShelfStore.syncWithDesktop(this);}catch'
         )
         expect(pairing).not.toContain(
             'BridgeClient.syncRecommendationState(this,false)'

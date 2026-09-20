@@ -2,119 +2,92 @@
 
 # Pica Library
 
-**Open-source manga library manager, reader and downloader for Windows & Android.**
+**Windows & Android 本地优先漫画库、阅读器与下载管理器。**
 
-Pica Library 是一个本地优先的漫画库管理、发现、下载与阅读工具，支持 **PicACG / Pica、E-Hentai / ExHentai、WebDAV**，以及 **Desktop ↔ Android** 跨端阅读与访问。
+支持 **PicACG / Pica、E-Hentai / ExHentai、WebDAV**，覆盖漫画发现、收藏、统一书库、下载、阅读、推荐与 Desktop ↔ Android 跨端访问。
 
-**[下载最新版](https://github.com/Saber-Alter-Lily/pica-library/releases/latest)** · [快速开始](docs/quick-start.zh-CN.md) · [Android 使用说明](docs/android-guide.zh-CN.md) · [项目版本日志](PROJECT_LOG.md)
+**[下载最新版](https://github.com/Saber-Alter-Lily/pica-library/releases/latest)** · [快速开始](docs/quick-start.zh-CN.md) · [Android 使用说明](docs/android-guide.zh-CN.md) · [版本日志](PROJECT_LOG.md)
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-Windows 负责完整管理与下载。Android 负责移动阅读、在线发现和远程访问。Web/Desktop 与 Android 使用一致的内容来源、收藏画像、推荐语义和阅读逻辑，但按各自屏幕重新组织交互。
-
 ## v0.4.1 本次更新
 
-- **Android 顶层导航**：书库、推荐、在线、设置统一在同一主页面切换；在线与设置不再触发明显的 Activity 跳转。
-- **Android 流畅度**：推荐画像、人工调整改为后台读取；推荐证据、Portable 候选与策略状态加入缓存，减少重复 JSON 与整库读取。
-- **推荐批次**：Desktop 复用同一 cycle 的冻结候选快照；Android 只重绘当前 12 本，上一批 / 下一批切换显著减负。
-- **画风推荐**：作为独立可开关模块；关闭时不影响常规推荐。提供轻度、标准、强三档影响强度。
-- **画风索引**：保留现有 DINOv2 Patch Mean 索引，并为后续版本在同一次推理中附加 compact CLS / Patch Mean 双视图数据。
-- **阅读体验**：章节末尾提供明确的下一章入口；阅读历史按漫画聚合，保留章节进度与封面。
-- **移动端层级**：折叠分组、子分组和具体选项使用不同字号、颜色与背景，减少层级混淆。
-- **正式分发**：Windows 从 v0.4.0 升级 v0.4.1 采用完整应用替换，并提供独立升级助手自动下载、校验、备份、替换与失败回滚；用户数据目录保持独立并保留。Android 正式包升级到 versionCode 43，包名与签名保持不变。
+- **Android 更顺滑**：书库 / 推荐 / 在线 / 设置统一主页面切换；推荐画像、人工调整与热数据读取移到后台并加入缓存。
+- **推荐更完整**：Desktop / Android 批次切换显著减负；画风推荐成为独立可开关模块，支持轻度 / 标准 / 强三档影响。
+- **阅读更连续**：章节末尾增加“下一章”；阅读历史按漫画聚合，并保留章节、页码与封面。
+- **界面层级收敛**：折叠分组、子分组与具体选项使用不同视觉层级，减少移动端误触与混淆。
+- **正式升级链完成**：Android v42 可原地升级到 v43；Windows v0.4.0 → v0.4.1 提供独立升级助手，自动校验、备份、替换、健康检查并在失败时回滚。
 
 完整版本演变见 [PROJECT_LOG.md](PROJECT_LOG.md)。
 
 ## 主要功能
 
-### 书库
+### 统一书库
 
-- **书库 → 搜索**：按标题、作者、标签和分类查找已纳入书库的漫画。
-- **书库 → 筛选**：按本机、Desktop、WebDAV、在线可读状态和内容来源筛选。
-- **书库 → 作者 / 标签 / 分类**：使用统一 facet 筛选，不按站点重复显示同一条目。
-- **书库 → 书架**：建立本地分组；删除书架不会删除漫画文件或远端收藏。
-- **书库 → 阅读历史**：按今天、7 天、30 天、全部或指定日期查看并继续阅读。
-- **书库 → 显示**：列表与多档网格独立切换。
+- Pica、E-H、Desktop、本机、Android 与 WebDAV 状态统一到同一漫画记录。
+- 支持标题、作者、标签、分类、Provider、存储位置与在线可读状态筛选。
+- 支持书架、阅读历史、继续阅读、列表 / 多档网格显示。
+- 作者使用 canonical name / alias / circle / provider binding 归一，详情页可继续浏览同作者跨来源作品。
 
-### 在线
+### 在线发现与账号
 
-- **在线 → 全部来源**：同时发现 Pica 与 E-H 内容；ExH 可用时作为额外扩展。
-- **在线 → Pica**：搜索、收藏、排行榜和分类。
-- **在线 → E-Hentai**：游客即可搜索和阅读公开 Gallery。
-- **在线 → E-H 浏览**：最新、热门、云收藏、关注、分类和 Toplists。
-- **在线 → E-H 筛选**：分类、语言、包含/排除标签、评分和页数。
-- **在线 → ExHentai**：入口和能力检测始终保留；当前不可访问不会阻塞 E-H 或推荐。
+- **Pica**：登录、注册、搜索、分类、排行、收藏与同步。
+- **E-Hentai**：公开搜索、详情、在线阅读、下载、Latest / Popular / Favorites / Watched / Toplists 与高级筛选。
+- **ExHentai**：作为 E-H 账号下的可选扩展；不可访问时不会阻塞 E-H 或推荐。
+- E-H 支持官方网页登录；Windows 使用 DPAPI、Android 使用 Android Keystore 保护会话信息。
 
-### 中文标签与语义
+### 中文标签与跨来源语义
 
-- **E-H 标签显示**：使用 EhTagTranslation 提供中文显示和中文反查。
-- **E-H 数据层**：始终保存 `namespace:value` canonical tag；中文不是数据身份。
-- **跨来源语义**：Pica tag 与 E-H namespaced tag 在可确认时映射到统一兴趣概念。
-- **搜索召回**：Pica 使用自身关键词；E-H 使用 namespaced exact-tag 查询。
+- E-H 保留原生 `namespace:value` canonical tag，中文仅作为显示与反查层。
+- 接入 EhTagTranslation，支持中文标签显示与中文搜索辅助。
+- Pica 与 E-H 标签在可确认时映射到统一兴趣概念，但保留各 Provider 最合适的召回语法。
 
 ### 推荐
 
-- **推荐 → 画像**：Pica 云收藏与 E-H 云收藏共同构建长期兴趣画像。
-- **推荐 → 候选**：分别从 Pica 和 E-H 召回；ExH 仅在可用时补充。
-- **推荐 → 排序**：保留可解释的 intent、来源证据和既有 ranker 约束。
-- **推荐 → 批次**：上一批、下一批和 seen cycle 独立管理。
+- Pica 与 E-H 收藏共同构建长期兴趣画像，并保留最近行为、显式偏好和推荐依据。
+- 两个 Provider 独立召回，再进行统一排序、去重与批次分配。
+- 支持推荐画像、人工调整、显式反馈、批次切换和可解释推荐依据。
+- 画风推荐作为独立模块，可完全关闭；关闭时不影响常规推荐。
+- Desktop 与 Android 可独立运行推荐；配对后同步可移植偏好与推荐基础数据，不强制同步当前批次 / Session。
 
-### 漫画详情与作者
+### 阅读与下载
 
-- **详情 → 收藏**：Pica 使用 Pica 收藏；E-H 支持本地收藏和 10 个 E-H 云收藏槽。
-- **详情 → 书架**：直接加入或移出一个或多个书架。
-- **详情 → 来源与副本**：查看在线来源、手机、Desktop 和 WebDAV 副本。
-- **详情 → 作者**：先进入归一作者目录，再进入该作者的跨来源作品列表。
-- **作者归一**：保留 canonical name、别名、circle 和 provider binding；E-H `artist:` 与 `group:` 不强制合并。
+- 支持 Android 本地、Desktop 已下载、WebDAV、Pica 在线与 E-H 在线阅读。
+- 阅读器支持左到右、右到左、纵向连续阅读、章节切换、进度保存与续读。
+- 阅读历史按漫画聚合，同时保留具体章节和页码。
+- 下载任务支持持久化队列、并发控制、失败恢复、暂停 / 继续与完成记录。
+- Android 可本地下载，也可配对后直接读取 Desktop 已下载漫画。
 
-### 阅读
+### 存储、多端与个性化
 
-- **阅读器 → 来源**：支持手机已下载、Desktop 已下载、WebDAV、Pica 在线和 E-H 在线。
-- **阅读器 → 模式**：左到右、右到左和纵向连续阅读。
-- **阅读器 → 进度**：本地先保存；可用时再同步 Desktop / WebDAV 便携进度。
-- **阅读器 → 历史**：按阅读 session 记录，而不是把最后书签冒充完整历史。
-- **历史 → 继续阅读**：恢复具体章节和页码；来源失效时回到详情重新选择。
+- 支持多个 WebDAV 目标、选择性上传、远端删除、切换与移动端后备访问。
+- Desktop ↔ Android 配对后可共享可移植书库 / 推荐基础与访问 Desktop 内容。
+- 支持 `.pica-theme` 主题包创建、导入与跨端同步；两端当前启用主题彼此独立。
+- Reader 缓存、预加载、下载目录与存储策略均可独立配置。
 
-### 下载与存储
+### 更新与维护
 
-- **下载任务**：持久化队列、并发控制、失败恢复和已完成任务管理。
-- **Android 下载**：支持移动端本地下载；也可直接读取 Desktop 已下载内容。
-- **WebDAV**：支持远程目录、选择性上传、远端删除和移动端后备访问。
-- **多 WebDAV**：可保存多个远程目标并切换当前目标。
-- **缓存与预加载**：Reader 图片缓存和预加载参数可独立调整。
-
-### 账号与来源
-
-- **Pica 账号**：登录、注册和收藏同步。
-- **E-H 账号**：官方网页登录为主；手动会话导入为高级方式。
-- **E-H 会话**：Windows 使用 DPAPI；Android 使用 Android Keystore AES-GCM。
-- **ExH 状态**：显示当前可用、当前不可访问、暂无法确认或待检查；不把一次失败写成永久权限结论。
-
-### 多端与个性化
-
-- **Desktop ↔ Android**：配对后手机可读取电脑已经下载的漫画。
-- **主题包**：支持 `.pica-theme` 创建、导入和跨端同步。
-- **当前主题**：Desktop 与 Android 独立选择，不强制同步当前启用状态。
-- **设置 → 存储与下载**：统一管理本地目录、WebDAV、缓存和下载策略。
-- **设置 → 软件更新**：Windows 支持官方增量更新和本地更新 ZIP；Android 使用官方 APK 更新元数据。
+- Windows 支持兼容增量更新、官方 Release 检查、本地更新 ZIP 与更新回滚。
+- v0.4.0 → v0.4.1 推荐使用 Release 中的 **Windows 升级助手**，无需手工覆盖数据目录。
+- Android 使用官方更新元数据进行 APK 原地升级，并校验版本、包名、SHA-256 与签名身份。
+- 提供日志、文件修复、缓存、导出与诊断入口。
 
 ## 平台能力
 
 | 能力 | Windows / Web | Android |
 | --- | --- | --- |
-| 统一书库、筛选、书架 | 是 | 是 |
-| Pica 在线 | 是 | 是 |
-| E-Hentai 在线 | 是 | 是 |
-| ExH 可选扩展 | 是 | 是 |
-| 双来源推荐画像 | 是 | 是 |
-| 作者归一与作品导航 | 是 | 是 |
-| 阅读历史 | 是 | 是 |
-| 在线阅读 | 是 | 是 |
-| 本地下载 | 主下载端 | 是 |
+| 统一书库、筛选、书架 | ✓ | ✓ |
+| Pica / E-H 在线 | ✓ | ✓ |
+| ExH 可选扩展 | ✓ | ✓ |
+| 推荐画像与人工调整 | ✓ | ✓ |
+| 画风推荐 | ✓ | ✓ |
+| 阅读历史与续读 | ✓ | ✓ |
+| 在线阅读 | ✓ | ✓ |
+| 本地下载 | 主下载端 | ✓ |
 | 读取 Desktop 已下载内容 | 本机 | 配对后直接读取 |
-| WebDAV | 配置、同步、管理 | 读取、切换、后备访问 |
-| 主题包 | 创建、导入、同步 | 接收、使用 |
-| 应用内更新 | 增量 ZIP | 官方 APK |
+| 多 WebDAV | 配置 / 同步 / 管理 | 读取 / 切换 / 后备 |
+| 主题包 | 创建 / 导入 / 同步 | 接收 / 使用 |
+| 应用更新 | 增量 / 完整包助手 | 官方 APK 原地升级 |
 
 ## 安装与更新
 
@@ -122,52 +95,41 @@ Windows 负责完整管理与下载。Android 负责移动阅读、在线发现�
 
 ### Windows
 
-解压完整 ZIP 后运行。用户数据与程序版本分离，更新程序不会把个人数据库当作应用文件覆盖。
+下载并完整解压 `Pica-Library-vX.Y.Z-windows-x64.zip`，运行 `Pica Library.exe`。
 
-已安装用户优先使用：
+用户数据与程序目录分离。兼容版本使用：
 
 `设置 → 软件更新 → 检查并更新（兼容时自动）`
 
-兼容版本会自动增量更新；需要完整程序替换时会显示完整包说明。v0.4.0 → v0.4.1 推荐使用 Release 中的 `Pica-Library-v0.4.1-upgrade-assistant.zip`。只有页面明确提供兼容 Update ZIP 时，才将该 ZIP 拖入本地更新区。
+**v0.4.0 → v0.4.1** 推荐下载 `Pica-Library-v0.4.1-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.1.cmd`。助手会保护 `%LOCALAPPDATA%\Pica Library`，并自动完成校验、备份、替换、健康检查与失败回滚。
 
 ### Android
 
-Android APK 未上架应用商店。请只从本仓库正式 Release 获取。
-
-正式 APK 使用固定签名身份；更新流程会校验版本、包名、SHA-256 和签名证书。
+Android APK 不通过应用商店分发，请只使用本仓库正式 Release。现有 v42 可通过应用内更新链原地升级到 v43 / 0.4.1。
 
 ## 本地优先与安全
 
-- 用户数据库、书架、历史和配置默认保存在本机或用户指定的 WebDAV。
-- Windows 敏感凭据使用当前 Windows 用户的 DPAPI 保护。
-- Android E-H 会话使用 Android Keystore AES-GCM 保护。
-- E-H canonical tag 与中文显示层分离，翻译更新不会改写内容身份。
-- 主题包只允许受控数据与图片资源，不执行任意脚本或可执行代码。
-- 官方发布提供 SHA-256、签名身份和构建透明度信息。
-
+- 数据库、书架、历史和设置默认保存在本机或用户指定的 WebDAV。
+- Windows 凭据使用当前 Windows 用户的 DPAPI；Android 敏感会话使用 Android Keystore。
+- 用户数据与程序文件分离，升级不会把个人数据库当作应用文件覆盖。
+- 官方 Release 提供 SHA-256、签名身份与构建透明度信息。
+- 主题包仅包含受控数据和图片资源，不执行任意脚本。
 
 ## 支持项目
 
-Pica Library 是一个免费、开源项目。如果它对你有帮助，可以通过 [爱发电](https://afdian.com/a/PicaLibrary) 自愿支持后续开发与维护。
+Pica Library 免费、开源。可通过 [爱发电](https://afdian.com/a/PicaLibrary) 自愿支持维护。
 
-赞助完全自愿，不会解锁任何额外功能、内容、下载权限或访问权限，也不会影响免费版本的完整使用。
+赞助不会解锁额外功能、内容或下载权限，也不会影响免费版本的完整使用。
 
 ## 使用边界
 
-Pica Library 是开源、本地优先的个人数字内容管理工具。项目本身不销售、托管或重新分发漫画内容。
-
-用户需要自行确保账号使用、内容访问、下载、保存、阅读和备份符合所在地法律法规、平台条款及授权范围。
+Pica Library 是本地优先的个人数字内容管理工具，本身不销售、托管或重新分发漫画内容。请确保账号使用、访问、下载、保存、阅读和备份符合所在地法律法规、平台条款及授权范围。
 
 完整说明见 [DISCLAIMER.md](DISCLAIMER.md)。
 
 ## 文档
 
-- [项目版本日志](PROJECT_LOG.md)
-- [快速开始](docs/quick-start.zh-CN.md)
-- [Desktop / Web 使用说明](docs/desktop-guide.zh-CN.md)
-- [Android 使用说明](docs/android-guide.zh-CN.md)
-- [Windows 分发说明](docs/windows-distribution.zh-CN.md)
-- [开发与架构](docs/architecture.md)
+[快速开始](docs/quick-start.zh-CN.md) · [Desktop / Web](docs/desktop-guide.zh-CN.md) · [Android](docs/android-guide.zh-CN.md) · [Windows 分发](docs/windows-distribution.zh-CN.md) · [版本日志](PROJECT_LOG.md) · [架构](docs/architecture.md)
 
 ## 开发
 
@@ -179,7 +141,7 @@ pnpm test
 pnpm build
 ```
 
-Android 工程位于 `mobile/android-alpha2`。官方 Android 发布签名私钥不在仓库内。
+Android 工程位于 `mobile/android-alpha2`。官方 Android 发布签名私钥不存放在仓库中。
 
 ## 致谢
 

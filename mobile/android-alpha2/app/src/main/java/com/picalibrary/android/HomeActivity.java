@@ -15,6 +15,7 @@ import java.util.concurrent.*;
 /** Product shell: library and recommendations live here; Online and Settings own separate screens. */
 public final class HomeActivity extends Activity {
     private FrameLayout body;private SharedPreferences prefs;private final ExecutorService worker=Executors.newFixedThreadPool(4);private Future<?> pending;private int serial,current,collectionMode;private String libraryQuery="",activeShelfId="",themeKey="";private boolean showingShelves;
+    private LinearLayout recommendationBatchList;private TextView recommendationBatchLabel;private UnifiedCatalogStore.Snapshot recommendationCatalog;
     private UnifiedLibraryFilter.Spec librarySpec;private UnifiedLibraryFilter.Facets libraryFacets=new UnifiedLibraryFilter.Facets(new ArrayList<>(),new ArrayList<>(),new ArrayList<>());
     private final int[] tabScrollY=new int[4],tabListPosition=new int[4],tabListOffset=new int[4];private ScrollView activeScroll;private RecyclerView activeList;private int activeViewportTab=-1;
 
@@ -27,7 +28,7 @@ public final class HomeActivity extends Activity {
 
     private void renderShell(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});body=new FrameLayout(this);body.setBackgroundColor(Ui.BG);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));root.addView(ShellNavigation.build(this,current));setContentView(root);root.requestApplyInsets();}
     private Button compact(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}
-    private void show(){captureCurrentViewport();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;if(showingShelves){shelves();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
+    private void show(){captureCurrentViewport();++serial;if(pending!=null)pending.cancel(true);pending=null;body.removeAllViews();activeScroll=null;activeList=null;activeViewportTab=-1;recommendationBatchList=null;recommendationBatchLabel=null;recommendationCatalog=null;if(showingShelves){shelves();return;}if(current==0)library();else if(current==1)recommendations();else if(current==2)onlineEntry();else settingsEntry();}
     private LinearLayout page(boolean scroll){LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(Ui.BG);p.setPadding(Ui.dp(this,12),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,8));if(scroll){final int tab=current;ScrollView s=new ScrollView(this);activeScroll=s;activeList=null;activeViewportTab=tab;s.setBackgroundColor(Ui.BG);s.addView(p);body.addView(s,new FrameLayout.LayoutParams(-1,-1));s.post(()->s.scrollTo(0,Math.max(0,tabScrollY[tab])));}else{activeScroll=null;activeList=null;activeViewportTab=-1;body.addView(p,new FrameLayout.LayoutParams(-1,-1));}return p;}
     private void titleRow(LinearLayout p,String title,View... actions){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);TextView label=Ui.text(this,title,26,Ui.TEXT,true);row.addView(label,new LinearLayout.LayoutParams(0,-2,1));for(View action:actions){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.setMargins(Ui.dp(this,4),0,0,0);row.addView(action,lp);}p.addView(row);}
     private RecyclerView collection(LinearLayout p,int mode){final int tab=current;RecyclerView v=new RecyclerView(this);activeScroll=null;activeList=v;activeViewportTab=tab;v.setClipToPadding(false);v.setPadding(0,Ui.dp(this,4),0,Ui.dp(this,16));setCollectionLayout(v,mode);p.addView(v,new LinearLayout.LayoutParams(-1,0,1));return v;}
@@ -87,12 +88,30 @@ public final class HomeActivity extends Activity {
         TextView sourceView=Ui.text(this,"手机独立排序 · Lifetime / Recent / Session / Explicit"+(portable.available()?" · 已接入同步候选基础":""),12,Ui.MUTED,false);
         sourceView.setPadding(0,0,0,Ui.dp(this,6));p.addView(sourceView);
         LinearLayout pager=new LinearLayout(this);pager.setGravity(Gravity.CENTER_VERTICAL);
-        pager.addView(compact("上一批",v->{RecommendationPolicyStore.moveVisibleBatch(this,-1);show();}),new LinearLayout.LayoutParams(0,-2,1));
-        TextView batch=Ui.text(this,"第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批",13,Ui.MUTED,false);batch.setGravity(Gravity.CENTER);pager.addView(batch,new LinearLayout.LayoutParams(0,-1,1));
-        pager.addView(compact("下一批",v->{RecommendationPolicyStore.moveVisibleBatch(this,1);show();}),new LinearLayout.LayoutParams(0,-2,1));
+        pager.addView(compact("上一批",v->switchHomeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
+        recommendationBatchLabel=Ui.text(this,"",13,Ui.MUTED,false);recommendationBatchLabel.setGravity(Gravity.CENTER);pager.addView(recommendationBatchLabel,new LinearLayout.LayoutParams(0,-1,1));
+        pager.addView(compact("下一批",v->switchHomeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
         p.addView(pager);
 
-        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
+        recommendationCatalog=UnifiedCatalogStore.load(this);
+        recommendationBatchList=new LinearLayout(this);recommendationBatchList.setOrientation(LinearLayout.VERTICAL);p.addView(recommendationBatchList);
+        renderHomeRecommendationBatch(snapshot);
+        NativeRecommendationStore.markSeen(this,snapshot.current());
+    }
+
+    private void switchHomeRecommendationBatch(int delta){
+        if(recommendationBatchList==null||recommendationBatchLabel==null)return;
+        RecommendationPolicyStore.moveVisibleBatch(this,delta);
+        NativeRecommendationStore.Snapshot visible=RecommendationPolicyStore.applyLocalPolicy(this,NativeRecommendationStore.load(this));
+        renderHomeRecommendationBatch(visible);
+        NativeRecommendationStore.markSeen(this,visible.current());
+    }
+
+    private void renderHomeRecommendationBatch(NativeRecommendationStore.Snapshot snapshot){
+        if(recommendationBatchList==null||recommendationBatchLabel==null)return;
+        recommendationBatchLabel.setText("第 "+(snapshot.batchIndex+1)+" / "+snapshot.batches.size()+" 批");
+        recommendationBatchList.removeAllViews();
+        UnifiedCatalogStore.Snapshot catalog=recommendationCatalog==null?UnifiedCatalogStore.load(this):recommendationCatalog;
         for(NativeRecommendationStore.Item item:snapshot.current()){
             UnifiedCatalogStore.Entry e=catalog.byId.get(item.comicId);
             if(e==null){e=new UnifiedCatalogStore.Entry(item.comicId,item.title,item.author);e.tags.addAll(item.tags);e.categories.addAll(item.categories);}
@@ -106,9 +125,8 @@ public final class HomeActivity extends Activity {
             feedback.addView(compact("👎 不喜欢",v->recommendationFeedback(item,"dislike")));Ui.gap(feedback,this,6);
             UnifiedCatalogStore.Entry target=e;
             feedback.addView(compact("⚙ 调节",v->RecommendationItemControlDialog.show(this,target,this::show)));copy.addView(feedback);
-            card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);p.addView(card);
+            card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);recommendationBatchList.addView(card);
         }
-        NativeRecommendationStore.markSeen(this,snapshot.current());
     }
 
     private void refreshRecommendations(RecommendationProgressPanel progress){

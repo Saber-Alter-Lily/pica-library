@@ -8,6 +8,10 @@
 
 ### Recommendation V5 / Visual V1
 
+- 双端同步 UX 收敛为“默认低打扰、始终可手动”：配对后不再连续弹收藏/推荐同步确认，也不再自动合并书架；收藏、封面、书架与推荐状态均改为用户显式触发。Android 连接时可后台比较推荐差异，但普通变化默认不弹窗，只有并发显式偏好冲突默认提醒；自动检查、普通变化提醒、冲突提醒均可关闭。
+- 多项推荐偏好冲突增加批量处理：可一次“全部用电脑 / 全部用手机”，仅在用户需要时再逐项判断；提醒弹窗本身不直接执行同步，只负责进入同步中心。
+- Android 圆形说明按钮由 32dp 缩至 24dp，字体同步收紧；通过扩展 TouchDelegate 保持约 48dp 可点击区域，不改变 Desktop 说明按钮尺寸。
+
 - 启动 v0.4.0 → 下一正式版直升验收：冻结 public Schema 9 作为兼容基线，新增 Schema 9→当前版本的数据保留回归测试与独立 CI Gate；Windows 采用“完整应用替换、用户数据目录保留”路线，Android 正式发布必须满足同 package ID、versionCode>42、同签名证书并完成原地安装验收。
 - 升级审计发现并修复 schema authority 漂移：public v0.4.0 实际已迁移到 9 但 capabilities 仍声明 8，当前开发实际到 13 也仍声明 8；现改为 `DATABASE_SCHEMA_VERSION = latestMigrationVersion`，更新 manifest、capabilities 与兼容判断统一引用 migration 权威。
 - 正式更新资产开始区分来源版本：新版客户端优先识别 `Pica-Library-v<target>-update-from-v<source>.zip`，再兼容旧通用 `-update.zip`；跨 Schema 的下一正式版不得发布会被 public v0.4.0 误判为可增量更新的通用 ZIP，使旧客户端明确进入已有的完整安装 Release 路径。

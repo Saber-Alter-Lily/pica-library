@@ -237,4 +237,114 @@ function Request-GracefulShutdown {
                 Write-UpgradeLog 'Requested graceful shutdown through the local Desktop API.'
             }
         } catch {
-            Write-UpgradeLog
+            Write-UpgradeLog "Graceful shutdown request did not complete: $($_.Exception.Message)"
+        }
+    }
+
+    if ($instance.pid) {
+        $deadline = (Get-Date).AddSeconds(20)
+        do {
+            Start-Sleep -Milliseconds 300
+            $alive = Get-Process -Id ([int]$instance.pid) -ErrorAction SilentlyContinue
+        } while ($alive -and (Get-Date) -lt $deadline)
+    }
+}
+
+function Get-InstallRuntimeProcesses([string]$Root) {
+    $runtime = Normalize-Path (Join-Path $Root 'runtime\node.exe')
+    return @(
+        Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.ExecutablePath -and
+                (Normalize-Path ([string]$_.ExecutablePath)).Equals($runtime, [StringComparison]::OrdinalIgnoreCase)
+            }
+    )
+}
+
+function Ensure-OldAppStopped([string]$Root) {
+    Request-GracefulShutdown
+    $running = @(Get-InstallRuntimeProcesses $Root)
+    if ($running.Count -gt 0) {
+        if (-not (Confirm-Action "旧版 Pica Library 仍在运行。`r`n`r`n是否强制结束旧版后台进程后继续？")) {
+            throw '用户取消：旧版仍在运行。'
+        }
+        foreach ($process in $running) {
+            Stop-Process -Id ([int]$process.ProcessId) -Force -ErrorAction Stop
+        }
+        Start-Sleep -Milliseconds 600
+    }
+    if (@(Get-InstallRuntimeProcesses $Root).Count -gt 0) {
+        throw '无法停止旧版后台进程。'
+    }
+}
+
+function Save-SafetySnapshot([string]$LibraryRoot) {
+    New-Item -ItemType Directory -Force -Path $SnapshotRoot | Out-Null
+    $configBackup = Join-Path $SnapshotRoot 'config'
+    New-Item -ItemType Directory -Force -Path $configBackup | Out-Null
+
+    foreach ($relative in @('config\config.json', 'config\credentials.dat', 'config\remote-storage.json')) {
+        $source = Join-Path $DataRoot $relative
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $configBackup ([IO.Path]::GetFileName($source))) -Force
+        }
+    }
+
+    $dbBackup = Join-Path $SnapshotRoot 'database'
+    New-Item -ItemType Directory -Force -Path $dbBackup | Out-Null
+    foreach ($name in @('library.db', 'library.db-wal', 'library.db-shm')) {
+        $source = Join-Path $LibraryRoot $name
+        if (Test-Path -LiteralPath $source) {
+            Copy-Item -LiteralPath $source -Destination (Join-Path $dbBackup $name) -Force
+        }
+    }
+
+    [ordered]@{
+        createdAt = (Get-Date).ToString('o')
+        sourceVersion = $RequiredSourceVersion
+        targetVersion = $TargetVersion
+        oldInstall = $ResolvedOldRoot
+        protectedDataRoot = $DataRoot
+        libraryDirectory = $LibraryRoot
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $SnapshotRoot 'snapshot.json') -Encoding UTF8
+    Write-UpgradeLog "Safety snapshot created: $SnapshotRoot"
+}
+
+function Restore-SafetySnapshot([string]$LibraryRoot) {
+    $configBackup = Join-Path $SnapshotRoot 'config'
+    if (Test-Path -LiteralPath $configBackup) {
+        foreach ($item in @(Get-ChildItem -LiteralPath $configBackup -File -ErrorAction SilentlyContinue)) {
+            $target = Join-Path (Join-Path $DataRoot 'config') $item.Name
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+            Copy-Item -LiteralPath $item.FullName -Destination $target -Force
+        }
+    }
+
+    $dbBackup = Join-Path $SnapshotRoot 'database'
+    if (Test-Path -LiteralPath $dbBackup) {
+        foreach ($name in @('library.db', 'library.db-wal', 'library.db-shm')) {
+            $target = Join-Path $LibraryRoot $name
+            Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+            $source = Join-Path $dbBackup $name
+            if (Test-Path -LiteralPath $source) {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+                Copy-Item -LiteralPath $source -Destination $target -Force
+            }
+        }
+    }
+    Write-UpgradeLog 'Safety snapshot restored.'
+}
+
+function Replace-ApplicationTree([string]$Root, [string]$TargetRoot) {
+    $parent = Split-Path -Parent $Root
+    $leaf = Split-Path -Leaf $Root
+    $script:BackupRoot = Join-Path $parent ($leaf + ".backup-before-v$TargetVersion-$Stamp")
+    if (Test-Path -LiteralPath $BackupRoot) {
+        throw "程序备份目录已存在：$BackupRoot"
+    }
+
+    Write-UpgradeLog "Renaming old application tree to $BackupRoot"
+    Rename-Item -LiteralPath $Root -NewName (Split-Path -Leaf $BackupRoot)
+    $script:ReplacementStarted = $true
+
+    New-Ite

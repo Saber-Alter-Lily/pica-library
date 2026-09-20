@@ -22,18 +22,25 @@ final class RecommendationEvidenceStore {
     private static final String EVENTS="events";
     private static final int MAX_EVENTS=1000;
     private static final String PROCESS_SESSION_ID=UUID.randomUUID().toString();
+    private static String cachedRaw=null;
+    private static JSONArray cachedEvents=null;
 
     private RecommendationEvidenceStore(){}
 
     private static SharedPreferences prefs(Context c){
         return c.getApplicationContext().getSharedPreferences(PREFS,Context.MODE_PRIVATE);
     }
-    private static JSONArray load(Context c){
-        try{return new JSONArray(prefs(c).getString(EVENTS,"[]"));}
-        catch(Exception e){return new JSONArray();}
+    private static synchronized JSONArray load(Context c){
+        String raw=prefs(c).getString(EVENTS,"[]");
+        if(raw==null)raw="[]";
+        if(cachedEvents!=null&&raw.equals(cachedRaw))return cachedEvents;
+        try{cachedEvents=new JSONArray(raw);cachedRaw=raw;return cachedEvents;}
+        catch(Exception e){cachedEvents=new JSONArray();cachedRaw="[]";return cachedEvents;}
     }
-    private static void save(Context c,JSONArray value){
-        prefs(c).edit().putString(EVENTS,value.toString()).apply();
+    private static synchronized void save(Context c,JSONArray value){
+        String raw=(value==null?new JSONArray():value).toString();
+        cachedRaw=raw;cachedEvents=value==null?new JSONArray():value;
+        prefs(c).edit().putString(EVENTS,raw).apply();
     }
     private static JSONArray strings(Collection<String> values){
         JSONArray out=new JSONArray();LinkedHashSet<String> unique=new LinkedHashSet<>();

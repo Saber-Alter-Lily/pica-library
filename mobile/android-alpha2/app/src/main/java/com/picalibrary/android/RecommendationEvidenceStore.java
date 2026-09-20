@@ -24,6 +24,18 @@ final class RecommendationEvidenceStore {
     private static final String PROCESS_SESSION_ID=UUID.randomUUID().toString();
     private static String cachedRaw=null;
     private static JSONArray cachedEvents=null;
+    private static List<EvidenceRow> cachedRows=null;
+
+    private static final class EvidenceRow {
+        final String eventType,comicId,author,sessionId;
+        final List<String> tags,categories;
+        final Set<String> normalizedTags,normalizedCategories;
+        final long occurredAtMillis;
+        EvidenceRow(String eventType,String comicId,String author,List<String> tags,List<String> categories,String sessionId,long occurredAtMillis){
+            this.eventType=eventType;this.comicId=comicId;this.author=author;this.tags=tags;this.categories=categories;this.sessionId=sessionId;this.occurredAtMillis=occurredAtMillis;
+            normalizedTags=normalized(tags);normalizedCategories=normalized(categories);
+        }
+    }
 
     private RecommendationEvidenceStore(){}
 
@@ -34,12 +46,13 @@ final class RecommendationEvidenceStore {
         String raw=prefs(c).getString(EVENTS,"[]");
         if(raw==null)raw="[]";
         if(cachedEvents!=null&&raw.equals(cachedRaw))return cachedEvents;
+        cachedRows=null;
         try{cachedEvents=new JSONArray(raw);cachedRaw=raw;return cachedEvents;}
         catch(Exception e){cachedEvents=new JSONArray();cachedRaw="[]";return cachedEvents;}
     }
     private static synchronized void save(Context c,JSONArray value){
         String raw=(value==null?new JSONArray():value).toString();
-        cachedRaw=raw;cachedEvents=value==null?new JSONArray():value;
+        cachedRaw=raw;cachedEvents=value==null?new JSONArray():value;cachedRows=null;
         prefs(c).edit().putString(EVENTS,raw).apply();
     }
     private static JSONArray strings(Collection<String> values){
@@ -133,6 +146,34 @@ final class RecommendationEvidenceStore {
         save(c,events);
     }
 
+    private static Set<String> normalized(Collection<String> values){
+        LinkedHashSet<String> out=new LinkedHashSet<>();if(values!=null)for(String value:values){String key=MobileTagRegistry.normalize(value);if(!key.isEmpty())out.add(key);}return out;
+    }
+    private static long parseMillis(String stamp){try{return Instant.parse(stamp==null?"":stamp).toEpochMilli();}catch(Exception e){return Long.MIN_VALUE;}}
+    private static synchronized List<EvidenceRow> rows(Context c){
+        if(cachedRows!=null)return cachedRows;
+        JSONArray events=load(c);ArrayList<EvidenceRow> out=new ArrayList<>();
+        for(int i=0;i<events.length();i++){
+            JSONObject row=events.optJSONObject(i);if(row==null)continue;
+            out.add(new EvidenceRow(
+                row.optString("eventType",""),
+                row.optString("comicId",""),
+                row.optString("author",""),
+                strings(row.optJSONArray("tags")),
+                strings(row.optJSONArray("categories")),
+                row.optString("sessionId",""),
+                parseMillis(row.optString("occurredAt",""))
+            ));
+        }
+        cachedRows=Collections.unmodifiableList(out);return cachedRows;
+    }
+    private static long ageMillis(EvidenceRow row,long now){
+        return row.occurredAtMillis==Long.MIN_VALUE?Long.MAX_VALUE:Math.max(0L,now-row.occurredAtMillis);
+    }
+    private static int overlapNormalized(Set<String> left,Set<String> right){
+        if(left.isEmpty()||right.isEmpty())return 0;int n=0;Set<String> small=left.size()<=right.size()?left:right,large=small==left?right:left;for(String value:small)if(large.contains(value))n++;return n;
+    }
+
     private static long ageMillis(JSONObject row){
         try{return Math.max(0L,Duration.between(Instant.parse(row.optString("occurredAt","")),Instant.now()).toMillis());}
         catch(Exception e){return Long.MAX_VALUE;}
@@ -152,33 +193,32 @@ final class RecommendationEvidenceStore {
         return adjustment(c,comic,true);
     }
     private static double adjustment(Context c,PicaClient.Comic comic,boolean sessionOnly){
-        if(comic==null)return 0d;JSONArray events=load(c);double score=0d;
+        if(comic==null)return 0d;double score=0d;long now=System.currentTimeMillis();
         long maxAge=sessionOnly?Long.MAX_VALUE:30L*24L*60L*60L*1000L;
-        for(int i=0;i<events.length();i++){
-            JSONObject row=events.optJSONObject(i);if(row==null)continue;
-            if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.optString("sessionId","")))continue;
-            if(!sessionOnly&&ageMillis(row)>maxAge)continue;
-            String type=row.optString("eventType","");
-            if("recommend_impression".equals(type)&&comic.id.equals(row.optString("comicId",""))){score-=sessionOnly?0.08:0.03;continue;}
+        String author=MobileTagRegistry.normalize(comic.author);Set<String> tags=normalized(comic.tags),categories=normalized(comic.categories);
+        for(EvidenceRow row:rows(c)){
+            if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.sessionId))continue;
+            if(!sessionOnly&&ageMillis(row,now)>maxAge)continue;
+            String type=row.eventType;
+            if("recommend_impression".equals(type)&&comic.id.equals(row.comicId)){score-=sessionOnly?0.08:0.03;continue;}
             double weight="reader_complete".equals(type)?0.035:"recommend_detail_open".equals(type)?0.018:0d;
             if(weight<=0)continue;
-            if(same(comic.author,row.optString("author","")))score+=weight;
-            score+=Math.min(weight,overlap(comic.tags,strings(row.optJSONArray("tags")))*weight*0.25);
-            score+=Math.min(weight*0.6,overlap(comic.categories,strings(row.optJSONArray("categories")))*weight*0.2);
+            if(!author.isEmpty()&&author.equals(MobileTagRegistry.normalize(row.author)))score+=weight;
+            score+=Math.min(weight,overlapNormalized(tags,row.normalizedTags)*weight*0.25);
+            score+=Math.min(weight*0.6,overlapNormalized(categories,row.normalizedCategories)*weight*0.2);
         }
         double cap=sessionOnly?0.15:0.10;return Math.max(-cap,Math.min(cap,score));
     }
 
     static List<Signal> topSignals(Context c,boolean sessionOnly,int limit){
-        JSONArray events=load(c);LinkedHashMap<String,Integer> score=new LinkedHashMap<>(),support=new LinkedHashMap<>();long max=30L*24L*60L*60L*1000L;
-        for(int i=0;i<events.length();i++){
-            JSONObject row=events.optJSONObject(i);if(row==null)continue;
-            if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.optString("sessionId","")))continue;
-            if(!sessionOnly&&ageMillis(row)>max)continue;
-            String type=row.optString("eventType","");int weight="reader_complete".equals(type)?3:"recommend_detail_open".equals(type)?1:0;if(weight<=0)continue;
-            addSignal(score,support,"作者",row.optString("author",""),weight);
-            for(String tag:strings(row.optJSONArray("tags")))addSignal(score,support,"标签",tag,weight);
-            for(String category:strings(row.optJSONArray("categories")))addSignal(score,support,"分类",category,weight);
+        LinkedHashMap<String,Integer> score=new LinkedHashMap<>(),support=new LinkedHashMap<>();long max=30L*24L*60L*60L*1000L,now=System.currentTimeMillis();
+        for(EvidenceRow row:rows(c)){
+            if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.sessionId))continue;
+            if(!sessionOnly&&ageMillis(row,now)>max)continue;
+            String type=row.eventType;int weight="reader_complete".equals(type)?3:"recommend_detail_open".equals(type)?1:0;if(weight<=0)continue;
+            addSignal(score,support,"作者",row.author,weight);
+            for(String tag:row.tags)addSignal(score,support,"标签",tag,weight);
+            for(String category:row.categories)addSignal(score,support,"分类",category,weight);
         }
         ArrayList<Signal> rows=new ArrayList<>();for(Map.Entry<String,Integer> item:score.entrySet()){String[] parts=item.getKey().split("\u0000",2);if(parts.length==2)rows.add(new Signal(parts[0],parts[1],item.getValue(),support.getOrDefault(item.getKey(),0)));}
         rows.sort((a,b)->{int by=Integer.compare(b.score,a.score);if(by!=0)return by;int sup=Integer.compare(b.support,a.support);return sup!=0?sup:a.label.compareToIgnoreCase(b.label);});
@@ -189,13 +229,12 @@ final class RecommendationEvidenceStore {
     }
 
     static int recentCount(Context c){
-        JSONArray events=load(c);int n=0;long max=30L*24L*60L*60L*1000L;
-        for(int i=0;i<events.length();i++){JSONObject row=events.optJSONObject(i);if(row!=null&&ageMillis(row)<=max)n++;}
+        int n=0;long max=30L*24L*60L*60L*1000L,now=System.currentTimeMillis();
+        for(EvidenceRow row:rows(c))if(ageMillis(row,now)<=max)n++;
         return n;
     }
     static int sessionCount(Context c){
-        JSONArray events=load(c);int n=0;
-        for(int i=0;i<events.length();i++){JSONObject row=events.optJSONObject(i);if(row!=null&&PROCESS_SESSION_ID.equals(row.optString("sessionId","")))n++;}
+        int n=0;for(EvidenceRow row:rows(c))if(PROCESS_SESSION_ID.equals(row.sessionId))n++;
         return n;
     }
     static String sessionId(){return PROCESS_SESSION_ID;}

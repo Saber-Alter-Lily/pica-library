@@ -4,10 +4,11 @@ export const VISUAL_MODEL_ID = 'onnx-community/dinov2-small'
 export const VISUAL_MODEL_VERSION = 'dinov2-small-transformersjs-4.2.0'
 export const VISUAL_SAMPLING_POLICY_VERSION = 'v1-spread-6-body-pages'
 export const VISUAL_PROFILE_VERSION = 'visual-profile-v1-multiprototype'
-export const VISUAL_RERANK_VERSION = 'visual-rerank-v1-confidence-blend'
+export const VISUAL_RERANK_VERSION = 'visual-rerank-v2-modular-strength'
 
 export type VisualSourceKind = 'LOCAL_PAGES' | 'REMOTE_PAGES' | 'COVER_ONLY'
 export type VisualRerankMode = 'OFF' | 'SHADOW' | 'LIVE'
+export type VisualInfluenceStrength = 'LIGHT' | 'STANDARD' | 'STRONG'
 export type VisualSamplingMode = 'local_only' | 'standard' | 'cover_only'
 
 export interface VisualEmbeddingRecord {
@@ -402,9 +403,29 @@ export function visualAffinity(
     }
 }
 
-function sourceWeight(source: VisualSourceKind, confidence: number) {
+export function visualSourceWeight(
+    source: VisualSourceKind,
+    confidence: number,
+    strength: VisualInfluenceStrength = 'LIGHT'
+) {
     const maximum =
-        source === 'LOCAL_PAGES' ? 0.1 : source === 'REMOTE_PAGES' ? 0.08 : 0.03
+        strength === 'STRONG'
+            ? source === 'LOCAL_PAGES'
+                ? 0.3
+                : source === 'REMOTE_PAGES'
+                  ? 0.26
+                  : 0.07
+            : strength === 'STANDARD'
+              ? source === 'LOCAL_PAGES'
+                  ? 0.2
+                  : source === 'REMOTE_PAGES'
+                    ? 0.17
+                    : 0.05
+              : source === 'LOCAL_PAGES'
+                ? 0.1
+                : source === 'REMOTE_PAGES'
+                  ? 0.08
+                  : 0.03
     return maximum * clamp(confidence)
 }
 
@@ -423,6 +444,7 @@ export function rerankWithVisualStyle(input: {
     embeddings: VisualEmbeddingRecord[]
     profile: VisualPreferenceProfile | null
     mode: VisualRerankMode
+    strength?: VisualInfluenceStrength
 }): VisualRerankedCandidate[] {
     const baseline = input.ranked.map((candidate, index) => ({
         candidate,
@@ -465,7 +487,11 @@ export function rerankWithVisualStyle(input: {
             ? (visualPercentiles.get(row.candidate.comicId) ?? row.baselinePercentile)
             : row.baselinePercentile
         const weight = row.embedding
-            ? sourceWeight(row.embedding.sourceKind, row.embedding.confidence)
+            ? visualSourceWeight(
+                  row.embedding.sourceKind,
+                  row.embedding.confidence,
+                  input.strength ?? 'LIGHT'
+              )
             : 0
         const shadowScore =
             row.baselinePercentile * (1 - weight) + visualPercentile * weight

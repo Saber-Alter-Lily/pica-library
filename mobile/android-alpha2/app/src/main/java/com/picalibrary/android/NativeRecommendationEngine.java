@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Mobile-native Recommendation V3 using frozen ranker authority with provider-aware semantic inputs. */

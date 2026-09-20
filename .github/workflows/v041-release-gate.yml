@@ -1,4 +1,4 @@
-# v0.4.1 release source freeze after formal module-name cleanup
+# v0.4.1 release source freeze after formal module and contract cleanup
 name: v0.4.1 Formal Release Gate
 
 on:

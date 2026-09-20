@@ -147,6 +147,36 @@ public final class HomeActivity extends Activity {
 
     private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);if(!RecommendationFeedbackStore.askReasons(this)){show();return;}String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?"为什么喜欢？（可选）":"为什么不喜欢？（可选）").setMultiChoiceItems(labels,checked,(d,which,value)->checked[which]=value).setNegativeButton("跳过",(d,w)->show()).setPositiveButton("保存原因",(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,30);if(reasons.contains("repetitive"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"duplicate",true,30);show();}).setOnCancelListener(d->show()).show();}
 
-    private void onlineEntry(){LinearLayout p=page(true);titleRow(p,"在线");p.addView(Ui.button(this,"进入在线",v->startActivity(new Intent(this,PicaBrowseActivity.class)),false));}
-    private void settingsEntry(){LinearLayout p=page(true);titleRow(p,"设置");p.addView(Ui.button(this,"打开设置",v->startActivity(new Intent(this,SettingsActivity.class)),false));}
+    private void openOnlineSource(String sourceMode){
+        Intent i=new Intent(this,PicaBrowseActivity.class);
+        i.putExtra("sourceMode",sourceMode);
+        startActivity(i);
+    }
+
+    private void onlineEntry(){
+        LinearLayout p=page(true);titleRow(p,"在线");
+        boolean pica=PicaClient.available(this);
+        boolean eh=EhClient.accountAvailable(this);
+        EhCapabilityStore.Snapshot exh=EhCapabilityStore.load(this);
+        p.addView(SettingsRow.row(this,"全部来源","Pica + E-H"+(exh.available()?" + ExH":""),v->openOnlineSource("all")));
+        p.addView(SettingsRow.row(this,"Pica",pica?"可用":"未登录",v->openOnlineSource("pica")));
+        p.addView(SettingsRow.row(this,"E-Hentai",eh?"账号已连接":"游客可浏览",v->openOnlineSource("eh")));
+        p.addView(SettingsRow.row(this,"ExHentai",exh.available()?"可用":"可选扩展",v->openOnlineSource("exh")));
+        p.addView(SettingsRow.row(this,"账号与来源","管理登录与连接",v->startActivity(new Intent(this,AccountSourcesActivity.class))));
+    }
+
+    private void settingsEntry(){
+        LinearLayout p=page(true);titleRow(p,"设置");
+        boolean paired=BridgeStore.paired(this);
+        boolean pica=PicaAccountStore.load(this).configured();
+        boolean eh=EhAccountStore.load(this).configured();
+        p.addView(SettingsRow.row(this,"账号与来源",(pica||eh)?"本机已配置":"",v->startActivity(new Intent(this,AccountSourcesActivity.class))));
+        p.addView(SettingsRow.row(this,"连接电脑",paired?"已连接":"未连接",v->startActivity(new Intent(this,PairingActivity.class))));
+        p.addView(SettingsRow.row(this,"存储与下载","目录 / WebDAV / 下载策略",v->startActivity(new Intent(this,StorageHubActivity.class))));
+        p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
+        p.addView(SettingsRow.row(this,"推荐与画风",paired?"独立运行 · 可同步":"本机独立运行",v->startActivity(new Intent(this,RecommendationStyleActivity.class))));
+        p.addView(SettingsRow.row(this,"数据与缓存","缓存与本地数据",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
+        p.addView(SettingsRow.row(this,"软件更新","检查并安装正式更新",v->startActivity(new Intent(this,UpdateActivity.class))));
+        p.addView(SettingsRow.row(this,"关于","版本 / 开源 / 使用说明",v->startActivity(new Intent(this,AboutActivity.class))));
+    }
 }

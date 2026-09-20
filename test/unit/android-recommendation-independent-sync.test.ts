@@ -52,7 +52,7 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(sync).toContain('使用电脑')
         expect(sync).toContain('使用手机')
         expect(sync).toContain('双向同步')
-        expect(sync).toContain('两端推荐周期保持独立')
+        expect(sync).toContain('电脑和手机各自拥有独立推荐周期')
         expect(sync).toContain('maybeOfferOnConnection')
         expect(sync).toContain('lastPromptSignature')
         expect(sync).toContain('连接时自动检查差异')

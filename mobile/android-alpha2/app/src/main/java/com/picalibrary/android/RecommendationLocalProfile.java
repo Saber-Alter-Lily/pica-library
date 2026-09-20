@@ -32,14 +32,21 @@ final class RecommendationLocalProfile {
 
     static JSONArray inferred(Context context){
         Context app=context.getApplicationContext();
+        return inferred(app,UnifiedCatalogStore.load(app),RecommendationPolicyStore.snapshot(app));
+    }
+
+    static JSONArray inferred(Context context,UnifiedCatalogStore.Snapshot catalog,JSONObject remoteSnapshot){
+        Context app=context.getApplicationContext();
         LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
-        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(app);
-        JSONObject remoteSnapshot=RecommendationPolicyStore.snapshot(app),remoteCounts=remoteSnapshot.optJSONObject("counts");
+        if(catalog==null)catalog=new UnifiedCatalogStore.Snapshot();
+        if(remoteSnapshot==null)remoteSnapshot=new JSONObject();
+        JSONObject remoteCounts=remoteSnapshot.optJSONObject("counts");
         int remoteFavorites=remoteCounts==null?0:remoteCounts.optInt("favorites",0),localFavorites=0;
         for(UnifiedCatalogStore.Entry entry:catalog.entries())if(entry.favorite)localFavorites++;
         boolean localLifetimeAuthoritative=localFavorites>0&&(remoteFavorites<=0||localFavorites>=Math.ceil(remoteFavorites*0.90d));
         if(!localLifetimeAuthoritative){
-            JSONArray remote=RecommendationPolicyStore.inferred(app);
+            JSONArray remote=remoteSnapshot.optJSONArray("inferred");
+            if(remote==null)remote=new JSONArray();
             for(int i=0;i<remote.length();i++){
                 JSONObject row=remote.optJSONObject(i);if(row==null)continue;
                 String type=row.optString("targetType","TAG"),key=row.optString("key","");
@@ -49,7 +56,7 @@ final class RecommendationLocalProfile {
 
         List<UnifiedCatalogStore.Entry> positives=new ArrayList<>();
         for(UnifiedCatalogStore.Entry entry:catalog.entries())
-            if((entry.favorite||RecommendationFeedbackStore.isLiked(app,entry.id))&&!RecommendationPolicyStore.tasteExcluded(app,entry.id))positives.add(entry);
+            if((entry.favorite||RecommendationFeedbackStore.isLiked(app,entry.id))&&!RecommendationPolicyStore.tasteExcluded(remoteSnapshot,entry.id))positives.add(entry);
         if(positives.isEmpty())return new JSONArray(merged.values());
 
         MobileTagRegistry registry=null;try{registry=MobileTagRegistry.load(app);}catch(Exception ignored){}
@@ -92,7 +99,7 @@ final class RecommendationLocalProfile {
             }catch(Exception ignored){}
         }
 
-        JSONArray controls=RecommendationPolicyStore.controls(app);
+        JSONArray controls=remoteSnapshot.optJSONArray("controls");if(controls==null)controls=new JSONArray();
         for(int i=0;i<controls.length();i++){
             JSONObject control=controls.optJSONObject(i);if(control==null)continue;
             String type=control.optString("targetType","TAG"),key=control.optString("key",""),identity=id(type,key);

@@ -68,7 +68,7 @@ describe('V5 Web UX audit contract', () => {
     })
 
     it('treats unknown preferences as unknown rather than inferred dislike', () => {
-        const controls = read('web/recommendation-v5-beta.js')
+        const controls = read('web/recommendation-v5.js')
         expect(controls).toContain('baselineLevel: 5')
         expect(controls).toContain('systemUnknown: true')
         expect(controls).toContain('系统未判断 · 5/10 为中性起点')
@@ -240,7 +240,7 @@ describe('V5 Web UX audit contract', () => {
     })
 
     it('coalesces Visual QC and Settings Hub global DOM observers', () => {
-        const visual = read('web/visual-qc-beta.js')
+        const visual = read('web/visual-qc.js')
         const hub = read('web/alpha8-7-desktop-hub.js')
         expect(visual).toContain('let queued = false')
         expect(visual).toContain('const observer = new MutationObserver(schedule)')
@@ -300,7 +300,7 @@ describe('V5 Web UX audit contract', () => {
     })
 
     it('shows an inspectable recommendation profile before explicit batch edits', () => {
-        const controls = read('web/recommendation-v5-beta.js')
+        const controls = read('web/recommendation-v5.js')
         expect(controls).toContain('你的推荐画像')
         expect(controls).toContain('当前实际推荐构成')
         expect(controls).toContain('完整画像与微调')
@@ -333,7 +333,7 @@ describe('V5 Web UX audit contract', () => {
     it('exports a credential-free recommendation audit bundle on explicit request', () => {
         const main = read('src/desktop/main.ts')
         const server = read('src/library/server.ts')
-        const controls = read('web/recommendation-v5-beta.js')
+        const controls = read('web/recommendation-v5.js')
         expect(main).toContain('exportRecommendationAudit: async (input = {}) =>')
         expect(main).toContain("'behavior_evidence_v5.json'")
         expect(main).toContain("'user_events.json'")
@@ -373,7 +373,7 @@ describe('V5 Web UX audit contract', () => {
 
     it('keeps connection and recommendation explanations compact and layered', () => {
         const index = read('web/index.html')
-        const controls = read('web/recommendation-v5-beta.js')
+        const controls = read('web/recommendation-v5.js')
         const polish = read('web/ui-polish-v5.css')
         const info = read('web/info-tip-v1.js')
         expect(index).toContain('class="mobile-pair-method"')
@@ -394,7 +394,7 @@ describe('V5 Web UX audit contract', () => {
     })
 
     it('separates final serving composition from shadow planner telemetry', () => {
-        const controls = read('web/recommendation-v5-beta.js')
+        const controls = read('web/recommendation-v5.js')
         const service = read('src/library/service.ts')
         const server = read('src/library/server.ts')
         expect(controls).toContain('当前实际推荐构成')
@@ -409,7 +409,7 @@ describe('V5 Web UX audit contract', () => {
 
     it('binds recommendation timescales and audit export to the active app session', () => {
         const app = read('web/app.js')
-        const controls = read('web/recommendation-v5-beta.js')
+        const controls = read('web/recommendation-v5.js')
         const main = read('src/desktop/main.ts')
         expect(app).toContain('window.picaAppSessionId = state.appSessionId')
         expect(controls).toContain("query.set('appSessionId', appSessionId)")
@@ -439,7 +439,7 @@ describe('V5 Web UX audit contract', () => {
         const evaluation = read(
             'web/recommendation-v5-evaluation.js'
         )
-        const visual = read('web/visual-qc-beta.js')
+        const visual = read('web/visual-qc.js')
         const installBody =
             /function evalInstall\(\) \{([\s\S]*?)\n\}/.exec(
                 evaluation

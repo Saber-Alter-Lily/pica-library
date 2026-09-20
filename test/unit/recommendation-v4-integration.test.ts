@@ -111,6 +111,18 @@ describe('Recommendation V4 integration', () => {
         fs.rmSync(dir, { recursive: true, force: true })
     })
 
+    it('keeps the V1 patch-mean vector while emitting compact CLS/Patch V2 shadow views', () => {
+        const runtime = read('web/visual-runtime.js')
+        const app = read('web/app.js')
+        expect(runtime).toContain('function tensorViews(output)')
+        expect(runtime).toContain("version: 'visual-representation-v2-cls-patchmean-shadow'")
+        expect(runtime).toContain('vector: patchMeanVector')
+        expect(runtime).toContain('globalCls')
+        expect(runtime).toContain('patchMean')
+        expect(app).toContain('representations: result.representations || null')
+        expect(runtime).not.toContain('tensorVector(output)')
+    })
+
     it('keeps reasons optional in UI and visual analysis lazy', () => {
         const html = read('web/index.html')
         const app = read('web/app.js')

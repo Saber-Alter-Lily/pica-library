@@ -89,6 +89,9 @@ final class PortableRecommendationPackageStore {
         }
     }
 
+    private static Snapshot cachedSnapshot;
+    private static long cachedModified=-1L,cachedLength=-1L;
+
     private PortableRecommendationPackageStore(){}
 
     private static File file(Context c){
@@ -105,12 +108,16 @@ final class PortableRecommendationPackageStore {
     }
 
     static synchronized Snapshot load(Context context){
-        Snapshot out=new Snapshot();File f=file(context);if(!f.isFile())return out;
+        File f=file(context);if(!f.isFile()){cachedSnapshot=null;cachedModified=-1L;cachedLength=-1L;return new Snapshot();}
+        long modified=f.lastModified(),length=f.length();
+        if(cachedSnapshot!=null&&cachedModified==modified&&cachedLength==length)return cachedSnapshot;
         try(InputStream in=new FileInputStream(f);ByteArrayOutputStream bytes=new ByteArrayOutputStream()){
             byte[] buffer=new byte[16384];int n;
             while((n=in.read(buffer))>0)bytes.write(buffer,0,n);
-            return parse(new JSONObject(bytes.toString("UTF-8")));
-        }catch(Exception ignored){return out;}
+            Snapshot parsed=parse(new JSONObject(bytes.toString("UTF-8")));
+            cachedSnapshot=parsed;cachedModified=modified;cachedLength=length;
+            return parsed;
+        }catch(Exception ignored){return new Snapshot();}
     }
 
     static synchronized Snapshot save(Context context,JSONObject root){
@@ -123,6 +130,7 @@ final class PortableRecommendationPackageStore {
         }catch(Exception e){throw new IllegalStateException("无法保存推荐基础包",e);}
         if(target.exists()&&!target.delete()){tmp.delete();throw new IllegalStateException("无法替换推荐基础包");}
         if(!tmp.renameTo(target)){tmp.delete();throw new IllegalStateException("无法写入推荐基础包");}
+        cachedSnapshot=parsed;cachedModified=target.lastModified();cachedLength=target.length();
         return parsed;
     }
 

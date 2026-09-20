@@ -20,6 +20,7 @@ final class ReaderProgress {
     private final String prefix;
     private boolean syncing;
     private String historySessionId="",historyDay="",historyChapterId="",historyStartedAt="",historyMetadataChapterId="",historyChapterTitle="章节";
+    private String historyComicId="",historyComicTitle="漫画",historyComicAuthor="未知作者",historyComicProvider="";
     private int historyChapterOrder;
 
     ReaderProgress(Context context, ReaderSource source) {
@@ -85,6 +86,14 @@ final class ReaderProgress {
         historyChapterOrder=Math.max(0,chapterOrder);
     }
 
+    private void ensureComicMetadata(String comic){
+        String id=comic==null?"":comic;
+        if(id.equals(historyComicId))return;
+        historyComicId=id;historyComicTitle="漫画";historyComicAuthor="未知作者";historyComicProvider=EhClient.isEhId(id)?"eh":("pica".equals(source.kind())?"pica":"");
+        UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(context).byId.get(id);
+        if(entry!=null){historyComicTitle=entry.title;historyComicAuthor=entry.displayAuthor();historyComicProvider=entry.providerId;}
+    }
+
     void save(String comic, String chapter, int page, boolean flush) {
         if (comic == null || chapter == null) return;
         try {
@@ -105,7 +114,7 @@ final class ReaderProgress {
         } catch (Exception e) { throw new IllegalStateException("无法保存阅读进度", e); }
     }
 
-    private void recordHistory(String comic,String chapter,int page,String now){LocalDate day=ReadingHistoryStore.localDay(now);String dayKey=day==null?now.substring(0,Math.min(10,now.length())):day.toString();if(historySessionId.isEmpty()||!dayKey.equals(historyDay)||!chapter.equals(historyChapterId)){historySessionId=UUID.randomUUID().toString();historyDay=dayKey;historyChapterId=chapter;historyStartedAt=now;}UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(context).byId.get(comic);String title=entry==null?"漫画":entry.title,author=entry==null?"未知作者":entry.displayAuthor(),provider=entry==null?(EhClient.isEhId(comic)?"eh":("pica".equals(source.kind())?"pica":"")):entry.providerId;String chapterTitle=chapter.equals(historyMetadataChapterId)?historyChapterTitle:"章节";int chapterOrder=chapter.equals(historyMetadataChapterId)?historyChapterOrder:0;ReadingHistoryStore.record(context,historySessionId,comic,chapter,title,author,chapterTitle,chapterOrder,provider,source.kind(),page,historyStartedAt,now);}
+    private void recordHistory(String comic,String chapter,int page,String now){LocalDate day=ReadingHistoryStore.localDay(now);String dayKey=day==null?now.substring(0,Math.min(10,now.length())):day.toString();if(historySessionId.isEmpty()||!dayKey.equals(historyDay)||!chapter.equals(historyChapterId)){historySessionId=UUID.randomUUID().toString();historyDay=dayKey;historyChapterId=chapter;historyStartedAt=now;}ensureComicMetadata(comic);String chapterTitle=chapter.equals(historyMetadataChapterId)?historyChapterTitle:"章节";int chapterOrder=chapter.equals(historyMetadataChapterId)?historyChapterOrder:0;ReadingHistoryStore.record(context,historySessionId,comic,chapter,historyComicTitle,historyComicAuthor,chapterTitle,chapterOrder,historyComicProvider,source.kind(),page,historyStartedAt,now);}
 
     synchronized void sync() {
         if (syncing) return;

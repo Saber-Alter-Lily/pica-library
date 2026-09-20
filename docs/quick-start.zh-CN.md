@@ -37,8 +37,9 @@
 打开 **设置 → 软件更新 → 检查并更新（兼容时自动）**。
 
 - 如果目标版本支持安全增量更新，程序会自动下载、校验、重启并应用。
-- 如果检测为“完整程序包更新”，页面会直接显示应下载的 Windows ZIP 和替换步骤。v0.4.0 → v0.4.1 即为完整包更新。
-- 完整包更新前先退出旧版；不要删除 `%LOCALAPPDATA%\\Pica Library`，也不需要卸载或重新导入数据。
+- 如果检测为“完整程序包更新”，优先使用 Release 中提供的升级助手。v0.4.0 → v0.4.1 可下载 `Pica-Library-v0.4.1-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.1.cmd`。
+- 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\\Pica Library`、备份旧程序和数据库并在失败时回滚；不需要卸载或重新导入数据。
+- 如果不使用助手，仍可按页面提示手动退出旧版并替换程序目录。
 
 ![软件更新使用示意](assets/screenshots/v0.3.0/05-update-guide.png)
 

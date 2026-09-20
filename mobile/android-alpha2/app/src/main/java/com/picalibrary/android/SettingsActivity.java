@@ -76,6 +76,7 @@ public final class SettingsActivity extends Activity {
         content.addView(SettingsRow.row(this,"推荐与画风",paired?"独立运行 · 可同步":"本机独立运行",v->startActivity(new Intent(this,RecommendationStyleActivity.class))));
         content.addView(SettingsRow.row(this,"数据与缓存","",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
         content.addView(SettingsRow.row(this,"软件更新","",v->startActivity(new Intent(this,UpdateActivity.class))));
+        content.addView(SettingsRow.row(this,"支持项目","支持开源开发",v->startActivity(new Intent(this,SupportActivity.class))));
         content.addView(SettingsRow.row(this,"关于","",v->startActivity(new Intent(this,AboutActivity.class))));
     }
 

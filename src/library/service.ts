@@ -105,6 +105,7 @@ import {
     VISUAL_RERANK_VERSION,
     VISUAL_SAMPLING_POLICY_VERSION,
     type VisualEmbeddingRecord,
+    type VisualInfluenceStrength,
     type VisualRerankMode,
     type VisualSamplingMode
 } from '../recommendation-v4/visual-style'
@@ -1754,6 +1755,7 @@ export class LibraryService {
             enabled?: boolean
             samplingMode?: VisualSamplingMode
             rerankMode?: VisualRerankMode
+            strength?: VisualInfluenceStrength
         }>('recommendation.visualSettings.v1')
         const samplingMode: VisualSamplingMode = [
             'local_only',
@@ -1767,10 +1769,16 @@ export class LibraryService {
         )
             ? (stored!.rerankMode as VisualRerankMode)
             : 'SHADOW'
+        const strength: VisualInfluenceStrength = ['LIGHT', 'STANDARD', 'STRONG'].includes(
+            String(stored?.strength ?? '')
+        )
+            ? (stored!.strength as VisualInfluenceStrength)
+            : 'STANDARD'
         return {
             enabled: Boolean(stored?.enabled),
             samplingMode,
-            rerankMode
+            rerankMode,
+            strength
         }
     }
 
@@ -1778,6 +1786,7 @@ export class LibraryService {
         enabled?: unknown
         samplingMode?: unknown
         rerankMode?: unknown
+        strength?: unknown
     }) {
         const previous = this.visualSettings()
         const samplingMode = ['local_only', 'standard', 'cover_only'].includes(
@@ -1790,13 +1799,19 @@ export class LibraryService {
         )
             ? (String(input.rerankMode) as VisualRerankMode)
             : previous.rerankMode
+        const strength = ['LIGHT', 'STANDARD', 'STRONG'].includes(
+            String(input.strength ?? '')
+        )
+            ? (String(input.strength) as VisualInfluenceStrength)
+            : previous.strength
         const next = {
             enabled:
                 input.enabled === undefined
                     ? previous.enabled
                     : Boolean(input.enabled),
             samplingMode,
-            rerankMode
+            rerankMode,
+            strength
         }
         this.database.setAppState('recommendation.visualSettings.v1', next)
         return next
@@ -2578,7 +2593,8 @@ export class LibraryService {
             ranked: policyAdjusted,
             embeddings: visualEmbeddings,
             profile: visualProfile,
-            mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF'
+            mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF',
+            strength: visualSettings.strength
         })
         this.recommendationProgress = {
             state: 'complete',

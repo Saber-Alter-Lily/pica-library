@@ -120,3 +120,121 @@ function Resolve-RunningInstallRoot {
     } catch {}
 
     return $null
+}
+
+function Select-OldInstallFolder {
+    $dialog = New-Object Windows.Forms.FolderBrowserDialog
+    $dialog.Description = "请选择旧版 Pica Library v0.4.0 程序文件夹。`r`n该文件夹中应包含 Pica Library.exe。"
+    $dialog.ShowNewFolderButton = $false
+    if ($dialog.ShowDialog() -ne [Windows.Forms.DialogResult]::OK) { return $null }
+    return (Normalize-Path $dialog.SelectedPath)
+}
+
+function Read-InstalledVersion([string]$Root) {
+    $readme = Join-Path $Root 'README-WINDOWS.txt'
+    if (Test-Path -LiteralPath $readme) {
+        $first = (Get-Content -LiteralPath $readme -TotalCount 1)
+        if ($first -match 'Pica Library v(\d+\.\d+\.\d+)') { return $Matches[1] }
+    }
+    $instance = Read-InstanceInfo
+    if ($instance -and $instance.url) {
+        try {
+            $status = Invoke-RestMethod -Uri ($instance.url.TrimEnd('/') + '/api/v1/status') -TimeoutSec 4
+            if ($status.version) { return [string]$status.version }
+        } catch {}
+    }
+    return $null
+}
+
+function Validate-OldInstall([string]$Root) {
+    foreach ($relative in @('Pica Library.exe', 'runtime\node.exe', 'app\desktop.js', 'SOURCE_SHA.txt')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Root $relative))) {
+            throw "选择的文件夹不是完整的 Pica Library 程序目录：缺少 $relative"
+        }
+    }
+
+    $driveRoot = [IO.Path]::GetPathRoot($Root)
+    if ((Normalize-Path $Root) -eq (Normalize-Path $driveRoot)) {
+        throw '拒绝把磁盘根目录作为程序目录。'
+    }
+    if (Test-SameOrUnder $DataRoot $Root) {
+        throw "用户数据目录位于所选程序目录之下，自动替换已停止。`r`n受保护目录：$DataRoot"
+    }
+    if (Test-SameOrUnder $PSScriptRoot $Root) {
+        throw '升级助手当前位于旧程序目录中。请把升级助手 ZIP 解压到“下载”或桌面等其他位置后再运行。'
+    }
+
+    $version = Read-InstalledVersion $Root
+    if ($version -ne $RequiredSourceVersion) {
+        $displayVersion = if ($version) { $version } else { '无法确认版本' }
+        throw "此助手只接受已验证的 v$RequiredSourceVersion → v$TargetVersion 路径。当前检测到：$displayVersion"
+    }
+}
+
+function Read-LibraryDirectory {
+    $config = Join-Path $DataRoot 'config\config.json'
+    if (Test-Path -LiteralPath $config) {
+        try {
+            $value = Get-Content -Raw -LiteralPath $config | ConvertFrom-Json
+            if ($value.libraryDirectory) {
+                return Normalize-Path ([string]$value.libraryDirectory)
+            }
+        } catch {
+            throw "无法读取本地配置：$config"
+        }
+    }
+    return Normalize-Path (Join-Path $DataRoot 'data')
+}
+
+function Assert-UserDataOutsideInstall([string]$Root, [string]$LibraryRoot) {
+    if (Test-SameOrUnder $LibraryRoot $Root) {
+        throw @"
+检测到漫画库/下载目录位于旧程序目录内部：
+$LibraryRoot
+
+为了避免替换程序时移动或隐藏你的漫画文件，升级助手已停止。
+请先在旧版中把漫画保存目录迁移到程序目录之外，再重新运行升级助手。
+"@
+    }
+}
+
+function Download-And-VerifyTarget {
+    New-Item -ItemType Directory -Force -Path $TempRoot | Out-Null
+    $zip = Join-Path $TempRoot $TargetZipName
+    Write-UpgradeLog "Downloading official $TargetZipName"
+    Invoke-WebRequest -UseBasicParsing -Uri $TargetZipUrl -OutFile $zip
+    $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+    Write-UpgradeLog "Downloaded SHA-256: $hash"
+    if ($hash -ne $ExpectedZipSha256) {
+        throw "官方 Windows 包 SHA-256 不匹配。期望 $ExpectedZipSha256，实际 $hash。"
+    }
+
+    $extract = Join-Path $TempRoot 'target'
+    Expand-Archive -LiteralPath $zip -DestinationPath $extract
+    foreach ($relative in @('Pica Library.exe', 'runtime\node.exe', 'app\desktop.js', 'SOURCE_SHA.txt')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $extract $relative))) {
+            throw "下载的目标包不完整：缺少 $relative"
+        }
+    }
+    $sourceSha = (Get-Content -Raw -LiteralPath (Join-Path $extract 'SOURCE_SHA.txt')).Trim()
+    if ($sourceSha -ne $ExpectedTargetSourceSha) {
+        throw "目标包来源 SHA 不匹配：$sourceSha"
+    }
+    return $extract
+}
+
+function Request-GracefulShutdown {
+    $instance = Read-InstanceInfo
+    if (-not $instance) { return }
+    if ($instance.url) {
+        try {
+            $base = ([string]$instance.url).TrimEnd('/')
+            $desktop = Invoke-RestMethod -Uri ($base + '/api/v1/desktop/status') -TimeoutSec 4
+            if ($desktop.csrfToken) {
+                Invoke-RestMethod -Method Post -Uri ($base + '/api/v1/desktop/shutdown') `
+                    -Headers @{ 'x-pica-csrf' = [string]$desktop.csrfToken } `
+                    -ContentType 'application/json' -Body '{}' -TimeoutSec 5 | Out-Null
+                Write-UpgradeLog 'Requested graceful shutdown through the local Desktop API.'
+            }
+        } catch {
+            Write-UpgradeLog

@@ -59,6 +59,7 @@ public final class RecommendationStyleActivity extends Activity {
         visual.addView(SettingsRow.statusLine(this,"候选 Visual 覆盖",Ui.text(this,covered+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
         visual.addView(SettingsRow.statusLine(this,"手机画风接入",Ui.text(this,MobileVisualPolicyStore.label(this),12,Ui.MUTED,true)));
         visual.addView(Ui.button(this,"调整手机画风接入模式",v->chooseMobileVisualMode(),true),new LinearLayout.LayoutParams(-1,-2));
+        visual.addView(Ui.button(this,"画风影响强度 · "+MobileVisualPolicyStore.strengthLabel(this),v->chooseMobileVisualStrength(),true),new LinearLayout.LayoutParams(-1,-2));
         content.addView(visual);
 
         if(BridgeStore.paired(this)){
@@ -98,7 +99,7 @@ public final class RecommendationStyleActivity extends Activity {
 
     private void chooseMobileVisualMode(){
         String current=MobileVisualPolicyStore.mode(this);
-        String[] labels={"关闭","Shadow · 只计算不改本机排序","Live · 低权重参与本机排序"};
+        String[] labels={"关闭 · 完全不影响常规推荐","Shadow · 只计算不改本机排序","Live · 按所选强度参与本机排序"};
         String[] values={MobileVisualPolicyStore.OFF,MobileVisualPolicyStore.SHADOW,MobileVisualPolicyStore.LIVE};
         int checked=MobileVisualPolicyStore.OFF.equals(current)?0:MobileVisualPolicyStore.LIVE.equals(current)?2:1;
         new AlertDialog.Builder(this)
@@ -116,39 +117,69 @@ public final class RecommendationStyleActivity extends Activity {
             .show();
     }
 
+    private void chooseMobileVisualStrength(){
+        String current=MobileVisualPolicyStore.strength(this);
+        String[] labels={"轻度 · 兼容旧权重","标准 · 推荐","强 · 更强调画风"};
+        String[] values={MobileVisualPolicyStore.LIGHT,MobileVisualPolicyStore.STANDARD,MobileVisualPolicyStore.STRONG};
+        int checked=MobileVisualPolicyStore.LIGHT.equals(current)?0:MobileVisualPolicyStore.STRONG.equals(current)?2:1;
+        new AlertDialog.Builder(this)
+            .setTitle("手机画风影响强度")
+            .setSingleChoiceItems(labels,checked,(d,w)->{
+                d.dismiss();
+                MobileVisualPolicyStore.setStrength(this,values[w]);
+                renderContent();
+                if(MobileVisualPolicyStore.live(this)&&NativeRecommendationStore.load(this).available()){
+                    NativeRecommendationJobs.refresh(this);
+                    Toast.makeText(this,"手机画风强度已更新，正在独立生成新的推荐周期",Toast.LENGTH_LONG).show();
+                }
+            })
+            .setNegativeButton("取消",null)
+            .show();
+    }
+
     private void showDesktopVisualActions(){
         if(desktopVisual==null){loadDesktopVisual(true);return;}
         JSONObject settings=desktopVisual.optJSONObject("settings");
         boolean enabled=settings!=null&&settings.optBoolean("enabled",false);
         String mode=settings==null?"SHADOW":settings.optString("rerankMode","SHADOW");
+        String strength=settings==null?"STANDARD":settings.optString("strength","STANDARD");
         String[] labels={
             "刷新 Desktop 状态",
-            enabled?"关闭 Desktop 画风信号":"启用 Desktop 画风信号",
-            "Desktop 接入模式 · "+mode
+            enabled?"关闭 Desktop 画风模块":"启用 Desktop 画风模块",
+            "Desktop 接入模式 · "+mode,
+            "Desktop 画风强度 · "+strength
         };
         new AlertDialog.Builder(this)
             .setTitle("Desktop 画风实验设置")
             .setItems(labels,(d,w)->{
                 if(w==0)loadDesktopVisual(true);
-                else if(w==1)updateDesktopVisual(!enabled,null);
-                else chooseDesktopMode(mode);
+                else if(w==1)updateDesktopVisual(!enabled,null,null);
+                else if(w==2)chooseDesktopMode(mode);
+                else chooseDesktopStrength(strength);
             })
             .setNegativeButton("关闭",null)
             .show();
     }
 
     private void chooseDesktopMode(String current){
-        String[] labels={"关闭排序影响","Shadow · 只计算","Live · 低权重参与"};
+        String[] labels={"关闭排序影响","Shadow · 只计算","Live · 按所选强度参与"};
         String[] values={"OFF","SHADOW","LIVE"};
         int checked="OFF".equals(current)?0:"LIVE".equals(current)?2:1;
-        new AlertDialog.Builder(this).setTitle("Desktop 推荐接入模式").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w]);}).setNegativeButton("取消",null).show();
+        new AlertDialog.Builder(this).setTitle("Desktop 推荐接入模式").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w],null);}).setNegativeButton("取消",null).show();
     }
 
-    private void updateDesktopVisual(Boolean enabled,String mode){
+    private void chooseDesktopStrength(String current){
+        String[] labels={"轻度 · 兼容旧权重","标准 · 推荐","强 · 更强调画风"};
+        String[] values={"LIGHT","STANDARD","STRONG"};
+        int checked="LIGHT".equals(current)?0:"STRONG".equals(current)?2:1;
+        new AlertDialog.Builder(this).setTitle("Desktop 画风影响强度").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,null,values[w]);}).setNegativeButton("取消",null).show();
+    }
+
+    private void updateDesktopVisual(Boolean enabled,String mode,String strength){
         if(loading)return;loading=true;
         new Thread(()->{
             try{
-                JSONObject value=BridgeClient.updateVisualSettings(this,enabled,mode);
+                JSONObject value=BridgeClient.updateVisualSettings(this,enabled,mode,strength);
                 runOnUiThread(()->{if(destroyed)return;loading=false;desktopVisual=value;renderContent();});
             }catch(Exception e){
                 runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"更新失败":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});

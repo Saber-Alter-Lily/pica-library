@@ -226,7 +226,8 @@ final class BridgeClient {
     }
     static JSONObject recommendationPolicy(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/recommendation/v5/snapshot"));}
     static JSONObject visualStatus(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/visual/status"));}
-    static JSONObject updateVisualSettings(Context c,Boolean enabled,String rerankMode) throws Exception {JSONObject body=new JSONObject();if(enabled!=null)body.put("enabled",enabled.booleanValue());if(rerankMode!=null&&!rerankMode.isEmpty())body.put("rerankMode",rerankMode);return new JSONObject(post(c,"/mobile/v1/visual/settings",body));}
+    static JSONObject updateVisualSettings(Context c,Boolean enabled,String rerankMode) throws Exception {return updateVisualSettings(c,enabled,rerankMode,null);}
+    static JSONObject updateVisualSettings(Context c,Boolean enabled,String rerankMode,String strength) throws Exception {JSONObject body=new JSONObject();if(enabled!=null)body.put("enabled",enabled.booleanValue());if(rerankMode!=null&&!rerankMode.isEmpty())body.put("rerankMode",rerankMode);if(strength!=null&&!strength.isEmpty())body.put("strength",strength);return new JSONObject(post(c,"/mobile/v1/visual/settings",body));}
     static JSONObject atlas(Context c) throws Exception { return new JSONObject(get(c,"/mobile/v1/atlas")); }
     private static String enc(String value) throws Exception { return java.net.URLEncoder.encode(value==null?"":value,"UTF-8").replace("+","%20"); }
 }

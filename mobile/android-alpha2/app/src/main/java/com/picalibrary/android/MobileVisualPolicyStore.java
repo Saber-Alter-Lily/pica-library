@@ -6,8 +6,9 @@ import android.content.SharedPreferences;
 /** Device-local Visual serving policy. Heavy Visual learning remains Desktop-authored. */
 final class MobileVisualPolicyStore {
     private static final String PREFS="recommendation-visual-mobile-v1";
-    private static final String MODE="mode";
+    private static final String MODE="mode",STRENGTH="strength";
     static final String OFF="OFF",SHADOW="SHADOW",LIVE="LIVE";
+    static final String LIGHT="LIGHT",STANDARD="STANDARD",STRONG="STRONG";
 
     private MobileVisualPolicyStore(){}
 
@@ -25,11 +26,27 @@ final class MobileVisualPolicyStore {
         prefs(c).edit().putString(MODE,next).apply();
     }
 
+    static String strength(Context c){
+        String value=prefs(c).getString(STRENGTH,STANDARD);
+        return LIGHT.equals(value)||STRONG.equals(value)?value:STANDARD;
+    }
+
+    static void setStrength(Context c,String value){
+        String next=LIGHT.equals(value)?LIGHT:STRONG.equals(value)?STRONG:STANDARD;
+        prefs(c).edit().putString(STRENGTH,next).apply();
+    }
+
     static boolean live(Context c){return LIVE.equals(mode(c));}
+    static String strengthLabel(Context c){
+        String value=strength(c);
+        if(LIGHT.equals(value))return "轻度";
+        if(STRONG.equals(value))return "强";
+        return "标准";
+    }
     static String label(Context c){
         String value=mode(c);
-        if(OFF.equals(value))return "关闭";
-        if(LIVE.equals(value))return "Live · 低权重参与本机排序";
+        if(OFF.equals(value))return "关闭 · 不影响常规推荐";
+        if(LIVE.equals(value))return "Live · "+strengthLabel(c)+"强度";
         return "Shadow · 只计算不改本机排序";
     }
 }

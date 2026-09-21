@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Iterator;
 import org.json.JSONObject;
 
 /**
@@ -48,7 +49,8 @@ final class LocalizedText {
                 JSONObject root=new JSONObject(raw);
                 JSONObject rows=root.getJSONObject("byLanguage").optJSONObject(language);
                 if(rows!=null){
-                    for(String key:rows.keySet())next.put(key,rows.optString(key,key));
+                    Iterator<String> keys=rows.keys();
+                    while(keys.hasNext()){String key=keys.next();next.put(key,rows.optString(key,key));}
                 }
             }catch(Exception ignored){
                 // Missing/generated assets fail open: UI stays on source text.

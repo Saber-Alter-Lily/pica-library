@@ -11,7 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** One explicit registration submission, independently of Desktop. No auto-login. */
-public final class PicaRegisterActivity extends Activity {
+public final class PicaRegisterActivity extends LocaleAwareActivity {
     private final Map<String,EditText> fields = new LinkedHashMap<>();
     private TextView status;
     private CheckBox consent;

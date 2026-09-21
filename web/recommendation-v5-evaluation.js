@@ -342,15 +342,15 @@ function evalRenderCriteria() {
         ? EVAL.summary.criteria
         : []
     const labels = {
-        EXACT_SHADOW_RUN_SUPPORT: '重复测试轮次',
-        CORRECTNESS_AUDIT_SUPPORT: '安全审计轮次',
-        FUTURE_OUTCOME_SUPPORT: '后续真实行为支持',
-        STEERABILITY_TARGET_SUPPORT: '偏好控制测试样本',
-        STEERABILITY_MONOTONICITY: '偏好控制方向一致性',
-        P3_SHADOW_ENGINEERING_GATE: '新算法工程稳定性'
+        EXACT_SHADOW_RUN_SUPPORT: evalT('重复测试轮次','Repeated test runs','反復テスト回数'),
+        CORRECTNESS_AUDIT_SUPPORT: evalT('安全审计轮次','Safety audit runs','安全監査回数'),
+        FUTURE_OUTCOME_SUPPORT: evalT('后续真实行为支持','Future-outcome support','後続の実行動サポート'),
+        STEERABILITY_TARGET_SUPPORT: evalT('偏好控制测试样本','Preference-control test samples','嗜好制御テストサンプル'),
+        STEERABILITY_MONOTONICITY: evalT('偏好控制方向一致性','Preference-control direction consistency','嗜好制御方向の一貫性'),
+        P3_SHADOW_ENGINEERING_GATE: evalT('新算法工程稳定性','New-algorithm engineering stability','新アルゴリズムのエンジニアリング安定性')
     }
     target.innerHTML = `
-      <h4>固定 Gate 条件（开发者）</h4>
+      <h4>${evalT('固定 Gate 条件（开发者）','Fixed gate conditions (developer)','固定 Gate 条件（開発者）')}</h4>
       <div class="v5-eval-criteria">
         ${criteria.map((item) => `
           <div class="v5-eval-criterion">
@@ -361,7 +361,7 @@ function evalRenderCriteria() {
             </div>
             <code>${evalEsc(String(item.actual ?? '—'))} / ${evalEsc(item.threshold || '')}</code>
           </div>
-        `).join('') || '<p class="status">当前没有可用 Gate 条件。</p>'}
+        `).join('') || `<p class="status">${evalT('当前没有可用 Gate 条件。','No gate conditions are available yet.','利用可能な Gate 条件はまだありません。')}</p>`}
       </div>
     `
 }
@@ -383,7 +383,7 @@ function evalDeltaMarkup(value, higherIsBetter = true) {
 function evalVersionOptions(selected) {
     return EVAL.versions
         .map((item) => {
-            const label = `${item.current ? '[current] ' : ''}${item.modelVersion} · runs ${Number(item.runCount || 0)}`
+            const label = `${item.current ? `[${evalT('当前','current','current')}] ` : ''}${item.modelVersion} · ${evalT('轮次','runs','実行回数')} ${Number(item.runCount || 0)}`
             return `<option value="${evalEsc(item.modelVersion)}" ${item.modelVersion === selected ? 'selected' : ''}>${evalEsc(label)}</option>`
         })
         .join('')
@@ -394,7 +394,7 @@ function evalRenderComparison() {
     if (!target) return
     if (EVAL.versions.length < 2) {
         target.innerHTML = `
-          <h4>Model Version Comparison（开发者）</h4>
+          <h4>${evalT('Model Version Comparison（开发者）','Model Version Comparison (developer)','Model Version Comparison（開発者）')}</h4>
           <p class="status">至少需要两个不同的 shadow modelVersion 才能做固定基线比较；当前只有 ${EVAL.versions.length} 个。</p>
         `
         return
@@ -403,7 +403,7 @@ function evalRenderComparison() {
     const metrics = comparison?.accuracy?.diversifiedBatch || {}
     const diversity = comparison?.diversity || {}
     target.innerHTML = `
-      <h4>Model Version Comparison（开发者）</h4>
+      <h4>${evalT('Model Version Comparison（开发者）','Model Version Comparison (developer)','Model Version Comparison（開発者）')}</h4>
       <div class="v5-eval-compare-controls">
         <label>Baseline
           <select id="v5-eval-baseline-version">${evalVersionOptions(EVAL.baselineVersion)}</select>
@@ -412,18 +412,18 @@ function evalRenderComparison() {
         <label>Candidate
           <select id="v5-eval-candidate-version">${evalVersionOptions(EVAL.candidateVersion)}</select>
         </label>
-        <button id="v5-eval-compare-btn" type="button">比较版本</button>
+        <button id="v5-eval-compare-btn" type="button">${evalT('比较版本','Compare versions','バージョンを比較')}</button>
       </div>
       ${comparison ? `
         <div class="v5-eval-grid">
-          ${evalMetricCard('Comparison', evalBadge(comparison.status), '不会自动选择 winner')}
+          ${evalMetricCard('Comparison', evalBadge(comparison.status), evalT('不会自动选择 winner','No winner is selected automatically.','winner は自動選択しません。'))}
           ${evalMetricCard('Δ Precision@12', evalDeltaMarkup(metrics.precision12?.delta, true), 'candidate − baseline')}
           ${evalMetricCard('Δ Recall@12', evalDeltaMarkup(metrics.recall12?.delta, true), 'candidate − baseline')}
           ${evalMetricCard('Δ NDCG@12', evalDeltaMarkup(metrics.ndcg12?.delta, true), 'candidate − baseline')}
           ${evalMetricCard('Δ Hit@12', evalDeltaMarkup(metrics.hit12?.delta, true), 'candidate − baseline')}
           ${evalMetricCard('Δ MRR', evalDeltaMarkup(metrics.mrr?.delta, true), 'candidate − baseline')}
-          ${evalMetricCard('Δ Author concentration', evalDeltaMarkup(diversity.authorMaxShare?.delta, false), 'lower is better')}
-          ${evalMetricCard('Δ Catalog coverage', evalDeltaMarkup(diversity.itemCoverage?.delta, true), 'higher is better')}
+          ${evalMetricCard('Δ Author concentration', evalDeltaMarkup(diversity.authorMaxShare?.delta, false), evalT('越低越好','lower is better','低いほど良い'))}
+          ${evalMetricCard('Δ Catalog coverage', evalDeltaMarkup(diversity.itemCoverage?.delta, true), evalT('越高越好','higher is better','高いほど良い'))}
         </div>
         <div class="v5-eval-note">
           baseline: <code>${evalEsc(comparison.baseline?.modelVersion || '')}</code><br>
@@ -494,9 +494,9 @@ function evalRenderAdvancedLearning() {
         ? gate.missingRequirements
         : []
     target.innerHTML = `
-      <h4>Advanced Learning Decision Gate（开发者）</h4>
+      <h4>${evalT('Advanced Learning Decision Gate（开发者）','Advanced Learning Decision Gate (developer)','Advanced Learning Decision Gate（開発者）')}</h4>
       <div class="v5-eval-compare-controls">
-        <label>方向
+        <label>${evalT('方向','Direction','方向')}
           <select id="v5-eval-advanced-direction">
             <option value="LEARNING_TO_RANK" ${EVAL.advancedDirection === 'LEARNING_TO_RANK' ? 'selected' : ''}>Learning-to-Rank</option>
             <option value="CONTEXTUAL_BANDIT" ${EVAL.advancedDirection === 'CONTEXTUAL_BANDIT' ? 'selected' : ''}>Contextual Bandit</option>
@@ -507,7 +507,7 @@ function evalRenderAdvancedLearning() {
         <div class="v5-eval-meta">
           LTR 使用当前 baseline/candidate 比较；Bandit 需要 propensity/randomized assignment；Active Learning 需要 uncertainty/query-value 日志。
         </div>
-        <button id="v5-eval-advanced-btn" type="button">评估实验门槛</button>
+        <button id="v5-eval-advanced-btn" type="button">${evalT('评估实验门槛','Evaluate experiment gate','実験 Gate を評価')}</button>
       </div>
       ${gate ? `
         <div class="v5-eval-grid">
@@ -572,12 +572,12 @@ function evalRenderRuns() {
     const rows = EVAL.runs.slice(0, 12)
     const readinessLabel = (value) => {
         const status = String(value || '')
-        if (status === 'READY') return '完成'
-        if (status === 'READY_DEGRADED') return '完成（部分来源降级）'
+        if (status === 'READY') return evalT('完成','Ready','完了')
+        if (status === 'READY_DEGRADED') return evalT('完成（部分来源降级）','Ready (some sources degraded)','完了（一部ソース低下）')
         return status || '—'
     }
     target.innerHTML = `
-      <h4>最近影子推荐</h4>
+      <h4>${evalT('最近影子推荐','Recent shadow recommendations','最近の Shadow おすすめ')}</h4>
       <div class="v5-eval-runs">
         ${rows.map((run, index) => {
             const telemetry = run.telemetry || {}
@@ -595,13 +595,13 @@ function evalRenderRuns() {
                   <strong>#${index + 1} · ${evalEsc(mode)}</strong>
                   <div class="v5-eval-meta">${evalEsc(new Date(run.generatedAt).toLocaleString())}</div>
                   <details>
-                    <summary>版本信息</summary>
+                    <summary>${evalT('版本信息','Version information','バージョン情報')}</summary>
                     <code>${evalEsc(run.modelVersion)}</code>
                   </details>
                 </div>
                 <span>${evalEsc(readinessLabel(readiness))}</span>
-                <span>排序 ${ranked}</span>
-                <span>最终 ${batch}</span>
+                <span>${evalT('排序','Ranked','順位付け')} ${ranked}</span>
+                <span>${evalT('最终','Final','最終')} ${batch}</span>
               </div>
             `
         }).join('') || '<p class="status">还没有影子推荐记录。隔一段时间运行一次即可；不会改变正式推荐。</p>'}

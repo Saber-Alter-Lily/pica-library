@@ -97,7 +97,7 @@ Existing **v0.4.0** users should move directly to the current release:
 
 - download `Pica-Library-v0.4.4-upgrade-assistant.zip` from the v0.4.4 Release;
 - run `Upgrade-Pica-Library-v0.4.4.cmd`;
-- do not install v0.4.1, v0.4.2, or v0.4.3 first.
+- no intermediate versions are required.
 
 The assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database backups, replaces the application, runs health checks, and rolls back on failure.
 

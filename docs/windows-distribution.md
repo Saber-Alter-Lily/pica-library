@@ -57,13 +57,13 @@ Open **Settings → Software Update** and check the current formal release.
 
 ### Public upgrade path: v0.4.0 → v0.4.6
 
-Download from the **v0.4.6 Release**:
+Download from the **v0.4.7 Release**:
 
-`Pica-Library-v0.4.6-upgrade-assistant.zip`
+`Pica-Library-v0.4.7-upgrade-assistant.zip`
 
 Extract it and run:
 
-`Upgrade-Pica-Library-v0.4.6.cmd`
+`Upgrade-Pica-Library-v0.4.7.cmd`
 
 The assistant:
 

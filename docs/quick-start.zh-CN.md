@@ -1,46 +1,115 @@
 # Pica Library 快速开始
 
-第一次使用 Windows 版通常只需几分钟。
+当前稳定版：**v0.4.4**。第一次使用 Windows 版通常只需要完成下载安装、首次设置、同步书库和按需配置推荐。
 
 ## 01 下载与解压
 
-从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.4 对应 `Pica-Library-v0.4.4-windows-x64.zip`。完整解压到普通文件夹，不要直接在压缩软件中运行。
+从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包。
+
+v0.4.4 对应：
+
+`Pica-Library-v0.4.4-windows-x64.zip`
+
+完整解压到普通文件夹，不要直接在压缩软件中运行。
 
 ## 02 第一次启动
 
-双击 `Pica Library.exe`。首次启动会在浏览器中打开欢迎页；未签名的开源程序可能触发 Windows SmartScreen 提示。
+双击 `Pica Library.exe`。首次启动会在浏览器中打开本地设置页面。
 
-![首次设置](assets/screenshots/v0.3.0/01-first-run.png)
+按需完成：
 
-填写 Pica 账号和密码，选择保存目录。只有当前网络无法连接 Pica 时才填写 HTTP/HTTPS 代理。连接检查通过后保存即可。
+- Pica 账号登录或注册；
+- 漫画保存目录；
+- 下载方式；
+- HTTP/HTTPS 代理。
 
-## 03 同步收藏并建立本地漫画库
+代理默认不需要填写，只有当前网络环境确实需要代理访问在线来源时再配置。
 
-首次使用先同步收藏，之后可以使用快速同步检查变化。漫画库支持标题、作者、标签、分类和书架筛选。
+Windows 可执行文件当前未进行商业代码签名，因此 SmartScreen 可能显示提示。请先确认文件来自项目官方 GitHub Release，并核对 SHA-256 后再决定是否运行。
 
-![漫画库使用示意](assets/screenshots/v0.3.0/02-library-guide.png)
+## 03 建立统一漫画库
 
-## 04 使用推荐和收藏图鉴
+完成账号配置后，可以同步收藏并建立本地漫画库。
 
-推荐页根据本地收藏画像生成分批推荐；收藏图鉴则把长期收藏整理成作品/IP、作者和语义兴趣地图。
+漫画库可以统一整理：
 
-![推荐使用示意](assets/screenshots/v0.3.0/03-recommendations-guide.png)
+- Pica；
+- E-Hentai / ExHentai；
+- Desktop 本地内容；
+- Android；
+- WebDAV；
+- 已下载内容。
 
-![收藏图鉴使用示意](assets/screenshots/v0.3.0/04-atlas-guide.png)
+支持按标题、作者、标签、分类、Provider、存储位置等条件筛选。
 
-## 05 下载与阅读
+## 04 使用推荐
 
-把作品加入下载任务后可以查看进度、暂停、继续或重试；下载完成后可使用内置 Web Reader 继续阅读。
+推荐会结合长期收藏、最近行为、显式偏好和当前会话意图。
 
-## 06 后续软件更新
+进入 **设置 → 推荐与画风** 可以查看推荐画像和人工调整。
 
-打开 **设置 → 软件更新 → 检查并更新（兼容时自动）**。
+人工偏好使用 **0–10 档**：
 
-- 如果目标版本支持安全增量更新，程序会自动下载、校验、重启并应用。
-- v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4 属于兼容增量更新，可直接在软件内完成；如果仍为 v0.4.0，则使用 Release 中的 `Pica-Library-v0.4.4-upgrade-assistant.zip` 直接跨代升级。
-- 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\\Pica Library`、备份旧程序和数据库并在失败时回滚；不需要卸载或重新导入数据。
-- 如果不使用助手，仍可按页面提示手动退出旧版并替换程序目录。
+- **5/10**：中性；
+- 高于 5：希望更多看到；
+- 低于 5：希望减少；
+- 也可以直接屏蔽；
+- 可以设置“本次想看”等临时意图。
 
-![软件更新使用示意](assets/screenshots/v0.3.0/05-update-guide.png)
+即使还没有足够收藏数据，也可以先手动配置最初的推荐偏好。
 
-应用文件与数据目录彼此独立；数据库、收藏、书架、历史、设置和已下载内容不会因为替换程序目录而被删除。
+画风推荐是可选独立模块，关闭后不会影响常规推荐。
+
+## 05 在线浏览、下载与阅读
+
+在线页面支持 Pica、E-Hentai / ExHentai 的搜索、详情、收藏和阅读等能力。
+
+把作品加入下载任务后，可以查看进度、暂停、继续或重试。下载完成后可在本机阅读。
+
+阅读器支持：
+
+- 左到右；
+- 右到左；
+- 纵向连续；
+- 章节切换；
+- 阅读进度保存；
+- 从历史记录继续阅读。
+
+## 06 连接 Android
+
+Desktop 打开 **设置 → 连接与同步**，Android 打开 **设置 → 管理连接**。
+
+配对后 Android 可以直接读取 Desktop 已下载漫画，不需要重复下载；两端也可以同步可移植书库、推荐基础数据、人工偏好和主题包。
+
+Desktop 与 Android 的推荐可以独立运行，同步不会强制两端当前推荐批次完全一致。
+
+## 07 支持项目
+
+Desktop：**设置 → 基本设置 → 支持项目**
+
+Android：**设置 → 支持项目**
+
+可以进入爱发电或 GitHub 项目主页。支持完全自愿，不会解锁额外功能、内容或访问权限。
+
+## 08 软件更新
+
+Windows 打开 **设置 → 软件更新**。
+
+当前 v0.4.4 升级方式：
+
+- **v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4**：直接使用软件内兼容增量更新。
+- **v0.4.0 → v0.4.4**：从 v0.4.4 Release 下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`，解压后运行 `Upgrade-Pica-Library-v0.4.4.cmd`。
+
+升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\Pica Library`、备份旧程序和数据库、替换程序并执行健康检查；失败时自动回滚。
+
+Android 当前 v42 / v43 / v44 / v45 均可通过应用内更新链升级到 v46 / 0.4.4。
+
+应用程序文件与用户数据目录彼此独立。不要为了升级删除 `%LOCALAPPDATA%\Pica Library`。
+
+## 09 需要进一步说明时
+
+- [Desktop / Web 使用说明](desktop-guide.zh-CN.md)
+- [Android 使用说明](android-guide.zh-CN.md)
+- [Windows 分发与升级](windows-distribution.zh-CN.md)
+- [版本日志](../PROJECT_LOG.md)
+- [使用边界与免责声明](../DISCLAIMER.md)

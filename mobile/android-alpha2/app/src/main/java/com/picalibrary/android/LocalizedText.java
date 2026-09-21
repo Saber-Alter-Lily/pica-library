@@ -44,6 +44,20 @@ final class LocalizedText {
         return value==null?source:value;
     }
 
+    static String[] ui(String[] source){
+        if(source==null)return null;
+        String[] out=new String[source.length];
+        for(int i=0;i<source.length;i++)out[i]=ui(source[i]);
+        return out;
+    }
+
+    static CharSequence[] ui(CharSequence[] source){
+        if(source==null)return null;
+        CharSequence[] out=new CharSequence[source.length];
+        for(int i=0;i<source.length;i++)out[i]=ui(String.valueOf(source[i]));
+        return out;
+    }
+
     static boolean has(Context c,String source){
         if(source==null||source.isEmpty())return false;
         String language=LocaleStore.language(c);

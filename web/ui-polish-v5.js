@@ -22,6 +22,26 @@ const UX_COPY = {
             '建议顺序：1 测试连接 → 2 保存设置 → 3 扫描同步计划 → 4 开始同步。',
         clearLite: '清除 Browser Lite 本地数据'
     },
+    ja: {
+        moreFilters: 'さらに絞り込む',
+        bulkOrganize: '一括操作と整理',
+        libraryMaintenance: '読み込みと完全確認',
+        sourceFilters: '配信元と絞り込み',
+        downloadAdvanced: '性能とエクスポート（詳細）',
+        downloadsIntro: 'ダウンロードタスク、進捗、一時停止・再開、失敗時の再試行を管理します。',
+        visualAdvanced: '画風おすすめの詳細設定',
+        settingsUtilities: 'ファイル・ログ・終了',
+        localUpdate: 'ローカル更新ZIPを使用',
+        ehMore: 'その他のE-H操作',
+        experimentTools: '実験と診断（詳細）',
+        experimentIntro:
+            'Shadowおすすめ、Visual QC、作品ID監査のための領域です。通常利用では操作不要で、重い再計算は明示的な操作時のみ実行します。',
+        readerSettings: 'リーダー設定',
+        readerEsc: 'Escで終了',
+        remoteFlow:
+            '推奨手順：1 接続テスト → 2 保存 → 3 同期プランをスキャン → 4 同期開始。',
+        clearLite: 'Browser Liteのローカルデータを消去'
+    },
     en: {
         moreFilters: 'More filters',
         bulkOrganize: 'Batch & organize',
@@ -45,7 +65,8 @@ const UX_COPY = {
 }
 
 function uxLanguage() {
-    return ux$('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
+    const value = ux$('#language-select')?.value
+    return ['zh-CN', 'ja', 'en'].includes(value) ? value : 'zh-CN'
 }
 
 function uxText(key) {

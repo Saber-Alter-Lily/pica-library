@@ -97,6 +97,8 @@ export const translations = {
         'library.sizeLarge': 'Large',
         'library.catalogHelp':
             'Local library records may come from favorites, search, recommendations or downloads.',
+        'library.helpLabel': 'View library help',
+        'library.helpText': 'Filter, verify and organize your local library here, then choose the works you want to download.',
         'library.loadMore': 'Load more',
         'library.author': 'Author',
         'library.tags': 'Tags',
@@ -1465,6 +1467,8 @@ export const domTranslations = [
         'browserLite.compatibility'
     ],
     ['#library h2', 'library.title'],
+    ['#library .page-heading .info-tip', 'library.helpLabel', 'aria-label'],
+    ['#library .page-heading .info-tip', 'library.helpText', 'data-info-tip'],
     ['#library .page-heading p', 'library.subtitle'],
     ['#import-file-label', 'library.selectFile'],
     ['#import-button', 'library.import'],

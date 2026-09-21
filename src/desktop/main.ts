@@ -690,6 +690,23 @@ async function startEngine(preferredPort: number) {
                 if (!remoteStorageManager) throw new Error('Remote storage is not ready')
                 return await remoteStorageManager.sync(input)
             }
+            if (
+                remoteAction === 'pause-sync' ||
+                remoteAction === 'resume-sync' ||
+                remoteAction === 'cancel-sync'
+            ) {
+                if (!remoteStorageManager) throw new Error('Remote storage is not ready')
+                return {
+                    success: true,
+                    syncProgress: remoteStorageManager.syncControl(
+                        remoteAction === 'pause-sync'
+                            ? 'pause'
+                            : remoteAction === 'resume-sync'
+                              ? 'resume'
+                              : 'cancel'
+                    )
+                }
+            }
             if (remoteAction === 'delete-remote') {
                 if (!remoteStorageManager) throw new Error('Remote storage is not ready')
                 return await remoteStorageManager.deleteCopies(input)

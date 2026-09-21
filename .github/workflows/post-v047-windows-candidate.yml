@@ -42,6 +42,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download checksum-pinned v0.4.6 Windows baseline
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts\release-base | Out-Null
+          $name='Pica-Library-v0.4.6-windows-x64.zip'
+          $path=Join-Path 'artifacts\release-base' $name
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.6/$name" -OutFile $path
+          $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+          $expected='914d691b441e8dbc95a9ef0bb7a7ebc46940bfc44907e0595a8953a293bda50c'
+          if($actual -ne $expected){ throw "Official v0.4.6 package checksum mismatch: $actual" }
+
       - name: Build and smoke Windows package
         shell: pwsh
         run: |

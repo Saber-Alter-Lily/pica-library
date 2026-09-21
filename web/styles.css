@@ -3098,3 +3098,22 @@ select:focus {
 .toggle-row { display:flex; align-items:center; gap:.55rem; }
 #settings-recommendation-v4 progress { width:100%; }
 .visual-similar-item { display:flex; flex-direction:column; gap:.2rem; padding:.7rem; border:1px solid var(--border, #ddd); border-radius:.6rem; }
+
+@media (max-width: 900px) {
+    #library .page-heading {
+        flex-wrap: wrap;
+    }
+    #library .page-heading > .actions {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        justify-content: flex-start;
+    }
+    #import-file-label {
+        max-width: 100%;
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
+    }
+}

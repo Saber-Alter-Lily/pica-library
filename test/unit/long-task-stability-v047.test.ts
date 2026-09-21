@@ -13,7 +13,7 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(service).toContain("recommendationBuildControl(action: 'pause' | 'resume' | 'cancel')")
         expect(service).toContain('private async recommendationCheckpoint()')
         expect(service).toContain("state: 'pausing'")
-        expect(service).toContain("state: 'cancelled'")
+        expect(service).toContain("cancelled ? 'cancelled' : 'failed'")
         expect(server).toContain("input.action === 'pause_build'")
         expect(server).toContain("input.action === 'resume_build'")
         expect(server).toContain("input.action === 'cancel_build'")

@@ -7,4 +7,6 @@
     <string name="language_current">当前</string>
     <string name="settings_language">语言与地区</string>
     <string name="settings_language_summary">简体中文 / 日本語 / English</string>
+    <string name="common_ok">知道了</string>
+    <string name="info_description">%1$s说明</string>
 </resources>

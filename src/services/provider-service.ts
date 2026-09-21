@@ -145,34 +145,19 @@ export class ProviderService {
             let headIds: string[] = []
             let pagesChecked = 0
             await checkpoint?.()
-            const first = await provider.favorites(1)
-            const comics = [...first.docs]
-            const pages = first.pages
-            pagesChecked = first.page
-            onProgress?.({
-                phase: 'reading',
-                mode: 'full',
-                page: first.page,
-                pages: first.pages,
-                fetched: comics.length,
-                total: first.total,
-                fallbackReason
-            })
-            for (let page = 2; page <= pages; page++) {
-                await checkpoint?.()
-                const next = await provider.favorites(page)
-                comics.push(...next.docs)
-                pagesChecked = next.page
-                onProgress?.({
-                    phase: 'reading',
-                    mode: 'full',
-                    page: next.page,
-                    pages: next.pages,
-                    fetched: comics.length,
-                    total: next.total,
-                    fallbackReason
-                })
-            }
+            const { comics, pages } = await provider.favoritesAll(
+                'all',
+                (page) => {
+                    pagesChecked = page.page
+                    onProgress?.({
+                        phase: 'reading',
+                        mode: 'full',
+                        ...page,
+                        fallbackReason
+                    })
+                },
+                checkpoint
+            )
             await checkpoint?.()
             headIds = comics.slice(0, 20).map((comic) => comic._id)
             onProgress?.({

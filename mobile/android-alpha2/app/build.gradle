@@ -6,8 +6,8 @@ def previewKeystorePath = System.getenv('ANDROID_PREVIEW_KEYSTORE_PATH')
 def previewKeystorePassword = System.getenv('ANDROID_PREVIEW_KEYSTORE_PASSWORD')
 def previewSigningConfigured = previewKeystorePath != null && !previewKeystorePath.isBlank() &&
         previewKeystorePassword != null && !previewKeystorePassword.isBlank()
-def buildVersionCode = Integer.parseInt(System.getenv('PICA_ANDROID_VERSION_CODE') ?: '48')
-def buildVersionName = System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.5'
+def buildVersionCode = Integer.parseInt(System.getenv('PICA_ANDROID_VERSION_CODE') ?: '49')
+def buildVersionName = System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.6'
 
 android {
     namespace 'com.picalibrary.android'

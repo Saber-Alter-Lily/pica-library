@@ -6,6 +6,26 @@ const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('Android independent recommendation runtime and sync UI', () => {
+    it('keeps Library actions visible instead of hiding them behind an overflow menu', () => {
+        const home = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+        )
+        const library = home.slice(
+            home.indexOf('private void library()'),
+            home.indexOf('private void chooseLibrarySort()')
+        )
+        expect(library).toContain('compact("书架"')
+        expect(library).toContain('compact("显示"')
+        expect(library).toContain(
+            'Ui.iconButton(this,R.drawable.ic_refresh_24,"刷新书库"'
+        )
+        expect(library).toContain(
+            'titleRow(p,"我的书库",history,shelfButton,display,refresh)'
+        )
+        expect(library).not.toContain('compact("⋮"')
+        expect(library).not.toContain('showLibraryMenu()')
+    })
+
     it('keeps the product recommendation tab local instead of requesting a Desktop runtime batch', () => {
         const home = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'

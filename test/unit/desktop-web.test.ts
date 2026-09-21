@@ -32,6 +32,28 @@ describe('desktop setup and settings UI contract', () => {
         expect(app).toContain("$('#settings-password').value = ''")
     })
 
+    it('cleans an orphaned browser session without dropping a paired Mobile Bridge', () => {
+        const app = read('web/app.js')
+        const main = read('src/desktop/main.ts')
+        const server = read('src/library/server.ts')
+        expect(app).toContain('/api/v1/desktop/browser-session')
+        expect(app).toContain('keepalive: true')
+        expect(app).toContain("action: 'close'")
+        expect(server).toContain("url.pathname === '/api/v1/desktop/browser-session'")
+        expect(server).toContain('browserSessionOpened')
+        expect(server).toContain('browserSessionClosed')
+        expect(main).toContain('BROWSER_CLOSE_GRACE_MS = 5_000')
+        expect(main).toContain('mobileBridge?.status().pairedDevices.length')
+        expect(main).toContain(
+            'browserSessions.size > 0 || mobileBridgeMustStayAlive()'
+        )
+        expect(main).toContain(
+            "log.write('Last browser session closed; stopping idle desktop engine')"
+        )
+        expect(main).toContain('browserSessionOpened,')
+        expect(main).toContain('browserSessionClosed,')
+    })
+
     it('persists only the non-sensitive Browser Lite export timestamp', () => {
         const main = read('src/desktop/main.ts')
         const paths = read('src/desktop/paths.ts')

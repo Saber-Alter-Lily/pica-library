@@ -430,6 +430,18 @@ describe('V5 Web UX audit contract', () => {
         expect(main).toContain("'serving_composition.json'")
     })
 
+    it('keeps onboarding close and update header controls compact under theme overrides', () => {
+        const onboarding = read('web/onboarding-v1.css')
+        const css = read('web/ui-polish-v5.css')
+        expect(onboarding).toContain('.driver-popover-close-btn')
+        expect(onboarding).toContain('width: 32px !important')
+        expect(onboarding).toContain('min-height: 32px !important')
+        expect(onboarding).toContain('.driver-popover-title { padding-right: 42px; }')
+        expect(css).toContain('#settings-update #update-current-version')
+        expect(css).toContain('position: static !important')
+        expect(css).toContain('margin: 0 0 0 auto !important')
+    })
+
     it('keeps info-tip controls visually compact under theme button overrides', () => {
         const css = read('web/info-tip-v1.css')
         const product = read('web/alpha8-product.js')

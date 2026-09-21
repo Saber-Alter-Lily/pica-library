@@ -76,7 +76,7 @@ jobs:
         with:
           name: Pica-Library-Localization-Onboarding-Test-Windows
           path: candidate/localization-onboarding-windows/
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error
 
   android-test:
@@ -143,5 +143,5 @@ jobs:
         with:
           name: Pica-Library-Localization-Onboarding-Test-Android
           path: mobile/android-alpha2/candidate-localization/
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error

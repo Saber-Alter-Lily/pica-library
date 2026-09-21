@@ -2,75 +2,99 @@
 
 # Windows One-Click Distribution
 
-## Export a Browser Lite Data Package
+> Current stable release: **v0.4.4**.
 
-After preparing the library, open **Settings → Browser Lite** and choose
-**Export Browser Lite Data Package**. Save the default
-`pica-library-bundle.json`, then select that file on the Browser Lite page.
-The web page does not need or request the Pica account or password.
+## Download and start
 
-Pica Library v0.2.0 targets Windows 10/11 x64 as its ordinary-user
-package. Download the ZIP, extract the entire directory, and double-click
-`Pica Library.exe`. Do not run the executable from inside an archive viewer.
+1. Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest). For v0.4.4, use `Pica-Library-v0.4.4-windows-x64.zip`.
+2. Extract the complete ZIP to a normal folder. Do not run the executable from inside an archive viewer.
+3. Run `Pica Library.exe`.
+4. The local setup page opens in your browser. Configure accounts, library location, download behavior, and an HTTP/HTTPS proxy only when needed.
 
-For the v0.1.3 to v0.2.0 upgrade, download and extract the complete v0.2.0
-Windows ZIP. v0.1.3 cannot consume the new incremental update format. v0.2.0
-establishes the updater baseline for future compatible releases.
+No system Node.js, npm, pnpm, Git, terminal, or administrator privileges are required.
 
-The first launch opens a setup page on `127.0.0.1`. Enter the Pica account and
-password, choose a library folder and performance profile, and optionally add
-an HTTP or HTTPS proxy. The folder picker is native to Windows; a path can also
-be entered manually. Later launches open the existing Library UI directly.
+## SmartScreen
 
-## Local Data and Credentials
+The Windows executable is currently not commercially code-signed, so Windows SmartScreen may show a reputation warning. Confirm that the package came from the official GitHub Release and verify the published SHA-256 before deciding to run it.
 
-Mutable application files live under `%LOCALAPPDATA%\Pica Library` by default:
+Do not disable Defender or SmartScreen globally for Pica Library.
 
-- `config/` contains non-secret settings and DPAPI-protected credentials.
-- `data/` contains the default SQLite library and downloads.
-- `cache/` is reserved for local cache data.
-- `logs/` contains redacted diagnostic logs.
-- `runtime-state/` contains the single-instance lock and active local URL.
+## Local data and credentials
 
-The password is encrypted with Windows DPAPI for the current user. Pica Library
-does not fall back to plaintext if DPAPI is unavailable. The normal config,
-SQLite database, logs, Browser Lite data, Bundles, and release ZIP do not store
-the plaintext account or password.
+User data lives under `%LOCALAPPDATA%\Pica Library` by default:
 
-The optional proxy is disabled by default. Only HTTP and HTTPS proxy URLs are
-accepted. Proxy username/password components use the same DPAPI credential
-store and are removed from normal configuration and logs.
+- `config/` — non-secret settings and DPAPI-protected credentials;
+- `data/` — SQLite library and related persistent data;
+- `cache/` — local cache;
+- `logs/` — redacted diagnostic logs;
+- `runtime-state/` — single-instance lock and local-service state.
 
-## Settings and Exit
+Passwords use Windows DPAPI for the current user. Pica Library does not fall back to plaintext storage if DPAPI is unavailable. Normal configuration, SQLite data, logs, exported data, and release ZIPs do not contain plaintext account passwords.
 
-Use **Settings** in the Web UI to change the account, password, library folder,
-download profile, or proxy; test the connection; open the library or log
-folder; view the version; or exit Pica Library. The saved password is never
-shown. Changing the library folder restarts the local engine against the new
-directory without deleting the old directory.
+The optional proxy is disabled by default. Proxy credentials use the same protected credential store.
 
-Only one engine runs per Windows user. A second launch opens the healthy
-existing instance. Port 4789 is preferred; when another service owns it, Pica
-Library selects a free loopback port and opens the correct URL. The server does
-not bind to the LAN by default.
+## Settings hub
 
-## Updates and Trust
+Desktop Settings currently includes:
 
-Application files and mutable data are separate. A future application ZIP can
-be extracted to a new directory without deleting the existing database,
-configuration, cache, or downloads.
+- **General** — account, basic settings, and project support;
+- **Recommendations & Visual Style** — recommendation profile, 0–10 manual controls, visual style, and recommendation sync;
+- **Connections & Sync** — Android pairing, WebDAV, and remote access;
+- **Appearance & Personalization** — light/dark mode and theme packs;
+- **Downloads & Storage** — library location, cache, and storage policy;
+- **Maintenance** — repair, logs, exports, and advanced tools;
+- **Software Update** — official updates, local update ZIPs, verification, installation, and rollback.
 
-The v0.2.0 Windows release is unsigned. Windows may display a SmartScreen or
-reputation warning for a new unsigned open-source executable. No self-signed
-certificate is presented as production signing.
+Closing the browser tab does not stop the Desktop process. Use the in-app exit action when you want to stop the local service completely.
 
-The package includes an official Node.js Windows x64 runtime, but users do not
-need a system Node.js, npm, pnpm, Git, terminal, or administrator privileges.
-Advanced users may continue to use the source CLI and environment-variable
-workflow documented in the main README.
+## Browser Lite
+
+When needed, export a Browser Lite data package from the related advanced Settings area. Browser Lite does not need and does not receive the Pica account or password.
+
+## Upgrades
+
+Open **Settings → Software Update** and check the current formal release.
+
+### v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4
+
+These are compatible incremental upgrades and can be completed in-app.
+
+### v0.4.0 → v0.4.4
+
+Download from the **v0.4.4 Release**:
+
+`Pica-Library-v0.4.4-upgrade-assistant.zip`
+
+Extract it and run:
+
+`Upgrade-Pica-Library-v0.4.4.cmd`
+
+The assistant:
+
+- verifies the official full-package SHA-256 and target version;
+- identifies the old application directory;
+- protects `%LOCALAPPDATA%\Pica Library`;
+- creates application and SQLite safety snapshots;
+- closes the old version and replaces the application;
+- performs version/database health checks;
+- rolls back automatically on failure.
+
+Intermediate versions are not required.
+
+### Manual replacement
+
+Manual replacement remains available as a fallback: fully exit the old version, extract the latest complete ZIP to a new directory, and run it.
+
+**Do not delete `%LOCALAPPDATA%\Pica Library`.** Database, shelves, reading history, settings, credentials, and downloaded content are stored separately from application files.
+
+If the library/download folder is inside the old application directory, the upgrade assistant refuses automatic replacement and asks you to move the data first.
 
 ## Verify SHA-256
 
-Download `SHA256SUMS.txt` from the same official GitHub Release. In PowerShell,
-run `Get-FileHash .\Pica-Library-v0.2.0-windows-x64.zip -Algorithm SHA256`
-and compare the complete value with the published checksum before extracting.
+Download `SHA256SUMS.txt` from the same official Release and run:
+
+```powershell
+Get-FileHash .\Pica-Library-v0.4.4-windows-x64.zip -Algorithm SHA256
+```
+
+Compare the full hash with the official Release value before extracting the package.

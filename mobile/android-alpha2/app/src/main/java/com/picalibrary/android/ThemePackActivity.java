@@ -16,7 +16,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /** Compact authenticated theme selector. Verification detail appears only during verification. */
-public final class ThemePackActivity extends Activity {
+public final class ThemePackActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private boolean authInProgress=false;
     private TextView authStatus;

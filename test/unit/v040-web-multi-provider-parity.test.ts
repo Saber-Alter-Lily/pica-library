@@ -71,7 +71,8 @@ describe('v0.4 Web/Desktop parity', () => {
 
   it('keeps ExH an optional E-H capability rather than a core dependency', () => {
     expect(web).toContain("['eh','exh'].includes")
-    expect(account).toContain("if (value === 'UNAVAILABLE') return '当前不可访问'")
+    expect(account).toContain("if (value === 'UNAVAILABLE') return ehT('当前不可访问','Unavailable','現在アクセス不可')")
+    expect(account).toContain("if (value === 'NETWORK_ERROR') return ehT('暂无法确认','Unable to confirm','確認できません')")
     expect(account).not.toContain('ExH 权限')
   })
 })

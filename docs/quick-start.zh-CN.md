@@ -99,7 +99,7 @@ Windows 打开 **设置 → 软件更新**。
 
 - 从 v0.4.4 Release 下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`；
 - 解压后运行 `Upgrade-Pica-Library-v0.4.4.cmd`；
-- 不需要先安装 v0.4.1、v0.4.2 或 v0.4.3。
+- 无需安装任何中间版本。
 
 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\\Pica Library`、备份旧程序和数据库、替换程序并执行健康检查；失败时自动回滚。
 

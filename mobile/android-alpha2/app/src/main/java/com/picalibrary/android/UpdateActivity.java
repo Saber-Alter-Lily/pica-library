@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Resilient in-app updater: observable DownloadManager state, cancellation, retry, verification and install. */
-public final class UpdateActivity extends Activity {
+public final class UpdateActivity extends LocaleAwareActivity {
     private static final String PREFS="updater-v2",P_SHA="sha256",P_CODE="versionCode",P_NAME="versionName",P_DOWNLOAD="downloadId",P_LAST_BYTES="lastBytes",P_LAST_PROGRESS="lastProgressAt";
     private static final long STALL_MS=120_000L;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();

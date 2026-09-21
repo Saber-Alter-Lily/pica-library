@@ -96,8 +96,9 @@ if (fs.existsSync(localeDir)) {
 const uiUnique = [...new Set(androidRows.filter(x => x.likelyUi && x.uiRouted).map(x => x.value))]
 const unroutedDirectRows = androidRows.filter(x => x.directUi && !x.coveredPrimitive && !x.explicitlyRouted)
 const unroutedDirectUnique = [...new Set(unroutedDirectRows.map(x => x.value))]
-const missingEn = uiUnique.filter(value => /[\u3400-\u9fff]/.test(value) && !mergedCatalog.byLanguage.en?.[value])
-const missingJa = uiUnique.filter(value => /[\u3400-\u9fff]/.test(value) && !mergedCatalog.byLanguage.ja?.[value])
+const hasTranslation = (language, value) => Object.prototype.hasOwnProperty.call(mergedCatalog.byLanguage?.[language] || {}, value)
+const missingEn = uiUnique.filter(value => /[\u3400-\u9fff]/.test(value) && !hasTranslation('en', value))
+const missingJa = uiUnique.filter(value => /[\u3400-\u9fff]/.test(value) && !hasTranslation('ja', value))
 
 result.android.unroutedDirectUiCount = unroutedDirectRows.length
 result.android.unroutedDirectUiUnique = unroutedDirectUnique

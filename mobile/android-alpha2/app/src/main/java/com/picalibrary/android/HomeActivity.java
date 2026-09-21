@@ -13,7 +13,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Product shell: library and recommendations live here; Online and Settings own separate screens. */
-public final class HomeActivity extends Activity {
+public final class HomeActivity extends LocaleAwareActivity {
     private FrameLayout body;private SharedPreferences prefs;private final ExecutorService worker=Executors.newFixedThreadPool(4);private Future<?> pending;private int serial,current,collectionMode;private String libraryQuery="",activeShelfId="",themeKey="";private boolean showingShelves;
     private LinearLayout recommendationBatchList;private TextView recommendationBatchLabel;private UnifiedCatalogStore.Snapshot recommendationCatalog;
     private UnifiedLibraryFilter.Spec librarySpec;private UnifiedLibraryFilter.Facets libraryFacets=new UnifiedLibraryFilter.Facets(new ArrayList<>(),new ArrayList<>(),new ArrayList<>());

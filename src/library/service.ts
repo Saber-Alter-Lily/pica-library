@@ -2533,6 +2533,10 @@ export class LibraryService {
                         : []
                 })
         })
+        if (retrieved.readiness === 'FAILED_INSUFFICIENT_POOL')
+            throw new Error(
+                'Recommendation generation could not retrieve enough candidates; previous recommendations were kept'
+            )
         this.recommendationProgress = {
             state: 'running',
             phase: 'rank',

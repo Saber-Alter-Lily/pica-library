@@ -12,7 +12,7 @@ final class FavoriteImportJobs {
     static final String UNIQUE_NAME = "portable-favorite-import";
     private FavoriteImportJobs() {}
 
-    static void enqueue(Context context, boolean covers) {
+    private static void enqueue(Context context, boolean covers, ExistingWorkPolicy policy) {
         Constraints constraints = new Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build();
@@ -25,6 +25,30 @@ final class FavoriteImportJobs {
             .addTag(UNIQUE_NAME)
             .build();
         WorkManager.getInstance(context.getApplicationContext())
-            .enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.REPLACE, request);
+            .enqueueUniqueWork(UNIQUE_NAME, policy, request);
+    }
+
+    static void enqueue(Context context, boolean covers) {
+        MobileTaskPauseStore.setPaused(context,"favorite-import",UNIQUE_NAME,false);
+        enqueue(context,covers,ExistingWorkPolicy.REPLACE);
+    }
+
+    static void pause(Context context) {
+        MobileTaskPauseStore.setPaused(context,"favorite-import",UNIQUE_NAME,true);
+        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);
+    }
+
+    static void resume(Context context, boolean covers) {
+        MobileTaskPauseStore.setPaused(context,"favorite-import",UNIQUE_NAME,false);
+        enqueue(context,covers,ExistingWorkPolicy.REPLACE);
+    }
+
+    static void cancel(Context context) {
+        MobileTaskPauseStore.setPaused(context,"favorite-import",UNIQUE_NAME,false);
+        WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);
+    }
+
+    static boolean paused(Context context) {
+        return MobileTaskPauseStore.isPaused(context,"favorite-import",UNIQUE_NAME);
     }
 }

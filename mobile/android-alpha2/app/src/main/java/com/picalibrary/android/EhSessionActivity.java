@@ -11,7 +11,7 @@ import java.net.*;
 import javax.net.ssl.SSLException;
 
 /** Advanced manual E-H session import. Web login is the normal user path. */
-public final class EhSessionActivity extends Activity {
+public final class EhSessionActivity extends LocaleAwareActivity {
     private EditText memberId,passHash,igneous,cfClearance;private TextView status;private LinearLayout advanced;private boolean busy;
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();}
     private Button compact(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}

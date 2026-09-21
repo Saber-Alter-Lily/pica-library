@@ -20,13 +20,14 @@ public final class NativeRecommendationWorker extends Worker {
             setForegroundAsync(foreground("正在准备手机推荐",0,0));
             NativeRecommendationStore.Snapshot snapshot=NativeRecommendationEngine.build(getApplicationContext(),(phase,done,total)->{
                 Data data=new Data.Builder().putString(KEY_PHASE,phase).putInt(KEY_DONE,done).putInt(KEY_TOTAL,total).build();setProgressAsync(data);setForegroundAsync(foreground(phase,done,total));
-            });
+            },()->{if(isStopped())throw new InterruptedException("推荐任务已停止");});
             if(!snapshot.available()&&NativeRecommendationPolicy.readinessRank(snapshot.candidateCount)==0){
                 return Result.failure(new Data.Builder().putString(KEY_PHASE,"候选池不足："+snapshot.candidateCount+" 本").putInt(KEY_DONE,snapshot.candidateCount).putInt(KEY_TOTAL,NativeRecommendationPolicy.TARGET_POOL).build());
             }
             return Result.success(new Data.Builder().putString(KEY_PHASE,"手机原生 Recommendation V3 已更新").putInt(KEY_DONE,snapshot.batches.size()).putInt(KEY_TOTAL,NativeRecommendationPolicy.MAX_BATCHES).build());
         }catch(Exception e){
             String message=e.getMessage()==null?"手机推荐生成失败":e.getMessage();
+            if(isStopped())return Result.failure(new Data.Builder().putString(KEY_PHASE,NativeRecommendationJobs.paused(getApplicationContext())?"推荐生成已暂停":"推荐生成已取消").build());
             if(getRunAttemptCount()<2)return Result.retry();
             return Result.failure(new Data.Builder().putString(KEY_PHASE,message).build());
         }

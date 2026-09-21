@@ -205,67 +205,67 @@ function ensurePanel() {
     panel.className = 'panel'
     panel.innerHTML = `
         <div class="v5-head">
-            <div class="v5-heading-inline"><h3>推荐偏好</h3>${infoButton('系统会根据收藏和后续真实使用自动学习；只有判断不准确时才需要手动纠正。')}</div>
+            <div class="v5-heading-inline"><h3>${v5t('推荐偏好','Recommendation preferences','おすすめ設定')}</h3>${infoButton(v5t('系统会根据收藏和后续真实使用自动学习；只有判断不准确时才需要手动纠正。','The system learns from your collection and later real usage. Manual correction is only needed when its judgment is inaccurate.','システムはコレクションと実際の利用から学習します。判断が合わない場合だけ手動で調整してください。'))}</div>
             <div class="actions">
-                <button id="v5-policy-refresh" type="button">刷新</button>
-                <button id="v5-audit-export" type="button">导出推荐审计数据</button>
-                <button id="v5-policy-rebuild" type="button" class="primary">重新生成推荐</button>
+                <button id="v5-policy-refresh" type="button">${v5t('刷新','Refresh','更新')}</button>
+                <button id="v5-audit-export" type="button">${v5t('导出推荐审计数据','Export recommendation audit','おすすめ監査データを書き出す')}</button>
+                <button id="v5-policy-rebuild" type="button" class="primary">${v5t('重新生成推荐','Regenerate recommendations','おすすめを再生成')}</button>
             </div>
         </div>
-        <p id="v5-policy-status" class="status">正在读取推荐偏好…</p>
+        <p id="v5-policy-status" class="status">${v5t('正在读取推荐偏好…','Reading recommendation preferences…','おすすめ設定を読み込み中…')}</p>
         <details class="v5-policy-tech">
-            <summary>策略信息 ${infoButton('这里显示推荐策略版本和 revision，主要用于排障与审计。')}</summary>
+            <summary>${v5t('策略信息','Policy information','ポリシー情報')} ${infoButton(v5t('这里显示推荐策略版本和 revision，主要用于排障与审计。','Shows the recommendation policy version and revision for troubleshooting and audit.','おすすめポリシーのバージョンと revision を表示し、トラブルシュートや監査に使用します。'))}</summary>
             <code id="v5-policy-tech"></code>
         </details>
         <div class="v5-session-row">
-            <span id="v5-session-status" class="status">本次想看：默认</span>
-            <button id="v5-session-reset" type="button" class="v5-compact">清除本次想看</button>
+            <span id="v5-session-status" class="status">${v5t('本次想看：默认','Session intent: default','今回見たいもの：既定')}</span>
+            <button id="v5-session-reset" type="button" class="v5-compact">${v5t('清除本次想看','Clear session intent','今回の希望をクリア')}</button>
         </div>
 
         <details id="v5-profile-section" class="v5-overview-section">
             <summary>
-                <strong>你的推荐画像</strong>
+                <strong>${v5t('你的推荐画像','Your recommendation profile','おすすめプロフィール')}</strong>
                 <span id="v5-profile-summary" class="v5-summary-note"></span>
-                ${infoButton('这里汇总长期兴趣、最近 30 天和当前会话。长期画像不会因为短期浏览被直接覆盖。')}
+                ${infoButton(v5t('这里汇总长期兴趣、最近 30 天和当前会话。长期画像不会因为短期浏览被直接覆盖。','Summarizes long-term interests, the last 30 days and the current session. Short-term browsing does not overwrite the long-term profile.','長期的な興味、直近30日、現在のセッションをまとめます。短期的な閲覧で長期プロフィールを直接上書きしません。'))}
             </summary>
             <div id="v5-profile-overview" class="v5-overview-grid"></div>
         </details>
 
         <details id="v5-serving-section" class="v5-overview-section">
             <summary>
-                <strong>当前实际推荐构成</strong>
+                <strong>${v5t('当前实际推荐构成','Current recommendation composition','現在のおすすめ構成')}</strong>
                 <span id="v5-serving-summary" class="v5-summary-note"></span>
-                ${infoButton('这里读取已经落盘并实际展示的 Final V3 当前批次，不会因为打开本页而重新分配推荐。')}
+                ${infoButton(v5t('这里读取已经落盘并实际展示的 Final V3 当前批次，不会因为打开本页而重新分配推荐。','Reads the persisted Final V3 batch that is actually being shown. Opening this page does not redistribute recommendations.','実際に表示中で保存済みの Final V3 バッチを読み取ります。このページを開いてもおすすめの再割り当ては行いません。'))}
             </summary>
             <div id="v5-serving-overview" class="v5-compose-grid"></div>
         </details>
 
         <details id="v5-shadow-section" class="v5-overview-section">
             <summary>
-                <strong>V5 Shadow 规划（实验）</strong>
+                <strong>${v5t('V5 Shadow 规划（实验）','V5 Shadow plan (experimental)','V5 Shadow 計画（実験）')}</strong>
                 <span id="v5-shadow-summary" class="v5-summary-note"></span>
-                ${infoButton('这是 V5 候选召回实验规划，servingImpact=false；它不是当前实际展示给你的推荐批次。')}
+                ${infoButton(v5t('这是 V5 候选召回实验规划，servingImpact=false；它不是当前实际展示给你的推荐批次。','This is the V5 experimental candidate-retrieval plan with servingImpact=false; it is not the batch currently shown to you.','servingImpact=false の V5 候補取得実験計画です。現在表示中のおすすめバッチではありません。'))}
             </summary>
             <div id="v5-composition-overview" class="v5-compose-grid"></div>
         </details>
 
-        <div class="v5-heading-inline"><h4>你的调整</h4>${infoButton('这里仅显示你主动覆盖系统判断的项目。屏蔽偏好和屏蔽具体作品会分别统计。')}</div>
+        <div class="v5-heading-inline"><h4>${v5t('你的调整','Your adjustments','あなたの調整')}</h4>${infoButton(v5t('这里仅显示你主动覆盖系统判断的项目。屏蔽偏好和屏蔽具体作品会分别统计。','Only items you explicitly override are shown here. Blocked preferences and blocked works are counted separately.','ここにはシステム判断を明示的に上書きした項目だけを表示します。嗜好のブロックと作品のブロックは別々に集計します。'))}</div>
         <div id="v5-control-list" class="v5-control-list"></div>
 
-        <div class="v5-heading-inline"><h4>完整画像与微调 · 0–10 档</h4>${infoButton('0 = 强烈减少，5 = 中性，10 = 非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好；0 仍是软偏好，不等同于“屏蔽”。')}</div>
+        <div class="v5-heading-inline"><h4>${v5t('完整画像与微调 · 0–10 档','Full profile & tuning · 0–10','プロフィール全体と調整 · 0–10')}</h4>${infoButton(v5t('0 = 强烈减少，5 = 中性，10 = 非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好；0 仍是软偏好，不等同于“屏蔽”。','0 = strongly reduce, 5 = neutral, 10 = strongly prefer. Slider changes are staged until you choose Save adjustments; 0 is still a soft preference, not a block.','0 = 強く減らす、5 = 中立、10 = とても好き。スライダー変更は「調整を保存」するまで仮保存されます。0 はソフト嗜好で、ブロックとは異なります。'))}</div>
         <div class="v5-search-row">
-            <label>查找一个具体偏好
-                <input id="v5-policy-search" placeholder="作者、IP、标签或分类，例如：巨乳" />
+            <label>${v5t('查找一个具体偏好','Find a specific preference','特定の嗜好を検索')}
+                <input id="v5-policy-search" placeholder="${v5t('作者、IP、标签或分类，例如：巨乳','Author, IP, tag or category, e.g. a specific tag','作者、IP、タグ、カテゴリを検索')}" />
             </label>
-            <button id="v5-policy-search-submit" type="button">查找</button>
-            <button id="v5-policy-search-clear" type="button">清空</button>
+            <button id="v5-policy-search-submit" type="button">${v5t('查找','Find','検索')}</button>
+            <button id="v5-policy-search-clear" type="button">${v5t('清空','Clear','クリア')}</button>
         </div>
         <div id="v5-inferred-list" class="v5-facet-list"></div>
         <div id="v5-pending-bar" class="v5-pending-bar" hidden>
-            <strong id="v5-pending-count">已修改 0 项</strong>
+            <strong id="v5-pending-count">${v5t('已修改 0 项','0 changes','変更 0 件')}</strong>
             <div class="actions">
-                <button id="v5-pending-discard" type="button">撤销修改</button>
-                <button id="v5-pending-save" type="button" class="primary">保存调整</button>
+                <button id="v5-pending-discard" type="button">${v5t('撤销修改','Discard changes','変更を破棄')}</button>
+                <button id="v5-pending-save" type="button" class="primary">${v5t('保存调整','Save adjustments','調整を保存')}</button>
             </div>
         </div>
     `
@@ -275,7 +275,7 @@ function ensurePanel() {
         const button = event.currentTarget
         if (button.disabled) return
         if (typeof window.picaDesktopPost !== 'function') {
-            showToast('推荐审计导出仅在 Windows / Desktop 模式可用。', 'negative')
+            showToast(v5t('推荐审计导出仅在 Windows / Desktop 模式可用。','Recommendation audit export is available only in Windows / Desktop mode.','おすすめ監査の書き出しは Windows / Desktop モードでのみ利用できます。'), 'negative')
             return
         }
         button.disabled = true
@@ -285,15 +285,15 @@ function ensurePanel() {
                 { appSessionId: window.picaAppSessionId || null }
             )
             if (result?.cancelled) {
-                showToast('已取消导出。')
+                showToast(v5t('已取消导出。','Export cancelled.','書き出しをキャンセルしました。'))
                 return
             }
             showToast(
-                `已导出 ${result?.fileName || '推荐审计数据包'} · ${Math.round(Number(result?.sizeBytes || 0) / 1024)} KB`,
+                `已导出 ${result?.fileName || v5t('推荐审计数据包','recommendation-audit-package','recommendation-audit-package')} · ${Math.round(Number(result?.sizeBytes || 0) / 1024)} KB`,
                 'positive'
             )
         } catch (error) {
-            showToast(`导出失败：${error.message}`, 'negative')
+            showToast(v5t(`导出失败：${error.message}`,`Export failed: ${error.message}`,`書き出しに失敗しました：${error.message}`), 'negative')
         } finally {
             button.disabled = false
         }
@@ -307,7 +307,7 @@ function ensurePanel() {
         try {
             V5.snapshot = await post('/api/v1/recommendation-v5/session', { mode: 'DEFAULT' })
             renderPolicy()
-            showToast('已清除“本次想看”，长期偏好调整保持不变。')
+            showToast(v5t('已清除“本次想看”，长期偏好调整保持不变。','Session intent cleared; long-term preference adjustments are unchanged.','今回の希望をクリアしました。長期嗜好の調整はそのままです。'))
         } catch (error) { showStatus(error.message, true) }
     })
     const searchInput = panel.querySelector('#v5-policy-search')
@@ -333,7 +333,7 @@ function ensurePanel() {
         V5.draftLevels.clear()
         V5.manualSignal = null
         renderPolicy()
-        showToast('已撤销尚未保存的偏好修改。')
+        showToast(v5t('已撤销尚未保存的偏好修改。','Unsaved preference changes discarded.','未保存の嗜好変更を破棄しました。'))
     })
     panel.querySelector('#v5-pending-save').addEventListener('click', () => void saveDraftLevels())
 }
@@ -350,7 +350,7 @@ async function setControl(signal, direction, levelDelta) {
         return V5.snapshot
     } catch (error) {
         showStatus(error.message, true)
-        showToast(`调整失败：${error.message}`, 'negative')
+        showToast(v5t(`调整失败：${error.message}`,`Adjustment failed: ${error.message}`,`調整に失敗しました：${error.message}`), 'negative')
         return null
     } finally { V5.busy = false }
 }
@@ -384,7 +384,7 @@ async function setSession(signal) {
             mode: 'TARGET', targetType: signal.targetType, key: signal.key, label: signal.label
         })
         renderPolicy()
-        showToast(`本次优先探索「${signal.label}」。`, 'positive')
+        showToast(v5t(`本次优先探索「${signal.label}」。`,`Prioritizing “${signal.label}” for this session.`,`このセッションでは「${signal.label}」を優先して探索します。`), 'positive')
     } catch (error) { showStatus(error.message, true) }
 }
 

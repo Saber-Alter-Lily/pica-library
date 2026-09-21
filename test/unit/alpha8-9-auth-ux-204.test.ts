@@ -36,7 +36,7 @@ describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
         expect(activity).toContain('!authInProgress')
         expect(activity).toContain('showCodeDialog(userCode,uri)')
         expect(activity).toContain('复制验证码')
-        expect(activity).toContain('setPositiveButton("打开 GitHub"')
+        expect(activity).toContain('setPositiveButton(LocalizedText.ui("打开 GitHub")')
         expect(activity).toContain('copyCode(userCode)')
         expect(activity).not.toContain('Button open=Ui.button(this,"打开 GitHub"')
     })

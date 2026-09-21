@@ -120,7 +120,7 @@ Prefer **Settings → Software Update**.
 
 The public user upgrade path is intentionally simple:
 
-- **v0.4.0 → current release v0.4.4**: use `Pica-Library-v0.4.4-upgrade-assistant.zip` from the v0.4.4 Release and move directly to the latest release. v0.4.1, v0.4.2, and v0.4.3 are not required.
+- **v0.4.0 → current release v0.4.4**: use `Pica-Library-v0.4.4-upgrade-assistant.zip` from the v0.4.4 Release and move directly to the latest release. No intermediate versions are required.
 
 The upgrade assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database safety snapshots, replaces the application, runs health checks, and rolls back on failure.
 

@@ -16,7 +16,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-public class ComicDetailActivity extends Activity {
+public class ComicDetailActivity extends LocaleAwareActivity {
     private String comicId,title,author,coverPath,sourceKind;
     private int downloadedPictures;
     private LinearLayout content;

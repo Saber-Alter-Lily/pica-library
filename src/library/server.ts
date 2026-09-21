@@ -1590,6 +1590,22 @@ export async function startLibraryServer(options: {
                     const appSessionId = input.appSessionId
                         ? String(input.appSessionId)
                         : null
+                    if (
+                        input.action === 'pause_build' ||
+                        input.action === 'resume_build' ||
+                        input.action === 'cancel_build'
+                    )
+                        return json(
+                            response,
+                            200,
+                            options.service.recommendationBuildControl(
+                                input.action === 'pause_build'
+                                    ? 'pause'
+                                    : input.action === 'resume_build'
+                                      ? 'resume'
+                                      : 'cancel'
+                            )
+                        )
                     if (input.action === 'resume_or_create')
                         return json(
                             response,

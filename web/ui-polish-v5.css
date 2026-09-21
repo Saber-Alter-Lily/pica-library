@@ -562,6 +562,20 @@ body.reader-active .reader-header {
 #settings-update .ux-local-update-actions > * {
     flex: 0 1 auto;
     max-width: 100%;
+    min-width: 0;
+}
+#settings-update button,
+#settings-update summary,
+#settings-update .button-control {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+}
+#settings-update .section-heading,
+#settings-update .help-heading {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 #settings-update #update-progress,
 #settings-update #update-message,
@@ -588,7 +602,7 @@ body.reader-active .reader-header {
     width: 100%;
     min-width: 0;
 }
-@media (max-width: 620px) {
+@media (max-width: 700px) {
     #settings-update .ux-update-primary-actions > button,
     #settings-update .ux-local-update-actions > button {
         flex: 1 1 100%;

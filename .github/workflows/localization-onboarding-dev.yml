@@ -19,6 +19,7 @@ jobs:
       - name: Build localization inventory
         run: node scripts/localization-inventory.mjs
       - uses: actions/upload-artifact@v4
+        if: github.event.repository.private == false
         with:
           name: localization-inventory
           path: _reports/localization-inventory.json

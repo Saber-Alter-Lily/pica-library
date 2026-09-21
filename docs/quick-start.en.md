@@ -93,14 +93,15 @@ AFDIAN and the GitHub project page are available there. Support is voluntary and
 
 On Windows, open **Settings → Software Update**.
 
-Current v0.4.4 upgrade paths:
+Existing **v0.4.0** users should move directly to the current release:
 
-- **v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4** — compatible in-app incremental update.
-- **v0.4.0 → v0.4.4** — download `Pica-Library-v0.4.4-upgrade-assistant.zip` from the v0.4.4 Release and run `Upgrade-Pica-Library-v0.4.4.cmd`.
+- download `Pica-Library-v0.4.4-upgrade-assistant.zip` from the v0.4.4 Release;
+- run `Upgrade-Pica-Library-v0.4.4.cmd`;
+- do not install v0.4.1, v0.4.2, or v0.4.3 first.
 
 The assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database backups, replaces the application, runs health checks, and rolls back on failure.
 
-Android v42 / v43 / v44 / v45 can update through the in-app chain to v46 / 0.4.4.
+Android v42 / 0.4.0 users can update directly through the in-app chain to v46 / 0.4.4; intermediate versions are not required.
 
 Application files and user data are separate. Do not delete `%LOCALAPPDATA%\Pica Library` during an upgrade.
 

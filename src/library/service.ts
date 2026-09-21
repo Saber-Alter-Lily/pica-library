@@ -280,6 +280,9 @@ export class LibraryService {
     private acceptingLocalDownloads = true
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
+    private localDownloadRunStartedAt: string | null = null
+    private localDownloadLastError: string | null = null
+    private recoveredLocalDownloadJobs = 0
     private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
     private favoritesTaskState:
         | 'idle'
@@ -2225,6 +2228,8 @@ export class LibraryService {
         this.pica = provider ?? null
         this.ehProvider = ehProvider ?? new EhProvider()
         fs.mkdirSync(dataDir, { recursive: true })
+        this.recoveredLocalDownloadJobs =
+            this.database.recoverInterruptedDownloadJobs('LOCAL')
         this.recoverInterruptedRecommendationBuild()
     }
 
@@ -3681,6 +3686,55 @@ export class LibraryService {
         return this.database.transitionDownloadJob(job.id, 'QUEUED')
     }
 
+    localDownloadRuntime() {
+        return {
+            running: this.activeLocalRuns.size > 0,
+            schedulers: this.activeLocalSchedulers.size,
+            startedAt:
+                this.activeLocalRuns.size > 0
+                    ? this.localDownloadRunStartedAt
+                    : null,
+            lastError: this.localDownloadLastError,
+            recoveredOnStartup: this.recoveredLocalDownloadJobs,
+            accepting: this.acceptingLocalDownloads
+        }
+    }
+
+    startLocalDownloadQueue(
+        options: {
+            profile?: PerformanceProfile
+            custom?: Partial<PerformanceSettings>
+            onProgress?: (progress: DownloadProgress) => void
+        } = {}
+    ) {
+        if (!this.acceptingLocalDownloads)
+            throw new Error('The local download engine is shutting down')
+
+        // Validate synchronously so an invalid Web request still receives an
+        // immediate actionable error rather than launching a rejected task.
+        resolvePerformanceSettings(
+            options.profile ?? 'balanced',
+            options.custom
+        )
+
+        if (this.activeLocalRuns.size > 0)
+            return {
+                started: false,
+                ...this.localDownloadRuntime()
+            }
+
+        void this.runDownloadQueue({
+            ...options,
+            runner: 'LOCAL'
+        }).catch(() => {
+            // runDownloadQueue records the authoritative error for status/UI.
+        })
+        return {
+            started: true,
+            ...this.localDownloadRuntime()
+        }
+    }
+
     async runDownloadQueue(
         options: {
             runner?: DownloadRunner
@@ -3692,6 +3746,12 @@ export class LibraryService {
         const runner = options.runner ?? 'LOCAL'
         if (runner === 'LOCAL' && !this.acceptingLocalDownloads)
             throw new Error('The local download engine is shutting down')
+        if (runner === 'LOCAL' && this.activeLocalRuns.size > 0)
+            throw new Error('The local download queue is already running')
+        if (runner === 'LOCAL') {
+            this.localDownloadRunStartedAt = new Date().toISOString()
+            this.localDownloadLastError = null
+        }
         const settings = resolvePerformanceSettings(
             options.profile ?? 'balanced',
             options.custom
@@ -3749,10 +3809,17 @@ export class LibraryService {
         }
         try {
             await draining
+        } catch (error) {
+            if (runner === 'LOCAL')
+                this.localDownloadLastError =
+                    error instanceof Error ? error.message : String(error)
+            throw error
         } finally {
             if (runner === 'LOCAL') {
                 this.activeLocalRuns.delete(draining)
                 this.activeLocalSchedulers.delete(scheduler)
+                if (this.activeLocalRuns.size === 0)
+                    this.localDownloadRunStartedAt = null
             }
         }
         return this.database.listDownloadJobs()

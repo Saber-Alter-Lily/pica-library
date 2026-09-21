@@ -70,6 +70,7 @@ public final class SettingsActivity extends LocaleAwareActivity {
                 : "";
 
         content.addView(SettingsRow.row(this,getString(R.string.settings_language),getString(R.string.settings_language_summary),v->startActivity(new Intent(this,LanguageActivity.class))));
+        content.addView(SettingsRow.row(this,getString(R.string.onboarding_settings_title),getString(R.string.onboarding_replay_summary),v->startActivity(new Intent(this,OnboardingSettingsActivity.class))));
         content.addView(SettingsRow.row(this,"账号与来源",accountStatus,v->startActivity(new Intent(this,AccountSourcesActivity.class))));
         content.addView(SettingsRow.row(this,"连接电脑",paired?"已连接":"未连接",v->startActivity(new Intent(this,PairingActivity.class))));
         content.addView(SettingsRow.row(this,"存储与下载","",v->startActivity(new Intent(this,StorageHubActivity.class))));

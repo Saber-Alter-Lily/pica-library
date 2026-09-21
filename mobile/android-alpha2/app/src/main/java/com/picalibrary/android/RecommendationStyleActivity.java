@@ -11,7 +11,7 @@ import org.json.JSONObject;
  * Android recommendation hub. Runtime recommendation is local; Desktop is only
  * the source of heavy Visual/Foundation artifacts and optional provider relay.
  */
-public final class RecommendationStyleActivity extends Activity {
+public final class RecommendationStyleActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private JSONObject desktopVisual;
     private boolean loading,destroyed;

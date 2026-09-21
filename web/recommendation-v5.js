@@ -1052,8 +1052,6 @@ ensurePanel()
 decorateRecommendationCards()
 decorateLibraryTasteToggles()
 void loadPolicy().then(() => decorateLibraryTasteToggles())
-document.addEventListener('pica-language-change',()=>{ensurePanel();renderPolicy()})
-
 void import('./work-identity-review.js').catch(() => undefined)
 
 void import('./recommendation-v5-evaluation.js').catch(() => undefined)

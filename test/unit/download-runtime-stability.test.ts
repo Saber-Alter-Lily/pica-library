@@ -334,19 +334,6 @@ describe('post-v0.4.7 Desktop download runtime stability', () => {
                 )
             ])
         try {
-            const first = await bounded(
-                `${started.url}/api/v1/downloads/run`
-            ).catch((error) => {
-                throw error
-            })
-            // The helper above sends GET, so start explicitly with the POST
-            // request and keep the bounded reads below separate.
-            void first
-        } catch {
-            // Start is tested below with the correct POST request.
-        }
-
-        try {
             const run = await Promise.race([
                 fetch(`${started.url}/api/v1/downloads/run`, request),
                 new Promise<never>((_, reject) =>

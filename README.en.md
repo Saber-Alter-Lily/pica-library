@@ -67,7 +67,7 @@ See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 ### Updates and maintenance
 
 - Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- v0.4.0 → v0.4.1 should use the **Windows upgrade assistant** from the Release instead of manual data-directory replacement.
+- v0.4.1 → v0.4.2 supports normal in-app incremental update. If you are still on v0.4.0, use the **Windows upgrade assistant** from the v0.4.2 Release to upgrade directly to v0.4.2 without installing v0.4.1 first or manually replacing the application directory.
 - Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
 - Logs, repair, cache, export, and diagnostic tools are available from the app.
 
@@ -104,7 +104,7 @@ For **v0.4.1 → v0.4.2**, use the normal in-app updater. Users still on **v0.4.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing v43 / 0.4.1 installs can upgrade in place to v44 / 0.4.2 through the in-app update chain.
+Android APKs are distributed only through this repository's official Release. Existing v42 / 0.4.0 and v43 / 0.4.1 installs can both upgrade directly in place to v44 / 0.4.2 through the in-app update chain.
 
 ## Local-first and security
 

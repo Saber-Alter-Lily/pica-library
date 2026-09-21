@@ -74,6 +74,7 @@ async function geometryProblems(page) {
                 rect.width <= 0 ||
                 rect.height <= 0
             ) continue
+            if (el.tagName === 'INPUT' && el.getAttribute('type') === 'file' && rect.width <= 3) continue
             const text = (el.textContent || el.getAttribute('aria-label') || '')
                 .replace(/\s+/g, ' ').trim().slice(0, 120)
             if (el.scrollWidth > el.clientWidth + 3 && style.overflowX !== 'auto') {

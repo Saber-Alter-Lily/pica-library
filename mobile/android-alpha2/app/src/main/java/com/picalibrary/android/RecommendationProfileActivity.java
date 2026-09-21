@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 import org.json.*;
 
 /** Android-local recommendation profile and current runtime explanation. */
-public final class RecommendationProfileActivity extends Activity {
+public final class RecommendationProfileActivity extends LocaleAwareActivity {
     private static final class ProfileData {
         JSONObject policy;
         JSONArray localControls,inferred;

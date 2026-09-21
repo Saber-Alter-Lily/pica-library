@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Reading-history destination outside bottom navigation. */
-public final class HistoryActivity extends Activity {
+public final class HistoryActivity extends LocaleAwareActivity {
     private static final class ComicHistory {
         final String comicId;final List<ReadingHistoryStore.Session> sessions=new ArrayList<>();ReadingHistoryStore.Session latest;
         ComicHistory(String comicId){this.comicId=comicId;}

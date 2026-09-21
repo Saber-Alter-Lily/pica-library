@@ -273,12 +273,155 @@ describe('post-v0.4.7 Desktop download runtime stability', () => {
         }
     })
 
+    it('keeps bounded APIs responsive with a 1500-job queue while one runner is active', async () => {
+        const { database, service, release } = setupBlockedDownload()
+        database.importCatalog(
+            Array.from({ length: 1500 }, (_, index) => ({
+                comicId: `stress-runtime-${index}`,
+                title: `Stress runtime ${index}`,
+                author: `Author ${index % 20}`,
+                categories: [],
+                tags: [],
+                finished: false
+            }))
+        )
+        const jobs = Array.from({ length: 1500 }, (_, index) => {
+            const job = database.createDownloadJob({
+                comicId: `stress-runtime-${index}`,
+                runner: 'LOCAL'
+            })
+            return database.transitionDownloadJob(job.id, 'QUEUED')
+        })
+        for (const job of jobs.slice(0, 350)) {
+            database.transitionDownloadJob(job.id, 'PREPARING')
+            database.transitionDownloadJob(job.id, 'RUNNING')
+            database.transitionDownloadJob(job.id, 'COMPLETED')
+        }
+
+        const started = await startLibraryServer({
+            database,
+            service,
+            host: '127.0.0.1',
+            port: 0
+        })
+        const request = {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                profile: 'custom',
+                jobConcurrency: 1,
+                globalMediaConcurrency: 1,
+                requestIntervalMs: 0,
+                maxRetries: 0
+            })
+        }
+        const bounded = async (url: string) =>
+            Promise.race([
+                fetch(url).then(async (response) => ({
+                    status: response.status,
+                    body: await response.json()
+                })),
+                new Promise<never>((_, reject) =>
+                    setTimeout(
+                        () =>
+                            reject(
+                                new Error(
+                                    `Large-queue API response exceeded 1500 ms: ${url}`
+                                )
+                            ),
+                        1500
+                    )
+                )
+            ])
+        try {
+            const first = await bounded(
+                `${started.url}/api/v1/downloads/run`
+            ).catch((error) => {
+                throw error
+            })
+            // The helper above sends GET, so start explicitly with the POST
+            // request and keep the bounded reads below separate.
+            void first
+        } catch {
+            // Start is tested below with the correct POST request.
+        }
+
+        try {
+            const run = await Promise.race([
+                fetch(`${started.url}/api/v1/downloads/run`, request),
+                new Promise<never>((_, reject) =>
+                    setTimeout(
+                        () => reject(new Error('Large queue start stayed attached')),
+                        1500
+                    )
+                )
+            ])
+            expect(run.status).toBe(200)
+            expect(await run.json()).toMatchObject({
+                started: true,
+                running: true,
+                schedulers: 1
+            })
+
+            const summary = await bounded(
+                `${started.url}/api/v1/downloads/summary`
+            )
+            expect(summary.status).toBe(200)
+            expect(summary.body).toMatchObject({
+                total: 1500,
+                finished: 350,
+                runtime: { running: true, schedulers: 1 }
+            })
+
+            const page = await bounded(
+                `${started.url}/api/v1/downloads/page?view=active&limit=100&offset=0`
+            )
+            expect(page.status).toBe(200)
+            expect(page.body).toMatchObject({
+                total: 1150,
+                limit: 100,
+                offset: 0
+            })
+            expect(page.body.items).toHaveLength(100)
+
+            const health = await bounded(`${started.url}/api/v1/status`)
+            expect(health.status).toBe(200)
+
+            const duplicate = await Promise.race([
+                fetch(`${started.url}/api/v1/downloads/run`, request),
+                new Promise<never>((_, reject) =>
+                    setTimeout(
+                        () => reject(new Error('Duplicate start stayed attached')),
+                        1500
+                    )
+                )
+            ])
+            expect(await duplicate.json()).toMatchObject({
+                started: false,
+                running: true,
+                schedulers: 1
+            })
+        } finally {
+            release()
+            await waitFor(() => !service.localDownloadRuntime().running, 5000)
+            await new Promise<void>((resolve, reject) =>
+                started.server.close((error) =>
+                    error ? reject(error) : resolve()
+                )
+            )
+            database.close()
+        }
+    }, 30000)
+
     it('keeps the Web task UI on bounded queue endpoints', () => {
         const app = fs.readFileSync('web/app.js', 'utf8')
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
+        const i18n = fs.readFileSync('web/i18n.js', 'utf8')
         expect(app).not.toContain("api('/api/v1/downloads').then")
         expect(app).toContain('data-progress-completed=')
-        expect(app).toContain('summary.runtime?.running')
+        expect(app).toContain('runtime.recoveredOnStartup')
+        expect(app).toContain("t('downloads.backgroundRunning'")
+        expect(i18n).toContain("'downloads.recoveredInterrupted'")
         expect(server).toContain('startLocalDownloadQueue')
         expect(server).not.toContain('await options.service.runDownloadQueue')
     })

@@ -258,7 +258,13 @@ export class LibraryService {
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
     private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
-    private recommendationProgress = {
+    private recommendationProgress: {
+        state: 'idle' | 'running' | 'complete' | 'failed'
+        phase: string
+        done: number
+        total: number
+        error?: string
+    } = {
         state: 'idle',
         phase: 'idle',
         done: 0,
@@ -266,6 +272,29 @@ export class LibraryService {
     }
 
     recommendationBuildProgress() { return { ...this.recommendationProgress } }
+
+    private recoverInterruptedRecommendationBuild() {
+        const key = 'recommendation.v3.activeCycle.v1'
+        const current = this.database.getAppState<Record<string, unknown>>(key)
+        if (
+            Number(current?.schemaVersion) !== 1 ||
+            !String(current?.buildingCycleId ?? '').trim()
+        )
+            return false
+        this.database.setAppState(key, {
+            ...current,
+            buildingCycleId: null,
+            buildingRequestId: null
+        })
+        this.recommendationProgress = {
+            state: 'failed',
+            phase: 'recovered',
+            done: 0,
+            total: 7,
+            error: 'Previous recommendation generation was interrupted and has been reset'
+        }
+        return true
+    }
 
     recordRecommendationEvent(input: UserEventInput) {
         return this.database.recordUserEvent(input)
@@ -2054,6 +2083,7 @@ export class LibraryService {
         this.pica = provider ?? null
         this.ehProvider = ehProvider ?? new EhProvider()
         fs.mkdirSync(dataDir, { recursive: true })
+        this.recoverInterruptedRecommendationBuild()
     }
 
     async connect() {

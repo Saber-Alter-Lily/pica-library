@@ -206,6 +206,13 @@ export interface DownloadResult {
     bytes: number
 }
 
+class RecommendationBuildCancelledError extends Error {
+    constructor() {
+        super('Recommendation generation was cancelled')
+        this.name = 'RecommendationBuildCancelledError'
+    }
+}
+
 export interface FavoritesSyncProgress {
     phase: 'idle' | 'reading' | 'processing' | 'complete' | 'failed'
     mode?: FavoritesSyncMode
@@ -259,7 +266,15 @@ export class LibraryService {
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
     private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
     private recommendationProgress: {
-        state: 'idle' | 'running' | 'complete' | 'failed'
+        state:
+            | 'idle'
+            | 'running'
+            | 'pausing'
+            | 'paused'
+            | 'cancelling'
+            | 'complete'
+            | 'failed'
+            | 'cancelled'
         phase: string
         done: number
         total: number
@@ -270,8 +285,107 @@ export class LibraryService {
         done: 0,
         total: 7
     }
+    private recommendationPauseRequested = false
+    private recommendationCancelRequested = false
+    private readonly recommendationResumeWaiters = new Set<() => void>()
+    private recommendationBuildCycleId: string | null = null
 
-    recommendationBuildProgress() { return { ...this.recommendationProgress } }
+    recommendationBuildProgress() {
+        return {
+            ...this.recommendationProgress,
+            canPause:
+                this.recommendationProgress.state === 'running' ||
+                this.recommendationProgress.state === 'pausing',
+            canResume: this.recommendationProgress.state === 'paused',
+            canCancel: [
+                'running',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(this.recommendationProgress.state)
+        }
+    }
+
+    recommendationBuildControl(action: 'pause' | 'resume' | 'cancel') {
+        if (action === 'pause') {
+            if (this.recommendationProgress.state === 'running') {
+                this.recommendationPauseRequested = true
+                this.recommendationProgress = {
+                    ...this.recommendationProgress,
+                    state: 'pausing'
+                }
+            }
+            return this.recommendationBuildProgress()
+        }
+        if (action === 'resume') {
+            this.recommendationPauseRequested = false
+            for (const resolve of this.recommendationResumeWaiters) resolve()
+            this.recommendationResumeWaiters.clear()
+            if (
+                this.recommendationProgress.state === 'paused' ||
+                this.recommendationProgress.state === 'pausing'
+            )
+                this.recommendationProgress = {
+                    ...this.recommendationProgress,
+                    state: 'running'
+                }
+            return this.recommendationBuildProgress()
+        }
+        this.recommendationCancelRequested = true
+        this.recommendationPauseRequested = false
+        for (const resolve of this.recommendationResumeWaiters) resolve()
+        this.recommendationResumeWaiters.clear()
+        if (
+            this.recommendationProgress.state === 'running' ||
+            this.recommendationProgress.state === 'pausing' ||
+            this.recommendationProgress.state === 'paused'
+        )
+            this.recommendationProgress = {
+                ...this.recommendationProgress,
+                state: 'cancelling'
+            }
+        return this.recommendationBuildProgress()
+    }
+
+    private beginRecommendationBuild(cycleId: string) {
+        this.recommendationBuildCycleId = cycleId
+        this.recommendationPauseRequested = false
+        this.recommendationCancelRequested = false
+        this.recommendationResumeWaiters.clear()
+        this.recommendationProgress = {
+            state: 'running',
+            phase: 'profile',
+            done: 0,
+            total: 7
+        }
+    }
+
+    private async recommendationCheckpoint() {
+        if (this.recommendationCancelRequested)
+            throw new RecommendationBuildCancelledError()
+        if (!this.recommendationPauseRequested) return
+        this.recommendationProgress = {
+            ...this.recommendationProgress,
+            state: 'paused'
+        }
+        await new Promise<void>((resolve) =>
+            this.recommendationResumeWaiters.add(resolve)
+        )
+        if (this.recommendationCancelRequested)
+            throw new RecommendationBuildCancelledError()
+        this.recommendationProgress = {
+            ...this.recommendationProgress,
+            state: 'running'
+        }
+    }
+
+    private finishRecommendationBuild() {
+        this.recommendationBuildCycleId = null
+        this.recommendationPauseRequested = false
+        this.recommendationCancelRequested = false
+        for (const resolve of this.recommendationResumeWaiters) resolve()
+        this.recommendationResumeWaiters.clear()
+    }
 
     private recoverInterruptedRecommendationBuild() {
         const key = 'recommendation.v3.activeCycle.v1'
@@ -2332,8 +2446,9 @@ export class LibraryService {
     }
 
     async buildFinalRecommendationCycleV3(cycleId: string) {
-        this.recommendationProgress = { state: 'running', phase: 'profile', done: 0, total: 7 }
+        this.beginRecommendationBuild(cycleId)
         try {
+        await this.recommendationCheckpoint()
         const pica = await this.connect()
         const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
@@ -2378,6 +2493,7 @@ export class LibraryService {
             .map((comic) => ({ ...comic, isFavorite: true }))
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
         const profile = buildFinalLifetimeProfileV3(favorites, { registry })
+        await this.recommendationCheckpoint()
         this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 7 }
         const history: IntentCycleHistory[] = this.database
             .listV3CandidatePools(50)
@@ -2413,6 +2529,7 @@ export class LibraryService {
             baseIntents,
             recommendationV5State
         )
+        await this.recommendationCheckpoint()
         this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 7 }
         const routes = translateIntentPlanV3(intents)
         const storePica = (comics: Comic[]) => {
@@ -2439,6 +2556,7 @@ export class LibraryService {
         const externalCache = new Map<string, StoredComic[]>()
         const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }
         const sourceRequests: Record<'eh' | 'exh', number> = { eh: 0, exh: 0 }
+        await this.recommendationCheckpoint()
         this.recommendationProgress = {
             state: 'running',
             phase: 'providers',
@@ -2464,6 +2582,7 @@ export class LibraryService {
             sourceRequests[source] += 1
             const providerQuery = kind === 'author' ? `artist:"${clean.replaceAll("\"", "")}"` : clean
             try {
+                await this.recommendationCheckpoint()
                 const records = await providerService.search(
                     { keyword: providerQuery, limit: 40 },
                     [source],
@@ -2477,6 +2596,7 @@ export class LibraryService {
                 return []
             }
         }
+        await this.recommendationCheckpoint()
         this.recommendationProgress = {
             state: 'running',
             phase: 'retrieve',
@@ -2486,6 +2606,7 @@ export class LibraryService {
         const retrieved = await retrieveCandidatesV3({
             provider: {
                 keyword: async (query, page) => {
+                    await this.recommendationCheckpoint()
                     const picaResults = storePica(
                         (
                             await pica.comicsPage(
@@ -2501,6 +2622,7 @@ export class LibraryService {
                     return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
                 },
                 author: async (query, page) => {
+                    await this.recommendationCheckpoint()
                     const picaResults = storePica(
                         (await pica.search(query, page, pica.Order.loved)).docs
                     )
@@ -2508,10 +2630,12 @@ export class LibraryService {
                     const exhResults = page === 1 ? await externalSearch(query, 'author', 'exh') : []
                     return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
                 },
-                related: async (comicId) =>
-                    comicId.startsWith('eh:')
+                related: async (comicId) => {
+                    await this.recommendationCheckpoint()
+                    return comicId.startsWith('eh:')
                         ? []
                         : storePica(await pica.related(comicId))
+                }
             },
             routes,
             intents,
@@ -2537,6 +2661,7 @@ export class LibraryService {
             throw new Error(
                 'Recommendation generation could not retrieve enough candidates; previous recommendations were kept'
             )
+        await this.recommendationCheckpoint()
         this.recommendationProgress = {
             state: 'running',
             phase: 'rank',
@@ -2610,6 +2735,7 @@ export class LibraryService {
                     a.comicId.localeCompare(b.comicId)
             )
             .map(({ __v5RankScore: _score, ...candidate }) => candidate)
+        await this.recommendationCheckpoint()
         this.recommendationProgress = {
             state: 'running',
             phase: 'visual',
@@ -2742,14 +2868,21 @@ export class LibraryService {
             }
         }
         } catch (error) {
+            const cancelled = error instanceof RecommendationBuildCancelledError
             this.recommendationProgress = {
-                state: 'failed',
+                state: cancelled ? 'cancelled' : 'failed',
                 phase: this.recommendationProgress.phase,
                 done: this.recommendationProgress.done,
                 total: 7,
-                error: error instanceof Error ? error.message : String(error)
+                error: cancelled
+                    ? undefined
+                    : error instanceof Error
+                      ? error.message
+                      : String(error)
             }
             throw error
+        } finally {
+            this.finishRecommendationBuild()
         }
     }
 

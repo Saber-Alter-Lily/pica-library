@@ -6,6 +6,20 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
         if (value) node.textContent = value
         return node
     }
+    function localizePicaAccountDisclosure() {
+        for (const prefix of ['setup','settings']) {
+            const form=document.getElementById(`${prefix}-form`)
+            const summary=form?.querySelector('.account-disclosure > summary')
+            if(!summary) continue
+            const strong=summary.querySelector('strong')
+            if(strong) strong.textContent=text('Pica 账号','Pica account','Pica アカウント')
+            for(const node of [...summary.childNodes]) {
+                if(node.nodeType===Node.TEXT_NODE && node.textContent.includes('·'))
+                    node.textContent=text(' · 点击展开修改',' · Click to edit',' · クリックして編集')
+            }
+        }
+    }
+
     function renderGuides() {
         for (const prefix of ['setup', 'settings']) {
             const form = document.getElementById(`${prefix}-form`)
@@ -56,8 +70,12 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             form.prepend(guide)
         }
     }
+    localizePicaAccountDisclosure()
     renderGuides()
-    document.addEventListener('pica-language-change', renderGuides)
+    document.addEventListener('pica-language-change', () => {
+        localizePicaAccountDisclosure()
+        renderGuides()
+    })
 
     function openRegistration(prefix) {
         const dialog = element('dialog')

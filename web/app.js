@@ -510,6 +510,38 @@ function renderMobileBridge() {
         : t('mobile.noDevices')
 }
 
+async function registerDesktopBrowserSession() {
+    if (!desktop?.csrfToken) return
+    try {
+        await desktopPost('/api/v1/desktop/browser-session', {
+            action: 'open',
+            sessionId: state.appSessionId
+        })
+    } catch {
+        // Browser-session cleanup is best-effort and must not block the UI.
+    }
+}
+
+function closeDesktopBrowserSession() {
+    if (!desktop?.csrfToken) return
+    try {
+        void fetch('/api/v1/desktop/browser-session', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'x-pica-csrf': desktop.csrfToken
+            },
+            body: JSON.stringify({
+                action: 'close',
+                sessionId: state.appSessionId
+            }),
+            keepalive: true
+        })
+    } catch {
+        // The page is already leaving.
+    }
+}
+
 async function loadDesktop() {
     try {
         desktop = await api('/api/v1/desktop/status')
@@ -523,6 +555,7 @@ async function loadDesktop() {
         $('#setup-directory').value = desktop.libraryDirectory || ''
         renderTimestamps()
         renderMobileBridge()
+        void registerDesktopBrowserSession()
         if (!desktop.configured) {
             document.body.classList.add('onboarding')
             // Multi-provider onboarding must not hide E-H / ExH account access.
@@ -2539,7 +2572,10 @@ $('#reader-export-zip').onclick = () => void exportReaderArchive('zip')
 $('#reader-export-cbz').onclick = async () => {
     await exportReaderArchive('cbz')
 }
-window.addEventListener('pagehide', () => void flushReaderProgress(true))
+window.addEventListener('pagehide', () => {
+    void flushReaderProgress(true)
+    closeDesktopBrowserSession()
+})
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushReaderProgress(true)
 })

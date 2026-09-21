@@ -66,6 +66,8 @@ export interface DesktopServerController {
     ) => Promise<Record<string, unknown>>
     applyUpdate?: (id: string) => Promise<Record<string, unknown>>
     updateProgress?: () => unknown
+    browserSessionOpened?: (sessionId: string) => void
+    browserSessionClosed?: (sessionId: string) => void
     shutdown: () => void
 }
 
@@ -1407,6 +1409,24 @@ export async function startLibraryServer(options: {
             ) {
                 const input = await body(request)
                 await options.desktop.openDirectory(String(input.kind ?? ''))
+                return json(response, 200, { success: true })
+            }
+            if (
+                url.pathname === '/api/v1/desktop/browser-session' &&
+                request.method === 'POST' &&
+                options.desktop
+            ) {
+                const input = await body(request)
+                const sessionId = String(input.sessionId ?? '').trim().slice(0, 160)
+                const action = String(input.action ?? '')
+                if (!sessionId)
+                    return json(response, 400, { error: 'Browser session id is required' })
+                if (action === 'open')
+                    options.desktop.browserSessionOpened?.(sessionId)
+                else if (action === 'close')
+                    options.desktop.browserSessionClosed?.(sessionId)
+                else
+                    return json(response, 400, { error: 'Unknown browser session action' })
                 return json(response, 200, { success: true })
             }
             if (

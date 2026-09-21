@@ -100,6 +100,44 @@ let remoteStorageManager: RemoteStorageDesktopManager | null = null
 let ehWebLogin: DesktopEhWebLogin | null = null
 let stopping = false
 let currentUrl = ''
+const browserSessions = new Set<string>()
+const BROWSER_CLOSE_GRACE_MS = 5_000
+let browserCloseTimer: NodeJS.Timeout | null = null
+
+function mobileBridgeMustStayAlive() {
+    return Boolean(mobileBridge?.status().pairedDevices.length)
+}
+
+function cancelBrowserCloseShutdown() {
+    if (!browserCloseTimer) return
+    clearTimeout(browserCloseTimer)
+    browserCloseTimer = null
+}
+
+function browserSessionOpened(sessionId: string) {
+    if (!sessionId) return
+    browserSessions.add(sessionId)
+    cancelBrowserCloseShutdown()
+}
+
+function browserSessionClosed(sessionId: string) {
+    if (!sessionId) return
+    browserSessions.delete(sessionId)
+    if (browserSessions.size > 0 || mobileBridgeMustStayAlive()) return
+    cancelBrowserCloseShutdown()
+    browserCloseTimer = setTimeout(() => {
+        browserCloseTimer = null
+        if (
+            stopping ||
+            browserSessions.size > 0 ||
+            mobileBridgeMustStayAlive()
+        )
+            return
+        log.write('Last browser session closed; stopping idle desktop engine')
+        void stop()
+    }, BROWSER_CLOSE_GRACE_MS)
+    browserCloseTimer.unref()
+}
 let lastBrowserLiteExportDirectory: string | null = null
 let browserLiteExportProgress: {
     phase: string
@@ -208,6 +246,7 @@ async function closeEngine() {
 async function stop(exitCode = 0) {
     if (stopping) return
     stopping = true
+    cancelBrowserCloseShutdown()
     log.write('Stopping desktop engine')
     await closeEngine()
     instance.release()
@@ -929,6 +968,8 @@ async function startEngine(preferredPort: number) {
             return result
         },
         updateProgress: () => updateManager.progress(),
+        browserSessionOpened,
+        browserSessionClosed,
         shutdown: () => { void stop() }
     }
     try {

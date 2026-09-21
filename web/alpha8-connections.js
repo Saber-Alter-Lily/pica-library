@@ -21,6 +21,23 @@ const COPY = {
         failed: '状态读取失败',
         probeHelp: '网络探测只会在你点击检查时运行。'
     },
+    ja: {
+        title: '接続状態',
+        config: '設定状態',
+        configured: '設定済み',
+        unconfigured: '未設定',
+        notChecked: '未確認',
+        disconnected: '未接続',
+        listening: '待受中',
+        stopped: '停止中',
+        available: '利用可能',
+        reachable: '接続可能',
+        unavailable: '現在利用不可',
+        checking: '確認中…',
+        check: '接続状態を確認',
+        failed: '状態を読み込めませんでした',
+        probeHelp: 'ネットワーク確認は「確認」を押したときだけ実行します。'
+    },
     en: {
         title: 'Connection status',
         config: 'Configuration',
@@ -41,7 +58,8 @@ const COPY = {
 }
 
 function language() {
-    return $c('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
+    const value=$c('#language-select')?.value
+    return ['zh-CN','ja','en'].includes(value) ? value : 'zh-CN'
 }
 function text(key) {
     return COPY[language()]?.[key] || COPY['zh-CN'][key] || key
@@ -120,7 +138,7 @@ function renderConfigured(snapshot = connectionSnapshot) {
         <div id="a83-connections-body">
             ${item('pica', 'Pica', picaConfigured, picaConfigured ? text('notChecked') : text('disconnected'), picaConfigured ? 'muted' : 'muted')}
             ${item('webdav', 'WebDAV', remoteConfigured, remoteConfigured ? text('notChecked') : text('disconnected'), remoteConfigured ? 'muted' : 'muted')}
-            ${item('mobile', language() === 'en' ? 'Phone LAN' : '手机局域网', mobileConfigured, mobileConfigured ? text('listening') : text('stopped'), mobileConfigured ? 'good' : 'muted')}
+            ${item('mobile', language() === 'en' ? 'Phone LAN' : language() === 'ja' ? 'スマートフォンLAN' : '手机局域网', mobileConfigured, mobileConfigured ? text('listening') : text('stopped'), mobileConfigured ? 'good' : 'muted')}
         </div>
     `
     panel.querySelector('#a83-check-connections')?.addEventListener(

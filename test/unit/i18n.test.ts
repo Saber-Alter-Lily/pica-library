@@ -67,7 +67,7 @@ describe('Web localization', () => {
 
     it('does not leave Chinese copy inside the English catalog', () => {
         const leaked = Object.entries(translations.en).filter(([, value]) =>
-            /[\\u3400-\\u9fff]/.test(value)
+            /[\u3400-\u9fff]/.test(value)
         )
         expect(leaked).toEqual([])
     })

@@ -116,6 +116,8 @@ export const jaCoreTranslations = {
     'downloads.refresh': '更新',
     'downloads.run': 'キューを実行',
     'downloads.starting': 'ダウンロードキューを開始しています…',
+    'downloads.backgroundRunning': 'ダウンロードキューをバックグラウンドで実行中 · 実行中 {running} 件 · 待機中 {waiting} 件',
+    'downloads.recoveredInterrupted': '前回の Desktop プロセス中断で残ったダウンロード {count} 件を自動復旧しました。データベースを削除せず、そのまま続行できます。',
     'downloads.eta': '残り時間 {value}',
     'downloads.inProgress': '進行中',
     'downloads.waiting': '待機中',

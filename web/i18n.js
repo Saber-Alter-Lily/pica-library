@@ -1656,6 +1656,7 @@ export const domTranslations = [
     ['#downloaded-table th:nth-child(5)', 'common.pictures'],
     ['#downloaded-table th:nth-child(6)', 'common.localSize'],
     ['#downloaded-table th:nth-child(7)', 'common.lastDownloaded'],
+    ['#performance-profile', 'downloads.profileLabel', 'aria-label'],
     [
         '#performance-profile option[value="conservative"]',
         'profile.conservative'

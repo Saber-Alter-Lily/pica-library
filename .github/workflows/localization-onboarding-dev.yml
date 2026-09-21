@@ -1,0 +1,25 @@
+name: Localization Onboarding Dev Audit
+
+on:
+  push:
+    branches:
+      - dev/localization-onboarding-v1
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build localization inventory
+        run: node scripts/localization-inventory.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: localization-inventory
+          path: _reports/localization-inventory.json
+          retention-days: 3

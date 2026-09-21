@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pica Library</string>
+    <string name="common_back">‹ 返回</string>
+    <string name="language_title">语言与地区</string>
+    <string name="language_help">切换界面语言。修改会立即生效，并在下次启动时继续保持。</string>
+    <string name="language_current">当前</string>
+    <string name="settings_language">语言与地区</string>
+    <string name="settings_language_summary">简体中文 / 日本語 / English</string>
+</resources>

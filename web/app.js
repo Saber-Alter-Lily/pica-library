@@ -85,6 +85,7 @@ const state = {
     recommendationExhausted: false,
     updateProgress: null,
     chronicleSnapshot: null,
+    downloadRunnerRunning: false,
     reader: {
         comicId: null,
         episodeId: null,
@@ -1961,6 +1962,9 @@ async function loadJobs() {
     downloadPollBusy = true
     try {
         if (state.mode === 'lite') {
+            state.downloadRunnerRunning = false
+            const runButton = $('#run-jobs')
+            if (runButton) runButton.disabled = false
             $('#job-list').innerHTML = state.queue.map((job) =>
                 `<article class="list-item"><div class="grow"><strong>${escapeHtml(job.comicId)}</strong><p>${escapeHtml(job.source || 'library')} · ${t('message.litePlan')}</p></div></article>`
             ).join('') || `<article class="notice">${t('message.emptyPlan')}</article>`
@@ -1974,6 +1978,9 @@ async function loadJobs() {
         ])
         const jobs = Array.isArray(page.items) ? page.items : []
         const counts = summary.counts || {}
+        state.downloadRunnerRunning = Boolean(summary.runtime?.running)
+        const runButton = $('#run-jobs')
+        if (runButton) runButton.disabled = state.downloadRunnerRunning
         $('#download-summary').innerHTML = [
             [t('downloads.inProgress'), Number(counts.RUNNING || 0) + Number(counts.PREPARING || 0)],
             [t('downloads.waiting'), Number(counts.QUEUED || 0) + Number(counts.RETRY_WAIT || 0)],
@@ -1990,7 +1997,7 @@ async function loadJobs() {
             const speed = job.bytesPerSecond ? `${formatBytes(job.bytesPerSecond)}/s` : '—'
             const eta = job.bytesPerSecond && job.expectedBytes > job.bytes
                 ? `${Math.ceil((job.expectedBytes - job.bytes) / job.bytesPerSecond)}s` : '—'
-            return `<article class="list-item download-job-card" data-job-status="${job.status}">
+            return `<article class="list-item download-job-card" data-job-id="${job.id}" data-job-status="${job.status}" data-progress-completed="${job.progressCompleted}" data-progress-total="${job.progressTotal || 0}">
                 <div class="grow"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(chapter)} · ${escapeHtml(t(`status.${job.status}`))}</p><p>${t('message.pictures', { count: `${job.progressCompleted} / ${job.progressTotal || '—'}` })} · ${percent}% · ${formatBytes(job.bytes)}${job.expectedBytes ? ` / ${formatBytes(job.expectedBytes)}` : ''}</p><div class="progress"><span style="width:${percent}%"></span></div><p>${speed} · ${t('message.elapsed', { value: formatElapsed(job.startedAt) })} · ${t('downloads.eta', { value: eta })} · ${t('message.retryCount', { count: job.retryCount })}${job.error ? ` · ${escapeHtml(localizeError(language, job.error))}` : ''}</p></div>
                 <div class="actions">${['QUEUED', 'PREPARING', 'RUNNING'].includes(job.status) ? `<button data-job-action="pause" data-job-id="${job.id}">${t('action.pause')}</button>` : ''}${job.status === 'PAUSED' ? `<button data-job-action="resume" data-job-id="${job.id}">${t('action.resume')}</button>` : ''}${job.status === 'FAILED' ? `<button data-job-action="retry" data-job-id="${job.id}">${t('action.retry')}</button>` : ''}${!['COMPLETED', 'CANCELLED'].includes(job.status) ? `<button data-job-action="cancel" data-job-id="${job.id}">${t('action.cancel')}</button>` : ''}</div>
             </article>`
@@ -2003,7 +2010,7 @@ async function loadJobs() {
                 void loadJobs()
             }
         }
-        if (Number(summary.active || 0) > 0) {
+        if (state.downloadRunnerRunning) {
             if (!downloadPoll && activeView === 'downloads')
                 downloadPoll = setInterval(() => void loadJobs(), 1000)
         } else if (downloadPoll) {
@@ -3728,21 +3735,20 @@ $('#run-jobs').onclick = async () => {
         await loadJobs()
     } finally {
         clearProgress($('#download-operation'))
-        button.disabled = false
+        button.disabled = state.downloadRunnerRunning
     }
 }
 $('#job-list').onclick = async (event) => {
     if (!event.target.dataset.jobAction || state.mode !== 'connected') return
     if (event.target.dataset.jobAction === 'cancel') {
-        const job = await api('/api/v1/downloads').then((jobs) =>
-            jobs.find((item) => item.id === event.target.dataset.jobId)
-        )
+        const card = event.target.closest('.download-job-card')
+        const completed = Number(card?.dataset.progressCompleted || 0)
+        const total = Number(card?.dataset.progressTotal || 0)
         if (
-            job &&
             !(await askConfirm(
                 t('downloads.cancelConfirm', {
-                    completed: job.progressCompleted,
-                    total: job.progressTotal || '—'
+                    completed,
+                    total: total || '—'
                 })
             ))
         )

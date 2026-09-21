@@ -7,7 +7,7 @@ import android.view.Gravity;
 import android.widget.*;
 
 /** First-launch/versioned disclaimer gate; reviewOnly reopens it from About without re-gating the app. */
-public final class DisclaimerActivity extends Activity {
+public final class DisclaimerActivity extends LocaleAwareActivity {
     private static final String PREF="pica-disclaimer-v1",KEY_VERSION="accepted_version",VERSION="1";
 
     static boolean accepted(Activity activity){return VERSION.equals(activity.getSharedPreferences(PREF,MODE_PRIVATE).getString(KEY_VERSION,""));}

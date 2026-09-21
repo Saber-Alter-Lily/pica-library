@@ -55,11 +55,7 @@ When needed, export a Browser Lite data package from the related advanced Settin
 
 Open **Settings → Software Update** and check the current formal release.
 
-### v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4
-
-These are compatible incremental upgrades and can be completed in-app.
-
-### v0.4.0 → v0.4.4
+### Public upgrade path: v0.4.0 → v0.4.4
 
 Download from the **v0.4.4 Release**:
 
@@ -79,7 +75,7 @@ The assistant:
 - performs version/database health checks;
 - rolls back automatically on failure.
 
-Intermediate versions are not required.
+This is the recommended public-user path. Intermediate versions are not required.
 
 ### Manual replacement
 

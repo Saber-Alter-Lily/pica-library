@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest'
 const read = (file: string) => fs.readFileSync(file, 'utf8')
 
 describe('v0.4.6 recommendation-controls hotfix release', () => {
-    it('keeps desktop and Android formal versions coordinated', () => {
-        const pkg = JSON.parse(read('package.json'))
-        const gradle = read('mobile/android-alpha2/app/build.gradle')
-        expect(pkg.version).toBe('0.4.6')
-        expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '49'")
-        expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.4.6'")
+    it('keeps the historical v0.4.6 publisher frozen and manual-only', () => {
+        const workflow = read('.github/workflows/v046-release.yml')
+        expect(workflow).toContain('workflow_dispatch:')
+        expect(workflow).not.toContain('branches: [main]')
+        expect(workflow).toContain("versionCode='49' versionName='0.4.6'")
+        expect(workflow).toContain('Pica-Library-Android-v49.apk')
     })
 
     it('ships a scoped update from v0.4.5 and a direct v0.4.0 assistant', () => {

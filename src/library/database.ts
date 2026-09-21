@@ -2999,6 +2999,25 @@ export class LibraryDatabase {
         return rows.map(downloadJob)
     }
 
+    recoverInterruptedDownloadJobs(
+        runner: DownloadJob['runner'] = 'LOCAL'
+    ) {
+        const now = new Date().toISOString()
+        const result = this.db
+            .prepare(
+                `UPDATE download_jobs
+                 SET status = 'QUEUED',
+                     started_at = NULL,
+                     finished_at = NULL,
+                     error = NULL,
+                     progress_updated_at = ?
+                 WHERE runner = ?
+                   AND status IN ('PREPARING','RUNNING','RETRY_WAIT')`
+            )
+            .run(now, runner)
+        return Number(result.changes)
+    }
+
     downloadJobSummary() {
         const rows = this.db
             .prepare(

@@ -35,8 +35,12 @@ export type RemoteSyncPhase =
     | 'scanning'
     | 'uploading'
     | 'publishing'
+    | 'pausing'
+    | 'paused'
+    | 'cancelling'
     | 'complete'
     | 'failed'
+    | 'cancelled'
 
 export interface RemoteSyncProgress {
     phase: RemoteSyncPhase
@@ -110,10 +114,17 @@ export class RemoteLibrarySyncService {
         dataDir: string,
         private readonly provider: RemoteStorageProvider,
         private readonly onProgress?: (progress: RemoteSyncProgress) => void,
-        private readonly pageConcurrency = 4
+        private readonly pageConcurrency = 4,
+        private readonly control?: {
+            checkpoint: () => Promise<void>
+        }
     ) {
         this.query = new LibraryQueryService(database)
         this.root = fs.realpathSync(path.resolve(dataDir))
+    }
+
+    private checkpoint() {
+        return this.control?.checkpoint() ?? Promise.resolve()
     }
 
     private safeFile(file: string) {
@@ -385,7 +396,9 @@ export class RemoteLibrarySyncService {
         emit({})
 
         try {
+            await this.checkpoint()
             const scan = this.localLibrary(selectedIds)
+            await this.checkpoint()
             const local = scan.comics
             const totalPages = local.reduce((sum, comic) => sum + comic.entry.pageCount, 0)
             emit({
@@ -394,6 +407,7 @@ export class RemoteLibrarySyncService {
                 totalPages,
                 message: local.length ? '准备上传' : '没有可上传漫画'
             })
+            await this.checkpoint()
             const previous = await this.remoteCatalog()
             if (!local.length && !previous)
                 throw new Error(`没有完整可同步的漫画；${scan.issues.length} 部存在本地文件问题，请先修复或重新下载`)
@@ -405,6 +419,7 @@ export class RemoteLibrarySyncService {
             let lastPublication: Awaited<ReturnType<RemoteLibrarySyncService['publishCatalog']>> | null = null
 
             for (let comicIndex = 0; comicIndex < local.length; comicIndex++) {
+                await this.checkpoint()
                 const comic = local[comicIndex]
                 let currentComicCompletedPages = 0
                 emit({
@@ -431,6 +446,7 @@ export class RemoteLibrarySyncService {
                             episode.pages,
                             this.pageConcurrency,
                             async (page) => {
+                                await this.checkpoint()
                                 const priorPage = prior?.pages[page.manifest.index]
                                 const alreadyPresent = Boolean(
                                     priorPage?.sha256 === page.manifest.sha256 &&
@@ -454,6 +470,7 @@ export class RemoteLibrarySyncService {
                                 })
                             }
                         )
+                        await this.checkpoint()
                         await this.provider.putJson(
                             remoteLayout.episodeManifest(comic.entry.comicId, episode.manifest.episodeId),
                             episode.manifest
@@ -461,6 +478,7 @@ export class RemoteLibrarySyncService {
                         uploadedObjects += 1
                         emit({ uploadedObjects })
                     }
+                    await this.checkpoint()
                     if (
                         comic.cover &&
                         (comic.cover.sha256 !== previousComic?.manifest.coverSha256 ||
@@ -472,6 +490,7 @@ export class RemoteLibrarySyncService {
                         uploadedBytes += data.byteLength
                         emit({ uploadedObjects, uploadedBytes })
                     }
+                    await this.checkpoint()
                     await this.provider.putJson(remoteLayout.comicManifest(comic.entry.comicId), comic.manifest)
                     uploadedObjects += 1
                     emit({ uploadedObjects })
@@ -500,6 +519,7 @@ export class RemoteLibrarySyncService {
                         phase: 'publishing',
                         message: `正在发布已完成的 ${completedComics}/${local.length} 本漫画`
                     })
+                    await this.checkpoint()
                     lastPublication = await this.publishCatalog(entries)
                     emit({
                         phase: 'uploading',
@@ -508,6 +528,7 @@ export class RemoteLibrarySyncService {
                 }
             }
 
+            await this.checkpoint()
             emit({ phase: 'publishing', message: '正在发布最终云端目录' })
             lastPublication = await this.publishCatalog(entries)
             emit({
@@ -531,9 +552,16 @@ export class RemoteLibrarySyncService {
                 retainedRemoteOnlyCount: lastPublication.catalog.comics.filter((comic) => !scan.localIds.has(comic.comicId)).length
             }
         } catch (error) {
+            const cancelled =
+                error instanceof Error &&
+                error.name === 'RemoteSyncCancelledError'
             emit({
-                phase: 'failed',
-                message: error instanceof Error ? error.message : String(error)
+                phase: cancelled ? 'cancelled' : 'failed',
+                message: cancelled
+                    ? '同步已取消；已上传对象会在下次同步时自动复用'
+                    : error instanceof Error
+                      ? error.message
+                      : String(error)
             })
             throw error
         }

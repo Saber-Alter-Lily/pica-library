@@ -104,7 +104,7 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         int checked=MobileVisualPolicyStore.OFF.equals(current)?0:MobileVisualPolicyStore.LIVE.equals(current)?2:1;
         new AlertDialog.Builder(this)
             .setTitle(LocalizedText.ui("手机画风接入模式"))
-            .setSingleChoiceItems(labels,checked,(d,w)->{
+            .setSingleChoiceItems(LocalizedText.ui(labels),checked,(d,w)->{
                 d.dismiss();
                 MobileVisualPolicyStore.setMode(this,values[w]);
                 renderContent();
@@ -124,7 +124,7 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         int checked=MobileVisualPolicyStore.LIGHT.equals(current)?0:MobileVisualPolicyStore.STRONG.equals(current)?2:1;
         new AlertDialog.Builder(this)
             .setTitle(LocalizedText.ui("手机画风影响强度"))
-            .setSingleChoiceItems(labels,checked,(d,w)->{
+            .setSingleChoiceItems(LocalizedText.ui(labels),checked,(d,w)->{
                 d.dismiss();
                 MobileVisualPolicyStore.setStrength(this,values[w]);
                 renderContent();
@@ -151,7 +151,7 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         };
         new AlertDialog.Builder(this)
             .setTitle(LocalizedText.ui("Desktop 画风设置"))
-            .setItems(labels,(d,w)->{
+            .setItems(LocalizedText.ui(labels),(d,w)->{
                 if(w==0)loadDesktopVisual(true);
                 else if(w==1)updateDesktopVisual(!enabled,null,null);
                 else if(w==2)chooseDesktopMode(mode);
@@ -165,14 +165,14 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         String[] labels={"关闭排序影响","仅分析 · 不改变排序","参与排序 · 按所选强度生效"};
         String[] values={"OFF","SHADOW","LIVE"};
         int checked="OFF".equals(current)?0:"LIVE".equals(current)?2:1;
-        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("Desktop 推荐接入模式")).setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w],null);}).setNegativeButton(LocalizedText.ui("取消"),null).show();
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("Desktop 推荐接入模式")).setSingleChoiceItems(LocalizedText.ui(labels),checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w],null);}).setNegativeButton(LocalizedText.ui("取消"),null).show();
     }
 
     private void chooseDesktopStrength(String current){
         String[] labels={"轻度 · 兼容旧权重","标准 · 推荐","强 · 更强调画风"};
         String[] values={"LIGHT","STANDARD","STRONG"};
         int checked="LIGHT".equals(current)?0:"STRONG".equals(current)?2:1;
-        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("Desktop 画风影响强度")).setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,null,values[w]);}).setNegativeButton(LocalizedText.ui("取消"),null).show();
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("Desktop 画风影响强度")).setSingleChoiceItems(LocalizedText.ui(labels),checked,(d,w)->{d.dismiss();updateDesktopVisual(null,null,values[w]);}).setNegativeButton(LocalizedText.ui("取消"),null).show();
     }
 
     private void updateDesktopVisual(Boolean enabled,String mode,String strength){

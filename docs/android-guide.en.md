@@ -106,7 +106,7 @@ Formal updates verify:
 - application package name;
 - official signing identity.
 
-Current **v42 / 0.4.0, v43 / 0.4.1, v44 / 0.4.2, and v45 / 0.4.3** builds can update in place to **v46 / 0.4.4** through the in-app update chain.
+Existing **v42 / 0.4.0** users can update in place directly to **v46 / 0.4.4** through the in-app update chain; v43, v44, and v45 are not required.
 
 If an update briefly reports that it is waiting for the Android system download service, Android DownloadManager is usually queueing the request; continue later or restart the download if needed.
 

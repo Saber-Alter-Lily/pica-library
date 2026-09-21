@@ -20,6 +20,8 @@ import {
     ExpectedPage
 } from './types'
 
+const PICA_API_TIMEOUT_MS = 15000
+
 const PICA_SECRET_KEY =
     process.env.PICA_SECRET_KEY ||
     '~d}$Q7$eIni=V)9\\RK/P.RM4;9[7|@/CA}b~OW!3?EV`:<>M7pddUBL5n|0/*Cn'
@@ -522,7 +524,9 @@ export class Pica {
             method,
             headers,
             data,
-            ...(/^auth\/(sign-in|register)$/.test(url) ? { timeout: 30000 } : {})
+            timeout: /^auth\/(sign-in|register)$/.test(url)
+                ? 30000
+                : PICA_API_TIMEOUT_MS
         })
     }
 }

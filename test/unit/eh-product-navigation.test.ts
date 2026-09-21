@@ -16,11 +16,11 @@ describe('source-oriented product navigation', () => {
 
   it('progressively discloses Desktop filters, account, batch and card actions', () => {
     const script = fs.readFileSync('web/eh-account.js', 'utf8')
-    expect(script).toContain("summary.textContent = '筛选 ▾'")
-    expect(script).toContain("disclosure('官方账号 ▾'")
-    expect(script).toContain("disclosure('账号功能 ▾'")
-    expect(script).toContain("disclosure('批量操作 ▾'")
-    expect(script).toContain("disclosure('更多 ▾', [download, favorite], 'result-action-menu')")
+    expect(script).toContain("summary.textContent = ehT('筛选 ▾','Filters ▾','絞り込み ▾')")
+    expect(script).toContain("disclosure(ehT('官方账号 ▾','Official account ▾','公式アカウント ▾')")
+    expect(script).toContain("disclosure(ehT('账号功能 ▾','Account actions ▾','アカウント操作 ▾')")
+    expect(script).toContain("disclosure(ehT('批量操作 ▾','Batch actions ▾','一括操作 ▾')")
+    expect(script).toContain("disclosure(ehT('更多 ▾','More ▾','その他 ▾'), [download, favorite], 'result-action-menu')")
     expect(script).toContain('observeResultCardActions()')
   })
 

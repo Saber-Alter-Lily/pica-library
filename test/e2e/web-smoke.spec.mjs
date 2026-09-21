@@ -65,6 +65,9 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
     const appearance = page.locator('#a87-appearance-panel #a83-appearance')
     await expect(appearance).toBeVisible()
 
+    await page.locator('nav [data-view="library"]').click()
+    await expect(page.locator('#library')).toHaveClass(/\bactive\b/)
+
     const help = page.locator('#library .info-tip').first()
     await expect(help).toBeVisible()
     await help.hover()

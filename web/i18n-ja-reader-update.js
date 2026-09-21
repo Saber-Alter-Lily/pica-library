@@ -37,6 +37,8 @@ export const jaReaderUpdateTranslations = {
     'mobile.copyLink': 'ペアリングリンクをコピー',
     'mobile.copiedLink': 'ペアリングリンクをコピーしました。',
     'mobile.copyFailed': 'コピーに失敗しました。値を選択して手動でコピーしてください。',
+    'mobile.settingsTitle': 'スマートフォン接続',
+    'mobile.refreshCode': 'ペアリングコードを更新',
     'mobile.pairQrTitle': 'スキャンして接続',
     'mobile.pairRecommended': '推奨',
     'mobile.pairManualTitle': '手動接続',

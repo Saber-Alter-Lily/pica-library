@@ -118,7 +118,7 @@ export const jaCommonChronicleTranslations = {
     'chronicle.favoritesMetric': 'お気に入り',
     'chronicle.authorsMetric': '作者',
     'chronicle.tagsMetric': 'タグ',
-    'chronicle.interestsMetric': '興味の軸'
+    'chronicle.interestsMetric': '興味の軸',
     'settings.helpLabel': '設定の説明を見る',
     'settings.helpText': 'この Windows 上の Pica Library インストールを管理します。',
     'settings.recommendHelpLabel': 'おすすめフィードバックの説明を見る',

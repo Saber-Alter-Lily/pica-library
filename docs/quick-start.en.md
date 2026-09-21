@@ -1,14 +1,14 @@
 # Pica Library Quick Start
 
-Current stable release: **v0.4.4**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
+Current stable release: **v0.4.5**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
 
 ## 01 Download and extract
 
 Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest).
 
-For v0.4.4:
+For v0.4.5:
 
-`Pica-Library-v0.4.4-windows-x64.zip`
+`Pica-Library-v0.4.5-windows-x64.zip`
 
 Extract the complete archive to a normal folder. Do not run the executable from inside an archive viewer.
 
@@ -95,13 +95,13 @@ On Windows, open **Settings → Software Update**.
 
 Existing **v0.4.0** users should move directly to the current release:
 
-- download `Pica-Library-v0.4.4-upgrade-assistant.zip` from the v0.4.4 Release;
-- run `Upgrade-Pica-Library-v0.4.4.cmd`;
+- download `Pica-Library-v0.4.5-upgrade-assistant.zip` from the v0.4.5 Release;
+- run `Upgrade-Pica-Library-v0.4.5.cmd`;
 - no intermediate versions are required.
 
 The assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database backups, replaces the application, runs health checks, and rolls back on failure.
 
-Android v42 / 0.4.0 users can update directly through the in-app chain to v46 / 0.4.4; intermediate versions are not required.
+Android v42 / 0.4.0 users can update directly through the in-app chain to v48 / 0.4.4; intermediate versions are not required.
 
 Application files and user data are separate. Do not delete `%LOCALAPPDATA%\Pica Library` during an upgrade.
 

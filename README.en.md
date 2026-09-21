@@ -15,7 +15,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 - **Desktop support now survives the real Settings Hub rebuild**: Support the Project is moved into General Settings, so AFDIAN and GitHub are visible from the actual user-facing settings center.
 - **Appearance placement fixed too**: the base light/dark appearance panel is moved into Appearance & Personalization instead of remaining inside the hidden legacy Settings container.
 - **Real-browser regression coverage**: Chromium smoke now opens the settings hub and verifies both support and appearance are visibly attached after the rebuild.
-- **Upgrades**: Windows v0.4.1 / v0.4.2 / v0.4.3 can all update in-app directly to v0.4.4; v0.4.0 can use the v0.4.4 upgrade assistant directly; Android aligns to versionCode 46 / 0.4.4.
+- **Public upgrade path**: existing v0.4.0 users go directly to v0.4.4. Windows uses the v0.4.4 upgrade assistant in one step; Android v42 / 0.4.0 can update in place directly to v46 / 0.4.4.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
@@ -67,7 +67,7 @@ See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 ### Updates and maintenance
 
 - Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4 supports normal in-app incremental update. If you are still on v0.4.0, use the **Windows upgrade assistant** from the v0.4.4 Release to upgrade directly to v0.4.4 without installing intermediate versions.
+- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.4 Release to move directly to the latest release without installing intermediate versions.
 - Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
 - Logs, repair, cache, export, and diagnostic tools are available from the app.
 
@@ -100,11 +100,11 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-For **v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4**, use the normal in-app updater. Users still on **v0.4.0** can download `Pica-Library-v0.4.4-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.4.cmd` to upgrade directly to v0.4.4. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+Existing **v0.4.0** users do not need to install v0.4.1, v0.4.2, or v0.4.3. Download `Pica-Library-v0.4.4-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.4.cmd` to move directly to the current release. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing v42 / 0.4.0, v43 / 0.4.1, v44 / 0.4.2, and v45 / 0.4.3 installs can all upgrade directly in place to v46 / 0.4.4 through the in-app update chain.
+Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v46 / 0.4.4** through the in-app update chain; no intermediate versions are required.
 
 ## Local-first and security
 

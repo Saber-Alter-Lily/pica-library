@@ -33,7 +33,7 @@ function literals(file) {
     const before = src.slice(Math.max(0, m.index - 220), m.index)
     const coveredPrimitive = /(Ui\.(?:text|button|pill|foldHeader|headingWithInfo|infoButton|iconButton)|SettingsRow\.(?:row|statusLine))\([^\n]{0,180}$/s.test(before)
     const directUi = /(setText\(|setHint\(|setTitle\(|setMessage\(|setPositiveButton\(|setNegativeButton\(|setNeutralButton\(|setItems\(|setSingleChoiceItems\(|setMultiChoiceItems\(|Toast\.makeText\(|setContentDescription\(|setSummary\(|setLabel\()/s.test(before)
-    const explicitlyRouted = /LocalizedText\.ui\(\s*$/s.test(before)
+    const explicitlyRouted = /LocalizedText\.ui\(\s*$/s.test(before) || /LocalizedText\.ui\(\s*new String\[\]\s*\{[^;]{0,220}$/s.test(before)
     const likelyUi = coveredPrimitive || directUi
     const uiRouted = coveredPrimitive || explicitlyRouted
     rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi, explicitlyRouted, uiRouted })
@@ -111,11 +111,11 @@ console.log('ANDROID_DIRECT_UNROUTED_UNIQUE=' + unroutedDirectUnique.length)
 console.log('ANDROID_UI_MISSING_EN=' + missingEn.length)
 console.log('ANDROID_UI_MISSING_JA=' + missingJa.length)
 console.log('ANDROID_DIRECT_UNROUTED_VALUES')
-console.log(unroutedDirectUnique.slice(0,500).join('\n'))
+console.log(unroutedDirectUnique.join('\n'))
 console.log('ANDROID_UI_MISSING_EN_VALUES')
-console.log(missingEn.slice(0,500).join('\n'))
+console.log(missingEn.join('\n'))
 console.log('ANDROID_UI_MISSING_JA_VALUES')
-console.log(missingJa.slice(0,500).join('\n'))
+console.log(missingJa.join('\n'))
 
 console.log('DIRECT_UI_SAMPLES')
 console.log(androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).slice(0,220).map(x=>`${x.file}:${x.line}\t${x.value}`).join('\n'))

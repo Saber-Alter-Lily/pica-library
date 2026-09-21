@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Alpha8 mobile shell: one library, native Pica, portable state and mature Reader. */
-public class MainActivity extends Activity {
+public class MainActivity extends LocaleAwareActivity {
     private static final class HistoryItem {
         final String comicId,title,author,episodeId,episodeTitle,updatedAt;
         final int episodeOrder,pageIndex;

@@ -76,7 +76,7 @@ describe('Alpha8.10 release readiness baseline', () => {
         expect(store).toContain('if(!StarAccessStore.enabled(c))throw new SecurityException("个性化装扮尚未解锁")')
         expect(store).toContain('static boolean applyToUi(Context c,boolean dark){if(!StarAccessStore.enabled(c))return false;')
         expect(activity).toContain('if(!StarAccessStore.enabled(this))')
-        expect(activity).toContain('if(!StarAccessStore.enabled(this)){Toast.makeText(this,"请先完成 GitHub 验证"')
+        expect(activity).toContain('if(!StarAccessStore.enabled(this)){Toast.makeText(this,LocalizedText.ui("请先完成 GitHub 验证")')
         expect(sync).toContain('if(!StarAccessStore.enabled(c))throw new SecurityException')
     })
 

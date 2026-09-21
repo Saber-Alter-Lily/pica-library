@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test'
 
 test('Web boots and primary navigation stays interactive', async ({ page }) => {
+    await page.addInitScript(() => {
+        localStorage.setItem(
+            'pica-onboarding-state-v1',
+            JSON.stringify({ completedVersion: 1, dismissedVersion: 0, autoShow: true })
+        )
+    })
     const pageErrors = []
     const consoleErrors = []
 

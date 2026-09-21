@@ -18,7 +18,30 @@ const copy = {
         openDownloads: '打开下载任务',
         historyHidden: '已结束任务已收起',
         historyShown: '隐藏已结束任务',
-        finishedCount: (count) => `已结束 ${count}`
+        finishedCount: (count) => `已结束 ${count}`,
+        languageTitle: '语言与地区',
+        languageHelp: '切换界面语言。修改会立即生效，并在下次启动时继续保持。'
+    },
+    ja: {
+        nav: '設定',
+        sectionsLabel: '設定セクション',
+        title: '接続と設定',
+        subtitle: '',
+        general: '基本設定',
+        recommendations: 'おすすめと画風',
+        connections: '接続と同期',
+        appearance: '外観とカスタマイズ',
+        storage: 'ダウンロードと保存先',
+        maintenance: 'メンテナンス',
+        software: 'ソフトウェア更新',
+        storageTitle: 'ダウンロードと保存先',
+        storageCopy: '',
+        openDownloads: 'ダウンロードを開く',
+        historyHidden: '完了済みタスクを折りたたみ中',
+        historyShown: '完了済みタスクを隠す',
+        finishedCount: (count) => `完了 ${count}`,
+        languageTitle: '言語と地域',
+        languageHelp: '表示言語を切り替えます。変更はすぐに反映され、次回起動時も保持されます。'
     },
     en: {
         nav: 'Settings',
@@ -37,12 +60,15 @@ const copy = {
         openDownloads: 'Open Downloads',
         historyHidden: 'Finished tasks are collapsed',
         historyShown: 'Hide finished tasks',
-        finishedCount: (count) => `${count} finished`
+        finishedCount: (count) => `${count} finished`,
+        languageTitle: 'Language & Region',
+        languageHelp: 'Choose the interface language. Changes apply immediately and are kept for the next launch.'
     }
 }
 
 function language() {
-    return hub$('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
+    const value = hub$('#language-select')?.value
+    return ['zh-CN', 'ja', 'en'].includes(value) ? value : 'zh-CN'
 }
 
 function text() {
@@ -74,6 +100,10 @@ function injectStyles() {
 #a87-storage-intro{margin-bottom:14px}
 #a87-download-history-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #a87-download-history-controls .a87-finished-count{font-size:.84rem;color:var(--a83-muted,#68636e);padding:0 4px}
+#a87-language-panel .language-control{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(150px,220px);gap:14px;align-items:center;margin-top:10px}
+#a87-language-panel .language-control select{width:100%;min-width:0}
+#a87-language-panel p{margin:.35rem 0 0}
+@media(max-width:560px){#a87-language-panel .language-control{grid-template-columns:1fr}}
 
 /* Personalization is a full-width settings surface, never a squeezed form column. */
 #a87-appearance-panel #a83-personalization{display:block!important;width:100%!important;max-width:none!important;min-width:0!important;grid-column:1/-1!important;box-sizing:border-box;margin:0!important}
@@ -235,6 +265,19 @@ function moveProductSettingsPanels() {
     const appearanceSlot = hub$('#a87-appearance-panel')
     const support = hub$('#a83-support')
     const appearance = hub$('#a83-appearance')
+    const languageControl = hub$('.language-control')
+    let languagePanel = hub$('#a87-language-panel')
+    if (general && languageControl) {
+        if (!languagePanel) {
+            languagePanel = document.createElement('article')
+            languagePanel.id = 'a87-language-panel'
+            languagePanel.className = 'panel'
+            languagePanel.innerHTML = '<h3></h3><p></p>'
+            general.prepend(languagePanel)
+        }
+        if (languageControl.parentElement !== languagePanel)
+            languagePanel.appendChild(languageControl)
+    }
     if (general && support && support.parentElement !== general) {
         general.appendChild(support)
         support.classList.add('a87-support-panel')
@@ -268,7 +311,11 @@ async function refreshPreviewStats() {
             const size = bytes < 1024 * 1024
                 ? `${(bytes / 1024).toFixed(1)} KB`
                 : `${(bytes / 1024 / 1024).toFixed(1)} MB`
-            target.textContent = language() === 'en' ? `${files} cached files · ${size}` : `缓存 ${files} 个文件 · ${size}`
+            target.textContent = language() === 'en'
+                ? `${files} cached files · ${size}`
+                : language() === 'ja'
+                    ? `キャッシュ ${files} ファイル · ${size}`
+                    : `缓存 ${files} 个文件 · ${size}`
         }
     } catch {
         // The existing cache controls retain their own error handling.
@@ -421,6 +468,10 @@ function refreshHubLabels() {
         const button = hub$(`.a87-hub-nav button[data-hub-panel="${id}"]`)
         if (button) button.textContent = value[key]
     }
+    const languageTitle = hub$('#a87-language-panel h3')
+    const languageHelp = hub$('#a87-language-panel p')
+    if (languageTitle) languageTitle.textContent = value.languageTitle
+    if (languageHelp) languageHelp.textContent = value.languageHelp
     const storageTitle = hub$('#a87-storage-intro h3')
     const storageCopy = hub$('#a87-storage-intro p')
     const openDownloads = hub$('#a87-open-downloads')

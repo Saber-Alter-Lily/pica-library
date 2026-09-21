@@ -116,7 +116,7 @@ function injectStyles() {
 .a85-pack{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--a83-line,#ddd)}.a85-pack:first-child{border-top:0}.a85-pack-main{min-width:0;flex:1}.a85-pack-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.a85-active{font-size:.78rem;padding:3px 8px;border-radius:999px;background:var(--a83-accent-soft,#eee);color:var(--a83-accent,#7457b9)}
 .a85-mobile-note{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--a83-accent-soft,#eee)}
 #a85-recommend-progress{display:none;grid-template-columns:minmax(150px,260px) 1fr;gap:16px;align-items:center;margin:10px 0 16px;padding:14px;border-radius:var(--a85-card-radius,18px);border:1px solid var(--a83-line,#ddd);background:var(--a83-surface,#fff)}
-#a85-recommend-progress.active{display:grid}#a85-recommend-progress img#a85-recommend-art{display:none;width:100%;max-height:150px;object-fit:cover;border-radius:14px}#a85-recommend-progress.has-art img#a85-recommend-art{display:block}.a85-progress-copy strong{display:block;margin-bottom:5px}.a85-progress-line{height:9px;background:var(--a85-progress-track,var(--a83-accent-soft,#eee));border-radius:999px;position:relative;margin-top:10px;overflow:visible}.a85-progress-line>span{display:block;height:100%;width:0;border-radius:999px;background:var(--a85-progress-fill,var(--a83-accent,#7457b9));transition:width .28s ease}.a85-progress-line.indeterminate>span{width:38%;animation:a85-indeterminate 1.1s ease-in-out infinite}
+#a85-recommend-progress.active{display:grid}#a85-recommend-progress img#a85-recommend-art{display:none;width:100%;max-height:150px;object-fit:cover;border-radius:14px}#a85-recommend-progress.has-art img#a85-recommend-art{display:block}.a85-progress-copy strong{display:block;margin-bottom:5px}.a85-task-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.a85-task-actions button[hidden]{display:none!important}.a85-progress-line{height:9px;background:var(--a85-progress-track,var(--a83-accent-soft,#eee));border-radius:999px;position:relative;margin-top:10px;overflow:visible}.a85-progress-line>span{display:block;height:100%;width:0;border-radius:999px;background:var(--a85-progress-fill,var(--a83-accent,#7457b9));transition:width .28s ease}.a85-progress-line.indeterminate>span{width:38%;animation:a85-indeterminate 1.1s ease-in-out infinite}
 .a85-progress-head{position:absolute;width:26px;height:26px;object-fit:contain;pointer-events:none;z-index:8;transform-origin:center;filter:drop-shadow(0 2px 4px rgb(0 0 0 / .16));transition:left .28s ease,top .28s ease}.a85-progress-head.bobble{animation:a85-bobble .65s ease-in-out infinite alternate}.a85-progress-head.hop{animation:a85-hop .7s ease-in-out infinite}.a85-progress-head.sparkle{filter:drop-shadow(0 0 5px var(--a83-accent,#7457b9)) drop-shadow(0 2px 4px rgb(0 0 0 / .16))}
 .a85-theme-active{--a85-card-radius:20px;--a85-cover-radius:14px;background-color:var(--a83-bg)!important}.a85-pattern-layer{position:fixed;inset:0;pointer-events:none;z-index:0;background-repeat:repeat;background-position:center;background-size:320px}.a85-theme-active .app-header,.a85-theme-active .app-nav,.a85-theme-active main,.a85-theme-active .app-dialog{position:relative;z-index:1}
 .a85-theme-active .app-header{position:relative;overflow:hidden}.a85-header-mascot{position:absolute;right:20px;bottom:-35px;width:128px;height:128px;object-fit:contain;pointer-events:none;opacity:.88}.a85-theme-active .app-header>.app-brand,.a85-theme-active .app-header>.header-controls{position:relative;z-index:2}
@@ -571,8 +571,46 @@ function ensureRecommendationProgress() {
     if (!host || $('#a85-recommend-progress')) return
     const card = document.createElement('div')
     card.id = 'a85-recommend-progress'
-    card.innerHTML = `<img id="a85-recommend-art" alt=""><div class="a85-progress-copy"><strong id="a85-recommend-phase">${t('正在准备推荐…','Preparing recommendations…','おすすめを準備中…')}</strong><span id="a85-recommend-detail" class="status">${t('正在读取推荐状态。','Reading recommendation status.','おすすめ状態を読み込み中。')}</span><div class="a85-progress-line indeterminate" id="a85-recommend-line"><span></span></div></div>`
+    card.innerHTML = `<img id="a85-recommend-art" alt=""><div class="a85-progress-copy"><strong id="a85-recommend-phase">${t('正在准备推荐…','Preparing recommendations…','おすすめを準備中…')}</strong><span id="a85-recommend-detail" class="status">${t('正在读取推荐状态。','Reading recommendation status.','おすすめ状態を読み込み中。')}</span><div class="a85-progress-line indeterminate" id="a85-recommend-line"><span></span></div><div class="a85-task-actions"><button id="a85-recommend-pause" type="button">${t('暂停','Pause','一時停止')}</button><button id="a85-recommend-resume" type="button" hidden>${t('继续','Resume','再開')}</button><button id="a85-recommend-cancel" type="button">${t('取消本轮','Cancel run','この処理を中止')}</button></div></div>`
     host.insertAdjacentElement('afterend', card)
+    $('#a85-recommend-pause').onclick = () => void controlRecommendationBuild('pause_build')
+    $('#a85-recommend-resume').onclick = () => void controlRecommendationBuild('resume_build')
+    $('#a85-recommend-cancel').onclick = () => void controlRecommendationBuild('cancel_build')
+}
+
+async function controlRecommendationBuild(actionName) {
+    const buttons = [
+        $('#a85-recommend-pause'),
+        $('#a85-recommend-resume'),
+        $('#a85-recommend-cancel')
+    ].filter(Boolean)
+    buttons.forEach((button) => (button.disabled = true))
+    try {
+        await api('/api/v1/recommendation-sessions', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ engine: 'v3', action: actionName })
+        })
+        await pollRecommendationProgress()
+    } catch (error) {
+        const detail = $('#a85-recommend-detail')
+        if (detail)
+            detail.textContent =
+                t('任务控制失败：','Task control failed: ','タスク操作に失敗：') +
+                String(error?.message || error)
+    } finally {
+        buttons.forEach((button) => (button.disabled = false))
+    }
+}
+
+function updateRecommendationTaskControls(progress = {}) {
+    const pause = $('#a85-recommend-pause')
+    const resume = $('#a85-recommend-resume')
+    const cancel = $('#a85-recommend-cancel')
+    if (!pause || !resume || !cancel) return
+    pause.hidden = !progress.canPause
+    resume.hidden = !progress.canResume
+    cancel.hidden = !progress.canCancel
 }
 
 function updateRecommendationArtwork() {
@@ -592,6 +630,7 @@ function updateRecommendationArtwork() {
 
 function buildPhaseLabel(phase) {
     return ({
+        recovered:t('恢复上次中断状态','Recovering an interrupted run','中断された処理を復旧'),
         profile:t('分析收藏与兴趣画像','Analyzing collection and preference profile','コレクションと嗜好プロフィールを解析'),
         intents:t('规划推荐方向','Planning recommendation intent','おすすめ方向を計画'),
         routes:t('准备多路召回','Preparing retrieval routes','複数の検索ルートを準備'),
@@ -633,6 +672,7 @@ async function pollRecommendationProgress() {
             '/api/v1/recommendation-sessions/status?mode=final'
         )
         const progress = current.buildProgress || {}
+        updateRecommendationTaskControls(progress)
         if (
             recommendationWatchBaselineCycleId === null &&
             current.activeCycleId
@@ -640,8 +680,17 @@ async function pollRecommendationProgress() {
             recommendationWatchBaselineCycleId = current.activeCycleId
         if (current.buildingCycleId) {
             card.classList.add('active')
+            const phaseLabel =
+                buildPhaseLabel(progress.phase) ||
+                t('正在生成推荐…','Generating recommendations…','おすすめを生成中…')
             $('#a85-recommend-phase').textContent =
-                buildPhaseLabel(progress.phase) || t('正在生成推荐…','Generating recommendations…','おすすめを生成中…')
+                progress.state === 'paused'
+                    ? t('已暂停 · ','Paused · ','一時停止 · ') + phaseLabel
+                    : progress.state === 'pausing'
+                      ? t('正在暂停 · ','Pausing · ','一時停止中 · ') + phaseLabel
+                      : progress.state === 'cancelling'
+                        ? t('正在取消 · ','Cancelling · ','キャンセル中 · ') + phaseLabel
+                        : phaseLabel
             const done = Number(progress.done || 0)
             const total = Number(progress.total || 0)
             const elapsed = recommendationWatchStartedAt
@@ -706,7 +755,19 @@ async function pollRecommendationProgress() {
         card.classList.add('active')
         $('#a85-recommend-line').classList.remove('indeterminate')
         $('#a85-recommend-line').querySelector('span').style.width = '100%'
-        if (changed) {
+        updateRecommendationTaskControls({})
+        if (progress.state === 'cancelled') {
+            $('#a85-recommend-phase').textContent =
+                t('本轮推荐已取消','Recommendation run cancelled','おすすめ生成をキャンセルしました')
+            $('#a85-recommend-detail').textContent =
+                t('上一轮可用推荐保持不变，可以随时重新生成。','The previous usable recommendations were kept. You can restart whenever you want.','前回の利用可能なおすすめは保持されています。いつでも再生成できます。')
+        } else if (progress.state === 'failed') {
+            $('#a85-recommend-phase').textContent =
+                t('推荐生成失败','Recommendation generation failed','おすすめ生成に失敗しました')
+            $('#a85-recommend-detail').textContent =
+                t('上一轮可用推荐已保留：','The previous usable recommendations were kept: ','前回の利用可能なおすすめは保持されています：') +
+                String(progress.error || t('请稍后重试','Try again later','後でもう一度お試しください'))
+        } else if (changed) {
             $('#a85-recommend-phase').textContent = t('新一轮推荐已更新','New recommendation round is ready','新しいおすすめラウンドを更新しました')
             const shortCycle = String(current.activeCycleId || '').slice(0, 8)
             $('#a85-recommend-detail').textContent =

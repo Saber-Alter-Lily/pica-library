@@ -1,3 +1,5 @@
+import { copy as evalT } from './locale-runtime.js'
+
 const EVAL = {
     summary: null,
     runs: [],
@@ -75,8 +77,8 @@ function evalEnsureStyles() {
 .v5-eval-technical{margin-top:14px;border:1px solid var(--a83-line,#ddd7e4);border-radius:14px;background:#fafbfe}
 .v5-eval-technical>summary{padding:12px 14px;cursor:pointer;font-weight:750;color:#596071;list-style:none}
 .v5-eval-technical>summary::-webkit-details-marker{display:none}
-.v5-eval-technical>summary::after{content:'展开';float:right;color:#6a72c8;font-size:.82rem}
-.v5-eval-technical[open]>summary::after{content:'收起'}
+.v5-eval-technical>summary::after{content:'+';float:right;color:#6a72c8;font-size:.9rem}
+.v5-eval-technical[open]>summary::after{content:'−'}
 .v5-eval-technical-body{padding:0 12px 12px}
 .v5-eval-run details{margin-top:5px}
 .v5-eval-run code{white-space:normal;overflow-wrap:anywhere}
@@ -110,19 +112,19 @@ function evalEnsurePanel() {
     panel.innerHTML = `
       <div class="v5-eval-head">
         <div>
-          <h3>推荐系统评估 · V5 Development</h3>
-          <p>“影子推荐（Shadow）”= 让新算法在后台模拟推荐一次，但不替换你现在看到的正式推荐。这里只记录它会召回、排序和选出哪些作品，用于后续比较新旧算法。</p>
+          <h3>${evalT('推荐系统评估 · V5 Development','Recommendation system evaluation · V5 Development','おすすめシステム評価 · V5 Development')}</h3>
+          <p>${evalT('“影子推荐（Shadow）”= 让新算法在后台模拟推荐一次，但不替换你现在看到的正式推荐。这里只记录它会召回、排序和选出哪些作品，用于后续比较新旧算法。','Shadow recommendations simulate one run of the new algorithm in the background without replacing the formal recommendations you currently see. This panel records what it retrieves, ranks and selects so old and new algorithms can be compared later.','Shadow おすすめは、新しいアルゴリズムをバックグラウンドで1回シミュレーションし、現在表示中の正式おすすめは置き換えません。取得・順位付け・選出した作品を記録し、後で新旧アルゴリズムを比較します。')}</p>
         </div>
         <div class="v5-eval-actions">
-          <button id="v5-eval-refresh" type="button">刷新评估</button>
-          <button id="v5-eval-run-shadow" type="button">运行一次影子推荐</button>
+          <button id="v5-eval-refresh" type="button">${evalT('刷新评估','Refresh evaluation','評価を更新')}</button>
+          <button id="v5-eval-run-shadow" type="button">${evalT('运行一次影子推荐','Run one shadow recommendation','Shadow おすすめを1回実行')}</button>
         </div>
       </div>
-      <p id="v5-eval-status" class="status">尚未读取评估数据。</p>
+      <p id="v5-eval-status" class="status">${evalT('尚未读取评估数据。','Evaluation data has not been loaded yet.','評価データはまだ読み込まれていません。')}</p>
       <div id="v5-eval-summary"></div>
       <div id="v5-eval-runs" class="v5-eval-section"></div>
       <details class="v5-eval-technical">
-        <summary>高级评估详情</summary>
+        <summary>${evalT('高级评估详情','Advanced evaluation details','高度な評価の詳細')}</summary>
         <div class="v5-eval-technical-body">
           <div id="v5-eval-technical-summary"></div>
           <div id="v5-eval-criteria" class="v5-eval-section"></div>

@@ -174,19 +174,22 @@ function refreshProductCopy() {
     if (supportText)
         supportText.textContent = productText(
             'Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。',
-            'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.'
+            'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.',
+            'Pica Libraryは無料のオープンソースです。今後の開発・テスト・保守を支援したい場合は、AFDIANから任意で支援できます。支援によって追加機能・コンテンツ・アクセス権が解放されることはありません。'
         )
     const afdian = $('#a83-afdian')
     if (afdian)
         afdian.textContent = productText(
             '❤ 爱发电支持',
-            '❤ Support on AFDIAN'
+            '❤ Support on AFDIAN',
+            '❤ AFDIANで支援'
         )
     const star = $('#a83-star')
     if (star)
         star.textContent = productText(
             '⭐ GitHub 项目主页',
-            '⭐ GitHub project page'
+            '⭐ GitHub project page',
+            '⭐ GitHubプロジェクト'
         )
     applyTheme(storedTheme())
 }

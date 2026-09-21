@@ -177,6 +177,7 @@ public final class HomeActivity extends Activity {
         p.addView(SettingsRow.row(this,"推荐与画风",paired?"独立运行 · 可同步":"本机独立运行",v->startActivity(new Intent(this,RecommendationStyleActivity.class))));
         p.addView(SettingsRow.row(this,"数据与缓存","缓存与本地数据",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
         p.addView(SettingsRow.row(this,"软件更新","检查并安装正式更新",v->startActivity(new Intent(this,UpdateActivity.class))));
+        p.addView(SettingsRow.row(this,"支持项目","爱发电 / GitHub · 支持开源开发",v->startActivity(new Intent(this,SupportActivity.class))));
         p.addView(SettingsRow.row(this,"关于","版本 / 开源 / 使用说明",v->startActivity(new Intent(this,AboutActivity.class))));
     }
 }

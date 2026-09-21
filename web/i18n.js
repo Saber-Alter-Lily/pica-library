@@ -360,6 +360,8 @@ export const translations = {
             'Building a new recommendation cycle; the current batch remains available…',
         'recommend.buildTimeout':
             'Recommendation generation is still running. Please try again shortly.',
+        'recommend.buildFailed':
+            'Recommendation generation failed. The previous recommendations were kept; retry when the network is stable.',
         'result.details': 'Details / Preview',
         'result.favorite': 'Add to Pica favorites',
         'provider.publicMetadata': 'Public metadata',
@@ -1108,6 +1110,7 @@ export const translations = {
         'recommend.preparing': '正在准备推荐…',
         'recommend.rebuilding': '正在生成新的推荐周期，当前批次会继续保留…',
         'recommend.buildTimeout': '推荐生成仍在进行，请稍后重试。',
+        'recommend.buildFailed': '推荐生成失败，已保留上一轮可用推荐；网络稳定后可以重新生成。',
         'result.details': '详情 / 预览',
         'result.favorite': '加入 Pica 收藏',
         'provider.publicMetadata': '公开元数据',

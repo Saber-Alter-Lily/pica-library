@@ -52,10 +52,11 @@ describe('v0.4.7 stability release contract', () => {
     it('keeps long-task stability as an explicit release gate', () => {
         const audit = read('docs/LONG_TASK_STABILITY_V047.md')
         const contract = read('test/unit/long-task-stability-v047.test.ts')
+        const pauseStore = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MobileTaskPauseStore.java')
         expect(audit).toContain('A task that can take more than a few seconds must not behave like a black box.')
         expect(audit).toContain('network interruption recovery tests PASS')
         expect(contract).toContain('v0.4.7 long-task stability contract')
         expect(contract).toContain('PICA_API_TIMEOUT_MS = 15000')
-        expect(contract).toContain('MobileTaskPauseStore')
+        expect(pauseStore).toContain('background-task-pauses-v1')
     })
 })

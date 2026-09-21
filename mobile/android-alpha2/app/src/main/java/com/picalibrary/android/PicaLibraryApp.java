@@ -12,6 +12,7 @@ public final class PicaLibraryApp extends Application {
     @Override protected void attachBaseContext(Context base){super.attachBaseContext(LocaleStore.wrap(base));}
     @Override public void onCreate(){
         super.onCreate();
+        LocalizedText.init(this);
         ThemeStore.applyPlatformNightMode(this,ThemeStore.mode(this));
         Ui.applyTheme(this);
         PreviewAccess.installIfEligible(this);

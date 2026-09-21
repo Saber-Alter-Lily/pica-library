@@ -314,9 +314,15 @@ function renderSettingsPanel() {
 }
 
 function installObserver() {
+    let queued = false
     const observer = new MutationObserver(() => {
-        markTourTargets()
-        ensureSettingsPanel()
+        if (queued) return
+        queued = true
+        requestAnimationFrame(() => {
+            queued = false
+            markTourTargets()
+            if (!document.querySelector('#a89-onboarding-panel')) ensureSettingsPanel()
+        })
     })
     observer.observe(document.body, { childList: true, subtree: true })
 }

@@ -1,6 +1,6 @@
 # Pica Library v0.4.7 Long-task Stability Audit
 
-Status: development / pre-release  
+Status: release candidate / formal gate  
 Scope: Windows Desktop + local Web UI + Android
 
 ## Product rule

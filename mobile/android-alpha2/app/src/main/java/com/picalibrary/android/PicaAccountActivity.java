@@ -10,7 +10,7 @@ import android.widget.*;
 import org.json.JSONObject;
 
 /** Compact Pica account management with Desktop-backed relay as the default paired path. */
-public final class PicaAccountActivity extends Activity {
+public final class PicaAccountActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private EditText account,password;
     private TextView feedback;

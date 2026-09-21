@@ -106,6 +106,108 @@ const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
 
+const VISUAL_SETTINGS_CACHE_KEY = 'pica-visual-settings-confirmed-v1'
+let visualSettingsMutationVersion = 0
+
+function readConfirmedVisualSettings() {
+    try {
+        const value = JSON.parse(
+            localStorage.getItem(VISUAL_SETTINGS_CACHE_KEY) || 'null'
+        )
+        if (!value || typeof value !== 'object') return null
+        return {
+            enabled: Boolean(value.enabled),
+            samplingMode: ['local_only', 'standard', 'cover_only'].includes(
+                value.samplingMode
+            )
+                ? value.samplingMode
+                : 'local_only',
+            rerankMode: ['OFF', 'SHADOW', 'LIVE'].includes(value.rerankMode)
+                ? value.rerankMode
+                : 'SHADOW',
+            strength: ['LIGHT', 'STANDARD', 'STRONG'].includes(value.strength)
+                ? value.strength
+                : 'STANDARD'
+        }
+    } catch {
+        return null
+    }
+}
+
+function visualSettingsFromControls() {
+    return {
+        enabled: Boolean($('#visual-enabled')?.checked),
+        samplingMode: $('#visual-sampling-mode')?.value || 'local_only',
+        rerankMode: $('#visual-rerank-mode')?.value || 'SHADOW',
+        strength: $('#visual-strength')?.value || 'STANDARD'
+    }
+}
+
+function applyVisualSettingsControls(settings) {
+    if (!settings) return
+    if ($('#visual-enabled'))
+        $('#visual-enabled').checked = Boolean(settings.enabled)
+    if ($('#visual-sampling-mode'))
+        $('#visual-sampling-mode').value =
+            settings.samplingMode || 'local_only'
+    if ($('#visual-rerank-mode'))
+        $('#visual-rerank-mode').value = settings.rerankMode || 'SHADOW'
+    if ($('#visual-strength'))
+        $('#visual-strength').value = settings.strength || 'STANDARD'
+}
+
+function cacheConfirmedVisualSettings(settings) {
+    if (!settings) return
+    localStorage.setItem(
+        VISUAL_SETTINGS_CACHE_KEY,
+        JSON.stringify({
+            enabled: Boolean(settings.enabled),
+            samplingMode: settings.samplingMode || 'local_only',
+            rerankMode: settings.rerankMode || 'SHADOW',
+            strength: settings.strength || 'STANDARD'
+        })
+    )
+}
+
+function showOperationToast(message, tone = 'neutral', timeout = 4600) {
+    if (!message) return
+    let stack = $('#operation-toast-stack')
+    if (!stack) {
+        stack = document.createElement('div')
+        stack.id = 'operation-toast-stack'
+        stack.setAttribute('role', 'status')
+        stack.setAttribute('aria-live', 'polite')
+        document.body.appendChild(stack)
+    }
+    const node = document.createElement('div')
+    node.className =
+        'operation-toast' + (tone === 'neutral' ? '' : ' ' + tone)
+    node.textContent = message
+    stack.appendChild(node)
+    window.setTimeout(() => node.remove(), timeout)
+}
+
+function setBackgroundTaskIndicator(message = '') {
+    let node = $('#background-task-indicator')
+    if (!node) {
+        node = document.createElement('div')
+        node.id = 'background-task-indicator'
+        node.setAttribute('role', 'status')
+        node.setAttribute('aria-live', 'polite')
+        node.hidden = true
+        document.body.appendChild(node)
+    }
+    if (!message) {
+        node.hidden = true
+        node.textContent = ''
+        return
+    }
+    node.textContent = message
+    node.hidden = false
+}
+
+applyVisualSettingsControls(readConfirmedVisualSettings())
+
 function askConfirm(message, title = t('common.confirmAction')) {
     const dialog = $('#app-confirm-dialog')
     if (!dialog) return Promise.resolve(window.confirm(message))
@@ -3206,15 +3308,13 @@ $('#recommend-feedback-dialog-save').onclick = async () => {
 
 async function loadVisualStatus() {
     if (state.mode !== 'connected') return null
+    const requestVersion = visualSettingsMutationVersion
     try {
         const value = await api('/api/v1/visual/status')
-        $('#visual-enabled').checked = Boolean(value.settings?.enabled)
-        $('#visual-sampling-mode').value =
-            value.settings?.samplingMode || 'local_only'
-        $('#visual-rerank-mode').value =
-            value.settings?.rerankMode || 'SHADOW'
-        $('#visual-strength').value =
-            value.settings?.strength || 'STANDARD'
+        if (requestVersion === visualSettingsMutationVersion) {
+            applyVisualSettingsControls(value.settings)
+            cacheConfirmedVisualSettings(value.settings)
+        }
         $('#visual-index-status').textContent = t('visual.indexStatus', {
             indexed: value.indexedCount || 0,
             target: value.targetCount || 0,
@@ -3227,15 +3327,33 @@ async function loadVisualStatus() {
     }
 }
 
-async function saveVisualSettings() {
-    if (state.mode !== 'connected') return
-    await post('/api/v1/visual/settings', {
-        enabled: $('#visual-enabled').checked,
-        samplingMode: $('#visual-sampling-mode').value,
-        rerankMode: $('#visual-rerank-mode').value,
-        strength: $('#visual-strength').value
-    })
-    await loadVisualStatus()
+async function saveVisualSettings({ announce = true } = {}) {
+    if (state.mode !== 'connected') return false
+    const desired = visualSettingsFromControls()
+    const previous = readConfirmedVisualSettings()
+    const revision = ++visualSettingsMutationVersion
+    const message = $('#visual-index-message')
+    if (message && announce)
+        message.textContent = t('visual.settingsSaving')
+    try {
+        const saved = await post('/api/v1/visual/settings', desired)
+        if (revision === visualSettingsMutationVersion) {
+            applyVisualSettingsControls(saved)
+            cacheConfirmedVisualSettings(saved)
+            if (message && announce)
+                message.textContent = t('visual.settingsSaved')
+        }
+        return true
+    } catch (error) {
+        if (revision === visualSettingsMutationVersion && previous)
+            applyVisualSettingsControls(previous)
+        const failure = t('visual.settingsSaveFailed', {
+            error: localizeError(language, error)
+        })
+        if (message) message.textContent = failure
+        showOperationToast(failure, 'negative', 6500)
+        return false
+    }
 }
 
 async function buildVisualIndex() {
@@ -3244,33 +3362,55 @@ async function buildVisualIndex() {
     state.visualIndexStopRequested = false
     $('#visual-index-build').disabled = true
     $('#visual-index-stop').hidden = false
+    const message = $('#visual-index-message')
+    const progressBar = $('#visual-index-progress')
+    let failures = 0
     try {
-        await saveVisualSettings()
+        if (!(await saveVisualSettings({ announce: false }))) return
         let status = await loadVisualStatus()
-        const pending = [...(status?.pendingComicIds || [])]
+        if (!status) throw new Error(t('visual.statusUnavailable'))
+        const pending = [...(status.pendingComicIds || [])]
         const total = pending.length
+        if (!total) {
+            const done = t('visual.noPending')
+            if (message) message.textContent = done
+            showOperationToast(done, 'positive')
+            return
+        }
+        if (message) message.dataset.busy = 'true'
+        if (progressBar) {
+            progressBar.hidden = false
+            progressBar.max = Math.max(1, total)
+            progressBar.value = 0
+        }
         for (let index = 0; index < pending.length; index++) {
             if (state.visualIndexStopRequested) break
             const comicId = pending[index]
-            $('#visual-index-progress').hidden = false
-            $('#visual-index-progress').max = Math.max(1, total)
-            $('#visual-index-progress').value = index
-            $('#visual-index-message').textContent = t('visual.processing', {
+            if (progressBar) progressBar.value = index
+            const background = t('visual.backgroundRunning', {
                 current: index + 1,
                 total
             })
+            setBackgroundTaskIndicator(background)
+            if (message)
+                message.textContent = t('visual.processing', {
+                    current: index + 1,
+                    total
+                })
             try {
                 const prepared = await post('/api/v1/visual/prepare', {
                     comicId,
                     mode: $('#visual-sampling-mode').value,
                     limit: 6
                 })
-                if (!prepared.samples?.length) continue
+                if (!prepared.samples?.length)
+                    throw new Error(t('visual.noSamples'))
                 const result = await analyzeVisualSamples(
                     prepared.samples,
                     (progress) => {
+                        if (!message) return
                         if (progress.phase === 'page')
-                            $('#visual-index-message').textContent = t(
+                            message.textContent = t(
                                 'visual.processingPage',
                                 {
                                     current: index + 1,
@@ -3280,16 +3420,16 @@ async function buildVisualIndex() {
                                 }
                             )
                         else if (progress.phase === 'model')
-                            $('#visual-index-message').textContent = t(
-                                'visual.loadingModel'
-                            )
+                            message.textContent = t('visual.loadingModel')
                     }
                 )
                 await post('/api/v1/visual/embedding', {
                     comicId,
                     ...result,
                     embeddingKind:
-                        prepared.sourceKind === 'COVER_ONLY' ? 'cover' : 'body',
+                        prepared.sourceKind === 'COVER_ONLY'
+                            ? 'cover'
+                            : 'body',
                     sourceKind: prepared.sourceKind,
                     confidence:
                         prepared.sourceKind === 'LOCAL_PAGES'
@@ -3298,27 +3438,53 @@ async function buildVisualIndex() {
                               ? 0.85
                               : 0.5,
                     metadata: {
-                        sampleIds: prepared.samples.map((item) => item.sampleId),
+                        sampleIds: prepared.samples.map(
+                            (item) => item.sampleId
+                        ),
                         representations: result.representations || null
                     }
                 })
             } catch (error) {
-                $('#visual-index-message').textContent = t(
-                    'visual.itemFailed',
-                    {
+                failures += 1
+                if (message)
+                    message.textContent = t('visual.itemFailed', {
                         current: index + 1,
                         total,
                         error: localizeError(language, error)
-                    }
-                )
+                    })
             }
         }
-        $('#visual-index-progress').value = total
+        if (progressBar)
+            progressBar.value = state.visualIndexStopRequested
+                ? Math.min(progressBar.value, total)
+                : total
         status = await loadVisualStatus()
-        $('#visual-index-message').textContent = state.visualIndexStopRequested
-            ? t('visual.stopped')
-            : t('visual.finished', { indexed: status?.indexedCount || 0 })
+        const indexed = status?.indexedCount || 0
+        let done
+        let tone = 'positive'
+        if (state.visualIndexStopRequested) {
+            done = t('visual.stopped')
+            tone = 'neutral'
+        } else if (failures > 0) {
+            done = t('visual.finishedWithFailures', {
+                indexed,
+                failed: failures
+            })
+            tone = 'warning'
+        } else {
+            done = t('visual.finished', { indexed })
+        }
+        if (message) message.textContent = done
+        showOperationToast(done, tone, failures ? 7000 : 4600)
+    } catch (error) {
+        const failure = t('visual.runFailed', {
+            error: localizeError(language, error)
+        })
+        if (message) message.textContent = failure
+        showOperationToast(failure, 'negative', 7000)
     } finally {
+        if (message) delete message.dataset.busy
+        setBackgroundTaskIndicator('')
         state.visualIndexRunning = false
         $('#visual-index-build').disabled = false
         $('#visual-index-stop').hidden = true
@@ -3333,6 +3499,7 @@ $('#visual-index-build').onclick = () => void buildVisualIndex()
 $('#visual-index-stop').onclick = () => {
     state.visualIndexStopRequested = true
 }
+
 $('#recommend-feedback-reasons-toggle').checked =
     state.recommendationFeedbackReasonsEnabled
 $('#recommend-feedback-reasons-toggle').onchange = (event) => {

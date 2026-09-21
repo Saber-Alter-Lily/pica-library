@@ -932,6 +932,7 @@
                     <label>画风影响强度<select id="visual-strength"><option value="LIGHT">轻度 · 兼容旧权重</option><option value="STANDARD">标准 · 推荐</option><option value="STRONG">强 · 更强调画风</option></select></label>
                     <div class="help-heading compact-help"><span>画风模型</span><button type="button" class="info-tip" aria-label="查看画风模型说明" data-info-tip="视觉模型在本机浏览器运行；首次使用会下载 Transformers.js 与 DINOv2 Small 模型。漫画页面仅从本机 Pica Library 服务读取，不上传给模型服务。">!</button></div>
                     <p id="visual-index-status" class="status">尚未读取画风索引。</p>
+                    <p id="visual-background-note" class="status visual-background-note">画风分析会在当前应用窗口后台继续，可切换到其他页面；关闭 Pica Library 会停止任务。</p>
                     <progress id="visual-index-progress" max="1" value="0" hidden></progress>
                     <p id="visual-index-message" class="status" aria-live="polite"></p>
                     <div class="actions"><button id="visual-index-build" type="button" class="primary">建立 / 补全画风索引</button><button id="visual-index-stop" type="button" hidden>停止</button></div>

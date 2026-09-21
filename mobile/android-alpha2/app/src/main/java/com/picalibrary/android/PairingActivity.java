@@ -105,9 +105,10 @@ public class PairingActivity extends LocaleAwareActivity {
         if(pairing)return;
         IntentIntegrator integrator=new IntentIntegrator(this);
         integrator.setDesiredBarcodeFormats(java.util.Collections.singleton("QR_CODE"));
-        integrator.setPrompt("扫描电脑端 Pica Library 配对二维码");
+        integrator.setPrompt(LocalizedText.ui("扫描电脑端 Pica Library 配对二维码"));
         integrator.setBeepEnabled(false);
-        integrator.setOrientationLocked(false);
+        integrator.setCaptureActivity(PortraitCaptureActivity.class);
+        integrator.setOrientationLocked(true);
         integrator.initiateScan();
     }
 

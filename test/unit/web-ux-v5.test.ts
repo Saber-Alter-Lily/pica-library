@@ -434,10 +434,11 @@ describe('V5 Web UX audit contract', () => {
         const css = read('web/info-tip-v1.css')
         const product = read('web/alpha8-product.js')
         expect(product).toContain('min-height:44px!important')
-        expect(css).toContain('min-height:20px !important')
+        expect(css).toContain('min-height:22px !important')
         expect(css).toContain('padding:0 !important')
         expect(css).toContain('border-radius:999px !important')
-        expect(css).toContain('background:transparent !important')
+        expect(css).toContain('background:color-mix(in srgb,#f2b84b')
+        expect(css).toContain('color:#9a6400 !important')
     })
 
     it('keeps heavy evaluation and Visual QA explicitly manual', () => {

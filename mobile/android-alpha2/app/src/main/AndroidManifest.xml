@@ -50,6 +50,7 @@
         <activity android:name=".RemoteStorageActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="false" />
         <activity android:name=".HomeActivity" android:exported="false" />
+        <activity android:name=".PortraitCaptureActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".PairingActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

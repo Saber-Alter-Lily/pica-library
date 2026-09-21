@@ -10,7 +10,7 @@ import android.widget.ScrollView;
 import android.widget.Toast;
 
 /** Voluntary project-support links; support never gates product capabilities. */
-public final class SupportActivity extends Activity {
+public final class SupportActivity extends LocaleAwareActivity {
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();}
 
     private void render(){

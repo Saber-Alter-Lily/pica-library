@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - dev/post-v047-download-stability
-    paths:
-      - '.github/workflows/post-v047-windows-candidate.yml'
+
+concurrency:
+  group: post-v047-download-stability-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

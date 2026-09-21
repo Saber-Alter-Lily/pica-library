@@ -10,7 +10,7 @@ import android.widget.*;
 import java.util.*;
 
 /** E-H account management. ExH is a monitored optional capability of the same account/session. */
-public final class EhAccountActivity extends Activity {
+public final class EhAccountActivity extends LocaleAwareActivity {
     private LinearLayout content;private TextView accountState,exhState,feedback;private boolean busy;private int probeSerial,desktopSerial;
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);renderShell();}
     @Override protected void onResume(){super.onResume();renderContent();refreshDesktopAccountState();}

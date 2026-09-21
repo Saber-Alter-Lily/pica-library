@@ -34,7 +34,7 @@ if [[ "${ready}" != "1" ]]; then
 fi
 
 PICA_WEB_SMOKE_URL="${BASE_URL}" \
-    pnpm exec playwright test test/e2e/web-smoke.spec.mjs test/e2e/localization-layout.spec.mjs test/e2e/onboarding.spec.mjs \
+    pnpm exec playwright test test/e2e/web-smoke.spec.mjs test/e2e/localization-layout.spec.mjs test/e2e/onboarding.spec.mjs test/e2e/recommendation-controls.spec.mjs \
     --config=playwright.smoke.config.mjs \
     --workers=1 \
     --reporter=line

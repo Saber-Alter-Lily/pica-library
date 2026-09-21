@@ -10,12 +10,12 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV** across discovery, fa
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.2 highlights
+## v0.4.3 highlights
 
-- **Recommendation onboarding without favorites**: new users can add tags and set 0–10 preferences from a neutral 5/10; positive 6–10 tags can seed the first recommendation recall.
-- **Support the open-source project from either client**: Windows / Web and Android Settings now link to voluntary AFDIAN support for continued development, testing, and maintenance; sponsorship unlocks no extra features, content, or access.
-- **Windows update UI fix**: primary update actions, local ZIP controls, progress, and status now use separate layout regions to prevent overlap at narrower widths.
-- **One-step upgrade paths**: Windows v0.4.1 can incrementally update in-app to v0.4.2; v0.4.0 can use the v0.4.2 upgrade assistant directly; Android advances to versionCode 44 / 0.4.2.
+- **Project support is actually visible**: Android's main Settings tab now shows Support the Project directly; Windows / Web moves the support card near the top of Settings instead of leaving it at the bottom.
+- **Recommendation copy aligned**: Android Recommendation & Style now labels manual controls as 0–10, matching the real slider.
+- **Core behavior preserved**: new users without favorites can still seed recommendations with 0–10 tags; the Windows update-page overlap fix remains in place.
+- **Direct upgrades**: Windows v0.4.1 and v0.4.2 can both update in-app directly to v0.4.3; v0.4.0 can use the v0.4.3 upgrade assistant directly; Android v42 / v43 / v44 can all upgrade directly to versionCode 45 / 0.4.3.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
@@ -67,7 +67,7 @@ See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 ### Updates and maintenance
 
 - Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- v0.4.1 → v0.4.2 supports normal in-app incremental update. If you are still on v0.4.0, use the **Windows upgrade assistant** from the v0.4.2 Release to upgrade directly to v0.4.2 without installing v0.4.1 first or manually replacing the application directory.
+- v0.4.1 / v0.4.2 → v0.4.3 supports normal in-app incremental update. If you are still on v0.4.0, use the **Windows upgrade assistant** from the v0.4.3 Release to upgrade directly to v0.4.3 without installing intermediate versions.
 - Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
 - Logs, repair, cache, export, and diagnostic tools are available from the app.
 
@@ -100,11 +100,11 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-For **v0.4.1 → v0.4.2**, use the normal in-app updater. Users still on **v0.4.0** can download `Pica-Library-v0.4.2-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.2.cmd` to upgrade directly to v0.4.2. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+For **v0.4.1 / v0.4.2 → v0.4.3**, use the normal in-app updater. Users still on **v0.4.0** can download `Pica-Library-v0.4.3-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.3.cmd` to upgrade directly to v0.4.3. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing v42 / 0.4.0 and v43 / 0.4.1 installs can both upgrade directly in place to v44 / 0.4.2 through the in-app update chain.
+Android APKs are distributed only through this repository's official Release. Existing v42 / 0.4.0, v43 / 0.4.1, and v44 / 0.4.2 installs can all upgrade directly in place to v45 / 0.4.3 through the in-app update chain.
 
 ## Local-first and security
 

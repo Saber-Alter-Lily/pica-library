@@ -45,18 +45,18 @@ describe('v0.4.1 full-package update guidance', () => {
 
         for (const content of [guide, quick, readme]) {
             expect(content).toContain('v0.4.0')
-            expect(content).toContain('v0.4.6')
+            expect(content).toContain('v0.4.7')
         }
 
-        expect(guide).toContain('Pica-Library-v0.4.6-upgrade-assistant.zip')
-        expect(quick).toContain('Pica-Library-v0.4.6-upgrade-assistant.zip')
+        expect(guide).toContain('Pica-Library-v0.4.7-upgrade-assistant.zip')
+        expect(quick).toContain('Pica-Library-v0.4.7-upgrade-assistant.zip')
         expect(guide).toContain('%LOCALAPPDATA%\\\\Pica Library')
         expect(quick).toContain('%LOCALAPPDATA%\\\\Pica Library')
         expect(quick).toContain('不需要卸载')
 
-        expect(readme).not.toContain('v0.4.1 / v0.4.2 / v0.4.3 → v0.4.6')
-        expect(quick).not.toContain('v0.4.1 / v0.4.2 / v0.4.3 → v0.4.6')
-        expect(guide).not.toContain('### v0.4.1 / v0.4.2 / v0.4.3 → v0.4.6')
+        expect(readme).not.toContain('v0.4.1 / v0.4.2 / v0.4.3 → v0.4.7')
+        expect(quick).not.toContain('v0.4.1 / v0.4.2 / v0.4.3 → v0.4.7')
+        expect(guide).not.toContain('### v0.4.1 / v0.4.2 / v0.4.3 → v0.4.7')
 
         // Historical assistant contracts remain testable even though they are not public guidance.
         expect(legacy).toContain("$RequiredSourceVersion = '0.4.0'")

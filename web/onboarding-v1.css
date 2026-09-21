@@ -38,3 +38,10 @@
     .pica-onboarding-welcome-actions button { width: 100%; }
     .driver-popover.pica-tour-popover { min-width: 0; width: min(340px, calc(100vw - 20px)); }
 }
+
+/* Driver.js disables pointer events globally while a tour is active.
+   App confirmation dialogs are top-layer UI and must remain interactive. */
+.driver-active #app-confirm-dialog,
+.driver-active #app-confirm-dialog * {
+    pointer-events: auto !important;
+}

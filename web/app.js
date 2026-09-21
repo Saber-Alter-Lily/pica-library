@@ -1687,6 +1687,8 @@ async function waitForFinalCycle(previousCycleId = null) {
         const status = await api(
             '/api/v1/recommendation-sessions/status?mode=final'
         )
+        if (status.buildProgress?.state === 'failed')
+            throw new Error(t('recommend.buildFailed'))
         if (
             status.activeCycleId &&
             !status.buildingCycleId &&

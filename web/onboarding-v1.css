@@ -1,0 +1,40 @@
+#pica-onboarding-welcome {
+    border: 0;
+    border-radius: 22px;
+    width: min(560px, calc(100vw - 28px));
+    max-width: 100%;
+    padding: 0;
+    background: var(--a83-surface, #fff);
+    color: var(--a83-text, #201e24);
+    box-shadow: 0 30px 90px rgb(0 0 0 / .28);
+}
+#pica-onboarding-welcome::backdrop { background: rgb(0 0 0 / .58); }
+.pica-onboarding-welcome-shell { padding: 24px; display: grid; gap: 16px; }
+.pica-onboarding-welcome-shell h2 { margin: 0; font-size: 1.5rem; }
+.pica-onboarding-welcome-shell p { margin: 0; line-height: 1.65; }
+.pica-onboarding-welcome-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.pica-onboarding-welcome-actions button { min-width: 120px; }
+.pica-onboarding-checkbox { display: flex; gap: 9px; align-items: flex-start; line-height: 1.45; }
+.pica-onboarding-checkbox input { margin-top: 3px; }
+#a89-onboarding-panel { margin-top: 16px; }
+#a89-onboarding-panel .a89-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+#a89-onboarding-panel .a89-auto { display: flex; gap: 8px; align-items: center; }
+.driver-popover.pica-tour-popover { max-width: min(370px, calc(100vw - 28px)); }
+.driver-popover.pica-tour-popover .driver-popover-description { line-height: 1.55; }
+.driver-popover.pica-tour-popover .driver-popover-footer { gap: 8px; flex-wrap: wrap; }
+.driver-popover.pica-tour-popover .driver-popover-navigation-btns { gap: 7px; flex-wrap: wrap; }
+.driver-popover.pica-tour-popover .pica-tour-skip {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    opacity: .72;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+.driver-popover.pica-tour-popover .pica-tour-skip:hover { opacity: 1; text-decoration: underline; }
+@media (max-width: 520px) {
+    .pica-onboarding-welcome-shell { padding: 18px; }
+    .pica-onboarding-welcome-actions { display: grid; grid-template-columns: 1fr; }
+    .pica-onboarding-welcome-actions button { width: 100%; }
+    .driver-popover.pica-tour-popover { min-width: 0; width: min(340px, calc(100vw - 20px)); }
+}

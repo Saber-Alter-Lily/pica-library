@@ -101,18 +101,18 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
         identity.addView(SettingsRow.statusLine(this,"本机 Cycle",Ui.text(this,runtime.cycleId.isEmpty()?"尚未生成":shortId(runtime.cycleId),12,Ui.MUTED,true)));
         identity.addView(SettingsRow.statusLine(this,"当前批次",Ui.text(this,runtime.available()?(runtime.batchIndex+1)+" / "+runtime.batches.size():"无",12,Ui.MUTED,true)));
         identity.addView(SettingsRow.statusLine(this,"Portable Policy",Ui.text(this,"revision "+policy.optInt("revision",0),12,Ui.MUTED,true)));
-        identity.addView(SettingsRow.statusLine(this,"候选基础",Ui.text(this,portable.available()?portable.candidates.size()+" 个 · "+shortId(portable.reservoirGeneration):"尚未同步",12,Ui.MUTED,true)));
+        identity.addView(SettingsRow.statusLine(this,"候选基础",Ui.rawText(this,portable.available()?LocalizedText.ui(this,portable.candidates.size()+" 个 · "+shortId(portable.reservoirGeneration),portable.candidates.size()+" items · "+shortId(portable.reservoirGeneration),portable.candidates.size()+" 件 · "+shortId(portable.reservoirGeneration)):LocalizedText.ui(this,"尚未同步","Not synced yet","未同期"),12,Ui.MUTED,true)));
         content.addView(identity);
 
         LinearLayout evidence=SettingsRow.panel(this,null);
         evidence.addView(Ui.text(this,"画像证据",17,Ui.TEXT,true));
         evidence.addView(SettingsRow.statusLine(this,"手机收藏 / 已拥有",Ui.text(this,data.localFavorites+" / "+data.localOwned,12,Ui.MUTED,true)));
-        evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.text(this,(data.localControls==null?0:data.localControls.length())+" 项",12,Ui.MUTED,true)));
-        evidence.addView(SettingsRow.statusLine(this,"最近 30 天行为",Ui.text(this,data.recentCount+" 条 · 本机 + 已同步",12,Ui.MUTED,true)));
-        evidence.addView(SettingsRow.statusLine(this,"本次手机 Session",Ui.text(this,data.sessionCount+" 条",12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.rawText(this,LocalizedText.ui(this,(data.localControls==null?0:data.localControls.length())+" 项",(data.localControls==null?0:data.localControls.length())+" items",(data.localControls==null?0:data.localControls.length())+" 件"),12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"最近 30 天行为",Ui.rawText(this,LocalizedText.ui(this,data.recentCount+" 条 · 本机 + 已同步",data.recentCount+" behaviors · local + synced",data.recentCount+" 件の行動 · 端末内 + 同期済み"),12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"本次手机 Session",Ui.rawText(this,LocalizedText.ui(this,data.sessionCount+" 条",data.sessionCount+" events",data.sessionCount+" 件"),12,Ui.MUTED,true)));
         JSONObject intent=policy.optJSONObject("sessionIntent");
         String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";
-        evidence.addView(SettingsRow.statusLine(this,"本次想看",Ui.text(this,session+" · 仅手机",12,Ui.MUTED,true)));
+        evidence.addView(SettingsRow.statusLine(this,"本次想看",Ui.rawText(this,LocalizedText.ui(this,session+" · 仅手机",session+" · phone only",session+" · スマートフォンのみ"),12,Ui.MUTED,true)));
         content.addView(evidence);
 
         JSONArray inferred=data.inferred==null?new JSONArray():data.inferred;
@@ -123,7 +123,7 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
         for(int i=0;i<top;i++){
             JSONObject row=inferred.optJSONObject(i);if(row==null)continue;
             int base=row.optInt("baselineLevel",5);
-            lifetime.addView(SettingsRow.statusLine(this,row.optString("label",row.optString("key","")),Ui.text(this,base+"/10 · "+row.optInt("supportCount",0)+" 本",12,Ui.MUTED,true)));
+            lifetime.addView(SettingsRow.statusLine(this,row.optString("label",row.optString("key","")),Ui.rawText(this,LocalizedText.ui(this,base+"/10 · "+row.optInt("supportCount",0)+" 本",base+"/10 · "+row.optInt("supportCount",0)+" supporting works",base+"/10 · "+row.optInt("supportCount",0)+" 作品の支持"),12,Ui.MUTED,true)));
         }
         content.addView(lifetime);
 
@@ -140,7 +140,7 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
                 families.put(key,families.getOrDefault(key,0)+1);
             }
             for(Map.Entry<String,Integer> row:families.entrySet())
-                composition.addView(SettingsRow.statusLine(this,familyLabel(row.getKey()),Ui.text(this,row.getValue()+" 本",12,Ui.MUTED,true)));
+                composition.addView(SettingsRow.statusLine(this,familyLabel(row.getKey()),Ui.rawText(this,LocalizedText.ui(this,row.getValue()+" 本",row.getValue()+" works",row.getValue()+" 作品"),12,Ui.MUTED,true)));
             LinkedHashSet<String> reasons=new LinkedHashSet<>();for(NativeRecommendationStore.Item item:runtime.current()){String reason=item.reason==null?"":item.reason.trim();if(!reason.isEmpty())reasons.add(reason);if(reasons.size()>=5)break;}
             if(!reasons.isEmpty()){composition.addView(Ui.text(this,"主要依据",13,Ui.TEXT,true));for(String reason:reasons)composition.addView(Ui.text(this,"• "+reason,12,Ui.MUTED,false));}
         }
@@ -156,7 +156,7 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
     private void addBehaviorSignals(String title,List<RecommendationEvidenceStore.Signal> rows,String help){
         LinearLayout panel=SettingsRow.panel(this,null);panel.addView(Ui.headingWithInfo(this,title,17,help));
         if(rows==null||rows.isEmpty())panel.addView(Ui.text(this,"暂无足够正向行为证据",12,Ui.MUTED,false));
-        else for(RecommendationEvidenceStore.Signal row:rows)panel.addView(SettingsRow.statusLine(this,row.kind+" · "+row.label,Ui.text(this,row.support+" 次",12,Ui.MUTED,true)));
+        else for(RecommendationEvidenceStore.Signal row:rows)panel.addView(SettingsRow.statusLine(this,row.kind+" · "+row.label,Ui.rawText(this,LocalizedText.ui(this,row.support+" 次",row.support+" times",row.support+" 回"),12,Ui.MUTED,true)));
         content.addView(panel);
     }
 

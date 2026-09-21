@@ -8,6 +8,10 @@ import java.util.concurrent.TimeUnit;
 final class PicaBootstrapJobs {
     static final String UNIQUE_NAME="pica-account-bootstrap";
     private PicaBootstrapJobs(){}
-    static void enqueue(Context context){Constraints constraints=new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();OneTimeWorkRequest request=new OneTimeWorkRequest.Builder(PicaBootstrapWorker.class).setConstraints(constraints).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,15,TimeUnit.SECONDS).addTag("pica-bootstrap").build();WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.REPLACE,request);}
-    static void cancel(Context context){WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
+    private static OneTimeWorkRequest request(){Constraints constraints=new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();return new OneTimeWorkRequest.Builder(PicaBootstrapWorker.class).setConstraints(constraints).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,15,TimeUnit.SECONDS).addTag("pica-bootstrap").build();}
+    static void enqueue(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.REPLACE,request());}
+    static void pause(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,true);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
+    static void resume(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.REPLACE,request());}
+    static void cancel(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
+    static boolean paused(Context context){return MobileTaskPauseStore.isPaused(context,"pica-bootstrap",UNIQUE_NAME);}
 }

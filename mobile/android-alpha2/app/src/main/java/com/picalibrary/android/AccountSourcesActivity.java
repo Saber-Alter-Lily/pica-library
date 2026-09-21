@@ -7,7 +7,7 @@ import android.view.Gravity;
 import android.widget.*;
 
 /** Unified account/source management. Desktop pairing mirrors non-secret provider state only. */
-public final class AccountSourcesActivity extends Activity {
+public final class AccountSourcesActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private TextView exhState;
     private int probeSerial,desktopSerial;

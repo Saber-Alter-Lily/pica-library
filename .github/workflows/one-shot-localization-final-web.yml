@@ -1,5 +1,5 @@
 name: One-shot Localization Final Web Gate
-# final-web-gate: pairing-webdav-pass-5
+# final-web-gate: connections-static-pass-6
 
 on:
   push:

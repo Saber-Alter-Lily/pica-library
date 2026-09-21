@@ -16,10 +16,14 @@ describe('v0.4.3 visible support hotfix', () => {
 
     it('keeps Desktop support prominent instead of appending it to the bottom', () => {
         const product = read('web/alpha8-product.js')
-        expect(product).toContain("const appearance = $('#a83-appearance')")
-        expect(product).toContain("appearance.insertAdjacentElement('afterend', panel)")
-        expect(product).not.toContain('settings.appendChild(panel)')
-        expect(product).toContain('https://afdian.com/a/PicaLibrary')
+        const support = product.slice(
+            product.indexOf('function supportPanel()'),
+            product.indexOf('async function personalizationPanel()')
+        )
+        expect(support).toContain("const appearance = $('#a83-appearance')")
+        expect(support).toContain("appearance.insertAdjacentElement('afterend', panel)")
+        expect(support).not.toContain('settings.appendChild(panel)')
+        expect(support).toContain('https://afdian.com/a/PicaLibrary')
     })
 
     it('shows the actual 0-10 range in the Android recommendation hub', () => {

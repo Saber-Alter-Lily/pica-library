@@ -86,7 +86,7 @@ function injectStyles() {
 .a87-settings-hub>.tabs{margin:0}
 .a87-hub-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:20px;align-items:start}
 .a87-hub-nav{position:sticky;top:12px;display:flex;flex-direction:column;gap:7px;padding:8px;border:1px solid var(--a83-line,#ddd7e4);border-radius:20px;background:color-mix(in srgb,var(--a83-surface,#fff) 92%,transparent);box-shadow:0 10px 30px rgb(35 23 55 / .05)}
-.a87-hub-nav button{width:100%;min-height:46px;text-align:left;justify-content:flex-start;padding:10px 14px;border-radius:14px!important;background:transparent!important;border:0!important;color:var(--a83-muted,#68636e)!important;font-weight:650;box-shadow:none!important}
+.a87-hub-nav button{width:100%;min-height:46px;text-align:left;justify-content:flex-start;padding:10px 14px;border-radius:14px!important;background:transparent!important;border:0!important;color:var(--a83-muted,#68636e)!important;font-weight:650;box-shadow:none!important;white-space:normal!important;overflow-wrap:anywhere;line-height:1.28}
 .a87-hub-nav button:hover{background:var(--a83-accent-soft,#eee7fa)!important;color:var(--a83-text,#221e27)!important}
 .a87-hub-nav button.active{background:var(--a83-accent-soft,#eee7fa)!important;color:var(--a83-accent,#7457b9)!important}
 .a87-hub-content{min-width:0}

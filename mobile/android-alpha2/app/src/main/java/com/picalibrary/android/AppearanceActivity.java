@@ -9,7 +9,7 @@ import android.widget.ScrollView;
 import java.util.*;
 
 /** Quiet personalization hub: appearance, active theme and GitHub Star status. */
-public final class AppearanceActivity extends Activity {
+public final class AppearanceActivity extends LocaleAwareActivity {
     private LinearLayout content;
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();}
     @Override public void onResume(){super.onResume();Ui.applyWindow(this);if(content!=null)renderContent();}

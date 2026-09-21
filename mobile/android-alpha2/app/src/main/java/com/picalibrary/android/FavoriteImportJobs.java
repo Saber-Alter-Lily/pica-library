@@ -30,6 +30,7 @@ final class FavoriteImportJobs {
 
     static void enqueue(Context context, boolean covers) {
         MobileTaskPauseStore.setPaused(context,"favorite-import",UNIQUE_NAME,false);
+        MobileTaskPauseStore.putBoolean(context,"favorite-import",UNIQUE_NAME,"covers",covers);
         enqueue(context,covers,ExistingWorkPolicy.REPLACE);
     }
 
@@ -40,7 +41,12 @@ final class FavoriteImportJobs {
 
     static void resume(Context context, boolean covers) {
         MobileTaskPauseStore.setPaused(context,"favorite-import",UNIQUE_NAME,false);
+        MobileTaskPauseStore.putBoolean(context,"favorite-import",UNIQUE_NAME,"covers",covers);
         enqueue(context,covers,ExistingWorkPolicy.REPLACE);
+    }
+
+    static void resume(Context context) {
+        resume(context,MobileTaskPauseStore.getBoolean(context,"favorite-import",UNIQUE_NAME,"covers",false));
     }
 
     static void cancel(Context context) {

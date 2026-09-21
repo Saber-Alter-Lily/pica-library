@@ -113,6 +113,41 @@ describe('LibraryService downloads and maintenance', () => {
         database.close()
     })
 
+    it('coalesces job progress persistence while preserving per-page progress callbacks', async () => {
+        const { database, service } = setup([20])
+        const job = service.enqueueDownload({ comicId: 'comic-progress-write-coalescing' })
+        const original = database.updateDownloadProgress.bind(database)
+        let writes = 0
+        database.updateDownloadProgress = ((id, patch) => {
+            writes += 1
+            return original(id, patch)
+        }) as typeof database.updateDownloadProgress
+        const callbacks: number[] = []
+
+        await service.runDownloadQueue({
+            profile: 'custom',
+            custom: {
+                jobConcurrency: 1,
+                globalMediaConcurrency: 4,
+                requestIntervalMs: 0,
+                maxRetries: 0
+            },
+            onProgress: (value) => callbacks.push(value.completed)
+        })
+
+        expect(callbacks).toEqual(
+            Array.from({ length: 20 }, (_, index) => index + 1)
+        )
+        expect(writes).toBeLessThan(20)
+        expect(database.getDownloadJob(job.id)).toMatchObject({
+            status: 'COMPLETED',
+            progressCompleted: 20,
+            progressTotal: 20,
+            bytes: 20
+        })
+        database.close()
+    })
+
     it('preserves cumulative progress across pause and resume', async () => {
         const { database, service } = setup([3, 3])
         const job = service.enqueueDownload({ comicId: 'comic-resume' })

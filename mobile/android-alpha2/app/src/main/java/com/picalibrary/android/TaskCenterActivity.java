@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** One task surface for lifecycle-independent import, download, Pica bootstrap and recommendation jobs. */
-public final class TaskCenterActivity extends Activity {
+public final class TaskCenterActivity extends LocaleAwareActivity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();private final Handler main=new Handler(Looper.getMainLooper());private LinearLayout content;private boolean destroyed;
     private final Runnable poll=new Runnable(){public void run(){refresh();if(!destroyed)main.postDelayed(this,1200);}};
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();main.post(poll);}

@@ -112,6 +112,7 @@ export const jaCoreTranslations = {
     'downloads.media': '画像同時取得数',
     'downloads.interval': 'リクエスト間隔（ms）',
     'downloads.retries': '再試行回数',
+    'downloads.profileLabel': '性能プロファイル',
     'downloads.refresh': '更新',
     'downloads.run': 'キューを実行',
     'downloads.starting': 'ダウンロードキューを開始しています…',

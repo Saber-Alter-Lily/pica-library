@@ -22,21 +22,87 @@ function rel(p) { return path.relative(ROOT, p).replaceAll('\\', '/') }
 const han = /[\u3400-\u9fff]/
 const quoted = /"((?:\\.|[^"\\])*)"/g
 
+function closeIndex(src, open, openChar = '(', closeChar = ')') {
+  let depth = 0, quote = '', escape = false
+  for (let i = open; i < src.length; i++) {
+    const ch = src[i]
+    if (quote) {
+      if (escape) { escape = false; continue }
+      if (ch === '\\') { escape = true; continue }
+      if (ch === quote) quote = ''
+      continue
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue }
+    if (ch === openChar) depth++
+    else if (ch === closeChar && --depth === 0) return i
+  }
+  return -1
+}
+
+function callRanges(src, regex) {
+  const ranges = []
+  let match
+  while ((match = regex.exec(src))) {
+    const open = src.indexOf('(', match.index)
+    if (open < 0) continue
+    const close = closeIndex(src, open)
+    if (close > open) ranges.push([open, close])
+  }
+  return ranges
+}
+function inRanges(index, ranges) { return ranges.some(([a,b]) => index > a && index < b) }
+
+function localizedArrayRanges(src) {
+  const ranges = []
+  const re = /String\[\]\s+(\w+)\s*=/g
+  let match
+  while ((match = re.exec(src))) {
+    const name = match[1]
+    if (!new RegExp(`LocalizedText\\.ui\\(\\s*${name}\\s*\\)`).test(src)) continue
+    let quote = '', escape = false, end = -1
+    for (let i = re.lastIndex; i < src.length; i++) {
+      const ch = src[i]
+      if (quote) {
+        if (escape) { escape = false; continue }
+        if (ch === '\\') { escape = true; continue }
+        if (ch === quote) quote = ''
+        continue
+      }
+      if (ch === '"' || ch === "'") { quote = ch; continue }
+      if (ch === ';') { end = i; break }
+    }
+    if (end > re.lastIndex) ranges.push([re.lastIndex, end])
+  }
+  return ranges
+}
+
 function literals(file) {
   const src = fs.readFileSync(file, 'utf8')
   const rows = []
+  const primitiveRanges = callRanges(
+    src,
+    /(?:Ui\.(?:text|button|pill|stylePill|foldHeader|headingWithInfo|infoButton|iconButton)|SettingsRow\.(?:row|statusLine)|\b(?:compact|primaryButton|titleRow))\s*\(/g
+  )
+  const directRanges = callRanges(
+    src,
+    /(?:\.(?:setText|setHint|setTitle|setMessage|setPositiveButton|setNegativeButton|setNeutralButton|setItems|setSingleChoiceItems|setMultiChoiceItems|setContentDescription|setSummary|setLabel)|Toast\.makeText)\s*\(/g
+  )
+  const localizedRanges = callRanges(src, /LocalizedText\.ui\s*\(/g)
+  const arrayRanges = localizedArrayRanges(src)
+
+  quoted.lastIndex = 0
   let m
   while ((m = quoted.exec(src))) {
     const value = m[1].replace(/\\"/g, '"')
     if (!han.test(value)) continue
     const line = src.slice(0, m.index).split('\n').length
-    const before = src.slice(Math.max(0, m.index - 220), m.index)
-    const coveredPrimitive = /(Ui\.(?:text|button|pill|foldHeader|headingWithInfo|infoButton|iconButton)|SettingsRow\.(?:row|statusLine))\([^\n]{0,180}$/s.test(before)
-    const directUi = /(setText\(|setHint\(|setTitle\(|setMessage\(|setPositiveButton\(|setNegativeButton\(|setNeutralButton\(|setItems\(|setSingleChoiceItems\(|setMultiChoiceItems\(|Toast\.makeText\(|setContentDescription\(|setSummary\(|setLabel\()/s.test(before)
-    const explicitlyRouted = /LocalizedText\.ui\(\s*$/s.test(before) || /LocalizedText\.ui\(\s*new String\[\]\s*\{[^;]{0,220}$/s.test(before)
-    const likelyUi = coveredPrimitive || directUi
-    const uiRouted = coveredPrimitive || explicitlyRouted
-    rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi, explicitlyRouted, uiRouted })
+    const coveredPrimitive = inRanges(m.index, primitiveRanges)
+    const directUi = inRanges(m.index, directRanges)
+    const explicitlyRouted = inRanges(m.index, localizedRanges)
+    const arrayRouted = inRanges(m.index, arrayRanges)
+    const likelyUi = coveredPrimitive || directUi || arrayRouted
+    const uiRouted = coveredPrimitive || explicitlyRouted || arrayRouted
+    rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi, explicitlyRouted, arrayRouted, uiRouted })
   }
   return rows
 }

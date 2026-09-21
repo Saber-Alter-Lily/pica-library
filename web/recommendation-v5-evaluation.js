@@ -395,7 +395,11 @@ function evalRenderComparison() {
     if (EVAL.versions.length < 2) {
         target.innerHTML = `
           <h4>${evalT('Model Version Comparison（开发者）','Model Version Comparison (developer)','Model Version Comparison（開発者）')}</h4>
-          <p class="status">至少需要两个不同的 shadow modelVersion 才能做固定基线比较；当前只有 ${EVAL.versions.length} 个。</p>
+          <p class="status">${evalT(
+   `至少需要两个不同的 shadow modelVersion 才能做固定基线比较；当前只有 ${EVAL.versions.length} 个。`,
+   `At least two different shadow modelVersions are required for a fixed-baseline comparison; only ${EVAL.versions.length} are available.`,
+   `固定ベースライン比較には異なる shadow modelVersion が2つ以上必要です。現在は ${EVAL.versions.length} 個です。`
+ )}</p>
         `
         return
     }
@@ -428,7 +432,11 @@ function evalRenderComparison() {
         <div class="v5-eval-note">
           baseline: <code>${evalEsc(comparison.baseline?.modelVersion || '')}</code><br>
           candidate: <code>${evalEsc(comparison.candidate?.modelVersion || '')}</code><br>
-          winner = null；这里只报告同口径描述性差值，不自动 promotion，不开启 LTR/Bandit/Active Learning。
+          ${evalT(
+   'winner = null；这里只报告同口径描述性差值，不自动 promotion，不开启 LTR/Bandit/Active Learning。',
+   'winner = null; this view reports descriptive deltas on the same basis only. It never auto-promotes or enables LTR, Bandit, or Active Learning.',
+   'winner = null。ここでは同一条件の記述的な差分だけを表示し、自動 promotion や LTR / Bandit / Active Learning の有効化は行いません。'
+ )}
         </div>
       ` : '<p class="status">选择两个版本后点击“比较版本”。</p>'}
     `
@@ -458,11 +466,11 @@ async function evalCompareSelected() {
     if (EVAL.comparing) return
     if (!EVAL.baselineVersion || !EVAL.candidateVersion) return
     if (EVAL.baselineVersion === EVAL.candidateVersion) {
-        evalStatus('Baseline 与 Candidate 必须是两个不同的 modelVersion。', true)
+        evalStatus(evalT('Baseline 与 Candidate 必须是两个不同的 modelVersion。','Baseline and Candidate must be different modelVersions.','Baseline と Candidate には異なる modelVersion を指定してください。'), true)
         return
     }
     EVAL.comparing = true
-    evalStatus('正在按同一 future-outcome benchmark 比较两个 exact modelVersion…')
+    evalStatus(evalT('正在按同一 future-outcome benchmark 比较两个 exact modelVersion…','Comparing two exact modelVersions on the same future-outcome benchmark…','同じ future-outcome benchmark で2つの exact modelVersion を比較中…'))
     try {
         const params = new URLSearchParams({
             baselineVersion: EVAL.baselineVersion,
@@ -477,10 +485,10 @@ async function evalCompareSelected() {
         evalRenderComparison()
         evalRenderAdvancedLearning()
         evalStatus(
-            `版本比较完成：${EVAL.comparison.status || 'UNKNOWN'}。不会自动选择 winner 或改变 serving。`
+            evalT(`版本比较完成：${EVAL.comparison.status || 'UNKNOWN'}。不会自动选择 winner 或改变 serving。`,`Version comparison complete: ${EVAL.comparison.status || 'UNKNOWN'}. No winner is selected automatically and serving is unchanged.`,`バージョン比較完了：${EVAL.comparison.status || 'UNKNOWN'}。winner の自動選択や serving の変更は行いません。`)
         )
     } catch (error) {
-        evalStatus(`版本比较失败：${error.message}`, true)
+        evalStatus(evalT(`版本比较失败：${error.message}`,`Version comparison failed: ${error.message}`,`バージョン比較に失敗しました：${error.message}`), true)
     } finally {
         EVAL.comparing = false
     }
@@ -505,7 +513,11 @@ function evalRenderAdvancedLearning() {
         </label>
         <span></span>
         <div class="v5-eval-meta">
-          LTR 使用当前 baseline/candidate 比较；Bandit 需要 propensity/randomized assignment；Active Learning 需要 uncertainty/query-value 日志。
+          ${evalT(
+   'LTR 使用当前 baseline/candidate 比较；Bandit 需要 propensity/randomized assignment；Active Learning 需要 uncertainty/query-value 日志。',
+   'LTR uses the current baseline/candidate comparison; Bandit requires propensity/randomized assignment; Active Learning requires uncertainty/query-value logs.',
+   'LTR は現在の baseline/candidate 比較を使用します。Bandit には propensity / randomized assignment、Active Learning には uncertainty / query-value ログが必要です。'
+ )}
         </div>
         <button id="v5-eval-advanced-btn" type="button">${evalT('评估实验门槛','Evaluate experiment gate','実験 Gate を評価')}</button>
       </div>
@@ -520,7 +532,7 @@ function evalRenderAdvancedLearning() {
           trainingEnabled=${String(Boolean(gate.trainingEnabled))} · servingMutationEnabled=${String(Boolean(gate.servingMutationEnabled))} · autoModelSelection=${String(Boolean(gate.autoModelSelection))}<br>
           ${missing.length ? `缺失条件：${evalEsc(missing.join(' / '))}` : '当前只允许进入离线实验设计；仍不授权训练或 serving mutation。'}
         </div>
-      ` : '<p class="status">选择方向后点击“评估实验门槛”。不会自动训练或上线。</p>'}
+      ` : `<p class="status">${evalT('选择方向后点击“评估实验门槛”。不会自动训练或上线。','Choose a direction, then select Evaluate experiment gate. Nothing is trained or deployed automatically.','方向を選択して「実験 Gate を評価」を押してください。自動で学習や配信は行いません。')}</p>`}
     `
     const select = target.querySelector('#v5-eval-advanced-direction')
     const button = target.querySelector('#v5-eval-advanced-btn')
@@ -537,7 +549,7 @@ function evalRenderAdvancedLearning() {
 async function evalEvaluateAdvancedLearning() {
     if (EVAL.evaluatingAdvanced) return
     EVAL.evaluatingAdvanced = true
-    evalStatus('正在评估高级学习实验门槛；不会训练模型或改变 serving…')
+    evalStatus(evalT('正在评估高级学习实验门槛；不会训练模型或改变 serving…','Evaluating the advanced-learning experiment gate; this will not train a model or change serving…','高度な学習の実験 Gate を評価中です。モデル学習や serving の変更は行いません…'))
     try {
         const params = new URLSearchParams({
             direction: EVAL.advancedDirection,
@@ -557,10 +569,10 @@ async function evalEvaluateAdvancedLearning() {
         )
         evalRenderAdvancedLearning()
         evalStatus(
-            `高级学习门槛：${EVAL.advancedGate.verdict || 'UNKNOWN'}。trainingEnabled=false，servingMutationEnabled=false。`
+            evalT(`高级学习门槛：${EVAL.advancedGate.verdict || 'UNKNOWN'}。trainingEnabled=false，servingMutationEnabled=false。`,`Advanced-learning gate: ${EVAL.advancedGate.verdict || 'UNKNOWN'}. trainingEnabled=false, servingMutationEnabled=false.`,`高度な学習 Gate：${EVAL.advancedGate.verdict || 'UNKNOWN'}。trainingEnabled=false、servingMutationEnabled=false。`)
         )
     } catch (error) {
-        evalStatus(`高级学习门槛评估失败：${error.message}`, true)
+        evalStatus(evalT(`高级学习门槛评估失败：${error.message}`,`Advanced-learning gate evaluation failed: ${error.message}`,`高度な学習 Gate の評価に失敗しました：${error.message}`), true)
     } finally {
         EVAL.evaluatingAdvanced = false
     }
@@ -604,7 +616,7 @@ function evalRenderRuns() {
                 <span>${evalT('最终','Final','最終')} ${batch}</span>
               </div>
             `
-        }).join('') || '<p class="status">还没有影子推荐记录。隔一段时间运行一次即可；不会改变正式推荐。</p>'}
+        }).join('') || `<p class="status">${evalT('还没有影子推荐记录。隔一段时间运行一次即可；不会改变正式推荐。','There are no shadow-recommendation records yet. Run one after some time; formal recommendations are unchanged.','Shadow おすすめの記録はまだありません。時間を置いて1回実行してください。正式おすすめは変更されません。')}</p>`}
       </div>
     `
 }
@@ -613,7 +625,7 @@ async function evalLoad(force = false) {
     if (EVAL.busy && !force) return
     EVAL.busy = true
     evalEnsurePanel()
-    evalStatus('正在读取 P3 / P4 / P5 评估数据…')
+    evalStatus(evalT('正在读取 P3 / P4 / P5 评估数据…','Reading P3 / P4 / P5 evaluation data…','P3 / P4 / P5 評価データを読み込み中…'))
     try {
         const [summary, runData, versionData] = await Promise.all([
             evalRequest(
@@ -650,10 +662,10 @@ async function evalLoad(force = false) {
         evalRenderRuns()
         const support = summary.sections?.retrospective?.support || {}
         evalStatus(
-            `评估已刷新：基础影子推荐 ${Number(support.exactRunCount || 0)}/3；成熟观察窗 ${Number(support.matureRunCount || 0)}，可评估记录 ${Number(support.evaluableRunCount || 0)}/3。正式推荐未改变。`
+            evalT(`评估已刷新：基础影子推荐 ${Number(support.exactRunCount || 0)}/3；成熟观察窗 ${Number(support.matureRunCount || 0)}，可评估记录 ${Number(support.evaluableRunCount || 0)}/3。正式推荐未改变。`,`Evaluation refreshed: baseline shadow runs ${Number(support.exactRunCount || 0)}/3; mature windows ${Number(support.matureRunCount || 0)}, evaluable runs ${Number(support.evaluableRunCount || 0)}/3. Formal recommendations are unchanged.`,`評価を更新しました：基礎 Shadow 実行 ${Number(support.exactRunCount || 0)}/3、成熟観察ウィンドウ ${Number(support.matureRunCount || 0)}、評価可能な実行 ${Number(support.evaluableRunCount || 0)}/3。正式おすすめは変更されていません。`)
         )
     } catch (error) {
-        evalStatus(`评估读取失败：${error.message}`, true)
+        evalStatus(evalT(`评估读取失败：${error.message}`,`Failed to read evaluation data: ${error.message}`,`評価データの読み込みに失敗しました：${error.message}`), true)
     } finally {
         EVAL.busy = false
     }
@@ -665,7 +677,7 @@ async function evalRunShadow() {
     const button = document.querySelector('#v5-eval-run-shadow')
     if (button) button.disabled = true
     evalStatus(
-        '正在后台模拟一次新算法推荐：不会改变当前正式推荐。正在召回候选、排序并生成 12 本测试批次…'
+        evalT('正在后台模拟一次新算法推荐：不会改变当前正式推荐。正在召回候选、排序并生成 12 本测试批次…','Simulating one new-algorithm recommendation in the background. Formal recommendations stay unchanged while candidates are retrieved, ranked and a 12-work test batch is built…','新アルゴリズムのおすすめをバックグラウンドで1回シミュレーションしています。正式おすすめは変更せず、候補取得・順位付け・12作品のテストバッチを生成中です…')
     )
     try {
         const result = await evalDesktopPost(
@@ -681,11 +693,11 @@ async function evalRunShadow() {
         )
         const audit = result.audit || {}
         evalStatus(
-            `影子推荐完成：原始候选 ${Number(result.rawCandidateCount || 0)} → 清洗后 ${Number(result.candidateCount || 0)} → 排序 ${Number(result.ranking?.candidateCount || 0)} → 最终测试批次 ${Number(result.diversity?.selectedCount || 0)}。正式推荐未改变。正在刷新评估…`
+            evalT(`影子推荐完成：原始候选 ${Number(result.rawCandidateCount || 0)} → 清洗后 ${Number(result.candidateCount || 0)} → 排序 ${Number(result.ranking?.candidateCount || 0)} → 最终测试批次 ${Number(result.diversity?.selectedCount || 0)}。正式推荐未改变。正在刷新评估…`,`Shadow recommendation complete: raw candidates ${Number(result.rawCandidateCount || 0)} → cleaned ${Number(result.candidateCount || 0)} → ranked ${Number(result.ranking?.candidateCount || 0)} → final test batch ${Number(result.diversity?.selectedCount || 0)}. Formal recommendations are unchanged. Refreshing evaluation…`,`Shadow おすすめ完了：元候補 ${Number(result.rawCandidateCount || 0)} → クリーン後 ${Number(result.candidateCount || 0)} → 順位付け ${Number(result.ranking?.candidateCount || 0)} → 最終テストバッチ ${Number(result.diversity?.selectedCount || 0)}。正式おすすめは変更されていません。評価を更新中…`)
         )
         await evalLoad(true)
     } catch (error) {
-        evalStatus(`Shadow run 失败：${error.message}`, true)
+        evalStatus(evalT(`Shadow run 失败：${error.message}`,`Shadow run failed: ${error.message}`,`Shadow run に失敗しました：${error.message}`), true)
     } finally {
         EVAL.runningShadow = false
         if (button) button.disabled = false
@@ -694,7 +706,7 @@ async function evalRunShadow() {
 
 function evalInstall() {
     if (!evalEnsurePanel()) return
-    evalStatus('评估尚未运行。点击“刷新评估”后才会读取 P3 / P4 / P5 数据；打开设置页不会自动执行重计算。')
+    evalStatus(evalT('评估尚未运行。点击“刷新评估”后才会读取 P3 / P4 / P5 数据；打开设置页不会自动执行重计算。','Evaluation has not run yet. Use Refresh evaluation to read P3 / P4 / P5 data; opening Settings never starts recomputation automatically.','評価はまだ実行されていません。「評価を更新」で P3 / P4 / P5 データを読み込みます。設定を開くだけでは再計算を自動実行しません。'))
 }
 
 evalInstall()

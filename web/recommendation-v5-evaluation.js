@@ -438,7 +438,7 @@ function evalRenderComparison() {
    'winner = null。ここでは同一条件の記述的な差分だけを表示し、自動 promotion や LTR / Bandit / Active Learning の有効化は行いません。'
  )}
         </div>
-      ` : '<p class="status">选择两个版本后点击“比较版本”。</p>'}
+      ` : `<p class="status">${evalT('选择两个版本后点击“比较版本”。','Select two versions, then choose Compare versions.','2つのバージョンを選択して「バージョンを比較」を押してください。')}</p>`}
     `
     const baseline = target.querySelector('#v5-eval-baseline-version')
     const candidate = target.querySelector('#v5-eval-candidate-version')
@@ -530,7 +530,17 @@ function evalRenderAdvancedLearning() {
         </div>
         <div class="v5-eval-note">
           trainingEnabled=${String(Boolean(gate.trainingEnabled))} · servingMutationEnabled=${String(Boolean(gate.servingMutationEnabled))} · autoModelSelection=${String(Boolean(gate.autoModelSelection))}<br>
-          ${missing.length ? `缺失条件：${evalEsc(missing.join(' / '))}` : '当前只允许进入离线实验设计；仍不授权训练或 serving mutation。'}
+          ${missing.length
+    ? evalT(
+        `缺失条件：${evalEsc(missing.join(' / '))}`,
+        `Missing requirements: ${evalEsc(missing.join(' / '))}`,
+        `不足条件：${evalEsc(missing.join(' / '))}`
+      )
+    : evalT(
+        '当前只允许进入离线实验设计；仍不授权训练或 serving mutation。',
+        'Only offline experiment design is allowed at this stage; training and serving mutation remain unauthorized.',
+        '現段階ではオフライン実験設計のみ許可され、training と serving mutation は引き続き許可されません。'
+      )}
         </div>
       ` : `<p class="status">${evalT('选择方向后点击“评估实验门槛”。不会自动训练或上线。','Choose a direction, then select Evaluate experiment gate. Nothing is trained or deployed automatically.','方向を選択して「実験 Gate を評価」を押してください。自動で学習や配信は行いません。')}</p>`}
     `
@@ -711,6 +721,7 @@ function evalInstall() {
 
 evalInstall()
 document.addEventListener('pica-language-change', () => {
+    document.querySelector('#settings-recommendation-v5-evaluation')?.remove()
     evalEnsurePanel()
     if (EVAL.summary) {
         evalRenderSummary()
@@ -718,5 +729,15 @@ document.addEventListener('pica-language-change', () => {
         evalRenderComparison()
         evalRenderAdvancedLearning()
         evalRenderRuns()
+        const support = EVAL.summary.sections?.retrospective?.support || {}
+        evalStatus(
+            evalT(
+                `评估已刷新：基础影子推荐 ${Number(support.exactRunCount || 0)}/3；成熟观察窗 ${Number(support.matureRunCount || 0)}，可评估记录 ${Number(support.evaluableRunCount || 0)}/3。正式推荐未改变。`,
+                `Evaluation refreshed: baseline shadow runs ${Number(support.exactRunCount || 0)}/3; mature windows ${Number(support.matureRunCount || 0)}, evaluable runs ${Number(support.evaluableRunCount || 0)}/3. Formal recommendations are unchanged.`,
+                `評価を更新しました：基礎 Shadow 実行 ${Number(support.exactRunCount || 0)}/3、成熟観察ウィンドウ ${Number(support.matureRunCount || 0)}、評価可能な実行 ${Number(support.evaluableRunCount || 0)}/3。正式おすすめは変更されていません。`
+            )
+        )
+    } else {
+        evalInstall()
     }
 })

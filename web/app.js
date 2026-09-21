@@ -43,6 +43,9 @@ const state = {
         localStorage.getItem('pica-recommend-feedback-reasons') === 'true',
     visualIndexRunning: false,
     visualIndexStopRequested: false,
+    visualIndexPauseRequested: false,
+    visualIndexPaused: false,
+    visualIndexResume: null,
     searchContextId: null,
     visible: [],
     libraryPage: 1,
@@ -3394,12 +3397,59 @@ async function saveVisualSettings({ announce = true } = {}) {
     }
 }
 
+function setVisualTaskControls(mode = 'idle') {
+    const pause = $('#visual-index-pause')
+    const resume = $('#visual-index-resume')
+    const cancel = $('#visual-index-stop')
+    if (!pause || !resume || !cancel) return
+    pause.hidden = mode !== 'running'
+    resume.hidden = mode !== 'paused' && mode !== 'pausing'
+    cancel.hidden = mode === 'idle'
+}
+
+async function visualTaskCheckpoint(current, total) {
+    if (state.visualIndexStopRequested) return false
+    if (!state.visualIndexPauseRequested) return true
+    state.visualIndexPaused = true
+    setVisualTaskControls('paused')
+    const message = $('#visual-index-message')
+    const paused = t('visual.paused', { current, total })
+    if (message) {
+        message.textContent = paused
+        delete message.dataset.busy
+    }
+    setBackgroundTaskIndicator(paused)
+    await new Promise((resolve) => {
+        state.visualIndexResume = resolve
+    })
+    state.visualIndexResume = null
+    state.visualIndexPaused = false
+    if (state.visualIndexStopRequested) return false
+    if (message) {
+        message.textContent = t('visual.resuming')
+        message.dataset.busy = 'true'
+    }
+    setVisualTaskControls('running')
+    return true
+}
+
+function resumeVisualTask() {
+    state.visualIndexPauseRequested = false
+    const resume = state.visualIndexResume
+    state.visualIndexResume = null
+    if (resume) resume()
+    if (state.visualIndexRunning) setVisualTaskControls('running')
+}
+
 async function buildVisualIndex() {
     if (state.mode !== 'connected' || state.visualIndexRunning) return
     state.visualIndexRunning = true
     state.visualIndexStopRequested = false
+    state.visualIndexPauseRequested = false
+    state.visualIndexPaused = false
+    state.visualIndexResume = null
     $('#visual-index-build').disabled = true
-    $('#visual-index-stop').hidden = false
+    setVisualTaskControls('running')
     const message = $('#visual-index-message')
     const progressBar = $('#visual-index-progress')
     let failures = 0
@@ -3422,7 +3472,11 @@ async function buildVisualIndex() {
             progressBar.value = 0
         }
         for (let index = 0; index < pending.length; index++) {
-            if (state.visualIndexStopRequested) break
+            if (
+                !(await visualTaskCheckpoint(index + 1, total)) ||
+                state.visualIndexStopRequested
+            )
+                break
             const comicId = pending[index]
             if (progressBar) progressBar.value = index
             const background = t('visual.backgroundRunning', {
@@ -3501,7 +3555,7 @@ async function buildVisualIndex() {
         let done
         let tone = 'positive'
         if (state.visualIndexStopRequested) {
-            done = t('visual.stopped')
+            done = t('visual.cancelled')
             tone = 'neutral'
         } else if (failures > 0) {
             done = t('visual.finishedWithFailures', {
@@ -3524,8 +3578,12 @@ async function buildVisualIndex() {
         if (message) delete message.dataset.busy
         setBackgroundTaskIndicator('')
         state.visualIndexRunning = false
+        state.visualIndexStopRequested = false
+        state.visualIndexPauseRequested = false
+        state.visualIndexPaused = false
+        resumeVisualTask()
         $('#visual-index-build').disabled = false
-        $('#visual-index-stop').hidden = true
+        setVisualTaskControls('idle')
     }
 }
 
@@ -3534,8 +3592,27 @@ $('#visual-sampling-mode').onchange = () => void saveVisualSettings()
 $('#visual-rerank-mode').onchange = () => void saveVisualSettings()
 $('#visual-strength').onchange = () => void saveVisualSettings()
 $('#visual-index-build').onclick = () => void buildVisualIndex()
+$('#visual-index-pause').onclick = () => {
+    if (!state.visualIndexRunning) return
+    state.visualIndexPauseRequested = true
+    setVisualTaskControls('pausing')
+    const message = $('#visual-index-message')
+    if (message) message.textContent = t('visual.pausePending')
+}
+$('#visual-index-resume').onclick = () => {
+    if (!state.visualIndexRunning) return
+    resumeVisualTask()
+}
 $('#visual-index-stop').onclick = () => {
+    if (!state.visualIndexRunning) return
     state.visualIndexStopRequested = true
+    state.visualIndexPauseRequested = false
+    const resume = state.visualIndexResume
+    state.visualIndexResume = null
+    if (resume) resume()
+    setVisualTaskControls('pausing')
+    const message = $('#visual-index-message')
+    if (message) message.textContent = t('visual.cancelling')
 }
 
 $('#recommend-feedback-reasons-toggle').checked =

@@ -30,9 +30,11 @@ function literals(file) {
     const value = m[1].replace(/\\"/g, '"')
     if (!han.test(value)) continue
     const line = src.slice(0, m.index).split('\n').length
-    const before = src.slice(Math.max(0, m.index - 180), m.index)
-    const likelyUi = /(Ui\.(?:text|button|pill|headingWithInfo|infoButton)|SettingsRow\.(?:row|statusLine|panel)|setText\(|setHint\(|setTitle\(|setMessage\(|setPositiveButton\(|setNegativeButton\(|Toast\.makeText\(|setContentDescription\(|setSummary\(|setLabel\()/s.test(before)
-    rows.push({ file: rel(file), line, value, likelyUi })
+    const before = src.slice(Math.max(0, m.index - 220), m.index)
+    const coveredPrimitive = /(Ui\.(?:text|button|pill|foldHeader|headingWithInfo|infoButton|iconButton)|SettingsRow\.(?:row|statusLine))\([^\n]{0,180}$/s.test(before)
+    const directUi = /(setText\(|setHint\(|setTitle\(|setMessage\(|setPositiveButton\(|setNegativeButton\(|Toast\.makeText\(|setContentDescription\(|setSummary\(|setLabel\()/s.test(before)
+    const likelyUi = coveredPrimitive || directUi
+    rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi })
   }
   return rows
 }
@@ -75,6 +77,11 @@ const counts = new Map()
 for (const row of androidRows) counts.set(row.file, (counts.get(row.file) || 0) + 1)
 console.log([...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,40).map(([f,n])=>`${n}\t${f}`).join('\n'))
 console.log('ANDROID_UNIQUE_LIKELY_UI=' + new Set(androidRows.filter(x=>x.likelyUi).map(x=>x.value)).size)
+console.log('ANDROID_COVERED_PRIMITIVE=' + androidRows.filter(x=>x.coveredPrimitive).length)
+console.log('ANDROID_DIRECT_UI=' + androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).length)
+console.log('ANDROID_DIRECT_UI_UNIQUE=' + new Set(androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).map(x=>x.value)).size)
+console.log('DIRECT_UI_SAMPLES')
+console.log(androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).slice(0,220).map(x=>`${x.file}:${x.line}\t${x.value}`).join('\n'))
 console.log('LIKELY_UI_SAMPLES')
 console.log(androidRows.filter(x=>x.likelyUi).slice(0,120).map(x=>`${x.file}:${x.line}\t${x.value}`).join('\n'))
 console.log('TOP_WEB_FILES')

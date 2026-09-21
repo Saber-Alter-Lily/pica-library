@@ -32,9 +32,11 @@ function literals(file) {
     const line = src.slice(0, m.index).split('\n').length
     const before = src.slice(Math.max(0, m.index - 220), m.index)
     const coveredPrimitive = /(Ui\.(?:text|button|pill|foldHeader|headingWithInfo|infoButton|iconButton)|SettingsRow\.(?:row|statusLine))\([^\n]{0,180}$/s.test(before)
-    const directUi = /(setText\(|setHint\(|setTitle\(|setMessage\(|setPositiveButton\(|setNegativeButton\(|Toast\.makeText\(|setContentDescription\(|setSummary\(|setLabel\()/s.test(before)
+    const directUi = /(setText\(|setHint\(|setTitle\(|setMessage\(|setPositiveButton\(|setNegativeButton\(|setNeutralButton\(|setItems\(|setSingleChoiceItems\(|setMultiChoiceItems\(|Toast\.makeText\(|setContentDescription\(|setSummary\(|setLabel\()/s.test(before)
+    const explicitlyRouted = /LocalizedText\.ui\(\s*$/s.test(before)
     const likelyUi = coveredPrimitive || directUi
-    rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi })
+    const uiRouted = coveredPrimitive || explicitlyRouted
+    rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi, explicitlyRouted, uiRouted })
   }
   return rows
 }
@@ -60,8 +62,6 @@ const result = {
     rows: webRows
   }
 }
-fs.writeFileSync(path.join(outDir, 'localization-inventory.json'), JSON.stringify(result, null, 2) + '\n')
-
 console.log('LOCALIZATION_INVENTORY')
 console.log(JSON.stringify({
   androidFilesScanned: result.android.filesScanned,
@@ -80,18 +80,41 @@ console.log('ANDROID_UNIQUE_LIKELY_UI=' + new Set(androidRows.filter(x=>x.likely
 console.log('ANDROID_COVERED_PRIMITIVE=' + androidRows.filter(x=>x.coveredPrimitive).length)
 console.log('ANDROID_DIRECT_UI=' + androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).length)
 console.log('ANDROID_DIRECT_UI_UNIQUE=' + new Set(androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).map(x=>x.value)).size)
+console.log('ANDROID_EXPLICITLY_ROUTED=' + androidRows.filter(x=>x.explicitlyRouted).length)
 
-const sharedPath = path.join(ROOT, 'mobile/android-alpha2/app/src/main/assets/locales/shared-literals.json')
-let sharedCatalog = { byLanguage: { en: {}, ja: {} } }
-if (fs.existsSync(sharedPath)) sharedCatalog = JSON.parse(fs.readFileSync(sharedPath, 'utf8'))
-const directUnique = [...new Set(androidRows.filter(x => x.directUi && !x.coveredPrimitive).map(x => x.value))]
-const missingEn = directUnique.filter(value => !sharedCatalog.byLanguage?.en?.[value])
-const missingJa = directUnique.filter(value => !sharedCatalog.byLanguage?.ja?.[value])
-console.log('ANDROID_DIRECT_MISSING_EN=' + missingEn.length)
-console.log('ANDROID_DIRECT_MISSING_JA=' + missingJa.length)
-console.log('ANDROID_DIRECT_MISSING_EN_VALUES')
+const localeDir = path.join(ROOT, 'mobile/android-alpha2/app/src/main/assets/locales')
+const mergedCatalog = { byLanguage: { en: {}, ja: {}, 'zh-CN': {} } }
+if (fs.existsSync(localeDir)) {
+  for (const name of fs.readdirSync(localeDir).filter(name => name.endsWith('.json')).sort()) {
+    try {
+      const value = JSON.parse(fs.readFileSync(path.join(localeDir, name), 'utf8'))
+      for (const language of Object.keys(mergedCatalog.byLanguage))
+        Object.assign(mergedCatalog.byLanguage[language], value.byLanguage?.[language] || {})
+    } catch {}
+  }
+}
+const uiUnique = [...new Set(androidRows.filter(x => x.likelyUi && x.uiRouted).map(x => x.value))]
+const unroutedDirectRows = androidRows.filter(x => x.directUi && !x.coveredPrimitive && !x.explicitlyRouted)
+const unroutedDirectUnique = [...new Set(unroutedDirectRows.map(x => x.value))]
+const missingEn = uiUnique.filter(value => /[\u3400-\u9fff]/.test(value) && !mergedCatalog.byLanguage.en?.[value])
+const missingJa = uiUnique.filter(value => /[\u3400-\u9fff]/.test(value) && !mergedCatalog.byLanguage.ja?.[value])
+
+result.android.unroutedDirectUiCount = unroutedDirectRows.length
+result.android.unroutedDirectUiUnique = unroutedDirectUnique
+result.android.routedUiUniqueCount = uiUnique.length
+result.android.missingEnglishUi = missingEn
+result.android.missingJapaneseUi = missingJa
+fs.writeFileSync(path.join(outDir, 'localization-inventory.json'), JSON.stringify(result, null, 2) + '\n')
+
+console.log('ANDROID_DIRECT_UNROUTED=' + unroutedDirectRows.length)
+console.log('ANDROID_DIRECT_UNROUTED_UNIQUE=' + unroutedDirectUnique.length)
+console.log('ANDROID_UI_MISSING_EN=' + missingEn.length)
+console.log('ANDROID_UI_MISSING_JA=' + missingJa.length)
+console.log('ANDROID_DIRECT_UNROUTED_VALUES')
+console.log(unroutedDirectUnique.slice(0,500).join('\n'))
+console.log('ANDROID_UI_MISSING_EN_VALUES')
 console.log(missingEn.slice(0,500).join('\n'))
-console.log('ANDROID_DIRECT_MISSING_JA_VALUES')
+console.log('ANDROID_UI_MISSING_JA_VALUES')
 console.log(missingJa.slice(0,500).join('\n'))
 
 console.log('DIRECT_UI_SAMPLES')

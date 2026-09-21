@@ -236,7 +236,7 @@ function identityComic(comicId, fallbackTitle = '', fallbackProvider = '') {
 }
 
 function identityComicMarkup(comic, provider) {
-    const author = comic.canonicalAuthor || comic.author || '未知作者'
+    const author = comic.canonicalAuthor || comic.author || wiT('未知作者','Unknown author','作者不明')
     return `
         <div class="v5-id-comic">
             <img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
@@ -245,8 +245,8 @@ function identityComicMarkup(comic, provider) {
                 <span class="status">${esc(author)} · ${esc(provider || comic.providerId || 'unknown')}</span>
                 <span class="status">${esc(comic.comicId)}</span>
                 <div class="v5-id-mini-actions">
-                    <button type="button" data-v5-id-detail="${esc(comic.comicId)}">详情</button>
-                    <button type="button" data-v5-id-read-online="${esc(comic.comicId)}">在线阅读</button>
+                    <button type="button" data-v5-id-detail="${esc(comic.comicId)}">${wiT('详情','Details','詳細')}</button>
+                    <button type="button" data-v5-id-read-online="${esc(comic.comicId)}">${wiT('在线阅读','Read online','オンラインで読む')}</button>
                 </div>
             </div>
         </div>`
@@ -265,26 +265,26 @@ function ensureIdentityDetailDialog() {
 function openIdentityDetail(comicId) {
     const comic = identityComic(comicId)
     const dialog = ensureIdentityDetailDialog()
-    const author = comic.canonicalAuthor || comic.author || '未知作者'
+    const author = comic.canonicalAuthor || comic.author || wiT('未知作者','Unknown author','作者不明')
     const tags = Array.isArray(comic.tags) ? comic.tags : []
     const categories = Array.isArray(comic.categories) ? comic.categories : []
     dialog.querySelector('.v5-id-detail-shell').innerHTML = `
         <div class="v5-id-detail-head">
             <div><h2>${esc(comic.title || comic.comicId)}</h2><p>${esc(author)} · ${esc(String(comic.providerId || '').toUpperCase())}</p></div>
-            <button type="button" data-v5-id-detail-close>关闭</button>
+            <button type="button" data-v5-id-detail-close>${wiT('关闭','Close','閉じる')}</button>
         </div>
         <div class="v5-id-detail-main">
             <img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" alt="" onerror="this.style.visibility='hidden'">
             <div>
-                <p>${esc(comic.description || '暂无简介')}</p>
-                <p class="status">页数 ${Number(comic.pagesCount || comic.knownPictures || 0)} · 章节 ${Number(comic.epsCount || comic.knownEpisodes || 0)} · ${comic.finished ? '已完结' : '连载/未知'}</p>
+                <p>${esc(comic.description || wiT('暂无简介','No description','説明なし'))}</p>
+                <p class="status">${wiT('页数','Pages','ページ数')} ${Number(comic.pagesCount || comic.knownPictures || 0)} · ${wiT('章节','Chapters','チャプター')} ${Number(comic.epsCount || comic.knownEpisodes || 0)} · ${comic.finished ? wiT('已完结','Completed','完結') : wiT('连载/未知','Ongoing / unknown','連載中 / 不明')}</p>
                 <div class="v5-id-detail-tags">
                     ${categories.slice(0,8).map((x)=>`<span class="tag">${esc(x)}</span>`).join('')}
                     ${tags.slice(0,18).map((x)=>`<span class="tag">${esc(x)}</span>`).join('')}
                 </div>
                 <div class="v5-id-detail-actions">
-                    <button type="button" data-v5-id-detail-local="${esc(comic.comicId)}">本地阅读</button>
-                    <button type="button" data-v5-id-detail-online="${esc(comic.comicId)}">在线阅读</button>
+                    <button type="button" data-v5-id-detail-local="${esc(comic.comicId)}">${wiT('本地阅读','Read locally','ローカルで読む')}</button>
+                    <button type="button" data-v5-id-detail-online="${esc(comic.comicId)}">${wiT('在线阅读','Read online','オンラインで読む')}</button>
                 </div>
             </div>
         </div>`
@@ -317,11 +317,15 @@ function renderReview() {
     const counts = review.storage?.counts || {}
     renderMaterializationPreview(review)
     status(
-        `证据 ${Number(counts.evidence || rows.length)} · 人工裁决 ${Number(counts.decisions || 0)} · 待裁决 ${Number(review.undecidedCount || 0)} · Work binding ${Number(counts.bindings || 0)}`
+        wiT(
+            `证据 ${Number(counts.evidence || rows.length)} · 人工裁决 ${Number(counts.decisions || 0)} · 待裁决 ${Number(review.undecidedCount || 0)} · Work binding ${Number(counts.bindings || 0)}`,
+            `Evidence ${Number(counts.evidence || rows.length)} · human decisions ${Number(counts.decisions || 0)} · undecided ${Number(review.undecidedCount || 0)} · Work bindings ${Number(counts.bindings || 0)}`,
+            `エビデンス ${Number(counts.evidence || rows.length)} · 人手裁定 ${Number(counts.decisions || 0)} · 未裁定 ${Number(review.undecidedCount || 0)} · Work binding ${Number(counts.bindings || 0)}`
+        )
     )
     if (!rows.length) {
         target.innerHTML =
-            '<p class="status">当前没有已保存的高置信身份证据。可点击“扫描身份证据”。</p>'
+            `<p class="status">${wiT('当前没有已保存的高置信身份证据。可点击“扫描身份证据”。','No saved high-confidence identity evidence is available. Choose Scan identity evidence.','保存済みの高信頼度作品IDエビデンスはありません。「作品IDエビデンスをスキャン」を実行してください。')}</p>`
         return
     }
     target.innerHTML = rows.slice(0, 80).map((item) => {
@@ -331,7 +335,7 @@ function renderReview() {
         const rightProvider = evidence.rightProvider || 'unknown'
         const pages =
             evidence.leftPages || evidence.rightPages
-                ? `${Number(evidence.leftPages || 0)} ↔ ${Number(evidence.rightPages || 0)} 页`
+                ? `${Number(evidence.leftPages || 0)} ↔ ${Number(evidence.rightPages || 0)} ${wiT('页','pages','ページ')}`
                 : ''
         const leftComic = identityComic(item.leftComicId, item.leftTitle, leftProvider)
         const rightComic = identityComic(item.rightComicId, item.rightTitle, rightProvider)
@@ -344,17 +348,17 @@ function renderReview() {
                 ${identityComicMarkup(rightComic, rightProvider)}
             </div>
             <div class="v5-id-meta">
-                <span>置信度 ${Number(item.confidence || 0).toFixed(2)}</span>
-                <span>${evidence.titleMatch === 'STRICT' ? '标题严格一致' : '去噪标题一致'}</span>
+                <span>${wiT('置信度','Confidence','信頼度')} ${Number(item.confidence || 0).toFixed(2)}</span>
+                <span>${evidence.titleMatch === 'STRICT' ? wiT('标题严格一致','Strict title match','タイトル完全一致') : wiT('去噪标题一致','Normalized title match','正規化タイトル一致')}</span>
                 ${pages ? `<span>${esc(pages)}</span>` : ''}
-                <span>${evidence.crossProvider ? '跨 Provider' : '同 Provider'}</span>
+                <span>${evidence.crossProvider ? wiT('跨 Provider','Cross-provider','Provider 横断') : wiT('同 Provider','Same provider','同一 Provider')}</span>
             </div>
             <div class="v5-id-decision">
-                ${decision ? `<span class="v5-id-badge ${decisionClass(decision)}">${esc(decisionLabel(decision))}</span>` : '<span class="status">尚未人工裁决</span>'}
-                <button type="button" data-v5-id-decision="SAME_WORK">同一作品</button>
-                <button type="button" data-v5-id-decision="EDITION_VARIANT">不同版本</button>
-                <button type="button" data-v5-id-decision="KEEP_SEPARATE">保持分离</button>
-                ${decision ? '<button type="button" data-v5-id-decision="CLEAR">清除裁决</button>' : ''}
+                ${decision ? `<span class="v5-id-badge ${decisionClass(decision)}">${esc(decisionLabel(decision))}</span>` : `<span class="status">${wiT('尚未人工裁决','No human decision yet','人手裁定なし')}</span>`}
+                <button type="button" data-v5-id-decision="SAME_WORK">${wiT('同一作品','Same work','同一作品')}</button>
+                <button type="button" data-v5-id-decision="EDITION_VARIANT">${wiT('不同版本','Different edition','別版')}</button>
+                <button type="button" data-v5-id-decision="KEEP_SEPARATE">${wiT('保持分离','Keep separate','分離を維持')}</button>
+                ${decision ? `<button type="button" data-v5-id-decision="CLEAR">${wiT('清除裁决','Clear decision','裁定を解除')}</button>` : ''}
             </div>
         </article>`
     }).join('')

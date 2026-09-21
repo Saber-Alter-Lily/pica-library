@@ -2032,6 +2032,26 @@ export async function startLibraryServer(options: {
                     )
                 )
             }
+            if (
+                url.pathname === '/api/v1/sync/control' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const action = String(input.action ?? '')
+                if (
+                    action !== 'pause' &&
+                    action !== 'resume' &&
+                    action !== 'cancel'
+                )
+                    return json(response, 400, {
+                        error: 'Unknown favorites sync control action'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.favoritesSyncControl(action)
+                )
+            }
             if (url.pathname === '/api/v1/sync' && request.method === 'POST') {
                 const input = await body(request)
                 const result = await options.service.syncFavorites(

@@ -100,7 +100,7 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-Existing **v0.4.0** users do not need to install v0.4.1, v0.4.2, or v0.4.3. Download `Pica-Library-v0.4.4-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.4.cmd` to move directly to the current release. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+Existing **v0.4.0** users should download `Pica-Library-v0.4.4-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.4.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 

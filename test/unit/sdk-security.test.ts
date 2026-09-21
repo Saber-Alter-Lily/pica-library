@@ -26,6 +26,27 @@ afterEach(() => {
 })
 
 describe('provider client security', () => {
+    it('bounds ordinary Pica API requests while keeping auth timeout longer', async () => {
+        const timeouts: Record<string, number | undefined> = {}
+        const apiAdapter: AxiosAdapter = async (config) => {
+            timeouts[String(config.url)] = Number(config.timeout)
+            if (config.url === 'auth/sign-in')
+                return response(config, {
+                    code: 200,
+                    data: { token: 'timeout-test-token' }
+                })
+            return response(config, {
+                code: 200,
+                data: { keywords: [] }
+            })
+        }
+        const pica = new Pica({ apiAdapter })
+        await pica.login('configured-account', 'configured-password')
+        await pica.request('get', 'keywords')
+        expect(timeouts['auth/sign-in']).toBe(30000)
+        expect(timeouts.keywords).toBe(15000)
+    })
+
     it('adds authorization to API requests but never media requests', async () => {
         let apiHeaders: unknown
         let mediaHeaders: unknown

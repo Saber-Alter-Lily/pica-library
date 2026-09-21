@@ -1,3 +1,5 @@
+import { copy as wiT } from './locale-runtime.js'
+
 const IDENTITY = {
     review: null,
     plan: null,
@@ -78,9 +80,9 @@ function ensureStyles() {
 
 function decisionLabel(decision) {
     return {
-        SAME_WORK: '已确认：同一作品',
-        EDITION_VARIANT: '已确认：不同版本',
-        KEEP_SEPARATE: '已确认：保持分离'
+        SAME_WORK: wiT('已确认：同一作品','Confirmed: same work','確認済み：同一作品'),
+        EDITION_VARIANT: wiT('已确认：不同版本','Confirmed: different edition','確認済み：別版'),
+        KEEP_SEPARATE: wiT('已确认：保持分离','Confirmed: keep separate','確認済み：分離を維持')
     }[decision] || ''
 }
 
@@ -105,22 +107,24 @@ function ensurePanel() {
     panel.innerHTML = `
         <div class="v5-id-head">
             <div>
-                <h3>作品身份审计 · P2A Beta</h3>
-                <p>检查不同 Provider / 重传记录是否可能属于同一作品。当前阶段不会自动创建 Work/Edition 绑定。</p>
+                <h3>${wiT('作品身份审计 · P2A Beta','Work identity review · P2A Beta','作品ID監査 · P2A Beta')}</h3>
+                <p>${wiT('检查不同 Provider / 重传记录是否可能属于同一作品。当前阶段不会自动创建 Work/Edition 绑定。','Review whether records from different providers or reuploads may represent the same work. This stage never creates Work/Edition bindings automatically.','異なる Provider や再アップロード記録が同一作品かどうかを確認します。この段階では Work / Edition の紐付けを自動作成しません。')}</p>
             </div>
             <div class="v5-id-actions">
-                <button id="v5-id-load" type="button">读取现有证据</button>
-                <button id="v5-id-scan" type="button" class="primary">扫描身份证据</button>
-                <button id="v5-id-plan-btn" type="button">生成 Dry-run 绑定计划</button>
+                <button id="v5-id-load" type="button">${wiT('读取现有证据','Load existing evidence','既存エビデンスを読み込む')}</button>
+                <button id="v5-id-scan" type="button" class="primary">${wiT('扫描身份证据','Scan identity evidence','作品IDエビデンスをスキャン')}</button>
+                <button id="v5-id-plan-btn" type="button">${wiT('生成 Dry-run 绑定计划','Generate dry-run binding plan','Dry-run 紐付け計画を生成')}</button>
             </div>
         </div>
         <div class="v5-id-note">
-            <strong>当前权限：</strong>
-            “同一作品”和“不同版本”只保存人工裁决，暂不改变 serving；
-            “保持分离”会立即成为高权限去重保护，防止自动规则把两条上传折叠。
-            所有裁决都可以清除。
+            <strong>${wiT('当前权限：','Current authority:','現在の権限：')}</strong>
+            ${wiT(
+                '“同一作品”和“不同版本”只保存人工裁决，暂不改变 serving；“保持分离”会立即成为高权限去重保护，防止自动规则把两条上传折叠。所有裁决都可以清除。',
+                '“Same work” and “different edition” only save human decisions and do not change serving yet. “Keep separate” immediately becomes a high-authority deduplication protection that prevents automatic rules from collapsing two uploads. Every decision can be cleared.',
+                '「同一作品」と「別版」は人手の裁定だけを保存し、まだ serving は変更しません。「分離を維持」は高権限の重複排除保護として即時反映され、自動ルールが2つのアップロードを統合するのを防ぎます。すべての裁定は解除できます。'
+            )}
         </div>
-        <p id="v5-id-status" class="status">尚未主动扫描。已有证据也不会在后台自动扩充。</p>
+        <p id="v5-id-status" class="status">${wiT('尚未主动扫描。已有证据也不会在后台自动扩充。','No active scan has been run yet. Existing evidence is not expanded automatically in the background.','まだ能動スキャンは実行されていません。既存エビデンスもバックグラウンドで自動拡張されません。')}</p>
         <div id="v5-id-preview" class="v5-id-preview" hidden></div>
         <div id="v5-id-plan" class="v5-id-plan" hidden></div>
         <div id="v5-id-list" class="v5-id-list"></div>
@@ -157,9 +161,9 @@ function renderMaterializationPreview(review) {
     const visible = groups.slice(0, 12)
     node.hidden = false
     node.innerHTML = `
-        <strong>Work 物化预览</strong>
-        <div>Work 组 ${Number(preview.workGroupCount || 0)} · 可进入后续绑定 ${Number(preview.readyGroupCount || 0)} · Upload 绑定候选 ${Number(preview.proposedUploadBindingCount || 0)} · 冲突 ${Number(preview.conflictCount || 0)}</div>
-        <div class="status">仅预览，不写入 Work/Edition binding；存在“保持分离”冲突的组会被阻断。</div>
+        <strong>${wiT('Work 物化预览','Work materialization preview','Work マテリアライズプレビュー')}</strong>
+        <div>${wiT('Work 组','Work groups','Work グループ')} ${Number(preview.workGroupCount || 0)} · ${wiT('可进入后续绑定','ready for later binding','後続の紐付け可能')} ${Number(preview.readyGroupCount || 0)} · ${wiT('Upload 绑定候选','Upload binding candidates','Upload 紐付け候補')} ${Number(preview.proposedUploadBindingCount || 0)} · ${wiT('冲突','conflicts','競合')} ${Number(preview.conflictCount || 0)}</div>
+        <div class="status">${wiT('仅预览，不写入 Work/Edition binding；存在“保持分离”冲突的组会被阻断。','Preview only; no Work/Edition binding is written. Groups with a “keep separate” conflict are blocked.','プレビューのみで Work / Edition binding は書き込みません。「分離を維持」と競合するグループはブロックされます。')}</div>
         ${visible.length ? `<div class="v5-id-preview-groups">${visible.map((group) => {
             const titles = Array.isArray(group.titles) ? group.titles.slice(0, 3).join(' / ') : ''
             const extra = Array.isArray(group.titles) && group.titles.length > 3
@@ -169,7 +173,7 @@ function renderMaterializationPreview(review) {
             return `<div class="v5-id-preview-group ${conflicts ? 'conflict' : ''}">
                 ${esc(titles)}${esc(extra)} · ${Number(group.comicIds?.length || 0)} uploads
                 ${Number(group.editionVariantPairCount || 0) ? ` · edition variant ${Number(group.editionVariantPairCount || 0)}` : ''}
-                ${conflicts ? ` · 冲突 ${conflicts}` : ' · 无冲突'}
+                ${conflicts ? ` · ${wiT('冲突','conflicts','競合')} ${conflicts}` : ` · ${wiT('无冲突','no conflict','競合なし')}`}
             </div>`
         }).join('')}</div>` : ''}
     `
@@ -187,10 +191,10 @@ function renderMaterializationPlan(plan) {
     const groups = Array.isArray(plan.groups) ? plan.groups : []
     node.hidden = false
     node.innerHTML = `
-        <strong>P2A-5 Dry-run 绑定计划</strong>
-        <div>Work 组 ${Number(summary.workGroupCount || 0)} · Work 可绑定 ${Number(summary.workReadyCount || 0)} · 完整绑定可执行 ${Number(summary.fullBindingReadyCount || 0)} · 阻断组 ${Number(summary.blockedGroupCount || 0)}</div>
-        <div>拟新建 Work ${Number(summary.createWorkCount || 0)} · 复用 Work ${Number(summary.reuseWorkCount || 0)} · Upload 变更 ${Number(summary.proposedUploadBindingCount || 0)} · 警告 ${Number(summary.warningCount || 0)} · 阻断项 ${Number(summary.blockerCount || 0)}</div>
-        <div class="status">planVersion: ${esc(plan.planVersion || '')} · digest: ${esc(String(plan.planDigest || '').slice(0, 16))}… · writeEnabled=false。这里只计算执行与回滚计划，不写数据库。</div>
+        <strong>${wiT('P2A-5 Dry-run 绑定计划','P2A-5 dry-run binding plan','P2A-5 Dry-run 紐付け計画')}</strong>
+        <div>${wiT('Work 组','Work groups','Work グループ')} ${Number(summary.workGroupCount || 0)} · ${wiT('Work 可绑定','Work-bindable','Work 紐付け可能')} ${Number(summary.workReadyCount || 0)} · ${wiT('完整绑定可执行','full binding ready','完全紐付け可能')} ${Number(summary.fullBindingReadyCount || 0)} · ${wiT('阻断组','blocked groups','ブロックグループ')} ${Number(summary.blockedGroupCount || 0)}</div>
+        <div>${wiT('拟新建 Work','Create Work','Work 新規作成')} ${Number(summary.createWorkCount || 0)} · ${wiT('复用 Work','Reuse Work','Work 再利用')} ${Number(summary.reuseWorkCount || 0)} · ${wiT('Upload 变更','Upload changes','Upload 変更')} ${Number(summary.proposedUploadBindingCount || 0)} · ${wiT('警告','warnings','警告')} ${Number(summary.warningCount || 0)} · ${wiT('阻断项','blockers','ブロッカー')} ${Number(summary.blockerCount || 0)}</div>
+        <div class="status">planVersion: ${esc(plan.planVersion || '')} · digest: ${esc(String(plan.planDigest || '').slice(0, 16))}… · ${wiT('writeEnabled=false。这里只计算执行与回滚计划，不写数据库。','writeEnabled=false. This computes execution and rollback plans only; the database is not written.','writeEnabled=false。実行・ロールバック計画を計算するだけで、データベースには書き込みません。')}</div>
         ${groups.length ? `<div class="v5-id-plan-groups">${groups.slice(0, 12).map((group) => {
             const blockers = Array.isArray(group.blockers) ? group.blockers : []
             const warnings = Array.isArray(group.warnings) ? group.warnings : []
@@ -198,12 +202,12 @@ function renderMaterializationPlan(plan) {
             const editions = Array.isArray(group.editionPlans) ? group.editionPlans : []
             return `<div class="v5-id-plan-group ${blockers.length ? 'blocked' : ''}">
                 <strong>${esc(group.preferredTitle || group.planWorkKey || 'Work')}</strong>
-                <div>${Number(group.comicIds?.length || 0)} uploads · ${esc(group.workAction || '')} · ${group.readyForFullBinding ? '可完整执行' : group.readyForWorkBinding ? '仅 Work 层可执行' : '已阻断'}</div>
+                <div>${Number(group.comicIds?.length || 0)} uploads · ${esc(group.workAction || '')} · ${group.readyForFullBinding ? wiT('可完整执行','full binding ready','完全実行可能') : group.readyForWorkBinding ? wiT('仅 Work 层可执行','Work layer only','Work 層のみ実行可能') : wiT('已阻断','blocked','ブロック済み')}</div>
                 <div>Edition clusters ${editions.length} · planned changes ${uploads.filter((item) => item.action !== 'NOOP').length}</div>
-                ${blockers.length ? `<div>阻断：${esc(blockers.map((item) => item.type).join(' / '))}</div>` : ''}
-                ${warnings.length ? `<div>警告：${esc(warnings.map((item) => item.type).join(' / '))}</div>` : ''}
+                ${blockers.length ? `<div>${wiT('阻断：','Blockers: ','ブロッカー：')}${esc(blockers.map((item) => item.type).join(' / '))}</div>` : ''}
+                ${warnings.length ? `<div>${wiT('警告：','Warnings: ','警告：')}${esc(warnings.map((item) => item.type).join(' / '))}</div>` : ''}
             </div>`
-        }).join('')}</div>` : '<p class="status">尚没有足够的人工裁决形成可物化 Work 组。</p>'}
+        }).join('')}</div>` : `<p class="status">${wiT('尚没有足够的人工裁决形成可物化 Work 组。','There are not enough human decisions to form materializable Work groups yet.','マテリアライズ可能な Work グループを形成するための人手裁定がまだ十分ではありません。')}</p>`}
     `
 }
 

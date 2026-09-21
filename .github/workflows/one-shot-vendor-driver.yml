@@ -1,0 +1,43 @@
+name: One-shot vendor Driver.js
+
+on:
+  push:
+    branches:
+      - dev/localization-onboarding-v1
+    paths:
+      - .github/workflows/one-shot-vendor-driver.yml
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev/localization-onboarding-v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Extract Driver.js 1.8.0 browser assets
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          cd "$tmp"
+          npm pack driver.js@1.8.0 --silent >/dev/null
+          tar -xzf driver.js-1.8.0.tgz
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p web/vendor/driverjs
+          cp "$tmp/package/dist/driver.js.iife.js" web/vendor/driverjs/driver.js.iife.js
+          cp "$tmp/package/dist/driver.css" web/vendor/driverjs/driver.css
+          cp "$tmp/package/LICENSE" web/vendor/driverjs/LICENSE 2>/dev/null || cp "$tmp/package/license" web/vendor/driverjs/LICENSE
+          printf '%s\n' 'Driver.js 1.8.0 — https://github.com/nilbuild/driver.js — MIT License' > web/vendor/driverjs/NOTICE.txt
+      - name: Commit vendored assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/vendor/driverjs
+          git diff --cached --quiet && exit 0
+          git commit -m "dev(onboarding): vendor Driver.js 1.8.0"
+          git push origin HEAD:dev/localization-onboarding-v1

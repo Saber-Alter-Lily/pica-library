@@ -8,7 +8,7 @@ import android.widget.*;
 import java.util.Locale;
 
 /** Completed persistent phone downloads. Active/failed jobs live in TaskCenterActivity. */
-public final class DownloadsActivity extends Activity {
+public final class DownloadsActivity extends LocaleAwareActivity {
     private LinearLayout content;
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();}
     @Override protected void onResume(){super.onResume();renderList();}

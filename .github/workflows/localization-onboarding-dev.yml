@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev/localization-onboarding-v1
-      - dev/post-v047-download-stability
 
 permissions:
   contents: read

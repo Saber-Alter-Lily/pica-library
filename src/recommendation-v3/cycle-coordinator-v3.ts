@@ -180,6 +180,10 @@ export class CycleCoordinatorV3 {
     ) {
         try {
             const built = await this.buildCycle(cycleId)
+            if (built.readiness === 'FAILED_INSUFFICIENT_POOL')
+                throw new Error(
+                    'Recommendation generation did not produce a usable pool; previous recommendations were kept'
+                )
             const identity = [
                 built.profile.favoriteFingerprint,
                 built.profile.registryVersion,

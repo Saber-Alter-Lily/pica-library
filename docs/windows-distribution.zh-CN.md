@@ -21,7 +21,7 @@
 
 ## 数据与凭据
 
-默认用户数据位置是 `%LOCALAPPDATA%\Pica Library`：
+默认用户数据位置是 `%LOCALAPPDATA%\\Pica Library`：
 
 - `config/`：非敏感设置和受 DPAPI 保护的凭据；
 - `data/`：SQLite 漫画库及相关持久化数据；
@@ -73,7 +73,7 @@ Desktop 设置中心当前分为：
 
 - 校验官方完整包 SHA-256 与目标版本；
 - 识别旧程序目录；
-- 保护 `%LOCALAPPDATA%\Pica Library`；
+- 保护 `%LOCALAPPDATA%\\Pica Library`；
 - 建立程序与 SQLite 安全快照；
 - 关闭旧版并替换程序；
 - 执行版本和数据库健康检查；
@@ -85,7 +85,7 @@ Desktop 设置中心当前分为：
 
 手动替换仍可作为备用方案：完全退出旧版，把新版完整 ZIP 解压到新目录后运行。
 
-**不要删除 `%LOCALAPPDATA%\Pica Library`。** 数据库、书架、阅读历史、设置、账号凭据与已下载内容位于独立用户数据目录，不需要卸载或重新导入。
+**不要删除 `%LOCALAPPDATA%\\Pica Library`。** 数据库、书架、阅读历史、设置、账号凭据与已下载内容位于独立用户数据目录，不需要卸载或重新导入。
 
 如果漫画保存目录位于旧程序目录内部，升级助手会拒绝自动替换并提示先迁移数据。
 

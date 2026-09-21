@@ -17,7 +17,7 @@ import org.json.*;
  * Persistent edits affect Android immediately and stay queued until an explicit
  * Desktop sync. Session Intent is intentionally device-local.
  */
-public final class RecommendationControlActivity extends Activity {
+public final class RecommendationControlActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private EditText search;
     private String activeQuery="";

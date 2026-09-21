@@ -2,6 +2,7 @@ package com.picalibrary.android;
 
 import android.content.Context;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,7 +46,11 @@ final class LocalizedText {
             if(language.equals(loadedLanguage))return;
             Map<String,String> next=new HashMap<>();
             try(InputStream in=c.getApplicationContext().getAssets().open(ASSET)){
-                String raw=new String(in.readAllBytes(),StandardCharsets.UTF_8);
+                ByteArrayOutputStream buffer=new ByteArrayOutputStream();
+                byte[] chunk=new byte[8192];
+                int read;
+                while((read=in.read(chunk))!=-1)buffer.write(chunk,0,read);
+                String raw=new String(buffer.toByteArray(),StandardCharsets.UTF_8);
                 JSONObject root=new JSONObject(raw);
                 JSONObject rows=root.getJSONObject("byLanguage").optJSONObject(language);
                 if(rows!=null){

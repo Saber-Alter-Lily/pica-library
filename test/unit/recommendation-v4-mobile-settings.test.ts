@@ -31,7 +31,7 @@ describe('Recommendation V4 mobile settings surface', () => {
         expect(engine).toContain('MobileVisualPolicyStore.strength(app)')
         expect(web).toContain('启用画风推荐模块（关闭时不影响常规推荐）')
         expect(web).toContain('id="visual-strength"')
-        expect(app).toContain("strength: $('#visual-strength').value")
+        expect(app).toContain("strength: $('#visual-strength')?.value || 'STANDARD'")
         expect(main).toContain('switchNativeRecommendationBatch(1)')
         expect(main).toContain('renderNativeRecommendationBatch')
         expect(main).not.toContain('NativeRecommendationStore.nextBatch(this);showTab()')

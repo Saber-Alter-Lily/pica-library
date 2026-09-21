@@ -465,10 +465,12 @@ export class Pica {
             pages: number
             fetched: number
             total?: number
-        }) => void
+        }) => void,
+        checkpoint?: () => Promise<void>
     ) {
         const pageNum = Number(page)
         if (page && Number.isInteger(pageNum)) {
+            await checkpoint?.()
             const res = await this.favorites(pageNum)
             onPage?.({
                 page: res.page,
@@ -480,6 +482,7 @@ export class Pica {
         }
 
         const comics: Comic[] = []
+        await checkpoint?.()
         const first = await this.favorites()
         const pages = first.pages
         comics.push(...first.docs)
@@ -490,6 +493,7 @@ export class Pica {
             total: first.total
         })
         for (let page = 2; page <= pages; page++) {
+            await checkpoint?.()
             const res = await this.favorites(page)
             comics.push(...res.docs)
             onPage?.({

@@ -862,3 +862,51 @@ body.reader-active .reader-header {
     overflow-wrap: anywhere;
     line-height: 1.3;
 }
+
+/* Localization-safe connection surfaces. */
+#a87-connections-panel,
+#a87-connections-panel > *,
+#a87-connections-panel .panel,
+#settings-mobile-bridge,
+#settings-remote-storage,
+#settings-browser-lite {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+#settings-mobile-bridge .mobile-pair-value,
+#settings-mobile-bridge .mobile-pair-inline,
+#settings-remote-storage .settings-form,
+#settings-remote-storage .actions,
+#settings-browser-lite .actions {
+    min-width: 0;
+    max-width: 100%;
+}
+#settings-mobile-bridge button,
+#settings-remote-storage button,
+#settings-browser-lite button,
+#settings-browser-lite .button-link,
+#settings-browser-lite .button-control {
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.28;
+}
+#settings-remote-storage .actions,
+#settings-browser-lite .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+@media (max-width: 560px) {
+    #settings-browser-lite .actions > *,
+    #settings-remote-storage .actions > * {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+    #settings-mobile-bridge .mobile-pair-value,
+    #settings-mobile-bridge .mobile-pair-inline {
+        flex-wrap: wrap;
+    }
+}

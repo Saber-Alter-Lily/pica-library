@@ -43,11 +43,11 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         LinearLayout runtimeCard=SettingsRow.panel(this,null);
         runtimeCard.addView(Ui.headingWithInfo(this,"本机推荐",17,"手机与电脑的当前推荐列表互不覆盖；同步只交换长期偏好、反馈、候选基础和 Desktop 预计算数据。"));
         runtimeCard.addView(SettingsRow.statusLine(this,"手机 Cycle",Ui.text(this,runtime.cycleId.isEmpty()?"尚未生成":shortId(runtime.cycleId),12,Ui.MUTED,true)));
-        runtimeCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.text(this,portable.available()?portable.candidates.size()+" 个 · "+shortId(portable.reservoirGeneration):"尚未同步",12,Ui.MUTED,true)));
+        runtimeCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.rawText(this,portable.available()?LocalizedText.ui(this,portable.candidates.size()+" 个 · "+shortId(portable.reservoirGeneration),portable.candidates.size()+" items · "+shortId(portable.reservoirGeneration),portable.candidates.size()+" 件 · "+shortId(portable.reservoirGeneration)):LocalizedText.ui(this,"尚未同步","Not synced yet","未同期"),12,Ui.MUTED,true)));
         content.addView(runtimeCard);
 
         content.addView(SettingsRow.row(this,"推荐画像","长期 / 最近 / 本次 / 当前构成",v->startActivity(new Intent(this,RecommendationProfileActivity.class))));
-        content.addView(SettingsRow.row(this,"人工调整",RecommendationPolicyStore.pendingControlCount(this)>0?"有 "+RecommendationPolicyStore.pendingControlCount(this)+" 项待同步":"0–10 档 / 屏蔽 / 本次想看",v->startActivity(new Intent(this,RecommendationControlActivity.class))));
+        int pendingControls=RecommendationPolicyStore.pendingControlCount(this);content.addView(SettingsRow.row(this,"人工调整",pendingControls>0?LocalizedText.ui(this,"有 "+pendingControls+" 项待同步",pendingControls+" items pending sync",pendingControls+" 件の同期待ち"):LocalizedText.ui(this,"0–10 档 / 屏蔽 / 本次想看","0–10 levels / blocks / session intent","0–10 段階 / ブロック / 今回見たいもの"),v->startActivity(new Intent(this,RecommendationControlActivity.class))));
         content.addView(SettingsRow.row(this,"推荐同步",BridgeStore.paired(this)?"与 Desktop 比较并双向合并":"未连接电脑",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
         boolean reasons=RecommendationFeedbackStore.askReasons(this);
         content.addView(SettingsRow.row(this,"反馈原因",reasons?"开启":"关闭",v->{RecommendationFeedbackStore.setAskReasons(this,!RecommendationFeedbackStore.askReasons(this));renderContent();}));
@@ -59,11 +59,11 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         visual.addView(SettingsRow.statusLine(this,"候选 Visual 覆盖",Ui.text(this,covered+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
         visual.addView(SettingsRow.statusLine(this,"手机画风接入",Ui.text(this,MobileVisualPolicyStore.label(this),12,Ui.MUTED,true)));
         visual.addView(Ui.button(this,"调整手机画风接入模式",v->chooseMobileVisualMode(),true),new LinearLayout.LayoutParams(-1,-2));
-        visual.addView(Ui.button(this,"画风影响强度 · "+MobileVisualPolicyStore.strengthLabel(this),v->chooseMobileVisualStrength(),true),new LinearLayout.LayoutParams(-1,-2));
+        visual.addView(Ui.button(this,LocalizedText.ui(this,"画风影响强度 · ","Visual influence strength · ","画風の影響強度 · ")+MobileVisualPolicyStore.strengthLabel(this),v->chooseMobileVisualStrength(),true),new LinearLayout.LayoutParams(-1,-2));
         content.addView(visual);
 
         if(BridgeStore.paired(this)){
-            String state=desktopVisual==null?(loading?"读取中":"待读取"):desktopVisual.optInt("indexedCount",0)+" / "+desktopVisual.optInt("targetCount",0);
+            String state=desktopVisual==null?(loading?LocalizedText.ui(this,"读取中","Loading","読み込み中"):LocalizedText.ui(this,"待读取","Pending","未取得")):desktopVisual.optInt("indexedCount",0)+" / "+desktopVisual.optInt("targetCount",0);
             content.addView(SettingsRow.row(this,"Desktop 画风状态（高级）",state,v->showDesktopVisualActions()));
             content.addView(Ui.button(this,"同步推荐基础数据",v->syncFoundation(),false),new LinearLayout.LayoutParams(-1,-2));
         }else{
@@ -146,8 +146,8 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         String[] labels={
             "刷新 Desktop 状态",
             enabled?"关闭 Desktop 画风模块":"启用 Desktop 画风模块",
-            "Desktop 接入模式 · "+mode,
-            "Desktop 画风强度 · "+strength
+            LocalizedText.ui(this,"Desktop 接入模式 · ","Desktop integration mode · ","Desktop 連携モード · ")+mode,
+            LocalizedText.ui(this,"Desktop 画风强度 · ","Desktop visual strength · ","Desktop 画風強度 · ")+strength
         };
         new AlertDialog.Builder(this)
             .setTitle(LocalizedText.ui("Desktop 画风设置"))

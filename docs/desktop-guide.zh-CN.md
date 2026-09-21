@@ -1,10 +1,10 @@
 # Pica Library Desktop / Web 使用说明
 
-> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.4.6**。
+> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.4.7**。
 
 ## 1. 安装与启动
 
-1. 从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.6 对应 `Pica-Library-v0.4.6-windows-x64.zip`。
+1. 从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.7 对应 `Pica-Library-v0.4.7-windows-x64.zip`。
 2. 完整解压到普通文件夹后运行 `Pica Library.exe`，不要直接在压缩包内运行。
 3. 首次启动会打开本地 Web UI，并进入首次设置。
 4. 按需配置账号、漫画保存目录、下载方式与 HTTP/HTTPS 代理。

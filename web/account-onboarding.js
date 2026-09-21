@@ -92,8 +92,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             return
         }
         const fields = {}
-        function field(name, zh, en, type = 'text', max = 200) {
-            const label = element('label', text(zh, en))
+        function field(name, zh, en, ja, type = 'text', max = 200) {
+            const label = element('label', text(zh, en, ja))
             const input = element('input')
             input.name = name
             input.type = type
@@ -207,7 +207,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             if (fields.password.value !== fields.confirmPassword.value) {
                 message.textContent = text(
                     '两次密码不一致',
-                    'Passwords do not match'
+                    'Passwords do not match',
+                    'パスワードが一致しません'
                 )
                 return
             }
@@ -216,7 +217,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             close.disabled = true
             message.textContent = text(
                 '正在提交。请勿重复注册…',
-                'Submitting. Do not submit again…'
+                'Submitting. Do not submit again…',
+                '送信中です。重複して登録しないでください…'
             )
             const payload = Object.fromEntries(
                 Object.entries(fields).map(([key, input]) => [key, input.value])
@@ -236,7 +238,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                     payload.email
                 message.textContent = text(
                     '注册成功。用户名已带回登录表单；请自行输入刚才设置的密码，测试连接并保存。',
-                    'Registered. The username was copied back to the login form; enter the password you just created, test the connection, and save.'
+                    'Registered. The username was copied back to the login form; enter the password you just created, test the connection, and save.',
+                    '登録に成功しました。ユーザー名をログインフォームへ反映しました。先ほど設定したパスワードを入力し、接続テスト後に保存してください。'
                 )
                 for (const input of Object.values(fields)) input.value = ''
                 accepted.checked = false
@@ -250,7 +253,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                 } else {
                     message.textContent += text(
                         ' 本次结果可能无法确认，请先返回登录尝试，不要立即重复注册。',
-                        ' The result may be uncertain; try logging in before registering again.'
+                        ' The result may be uncertain; try logging in before registering again.',
+                        ' 結果を確認できない可能性があります。すぐ再登録せず、ログイン画面へ戻ってサインインを試してください。'
                     )
                 }
             } finally {

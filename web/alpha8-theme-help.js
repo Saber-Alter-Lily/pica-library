@@ -1,3 +1,5 @@
+import { copy as t } from './locale-runtime.js'
+
 const $$ = (selector) => [...document.querySelectorAll(selector)]
 const $ = (selector) => document.querySelector(selector)
 
@@ -71,7 +73,7 @@ async function action(personalizationAction, payload = {}) {
 function fileBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader()
-        reader.onerror = () => reject(reader.error || new Error('无法读取图片'))
+        reader.onerror = () => reject(reader.error || new Error(t('无法读取图片','Could not read the image','画像を読み込めませんでした')))
         reader.onload = () =>
             resolve(String(reader.result || '').split(',', 2)[1] || '')
         reader.readAsDataURL(file)
@@ -155,7 +157,7 @@ function renderReferences() {
         const remove = document.createElement('button')
         remove.type = 'button'
         remove.textContent = '×'
-        remove.title = '移除图片'
+        remove.title = t('移除图片','Remove image','画像を削除')
         remove.onclick = () => {
             referenceFiles.splice(index, 1)
             renderReferences()
@@ -172,29 +174,29 @@ function updateReferenceHint(message = '') {
     const total = referenceFiles.reduce((sum, file) => sum + file.size, 0)
     node.textContent =
         message ||
-        `${referenceFiles.length} / ${CREATOR_MAX_FILES} 张 · ${bytes(total)} / ${bytes(CREATOR_MAX_TOTAL_BYTES)}`
+        `${referenceFiles.length} / ${CREATOR_MAX_FILES} ${t('张','images','枚')} · ${bytes(total)} / ${bytes(CREATOR_MAX_TOTAL_BYTES)}`
 }
 
 function acceptReferences(files) {
     for (const file of [...(files || [])]) {
         if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-            updateReferenceHint('仅支持 PNG / JPEG / WebP 参考图。')
+            updateReferenceHint(t('仅支持 PNG / JPEG / WebP 参考图。','Only PNG / JPEG / WebP reference images are supported.','参照画像は PNG / JPEG / WebP のみに対応しています。'))
             continue
         }
         if (file.size > CREATOR_MAX_FILE_BYTES) {
             updateReferenceHint(
-                `${file.name} 超过单张 ${bytes(CREATOR_MAX_FILE_BYTES)} 限制。`
+                t(`${file.name} 超过单张 ${bytes(CREATOR_MAX_FILE_BYTES)} 限制。`,`${file.name} exceeds the ${bytes(CREATOR_MAX_FILE_BYTES)} per-image limit.`,`${file.name} は1枚あたり ${bytes(CREATOR_MAX_FILE_BYTES)} の上限を超えています。`)
             )
             continue
         }
         if (referenceFiles.length >= CREATOR_MAX_FILES) {
-            updateReferenceHint(`最多上传 ${CREATOR_MAX_FILES} 张参考图。`)
+            updateReferenceHint(t(`最多上传 ${CREATOR_MAX_FILES} 张参考图。`,`You can upload up to ${CREATOR_MAX_FILES} reference images.`,`参照画像は最大 ${CREATOR_MAX_FILES} 枚までアップロードできます。`))
             break
         }
         const total = referenceFiles.reduce((sum, item) => sum + item.size, 0)
         if (total + file.size > CREATOR_MAX_TOTAL_BYTES) {
             updateReferenceHint(
-                `参考图总大小请控制在 ${bytes(CREATOR_MAX_TOTAL_BYTES)} 内。`
+                t(`参考图总大小请控制在 ${bytes(CREATOR_MAX_TOTAL_BYTES)} 内。`,`Keep the total reference-image size under ${bytes(CREATOR_MAX_TOTAL_BYTES)}.`,`参照画像の合計サイズは ${bytes(CREATOR_MAX_TOTAL_BYTES)} 未満にしてください。`)
             )
             break
         }
@@ -205,30 +207,29 @@ function acceptReferences(files) {
 }
 
 function studioMarkup() {
-    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><div class="help-heading"><h3>个性化装扮</h3><button type="button" class="info-tip" aria-label="查看个性化装扮说明" data-info-tip="只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。">!</button></div></div><span class="a83-state a83-good">已解锁</span></div>
-<div class="a85-steps"><span class="a85-step">1 · 描述与参考图</span><span class="a85-step">2 · 导出 ZIP 给 AI</span><span class="a85-step">3 · 导入 AI 返回包</span><span class="a85-step">4 · 自动同步手机</span></div>
+    return `<div class="section-heading"><div><p class="eyebrow">Theme Studio</p><div class="help-heading"><h3>${t('个性化装扮','Personalization','カスタマイズ')}</h3><button type="button" class="info-tip" aria-label="${t('查看个性化装扮说明','View personalization help','カスタマイズの説明を見る')}" data-info-tip="${t('只需要写一句你想要的风格并上传角色参考图。网页会把固定提示词、规范、模板和参考图一起打包给 AI；AI 返回装扮包后，拖回来即可应用。','Describe the style you want and upload character references. Pica Library packages the fixed prompt, specification, template and references for the AI; drop the returned theme pack here to apply it.','希望するスタイルを一文で説明し、キャラクター参照画像をアップロードします。固定プロンプト・仕様・テンプレート・参照画像をAI向けにまとめ、AIが返したテーマパックをここへドロップすると適用できます。')}">!</button></div></div><span class="a83-state a83-good">${t('已解锁','Unlocked','利用可能')}</span></div>
+<div class="a85-steps"><span class="a85-step">1 · ${t('描述与参考图','Description & references','説明と参照画像')}</span><span class="a85-step">2 · ${t('导出 ZIP 给 AI','Export ZIP for AI','AI用ZIPを書き出す')}</span><span class="a85-step">3 · ${t('导入 AI 返回包','Import AI result','AIの返却パックを読み込む')}</span><span class="a85-step">4 · ${t('自动同步手机','Sync to phone','スマートフォンへ同期')}</span></div>
 <div class="a85-workflow">
-<section class="a85-box"><div class="help-heading"><h4>制作装扮 · Theme Creator Kit</h4><button type="button" class="info-tip" aria-label="查看 Theme Creator Kit 说明" data-info-tip="主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。">!</button></div>
-<textarea id="a85-description" maxlength="4000" placeholder="例如：紫发二次元漫画向导，星空与白猫，薰衣草紫为主色，整体轻盈、可爱，但不要遮抢漫画封面。"></textarea>
-<label class="a85-upload" id="a85-reference-drop"><strong>上传角色 / 风格参考图</strong><br><span>PNG / JPEG / WebP · 最多 4 张</span><input id="a85-reference-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
+<section class="a85-box"><div class="help-heading"><h4>${t('制作装扮 · Theme Creator Kit','Create a theme · Theme Creator Kit','テーマ作成 · Theme Creator Kit')}</h4><button type="button" class="info-tip" aria-label="${t('查看 Theme Creator Kit 说明','View Theme Creator Kit help','Theme Creator Kit の説明を見る')}" data-info-tip="${t('主题描述是唯一必填项；角色图建议 1 张，额外风格图可选。','The theme description is the only required field. One character reference is recommended; extra style references are optional.','テーマ説明だけが必須です。キャラクター画像は1枚推奨、追加のスタイル参照画像は任意です。')}">!</button></div>
+<textarea id="a85-description" maxlength="4000" placeholder="${t('例如：紫发二次元漫画向导，星空与白猫，薰衣草紫为主色，整体轻盈、可爱，但不要遮抢漫画封面。','Example: a purple-haired manga guide with stars and a white cat, lavender as the main color, light and cute without covering comic covers.','例：紫髪の漫画ガイド、星空と白猫、ラベンダーを基調に軽く可愛らしく、表紙を邪魔しないデザイン。')}"></textarea>
+<label class="a85-upload" id="a85-reference-drop"><strong>${t('上传角色 / 风格参考图','Upload character / style references','キャラクター / スタイル参照画像をアップロード')}</strong><br><span>PNG / JPEG / WebP · ${t('最多 4 张','up to 4 images','最大4枚')}</span><input id="a85-reference-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label>
 <div id="a85-reference-grid" class="a85-reference-grid"></div><p id="a85-reference-message" class="status"></p>
-<div class="a83-row"><button id="a85-export" type="button" class="primary">导出给 AI</button><a class="button-link" href="./theme-pack-creator-prompt.txt" download>查看固定提示词</a><a class="button-link" href="./theme-pack-spec-v1.txt" download>查看装扮规范</a></div><p id="a85-export-message" class="status"></p></section>
-<section class="a85-box"><div class="help-heading"><h4>导入并应用</h4><button type="button" class="info-tip" aria-label="查看装扮导入说明" data-info-tip="把 AI 返回的 .pica-theme 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。">!</button></div>
-<label class="a85-theme-drop" id="a85-theme-drop"><strong>拖入 AI 返回的装扮包</strong><br><span>或点击选择文件 · 上限 24 MiB</span><input id="a85-theme-input" type="file" accept=".pica-theme,.zip,application/zip" hidden></label>
-<p id="a85-import-message" class="status"></p><div id="a85-theme-list"></div><div class="a85-mobile-note" id="a85-mobile-note">手机与电脑在同一局域网重新配对/同步一次后，会自动取得 Desktop 的已安装装扮，并跟随当前启用的装扮。</div></section>
+<div class="a83-row"><button id="a85-export" type="button" class="primary">${t('导出给 AI','Export for AI','AI向けに書き出す')}</button><a class="button-link" href="./theme-pack-creator-prompt.txt" download>${t('查看固定提示词','View fixed prompt','固定プロンプトを見る')}</a><a class="button-link" href="./theme-pack-spec-v1.txt" download>${t('查看装扮规范','View theme specification','テーマ仕様を見る')}</a></div><p id="a85-export-message" class="status"></p></section>
+<section class="a85-box"><div class="help-heading"><h4>${t('导入并应用','Import and apply','読み込んで適用')}</h4><button type="button" class="info-tip" aria-label="${t('查看装扮导入说明','View theme import help','テーマ読み込みの説明を見る')}" data-info-tip="${t('把 AI 返回的 .pica-theme 或 ZIP 直接拖入。Desktop 会独立安全校验，校验通过后立即应用到当前网页。','Drop the .pica-theme or ZIP returned by the AI here. Desktop validates it independently and applies it after the safety checks pass.','AIが返した .pica-theme または ZIP をここへドロップします。Desktop が独立して安全性を検証し、通過後すぐに現在の画面へ適用します。')}">!</button></div>
+<label class="a85-theme-drop" id="a85-theme-drop"><strong>${t('拖入 AI 返回的装扮包','Drop the AI-returned theme pack','AIが返したテーマパックをドロップ')}</strong><br><span>${t('或点击选择文件 · 上限 24 MiB','or click to choose a file · 24 MiB max','またはクリックしてファイルを選択 · 上限24 MiB')}</span><input id="a85-theme-input" type="file" accept=".pica-theme,.zip,application/zip" hidden></label>
+<p id="a85-import-message" class="status"></p><div id="a85-theme-list"></div><div class="a85-mobile-note" id="a85-mobile-note">${t('手机与电脑在同一局域网重新配对/同步一次后，会自动取得 Desktop 的已安装装扮，并跟随当前启用的装扮。','After the phone reconnects or syncs on the same LAN, it automatically receives Desktop theme packs and follows the active theme.','同じLANでスマートフォンを再接続または同期すると、Desktopのテーマパックを自動取得し、現在の有効テーマに追従します。')}</div></section>
 </div>`
 }
-
 async function exportCreatorKit() {
     const message = $('#a85-export-message')
     const button = $('#a85-export')
     const description = $('#a85-description')?.value?.trim() || ''
     if (description.length < 3) {
-        message.textContent = '先写一句主题描述。'
+        message.textContent = t('先写一句主题描述。','Write a short theme description first.','まずテーマの説明を入力してください。')
         return
     }
     button.disabled = true
-    message.textContent = '正在整理固定提示词、规范、模板和参考图…'
+    message.textContent = t('正在整理固定提示词、规范、模板和参考图…','Packaging the fixed prompt, specification, template and references…','固定プロンプト・仕様・テンプレート・参照画像をまとめています…')
     try {
         const references = []
         for (const file of referenceFiles)
@@ -245,9 +246,9 @@ async function exportCreatorKit() {
             result.fileName || 'Pica-Library-Theme-Creator-Kit.zip',
             result.dataBase64
         )
-        message.textContent = `已导出 ${result.fileName} · ${bytes(result.size)}。直接把这个 ZIP 交给 AI，并让它按包内说明返回完成的装扮包。`
+        message.textContent = t(`已导出 ${result.fileName} · ${bytes(result.size)}。直接把这个 ZIP 交给 AI，并让它按包内说明返回完成的装扮包。`,`Exported ${result.fileName} · ${bytes(result.size)}. Give this ZIP to the AI and ask it to return a completed theme pack following the package instructions.`,`${result.fileName} · ${bytes(result.size)} を書き出しました。このZIPをAIに渡し、同梱の説明に従って完成したテーマパックを返すよう依頼してください。`)
     } catch (error) {
-        message.textContent = `导出失败：${error.message}`
+        message.textContent = t(`导出失败：${error.message}`,`Export failed: ${error.message}`,`書き出しに失敗しました：${error.message}`)
     } finally {
         button.disabled = false
     }
@@ -257,14 +258,14 @@ async function importTheme(file) {
     const message = $('#a85-import-message')
     if (!file) return
     if (!/\.(pica-theme|zip)$/i.test(file.name)) {
-        message.textContent = '请选择 .pica-theme 或 .zip。'
+        message.textContent = t('请选择 .pica-theme 或 .zip。','Choose a .pica-theme or .zip file.','.pica-theme または .zip を選択してください。')
         return
     }
     if (!file.size || file.size > THEME_MAX_BYTES) {
-        message.textContent = `装扮包必须小于 ${bytes(THEME_MAX_BYTES)}。`
+        message.textContent = t(`装扮包必须小于 ${bytes(THEME_MAX_BYTES)}。`,`Theme pack must be smaller than ${bytes(THEME_MAX_BYTES)}.`,`テーマパックは ${bytes(THEME_MAX_BYTES)} 未満にしてください。`)
         return
     }
-    message.textContent = '正在校验、安装并应用装扮…'
+    message.textContent = t('正在校验、安装并应用装扮…','Validating, installing and applying the theme…','テーマを検証・インストール・適用中…')
     try {
         const current = await status()
         const response = await fetch('/api/v1/desktop/theme-import', {
@@ -280,10 +281,10 @@ async function importTheme(file) {
         if (!response.ok)
             throw new Error(result.error || `HTTP ${response.status}`)
         desktopStatus = null
-        message.textContent = `已安装并启用：${result.themePack?.name || file.name}。`
+        message.textContent = t(`已安装并启用：${result.themePack?.name || file.name}。`,`Installed and enabled: ${result.themePack?.name || file.name}.`,`インストールして有効化しました：${result.themePack?.name || file.name}。`)
         await refreshStudio(true)
     } catch (error) {
-        message.textContent = `安装失败：${error.message}`
+        message.textContent = t(`安装失败：${error.message}`,`Installation failed: ${error.message}`,`インストールに失敗しました：${error.message}`)
     } finally {
         const input = $('#a85-theme-input')
         if (input) input.value = ''
@@ -295,17 +296,17 @@ async function renderInstalled(current) {
     if (!target) return
     const p = current.personalization || {}
     const packs = Array.isArray(p.themePacks) ? p.themePacks : []
-    target.innerHTML = `<h4>已安装装扮</h4>${packs.length ? '' : '<p class="status">暂时没有装扮包。</p>'}`
+    target.innerHTML = `<h4>${t('已安装装扮','Installed themes','インストール済みテーマ')}</h4>${packs.length ? '' : `<p class="status">${t('暂时没有装扮包。','No theme packs installed yet.','テーマパックはまだありません。')}</p>`}`
     packs.forEach((pack) => {
         const row = document.createElement('div')
         row.className = 'a85-pack'
         const active = pack.id === p.activeThemeId
-        row.innerHTML = `<div class="a85-pack-main"><strong>${escapeHtml(pack.name || pack.id)}</strong><div class="status">${escapeHtml(pack.author || '')} · ${escapeHtml(pack.version || '')} · ${bytes(pack.size)}</div>${pack.description ? `<div class="status">${escapeHtml(pack.description)}</div>` : ''}</div><div class="a85-pack-actions">${active ? '<span class="a85-active">使用中</span>' : `<button type="button" data-a85-use="${escapeHtml(pack.id)}">应用</button>`}</div>`
+        row.innerHTML = `<div class="a85-pack-main"><strong>${escapeHtml(pack.name || pack.id)}</strong><div class="status">${escapeHtml(pack.author || '')} · ${escapeHtml(pack.version || '')} · ${bytes(pack.size)}</div>${pack.description ? `<div class="status">${escapeHtml(pack.description)}</div>` : ''}</div><div class="a85-pack-actions">${active ? `<span class="a85-active">${t('使用中','Active','使用中')}</span>` : `<button type="button" data-a85-use="${escapeHtml(pack.id)}">${t('应用','Apply','適用')}</button>`}</div>`
         target.appendChild(row)
     })
     const reset = document.createElement('div')
     reset.className = 'a83-row'
-    reset.innerHTML = `<button type="button" id="a85-reset" ${p.activeThemeId ? '' : 'disabled'}>恢复默认外观</button>`
+    reset.innerHTML = `<button type="button" id="a85-reset" ${p.activeThemeId ? '' : 'disabled'}>${t('恢复默认外观','Restore default appearance','既定の外観に戻す')}</button>`
     target.appendChild(reset)
     target.querySelectorAll('[data-a85-use]').forEach((button) => {
         button.onclick = async () => {
@@ -318,7 +319,7 @@ async function renderInstalled(current) {
                 await refreshStudio(true)
             } catch (error) {
                 $('#a85-import-message').textContent =
-                    `应用失败：${error.message}`
+                    t(`应用失败：${error.message}`,`Apply failed: ${error.message}`,`適用に失敗しました：${error.message}`)
                 button.disabled = false
             }
         }
@@ -332,7 +333,7 @@ async function renderInstalled(current) {
                 await refreshStudio(true)
             } catch (error) {
                 $('#a85-import-message').textContent =
-                    `恢复失败：${error.message}`
+                    t(`恢复失败：${error.message}`,`Restore failed: ${error.message}`,`復元に失敗しました：${error.message}`)
             }
         }
 }
@@ -561,8 +562,8 @@ async function refreshStudio(force = false) {
     const mobile = current.mobileBridge
     if ($('#a85-mobile-note') && mobile?.enabled)
         $('#a85-mobile-note').textContent = mobile.pairedDevices?.length
-            ? `已配对 ${mobile.pairedDevices.length} 台设备。手机下次启动或重新配对/同步时会自动取得装扮包并跟随当前启用装扮。`
-            : '尚未配对手机。完成一次局域网配对后，手机会自动取得 Desktop 的装扮包并跟随当前启用装扮。'
+            ? t(`已配对 ${mobile.pairedDevices.length} 台设备。手机下次启动或重新配对/同步时会自动取得装扮包并跟随当前启用装扮。`,`Paired with ${mobile.pairedDevices.length} device(s). On next start or reconnect/sync, the phone will receive theme packs and follow the active theme.`,`${mobile.pairedDevices.length} 台とペアリング済みです。次回起動または再接続/同期時にテーマパックを取得し、有効なテーマに追従します。`)
+            : t('尚未配对手机。完成一次局域网配对后，手机会自动取得 Desktop 的装扮包并跟随当前启用装扮。','No phone is paired yet. Pair once on the LAN and the phone will receive Desktop theme packs and follow the active theme.','スマートフォンはまだペアリングされていません。LANで一度ペアリングすると、Desktopのテーマパックを取得して有効テーマに追従します。')
 }
 
 function ensureRecommendationProgress() {
@@ -570,7 +571,7 @@ function ensureRecommendationProgress() {
     if (!host || $('#a85-recommend-progress')) return
     const card = document.createElement('div')
     card.id = 'a85-recommend-progress'
-    card.innerHTML = `<img id="a85-recommend-art" alt=""><div class="a85-progress-copy"><strong id="a85-recommend-phase">正在准备推荐…</strong><span id="a85-recommend-detail" class="status">正在读取推荐状态。</span><div class="a85-progress-line indeterminate" id="a85-recommend-line"><span></span></div></div>`
+    card.innerHTML = `<img id="a85-recommend-art" alt=""><div class="a85-progress-copy"><strong id="a85-recommend-phase">${t('正在准备推荐…','Preparing recommendations…','おすすめを準備中…')}</strong><span id="a85-recommend-detail" class="status">${t('正在读取推荐状态。','Reading recommendation status.','おすすめ状態を読み込み中。')}</span><div class="a85-progress-line indeterminate" id="a85-recommend-line"><span></span></div></div>`
     host.insertAdjacentElement('afterend', card)
 }
 
@@ -589,15 +590,17 @@ function updateRecommendationArtwork() {
     }
 }
 
-const buildPhaseLabels = {
-    profile: '分析收藏与兴趣画像',
-    intents: '规划推荐方向',
-    routes: '准备多路召回',
-    providers: '检查 Pica / E-H / ExH 可用性',
-    retrieve: '跨来源召回候选漫画',
-    rank: '排序、去重与偏好调节',
-    visual: '应用画风信号与最终重排',
-    complete: '正在保存推荐结果'
+function buildPhaseLabel(phase) {
+    return ({
+        profile:t('分析收藏与兴趣画像','Analyzing collection and preference profile','コレクションと嗜好プロフィールを解析'),
+        intents:t('规划推荐方向','Planning recommendation intent','おすすめ方向を計画'),
+        routes:t('准备多路召回','Preparing retrieval routes','複数の検索ルートを準備'),
+        providers:t('检查 Pica / E-H / ExH 可用性','Checking Pica / E-H / ExH availability','Pica / E-H / ExH の利用可否を確認'),
+        retrieve:t('跨来源召回候选漫画','Retrieving candidates across providers','複数配信元から候補を取得'),
+        rank:t('排序、去重与偏好调节','Ranking, deduplicating and applying preferences','順位付け・重複排除・嗜好調整'),
+        visual:t('应用画风信号与最终重排','Applying visual-style signals and final reranking','画風シグナルを適用して最終再順位付け'),
+        complete:t('正在保存推荐结果','Saving recommendation results','おすすめ結果を保存中')
+    })[phase] || ''
 }
 
 function startRecommendationWatch() {
@@ -612,9 +615,9 @@ function startRecommendationWatch() {
     recommendationWatchBaselineCycleId = null
     recommendationWatchStartedAt = Date.now()
     card.classList.add('active')
-    $('#a85-recommend-phase').textContent = '正在启动推荐生成…'
+    $('#a85-recommend-phase').textContent = t('正在启动推荐生成…','Starting recommendation generation…','おすすめ生成を開始中…')
     $('#a85-recommend-detail').textContent =
-        '下方暂时保留上一轮推荐；新一轮完成后会自动切换。'
+        t('下方暂时保留上一轮推荐；新一轮完成后会自动切换。','The previous recommendations stay visible until the new round finishes, then they switch automatically.','新しいラウンドが完了するまで前回のおすすめを表示し、完了後に自動で切り替えます。')
     $('#a85-recommend-line').classList.add('indeterminate')
     $('#a85-recommend-line').querySelector('span').style.width = ''
     if (recommendationTimer) clearInterval(recommendationTimer)
@@ -638,7 +641,7 @@ async function pollRecommendationProgress() {
         if (current.buildingCycleId) {
             card.classList.add('active')
             $('#a85-recommend-phase').textContent =
-                buildPhaseLabels[progress.phase] || '正在生成推荐…'
+                buildPhaseLabel(progress.phase) || t('正在生成推荐…','Generating recommendations…','おすすめを生成中…')
             const done = Number(progress.done || 0)
             const total = Number(progress.total || 0)
             const elapsed = recommendationWatchStartedAt
@@ -655,13 +658,13 @@ async function pollRecommendationProgress() {
                     Math.min(100, Math.round((done * 100) / total))
                 )
                 $('#a85-recommend-detail').textContent =
-                    '下方仍显示上一轮结果，完成后自动切换 · ' +
+                    t('下方仍显示上一轮结果，完成后自动切换','Previous results stay visible and switch automatically when complete','前回の結果を表示中。完了後に自動で切り替え') + ' · ' +
                     done +
                     ' / ' +
                     total +
                     ' · ' +
                     percent +
-                    '% · 已用时 ' +
+                    '% · ' + t('已用时','Elapsed','経過') + ' ' +
                     elapsed +
                     's'
                 $('#a85-recommend-line').classList.remove('indeterminate')
@@ -669,7 +672,7 @@ async function pollRecommendationProgress() {
                     percent + '%'
             } else {
                 $('#a85-recommend-detail').textContent =
-                    '后台仍在处理；下方不是新结果 · 已用时 ' +
+                    t('后台仍在处理；下方不是新结果','Processing continues in the background; the results below are not new yet','バックグラウンドで処理中。下の結果はまだ新しいものではありません') + ' · ' + t('已用时','Elapsed','経過') + ' ' +
                     elapsed +
                     's'
                 $('#a85-recommend-line').classList.add('indeterminate')
@@ -704,10 +707,10 @@ async function pollRecommendationProgress() {
         $('#a85-recommend-line').classList.remove('indeterminate')
         $('#a85-recommend-line').querySelector('span').style.width = '100%'
         if (changed) {
-            $('#a85-recommend-phase').textContent = '新一轮推荐已更新'
+            $('#a85-recommend-phase').textContent = t('新一轮推荐已更新','New recommendation round is ready','新しいおすすめラウンドを更新しました')
             const shortCycle = String(current.activeCycleId || '').slice(0, 8)
             $('#a85-recommend-detail').textContent =
-                '已切换到新结果' +
+                t('已切换到新结果','Switched to the new results','新しい結果に切り替えました') +
                 (shortCycle ? ' · cycle ' + shortCycle : '') +
                 ' · ' +
                 new Date().toLocaleTimeString()
@@ -715,7 +718,7 @@ async function pollRecommendationProgress() {
             $('#a85-recommend-phase').textContent =
                 '推荐生成已结束，但当前结果未切换'
             $('#a85-recommend-detail').textContent =
-                '下方仍是上一轮结果；请查看页面错误提示后重试。'
+                t('下方仍是上一轮结果；请查看页面错误提示后重试。','The previous results are still shown. Check the page error and try again.','前回の結果が表示されたままです。ページのエラーを確認して再試行してください。')
         }
         decorateProgress()
         recommendationCompletionTimer = window.setTimeout(() => {
@@ -725,9 +728,9 @@ async function pollRecommendationProgress() {
         recommendationWatchStartedAt = 0
         return false
     } catch (error) {
-        $('#a85-recommend-phase').textContent = '正在等待推荐服务响应'
+        $('#a85-recommend-phase').textContent = t('正在等待推荐服务响应','Waiting for the recommendation service','おすすめサービスの応答待ち')
         $('#a85-recommend-detail').textContent =
-            '暂时无法读取实时进度：' +
+            t('暂时无法读取实时进度：','Could not read live progress: ','リアルタイム進捗を読み込めません：') +
             String(error?.message || error)
         return false
     }
@@ -958,4 +961,15 @@ else void bootstrap()
 window.addEventListener('pagehide', () => {
     if (progressTimer) clearInterval(progressTimer)
     if (recommendationTimer) clearInterval(recommendationTimer)
+})
+
+
+document.addEventListener('pica-language-change', () => {
+    void refreshStudio(true)
+    const progress = $('#a85-recommend-progress')
+    if (progress) {
+        progress.remove()
+        ensureRecommendationProgress()
+        updateRecommendationArtwork()
+    }
 })

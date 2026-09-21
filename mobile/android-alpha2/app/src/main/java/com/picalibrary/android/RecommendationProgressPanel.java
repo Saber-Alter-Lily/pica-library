@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -29,6 +30,8 @@ final class RecommendationProgressPanel extends LinearLayout {
     private final Runnable onFinished;
     private final TextView phase,detail;
     private final ProgressBar bar;
+    private final LinearLayout actions;
+    private final Button pause,resume,cancel;
     private final FrameLayout progressHost;
     private final ImageView progressHead;
     private boolean attached,sawActive,finishedDispatched;private int wobble=1;
@@ -41,10 +44,16 @@ final class RecommendationProgressPanel extends LinearLayout {
         progressHost=new FrameLayout(context);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,Ui.dp(context,32));addView(progressHost,hp);
         bar=new ProgressBar(context,null,android.R.attr.progressBarStyleHorizontal);bar.setProgressTintList(ColorStateList.valueOf(ThemePackStore.progressFill(context)));bar.setProgressBackgroundTintList(ColorStateList.valueOf(ThemePackStore.progressTrack(context)));FrameLayout.LayoutParams bp=new FrameLayout.LayoutParams(-1,Ui.dp(context,7),Gravity.CENTER_VERTICAL);bp.setMargins(Ui.dp(context,2),0,Ui.dp(context,2),0);progressHost.addView(bar,bp);
         progressHead=new ImageView(context);Drawable head=ThemePackStore.mascotHeadDrawable(context);if(head!=null)progressHead.setImageDrawable(head);progressHead.setScaleType(ImageView.ScaleType.FIT_CENTER);FrameLayout.LayoutParams ip=new FrameLayout.LayoutParams(Ui.dp(context,26),Ui.dp(context,26));ip.gravity=Gravity.CENTER_VERTICAL;progressHost.addView(progressHead,ip);progressHead.setVisibility(GONE);if(ThemePackStore.progressSparkle(context))progressHead.setElevation(Ui.dp(context,4));
+        actions=new LinearLayout(context);actions.setOrientation(HORIZONTAL);actions.setGravity(Gravity.CENTER_VERTICAL);
+        pause=Ui.button(context,"暂停",v->NativeRecommendationJobs.pause(context),true);
+        resume=Ui.button(context,"继续",v->NativeRecommendationJobs.resume(context),true);
+        cancel=Ui.button(context,"取消本轮",v->NativeRecommendationJobs.cancel(context),true);
+        actions.addView(pause);actions.addView(resume);actions.addView(cancel);addView(actions);
+        setControls(false,false,false);
         setVisibility(GONE);
     }
 
-    void begin(){sawActive=true;finishedDispatched=false;phase.setText(LocalizedText.ui("正在启动推荐生成…"));detail.setText(LocalizedText.ui("请保持网络可用，完成后本区域会自动消失。"));bar.setIndeterminate(true);progressHead.setVisibility(GONE);setVisibility(VISIBLE);pollSoon(60);}
+    void begin(){sawActive=true;finishedDispatched=false;phase.setText(LocalizedText.ui("正在启动推荐生成…"));detail.setText(LocalizedText.ui("可以离开当前页面，任务会在后台继续；也可以暂停或取消。"));bar.setIndeterminate(true);progressHead.setVisibility(GONE);setControls(true,false,true);setVisibility(VISIBLE);pollSoon(60);}
 
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();attached=true;pollSoon(0);}
     @Override protected void onDetachedFromWindow(){attached=false;main.removeCallbacksAndMessages(null);io.shutdownNow();super.onDetachedFromWindow();}
@@ -53,12 +62,27 @@ final class RecommendationProgressPanel extends LinearLayout {
     private void query(){if((!attached&&getWindowToken()==null)||!querying.compareAndSet(false,true))return;io.execute(()->{State state=readState(getContext());main.post(()->{querying.set(false);apply(state);if(attached)pollSoon(POLL_MS);});});}
 
     private void apply(State state){
-        if(state==null){if(!sawActive)setVisibility(GONE);return;}
-        if(state.active){sawActive=true;setVisibility(VISIBLE);phase.setText(state.phase);detail.setText(state.detail);if(state.total>0){bar.setIndeterminate(false);bar.setMax(Math.max(1,state.total));bar.setProgress(Math.max(0,Math.min(state.done,state.total)));moveHead(state.done,state.total);}else{bar.setIndeterminate(true);progressHead.setVisibility(GONE);}return;}
-        progressHead.setVisibility(GONE);
-        if(state.failed){setVisibility(VISIBLE);bar.setIndeterminate(false);bar.setProgress(0);phase.setText(LocalizedText.ui("推荐生成失败"));detail.setText(state.detail.isEmpty()?LocalizedText.ui("请检查网络后重新生成。"):state.detail);return;}
+        boolean paused=NativeRecommendationJobs.paused(getContext());
+        if(paused){
+            sawActive=true;setVisibility(VISIBLE);bar.setIndeterminate(false);progressHead.setVisibility(GONE);
+            phase.setText(LocalizedText.ui("推荐生成已暂停"));
+            detail.setText(LocalizedText.ui("继续会重新开始本轮生成；上一轮可用推荐保持不变。"));
+            setControls(false,true,true);
+            return;
+        }
+        if(state==null){setControls(false,false,false);if(!sawActive)setVisibility(GONE);return;}
+        if(state.active){sawActive=true;setVisibility(VISIBLE);setControls(true,false,true);phase.setText(state.phase);detail.setText(state.detail);if(state.total>0){bar.setIndeterminate(false);bar.setMax(Math.max(1,state.total));bar.setProgress(Math.max(0,Math.min(state.done,state.total)));moveHead(state.done,state.total);}else{bar.setIndeterminate(true);progressHead.setVisibility(GONE);}return;}
+        setControls(false,false,false);progressHead.setVisibility(GONE);
+        if(state.failed){setVisibility(VISIBLE);bar.setIndeterminate(false);bar.setProgress(0);phase.setText(LocalizedText.ui("推荐生成失败"));detail.setText(state.detail.isEmpty()?LocalizedText.ui("请检查网络后重新生成；上一轮推荐仍然可用。"):state.detail);return;}
         setVisibility(GONE);
         if(sawActive&&!finishedDispatched&&state.succeeded){finishedDispatched=true;if(onFinished!=null)onFinished.run();}
+    }
+
+    private void setControls(boolean canPause,boolean canResume,boolean canCancel){
+        actions.setVisibility((canPause||canResume||canCancel)?VISIBLE:GONE);
+        pause.setVisibility(canPause?VISIBLE:GONE);
+        resume.setVisibility(canResume?VISIBLE:GONE);
+        cancel.setVisibility(canCancel?VISIBLE:GONE);
     }
 
     private void moveHead(int done,int total){Drawable drawable=progressHead.getDrawable();String style=ThemePackStore.progressStyle(getContext());if(drawable==null||"classic".equals(style)||total<=0){progressHead.setVisibility(GONE);return;}progressHead.setVisibility(VISIBLE);progressHost.post(()->{float ratio=Math.max(0f,Math.min(1f,done/(float)Math.max(1,total)));float x=ratio*Math.max(0,progressHost.getWidth()-progressHead.getWidth());String motion=ThemePackStore.progressMotion(getContext());float y=0f,rotation=0f;if("bobble".equals(motion)){wobble=-wobble;y=Ui.dp(getContext(),2)*wobble;rotation=4f*wobble;}else if("hop".equals(motion)){wobble=-wobble;y=wobble>0?0f:-Ui.dp(getContext(),5);}progressHead.animate().x(x).translationY(y).rotation(rotation).setDuration(320).start();});}

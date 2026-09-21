@@ -1,0 +1,147 @@
+name: Localization Onboarding Test Packages (unpublished)
+
+on:
+  push:
+    branches:
+      - dev/localization-onboarding-v1
+    paths:
+      - '.github/workflows/localization-onboarding-test-packages.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-test:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - name: Install and validate package inputs
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm type:check
+          pnpm web:check
+      - name: Fetch checksum-pinned v0.4.3 launcher base
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $target = 'artifacts/release-base/Pica-Library-v0.4.3-windows-x64.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.3/Pica-Library-v0.4.3-windows-x64.zip' -OutFile $target
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $target).Hash.ToLowerInvariant()
+          if ($hash -ne '36283292a1b3aefb1032b11c5064663bef9176d4bf32562be6a3f531c84ac733') {
+            throw "Official v0.4.3 package checksum mismatch: $hash"
+          }
+      - name: Build current-branch Windows package
+        shell: pwsh
+        env:
+          PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+        run: |
+          ./scripts/build-windows-package.ps1
+          $built = 'artifacts/Pica-Library-v0.4.4-windows-x64.zip'
+          if (-not (Test-Path -LiteralPath $built)) { throw 'Windows package was not created' }
+          ./scripts/test-windows-artifact.ps1 -Zip $built
+
+          $work = Join-Path $env:RUNNER_TEMP 'pica-localization-test'
+          $stage = Join-Path $work 'Pica-Library-Localization-Onboarding-Test-Windows-x64'
+          $out = 'candidate/localization-onboarding-windows'
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work,$out
+          New-Item -ItemType Directory -Force -Path $stage,$out | Out-Null
+          Expand-Archive -LiteralPath $built -DestinationPath $stage
+          @"
+          UNPUBLISHED MANUAL-QA BUILD
+          Branch: dev/localization-onboarding-v1
+          Source SHA: $env:GITHUB_SHA
+          Includes trilingual UI, onboarding, and Issue #54 UX fixes.
+          This build uses the normal Pica Library user-data location:
+          %LOCALAPPDATA%\Pica Library
+          It is not a GitHub Release and is not advertised through the update channel.
+          "@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $stage 'TEST_BUILD.txt')
+
+          $zip = Join-Path $out 'Pica-Library-Localization-Onboarding-Test-Windows-x64.zip'
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+          ./scripts/test-windows-artifact.ps1 -Zip $zip
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          "$sha  Pica-Library-Localization-Onboarding-Test-Windows-x64.zip" | Set-Content -Encoding ascii -LiteralPath (Join-Path $out 'SHA256SUMS.txt')
+          $env:GITHUB_SHA | Set-Content -Encoding ascii -LiteralPath (Join-Path $out 'SOURCE_SHA.txt')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Localization-Onboarding-Test-Windows
+          path: candidate/localization-onboarding-windows/
+          retention-days: 3
+          if-no-files-found: error
+
+  android-test:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test and lint Android candidate
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Build same-package signed test APK
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+          PICA_ANDROID_VERSION_CODE: '47'
+          PICA_ANDROID_VERSION_NAME: '0.4.5-test.1'
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_PREVIEW_KEYSTORE_B64"
+          test -n "$ANDROID_PREVIEW_KEYSTORE_PASSWORD"
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-localization-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -f -- "$ANDROID_PREVIEW_KEYSTORE_PATH"; rmdir -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+
+          gradle :app:assembleRelease --no-daemon
+          apk=app/build/outputs/apk/release/app-release.apk
+          test -f "$apk"
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/pica-test-cert.txt"
+          fingerprint=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/pica-test-cert.txt")
+          curl -fsSL 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.4/Pica-Library-Android-Preview.cert-sha256' -o "$RUNNER_TEMP/formal-cert.txt"
+          formal_fingerprint=$(tr -d '\r\n ' < "$RUNNER_TEMP/formal-cert.txt")
+          test -n "$formal_fingerprint"
+          test "$fingerprint" = "$formal_fingerprint"
+
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/pica-test-package.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='47' versionName='0.4.5-test.1'" "$RUNNER_TEMP/pica-test-package.txt"
+          grep -q "application-label:'Pica Library'" "$RUNNER_TEMP/pica-test-package.txt"
+
+          mkdir -p candidate-localization
+          cp "$apk" candidate-localization/Pica-Library-Android-v47-Localization-Onboarding-Test.apk
+          cp "$RUNNER_TEMP/pica-test-package.txt" candidate-localization/PACKAGE_INFO.txt
+          printf '%s\n' "$fingerprint" > candidate-localization/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate-localization/SOURCE_SHA.txt
+          printf '%s\n' 'UNPUBLISHED SAME-PACKAGE MANUAL-QA BUILD. Installs over formal v46 and preserves app data. Not published to the update channel.' > candidate-localization/STATUS.txt
+          (cd candidate-localization && sha256sum Pica-Library-Android-v47-Localization-Onboarding-Test.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Localization-Onboarding-Test-Android
+          path: mobile/android-alpha2/candidate-localization/
+          retention-days: 3
+          if-no-files-found: error

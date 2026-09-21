@@ -45,6 +45,7 @@ async function visibleText(page) {
         while ((node = walker.nextNode())) {
             const parent = node.parentElement
             if (!parent) continue
+            if (parent.closest('#a87-language-panel, .language-control')) continue
             const style = getComputedStyle(parent)
             if (style.display === 'none' || style.visibility === 'hidden') continue
             const rect = parent.getBoundingClientRect()

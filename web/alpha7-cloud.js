@@ -241,7 +241,12 @@ function ensureProgressBox() {
         <p class="status">${t('整库','Whole library','ライブラリ全体')} · <span id="remote-progress-overall-text">0/0 ${t('本','works','作品')} · 0/0 ${t('页','pages','ページ')} · 0 B</span></p>
         <progress id="remote-progress-overall" max="100" value="0" style="width:100%;height:14px"></progress>
         <p class="status" style="margin-top:8px">${t('当前','Current','現在')} · <strong id="remote-progress-current-title">${t('准备中','Preparing','準備中')}</strong> · <span id="remote-progress-current-text">0/0 ${t('页','pages','ページ')}</span></p>
-        <progress id="remote-progress-current" max="100" value="0" style="width:100%;height:14px"></progress>`
+        <progress id="remote-progress-current" max="100" value="0" style="width:100%;height:14px"></progress>
+        <div id="remote-progress-actions" class="actions" hidden style="margin-top:10px">
+            <button id="remote-progress-pause" type="button">${t('暂停','Pause','一時停止')}</button>
+            <button id="remote-progress-resume" type="button" hidden>${t('继续','Resume','再開')}</button>
+            <button id="remote-progress-cancel" type="button">${t('取消同步','Cancel sync','同期をキャンセル')}</button>
+        </div>`
     anchor.insertAdjacentElement('afterend', box)
     return box
 }
@@ -249,9 +254,32 @@ function ensureProgressBox() {
 function renderProgress(progress) {
     const box = ensureProgressBox()
     if (!box || !progress) return
-    const visible = ['scanning', 'uploading', 'publishing', 'complete', 'failed'].includes(progress.phase)
+    const visible = [
+        'scanning',
+        'uploading',
+        'publishing',
+        'pausing',
+        'paused',
+        'cancelling',
+        'complete',
+        'failed',
+        'cancelled'
+    ].includes(progress.phase)
     box.hidden = !visible
     if (!visible) return
+    const actions = $('#remote-progress-actions')
+    const pause = $('#remote-progress-pause')
+    const resume = $('#remote-progress-resume')
+    const cancel = $('#remote-progress-cancel')
+    if (actions && pause && resume && cancel) {
+        const active = Boolean(
+            progress.canPause || progress.canResume || progress.canCancel
+        )
+        actions.hidden = !active
+        pause.hidden = !progress.canPause
+        resume.hidden = !progress.canResume
+        cancel.hidden = !progress.canCancel
+    }
     $('#remote-progress-overall').value = percent(progress.completedPages, progress.totalPages)
     $('#remote-progress-current').value = percent(progress.currentComicCompletedPages, progress.currentComicPages)
     $('#remote-progress-overall-text').textContent = `${progress.completedComics || 0}/${progress.totalComics || 0} ${t('本','works','作品')} · ${progress.completedPages || 0}/${progress.totalPages || 0} ${t('页','pages','ページ')} · ${bytes(progress.uploadedBytes)}`
@@ -270,6 +298,40 @@ async function pollProgress() {
 }
 function startProgressPolling() { stopProgressPolling(); pollProgress(); progressTimer = setInterval(pollProgress, 700) }
 function stopProgressPolling() { if (progressTimer) clearInterval(progressTimer); progressTimer = null }
+
+async function controlRemoteSync(action) {
+    const buttons = [
+        $('#remote-progress-pause'),
+        $('#remote-progress-resume'),
+        $('#remote-progress-cancel')
+    ].filter(Boolean)
+    buttons.forEach((button) => (button.disabled = true))
+    try {
+        const result = await post('/api/v1/desktop/settings', {
+            remoteStorageAction:
+                action === 'pause'
+                    ? 'pause-sync'
+                    : action === 'resume'
+                      ? 'resume-sync'
+                      : 'cancel-sync'
+        })
+        renderProgress(result.syncProgress)
+        if (action === 'pause')
+            message(t('已请求暂停，当前正在上传的页面完成后会暂停。','Pause requested. The currently uploading pages will finish before the task pauses.','一時停止を要求しました。現在アップロード中のページが完了してから停止します。'))
+        else if (action === 'resume')
+            message(t('正在继续网盘同步。','Resuming cloud sync.','クラウド同期を再開しています。'))
+        else
+            message(t('正在取消；当前正在上传的页面完成后停止。','Cancelling. The currently uploading pages will finish before the run stops.','キャンセル中です。現在アップロード中のページが完了してから停止します。'))
+    } catch (error) {
+        message(t(`任务控制失败：${error.message}`,`Task control failed: ${error.message}`,`タスク操作に失敗しました：${error.message}`), true)
+    } finally {
+        buttons.forEach((button) => (button.disabled = false))
+    }
+}
+
+$('#remote-progress-pause')?.addEventListener('click', () => void controlRemoteSync('pause'))
+$('#remote-progress-resume')?.addEventListener('click', () => void controlRemoteSync('resume'))
+$('#remote-progress-cancel')?.addEventListener('click', () => void controlRemoteSync('cancel'))
 
 function renderPlan(plan) {
     const box = $('#remote-sync-plan')
@@ -394,7 +456,14 @@ $('#remote-sync')?.addEventListener('click', async () => {
         message(t(`同步完成 · ${target} · 云端 ${result.comicCount || 0} 部 · 上传 ${result.uploadedObjects || 0} 个对象 · ${bytes(result.uploadedBytes)}${skipped ? ` · 跳过 ${skipped} 部` : ''}。`,`Sync complete · ${target} · ${result.comicCount || 0} cloud works · ${result.uploadedObjects || 0} objects uploaded · ${bytes(result.uploadedBytes)}${skipped ? ` · ${skipped} skipped` : ''}.`,`同期完了 · ${target} · クラウド ${result.comicCount || 0} 作品 · ${result.uploadedObjects || 0} オブジェクトをアップロード · ${bytes(result.uploadedBytes)}${skipped ? ` · ${skipped} 作品をスキップ` : ''}。`))
         $('#remote-sync-plan').hidden = true
         await load(selectedTargetId)
-    } catch (error) { await pollProgress(); message(t(`同步失败：${error.message}`,`Sync failed: ${error.message}`,`同期に失敗しました：${error.message}`), true) }
+    } catch (error) {
+        await pollProgress()
+        const reason = String(error?.message || error)
+        if (/cancelled|canceled|已取消|キャンセル/i.test(reason))
+            message(t('同步已取消；已成功上传的对象会在下次同步时自动复用。','Sync cancelled. Successfully uploaded objects will be reused automatically next time.','同期をキャンセルしました。アップロード済みのオブジェクトは次回自動的に再利用されます。'))
+        else
+            message(t(`同步失败：${reason}`,`Sync failed: ${reason}`,`同期に失敗しました：${reason}`), true)
+    }
     finally { stopProgressPolling(); button.disabled = false }
 })
 

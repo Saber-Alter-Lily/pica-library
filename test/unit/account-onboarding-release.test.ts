@@ -8,28 +8,28 @@ describe('account onboarding distribution candidate', () => {
             'mobile/android-alpha2/app/build.gradle',
             'utf8'
         )
-        expect(pkg.version).toBe('0.4.5')
+        expect(pkg.version).toBe('0.4.6')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '48'"
+            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '49'"
         )
         expect(gradle).toContain('versionCode buildVersionCode')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.5'"
+            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.6'"
         )
         expect(gradle).toContain('versionName buildVersionName')
     })
 
-    it('requires the checksum-verified official v0.4.4 base without replacing the launcher', () => {
+    it('requires the checksum-verified official v0.4.5 base without replacing the launcher', () => {
         const script = fs.readFileSync(
             'scripts/build-windows-package.ps1',
             'utf8'
         )
-        expect(script).toContain("$version -eq '0.4.5'")
+        expect(script).toContain("$version -eq '0.4.6'")
         expect(script).toContain(
-            'artifacts\\release-base\\Pica-Library-v0.4.4-windows-x64.zip'
+            'artifacts\\release-base\\Pica-Library-v0.4.5-windows-x64.zip'
         )
         expect(script).toContain(
-            'cff1c7cf5d79300d8fa38e9faf9d7280c20df1641908fbf28a28e32d3de41bff'
+            'f5b93b4a81c78df17bbee793354d4e8df002fad6dcc9c432e334bb7c14fee901'
         )
         expect(script).toContain(
             'Launcher source changed since accepted stable package'

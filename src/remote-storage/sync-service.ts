@@ -250,8 +250,13 @@ export class RemoteLibrarySyncService {
                 await this.checkpoint()
                 const value = await this.localComic(summary.comicId)
                 if (value) comics.push(value)
+                else
+                    issues.push({
+                        comicId: summary.comicId,
+                        title: summary.title,
+                        reason: '没有可同步的本地章节文件'
+                    })
                 await new Promise<void>((resolve) => setImmediate(resolve))
-                else issues.push({ comicId: summary.comicId, title: summary.title, reason: '没有可同步的本地章节文件' })
             } catch (error) {
                 issues.push({
                     comicId: summary.comicId,

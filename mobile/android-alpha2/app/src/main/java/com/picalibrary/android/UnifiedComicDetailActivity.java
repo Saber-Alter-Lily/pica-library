@@ -10,7 +10,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Comic-first detail screen with actionable creator identity and explicit source/read actions. */
-public final class UnifiedComicDetailActivity extends Activity {
+public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
     private static final class ResolvedChapter {
         final String id,title,sourceKind,label;final int order,pages,priority;boolean picaBacked,ehBacked;
         ResolvedChapter(BridgeClient.ChapterItem item,String sourceKind,String label,int priority,boolean picaBacked,boolean ehBacked){this.id=item.id;this.title=item.title;this.order=item.order;this.pages=item.downloadedPictures;this.sourceKind=sourceKind;this.label=label;this.priority=priority;this.picaBacked=picaBacked;this.ehBacked=ehBacked;}

@@ -1,0 +1,66 @@
+name: Post-v0.4.7 Windows candidate (unpublished)
+
+on:
+  push:
+    branches:
+      - dev/post-v047-download-stability
+    paths:
+      - '.github/workflows/post-v047-windows-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-candidate:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - name: Re-run Desktop gates
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm type:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and smoke Windows package
+        shell: pwsh
+        run: |
+          pnpm build:windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $zip='artifacts\Pica-Library-v0.4.7-windows-x64.zip'
+          if (-not (Test-Path -LiteralPath $zip)) { throw 'Windows package was not created' }
+          ./scripts/test-windows-artifact.ps1 -Zip $zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          New-Item -ItemType Directory -Force -Path candidate | Out-Null
+          Copy-Item -LiteralPath $zip -Destination 'candidate\Pica-Library-v0.4.7-post-release-download-stability-test.zip'
+          $sha=(Get-FileHash -Algorithm SHA256 -LiteralPath 'candidate\Pica-Library-v0.4.7-post-release-download-stability-test.zip').Hash.ToLowerInvariant()
+          "$sha  Pica-Library-v0.4.7-post-release-download-stability-test.zip" | Set-Content -Encoding ascii 'candidate\SHA256SUMS.txt'
+          $env:GITHUB_SHA | Set-Content -Encoding ascii 'candidate\SOURCE_SHA.txt'
+          'UNPUBLISHED MANUAL-QA BUILD. Post-v0.4.7 download runtime stability candidate. Not connected to the stable update channel.' | Set-Content -Encoding utf8 'candidate\STATUS.txt'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: post-v047-download-stability-windows
+          path: candidate/
+          retention-days: 1
+          if-no-files-found: error

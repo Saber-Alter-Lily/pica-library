@@ -21,6 +21,22 @@
 #a89-onboarding-panel .a89-auto { display: flex; gap: 8px; align-items: center; }
 .driver-popover.pica-tour-popover { max-width: min(370px, calc(100vw - 28px)); }
 .driver-popover.pica-tour-popover .driver-popover-description { line-height: 1.55; }
+.driver-popover.pica-tour-popover .driver-popover-title { padding-right: 42px; }
+.driver-popover.pica-tour-popover .driver-popover-close-btn {
+    position: absolute !important;
+    top: 10px !important;
+    right: 10px !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    display: grid !important;
+    place-items: center;
+    border-radius: 10px !important;
+    line-height: 1 !important;
+    font-size: 18px !important;
+}
 .driver-popover.pica-tour-popover .driver-popover-footer { gap: 8px; flex-wrap: wrap; }
 .driver-popover.pica-tour-popover .driver-popover-navigation-btns { gap: 7px; flex-wrap: wrap; }
 .driver-popover.pica-tour-popover .pica-tour-skip {

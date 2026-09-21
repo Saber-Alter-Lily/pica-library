@@ -577,6 +577,29 @@ body.reader-active .reader-header {
     max-width: 100%;
     overflow-wrap: anywhere;
 }
+#settings-update .section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px 14px;
+    flex-wrap: wrap;
+}
+#settings-update .section-heading > div {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+#settings-update .section-heading .help-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+#settings-update #update-current-version {
+    position: static !important;
+    flex: 0 0 auto;
+    align-self: flex-start;
+    margin: 0 0 0 auto !important;
+    white-space: nowrap;
+}
 #settings-update #update-progress,
 #settings-update #update-message,
 #settings-update #a83-update-live,

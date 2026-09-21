@@ -214,112 +214,127 @@ function evalRenderSummary() {
     target.innerHTML = `
       <div class="v5-eval-grid">
         ${evalMetricCard(
-            '基础测试进度',
+            evalT('基础测试进度','Baseline test progress','基礎テスト進捗'),
             `<strong>${Math.min(exactRuns, 3)}/3</strong>`,
             exactRuns >= 3
-                ? '基础影子推荐轮次已经够用'
-                : '隔一段时间再运行一次即可，不要连续重复点击'
+                ? evalT('基础影子推荐轮次已经够用','Enough baseline shadow runs have been collected.','基礎 Shadow おすすめの実行回数は十分です。')
+                : evalT('隔一段时间再运行一次即可，不要连续重复点击','Run another shadow recommendation later; do not click repeatedly in succession.','時間を置いてもう一度 Shadow おすすめを実行してください。連続クリックは不要です。')
         )}
         ${evalMetricCard(
-            '安全检查',
+            evalT('安全检查','Safety check','安全チェック'),
             correctnessPass ? evalBadge('PASS') : evalBadge('FAIL'),
             correctnessPass
-                ? '没有把已拥有 / 已看过 / 硬屏蔽等内容漏进测试批次'
-                : '发现过滤泄漏，需要先修复'
+                ? evalT('没有把已拥有 / 已看过 / 硬屏蔽等内容漏进测试批次','Owned, already-viewed and hard-blocked items did not leak into the test batch.','所有済み・閲覧済み・ハードブロック済みの項目はテストバッチに混入していません。')
+                : evalT('发现过滤泄漏，需要先修复','A filtering leak was found and must be fixed first.','フィルタ漏れが見つかりました。先に修正が必要です。')
         )}
         ${evalMetricCard(
-            '后续真实行为',
+            evalT('后续真实行为','Future real behavior','後続の実行動'),
             evaluableRuns
                 ? `<strong>${evaluableRuns}/3</strong>`
-                : '<strong>等待积累</strong>',
+                : `<strong>${evalT('等待积累','Collecting data','データ蓄積中')}</strong>`,
             evaluableRuns
-                ? `成熟观察窗 ${matureRuns} · 已观察到 ${Number(support.maturePositiveEventCountAcrossWindows || 0)} 个成熟正向行为`
-                : `成熟观察窗 ${matureRuns} · 仍在观察 ${immatureRuns} 轮；继续正常使用即可`
+                ? evalT(
+                    `成熟观察窗 ${matureRuns} · 已观察到 ${Number(support.maturePositiveEventCountAcrossWindows || 0)} 个成熟正向行为`,
+                    `Mature windows ${matureRuns} · ${Number(support.maturePositiveEventCountAcrossWindows || 0)} mature positive events observed`,
+                    `成熟観察ウィンドウ ${matureRuns} · 成熟したポジティブ行動を ${Number(support.maturePositiveEventCountAcrossWindows || 0)} 件観測`
+                  )
+                : evalT(
+                    `成熟观察窗 ${matureRuns} · 仍在观察 ${immatureRuns} 轮；继续正常使用即可`,
+                    `Mature windows ${matureRuns} · ${immatureRuns} runs are still maturing; keep using the app normally.`,
+                    `成熟観察ウィンドウ ${matureRuns} · ${immatureRuns} 回は観察中です。通常どおり利用してください。`
+                  )
         )}
         ${evalMetricCard(
-            '正式推荐',
-            '<strong>未改变</strong>',
-            '影子推荐只在后台模拟，不会替换你现在看到的正式推荐'
+            evalT('正式推荐','Formal recommendations','正式おすすめ'),
+            `<strong>${evalT('未改变','Unchanged','変更なし')}</strong>`,
+            evalT('影子推荐只在后台模拟，不会替换你现在看到的正式推荐','Shadow recommendations only simulate in the background and never replace the formal recommendations you see.','Shadow おすすめはバックグラウンドでシミュレーションするだけで、表示中の正式おすすめは置き換えません。')
         )}
       </div>
       <div class="v5-eval-user-note">
-        <strong>你现在需要做的事：</strong>
-        正常使用软件即可。隔一段时间再运行一次影子推荐；系统会自动记录后续真实收藏、Like 和阅读结果。30 天观察窗走完整之前只显示为“正在积累”，不会提前计算正式准确率。
+        <strong>${evalT('你现在需要做的事：','What you need to do now:','今やること：')}</strong>
+        ${evalT(
+            '正常使用软件即可。隔一段时间再运行一次影子推荐；系统会自动记录后续真实收藏、Like 和阅读结果。30 天观察窗走完整之前只显示为“正在积累”，不会提前计算正式准确率。',
+            'Use the app normally. Run another shadow recommendation after some time; the system will automatically record later favorites, Likes and reading outcomes. Until the 30-day observation window matures, the result stays in a collecting state and formal accuracy is not calculated early.',
+            '通常どおりアプリを利用してください。時間を置いて Shadow おすすめを再実行すると、その後のお気に入り・Like・閲覧結果が自動記録されます。30日観察ウィンドウが完了するまでは「蓄積中」と表示し、正式な精度を早期計算しません。'
+        )}
       </div>
     `
 
     technicalTarget.innerHTML = `
       <div class="v5-eval-grid">
         ${evalMetricCard(
-            'P5 基线状态',
+            evalT('P5 基线状态','P5 baseline status','P5 ベースライン状態'),
             evalBadge(summary.status),
             `framework ${evalEsc(summary.frameworkVersion || '')}`
         )}
         ${evalMetricCard(
-            'P3 工程 Gate',
+            evalT('P3 工程 Gate','P3 engineering gate','P3 エンジニアリング Gate'),
             evalBadge(p3.verdict),
             `exact shadow runs ${exactRuns}`
         )}
         ${evalMetricCard(
             'P4 Visual Gate',
             evalBadge(visual.verdict),
-            'Visual 仍不自动激活'
+            evalT('Visual 仍不自动激活','Visual remains non-automatic.','Visual は引き続き自動有効化されません。')
         )}
         ${evalMetricCard(
             'Batch Precision@12',
-            accuracyAvailable ? evalPct(batch.precision12) : '等待数据',
+            accuracyAvailable ? evalPct(batch.precision12) : evalT('等待数据','Waiting for data','データ待ち'),
             accuracyAvailable
                 ? `Ranked P@12 ${evalPct(ranked.precision12)}`
-                : '没有成熟 future-outcome 时不把 0% 解释成模型失败'
+                : evalT('没有成熟 future-outcome 时不把 0% 解释成模型失败','Do not interpret 0% as model failure when no mature future outcome exists.','成熟した future outcome がない段階では、0% をモデル失敗とは解釈しません。')
         )}
         ${evalMetricCard(
             'Batch Recall@12',
-            accuracyAvailable ? evalPct(batch.recall12) : '等待数据',
+            accuracyAvailable ? evalPct(batch.recall12) : evalT('等待数据','Waiting for data','データ待ち'),
             accuracyAvailable
                 ? `Ranked R@12 ${evalPct(ranked.recall12)}`
                 : ''
         )}
         ${evalMetricCard(
             'Batch NDCG@12',
-            accuracyAvailable ? evalFmt(batch.ndcg12) : '等待数据',
+            accuracyAvailable ? evalFmt(batch.ndcg12) : evalT('等待数据','Waiting for data','データ待ち'),
             accuracyAvailable
                 ? `Hit@12 ${evalPct(batch.hit12)} · MRR ${evalFmt(batch.mrr)}`
                 : ''
         )}
         ${evalMetricCard(
-            '作者最大集中度',
+            evalT('作者最大集中度','Maximum author concentration','作者最大集中度'),
             evalPct(diversity.medianAuthorMaxShare),
             `IP ${evalPct(diversity.medianFandomMaxShare)} · Tag ${evalPct(diversity.medianTagMaxShare)}`
         )}
         ${evalMetricCard(
-            'Catalog Coverage',
+            evalT('目录覆盖率','Catalog Coverage','カタログカバレッジ'),
             evalPct(diversity.itemCoverage?.coverage),
             `${Number(diversity.itemCoverage?.distinctRecommendedItems || 0)} distinct / ${Number(diversity.itemCoverage?.catalogSize || 0)} catalog`
         )}
         ${evalMetricCard(
-            'Steerability',
+            evalT('可调性','Steerability','ステアラビリティ'),
             steer.summary?.passRate === null ||
             steer.summary?.passRate === undefined
-                ? '等待数据'
+                ? evalT('等待数据','Waiting for data','データ待ち')
                 : evalPct(steer.summary.passRate),
             `two-sided targets ${Number(steer.summary?.twoSidedTestableCount || 0)}`
         )}
         ${evalMetricCard(
-            '高级学习',
+            evalT('高级学习','Advanced learning','高度な学習'),
             evalBadge('DEFERRED'),
             `LTR=${Boolean(decisions.learningToRank)} · Bandit=${Boolean(decisions.contextualBandit)} · Active=${Boolean(decisions.activeLearning)}`
         )}
       </div>
       <div class="v5-eval-note">
-        当前评估只使用 exact current shadow modelVersion 和后续真实行为证据。
+        ${evalT(
+            '当前评估只使用 exact current shadow modelVersion 和后续真实行为证据。',
+            'The current evaluation uses only the exact current shadow modelVersion and subsequent real-behavior evidence.',
+            '現在の評価では exact current shadow modelVersion と、その後の実行動エビデンスだけを使用します。'
+        )}
         ${retrospective.discovery?.serendipity === 'NOT_YET_IDENTIFIABLE_WITH_CURRENT_LOGS'
-            ? 'Serendipity / long-tail 仍缺可靠日志定义，因此不会补造指标。'
+            ? evalT('Serendipity / long-tail 仍缺可靠日志定义，因此不会补造指标。','Serendipity / long-tail still lacks a reliable log definition, so no metric is fabricated.','Serendipity / long-tail は信頼できるログ定義がまだないため、指標を捏造しません。')
             : ''}
-        Advanced Learning 保持 ${evalEsc(decisions.advancedLearning || 'DEFERRED')}。
+        ${evalT('Advanced Learning 保持','Advanced Learning remains','Advanced Learning は')} ${evalEsc(decisions.advancedLearning || 'DEFERRED')}${evalT('。','.',' のままです。')}
       </div>
     `
 }
-
 function evalRenderCriteria() {
     const target = document.querySelector('#v5-eval-criteria')
     if (!target || !EVAL.summary) return

@@ -23,4 +23,10 @@ final class MobileTaskPauseStore {
     static boolean isPaused(Context context,String scope,String id){
         return prefs(context).getBoolean(key(scope,id),false);
     }
+    static void putBoolean(Context context,String scope,String id,String option,boolean value){
+        prefs(context).edit().putBoolean(key(scope,id)+":"+option,value).apply();
+    }
+    static boolean getBoolean(Context context,String scope,String id,String option,boolean fallback){
+        return prefs(context).getBoolean(key(scope,id)+":"+option,fallback);
+    }
 }

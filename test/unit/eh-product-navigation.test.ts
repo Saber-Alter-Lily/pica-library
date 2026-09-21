@@ -121,7 +121,7 @@ describe('source-oriented product navigation', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java', 'utf8')
     const detail = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java', 'utf8')
     const shell = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ShellPolicy.java', 'utf8')
-    expect(browse).toContain('setSingleChoiceItems(labels,checked')
+    expect(browse).toContain('setSingleChoiceItems(LocalizedText.ui(labels),checked')
     expect(browse).toContain('primaryButton("搜索"')
     expect(browse).toContain('showPicaUnavailable()')
     expect(browse).toContain('showExhProblem(EhCapabilityStore.Snapshot capability)')

@@ -80,9 +80,9 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
             (!remoteBehavior.isEmpty()&&!remoteBehavior.equals(local.behaviorGeneration));
 
         LinearLayout card=SettingsRow.panel(this,null);
-        card.addView(SettingsRow.statusLine(this,"手机 → 电脑",Ui.text(this,android+" 项待同步",13,android>0?Ui.PRIMARY:Ui.MUTED,true)));
-        card.addView(SettingsRow.statusLine(this,"电脑 → 手机",Ui.text(this,desktop+" 项偏好更新"+(packageChanged?" · 基础包有更新":""),13,(desktop>0||packageChanged)?Ui.PRIMARY:Ui.MUTED,true)));
-        card.addView(SettingsRow.statusLine(this,"人工冲突",Ui.text(this,conflictCount+" 项",13,conflictCount>0?Ui.BAD:Ui.MUTED,true)));
+        card.addView(SettingsRow.statusLine(this,"手机 → 电脑",Ui.rawText(this,LocalizedText.ui(this,android+" 项待同步",android+" items pending sync",android+" 件の同期待ち"),13,android>0?Ui.PRIMARY:Ui.MUTED,true)));
+        card.addView(SettingsRow.statusLine(this,"电脑 → 手机",Ui.rawText(this,LocalizedText.ui(this,desktop+" 项偏好更新",desktop+" preference updates",desktop+" 件の嗜好更新")+(packageChanged?LocalizedText.ui(this," · 基础包有更新"," · base package updated"," · 基盤パッケージ更新あり"):""),13,(desktop>0||packageChanged)?Ui.PRIMARY:Ui.MUTED,true)));
+        card.addView(SettingsRow.statusLine(this,"人工冲突",Ui.rawText(this,LocalizedText.ui(this,conflictCount+" 项",conflictCount+" items",conflictCount+" 件"),13,conflictCount>0?Ui.BAD:Ui.MUTED,true)));
         content.addView(card);
 
         LinearLayout versions=SettingsRow.panel(this,null);
@@ -92,11 +92,11 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
         versions.addView(SettingsRow.statusLine(this,"Canonical",Ui.text(this,shortId(local.canonicalGeneration)+" → "+shortId(remoteCanonical),12,Ui.MUTED,true)));
         versions.addView(SettingsRow.statusLine(this,"候选池",Ui.text(this,shortId(local.reservoirGeneration)+" → "+shortId(remoteReservoir),12,Ui.MUTED,true)));
         versions.addView(SettingsRow.statusLine(this,"近期行为",Ui.text(this,shortId(local.behaviorGeneration)+" → "+shortId(remoteBehavior),12,Ui.MUTED,true)));
-        versions.addView(SettingsRow.statusLine(this,"手机本地 Session",Ui.text(this,RecommendationEvidenceStore.sessionCount(this)+" 条行为 · 不同步",12,Ui.MUTED,true)));
+        versions.addView(SettingsRow.statusLine(this,"手机本地 Session",Ui.rawText(this,LocalizedText.ui(this,RecommendationEvidenceStore.sessionCount(this)+" 条行为 · 不同步",RecommendationEvidenceStore.sessionCount(this)+" behaviors · not synced",RecommendationEvidenceStore.sessionCount(this)+" 件の行動 · 同期しない"),12,Ui.MUTED,true)));
         content.addView(versions);
 
         if(conflictCount>0){
-            content.addView(Ui.button(this,"查看并解决 "+conflictCount+" 项冲突",v->resolveAndApply(),false),new LinearLayout.LayoutParams(-1,-2));
+            content.addView(Ui.button(this,LocalizedText.ui(this,"查看并解决 "+conflictCount+" 项冲突","View & resolve "+conflictCount+" conflicts",conflictCount+" 件の競合を確認して解決"),v->resolveAndApply(),false),new LinearLayout.LayoutParams(-1,-2));
         }else{
             content.addView(Ui.button(this,(android+desktop>0||packageChanged)?"双向同步":"刷新可复用基础",v->apply(new JSONArray()),false),new LinearLayout.LayoutParams(-1,-2));
         }
@@ -138,7 +138,7 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
             return;
         }
         new AlertDialog.Builder(this)
-            .setTitle(conflicts.length()+LocalizedText.ui(" 项偏好冲突"))
+            .setTitle(LocalizedText.ui(this,conflicts.length()+" 项偏好冲突",conflicts.length()+" preference conflicts",conflicts.length()+" 件の嗜好競合"))
             .setMessage(LocalizedText.ui("无需逐项确认。可以统一采用电脑或手机的修改；只有少数冲突需要分别判断时，再选择逐项处理。"))
             .setNegativeButton(LocalizedText.ui("全部用电脑"),(d,w)->apply(resolutionsFor(conflicts,"DESKTOP")))
             .setNeutralButton(LocalizedText.ui("逐项处理"),(d,w)->resolveOne(conflicts,0,new JSONArray()))
@@ -164,7 +164,7 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
         String identity=conflict.optString("identity","");
         String label=conflict.optString("label",identity);
         JSONObject base=conflict.optJSONObject("base"),desktop=conflict.optJSONObject("desktop"),android=conflict.optJSONObject("android");
-        String message="上次同步："+controlLabel(base)+"\n电脑："+controlLabel(desktop)+"\n手机："+controlLabel(android);
+        String message=LocalizedText.ui(this,"上次同步：","Last sync: ","前回同期：")+controlLabel(base)+"\n"+LocalizedText.ui(this,"电脑：","Desktop: ","Desktop：")+controlLabel(desktop)+"\n"+LocalizedText.ui(this,"手机：","Phone: ","スマートフォン：")+controlLabel(android);
         new AlertDialog.Builder(this)
             .setTitle(LocalizedText.ui("偏好冲突 · ")+label)
             .setMessage(message)
@@ -179,14 +179,16 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
     }
 
     private String controlLabel(JSONObject value){
-        if(value==null)return "默认";
-        if("BLOCK".equals(value.optString("direction")))return "屏蔽";
+        if(value==null)return LocalizedText.ui(this,"默认","Default","既定");
+        if("BLOCK".equals(value.optString("direction")))return LocalizedText.ui(this,"屏蔽","Blocked","ブロック");
         if(value.has("levelDelta")){
             int delta=value.optInt("levelDelta",0);
-            return delta>0?"提高 "+delta+" 档":delta<0?"降低 "+(-delta)+" 档":"默认";
+            if(delta>0)return LocalizedText.ui(this,"提高 "+delta+" 档","Increase by "+delta,"+"+delta);
+            if(delta<0)return LocalizedText.ui(this,"降低 "+(-delta)+" 档","Decrease by "+(-delta),String.valueOf(delta));
+            return LocalizedText.ui(this,"默认","Default","既定");
         }
         String direction=value.optString("direction","DEFAULT");
-        return "MORE".equals(direction)?"多一点":"LESS".equals(direction)?"少一点":"默认";
+        return "MORE".equals(direction)?LocalizedText.ui(this,"多一点","More","多め"):"LESS".equals(direction)?LocalizedText.ui(this,"少一点","Less","少なめ"):LocalizedText.ui(this,"默认","Default","既定");
     }
 
     private void apply(JSONArray resolutions){
@@ -278,11 +280,11 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
                         .setNegativeButton(LocalizedText.ui("稍后"),null)
                         .setPositiveButton(conflictCount>0?LocalizedText.ui("查看冲突"):LocalizedText.ui("打开推荐同步"),(d,w)->activity.startActivity(new Intent(activity,RecommendationSyncActivity.class)));
                     if(conflictCount>0){
-                        dialog.setTitle(LocalizedText.ui("有 ")+conflictCount+LocalizedText.ui(" 项偏好冲突"))
+                        dialog.setTitle(LocalizedText.ui(this,"有 "+conflictCount+" 项偏好冲突",conflictCount+" preference conflicts",conflictCount+" 件の嗜好競合"))
                             .setMessage(LocalizedText.ui("电脑和手机同时修改了同一偏好。同步不会自动替你决定；打开同步页后可批量使用电脑、批量使用手机，或只对少数冲突逐项处理。"));
                     }else{
                         dialog.setTitle(LocalizedText.ui("有可同步的推荐数据"))
-                            .setMessage(changes+LocalizedText.ui(" 项长期数据可同步")+(packageChanged?LocalizedText.ui("，Desktop 推荐基础也有更新"):"")+LocalizedText.ui("。当前推荐列表和“本次想看”不会被覆盖。"));
+                            .setMessage(LocalizedText.ui(this,changes+" 项长期数据可同步"+(packageChanged?"，Desktop 推荐基础也有更新":"")+"。当前推荐列表和“本次想看”不会被覆盖。",changes+" long-term items can be synced"+(packageChanged?", and the Desktop recommendation base also has updates":"")+". Current recommendation lists and session intent will not be overwritten.",changes+" 件の長期データを同期可能"+(packageChanged?"、Desktop のおすすめ基盤にも更新があります":"")+"。現在のおすすめ一覧と「今回見たいもの」は上書きされません。"));
                     }
                     dialog.show();
                 });

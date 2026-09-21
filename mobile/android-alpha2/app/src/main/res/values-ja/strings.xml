@@ -7,4 +7,6 @@
     <string name="language_current">使用中</string>
     <string name="settings_language">言語と地域</string>
     <string name="settings_language_summary">简体中文 / 日本語 / English</string>
+    <string name="common_ok">OK</string>
+    <string name="info_description">%1$sの説明</string>
 </resources>

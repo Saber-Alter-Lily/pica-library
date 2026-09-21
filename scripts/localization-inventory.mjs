@@ -52,6 +52,26 @@ function callRanges(src, regex) {
 }
 function inRanges(index, ranges) { return ranges.some(([a,b]) => index > a && index < b) }
 
+function semanticLocalizedRanges(src) {
+  return callRanges(src, /LocalizedText\.ui\s*\(/g).filter(([open, close]) => {
+    let depth = 0, quote = '', escape = false, commas = 0
+    for (let i = open + 1; i < close; i++) {
+      const ch = src[i]
+      if (quote) {
+        if (escape) { escape = false; continue }
+        if (ch === '\\') { escape = true; continue }
+        if (ch === quote) quote = ''
+        continue
+      }
+      if (ch === '"' || ch === "'") { quote = ch; continue }
+      if (ch === '(' || ch === '[' || ch === '{') depth++
+      else if (ch === ')' || ch === ']' || ch === '}') depth--
+      else if (ch === ',' && depth === 0) commas++
+    }
+    return commas >= 3
+  })
+}
+
 function localizedArrayRanges(src) {
   const ranges = []
   const re = /String\[\]\s+(\w+)\s*=/g
@@ -88,6 +108,7 @@ function literals(file) {
     /(?:\.(?:setText|setHint|setTitle|setMessage|setPositiveButton|setNegativeButton|setNeutralButton|setItems|setSingleChoiceItems|setMultiChoiceItems|setContentDescription|setSummary|setLabel)|Toast\.makeText)\s*\(/g
   )
   const localizedRanges = callRanges(src, /LocalizedText\.ui\s*\(/g)
+  const semanticRanges = semanticLocalizedRanges(src)
   const arrayRanges = localizedArrayRanges(src)
 
   quoted.lastIndex = 0
@@ -99,10 +120,11 @@ function literals(file) {
     const coveredPrimitive = inRanges(m.index, primitiveRanges)
     const directUi = inRanges(m.index, directRanges)
     const explicitlyRouted = inRanges(m.index, localizedRanges)
+    const semanticRouted = inRanges(m.index, semanticRanges)
     const arrayRouted = inRanges(m.index, arrayRanges)
-    const likelyUi = coveredPrimitive || directUi || arrayRouted
-    const uiRouted = coveredPrimitive || explicitlyRouted || arrayRouted
-    rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi, explicitlyRouted, arrayRouted, uiRouted })
+    const likelyUi = coveredPrimitive || directUi || arrayRouted || semanticRouted
+    const uiRouted = coveredPrimitive || explicitlyRouted || arrayRouted || semanticRouted
+    rows.push({ file: rel(file), line, value, likelyUi, coveredPrimitive, directUi, explicitlyRouted, semanticRouted, arrayRouted, uiRouted })
   }
   return rows
 }
@@ -159,7 +181,7 @@ if (fs.existsSync(localeDir)) {
     } catch {}
   }
 }
-const uiUnique = [...new Set(androidRows.filter(x => x.likelyUi && x.uiRouted).map(x => x.value))]
+const uiUnique = [...new Set(androidRows.filter(x => x.likelyUi && x.uiRouted && !x.semanticRouted).map(x => x.value))]
 const unroutedDirectRows = androidRows.filter(x => x.directUi && !x.coveredPrimitive && !x.explicitlyRouted)
 const unroutedDirectUnique = [...new Set(unroutedDirectRows.map(x => x.value))]
 const hasTranslation = (language, value) => Object.prototype.hasOwnProperty.call(mergedCatalog.byLanguage?.[language] || {}, value)

@@ -175,12 +175,12 @@ public final class HomeActivity extends LocaleAwareActivity {
         boolean eh=EhAccountStore.load(this).configured();
         LinearLayout languageRow=SettingsRow.row(this,getString(R.string.settings_language),getString(R.string.settings_language_summary),v->startActivity(new Intent(this,LanguageActivity.class)));languageRow.setTag(AndroidOnboarding.SETTINGS_LANGUAGE);p.addView(languageRow);
         p.addView(SettingsRow.row(this,"账号与来源",(pica||eh)?"本机已配置":"",v->startActivity(new Intent(this,AccountSourcesActivity.class))));
-        LinearLayout pairRow=SettingsRow.row(this,"连接电脑",paired?"已连接":"未连接",v->startActivity(new Intent(this,PairingActivity.class));pairRow.setTag(AndroidOnboarding.SETTINGS_PAIR);p.addView(pairRow);
+        LinearLayout pairRow=SettingsRow.row(this,"连接电脑",paired?"已连接":"未连接",v->startActivity(new Intent(this,PairingActivity.class)));pairRow.setTag(AndroidOnboarding.SETTINGS_PAIR);p.addView(pairRow);
         p.addView(SettingsRow.row(this,"存储与下载","目录 / WebDAV / 下载策略",v->startActivity(new Intent(this,StorageHubActivity.class))));
         p.addView(SettingsRow.row(this,"个性化",ThemeStore.label(this),v->startActivity(new Intent(this,AppearanceActivity.class))));
-        LinearLayout recommendRow=SettingsRow.row(this,"推荐与画风",paired?"独立运行 · 可同步":"本机独立运行",v->startActivity(new Intent(this,RecommendationStyleActivity.class));recommendRow.setTag(AndroidOnboarding.SETTINGS_RECOMMEND);p.addView(recommendRow);
+        LinearLayout recommendRow=SettingsRow.row(this,"推荐与画风",paired?"独立运行 · 可同步":"本机独立运行",v->startActivity(new Intent(this,RecommendationStyleActivity.class)));recommendRow.setTag(AndroidOnboarding.SETTINGS_RECOMMEND);p.addView(recommendRow);
         p.addView(SettingsRow.row(this,"数据与缓存","缓存与本地数据",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
-        LinearLayout updateRow=SettingsRow.row(this,"软件更新","检查并安装正式更新",v->startActivity(new Intent(this,UpdateActivity.class));updateRow.setTag(AndroidOnboarding.SETTINGS_UPDATE);p.addView(updateRow);
+        LinearLayout updateRow=SettingsRow.row(this,"软件更新","检查并安装正式更新",v->startActivity(new Intent(this,UpdateActivity.class)));updateRow.setTag(AndroidOnboarding.SETTINGS_UPDATE);p.addView(updateRow);
         LinearLayout helpRow=SettingsRow.row(this,getString(R.string.onboarding_settings_title),getString(R.string.onboarding_replay_summary),v->startActivity(new Intent(this,OnboardingSettingsActivity.class)));helpRow.setTag(AndroidOnboarding.SETTINGS_HELP);p.addView(helpRow);
         p.addView(SettingsRow.row(this,"支持项目","爱发电 / GitHub · 支持开源开发",v->startActivity(new Intent(this,SupportActivity.class))));
         p.addView(SettingsRow.row(this,"关于","版本 / 开源 / 使用说明",v->startActivity(new Intent(this,AboutActivity.class))));

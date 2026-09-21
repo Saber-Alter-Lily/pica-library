@@ -129,7 +129,8 @@ export class ProviderService {
 
     async syncFavorites(
         mode: FavoritesSyncMode = 'quick',
-        onProgress?: (progress: ProviderFavoritesProgress) => void
+        onProgress?: (progress: ProviderFavoritesProgress) => void,
+        checkpoint?: () => Promise<void>
     ) {
         const provider = await this.connect()
         const previous = this.database.favoritesSyncState()
@@ -143,18 +144,36 @@ export class ProviderService {
         const full = async (fallbackReason?: string) => {
             let headIds: string[] = []
             let pagesChecked = 0
-            const { comics, pages } = await provider.favoritesAll(
-                'all',
-                (page) => {
-                    pagesChecked = page.page
-                    onProgress?.({
-                        phase: 'reading',
-                        mode: 'full',
-                        ...page,
-                        fallbackReason
-                    })
-                }
-            )
+            await checkpoint?.()
+            const first = await provider.favorites(1)
+            const comics = [...first.docs]
+            const pages = first.pages
+            pagesChecked = first.page
+            onProgress?.({
+                phase: 'reading',
+                mode: 'full',
+                page: first.page,
+                pages: first.pages,
+                fetched: comics.length,
+                total: first.total,
+                fallbackReason
+            })
+            for (let page = 2; page <= pages; page++) {
+                await checkpoint?.()
+                const next = await provider.favorites(page)
+                comics.push(...next.docs)
+                pagesChecked = next.page
+                onProgress?.({
+                    phase: 'reading',
+                    mode: 'full',
+                    page: next.page,
+                    pages: next.pages,
+                    fetched: comics.length,
+                    total: next.total,
+                    fallbackReason
+                })
+            }
+            await checkpoint?.()
             headIds = comics.slice(0, 20).map((comic) => comic._id)
             onProgress?.({
                 phase: 'processing',
@@ -204,6 +223,7 @@ export class ProviderService {
         let stableOverlap = false
         let orderingAnomaly = false
         while (page <= MAX_QUICK_PAGES) {
+            await checkpoint?.()
             const result = await provider.favorites(page)
             remoteTotal = result.total
             totalPages = result.pages
@@ -242,6 +262,7 @@ export class ProviderService {
             return full(reason)
         }
 
+        await checkpoint?.()
         onProgress?.({
             phase: 'processing',
             mode: 'quick',

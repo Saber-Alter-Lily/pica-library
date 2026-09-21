@@ -1,0 +1,40 @@
+name: One-shot v0.4.4 release note sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-shot-v044-release-note.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-release-note:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rewrite v0.4.4 release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cat > "$RUNNER_TEMP/v044-notes.md" <<'EOF'
+          Pica Library v0.4.4
+
+          ## 普通用户升级
+
+          - **Windows v0.4.0 → v0.4.4**：下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`，解压后运行 `Upgrade-Pica-Library-v0.4.4.cmd`，一次直达当前最新版。
+          - **Android v42 / 0.4.0 → v46 / 0.4.4**：直接使用应用内更新原地升级。
+          - **无需安装任何中间版本。**
+          - Release 中名称包含 `update-from-v0.4.1`、`update-from-v0.4.2`、`update-from-v0.4.3` 的 ZIP 是兼容/开发资产，普通用户无需下载。
+
+          ## v0.4.4 变化
+
+          - 修复 Desktop Settings Hub 重组时漏搬“支持项目”的问题；现在“基本设置”中可直接看到爱发电与 GitHub。
+          - 基础明暗外观设置会正确进入“外观与个性化”。
+          - Chromium 真实浏览器 smoke 直接验证设置中心中的支持卡和外观入口可见。
+          - Android 对齐到 versionCode 46 / 0.4.4，既有 v0.4.0 用户可直接原地升级。
+
+          用户数据与程序文件分离。Windows 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\Pica Library`、建立备份、执行健康检查，并在失败时回滚。
+          EOF
+          gh release edit v0.4.4 --repo "$GH_REPO" --notes-file "$RUNNER_TEMP/v044-notes.md"

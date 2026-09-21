@@ -16,6 +16,7 @@ const zhPhrases = [...new Set(Object.values(translations['zh-CN']))]
 async function boot(page, language) {
     await page.addInitScript((lang) => {
         localStorage.setItem('pica-library-language', lang)
+        localStorage.setItem('pica-onboarding-state-v1', JSON.stringify({ completedVersion: 1, dismissedVersion: 0, autoShow: true }))
     }, language)
     await page.route('**/api/v1/**', async (route) => {
         await route.fulfill({

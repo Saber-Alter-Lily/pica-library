@@ -2333,6 +2333,7 @@ export class LibraryService {
 
     async buildFinalRecommendationCycleV3(cycleId: string) {
         this.recommendationProgress = { state: 'running', phase: 'profile', done: 0, total: 7 }
+        try {
         const pica = await this.connect()
         const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
@@ -2735,6 +2736,16 @@ export class LibraryService {
                 candidatePoolVersion: `${INTENT_PLANNER_VERSION}/${QUERY_TRANSLATOR_VERSION}/${RETRIEVER_VERSION}`,
                 allocatorVersion: BATCH_ALLOCATOR_VERSION
             }
+        }
+        } catch (error) {
+            this.recommendationProgress = {
+                state: 'failed',
+                phase: this.recommendationProgress.phase,
+                done: this.recommendationProgress.done,
+                total: 7,
+                error: error instanceof Error ? error.message : String(error)
+            }
+            throw error
         }
     }
 

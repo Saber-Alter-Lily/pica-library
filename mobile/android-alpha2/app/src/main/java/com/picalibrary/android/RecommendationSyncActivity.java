@@ -9,7 +9,7 @@ import java.util.*;
 import org.json.*;
 
 /** Explicit Desktop↔Android recommendation sync center. Runtime cycles stay independent. */
-public final class RecommendationSyncActivity extends Activity {
+public final class RecommendationSyncActivity extends LocaleAwareActivity {
     private static long lastAutomaticCheckAt;
     private static String lastPromptSignature="";
     private LinearLayout content;

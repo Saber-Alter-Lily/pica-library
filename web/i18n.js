@@ -137,6 +137,10 @@ export const translations = {
         'downloads.refresh': 'Refresh',
         'downloads.run': 'Run queue',
         'downloads.starting': 'Starting the download queue…',
+        'downloads.backgroundRunning':
+            'Download queue is running in the background · {running} active · {waiting} waiting',
+        'downloads.recoveredInterrupted':
+            'Recovered {count} interrupted download task(s) from the previous Desktop process. They are ready to continue.',
         'downloads.eta': 'ETA {value}',
         'downloads.inProgress': 'In progress',
         'downloads.waiting': 'Waiting',
@@ -917,6 +921,10 @@ export const translations = {
         'downloads.refresh': '刷新',
         'downloads.run': '运行队列',
         'downloads.starting': '正在启动下载队列…',
+        'downloads.backgroundRunning':
+            '下载队列正在后台运行 · {running} 个进行中 · {waiting} 个等待中',
+        'downloads.recoveredInterrupted':
+            '已自动恢复上次 Desktop 进程中断留下的 {count} 个下载任务，可以继续运行，无需删除数据库。',
         'downloads.eta': '预计剩余 {value}',
         'downloads.inProgress': '进行中',
         'downloads.waiting': '等待中',

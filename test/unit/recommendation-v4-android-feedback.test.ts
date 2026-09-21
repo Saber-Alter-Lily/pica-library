@@ -17,7 +17,7 @@ describe('Recommendation V4 Android feedback parity',()=>{
     const method=home.slice(start,home.indexOf('private void onlineEntry()',start))
     expect(method.indexOf('RecommendationFeedbackStore.setSentiment')).toBeGreaterThanOrEqual(0)
     expect(method.indexOf('RecommendationFeedbackStore.setSentiment')).toBeLessThan(method.indexOf('RecommendationFeedbackStore.askReasons'))
-    expect(method).toContain('setNegativeButton("跳过"')
+    expect(method).toContain('setNegativeButton(LocalizedText.ui("跳过")')
     expect(settings).toContain('"推荐与画风"')
     expect(settings).toContain('RecommendationStyleActivity.class')
     expect(visualSettings).toContain('"反馈原因"')

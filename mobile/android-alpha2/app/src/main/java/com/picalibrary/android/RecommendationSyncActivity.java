@@ -280,11 +280,11 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
                         .setNegativeButton(LocalizedText.ui("稍后"),null)
                         .setPositiveButton(conflictCount>0?LocalizedText.ui("查看冲突"):LocalizedText.ui("打开推荐同步"),(d,w)->activity.startActivity(new Intent(activity,RecommendationSyncActivity.class)));
                     if(conflictCount>0){
-                        dialog.setTitle(LocalizedText.ui(this,"有 "+conflictCount+" 项偏好冲突",conflictCount+" preference conflicts",conflictCount+" 件の嗜好競合"))
+                        dialog.setTitle(LocalizedText.ui(activity,"有 "+conflictCount+" 项偏好冲突",conflictCount+" preference conflicts",conflictCount+" 件の嗜好競合"))
                             .setMessage(LocalizedText.ui("电脑和手机同时修改了同一偏好。同步不会自动替你决定；打开同步页后可批量使用电脑、批量使用手机，或只对少数冲突逐项处理。"));
                     }else{
                         dialog.setTitle(LocalizedText.ui("有可同步的推荐数据"))
-                            .setMessage(LocalizedText.ui(this,changes+" 项长期数据可同步"+(packageChanged?"，Desktop 推荐基础也有更新":"")+"。当前推荐列表和“本次想看”不会被覆盖。",changes+" long-term items can be synced"+(packageChanged?", and the Desktop recommendation base also has updates":"")+". Current recommendation lists and session intent will not be overwritten.",changes+" 件の長期データを同期可能"+(packageChanged?"、Desktop のおすすめ基盤にも更新があります":"")+"。現在のおすすめ一覧と「今回見たいもの」は上書きされません。"));
+                            .setMessage(LocalizedText.ui(activity,changes+" 项长期数据可同步"+(packageChanged?"，Desktop 推荐基础也有更新":"")+"。当前推荐列表和“本次想看”不会被覆盖。",changes+" long-term items can be synced"+(packageChanged?", and the Desktop recommendation base also has updates":"")+". Current recommendation lists and session intent will not be overwritten.",changes+" 件の長期データを同期可能"+(packageChanged?"、Desktop のおすすめ基盤にも更新があります":"")+"。現在のおすすめ一覧と「今回見たいもの」は上書きされません。"));
                     }
                     dialog.show();
                 });

@@ -3815,12 +3815,8 @@ export class LibraryService {
                     this.database.updateDownloadProgress(job.id, {
                         progressCompleted: result.completed,
                         progressTotal: result.pictures,
-                        bytes: result.bytes,
-                        chapterTitle:
-                            latestProgress?.episodeTitle ??
-                            this.database.getDownloadJob(job.id).chapterTitle
+                        bytes: result.bytes
                     })
-                    latestProgress = null
                 } finally {
                     if (latestProgress)
                         persistProgress(latestProgress, true)

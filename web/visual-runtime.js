@@ -5,7 +5,21 @@ export const VISUAL_RUNTIME = Object.freeze({
     samplingPolicyVersion: 'v1-spread-6-body-pages'
 })
 
+const MODEL_LOAD_TIMEOUT_MS = 120000
+const PAGE_ANALYSIS_TIMEOUT_MS = 45000
 let extractorPromise = null
+
+function withTimeout(promise, timeoutMs, message) {
+    let timer
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+            timer = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+        })
+    ]).finally(() => {
+        if (timer) window.clearTimeout(timer)
+    })
+}
 
 function l2(values) {
     const vector = Array.from(values, Number)
@@ -80,8 +94,8 @@ function tensorViews(output) {
     throw new Error('视觉模型没有返回可读取的 embedding')
 }
 async function loadExtractor(onProgress) {
-    if (!extractorPromise)
-        extractorPromise = (async () => {
+    if (!extractorPromise) {
+        const loading = (async () => {
             const transformers = await import(VISUAL_RUNTIME.libraryUrl)
             const options = {
                 progress_callback: (event) => onProgress?.({ phase: 'model', event })
@@ -100,6 +114,15 @@ async function loadExtractor(onProgress) {
                 )
             }
         })()
+        extractorPromise = withTimeout(
+            loading,
+            MODEL_LOAD_TIMEOUT_MS,
+            '视觉模型加载超时，请检查网络后重试'
+        ).catch((error) => {
+            extractorPromise = null
+            throw error
+        })
+    }
     return extractorPromise
 }
 
@@ -113,7 +136,11 @@ export async function analyzeVisualSamples(samples, onProgress) {
     for (let index = 0; index < usable.length; index++) {
         const sample = usable[index]
         onProgress?.({ phase: 'page', current: index + 1, total: usable.length, sample })
-        const output = await extractor(new URL(sample.url, location.origin).toString())
+        const output = await withTimeout(
+            extractor(new URL(sample.url, location.origin).toString()),
+            PAGE_ANALYSIS_TIMEOUT_MS,
+            '单页画风分析超时，已停止本页处理'
+        )
         const views = tensorViews(output)
         clsPages.push(views.cls)
         patchMeanPages.push(views.patchMean)

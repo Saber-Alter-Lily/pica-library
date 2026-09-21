@@ -8,7 +8,7 @@
 
 ## 下载与启动
 
-1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.3 对应 `Pica-Library-v0.4.3-windows-x64.zip`。
+1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.4 对应 `Pica-Library-v0.4.4-windows-x64.zip`。
 2. 完整解压到一个新文件夹，不要直接在压缩软件中运行。
 3. 双击 `Pica Library.exe`。
 4. 浏览器将自动打开首次启动向导；填写 Pica 账号和密码，选择漫画保存目录与下载模式，可按需填写 HTTP/HTTPS 代理。
@@ -46,8 +46,8 @@
 打开 **设置 → 软件更新** 后先点击“检查并更新（兼容时自动）”。
 
 - **兼容增量更新**：程序会下载、校验、暂存并在确认后自动重启完成更新。
-- **兼容增量更新**：v0.4.1 / v0.4.2 → v0.4.3 可在软件内直接下载、校验、重启并完成更新。
-- **完整程序包更新**：仍停留在 v0.4.0 时，从 v0.4.2 Release 下载 `Pica-Library-v0.4.3-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.3.cmd` 直接跨代升级。助手会自动下载并校验官方完整包、识别旧程序目录、关闭旧版、建立程序与数据库安全快照、替换程序并执行健康检查；失败时自动回滚。
+- **兼容增量更新**：v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4 可在软件内直接下载、校验、重启并完成更新。
+- **完整程序包更新**：仍停留在 v0.4.0 时，从 v0.4.2 Release 下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.4.cmd` 直接跨代升级。助手会自动下载并校验官方完整包、识别旧程序目录、关闭旧版、建立程序与数据库安全快照、替换程序并执行健康检查；失败时自动回滚。
 - 手动替换仍作为备用方案：先完全退出 Pica Library，再把新版 ZIP 解压到新目录运行；也可以在旧版退出后替换旧程序目录。
 - **不要删除 `%LOCALAPPDATA%\\Pica Library`**。数据库、书架、阅读历史、设置、账号凭据与已下载内容位于独立用户数据目录，不需要卸载或重新导入。若漫画保存目录位于旧程序目录内部，升级助手会拒绝自动替换并提示先迁移数据。
 
@@ -58,7 +58,7 @@
 从同一官方 Release 下载 `SHA256SUMS.txt`，然后在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash .\Pica-Library-v0.4.3-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\Pica-Library-v0.4.4-windows-x64.zip -Algorithm SHA256
 ```
 
 将完整校验值与发布页提供的值逐字比较，一致后再解压运行。

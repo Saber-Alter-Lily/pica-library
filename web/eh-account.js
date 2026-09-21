@@ -395,10 +395,21 @@ void status().then(() => pollWebLogin()).catch(() => {})
 void import('./v040-parity.js').catch(() => {})
 
 
+function localizeGeneratedEhDisclosures() {
+    const panel=$('#settings-eh-account')
+    const summaries=[...(panel?.querySelectorAll('.account-action-group > summary') || [])]
+    if(summaries[0]) summaries[0].textContent=ehT('官方账号 ▾','Official account ▾','公式アカウント ▾')
+    if(summaries[1]) summaries[1].textContent=ehT('账号功能 ▾','Account actions ▾','アカウント操作 ▾')
+    const filters=$('.search-filters > summary')
+    if(filters) filters.textContent=ehT('筛选 ▾','Filters ▾','絞り込み ▾')
+    for(const summary of document.querySelectorAll('.batch-action-disclosure > summary'))
+        summary.textContent=ehT('批量操作 ▾','Batch actions ▾','一括操作 ▾')
+    for(const summary of document.querySelectorAll('.result-action-menu > summary'))
+        summary.textContent=ehT('更多 ▾','More ▾','その他 ▾')
+}
+
+localizeGeneratedEhDisclosures()
 document.addEventListener('pica-language-change',()=>{
     localizeStaticEhAccount()
-    const panel=$('#settings-eh-account')
-    for(const details of panel?.querySelectorAll('.account-action-group') || []) details.remove()
-    if(panel) panel.dataset.compactActions='false'
-    compactEhAccountActions()
+    localizeGeneratedEhDisclosures()
 })

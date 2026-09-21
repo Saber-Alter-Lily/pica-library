@@ -148,23 +148,31 @@ export class RemoteLibrarySyncService {
         for (const episode of this.database.listReaderEpisodes(comicId)) {
             const pictures = this.database.listDownloadedPictures(episode.id)
             if (!pictures.length) continue
-            const pages: LocalPage[] = pictures.map((picture, index) => {
+            const pages: LocalPage[] = []
+            for (let index = 0; index < pictures.length; index++) {
+                await this.checkpoint()
+                const picture = pictures[index]
                 const file = this.safeFile(picture.localPath)
                 const extension = path.extname(file).toLowerCase()
                 const contentType = imageTypes[extension]
                 if (!contentType) throw new Error('发现不支持的本地图片类型')
                 const digest = await hashFile(file)
-                return {
+                pages.push({
                     file,
                     manifest: {
                         index,
-                        objectPath: remoteLayout.page(comicId, episode.id, index, extension),
+                        objectPath: remoteLayout.page(
+                            comicId,
+                            episode.id,
+                            index,
+                            extension
+                        ),
                         sha256: digest.sha256,
                         bytes: digest.bytes,
                         contentType
                     }
-                }
-            })
+                })
+            }
             episodes.push({
                 pages,
                 manifest: {

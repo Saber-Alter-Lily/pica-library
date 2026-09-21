@@ -95,14 +95,15 @@ Android：**设置 → 支持项目**
 
 Windows 打开 **设置 → 软件更新**。
 
-当前 v0.4.4 升级方式：
+已有 **v0.4.0** 的用户直接升级到当前最新版即可：
 
-- **v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4**：直接使用软件内兼容增量更新。
-- **v0.4.0 → v0.4.4**：从 v0.4.4 Release 下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`，解压后运行 `Upgrade-Pica-Library-v0.4.4.cmd`。
+- 从 v0.4.4 Release 下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`；
+- 解压后运行 `Upgrade-Pica-Library-v0.4.4.cmd`；
+- 不需要先安装 v0.4.1、v0.4.2 或 v0.4.3。
 
 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\\Pica Library`、备份旧程序和数据库、替换程序并执行健康检查；失败时自动回滚。
 
-Android 当前 v42 / v43 / v44 / v45 均可通过应用内更新链升级到 v46 / 0.4.4。
+Android 已有 v42 / 0.4.0 用户可直接通过应用内更新链升级到 v46 / 0.4.4，无需安装中间版本。
 
 应用程序文件与用户数据目录彼此独立。升级不需要卸载，也不需要重新导入数据库、书架、历史或设置；不要为了升级删除 `%LOCALAPPDATA%\\Pica Library`。
 

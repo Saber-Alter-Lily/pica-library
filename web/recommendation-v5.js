@@ -565,7 +565,7 @@ function renderCompositionOverview() {
         sourceCounts.set(channel.sourceLayer, (sourceCounts.get(channel.sourceLayer) || 0) + 1)
     const sourceHtml = [...sourceCounts.entries()]
         .sort((a,b) => b[1]-a[1])
-        .map(([key,count]) => `<p><strong>${esc(sourceLabels[key] || key)}</strong> · ${count} 条通道</p>`)
+        .map(([key,count]) => `<p><strong>${esc(sourceLabels[key] || key)}</strong> · ${v5Channels(count)}</p>`)
         .join('') || `<p class="status">${v5t('暂无启用通道','No enabled channels','有効なチャンネルなし')}</p>`
     const familyEntries = Object.entries(plan.summary?.families || {})
         .filter(([,count]) => Number(count) > 0)
@@ -603,7 +603,7 @@ function updatePendingBar() {
     if (!bar || !count) return
     const pending = V5.draftLevels.size
     bar.hidden = pending === 0
-    count.textContent = `已修改 ${pending} 项 · 尚未保存`
+    count.textContent = v5t(`已修改 ${pending} 项 · 尚未保存`,`${pending} changes · not saved`,`${pending} 件変更 · 未保存`)
 }
 
 async function saveDraftLevels() {
@@ -630,11 +630,11 @@ async function saveDraftLevels() {
         }
         V5.draftLevels.clear()
         V5.manualSignal = null
-        showToast('偏好调整已保存；后续完整重算会同时影响召回与排序。', 'positive')
+        showToast(v5t('偏好调整已保存；后续完整重算会同时影响召回与排序。','Preference adjustments saved; the next full recomputation will affect both retrieval and ranking.','嗜好調整を保存しました。次回の完全再計算で取得と順位付けの両方に反映されます。'), 'positive')
         await loadPolicy()
     } catch (error) {
-        showStatus(`保存偏好失败：${error.message}`, true)
-        showToast(`保存失败：${error.message}`, 'negative')
+        showStatus(v5t(`保存偏好失败：${error.message}`,`Could not save preferences: ${error.message}`,`嗜好を保存できませんでした：${error.message}`), true)
+        showToast(v5t(`保存失败：${error.message}`,`Save failed: ${error.message}`,`保存に失敗しました：${error.message}`), 'negative')
     } finally {
         V5.busy = false
         if (button) button.disabled = false
@@ -651,16 +651,16 @@ function signalRow(signal) {
     const delta = Number(current?.levelDelta ?? legacyDelta)
     return `<div class="v5-signal-row" data-v5-signal="${esc(signalId(signal))}">
         <div class="v5-signal-copy"><strong>${esc(signal.label)}</strong>
-        <span class="status">${signal.manual ? '系统尚未形成稳定判断' : signal.behaviorDerived ? `长期行为支持 ${Number(signal.supportCount || 0)} 本` : `收藏支持 ${Number(signal.supportCount || 0)} 本`}</span></div>
+        <span class="status">${signal.manual ? v5t('系统尚未形成稳定判断','The system has no stable judgment yet','システムにはまだ安定した判断がありません') : signal.behaviorDerived ? v5t(`长期行为支持 ${Number(signal.supportCount || 0)} 本`,`Long-term behavior supports ${Number(signal.supportCount || 0)} works`,`長期行動による支持 ${Number(signal.supportCount || 0)} 作品`) : v5t(`收藏支持 ${Number(signal.supportCount || 0)} 本`,`Supported by ${Number(signal.supportCount || 0)} favorites`,`お気に入り ${Number(signal.supportCount || 0)} 件の支持`)}</span></div>
         <div class="v5-range-wrap">
             <input type="range" min="0" max="10" step="1" value="${level}" data-v5-level="${esc(signalId(signal))}" ${blocked ? 'disabled' : ''} />
-            <span class="v5-range-value" data-v5-level-value="${esc(signalId(signal))}">${blocked ? '已屏蔽' : `${level}/10`}</span>
-            <span class="v5-range-meta">${signal.manual ? '系统未判断 · 5/10 为中性起点' : `系统基准 ${baseline}/10`}${current && !blocked ? ` · 你的调整 ${delta > 0 ? '+' : ''}${delta}` : ''}</span>
+            <span class="v5-range-value" data-v5-level-value="${esc(signalId(signal))}">${blocked ? v5t('已屏蔽','Blocked','ブロック済み') : `${level}/10`}</span>
+            <span class="v5-range-meta">${signal.manual ? v5t('系统未判断 · 5/10 为中性起点','No system judgment · 5/10 is neutral','システム未判断 · 5/10 が中立') : v5t(`系统基准 ${baseline}/10`,`System baseline ${baseline}/10`,`システム基準 ${baseline}/10`)}${current && !blocked ? v5t(` · 你的调整 ${delta > 0 ? '+' : ''}${delta}`,` · Your adjustment ${delta > 0 ? '+' : ''}${delta}`,` · あなたの調整 ${delta > 0 ? '+' : ''}${delta}`) : ''}</span>
         </div>
         <div class="v5-row-actions">
-            <button type="button" data-v5-session-target="${esc(signalId(signal))}">本次想看</button>
-            ${current ? `<button type="button" data-v5-reset="${esc(signalId(signal))}">恢复系统判断</button>` : ''}
-            <button type="button" data-v5-block="${esc(signalId(signal))}">${blocked ? '已屏蔽' : '屏蔽'}</button>
+            <button type="button" data-v5-session-target="${esc(signalId(signal))}">${v5t('本次想看','Want this now','今回見たい')}</button>
+            ${current ? `<button type="button" data-v5-reset="${esc(signalId(signal))}">${v5t('恢复系统判断','Restore system judgment','システム判断に戻す')}</button>` : ''}
+            <button type="button" data-v5-block="${esc(signalId(signal))}">${blocked ? v5t('已屏蔽','Blocked','ブロック済み') : v5t('屏蔽','Block','ブロック')}</button>
         </div>
     </div>`
 }
@@ -670,7 +670,7 @@ function renderPolicy() {
     if (!V5.snapshot) return
     const counts = V5.snapshot.counts || {}
     showStatus(
-        `已拥有 ${Number(counts.owned || 0)} 本 · 收藏 ${Number(counts.favorites || 0)} 本 · 你调整 ${Number(counts.controls || 0)} 项 · 屏蔽偏好 ${Number(counts.blockedTargets || 0)} 项 · 屏蔽作品 ${Number(counts.hardSuppressed || 0)} 本`
+        v5t(`已拥有 ${Number(counts.owned || 0)} 本 · 收藏 ${Number(counts.favorites || 0)} 本 · 你调整 ${Number(counts.controls || 0)} 项 · 屏蔽偏好 ${Number(counts.blockedTargets || 0)} 项 · 屏蔽作品 ${Number(counts.hardSuppressed || 0)} 本`,`Owned ${Number(counts.owned || 0)} · Favorites ${Number(counts.favorites || 0)} · Your adjustments ${Number(counts.controls || 0)} · Blocked preferences ${Number(counts.blockedTargets || 0)} · Blocked works ${Number(counts.hardSuppressed || 0)}`,`所有済み ${Number(counts.owned || 0)} · お気に入り ${Number(counts.favorites || 0)} · あなたの調整 ${Number(counts.controls || 0)} · ブロック嗜好 ${Number(counts.blockedTargets || 0)} · ブロック作品 ${Number(counts.hardSuppressed || 0)}`)
     )
     const technical = document.querySelector('#v5-policy-tech')
     if (technical)
@@ -680,7 +680,7 @@ function renderPolicy() {
     if (sessionLabel) {
         const intent = V5.snapshot.sessionIntent || {}
         sessionLabel.textContent = intent.mode === 'TARGET'
-            ? `本次想看：${intent.label || intent.key || ''}` : '本次想看：默认'
+            ? v5t(`本次想看：${intent.label || intent.key || ''}`,`Session intent: ${intent.label || intent.key || ''}`,`今回見たいもの：${intent.label || intent.key || ''}`) : v5t('本次想看：默认','Session intent: default','今回見たいもの：既定')
     }
     const inferred = lifetimeSignals()
     V5.signalById = new Map(inferred.map((item) => [signalId(item), item]))
@@ -731,23 +731,23 @@ function renderPolicy() {
                     rows.sort((a,b) => baselineLevel(b)-baselineLevel(a) || Number(b.supportCount||0)-Number(a.supportCount||0) || String(a.label).localeCompare(String(b.label)))
                     const facetAdjusted = rows.some(row => controlFor(row))
                     return `<details class="v5-facet-group" ${searchHit || facetAdjusted || (majorIndex===0 && facetIndex===0) ? 'open' : ''}>
-                        <summary>${esc(facetLabel(facet))}<span class="v5-facet-count">${rows.length} 项</span></summary>
+                        <summary>${esc(facetLabel(facet))}<span class="v5-facet-count">${v5Items(rows.length)}</span></summary>
                         <div class="v5-facet-body"><div class="v5-facet-scroll">${rows.map(signalRow).join('')}</div></div>
                     </details>`
                 }).join('')
                 return `<details class="v5-major-group" ${searchHit || hasAdjusted || majorIndex===0 ? 'open' : ''}>
-                    <summary>${esc(supergroupLabel(major))}<span class="v5-facet-count">${total} 项</span></summary>
+                    <summary>${esc(supergroupLabel(major))}<span class="v5-facet-count">${v5Items(total)}</span></summary>
                     <div class="v5-major-body">${facetsHtml}</div>
                 </details>`
             }).join('')
         } else if (manualSignal) {
             inferredTarget.innerHTML =
-                `<div class="v5-help"><strong>已确认把“${esc(V5.search)}”作为自定义标签微调。</strong> 5/10 是中性起点，可调整到 0–10；修改后仍需点击“保存调整”。</div><div class="v5-facet-group"><div class="v5-facet-body"><div class="v5-facet-scroll">${signalRow(manualSignal)}</div></div></div>`
+                `<div class="v5-help"><strong>${v5t(`已确认把“${esc(V5.search)}”作为自定义标签微调。`,`Using “${esc(V5.search)}” as a custom tag preference.`,`「${esc(V5.search)}」をカスタムタグ嗜好として調整します。`)}</strong> ${v5t('5/10 是中性起点，可调整到 0–10；修改后仍需点击“保存调整”。','5/10 is the neutral starting point. Adjust from 0–10, then choose Save adjustments.','5/10 が中立の開始点です。0–10で調整し、「調整を保存」を選んでください。')}</div><div class="v5-facet-group"><div class="v5-facet-body"><div class="v5-facet-scroll">${signalRow(manualSignal)}</div></div></div>`
         } else if (V5.search) {
             inferredTarget.innerHTML =
-                `<div class="v5-search-empty"><strong>没有找到“${esc(V5.search)}”</strong><button type="button" class="info-tip" data-info-tip="系统不会因为输入文字就自动创建偏好。确认它确实是标签后再添加。">i</button><p><button type="button" data-v5-add-custom-tag>作为标签添加</button></p></div>`
+                `<div class="v5-search-empty"><strong>${v5t(`没有找到“${esc(V5.search)}”`,`No match for “${esc(V5.search)}”`,`「${esc(V5.search)}」が見つかりません`)}</strong><button type="button" class="info-tip" data-info-tip="${v5t('系统不会因为输入文字就自动创建偏好。确认它确实是标签后再添加。','Typing text does not automatically create a preference. Add it only after confirming it is really a tag.','入力した文字だけで嗜好を自動作成しません。実際のタグであることを確認してから追加してください。')}">i</button><p><button type="button" data-v5-add-custom-tag>${v5t('作为标签添加','Add as tag','タグとして追加')}</button></p></div>`
         } else {
-            inferredTarget.innerHTML = '<div class="v5-help"><strong>还没有收藏画像也可以先配置推荐。</strong> 在上方搜索标签并“作为标签添加”，从 5/10 中性起点调整到 0–10；设置为 6–10 的标签可直接作为首轮推荐召回种子。</div>'
+            inferredTarget.innerHTML = `<div class="v5-help"><strong>${v5t('还没有收藏画像也可以先配置推荐。','You can configure recommendations before a collection profile exists.','コレクションプロフィールがなくてもおすすめを設定できます。')}</strong> ${v5t('在上方搜索标签并“作为标签添加”，从 5/10 中性起点调整到 0–10；设置为 6–10 的标签可直接作为首轮推荐召回种子。','Search for a tag above, add it as a tag, and adjust from the neutral 5/10 starting point. Tags set to 6–10 can seed the first recommendation round.','上でタグを検索し「タグとして追加」して、5/10 の中立点から0–10で調整します。6–10にしたタグは最初のおすすめ取得の種として使えます。')}</div>`
         }
     }
 
@@ -784,7 +784,7 @@ function renderPolicy() {
     document.querySelectorAll('[data-v5-block]').forEach(button => button.addEventListener('click', async () => {
         const signal=V5.signalById.get(button.dataset.v5Block); if(!signal) return
         const result=await setControl(signal,'BLOCK')
-        if(result) showToast(`已屏蔽「${signal.label}」，完整重算和后续展示都会硬排除。`,'negative')
+        if(result) showToast(v5t(`已屏蔽「${signal.label}」，完整重算和后续展示都会硬排除。`,`Blocked “${signal.label}”; full recomputation and future display will exclude it.`,`「${signal.label}」をブロックしました。完全再計算と今後の表示から除外されます。`),'negative')
     }))
 
     document.querySelector('[data-v5-add-custom-tag]')?.addEventListener('click', () => {
@@ -809,9 +809,9 @@ function renderPolicy() {
     if(controlTarget){
         controlTarget.innerHTML=controls.length?controls.map(item=>{
             const signal=V5.signalById.get(`${item.targetType}:${item.key}`)||{...item,supportCount:0,supportShare:0,baselineLevel:5,manual:true,systemUnknown:true}
-            const current=item.direction==='BLOCK'?'屏蔽':`${currentLevel(signal)}/10`
-            return `<span class="v5-control-chip"><strong>${esc(item.label)}</strong><span>${esc(current)}</span><button type="button" data-v5-control-reset="${esc(signalId(signal))}">恢复系统判断</button></span>`
-        }).join(''):'<p class="status">目前没有手动覆盖，完全使用系统推断。</p>'
+            const current=item.direction==='BLOCK'?v5t('屏蔽','Blocked','ブロック'):`${currentLevel(signal)}/10`
+            return `<span class="v5-control-chip"><strong>${esc(item.label)}</strong><span>${esc(current)}</span><button type="button" data-v5-control-reset="${esc(signalId(signal))}">${v5t('恢复系统判断','Restore system judgment','システム判断に戻す')}</button></span>`
+        }).join(''):`<p class="status">${v5t('目前没有手动覆盖，完全使用系统推断。','No manual overrides; using system inference only.','手動上書きはありません。システム推論のみを使用しています。')}</p>`
         document.querySelectorAll('[data-v5-control-reset]').forEach(button=>button.addEventListener('click',()=>{
             const signal=V5.signalById.get(button.dataset.v5ControlReset)||controls.filter(item=>`${item.targetType}:${item.key}`===button.dataset.v5ControlReset).map(item=>({...item,supportCount:0,supportShare:0,baselineLevel:5,manual:true}))[0]
             if(!signal) return
@@ -840,14 +840,14 @@ async function loadPolicy() {
         V5.serving = serving
         renderPolicy()
         decorateRecommendationCards()
-    } catch (error) { showStatus(`推荐控制中心暂不可用：${error.message}`, true) }
+    } catch (error) { showStatus(v5t(`推荐控制中心暂不可用：${error.message}`,`Recommendation controls are unavailable: ${error.message}`,`おすすめ調整を利用できません：${error.message}`), true) }
 }
 
 function ensureQuickDialog() {
     let dialog=document.querySelector('#v5-quick-control-dialog')
     if(dialog) return dialog
     dialog=document.createElement('dialog'); dialog.id='v5-quick-control-dialog'; dialog.className='app-dialog'
-    dialog.innerHTML='<div><h3>调整这类推荐</h3><p class="status">滑杆以你的收藏画像为基准；修改会先保存，完整重算后同时影响召回与排序。</p><div id="v5-quick-control-body"></div><div class="actions"><button type="button" id="v5-quick-close">关闭</button></div></div>'
+    dialog.innerHTML=`<div><h3>${v5t('调整这类推荐','Tune this recommendation','このおすすめを調整')}</h3><p class="status">${v5t('滑杆以你的收藏画像为基准；修改会先保存，完整重算后同时影响召回与排序。','The slider starts from your profile baseline. Changes are saved and affect retrieval and ranking after full recomputation.','スライダーはプロフィール基準から始まります。変更は保存され、完全再計算後に取得と順位付けの両方へ反映されます。')}</p><div id="v5-quick-control-body"></div><div class="actions"><button type="button" id="v5-quick-close">${v5t('关闭','Close','閉じる')}</button></div></div>`
     document.body.appendChild(dialog)
     dialog.querySelector('#v5-quick-close').addEventListener('click',()=>dialog.close())
     return dialog
@@ -872,9 +872,9 @@ function quickSliderRow(signal) {
     return `<div class="v5-quick-row"><strong>${esc(signal.label)}</strong>
     <div class="v5-range-wrap"><input type="range" min="0" max="10" step="1" value="${level}" data-v5-quick-level="${esc(signalId(signal))}" />
     <span class="v5-range-value" data-v5-quick-value="${esc(signalId(signal))}">${level}/10</span>
-    <span class="v5-range-meta">系统基准 ${baseline}/10 · 收藏支持 ${Number(signal.supportCount||0)} 本</span></div>
-    <div class="v5-row-actions"><button type="button" data-v5-quick-session="${esc(signalId(signal))}">本次想看</button>
-    ${signal.targetType==='AUTHOR'?`<button type="button" data-v5-quick-block="${esc(signalId(signal))}">不推荐此作者</button>`:''}</div></div>`
+    <span class="v5-range-meta">${v5t(`系统基准 ${baseline}/10 · 收藏支持 ${Number(signal.supportCount||0)} 本`,`System baseline ${baseline}/10 · supported by ${Number(signal.supportCount||0)} favorites`,`システム基準 ${baseline}/10 · お気に入り ${Number(signal.supportCount||0)} 件の支持`)}</span></div>
+    <div class="v5-row-actions"><button type="button" data-v5-quick-session="${esc(signalId(signal))}">${v5t('本次想看','Want this now','今回見たい')}</button>
+    ${signal.targetType==='AUTHOR'?`<button type="button" data-v5-quick-block="${esc(signalId(signal))}">${v5t('不推荐此作者','Do not recommend this author','この作者をおすすめしない')}</button>`:''}</div></div>`
 }
 
 function setCardState(card,className,message,tone='neutral') {
@@ -889,11 +889,11 @@ function setCardState(card,className,message,tone='neutral') {
 
 function suppressionMessage(reason) {
     return {
-        already_seen:'已标记看过 · 当前作品将从新作推荐中隐藏',
-        already_owned:'已标记已有 · 当前作品不再作为新作推荐',
-        duplicate:'已标记重复反馈 · 当前上传将隐藏',
-        temporary:'已暂时隐藏当前作品 · 30 天后自动恢复'
-    }[reason]||'已隐藏当前作品'
+        already_seen:v5t('已标记看过 · 当前作品将从新作推荐中隐藏','Marked as seen · hidden from new-work recommendations','閲覧済みに設定 · 新作おすすめから非表示'),
+        already_owned:v5t('已标记已有 · 当前作品不再作为新作推荐','Marked as owned · no longer recommended as new','所有済みに設定 · 新作としておすすめしません'),
+        duplicate:v5t('已标记重复反馈 · 当前上传将隐藏','Marked as duplicate · this upload will be hidden','重複として設定 · このアップロードを非表示'),
+        temporary:v5t('已暂时隐藏当前作品 · 30 天后自动恢复','Temporarily hidden · automatically returns after 30 days','一時的に非表示 · 30日後に自動復帰')
+    }[reason]||v5t('已隐藏当前作品','This work is hidden','この作品を非表示にしました')
 }
 
 function openQuickControl(card) {
@@ -902,22 +902,22 @@ function openQuickControl(card) {
     for(const tag of context.tags.slice(0,4)) signals.push(quickSignal('TAG',tag,tag))
     V5.quickSignals=new Map(signals.map(item=>[signalId(item),item]))
     const body=dialog.querySelector('#v5-quick-control-body')
-    body.innerHTML=signals.map(quickSliderRow).join('')+`<div class="v5-quick-row"><strong>这本作品不该作为新推荐出现</strong>
-    <div class="v5-suppress-grid"><button data-v5-suppress-reason="already_seen">已经看过</button>
-    <button data-v5-suppress-reason="already_owned">已经拥有</button><button data-v5-suppress-reason="duplicate">重复上传</button>
-    <button data-v5-suppress-reason="temporary">暂时不想看（30天）</button></div></div>`
+    body.innerHTML=signals.map(quickSliderRow).join('')+`<div class="v5-quick-row"><strong>${v5t('这本作品不该作为新推荐出现','This work should not appear as a new recommendation','この作品を新しいおすすめとして表示しない')}</strong>
+    <div class="v5-suppress-grid"><button data-v5-suppress-reason="already_seen">${v5t('已经看过','Already seen','閲覧済み')}</button>
+    <button data-v5-suppress-reason="already_owned">${v5t('已经拥有','Already owned','所有済み')}</button><button data-v5-suppress-reason="duplicate">${v5t('重复上传','Duplicate upload','重複アップロード')}</button>
+    <button data-v5-suppress-reason="temporary">${v5t('暂时不想看（30天）','Hide temporarily (30 days)','一時的に非表示（30日）')}</button></div></div>`
     body.querySelectorAll('[data-v5-quick-level]').forEach(input=>{
         input.addEventListener('input',()=>{const output=body.querySelector(`[data-v5-quick-value="${CSS.escape(input.dataset.v5QuickLevel)}"]`);if(output)output.textContent=`${input.value}/10`})
         input.addEventListener('change',async()=>{const signal=V5.quickSignals.get(input.dataset.v5QuickLevel);if(!signal)return;await setLevel(signal,Number(input.value));dialog.close()})
     })
     body.querySelectorAll('[data-v5-quick-session]').forEach(button=>button.addEventListener('click',async()=>{const signal=V5.quickSignals.get(button.dataset.v5QuickSession);if(!signal)return;await setSession(signal);dialog.close()}))
-    body.querySelectorAll('[data-v5-quick-block]').forEach(button=>button.addEventListener('click',async()=>{const signal=V5.quickSignals.get(button.dataset.v5QuickBlock);if(!signal)return;const result=await setControl(signal,'BLOCK');if(result){showToast(`已屏蔽作者「${signal.label}」。`,'negative');dialog.close()}}))
+    body.querySelectorAll('[data-v5-quick-block]').forEach(button=>button.addEventListener('click',async()=>{const signal=V5.quickSignals.get(button.dataset.v5QuickBlock);if(!signal)return;const result=await setControl(signal,'BLOCK');if(result){showToast(v5t(`已屏蔽作者「${signal.label}」。`,`Blocked author “${signal.label}”.`,`作者「${signal.label}」をブロックしました。`),'negative');dialog.close()}}))
     body.querySelectorAll('[data-v5-suppress-reason]').forEach(button=>button.addEventListener('click',async()=>{
         try{
             V5.snapshot=await post('/api/v1/recommendation-v5/suppress',{comicId:context.comicId,suppressed:true,reason:button.dataset.v5SuppressReason})
             const message=suppressionMessage(button.dataset.v5SuppressReason)
             setCardState(card,'v5-suppressed',message,'negative');showToast(message,'negative');dialog.close();renderPolicy()
-        }catch(error){showToast(`操作失败：${error.message}`,'negative')}
+        }catch(error){showToast(v5t(`操作失败：${error.message}`,`Operation failed: ${error.message}`,`操作に失敗しました：${error.message}`),'negative')}
     }))
     dialog.showModal()
 }
@@ -928,10 +928,10 @@ function syncFeedbackVisual(card,announce=false) {
     const next=dislike?'dislike':like?'like':'', previous=card.dataset.v5FeedbackState||''
     card.dataset.v5FeedbackState=next
     card.classList.toggle('v5-feedback-like',next==='like');card.classList.toggle('v5-feedback-dislike',next==='dislike')
-    if(next==='like')setCardState(card,'','已记录喜欢 · 将增加类似推荐','positive')
-    else if(next==='dislike')setCardState(card,'','已记录不喜欢 · 将减少此类推荐','negative')
+    if(next==='like')setCardState(card,'',v5t('已记录喜欢 · 将增加类似推荐','Liked · similar recommendations will increase','好きとして記録 · 類似おすすめを増やします'),'positive')
+    else if(next==='dislike')setCardState(card,'',v5t('已记录不喜欢 · 将减少此类推荐','Disliked · similar recommendations will decrease','苦手として記録 · この種類のおすすめを減らします'),'negative')
     else if(!card.classList.contains('v5-suppressed'))card.querySelector('.v5-card-state')?.remove()
-    if(announce&&next&&next!==previous)showToast(next==='like'?'已记录喜欢，将增加类似推荐。':'已记录不喜欢，将减少此类推荐。',next==='like'?'positive':'negative')
+    if(announce&&next&&next!==previous)showToast(next==='like'?v5t('已记录喜欢，将增加类似推荐。','Liked; similar recommendations will increase.','好きとして記録し、類似おすすめを増やします。'):v5t('已记录不喜欢，将减少此类推荐。','Disliked; similar recommendations will decrease.','苦手として記録し、この種類のおすすめを減らします。'),next==='like'?'positive':'negative')
 }
 
 function tasteExcluded(comicId) {
@@ -949,12 +949,12 @@ async function setTasteExclusion(comicId, excluded) {
         decorateLibraryTasteToggles()
         showToast(
             excluded
-                ? '收藏已保留，但这本不再参与推荐口味画像。'
-                : '这本收藏已恢复参与推荐口味画像。',
+                ? v5t('收藏已保留，但这本不再参与推荐口味画像。','Favorite kept, but this work no longer contributes to your recommendation profile.','お気に入りは保持しますが、この作品はおすすめプロフィールに反映しません。')
+                : v5t('这本收藏已恢复参与推荐口味画像。','This favorite now contributes to your recommendation profile again.','このお気に入りをおすすめプロフィールに再び反映します。'),
             'positive'
         )
     } catch (error) {
-        showToast('口味画像设置失败：' + error.message, 'negative')
+        showToast(v5t('口味画像设置失败：' + error.message,'Preference-profile setting failed: ' + error.message,'嗜好プロフィール設定に失敗しました：' + error.message), 'negative')
     }
 }
 
@@ -988,12 +988,12 @@ function decorateLibraryTasteToggles() {
             }
             holder.dataset.v5TasteState = renderState
             holder.innerHTML =
-                '<span class="status">推荐口味：' +
-                (excluded ? '已排除' : '参与') +
+                '<span class="status">' + v5t('推荐口味：','Recommendation profile: ','おすすめプロフィール：') +
+                (excluded ? v5t('已排除','Excluded','除外') : v5t('参与','Included','参加')) +
                 '</span><button type="button">' +
                 (excluded
-                    ? '恢复用于推荐口味'
-                    : '保留收藏，但不用于推荐口味') +
+                    ? v5t('恢复用于推荐口味','Include in recommendation profile','おすすめプロフィールに戻す')
+                    : v5t('保留收藏，但不用于推荐口味','Keep favorite, exclude from profile','お気に入りを保持し、プロフィールから除外')) +
                 '</button>'
             holder.querySelector('button').addEventListener('click', () => {
                 void setTasteExclusion(comicId, !excluded)
@@ -1007,13 +1007,13 @@ function decorateRecommendationCards() {
         const body=card.querySelector('.result-body');if(!body)return
         const detailActions=body.querySelector('.detail-actions')
         if(!card.querySelector('[data-v5-quick-control]')){
-            const button=document.createElement('button');button.type='button';button.dataset.v5QuickControl='true';button.textContent='⚙ 调节推荐'
+            const button=document.createElement('button');button.type='button';button.dataset.v5QuickControl='true';button.textContent=v5t('⚙ 调节推荐','⚙ Tune recommendations','⚙ おすすめを調整')
             button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();openQuickControl(card)})
             ;(detailActions||body).appendChild(button)
         }
         syncFeedbackVisual(card,false)
         if(Array.isArray(V5.snapshot?.hardSuppressComicIds)&&V5.snapshot.hardSuppressComicIds.includes(card.dataset.comicId))
-            setCardState(card,'v5-suppressed','已按你的设置隐藏 · 后续推荐将排除','negative')
+            setCardState(card,'v5-suppressed',v5t('已按你的设置隐藏 · 后续推荐将排除','Hidden by your setting · excluded from future recommendations','設定により非表示 · 今後のおすすめから除外'),'negative')
     })
 }
 
@@ -1057,3 +1057,13 @@ document.addEventListener('pica-language-change',()=>{ensurePanel();renderPolicy
 void import('./work-identity-review.js').catch(() => undefined)
 
 void import('./recommendation-v5-evaluation.js').catch(() => undefined)
+
+
+document.addEventListener('pica-language-change', () => {
+    const panel=document.querySelector('#settings-recommendation-v5')
+    if(panel) panel.remove()
+    ensurePanel()
+    renderPolicy()
+    decorateRecommendationCards()
+    decorateLibraryTasteToggles()
+})

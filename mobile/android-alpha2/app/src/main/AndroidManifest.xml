@@ -25,6 +25,7 @@
         <activity android:name=".HistoryActivity" android:exported="false" />
         <activity android:name=".ComicDetailActivity" android:exported="false" />
         <activity android:name=".AppearanceActivity" android:exported="false" />
+        <activity android:name=".LanguageActivity" android:exported="false" />
         <activity android:name=".ThemePackActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".RecommendationStyleActivity" android:exported="false" />

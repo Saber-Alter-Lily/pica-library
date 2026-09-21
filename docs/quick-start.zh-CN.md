@@ -4,7 +4,7 @@
 
 ## 01 下载与解压
 
-从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.3 对应 `Pica-Library-v0.4.3-windows-x64.zip`。完整解压到普通文件夹，不要直接在压缩软件中运行。
+从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.4 对应 `Pica-Library-v0.4.4-windows-x64.zip`。完整解压到普通文件夹，不要直接在压缩软件中运行。
 
 ## 02 第一次启动
 
@@ -37,7 +37,7 @@
 打开 **设置 → 软件更新 → 检查并更新（兼容时自动）**。
 
 - 如果目标版本支持安全增量更新，程序会自动下载、校验、重启并应用。
-- v0.4.1 / v0.4.2 → v0.4.3 属于兼容增量更新，可直接在软件内完成；如果仍为 v0.4.0，则使用 Release 中的 `Pica-Library-v0.4.3-upgrade-assistant.zip` 直接跨代升级。
+- v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4 属于兼容增量更新，可直接在软件内完成；如果仍为 v0.4.0，则使用 Release 中的 `Pica-Library-v0.4.4-upgrade-assistant.zip` 直接跨代升级。
 - 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\\Pica Library`、备份旧程序和数据库并在失败时回滚；不需要卸载或重新导入数据。
 - 如果不使用助手，仍可按页面提示手动退出旧版并替换程序目录。
 

@@ -29,6 +29,8 @@ describe('Web localization', () => {
         [['zh-Hans'], 'zh-CN'],
         [['zh-SG'], 'zh-CN'],
         [['zh'], 'zh-CN'],
+        [['ja-JP'], 'ja'],
+        [['ja'], 'ja'],
         [['en-US'], 'en']
     ])('detects %j as %s', (languages, expected) => {
         expect(detectLanguage(languages)).toBe(expected)
@@ -39,6 +41,8 @@ describe('Web localization', () => {
         expect(resolveLanguage(storage, ['en-US'])).toBe('en')
         expect(saveLanguage(storage, 'zh-CN')).toBe('zh-CN')
         expect(resolveLanguage(storage, ['en-US'])).toBe('zh-CN')
+        expect(saveLanguage(storage, 'ja')).toBe('ja')
+        expect(resolveLanguage(storage, ['en-US'])).toBe('ja')
         expect(saveLanguage(storage, 'en')).toBe('en')
         expect(resolveLanguage(storage, ['zh-CN'])).toBe('en')
     })
@@ -46,15 +50,26 @@ describe('Web localization', () => {
     it('updates translated UI strings in both directions', () => {
         expect(translate('en', 'nav.library')).toBe('Library')
         expect(translate('zh-CN', 'nav.library')).toBe('漫画库')
+        expect(translate('ja', 'nav.library')).toBe('ライブラリ')
         expect(translate('en', 'nav.library')).toBe('Library')
     })
 
-    it('has complete Simplified Chinese coverage for ordinary UI keys', () => {
+    it('has complete Simplified Chinese and Japanese coverage for ordinary UI keys', () => {
         expect(missingTranslationKeys('zh-CN')).toEqual([])
+        expect(missingTranslationKeys('ja')).toEqual([])
         expect(Object.keys(translations.en).length).toBeGreaterThan(100)
-        expect(Object.keys(translations['zh-CN']).sort()).toEqual(
-            Object.keys(translations.en).sort()
+        for (const language of ['zh-CN', 'ja']) {
+            expect(Object.keys(translations[language]).sort()).toEqual(
+                Object.keys(translations.en).sort()
+            )
+        }
+    })
+
+    it('does not leave Chinese copy inside the English catalog', () => {
+        const leaked = Object.entries(translations.en).filter(([, value]) =>
+            /[\\u3400-\\u9fff]/.test(value)
         )
+        expect(leaked).toEqual([])
     })
 
     it('covers every v0.2 dynamic surface in both languages', () => {
@@ -75,10 +90,12 @@ describe('Web localization', () => {
         expect(keys.length).toBeGreaterThan(80)
         for (const key of keys) {
             expect(translations.en[key], `missing en ${key}`).toBeTruthy()
-            expect(
-                translations['zh-CN'][key],
-                `missing zh-CN ${key}`
-            ).toBeTruthy()
+            for (const language of ['zh-CN', 'ja']) {
+                expect(
+                    translations[language][key],
+                    `missing ${language} ${key}`
+                ).toBeTruthy()
+            }
         }
     })
 
@@ -119,10 +136,12 @@ describe('Web localization', () => {
                 translations.en[key],
                 `missing en DOM key ${key}`
             ).toBeTruthy()
-            expect(
-                translations['zh-CN'][key],
-                `missing zh-CN DOM key ${key}`
-            ).toBeTruthy()
+            for (const language of ['zh-CN', 'ja']) {
+                expect(
+                    translations[language][key],
+                    `missing ${language} DOM key ${key}`
+                ).toBeTruthy()
+            }
         }
     })
 
@@ -192,7 +211,7 @@ describe('Web localization', () => {
         ).toBe('The normalized name is consistent.')
     })
 
-    it.each(['zh-CN', 'en'])(
+    it.each(['zh-CN', 'ja', 'en'])(
         'classifies secure credential storage before authentication in %s',
         (language) => {
             expect(

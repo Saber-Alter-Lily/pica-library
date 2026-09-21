@@ -75,6 +75,8 @@ export const jaCoreTranslations = {
     'library.sizeMedium': '中',
     'library.sizeLarge': '大',
     'library.catalogHelp': 'ローカルライブラリの記録は、お気に入り、検索、おすすめ、ダウンロードなどから作成されます。',
+    'library.helpLabel': 'ライブラリの説明を見る',
+    'library.helpText': 'ここでローカルライブラリを絞り込み・確認・整理し、ダウンロードする作品を選択できます。',
     'library.loadMore': 'さらに読み込む',
     'library.author': '作者',
     'library.tags': 'タグ',

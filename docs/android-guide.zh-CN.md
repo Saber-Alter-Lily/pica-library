@@ -1,11 +1,11 @@
 # Pica Library Android 使用说明
 
-> 当前正式版本：**v0.4.6 · versionCode 46**。Android 版本未上架任何应用商店，请仅从本仓库正式 GitHub Release 下载 APK。
+> 当前正式版本：**v0.4.7 · versionCode 50**。Android 版本未上架任何应用商店，请仅从本仓库正式 GitHub Release 下载 APK。
 
 ## 1. 下载与安装
 
 1. 打开 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest)。
-2. 下载当前版本 APK；v0.4.6 对应 `Pica-Library-Android-v50.apk`。
+2. 下载当前版本 APK；v0.4.7 对应 `Pica-Library-Android-v50.apk`。
 3. 在手机上打开 APK，并按 Android 系统提示允许本次安装。
 4. 首次启动后阅读并确认使用说明，再进入应用。
 

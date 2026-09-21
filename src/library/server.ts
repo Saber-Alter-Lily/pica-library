@@ -2182,19 +2182,6 @@ export async function startLibraryServer(options: {
                         })
                     )
                 }
-                if (input.run !== false) {
-                    await options.service.runDownloadQueue({
-                        runner: 'LOCAL',
-                        profile: (input.profile
-                            ? String(input.profile)
-                            : 'balanced') as
-                            | 'conservative'
-                            | 'balanced'
-                            | 'fast'
-                            | 'custom',
-                        custom: performanceOverrides(input)
-                    })
-                }
                 for (const job of jobs)
                     options.database.recordUserEvent({
                         eventType: 'download_enqueue',
@@ -2208,6 +2195,17 @@ export async function startLibraryServer(options: {
                             : null,
                         metadata: { jobId: job.id }
                     })
+                if (input.run !== false)
+                    options.service.startLocalDownloadQueue({
+                        profile: (input.profile
+                            ? String(input.profile)
+                            : 'balanced') as
+                            | 'conservative'
+                            | 'balanced'
+                            | 'fast'
+                            | 'custom',
+                        custom: performanceOverrides(input)
+                    })
                 return json(
                     response,
                     200,
@@ -2218,7 +2216,10 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/downloads/summary' &&
                 request.method === 'GET'
             )
-                return json(response, 200, options.database.downloadJobSummary())
+                return json(response, 200, {
+                    ...options.database.downloadJobSummary(),
+                    runtime: options.service.localDownloadRuntime()
+                })
             if (
                 url.pathname === '/api/v1/downloads/page' &&
                 request.method === 'GET'
@@ -2251,8 +2252,7 @@ export async function startLibraryServer(options: {
                 request.method === 'POST'
             ) {
                 const input = await body(request)
-                await options.service.runDownloadQueue({
-                    runner: 'LOCAL',
+                const runtime = options.service.startLocalDownloadQueue({
                     profile: (input.profile
                         ? String(input.profile)
                         : 'balanced') as
@@ -2262,7 +2262,10 @@ export async function startLibraryServer(options: {
                         | 'custom',
                     custom: performanceOverrides(input)
                 })
-                return json(response, 200, options.database.listDownloadJobs())
+                return json(response, 200, {
+                    ...runtime,
+                    summary: options.database.downloadJobSummary()
+                })
             }
             const jobAction = url.pathname.match(
                 /^\/api\/v1\/downloads\/([^/]+)\/(pause|resume|retry|cancel)$/

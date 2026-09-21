@@ -25,7 +25,7 @@ import java.util.Map;
 import javax.net.ssl.SSLException;
 
 /** Official E-H web login in an app-owned WebView; credentials stay on the official site. */
-public final class EhWebLoginActivity extends Activity {
+public final class EhWebLoginActivity extends LocaleAwareActivity {
     private static final String LOGIN_URL="https://forums.e-hentai.org/index.php?act=Login";
     private static final String FORUMS_URL="https://forums.e-hentai.org/",EH_URL="https://e-hentai.org/",EXH_URL="https://exhentai.org/";
     private WebView web;private TextView status;private ProgressBar loading;private boolean verifying,destroyed;private String lastSignature="";

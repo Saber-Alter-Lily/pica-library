@@ -2520,6 +2520,19 @@ select:focus {
     fill: #212633;
 }
 
+@media (max-width: 900px) {
+    .app-nav {
+        position: static;
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+    .app-nav button {
+        flex: 1 1 auto;
+        white-space: normal;
+        line-height: 1.25;
+    }
+}
+
 @media (max-width: 760px) {
     .app-header {
         padding-inline: 14px;

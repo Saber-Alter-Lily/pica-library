@@ -1,5 +1,5 @@
 name: One-shot Localization Final Web Gate
-# final-web-gate: connections-static-pass-6
+# final-web-gate: support-redraw-pass-7
 
 on:
   push:

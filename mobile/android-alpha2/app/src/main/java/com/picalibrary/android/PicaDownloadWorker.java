@@ -32,7 +32,7 @@ public final class PicaDownloadWorker extends Worker {
                 episodeDone++;publish(comicId,online.title,episode.title,episodeDone,episodeTotal,pageDone,pages.size(),"章节完成");
             }
             UnifiedPicaCatalogSync.merge(getApplicationContext(),online);PhoneDownloadStore.reconcileCatalog(getApplicationContext());Data done=progress(episodeTotal,episodeTotal,0,0,online.title,"","下载完成");return Result.success(done);
-        }catch(Exception e){String message=e.getMessage()==null?"下载失败":e.getMessage();if(isStopped())return failure(PicaDownloadJobs.paused(getApplicationContext())?"下载已暂停，可从已完成页面继续":"下载已取消");if(getRunAttemptCount()<3)return Result.retry();return failure(message);}
+        }catch(Exception e){String message=e.getMessage()==null?"下载失败":e.getMessage();if(isStopped())return failure(PicaDownloadJobs.paused(getApplicationContext(),comicId,selected)?"下载已暂停，可从已完成页面继续":"下载已取消");if(getRunAttemptCount()<3)return Result.retry();return failure(message);}
     }
 
     private void publish(String comicId,String title,String episodeTitle,int episodeDone,int episodeTotal,int pageDone,int pageTotal,String phase){Data data=progress(episodeDone,episodeTotal,pageDone,pageTotal,title,episodeTitle,phase);setProgressAsync(data);setForegroundAsync(foreground(comicId,title,episodeTitle.isEmpty()?phase:episodeTitle+" · "+pageDone+" / "+pageTotal,pageDone,pageTotal));}

@@ -8,7 +8,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
 /** Storage/download operations only. Cache/data maintenance remains a separate Settings destination. */
-public final class StorageHubActivity extends Activity {
+public final class StorageHubActivity extends LocaleAwareActivity {
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();}
     private void render(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});

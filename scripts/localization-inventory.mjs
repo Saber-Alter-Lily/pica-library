@@ -80,6 +80,20 @@ console.log('ANDROID_UNIQUE_LIKELY_UI=' + new Set(androidRows.filter(x=>x.likely
 console.log('ANDROID_COVERED_PRIMITIVE=' + androidRows.filter(x=>x.coveredPrimitive).length)
 console.log('ANDROID_DIRECT_UI=' + androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).length)
 console.log('ANDROID_DIRECT_UI_UNIQUE=' + new Set(androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).map(x=>x.value)).size)
+
+const sharedPath = path.join(ROOT, 'mobile/android-alpha2/app/src/main/assets/locales/shared-literals.json')
+let sharedCatalog = { byLanguage: { en: {}, ja: {} } }
+if (fs.existsSync(sharedPath)) sharedCatalog = JSON.parse(fs.readFileSync(sharedPath, 'utf8'))
+const directUnique = [...new Set(androidRows.filter(x => x.directUi && !x.coveredPrimitive).map(x => x.value))]
+const missingEn = directUnique.filter(value => !sharedCatalog.byLanguage?.en?.[value])
+const missingJa = directUnique.filter(value => !sharedCatalog.byLanguage?.ja?.[value])
+console.log('ANDROID_DIRECT_MISSING_EN=' + missingEn.length)
+console.log('ANDROID_DIRECT_MISSING_JA=' + missingJa.length)
+console.log('ANDROID_DIRECT_MISSING_EN_VALUES')
+console.log(missingEn.slice(0,500).join('\n'))
+console.log('ANDROID_DIRECT_MISSING_JA_VALUES')
+console.log(missingJa.slice(0,500).join('\n'))
+
 console.log('DIRECT_UI_SAMPLES')
 console.log(androidRows.filter(x=>x.directUi&&!x.coveredPrimitive).slice(0,220).map(x=>`${x.file}:${x.line}\t${x.value}`).join('\n'))
 console.log('LIKELY_UI_SAMPLES')

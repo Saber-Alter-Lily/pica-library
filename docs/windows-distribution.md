@@ -2,11 +2,11 @@
 
 # Windows One-Click Distribution
 
-> Current stable release: **v0.4.4**.
+> Current stable release: **v0.4.5**.
 
 ## Download and start
 
-1. Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest). For v0.4.4, use `Pica-Library-v0.4.4-windows-x64.zip`.
+1. Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest). For v0.4.5, use `Pica-Library-v0.4.5-windows-x64.zip`.
 2. Extract the complete ZIP to a normal folder. Do not run the executable from inside an archive viewer.
 3. Run `Pica Library.exe`.
 4. The local setup page opens in your browser. Configure accounts, library location, download behavior, and an HTTP/HTTPS proxy only when needed.
@@ -45,7 +45,7 @@ Desktop Settings currently includes:
 - **Maintenance** — repair, logs, exports, and advanced tools;
 - **Software Update** — official updates, local update ZIPs, verification, installation, and rollback.
 
-Closing the browser tab does not stop the Desktop process. Use the in-app exit action when you want to stop the local service completely.
+Closing the last browser tab now stops an idle Desktop Node process after a short grace period only when no paired Android device needs the Mobile Bridge. If a phone is paired, the Desktop service stays available. Use the in-app exit action for an explicit full shutdown.
 
 ## Browser Lite
 
@@ -55,15 +55,15 @@ When needed, export a Browser Lite data package from the related advanced Settin
 
 Open **Settings → Software Update** and check the current formal release.
 
-### Public upgrade path: v0.4.0 → v0.4.4
+### Public upgrade path: v0.4.0 → v0.4.5
 
-Download from the **v0.4.4 Release**:
+Download from the **v0.4.5 Release**:
 
-`Pica-Library-v0.4.4-upgrade-assistant.zip`
+`Pica-Library-v0.4.5-upgrade-assistant.zip`
 
 Extract it and run:
 
-`Upgrade-Pica-Library-v0.4.4.cmd`
+`Upgrade-Pica-Library-v0.4.5.cmd`
 
 The assistant:
 
@@ -90,7 +90,7 @@ If the library/download folder is inside the old application directory, the upgr
 Download `SHA256SUMS.txt` from the same official Release and run:
 
 ```powershell
-Get-FileHash .\Pica-Library-v0.4.4-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\Pica-Library-v0.4.5-windows-x64.zip -Algorithm SHA256
 ```
 
 Compare the full hash with the official Release value before extracting the package.

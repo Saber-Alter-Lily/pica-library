@@ -168,6 +168,8 @@ export const WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION =
 export const RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION =
     'RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL'
 
+const DOWNLOAD_PROGRESS_PERSIST_INTERVAL_MS = 250
+
 export interface DiscoverQuery {
     keyword?: string
     tags?: string[]
@@ -3771,30 +3773,58 @@ export class LibraryService {
         const scheduler = new DownloadScheduler(
             store,
             async (job) => {
-                const result = await this.downloadComicNow(job.comicId, {
-                    episodeOrders: job.episodeOrders,
-                    mediaGate,
-                    onProgress: (progress) => {
-                        this.database.updateDownloadProgress(job.id, {
-                            progressCompleted: progress.completed,
-                            progressTotal: progress.total,
-                            bytes: progress.bytes,
-                            chapterTitle: progress.episodeTitle
-                        })
-                        options.onProgress?.(progress)
-                    },
-                    shouldStop: () => {
-                        const status = this.database.getDownloadJob(
-                            job.id
-                        ).status
-                        return status === 'PAUSED' || status === 'CANCELLED'
-                    }
-                })
-                this.database.updateDownloadProgress(job.id, {
-                    progressCompleted: result.completed,
-                    progressTotal: result.pictures,
-                    bytes: result.bytes
-                })
+                let latestProgress: DownloadProgress | null = null
+                let lastPersistedAt = 0
+                const persistProgress = (
+                    progress: DownloadProgress,
+                    force = false
+                ) => {
+                    latestProgress = progress
+                    options.onProgress?.(progress)
+                    const now = Date.now()
+                    if (
+                        !force &&
+                        now - lastPersistedAt <
+                            DOWNLOAD_PROGRESS_PERSIST_INTERVAL_MS
+                    )
+                        return
+                    this.database.updateDownloadProgress(job.id, {
+                        progressCompleted: progress.completed,
+                        progressTotal: progress.total,
+                        bytes: progress.bytes,
+                        chapterTitle: progress.episodeTitle
+                    })
+                    lastPersistedAt = now
+                }
+                try {
+                    const result = await this.downloadComicNow(job.comicId, {
+                        episodeOrders: job.episodeOrders,
+                        mediaGate,
+                        onProgress: (progress) =>
+                            persistProgress(progress),
+                        shouldStop: () => {
+                            const status = this.database.getDownloadJob(
+                                job.id
+                            ).status
+                            return (
+                                status === 'PAUSED' ||
+                                status === 'CANCELLED'
+                            )
+                        }
+                    })
+                    this.database.updateDownloadProgress(job.id, {
+                        progressCompleted: result.completed,
+                        progressTotal: result.pictures,
+                        bytes: result.bytes,
+                        chapterTitle:
+                            latestProgress?.episodeTitle ??
+                            this.database.getDownloadJob(job.id).chapterTitle
+                    })
+                    latestProgress = null
+                } finally {
+                    if (latestProgress)
+                        persistProgress(latestProgress, true)
+                }
             },
             {
                 jobConcurrency: settings.jobConcurrency,

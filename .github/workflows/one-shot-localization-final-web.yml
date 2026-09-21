@@ -1,5 +1,5 @@
 name: One-shot Localization Final Web Gate
-# final-web-gate: recommendations-i18n-pass-2
+# final-web-gate: visual-layout-pass-3
 
 on:
   push:

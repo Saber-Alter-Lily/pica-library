@@ -86,6 +86,7 @@ const state = {
     updateProgress: null,
     chronicleSnapshot: null,
     downloadRunnerRunning: false,
+    downloadRecoveryNotified: false,
     reader: {
         comicId: null,
         episodeId: null,
@@ -1978,7 +1979,32 @@ async function loadJobs() {
         ])
         const jobs = Array.isArray(page.items) ? page.items : []
         const counts = summary.counts || {}
-        state.downloadRunnerRunning = Boolean(summary.runtime?.running)
+        const runtime = summary.runtime || {}
+        state.downloadRunnerRunning = Boolean(runtime.running)
+        const recovered = Number(runtime.recoveredOnStartup || 0)
+        if (recovered > 0 && !state.downloadRecoveryNotified) {
+            state.downloadRecoveryNotified = true
+            showOperationToast(
+                t('downloads.recoveredInterrupted', { count: recovered }),
+                'warning',
+                7000
+            )
+        }
+        const runningCount =
+            Number(counts.RUNNING || 0) + Number(counts.PREPARING || 0)
+        const waitingCount =
+            Number(counts.QUEUED || 0) + Number(counts.RETRY_WAIT || 0)
+        if (state.downloadRunnerRunning)
+            setProgress(
+                $('#download-operation'),
+                t('downloads.backgroundRunning', {
+                    running: runningCount,
+                    waiting: waitingCount
+                }),
+                0,
+                0
+            )
+        else clearProgress($('#download-operation'))
         const runButton = $('#run-jobs')
         if (runButton) runButton.disabled = state.downloadRunnerRunning
         $('#download-summary').innerHTML = [
@@ -3734,7 +3760,8 @@ $('#run-jobs').onclick = async () => {
         await post('/api/v1/downloads/run', runtime)
         await loadJobs()
     } finally {
-        clearProgress($('#download-operation'))
+        if (!state.downloadRunnerRunning)
+            clearProgress($('#download-operation'))
         button.disabled = state.downloadRunnerRunning
     }
 }

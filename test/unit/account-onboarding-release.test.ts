@@ -19,17 +19,17 @@ describe('account onboarding distribution candidate', () => {
         expect(gradle).toContain('versionName buildVersionName')
     })
 
-    it('requires the checksum-verified official v0.4.1 base without replacing the launcher', () => {
+    it('requires the checksum-verified official v0.4.2 base without replacing the launcher', () => {
         const script = fs.readFileSync(
             'scripts/build-windows-package.ps1',
             'utf8'
         )
         expect(script).toContain("$version -eq '0.4.3'")
         expect(script).toContain(
-            'artifacts\\release-base\\Pica-Library-v0.4.1-windows-x64.zip'
+            'artifacts\\release-base\\Pica-Library-v0.4.2-windows-x64.zip'
         )
         expect(script).toContain(
-            '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d'
+            '96bcc020c7cd19aa84f982af9010f6656a44dc01b827839d6e24c40e36ec24c1'
         )
         expect(script).toContain(
             'Launcher source changed since accepted stable package'

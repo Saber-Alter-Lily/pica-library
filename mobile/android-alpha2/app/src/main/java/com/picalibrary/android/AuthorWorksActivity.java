@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Creator works over provider bindings. Core retrieval is Pica + E-H; ExH is optional. */
-public final class AuthorWorksActivity extends Activity {
+public final class AuthorWorksActivity extends LocaleAwareActivity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();private String conceptId="",sourceMode="all";private TextView status;private RecyclerView list;private boolean destroyed,refreshing;private AuthorConceptStore.Concept concept;
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);conceptId=safe(getIntent().getStringExtra("authorConceptId"));AuthorConceptStore.Snapshot snapshot=AuthorConceptStore.build(this);concept=snapshot.get(conceptId);renderShell();renderWorks();refreshOnline();}
     private Button compact(String label,android.view.View.OnClickListener action){return Ui.button(this,label,action,true);}

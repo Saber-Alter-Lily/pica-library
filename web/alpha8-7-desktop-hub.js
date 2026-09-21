@@ -230,6 +230,21 @@ function openSettingsHubPanel(id) {
     activateHubPanel(id)
 }
 
+function moveProductSettingsPanels() {
+    const general = hub$('#a87-general-panel')
+    const appearanceSlot = hub$('#a87-appearance-panel')
+    const support = hub$('#a83-support')
+    const appearance = hub$('#a83-appearance')
+    if (general && support && support.parentElement !== general) {
+        general.appendChild(support)
+        support.classList.add('a87-support-panel')
+    }
+    if (appearanceSlot && appearance && appearance.parentElement !== appearanceSlot) {
+        appearanceSlot.prepend(appearance)
+        appearance.classList.add('a87-appearance-panel')
+    }
+}
+
 function movePersonalization() {
     const slot = hub$('#a87-appearance-panel')
     const personalization = hub$('#a83-personalization')
@@ -237,6 +252,7 @@ function movePersonalization() {
         slot.appendChild(personalization)
         personalization.classList.add('a87-personalization')
     }
+    moveProductSettingsPanels()
 }
 
 async function refreshPreviewStats() {
@@ -382,6 +398,7 @@ function buildSettingsHub() {
 
     maintenance.replaceChildren(heading, layout)
     settings.hidden = true
+    moveProductSettingsPanels()
     movePersonalization()
     refreshHubLabels()
 
@@ -420,6 +437,7 @@ function installObservers() {
         queued = true
         requestAnimationFrame(() => {
             queued = false
+            moveProductSettingsPanels()
             movePersonalization()
             const settingsNav = hub$('#settings-nav')
             if (settingsNav) settingsNav.style.display = 'none'
@@ -441,6 +459,7 @@ function bootstrap() {
     setTimeout(() => {
         buildSettingsHub()
         installDownloadHistoryControl()
+        moveProductSettingsPanels()
         movePersonalization()
     }, 250)
 }

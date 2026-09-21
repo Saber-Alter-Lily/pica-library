@@ -52,6 +52,22 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
     await page.locator('button[data-go="library"]').click()
     await expect(page.locator('#library')).toHaveClass(/\bactive\b/)
 
+    const settingsNav = page.locator('nav [data-view="maintenance"]')
+    await settingsNav.click()
+    await expect(page.locator('#a87-hub-layout')).toBeVisible()
+
+    const support = page.locator('#a87-general-panel #a83-support')
+    await expect(support).toBeVisible()
+    await expect(support.locator('#a83-afdian')).toBeVisible()
+    await expect(support.locator('#a83-star')).toBeVisible()
+
+    await page.locator('#a87-appearance-tab').click()
+    const appearance = page.locator('#a87-appearance-panel #a83-appearance')
+    await expect(appearance).toBeVisible()
+
+    await page.locator('nav [data-view="library"]').click()
+    await expect(page.locator('#library')).toHaveClass(/\bactive\b/)
+
     const help = page.locator('#library .info-tip').first()
     await expect(help).toBeVisible()
     await help.hover()

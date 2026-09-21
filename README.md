@@ -10,12 +10,12 @@
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.3 本次更新
+## v0.4.4 本次更新
 
-- **支持项目真正可见**：Android 主“设置”页直接增加“支持项目”；Windows / Web 支持卡移动到设置前部，爱发电与 GitHub 不再藏在页面底部。
-- **推荐文案对齐**：Android“推荐与画风 → 人工调整”入口明确显示 0–10 档，与实际滑杆一致。
-- **功能逻辑保持**：无收藏的新用户仍可用 0–10 标签建立初始推荐；Windows 更新页分区修复继续保留。
-- **直达升级**：v0.4.1、v0.4.2 Windows 均可软件内直接升级到 v0.4.3；v0.4.0 使用 v0.4.3 升级助手直达；Android v42 / v43 / v44 可直接升级到 versionCode 45 / 0.4.3。
+- **网页端支持项目真正进入设置中心**：修复 Desktop Settings Hub 重组时漏搬“支持项目”的问题；现在打开设置后即可在“基本设置”看到爱发电与 GitHub。
+- **网页端外观入口同步修复**：基础明暗模式也会正确进入“外观与个性化”，不再跟随旧 Settings 容器一起被隐藏。
+- **真实浏览器验收**：CI 现在会用 Chromium 打开设置中心，直接断言支持卡和基础外观在重组后的可见 DOM 中存在。
+- **升级**：Windows v0.4.1 / v0.4.2 / v0.4.3 均可直接软件内升级到 v0.4.4；v0.4.0 使用 v0.4.4 升级助手直达；Android 对齐到 versionCode 46 / 0.4.4。
 
 完整版本演变见 [PROJECT_LOG.md](PROJECT_LOG.md)。
 
@@ -67,7 +67,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 ### 更新与维护
 
 - Windows 支持兼容增量更新、官方 Release 检查、本地更新 ZIP 与更新回滚。
-- v0.4.1 / v0.4.2 → v0.4.3 可直接使用软件内增量更新；仍为 v0.4.0 时，使用 v0.4.3 Release 中的 **Windows 升级助手** 可直接跨代升级到 v0.4.3，无需安装中间版本。
+- v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4 可直接使用软件内增量更新；仍为 v0.4.0 时，使用 v0.4.4 Release 中的 **Windows 升级助手** 可直接跨代升级到 v0.4.4，无需安装中间版本。
 - Android 使用官方更新元数据进行 APK 原地升级，并校验版本、包名、SHA-256 与签名身份。
 - 提供日志、文件修复、缓存、导出与诊断入口。
 
@@ -100,11 +100,11 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 
 `设置 → 软件更新 → 检查并更新（兼容时自动）`
 
-**v0.4.1 / v0.4.2 → v0.4.3** 可直接使用软件内更新。仍停留在 **v0.4.0** 的用户可下载 `Pica-Library-v0.4.3-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.3.cmd` 直接升级到 v0.4.3；助手会保护 `%LOCALAPPDATA%\Pica Library`，并自动完成校验、备份、替换、健康检查与失败回滚。
+**v0.4.1 / v0.4.2 / v0.4.3 → v0.4.4** 可直接使用软件内更新。仍停留在 **v0.4.0** 的用户可下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.4.cmd` 直接升级到 v0.4.4；助手会保护 `%LOCALAPPDATA%\Pica Library`，并自动完成校验、备份、替换、健康检查与失败回滚。
 
 ### Android
 
-Android APK 不通过应用商店分发，请只使用本仓库正式 Release。现有 v42 / 0.4.0、v43 / 0.4.1 与 v44 / 0.4.2 均可通过应用内更新链直接原地升级到 v45 / 0.4.3。
+Android APK 不通过应用商店分发，请只使用本仓库正式 Release。现有 v42 / 0.4.0、v43 / 0.4.1 与 v44 / 0.4.2 均可通过应用内更新链直接原地升级到 v46 / 0.4.4。
 
 ## 本地优先与安全
 

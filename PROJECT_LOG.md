@@ -2,6 +2,13 @@
 
 本文件只记录版本的核心能力演变，不记录纯文案、微小样式和一次性修复。
 
+## v0.4.4 — Desktop 设置中心可见性修复
+
+- 修复 Desktop Settings Hub 重组遗漏：旧 `#settings` 被隐藏前，`#a83-support` 现在明确迁入“基本设置”，`#a83-appearance` 明确迁入“外观与个性化”。
+- 支持卡不再依赖旧 Settings 容器的可见性；爱发电与 GitHub 从实际用户入口可见。
+- Playwright 真实浏览器 smoke 新增设置中心可见性断言，直接验证重组后的支持卡、爱发电按钮、GitHub 按钮和基础外观。
+- Desktop v0.4.4 / Android versionCode 46；Windows v0.4.1、v0.4.2、v0.4.3 均准备 scoped 增量直升，v0.4.0 使用 v0.4.4 直达助手。
+
 ## v0.4.3 — 支持入口可见性收口
 
 - 修复 Android 主四标签壳的“设置”页未挂“支持项目”入口：现在可直接进入爱发电 / GitHub 支持页，不再依赖旧 SettingsActivity。

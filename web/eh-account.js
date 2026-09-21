@@ -1,6 +1,56 @@
+import { copy as ehT } from './locale-runtime.js'
+
 const $ = (selector) => document.querySelector(selector)
 let csrf = ''
 let webLoginPoll = null
+
+function setLabelPrefix(input, value) {
+    const label = input?.closest('label')
+    if (!label) return
+    let textNode = label.firstChild
+    if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+        textNode = document.createTextNode('')
+        label.prepend(textNode)
+    }
+    textNode.textContent = value
+}
+
+function localizeStaticEhAccount() {
+    const panel = $('#settings-eh-account')
+    if (!panel) return
+    const topSummary = panel.querySelector(':scope > summary')
+    const strong = topSummary?.querySelector('strong')
+    if (strong) strong.textContent = ehT('E-Hentai / ExHentai 账号','E-Hentai / ExHentai account','E-Hentai / ExHentai アカウント')
+    if (topSummary) {
+        for (const node of [...topSummary.childNodes]) {
+            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('·'))
+                node.textContent = ehT(' · 可选增强 ',' · Optional enhancement ',' · オプション機能 ')
+        }
+    }
+    const advanced = panel.querySelector('.account-advanced > summary')
+    if (advanced) advanced.textContent = ehT('高级 · 手动导入官方站点会话','Advanced · manually import an official-site session','詳細 · 公式サイトのセッションを手動で取り込む')
+    setLabelPrefix($('#eh-member-id'),'ipb_member_id')
+    setLabelPrefix($('#eh-pass-hash'),'ipb_pass_hash')
+    setLabelPrefix($('#eh-igneous'),ehT('igneous（可选）','igneous (optional)','igneous（任意）'))
+    setLabelPrefix($('#eh-cf-clearance'),ehT('cf_clearance（仅遇到 Cloudflare 时可选）','cf_clearance (optional for Cloudflare)','cf_clearance（Cloudflare 利用時のみ任意）'))
+    const copy = [
+        ['#eh-web-login-start','网页登录（推荐）','Web login (recommended)','Web ログイン（推奨）'],
+        ['#eh-web-login-cancel','取消网页登录','Cancel web login','Web ログインをキャンセル'],
+        ['#eh-account-save','保存并验证会话','Save & verify session','セッションを保存して検証'],
+        ['#eh-account-verify','重新验证','Verify again','再検証'],
+        ['#eh-exh-probe','探测 ExH','Probe ExH','ExH を確認'],
+        ['#eh-favorites-sync','同步 E-H 云收藏','Sync E-H cloud favorites','E-H クラウドお気に入りを同期'],
+        ['#eh-account-clear','清除 E-H 会话','Clear E-H session','E-H セッションを消去']
+    ]
+    for (const [selector,zh,en,ja] of copy) {
+        const node=$(selector)
+        if(node) node.textContent=ehT(zh,en,ja)
+    }
+    const login=panel.querySelector('a[href*="act=Login"]')
+    if(login) login.textContent=ehT('默认浏览器打开官方登录页（手动）','Open official login page in default browser (manual)','既定ブラウザで公式ログインページを開く（手動）')
+    const register=panel.querySelector('a[href*="act=Reg"]')
+    if(register) register.textContent=ehT('打开官方注册页','Open official registration page','公式登録ページを開く')
+}
 
 function disclosure(summaryText, nodes, className) {
     const details = document.createElement('details')
@@ -35,8 +85,8 @@ function compactEhAccountActions() {
         const clear = $('#eh-account-clear')
         clear?.classList.add('danger-action')
         actions.append(
-            disclosure('官方账号 ▾', [login, register], 'account-action-group'),
-            disclosure('账号功能 ▾', [verify, probe, sync, clear], 'account-action-group')
+            disclosure(ehT('官方账号 ▾','Official account ▾','公式アカウント ▾'), [login, register], 'account-action-group'),
+            disclosure(ehT('账号功能 ▾','Account actions ▾','アカウント操作 ▾'), [verify, probe, sync, clear], 'account-action-group')
         )
     }
     panel.dataset.compactActions = 'true'
@@ -52,7 +102,7 @@ function compactOnlineToolbar() {
     const filters = document.createElement('details')
     filters.className = 'search-filters'
     const summary = document.createElement('summary')
-    summary.textContent = '筛选 ▾'
+    summary.textContent = ehT('筛选 ▾','Filters ▾','絞り込み ▾')
     const body = document.createElement('div')
     body.className = 'compact-filter-panel'
     body.append(tags, sort)
@@ -70,7 +120,7 @@ function compactBatchActions() {
         const clear = $(clearSelector)
         const statusNode = $(statusSelector)
         if (!add || !clear || add.closest('.batch-action-disclosure')) continue
-        const details = disclosure('批量操作 ▾', [add, clear], 'batch-action-disclosure')
+        const details = disclosure(ehT('批量操作 ▾','Batch actions ▾','一括操作 ▾'), [add, clear], 'batch-action-disclosure')
         const parent = statusNode?.parentElement || add.parentElement
         if (!parent) continue
         parent.insertBefore(details, statusNode || null)
@@ -89,7 +139,7 @@ function compactResultCardActions(root = document) {
         const favorite = actions.querySelector('[data-result-favorite]')
         if (!detail || (!download && !favorite)) continue
         detail.classList.add('primary')
-        actions.append(disclosure('更多 ▾', [download, favorite], 'result-action-menu'))
+        actions.append(disclosure(ehT('更多 ▾','More ▾','その他 ▾'), [download, favorite], 'result-action-menu'))
         actions.dataset.compactActions = 'true'
     }
 }
@@ -109,11 +159,11 @@ function observeResultCardActions() {
 }
 
 function exhLabel(value, configured = true) {
-    if (!configured) return '需 E-H 登录'
-    if (value === 'AVAILABLE') return '当前可用'
-    if (value === 'NETWORK_ERROR') return '暂无法确认'
-    if (value === 'UNAVAILABLE') return '当前不可访问'
-    return '待检查'
+    if (!configured) return ehT('需 E-H 登录','E-H login required','E-H ログインが必要')
+    if (value === 'AVAILABLE') return ehT('当前可用','Available','利用可能')
+    if (value === 'NETWORK_ERROR') return ehT('暂无法确认','Unable to confirm','確認できません')
+    if (value === 'UNAVAILABLE') return ehT('当前不可访问','Unavailable','現在アクセス不可')
+    return ehT('待检查','Not checked','未確認')
 }
 
 async function status() {
@@ -129,10 +179,10 @@ function render(value) {
     const state = $('#eh-account-state')
     if (state)
         state.textContent = configured
-            ? 'E-H 会话已加密保存；公共模式仍可独立使用。'
-            : '未配置 E-H 会话；公共 E-H 功能可正常使用。'
+            ? ehT('E-H 会话已加密保存；公共模式仍可独立使用。','E-H session is encrypted and saved; public mode remains independently available.','E-H セッションは暗号化して保存されています。公開モードは引き続き単独で利用できます。')
+            : ehT('未配置 E-H 会话；公共 E-H 功能可正常使用。','No E-H session is configured; public E-H features remain available.','E-H セッションは未設定です。公開 E-H 機能は通常どおり利用できます。')
     if ($('#eh-account-message'))
-        $('#eh-account-message').textContent = 'ExH 扩展：' + exhLabel(value.exHentai, configured)
+        $('#eh-account-message').textContent = ehT('ExH 扩展：','ExH extension: ','ExH 拡張：') + exhLabel(value.exHentai, configured)
 }
 
 async function action(payload) {
@@ -158,7 +208,7 @@ async function desktopLoginRequest(path, method = 'GET') {
         cache: 'no-store'
     })
     const value = await response.json()
-    if (!response.ok) throw new Error(value.error || 'E-H 网页登录失败')
+    if (!response.ok) throw new Error(value.error || ehT('E-H 网页登录失败','E-H web login failed','E-H Web ログインに失敗しました'))
     return value
 }
 
@@ -178,7 +228,7 @@ function renderWebLoginState(value) {
     if (value?.state === 'complete') {
         stopWebLoginPoll()
         void status().then(() => {
-            if (message) message.textContent = 'E-H 登录成功，会话已自动验证并加密保存。'
+            if (message) message.textContent = ehT('E-H 登录成功，会话已自动验证并加密保存。','E-H login succeeded. The session was verified and encrypted automatically.','E-H ログインに成功しました。セッションは自動検証され、暗号化して保存されました。')
         })
     } else if (value?.state === 'failed' || value?.state === 'cancelled') {
         stopWebLoginPoll()
@@ -201,7 +251,7 @@ async function pollWebLogin() {
 async function startWebLogin() {
     const message = $('#eh-account-message')
     try {
-        if (message) message.textContent = '正在打开 E-H 官方登录窗口…'
+        if (message) message.textContent = ehT('正在打开 E-H 官方登录窗口…','Opening the official E-H login window…','E-H 公式ログインウィンドウを開いています…')
         renderWebLoginState(
             await desktopLoginRequest('/api/v1/desktop/eh-web-login/start', 'POST')
         )
@@ -243,6 +293,7 @@ function clearInputs() {
     }
 }
 
+localizeStaticEhAccount()
 compactEhAccountActions()
 compactOnlineToolbar()
 compactBatchActions()
@@ -255,7 +306,7 @@ $('#eh-account-save')?.addEventListener('click', async (event) => {
     const message = $('#eh-account-message')
     await withBusyButton(button, async () => {
         try {
-            message.textContent = '正在验证 E-H 会话…'
+            message.textContent = ehT('正在验证 E-H 会话…','Verifying E-H session…','E-H セッションを検証中…')
             await action({
                 ehAccountAction: 'save-session',
                 memberId: $('#eh-member-id').value,
@@ -264,7 +315,7 @@ $('#eh-account-save')?.addEventListener('click', async (event) => {
                 cfClearance: $('#eh-cf-clearance').value
             })
             clearInputs()
-            message.textContent = 'E-H 会话验证成功并已加密保存。'
+            message.textContent = ehT('E-H 会话验证成功并已加密保存。','E-H session verified and encrypted successfully.','E-H セッションの検証に成功し、暗号化して保存しました。')
         } catch (error) {
             message.textContent =
                 error instanceof Error ? error.message : String(error)
@@ -275,9 +326,9 @@ $('#eh-account-verify')?.addEventListener('click', async (event) => {
     const message = $('#eh-account-message')
     await withBusyButton(event.currentTarget, async () => {
         try {
-            message.textContent = '正在验证…'
+            message.textContent = ehT('正在验证…','Verifying…','検証中…')
             await action({ ehAccountAction: 'verify-session' })
-            message.textContent = 'E-H 会话有效。'
+            message.textContent = ehT('E-H 会话有效。','E-H session is valid.','E-H セッションは有効です。')
         } catch (error) {
             message.textContent =
                 error instanceof Error ? error.message : String(error)
@@ -290,7 +341,7 @@ $('#eh-exh-probe')?.addEventListener('click', async (event) => {
         try {
             const value = await action({ ehAccountAction: 'probe-exh' })
             message.textContent =
-                'ExH 扩展：' +
+                ehT('ExH 扩展：','ExH extension: ','ExH 拡張：') +
                 exhLabel(
                     value.ehAccount.exHentai,
                     Boolean(value.ehAccount.configured)
@@ -305,12 +356,12 @@ $('#eh-favorites-sync')?.addEventListener('click', async (event) => {
     const message = $('#eh-account-message')
     await withBusyButton(event.currentTarget, async () => {
         try {
-            message.textContent = '正在同步 E-H 云收藏…'
+            message.textContent = ehT('正在同步 E-H 云收藏…','Syncing E-H cloud favorites…','E-H クラウドお気に入りを同期中…')
             const value = await action({ ehAccountAction: 'sync-favorites' })
             message.textContent =
-                'E-H 云收藏已同步：' +
+                ehT('E-H 云收藏已同步：','E-H cloud favorites synced: ','E-H クラウドお気に入りを同期しました：') +
                 Number(value.ehAccount.sync?.remoteFavoriteCount || 0) +
-                ' 本。'
+                ehT(' 本。',' works.',' 作品。')
         } catch (error) {
             message.textContent =
                 error instanceof Error ? error.message : String(error)
@@ -320,10 +371,10 @@ $('#eh-favorites-sync')?.addEventListener('click', async (event) => {
 $('#eh-account-clear')?.addEventListener('click', async (event) => {
     const confirmed = window.picaConfirmAction
         ? await window.picaConfirmAction(
-              '清除本机保存的 E-H 会话？E-H 公共搜索和阅读仍可继续使用。'
+              ehT('清除本机保存的 E-H 会话？E-H 公共搜索和阅读仍可继续使用。','Clear the saved E-H session from this computer? Public E-H search and reading will remain available.','このPCに保存された E-H セッションを消去しますか？公開 E-H の検索と閲覧は引き続き利用できます。')
           )
         : window.confirm(
-              '清除本机保存的 E-H 会话？E-H 公共搜索和阅读仍可继续使用。'
+              ehT('清除本机保存的 E-H 会话？E-H 公共搜索和阅读仍可继续使用。','Clear the saved E-H session from this computer? Public E-H search and reading will remain available.','このPCに保存された E-H セッションを消去しますか？公開 E-H の検索と閲覧は引き続き利用できます。')
           )
     if (!confirmed) return
     const message = $('#eh-account-message')
@@ -332,7 +383,7 @@ $('#eh-account-clear')?.addEventListener('click', async (event) => {
             await action({ ehAccountAction: 'clear-session' })
             clearInputs()
             message.textContent =
-                'E-H 会话已从本机删除；公共功能不受影响。'
+                ehT('E-H 会话已从本机删除；公共功能不受影响。','The E-H session was removed from this computer; public features are unaffected.','E-H セッションをこのPCから削除しました。公開機能には影響しません。')
         } catch (error) {
             message.textContent =
                 error instanceof Error ? error.message : String(error)
@@ -342,3 +393,12 @@ $('#eh-account-clear')?.addEventListener('click', async (event) => {
 
 void status().then(() => pollWebLogin()).catch(() => {})
 void import('./v040-parity.js').catch(() => {})
+
+
+document.addEventListener('pica-language-change',()=>{
+    localizeStaticEhAccount()
+    const panel=$('#settings-eh-account')
+    for(const details of panel?.querySelectorAll('.account-action-group') || []) details.remove()
+    if(panel) panel.dataset.compactActions='false'
+    compactEhAccountActions()
+})

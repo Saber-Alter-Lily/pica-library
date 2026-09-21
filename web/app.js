@@ -2931,6 +2931,41 @@ $('#import-button').onclick = importSelectedFile
 $('#import-file').onchange = importSelectedFile
 $('#onboarding-import').onclick = () => $('#import-file').click()
 $('#lite-reimport').onclick = () => $('#import-file').click()
+function setFavoritesSyncTaskControls(progress = {}) {
+    const box = $('#sync-task-actions')
+    const pause = $('#sync-pause')
+    const resume = $('#sync-resume')
+    const cancel = $('#sync-cancel')
+    if (!box || !pause || !resume || !cancel) return
+    const active = Boolean(
+        progress.canPause || progress.canResume || progress.canCancel
+    )
+    box.hidden = !active
+    pause.hidden = !progress.canPause
+    resume.hidden = !progress.canResume
+    cancel.hidden = !progress.canCancel
+}
+
+async function controlFavoritesSync(action) {
+    const buttons = [$('#sync-pause'), $('#sync-resume'), $('#sync-cancel')].filter(Boolean)
+    buttons.forEach((button) => (button.disabled = true))
+    try {
+        const progress = await post('/api/v1/sync/control', { action })
+        setFavoritesSyncTaskControls(progress)
+        const message = $('#import-result')
+        if (progress.state === 'pausing') message.textContent = t('sync.pausing')
+        else if (progress.state === 'paused') message.textContent = t('sync.paused')
+        else if (progress.state === 'running' && action === 'resume')
+            message.textContent = t('sync.resuming')
+        else if (progress.state === 'cancelling')
+            message.textContent = t('sync.cancelling')
+    } catch (error) {
+        $('#import-result').textContent = localizeError(language, error)
+    } finally {
+        buttons.forEach((button) => (button.disabled = false))
+    }
+}
+
 async function syncFavorites(message = $('#import-result'), mode = 'quick') {
     if (state.syncPending) return
     state.syncPending = true
@@ -2941,6 +2976,11 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
         $('#setup-sync')
     ].filter(Boolean)
     syncButtons.forEach((button) => (button.disabled = true))
+    setFavoritesSyncTaskControls({
+        canPause: true,
+        canResume: false,
+        canCancel: true
+    })
     try {
         if (state.mode !== 'connected')
             throw new Error(t('message.syncNeedsEngine'))
@@ -2950,7 +2990,29 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
         let progressTimer = setInterval(async () => {
             try {
                 const progress = await api('/api/v1/sync/progress')
-                if (progress.phase === 'reading') {
+                setFavoritesSyncTaskControls(progress)
+                if (progress.state === 'paused') {
+                    setProgress(
+                        $('#library-operation'),
+                        t('sync.paused'),
+                        progress.fetched,
+                        progress.total
+                    )
+                } else if (progress.state === 'pausing') {
+                    setProgress(
+                        $('#library-operation'),
+                        t('sync.pausing'),
+                        progress.fetched,
+                        progress.total
+                    )
+                } else if (progress.state === 'cancelling') {
+                    setProgress(
+                        $('#library-operation'),
+                        t('sync.cancelling'),
+                        progress.fetched,
+                        progress.total
+                    )
+                } else if (progress.phase === 'reading') {
                     const text = progress.fallbackReason
                         ? t('sync.fullFallback', {
                               page: progress.page || 0
@@ -2999,12 +3061,19 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
         await detect()
     } catch (error) {
         clearProgress($('#library-operation'))
-        message.textContent = localizeError(language, error)
+        const reason = String(error?.message || error)
+        message.textContent = /cancelled|canceled|已取消|キャンセル/i.test(reason)
+            ? t('sync.cancelled')
+            : localizeError(language, error)
     } finally {
         state.syncPending = false
+        setFavoritesSyncTaskControls({})
         syncButtons.forEach((button) => (button.disabled = false))
     }
 }
+$('#sync-pause').onclick = () => void controlFavoritesSync('pause')
+$('#sync-resume').onclick = () => void controlFavoritesSync('resume')
+$('#sync-cancel').onclick = () => void controlFavoritesSync('cancel')
 $('#sync-button').onclick = () => syncFavorites()
 $('#full-sync-button').onclick = () =>
     syncFavorites($('#import-result'), 'full')

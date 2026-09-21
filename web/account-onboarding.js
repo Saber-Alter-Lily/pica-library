@@ -1,6 +1,6 @@
 /** Registration stays in memory and is sent only to the local Desktop controller. */
 export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
-    const text = (zh, en) => (getLanguage() === 'en' ? en : zh)
+    const text = (zh, en, ja) => getLanguage() === 'en' ? en : getLanguage() === 'ja' ? (ja || en) : zh
     const element = (tag, value) => {
         const node = document.createElement(tag)
         if (value) node.textContent = value
@@ -14,14 +14,15 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             const guide = element('article')
             guide.className = 'wide notice panel account-onboarding-guide'
             guide.append(
-                element('h3', text('第一次使用 Pica？', 'New to Pica?'))
+                element('h3', text('第一次使用 Pica？', 'New to Pica?', 'Pica は初めてですか？'))
             )
             guide.append(
                 element(
                     'p',
                     text(
                         '已有账号：填写你在哔咔使用的账号标识和密码，不是 GitHub 账号，也不是昵称。原账号不一定是邮箱。先测试连接，再保存。',
-                        'Have an account? Use your existing Pica account identifier and password, not your GitHub account or nickname. An existing identifier need not be an email. Test the connection before saving.'
+                        'Have an account? Use your existing Pica account identifier and password, not your GitHub account or nickname. An existing identifier need not be an email. Test the connection before saving.',
+                        'アカウントをお持ちの場合：Pica で使っているアカウントIDとパスワードを入力してください。GitHub アカウントやニックネームではありません。既存のIDはメールアドレスとは限りません。保存前に接続テストを行ってください。'
                     )
                 )
             )
@@ -30,13 +31,14 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                     'p',
                     text(
                         '没有账号：可在这里注册第三方 Pica 账号。注册本身不强制使用代理；如果提示无法连接 Pica API，说明当前网络直连失败，请开启系统代理/加速器或配置 HTTP/HTTPS 代理。',
-                        'No account? Register with the third-party Pica service here. Registration does not inherently require a proxy. If the Pica API cannot be reached directly on this network, enable your system proxy/VPN or configure an HTTP/HTTPS proxy.'
+                        'No account? Register with the third-party Pica service here. Registration does not inherently require a proxy. If the Pica API cannot be reached directly on this network, enable your system proxy/VPN or configure an HTTP/HTTPS proxy.',
+                        'アカウントがない場合：ここから第三者の Pica サービスに登録できます。登録自体にプロキシは必須ではありません。現在のネットワークから Pica API に直接接続できない場合は、システムのプロキシ / VPN を有効にするか、HTTP/HTTPS プロキシを設定してください。'
                     )
                 )
             )
             const register = element(
                 'button',
-                text('没有账号？注册 Pica', 'Create a Pica account')
+                text('没有账号？注册 Pica', 'Create a Pica account', 'Pica アカウントを作成')
             )
             register.type = 'button'
             register.onclick = () => openRegistration(prefix)
@@ -46,7 +48,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                     'p',
                     text(
                         '暂不登录也可使用 Browser Lite 导入数据包；手机本地 / 局域网 / WebDAV 阅读不要求 Pica 账号。Pica 账号只用于在线服务。',
-                        'Pica login is only needed for Pica online services. Browser Lite imports and Android local/LAN/WebDAV reading do not require it.'
+                        'Pica login is only needed for Pica online services. Browser Lite imports and Android local/LAN/WebDAV reading do not require it.',
+                        'Pica へのログインが必要なのはオンラインサービスだけです。Browser Lite のインポートや Android のローカル / LAN / WebDAV 閲覧には必要ありません。'
                     )
                 )
             )
@@ -63,11 +66,11 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
         form.className = 'account-registration-form'
         const heading = element(
             'h2',
-            text('注册 Pica 账号', 'Register a Pica account')
+            text('注册 Pica 账号', 'Register a Pica account', 'Pica アカウントを登録')
         )
         heading.className = 'wide'
         form.append(heading)
-        const close = element('button', text('返回登录', 'Back to login'))
+        const close = element('button', text('返回登录', 'Back to login', 'ログインに戻る'))
         close.type = 'button'
         close.className = 'wide'
         close.onclick = () => dialog.close()
@@ -78,7 +81,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
         if (!getDesktop()) {
             message.textContent = text(
                 'Browser Lite 不接收账号或密码。请打开本地 Windows 版或 Android 的 Pica 账号页面注册。',
-                'Browser Lite does not collect credentials. Open Pica account settings in the local Windows or Android app to register.'
+                'Browser Lite does not collect credentials. Open Pica account settings in the local Windows or Android app to register.',
+                'Browser Lite はアカウント情報を受け取りません。登録するにはローカル Windows 版または Android の Pica アカウント設定を開いてください。'
             )
             form.append(message)
             dialog.append(form)
@@ -104,6 +108,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'name',
             '昵称（2–50 字）',
             'Nickname (2–50 characters)',
+            'ニックネーム（2〜50文字）',
             'text',
             50
         )
@@ -112,6 +117,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'email',
             '用户名（1–16 位字母 / 数字 / . / _）',
             'Username (1–16 letters, digits, . or _)',
+            'ユーザー名（1〜16文字の英数字 / . / _）',
             'text',
             16
         )
@@ -120,6 +126,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'password',
             '密码（至少 9 位）',
             'Password (at least 9 characters)',
+            'パスワード（9文字以上）',
             'password',
             128
         )
@@ -128,6 +135,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'confirmPassword',
             '确认密码',
             'Confirm password',
+            'パスワードを確認',
             'password',
             128
         )
@@ -136,17 +144,18 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'birthday',
             '真实出生日期（须年满 18 岁）',
             'Date of birth (18+ required)',
+            '生年月日（18歳以上）',
             'date'
         )
-        const genderLabel = element('label', text('性别选项', 'Gender'))
+        const genderLabel = element('label', text('性别选项', 'Gender', '性別'))
         const gender = element('select')
-        for (const [value, zh, en] of [
-            ['', '请选择', 'Choose'],
-            ['m', '男', 'Male'],
-            ['f', '女', 'Female'],
-            ['bot', '其他', 'Other']
+        for (const [value, zh, en, ja] of [
+            ['', '请选择', 'Choose', '選択してください'],
+            ['m', '男', 'Male', '男性'],
+            ['f', '女', 'Female', '女性'],
+            ['bot', '其他', 'Other', 'その他']
         ]) {
-            const option = element('option', text(zh, en))
+            const option = element('option', text(zh, en, ja))
             option.value = value
             gender.append(option)
         }
@@ -158,12 +167,14 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             field(
                 `question${index}`,
                 `安全问题 ${index}`,
-                `Security question ${index}`
+                `Security question ${index}`,
+                `セキュリティ質問 ${index}`
             )
             field(
                 `answer${index}`,
                 `安全答案 ${index}（自行妥善保管）`,
                 `Answer ${index} (keep it safe)`,
+                `セキュリティ回答 ${index}（安全に保管してください）`,
                 'password'
             )
         }
@@ -171,7 +182,8 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
             'label',
             text(
                 '我已年满 18 岁，了解这是第三方 Pica 服务，将遵守其条款，仅访问合法授权内容。注册资料直接发送至 Pica；安全答案不由 Pica Library 保存。',
-                'I am at least 18 and understand this is the third-party Pica service. I will follow its terms and access only authorized content. Registration data goes to Pica; Pica Library does not save security answers.'
+                'I am at least 18 and understand this is the third-party Pica service. I will follow its terms and access only authorized content. Registration data goes to Pica; Pica Library does not save security answers.',
+                '私は18歳以上で、これが第三者の Pica サービスであることを理解しています。利用規約に従い、権限のあるコンテンツだけにアクセスします。登録情報は Pica に直接送信され、Pica Library はセキュリティ回答を保存しません。'
             )
         )
         consent.className = 'wide'
@@ -183,7 +195,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
         form.append(consent)
         const submit = element(
             'button',
-            text('确认并注册', 'Confirm registration')
+            text('确认并注册', 'Confirm registration', '確認して登録')
         )
         submit.type = 'submit'
         submit.className = 'primary'
@@ -218,7 +230,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                 )
                 if (result.registered !== true)
                     throw new Error(
-                        text('注册结果尚未确认', 'Registration not confirmed')
+                        text('注册结果尚未确认', 'Registration not confirmed', '登録結果を確認できません')
                     )
                 document.getElementById(`${prefix}-account`).value =
                     payload.email
@@ -230,7 +242,7 @@ export function installAccountOnboarding({ post, getDesktop, getLanguage }) {
                 accepted.checked = false
             } catch (error) {
                 const reason = error instanceof Error ? error.message : String(error)
-                message.textContent = `${text('注册失败：', 'Registration failed: ')}${reason}`
+                message.textContent = `${text('注册失败：', 'Registration failed: ', '登録に失敗しました：')}${reason}`
                 const uncertain = /无法连接 Pica API|响应异常|尚未确认|not confirmed|network|timeout/i.test(reason)
                 if (!uncertain) {
                     submitted = false

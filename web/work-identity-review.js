@@ -390,7 +390,7 @@ function renderReview() {
 async function loadReview() {
     if (IDENTITY.busy) return
     IDENTITY.busy = true
-    status('正在读取已保存身份证据…')
+    status(wiT('正在读取已保存身份证据…','Reading saved identity evidence…','保存済み作品IDエビデンスを読み込み中…'))
     try {
         const [review] = await Promise.all([
             request('/api/v1/recommendation-v5/work-identity/review?limit=300'),
@@ -399,7 +399,7 @@ async function loadReview() {
         IDENTITY.review = review
         renderReview()
     } catch (error) {
-        status(`读取失败：${error.message}`, true)
+        status(wiT(`读取失败：${error.message}`,`Load failed: ${error.message}`,`読み込みに失敗しました：${error.message}`), true)
     } finally {
         IDENTITY.busy = false
     }
@@ -408,14 +408,18 @@ async function loadReview() {
 async function refreshEvidence() {
     if (IDENTITY.busy) return
     IDENTITY.busy = true
-    status('正在扫描本地目录中的高置信同作品候选；不会自动绑定…')
+    status(wiT('正在扫描本地目录中的高置信同作品候选；不会自动绑定…','Scanning the local library for high-confidence same-work candidates; nothing is bound automatically…','ローカルライブラリから高信頼度の同一作品候補をスキャン中です。自動で紐付けることはありません…'))
     try {
         const result = await post(
             '/api/v1/recommendation-v5/work-identity/evidence/refresh',
             { limit: 500 }
         )
         status(
-            `扫描完成：发现 ${Number(result.candidateCount || 0)} 对候选，其中跨 Provider ${Number(result.crossProviderCandidateCount || 0)} 对；Work binding 仍为 ${Number(result.storage?.counts?.bindings || 0)}。`
+            wiT(
+                `扫描完成：发现 ${Number(result.candidateCount || 0)} 对候选，其中跨 Provider ${Number(result.crossProviderCandidateCount || 0)} 对；Work binding 仍为 ${Number(result.storage?.counts?.bindings || 0)}。`,
+                `Scan complete: ${Number(result.candidateCount || 0)} candidate pairs found, including ${Number(result.crossProviderCandidateCount || 0)} cross-provider pairs; Work bindings remain ${Number(result.storage?.counts?.bindings || 0)}.`,
+                `スキャン完了：候補ペア ${Number(result.candidateCount || 0)} 件、そのうち Provider 横断 ${Number(result.crossProviderCandidateCount || 0)} 件。Work binding は ${Number(result.storage?.counts?.bindings || 0)} のままです。`
+            )
         )
         IDENTITY.review = await request(
             '/api/v1/recommendation-v5/work-identity/review?limit=300'
@@ -423,7 +427,7 @@ async function refreshEvidence() {
         await loadCatalog()
         renderReview()
     } catch (error) {
-        status(`扫描失败：${error.message}`, true)
+        status(wiT(`扫描失败：${error.message}`,`Scan failed: ${error.message}`,`スキャンに失敗しました：${error.message}`), true)
     } finally {
         IDENTITY.busy = false
     }
@@ -432,7 +436,7 @@ async function refreshEvidence() {
 async function loadMaterializationPlan() {
     if (IDENTITY.busy) return
     IDENTITY.busy = true
-    status('正在生成只读 Work / Edition / Upload 绑定计划…')
+    status(wiT('正在生成只读 Work / Edition / Upload 绑定计划…','Generating a read-only Work / Edition / Upload binding plan…','読み取り専用の Work / Edition / Upload 紐付け計画を生成中…'))
     try {
         IDENTITY.plan = await request(
             '/api/v1/recommendation-v5/work-identity/materialization-plan'
@@ -440,10 +444,14 @@ async function loadMaterializationPlan() {
         renderMaterializationPlan(IDENTITY.plan)
         const summary = IDENTITY.plan.summary || {}
         status(
-            `Dry-run 完成：Work 组 ${Number(summary.workGroupCount || 0)}，完整可执行 ${Number(summary.fullBindingReadyCount || 0)}，阻断组 ${Number(summary.blockedGroupCount || 0)}。未写入任何 binding。`
+            wiT(
+                `Dry-run 完成：Work 组 ${Number(summary.workGroupCount || 0)}，完整可执行 ${Number(summary.fullBindingReadyCount || 0)}，阻断组 ${Number(summary.blockedGroupCount || 0)}。未写入任何 binding。`,
+                `Dry-run complete: Work groups ${Number(summary.workGroupCount || 0)}, full-binding ready ${Number(summary.fullBindingReadyCount || 0)}, blocked groups ${Number(summary.blockedGroupCount || 0)}. No binding was written.`,
+                `Dry-run 完了：Work グループ ${Number(summary.workGroupCount || 0)}、完全実行可能 ${Number(summary.fullBindingReadyCount || 0)}、ブロックグループ ${Number(summary.blockedGroupCount || 0)}。binding は一切書き込んでいません。`
+            )
         )
     } catch (error) {
-        status(`Dry-run 失败：${error.message}`, true)
+        status(wiT(`Dry-run 失败：${error.message}`,`Dry-run failed: ${error.message}`,`Dry-run に失敗しました：${error.message}`), true)
     } finally {
         IDENTITY.busy = false
     }
@@ -453,12 +461,12 @@ async function saveDecision(leftComicId, rightComicId, decision) {
     if (IDENTITY.busy) return
     IDENTITY.busy = true
     const labels = {
-        SAME_WORK: '同一作品',
-        EDITION_VARIANT: '不同版本',
-        KEEP_SEPARATE: '保持分离',
-        CLEAR: '清除裁决'
+        SAME_WORK: wiT('同一作品','Same work','同一作品'),
+        EDITION_VARIANT: wiT('不同版本','Different edition','別版'),
+        KEEP_SEPARATE: wiT('保持分离','Keep separate','分離を維持'),
+        CLEAR: wiT('清除裁决','Clear decision','裁定を解除')
     }
-    status(`正在保存：${labels[decision] || decision}…`)
+    status(wiT(`正在保存：${labels[decision] || decision}…`,`Saving: ${labels[decision] || decision}…`,`保存中：${labels[decision] || decision}…`))
     try {
         IDENTITY.review = await post(
             '/api/v1/recommendation-v5/work-identity/decision',
@@ -471,7 +479,7 @@ async function saveDecision(leftComicId, rightComicId, decision) {
         )
         renderReview()
     } catch (error) {
-        status(`保存失败：${error.message}`, true)
+        status(wiT(`保存失败：${error.message}`,`Save failed: ${error.message}`,`保存に失敗しました：${error.message}`), true)
     } finally {
         IDENTITY.busy = false
     }
@@ -479,6 +487,9 @@ async function saveDecision(leftComicId, rightComicId, decision) {
 
 ensurePanel()
 document.addEventListener('pica-language-change', () => {
+    document.querySelector('#v5-id-detail-dialog')?.remove()
+    document.querySelector('#settings-work-identity-v5')?.remove()
     ensurePanel()
     if (IDENTITY.review) renderReview()
+    if (IDENTITY.plan) renderMaterializationPlan(IDENTITY.plan)
 })

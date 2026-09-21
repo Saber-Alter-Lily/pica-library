@@ -57,6 +57,56 @@ async function visibleText(page) {
     })
 }
 
+async function visibleAttributes(page) {
+    return await page.locator('body').evaluate(() => {
+        const attrs = ['aria-label', 'placeholder', 'title', 'data-info-tip']
+        const values = []
+        for (const el of document.querySelectorAll('*')) {
+            if (el.closest('#a87-language-panel, .language-control')) continue
+            const style = getComputedStyle(el)
+            const rect = el.getBoundingClientRect()
+            if (style.display === 'none' || style.visibility === 'hidden' || rect.width <= 0 || rect.height <= 0)
+                continue
+            for (const attr of attrs) {
+                const value = (el.getAttribute(attr) || '').replace(/\s+/g, ' ').trim()
+                if (value) values.push(`${attr}: ${value}`)
+            }
+        }
+        return values.join('\n')
+    })
+}
+
+function japaneseLeaks(text) {
+    return zhPhrases
+        .filter((phrase) => {
+            const key = Object.keys(translations['zh-CN']).find(
+                (candidate) => translations['zh-CN'][candidate] === phrase
+            )
+            return !key || translations.ja[key] !== phrase
+        })
+        .filter((phrase) => text.includes(phrase))
+        .slice(0, 40)
+}
+
+async function assertLocalizedSurface(page, language, label) {
+    const problems = await geometryProblems(page)
+    expect(problems, `${label}\n${JSON.stringify(problems, null, 2)}`).toEqual([])
+
+    const text = await visibleText(page)
+    const attributes = await visibleAttributes(page)
+    const combined = `${text}\n${attributes}`
+
+    if (language === 'en') {
+        expect(
+            combined.match(/[\u3400-\u9fff]/g) ?? [],
+            `${label}\n${combined.slice(0, 8000)}`
+        ).toEqual([])
+    } else if (language === 'ja') {
+        const leaked = japaneseLeaks(combined)
+        expect(leaked, `${label}\n${combined.slice(0, 8000)}`).toEqual([])
+    }
+}
+
 async function geometryProblems(page) {
     return await page.locator('body').evaluate(() => {
         const selector = [
@@ -106,6 +156,7 @@ for (const viewport of viewports) {
                 if (await nav.isVisible().catch(() => false)) {
                     await nav.click()
                     await expect(page.locator(`#${view}`)).toHaveClass(/\bactive\b/)
+                    await assertLocalizedSurface(page, language, `view:${view}`)
                 }
             }
             await openSettings(page)
@@ -114,20 +165,14 @@ for (const viewport of viewports) {
                 await expect(tab).toBeVisible()
                 await tab.click()
                 await expect(page.locator(`#a87-${id}-panel`)).toBeVisible()
+                await assertLocalizedSurface(page, language, `settings:${id}`)
             }
 
-            const problems = await geometryProblems(page)
-            expect(problems, JSON.stringify(problems, null, 2)).toEqual([])
-
-            const text = await visibleText(page)
-            if (language === 'en') {
-                expect(text.match(/[\u3400-\u9fff]/g) ?? [], text.slice(0, 4000)).toEqual([])
-            } else if (language === 'ja') {
-                const leaked = zhPhrases
-                    .filter((phrase) => translations.ja[Object.keys(translations['zh-CN']).find((key) => translations['zh-CN'][key] === phrase)] !== phrase)
-                    .filter((phrase) => text.includes(phrase))
-                    .slice(0, 30)
-                expect(leaked, text.slice(0, 4000)).toEqual([])
+            if (language === 'ja') {
+                const missing = await page.evaluate(
+                    () => [...(window.__picaRuntimeTranslationMissing || [])]
+                )
+                expect(missing, JSON.stringify(missing, null, 2)).toEqual([])
             }
         })
     }

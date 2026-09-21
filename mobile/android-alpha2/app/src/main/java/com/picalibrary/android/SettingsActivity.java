@@ -8,7 +8,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
 /** Top-level settings list. Paired Desktop account state is mirrored without secrets. */
-public final class SettingsActivity extends Activity {
+public final class SettingsActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private int desktopSerial;
 

@@ -1,14 +1,14 @@
 # Pica Library Quick Start
 
-Current stable release: **v0.4.6**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
+Current stable release: **v0.4.7**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
 
 ## 01 Download and extract
 
 Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest).
 
-For v0.4.6:
+For v0.4.7:
 
-`Pica-Library-v0.4.6-windows-x64.zip`
+`Pica-Library-v0.4.7-windows-x64.zip`
 
 Extract the complete archive to a normal folder. Do not run the executable from inside an archive viewer.
 

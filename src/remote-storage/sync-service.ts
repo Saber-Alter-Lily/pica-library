@@ -266,6 +266,11 @@ export class RemoteLibrarySyncService {
                     })
                 await new Promise<void>((resolve) => setImmediate(resolve))
             } catch (error) {
+                if (
+                    error instanceof Error &&
+                    error.name === 'RemoteSyncCancelledError'
+                )
+                    throw error
                 issues.push({
                     comicId: summary.comicId,
                     title: summary.title,

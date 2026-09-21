@@ -10,12 +10,14 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV** across discovery, fa
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.4 highlights
+## v0.4.5 highlights
 
-- **Desktop support now survives the real Settings Hub rebuild**: Support the Project is moved into General Settings, so AFDIAN and GitHub are visible from the actual user-facing settings center.
-- **Appearance placement fixed too**: the base light/dark appearance panel is moved into Appearance & Personalization instead of remaining inside the hidden legacy Settings container.
-- **Real-browser regression coverage**: Chromium smoke now opens the settings hub and verifies both support and appearance are visibly attached after the rebuild.
-- **Public upgrade path**: existing v0.4.0 users go directly to v0.4.4. Windows uses the v0.4.4 upgrade assistant in one step; Android v42 / 0.4.0 can update in place directly to v46 / 0.4.4.
+- **Chinese / Japanese / English UI** on Desktop/Web and Android, with localized dynamic copy and multilingual layout regression coverage.
+- **Skippable onboarding** for first entry into v0.4.5, with Later, Skip, disable-auto-prompt, and replay from Settings.
+- **Connection and task feedback fixes**: portrait QR pairing on Android, more visible help affordances, explicit visual-analysis background/completion/failure feedback, and persistent visual settings.
+- **UI polish** for the onboarding close control, software-update version badge, and Android Library toolbar; Shelves / Display / Refresh are now direct actions.
+- **Conservative Desktop lifecycle cleanup**: closing the last Web UI stops an idle Node process only when no paired phone needs the Mobile Bridge.
+- **Upgrade path**: Windows v0.4.0 uses the v0.4.5 upgrade assistant; v0.4.1–v0.4.4 can use scoped incremental updates. Android formal release is v48 / 0.4.5 and can replace both prior formal builds and the v47 test build.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
@@ -67,7 +69,7 @@ See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 ### Updates and maintenance
 
 - Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.4 Release to move directly to the latest release without installing intermediate versions.
+- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.5 Release to move directly to the latest release without installing intermediate versions.
 - Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
 - Logs, repair, cache, export, and diagnostic tools are available from the app.
 
@@ -100,11 +102,11 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-Existing **v0.4.0** users should download `Pica-Library-v0.4.4-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.4.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+Existing **v0.4.0** users should download `Pica-Library-v0.4.5-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.5.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v46 / 0.4.4** through the in-app update chain; no intermediate versions are required.
+Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v48 / 0.4.4** through the in-app update chain; no intermediate versions are required.
 
 ## Local-first and security
 

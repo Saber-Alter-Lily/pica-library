@@ -7,7 +7,7 @@ import android.widget.*;
 import java.util.*;
 
 /** Manage multiple named WebDAV targets and choose the active mobile cloud source. */
-public class RemoteStorageActivity extends Activity {
+public class RemoteStorageActivity extends LocaleAwareActivity {
     private Spinner targetSpinner,vendorSpinner;
     private EditText label,url,root,user,password;
     private TextView status,providerNote;

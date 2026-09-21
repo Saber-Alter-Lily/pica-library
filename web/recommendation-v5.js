@@ -1,23 +1,25 @@
+import { copy as v5t } from './locale-runtime.js'
+
 const V5={snapshot:null,timescales:null,channels:null,serving:null,search:'',busy:false,signalById:new Map(),quickSignals:new Map(),draftLevels:new Map(),manualSignal:null}
 
 const V5_FACET_LABELS={
-    "CREATOR_ENTITY":"作者","CATEGORY":"分类","FANDOM_IP":"作品 / IP","FANDOM_CHARACTER":"角色",
-    "GENRE_THEME":"题材 / 类型","STORY_TROPE":"剧情 / 设定","RELATIONSHIP":"人物关系",
-    "RELATIONSHIP_TROPE":"人物关系","IDENTITY_ROLE":"身份 / 职业","CHARACTER_IDENTITY_ROLE":"身份 / 职业",
-    "SPECIES_FANTASY":"种族 / 幻想","APPEARANCE_TRAIT":"外观特征","APPEARANCE_OUTFIT":"外观 / 服装",
-    "BODY_ATTRIBUTE":"身体特征","CHARACTER_BODY_ATTRIBUTE":"身体 / 外观特征","SETTING_LOCATION":"场景 / 地点",
-    "SEXUAL_BEHAVIOR":"行为","CONTENT_BEHAVIOR":"行为","FETISH_TROPE":"偏好 / 情境",
-    "PHYSIOLOGY_STATE":"生理状态","CONTROL_COERCION":"支配 / 控制",
-    "AUDIENCE_ORIENTATION":"受众方向","VISUAL_STYLE":"视觉风格","FORMAT":"作品形式",
-    "RAW_TAG":"其他标签","OTHER":"其他"
+    "CREATOR_ENTITY":["作者","Author","作者"],"CATEGORY":["分类","Category","カテゴリ"],"FANDOM_IP":["作品 / IP","Work / IP","作品 / IP"],"FANDOM_CHARACTER":["角色","Character","キャラクター"],
+    "GENRE_THEME":["题材 / 类型","Genre / theme","ジャンル / テーマ"],"STORY_TROPE":["剧情 / 设定","Story / setting","ストーリー / 設定"],"RELATIONSHIP":["人物关系","Relationship","人物関係"],
+    "RELATIONSHIP_TROPE":["人物关系","Relationship","人物関係"],"IDENTITY_ROLE":["身份 / 职业","Identity / role","属性 / 役割"],"CHARACTER_IDENTITY_ROLE":["身份 / 职业","Identity / role","属性 / 役割"],
+    "SPECIES_FANTASY":["种族 / 幻想","Species / fantasy","種族 / ファンタジー"],"APPEARANCE_TRAIT":["外观特征","Appearance trait","外見的特徴"],"APPEARANCE_OUTFIT":["外观 / 服装","Appearance / outfit","外見 / 服装"],
+    "BODY_ATTRIBUTE":["身体特征","Body attribute","身体的特徴"],"CHARACTER_BODY_ATTRIBUTE":["身体 / 外观特征","Body / appearance","身体 / 外見"],"SETTING_LOCATION":["场景 / 地点","Setting / location","舞台 / 場所"],
+    "SEXUAL_BEHAVIOR":["行为","Behavior","行動"],"CONTENT_BEHAVIOR":["行为","Behavior","行動"],"FETISH_TROPE":["偏好 / 情境","Preference / trope","嗜好 / シチュエーション"],
+    "PHYSIOLOGY_STATE":["生理状态","Physiology / state","生理 / 状態"],"CONTROL_COERCION":["支配 / 控制","Control / coercion","支配 / 強制"],
+    "AUDIENCE_ORIENTATION":["受众方向","Audience orientation","対象傾向"],"VISUAL_STYLE":["视觉风格","Visual style","ビジュアルスタイル"],"FORMAT":["作品形式","Format","形式"],
+    "RAW_TAG":["其他标签","Other tags","その他のタグ"],"OTHER":["其他","Other","その他"]
 }
 
 const V5_FACET_SUPERGROUPS=[
-    {id:"people",label:"人物与作品",facets:["CREATOR_ENTITY","FANDOM_IP","FANDOM_CHARACTER","IDENTITY_ROLE","CHARACTER_IDENTITY_ROLE","SPECIES_FANTASY","RELATIONSHIP","RELATIONSHIP_TROPE","AUDIENCE_ORIENTATION"]},
-    {id:"content",label:"内容与剧情",facets:["CATEGORY","GENRE_THEME","STORY_TROPE","SETTING_LOCATION","PHYSIOLOGY_STATE"]},
-    {id:"appearance",label:"外观与画风",facets:["APPEARANCE_TRAIT","APPEARANCE_OUTFIT","BODY_ATTRIBUTE","CHARACTER_BODY_ATTRIBUTE","VISUAL_STYLE"]},
-    {id:"behavior",label:"行为与偏好",facets:["SEXUAL_BEHAVIOR","CONTENT_BEHAVIOR","FETISH_TROPE","CONTROL_COERCION"]},
-    {id:"format",label:"形式与其他",facets:["FORMAT","RAW_TAG","OTHER"]}
+    {id:"people",label:["人物与作品","People & works","人物と作品"],facets:["CREATOR_ENTITY","FANDOM_IP","FANDOM_CHARACTER","IDENTITY_ROLE","CHARACTER_IDENTITY_ROLE","SPECIES_FANTASY","RELATIONSHIP","RELATIONSHIP_TROPE","AUDIENCE_ORIENTATION"]},
+    {id:"content",label:["内容与剧情","Content & story","内容とストーリー"],facets:["CATEGORY","GENRE_THEME","STORY_TROPE","SETTING_LOCATION","PHYSIOLOGY_STATE"]},
+    {id:"appearance",label:["外观与画风","Appearance & visual style","外見と画風"],facets:["APPEARANCE_TRAIT","APPEARANCE_OUTFIT","BODY_ATTRIBUTE","CHARACTER_BODY_ATTRIBUTE","VISUAL_STYLE"]},
+    {id:"behavior",label:["行为与偏好","Behavior & preferences","行動と嗜好"],facets:["SEXUAL_BEHAVIOR","CONTENT_BEHAVIOR","FETISH_TROPE","CONTROL_COERCION"]},
+    {id:"format",label:["形式与其他","Format & other","形式とその他"],facets:["FORMAT","RAW_TAG","OTHER"]}
 ]
 const V5_FACET_ORDER=V5_FACET_SUPERGROUPS.flatMap((group)=>group.facets)
 
@@ -183,12 +185,13 @@ function currentLevel(signal) {
     return webClampLevel(baseline + (control.direction === 'MORE' ? 2 : control.direction === 'LESS' ? -2 : 0))
 }
 
-function facetLabel(facet) { return V5_FACET_LABELS[facet] || facet || '其他' }
+function facetLabel(facet) { const row=V5_FACET_LABELS[facet]; return row ? v5t(...row) : (facet || v5t('其他','Other','その他')) }
+function supergroupLabel(group){ return Array.isArray(group?.label) ? v5t(...group.label) : String(group?.label || '') }
 function facetSupergroup(facet) {
     return V5_FACET_SUPERGROUPS.find((group) => group.facets.includes(facet)) ||
         V5_FACET_SUPERGROUPS.at(-1)
 }
-function infoButton(text, label='查看说明') {
+function infoButton(text, label=v5t('查看说明','View help','説明を見る')) {
     return `<button type="button" class="info-tip" aria-label="${esc(label)}" data-info-tip="${esc(text)}">!</button>`
 }
 
@@ -730,7 +733,7 @@ function renderPolicy() {
                     </details>`
                 }).join('')
                 return `<details class="v5-major-group" ${searchHit || hasAdjusted || majorIndex===0 ? 'open' : ''}>
-                    <summary>${esc(major.label)}<span class="v5-facet-count">${total} 项</span></summary>
+                    <summary>${esc(supergroupLabel(major))}<span class="v5-facet-count">${total} 项</span></summary>
                     <div class="v5-major-body">${facetsHtml}</div>
                 </details>`
             }).join('')

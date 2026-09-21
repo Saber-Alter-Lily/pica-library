@@ -10,6 +10,10 @@ describe('Recommendation V5 UI stability', () => {
         expect(source).toContain('queueMicrotask(() => {')
     })
 
+    it('uses one language-change redraw path for the recommendation panel', () => {
+        expect(source.split('pica-language-change').length - 1).toBe(1)
+    })
+
     it('does not rewrite an unchanged recommendation feedback badge', () => {
         expect(source).toContain(
             'if(badge.textContent!==message) badge.textContent=message'

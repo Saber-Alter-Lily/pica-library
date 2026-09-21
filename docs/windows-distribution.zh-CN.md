@@ -2,11 +2,11 @@
 
 # Windows 一键版使用指南
 
-> 当前稳定版：**v0.4.4**。
+> 当前稳定版：**v0.4.5**。
 
 ## 下载与启动
 
-1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.4 对应 `Pica-Library-v0.4.4-windows-x64.zip`。
+1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.5 对应 `Pica-Library-v0.4.5-windows-x64.zip`。
 2. 完整解压到一个普通文件夹，不要直接在压缩软件中运行。
 3. 双击 `Pica Library.exe`。
 4. 浏览器会自动打开本地设置页面；按需配置账号、漫画保存目录、下载方式与 HTTP/HTTPS 代理。
@@ -45,7 +45,7 @@ Desktop 设置中心当前分为：
 - **维护工具**：修复、日志、导出及高级维护；
 - **软件更新**：官方更新、本地更新 ZIP、校验、应用和回滚。
 
-关闭浏览器标签页不会自动退出 Desktop 程序。需要完全停止本地服务时，请使用应用内退出入口。
+关闭最后一个浏览器标签页后，仅当没有已配对 Android 设备需要 Mobile Bridge 时，空闲 Desktop Node 才会在短暂宽限期后退出；已有手机配对时后台会继续保留。需要明确完全停止本地服务时，请使用应用内退出入口。
 
 ## Browser Lite
 
@@ -55,15 +55,15 @@ Desktop 设置中心当前分为：
 
 打开 **设置 → 软件更新** 后先检查正式版本。
 
-### 公开升级路径：v0.4.0 → v0.4.4
+### 公开升级路径：v0.4.0 → v0.4.5
 
-从 **v0.4.4 Release** 下载：
+从 **v0.4.5 Release** 下载：
 
-`Pica-Library-v0.4.4-upgrade-assistant.zip`
+`Pica-Library-v0.4.5-upgrade-assistant.zip`
 
 解压后双击：
 
-`Upgrade-Pica-Library-v0.4.4.cmd`
+`Upgrade-Pica-Library-v0.4.5.cmd`
 
 升级助手会：
 
@@ -90,7 +90,7 @@ Desktop 设置中心当前分为：
 从同一官方 Release 下载 `SHA256SUMS.txt`，然后在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash .\Pica-Library-v0.4.4-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\Pica-Library-v0.4.5-windows-x64.zip -Algorithm SHA256
 ```
 
 将完整校验值与官方 Release 提供的值逐字比较，一致后再解压运行。

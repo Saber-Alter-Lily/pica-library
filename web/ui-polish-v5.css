@@ -834,3 +834,31 @@ body.reader-active .reader-header {
     font-size: 0.9rem;
     font-weight: 650;
 }
+
+
+/* Trilingual visual settings must not inherit select min-content width. */
+#ux-visual-settings .ux-more-body > label {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+#ux-visual-settings .ux-more-body select,
+#settings-recommendation-v4 select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+#ux-visual-settings .actions,
+#settings-recommendation-v4 .actions {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+#ux-visual-settings .actions button,
+#settings-recommendation-v4 .actions button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+}

@@ -15,7 +15,7 @@ import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 import org.json.JSONObject;
 
-public class PairingActivity extends Activity {
+public class PairingActivity extends LocaleAwareActivity {
     private EditText host,code;
     private TextView status;
     private Button scanButton,pairButton;

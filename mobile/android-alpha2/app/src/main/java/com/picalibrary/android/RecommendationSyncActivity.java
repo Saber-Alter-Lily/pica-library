@@ -103,7 +103,7 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
         Ui.gap(content,this,8);
         content.addView(Ui.button(this,"重新检查",v->loadPreview(),true),new LinearLayout.LayoutParams(-1,-2));
         Ui.gap(content,this,12);
-        content.addView(Ui.button(this,"同步后重新生成手机推荐",v->{NativeRecommendationJobs.refresh(this);Toast.makeText(this,"手机将独立生成新的推荐周期",Toast.LENGTH_SHORT).show();},true),new LinearLayout.LayoutParams(-1,-2));
+        content.addView(Ui.button(this,"同步后重新生成手机推荐",v->{NativeRecommendationJobs.refresh(this);Toast.makeText(this,LocalizedText.ui("手机将独立生成新的推荐周期"),Toast.LENGTH_SHORT).show();},true),new LinearLayout.LayoutParams(-1,-2));
     }
 
     private LinearLayout toggleRow(String title,boolean checked,boolean enabled,CompoundButton.OnCheckedChangeListener listener){
@@ -125,7 +125,7 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
                 JSONObject value=BridgeClient.recommendationSyncPreview(this);
                 runOnUiThread(()->{if(destroyed)return;loading=false;preview=value;render();});
             }catch(Exception e){
-                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"无法比较推荐状态":e.getMessage(),Toast.LENGTH_LONG).show();render();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?LocalizedText.ui("无法比较推荐状态"):e.getMessage(),Toast.LENGTH_LONG).show();render();});
             }
         }).start();
     }
@@ -138,11 +138,11 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
             return;
         }
         new AlertDialog.Builder(this)
-            .setTitle(conflicts.length()+" 项偏好冲突")
-            .setMessage("无需逐项确认。可以统一采用电脑或手机的修改；只有少数冲突需要分别判断时，再选择逐项处理。")
-            .setNegativeButton("全部用电脑",(d,w)->apply(resolutionsFor(conflicts,"DESKTOP")))
-            .setNeutralButton("逐项处理",(d,w)->resolveOne(conflicts,0,new JSONArray()))
-            .setPositiveButton("全部用手机",(d,w)->apply(resolutionsFor(conflicts,"ANDROID")))
+            .setTitle(conflicts.length()+LocalizedText.ui(" 项偏好冲突"))
+            .setMessage(LocalizedText.ui("无需逐项确认。可以统一采用电脑或手机的修改；只有少数冲突需要分别判断时，再选择逐项处理。"))
+            .setNegativeButton(LocalizedText.ui("全部用电脑"),(d,w)->apply(resolutionsFor(conflicts,"DESKTOP")))
+            .setNeutralButton(LocalizedText.ui("逐项处理"),(d,w)->resolveOne(conflicts,0,new JSONArray()))
+            .setPositiveButton(LocalizedText.ui("全部用手机"),(d,w)->apply(resolutionsFor(conflicts,"ANDROID")))
             .show();
     }
 
@@ -166,11 +166,11 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
         JSONObject base=conflict.optJSONObject("base"),desktop=conflict.optJSONObject("desktop"),android=conflict.optJSONObject("android");
         String message="上次同步："+controlLabel(base)+"\n电脑："+controlLabel(desktop)+"\n手机："+controlLabel(android);
         new AlertDialog.Builder(this)
-            .setTitle("偏好冲突 · "+label)
+            .setTitle(LocalizedText.ui("偏好冲突 · ")+label)
             .setMessage(message)
-            .setNegativeButton("稍后",null)
-            .setNeutralButton("使用电脑",(d,w)->{resolutions.put(resolution(identity,"DESKTOP"));resolveOne(conflicts,index+1,resolutions);})
-            .setPositiveButton("使用手机",(d,w)->{resolutions.put(resolution(identity,"ANDROID"));resolveOne(conflicts,index+1,resolutions);})
+            .setNegativeButton(LocalizedText.ui("稍后"),null)
+            .setNeutralButton(LocalizedText.ui("使用电脑"),(d,w)->{resolutions.put(resolution(identity,"DESKTOP"));resolveOne(conflicts,index+1,resolutions);})
+            .setPositiveButton(LocalizedText.ui("使用手机"),(d,w)->{resolutions.put(resolution(identity,"ANDROID"));resolveOne(conflicts,index+1,resolutions);})
             .show();
     }
 
@@ -195,9 +195,9 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
             try{
                 JSONObject result=BridgeClient.syncRecommendationState(this,false,resolutions);
                 if(result.optBoolean("requiresResolution",false))throw new IllegalStateException("仍有未解决的推荐偏好冲突");
-                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,"推荐知识与人工调整已同步；两端当前推荐周期保持独立",Toast.LENGTH_LONG).show();loadPreview();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,LocalizedText.ui("推荐知识与人工调整已同步；两端当前推荐周期保持独立"),Toast.LENGTH_LONG).show();loadPreview();});
             }catch(Exception e){
-                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"推荐同步失败":e.getMessage(),Toast.LENGTH_LONG).show();render();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?LocalizedText.ui("推荐同步失败"):e.getMessage(),Toast.LENGTH_LONG).show();render();});
             }
         }).start();
     }
@@ -275,14 +275,14 @@ public final class RecommendationSyncActivity extends LocaleAwareActivity {
                 activity.runOnUiThread(()->{
                     if(activity.isFinishing()||activity.isDestroyed())return;
                     AlertDialog.Builder dialog=new AlertDialog.Builder(activity)
-                        .setNegativeButton("稍后",null)
-                        .setPositiveButton(conflictCount>0?"查看冲突":"打开推荐同步",(d,w)->activity.startActivity(new Intent(activity,RecommendationSyncActivity.class)));
+                        .setNegativeButton(LocalizedText.ui("稍后"),null)
+                        .setPositiveButton(conflictCount>0?LocalizedText.ui("查看冲突"):LocalizedText.ui("打开推荐同步"),(d,w)->activity.startActivity(new Intent(activity,RecommendationSyncActivity.class)));
                     if(conflictCount>0){
-                        dialog.setTitle("有 "+conflictCount+" 项偏好冲突")
-                            .setMessage("电脑和手机同时修改了同一偏好。同步不会自动替你决定；打开同步页后可批量使用电脑、批量使用手机，或只对少数冲突逐项处理。");
+                        dialog.setTitle(LocalizedText.ui("有 ")+conflictCount+LocalizedText.ui(" 项偏好冲突"))
+                            .setMessage(LocalizedText.ui("电脑和手机同时修改了同一偏好。同步不会自动替你决定；打开同步页后可批量使用电脑、批量使用手机，或只对少数冲突逐项处理。"));
                     }else{
-                        dialog.setTitle("有可同步的推荐数据")
-                            .setMessage(changes+" 项长期数据可同步"+(packageChanged?"，Desktop 推荐基础也有更新":"")+"。当前推荐列表和“本次想看”不会被覆盖。");
+                        dialog.setTitle(LocalizedText.ui("有可同步的推荐数据"))
+                            .setMessage(changes+LocalizedText.ui(" 项长期数据可同步")+(packageChanged?LocalizedText.ui("，Desktop 推荐基础也有更新"):"")+LocalizedText.ui("。当前推荐列表和“本次想看”不会被覆盖。"));
                     }
                     dialog.show();
                 });

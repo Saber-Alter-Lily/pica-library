@@ -34,7 +34,7 @@ public final class PicaRegisterActivity extends LocaleAwareActivity {
         field(content,"birthday","出生日期（YYYY-MM-DD，18+）",false);
         gender=new Spinner(this);gender.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"请选择性别","男","女","其他"}));content.addView(gender);
         for(int i=1;i<=3;i++){field(content,"question"+i,"安全问题 "+i,false);field(content,"answer"+i,"安全答案 "+i,true);}
-        consent=new CheckBox(this);consent.setText("我已年满 18 岁并同意遵守 Pica 服务条款；Pica Library 不保存安全答案。");consent.setTextColor(Ui.TEXT);content.addView(consent);
+        consent=new CheckBox(this);consent.setText(LocalizedText.ui("我已年满 18 岁并同意遵守 Pica 服务条款；Pica Library 不保存安全答案。"));consent.setTextColor(Ui.TEXT);content.addView(consent);
         status=Ui.text(this,"",13,Ui.MUTED,false);status.setVisibility(View.GONE);content.addView(status);
         submit=Ui.button(this,"确认并注册",v->register(),false);content.addView(submit);
         setContentView(scroll);scroll.requestApplyInsets();

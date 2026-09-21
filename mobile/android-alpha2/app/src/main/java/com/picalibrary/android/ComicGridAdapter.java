@@ -37,7 +37,7 @@ final class ComicGridAdapter extends BaseAdapter {
         }else h=(Holder)convertView.getTag();
         BridgeClient.ComicItem item=getItem(position);
         h.title.setText(item.title);
-        h.meta.setText(item.author+" · "+item.downloadedPictures+" 页");
+        h.meta.setText(item.author+" · "+item.downloadedPictures+LocalizedText.ui(" 页"));
         ImageRepository.load(activity,h.cover,item.coverPath,0xffebe8ef);
         convertView.setOnClickListener(v->listener.onComic(item));
         return convertView;

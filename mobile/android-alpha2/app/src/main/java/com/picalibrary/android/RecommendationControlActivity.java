@@ -107,7 +107,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         content.addView(actions);Ui.gap(content,this,10);
 
         LinearLayout find=SettingsRow.panel(this,null);
-        search=new EditText(this);search.setSingleLine(true);search.setHint("查找作者、IP、标签或分类");search.setText(activeQuery);
+        search=new EditText(this);search.setSingleLine(true);search.setHint(LocalizedText.ui("查找作者、IP、标签或分类"));search.setText(activeQuery);
         find.addView(search,new LinearLayout.LayoutParams(-1,-2));
         find.addView(Ui.button(this,"查找",v->{manualSignal=null;activeQuery=search.getText().toString().trim();renderSignals(activeQuery);},true));
         content.addView(find);

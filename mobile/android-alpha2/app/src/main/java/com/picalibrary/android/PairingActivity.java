@@ -59,7 +59,7 @@ public class PairingActivity extends LocaleAwareActivity {
         Ui.gap(root,this,8);
 
         host=new EditText(this);
-        host.setHint("电脑地址，例如 http://192.168.1.12:7788");
+        host.setHint(LocalizedText.ui("电脑地址，例如 http://192.168.1.12:7788"));
         host.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
         host.setText(BridgeStore.host(this));
         Ui.styleField(host,this);
@@ -67,7 +67,7 @@ public class PairingActivity extends LocaleAwareActivity {
 
         Ui.gap(root,this,10);
         code=new EditText(this);
-        code.setHint("6 位配对码");
+        code.setHint(LocalizedText.ui("6 位配对码"));
         code.setInputType(InputType.TYPE_CLASS_NUMBER);
         Ui.styleField(code,this);
         root.addView(code);
@@ -115,7 +115,7 @@ public class PairingActivity extends LocaleAwareActivity {
         IntentResult result=IntentIntegrator.parseActivityResult(requestCode,resultCode,data);
         if(result!=null){
             if(result.getContents()==null){
-                status.setText("已取消扫码");
+                status.setText(LocalizedText.ui("已取消扫码"));
                 return;
             }
             handlePairingUri(Uri.parse(result.getContents()));
@@ -135,11 +135,11 @@ public class PairingActivity extends LocaleAwareActivity {
         final String h=host.getText().toString().trim().replaceAll("/$","");
         final String c=code.getText().toString().trim();
         if(h.isEmpty()||!c.matches("\\d{6}")){
-            status.setText("请填写电脑地址和 6 位配对码");
+            status.setText(LocalizedText.ui("请填写电脑地址和 6 位配对码"));
             return;
         }
         setBusy(true);
-        status.setText("正在连接…");
+        status.setText(LocalizedText.ui("正在连接…"));
         new Thread(()->{
             try{
                 JSONObject result=BridgeClient.pair(this,h,c);
@@ -153,15 +153,15 @@ public class PairingActivity extends LocaleAwareActivity {
                 runOnUiThread(()->{
                     setBusy(false);
                     render();
-                    status.setText("配对成功 · 内容同步均为可选");
-                    Toast.makeText(this,"配对成功",Toast.LENGTH_SHORT).show();
+                    status.setText(LocalizedText.ui("配对成功 · 内容同步均为可选"));
+                    Toast.makeText(this,LocalizedText.ui("配对成功"),Toast.LENGTH_SHORT).show();
                     RecommendationSyncActivity.offerAfterPairing(this);
                 });
                 SupporterSyncJobs.enqueue(this);
             }catch(Exception e){
                 runOnUiThread(()->{
                     setBusy(false);
-                    status.setText("连接失败："+(e.getMessage()==null?"请检查地址和配对码":e.getMessage()));
+                    status.setText(LocalizedText.ui("连接失败：")+(e.getMessage()==null?LocalizedText.ui("请检查地址和配对码"):e.getMessage()));
                 });
             }
         }).start();
@@ -172,23 +172,23 @@ public class PairingActivity extends LocaleAwareActivity {
         SupporterSyncJobs.enqueue(this);
         Toast.makeText(
             this,
-            covers?"正在后台同步收藏和封面":"正在后台同步收藏",
+            covers?LocalizedText.ui("正在后台同步收藏和封面"):LocalizedText.ui("正在后台同步收藏"),
             Toast.LENGTH_SHORT
         ).show();
     }
 
     private void syncShelves(){
         if(!BridgeStore.paired(this))return;
-        status.setText("正在同步书架…");
+        status.setText(LocalizedText.ui("正在同步书架…"));
         new Thread(()->{
             try{
                 ShelfStore.syncWithDesktop(this);
                 runOnUiThread(()->{
-                    status.setText("书架同步完成");
-                    Toast.makeText(this,"书架同步完成",Toast.LENGTH_SHORT).show();
+                    status.setText(LocalizedText.ui("书架同步完成"));
+                    Toast.makeText(this,LocalizedText.ui("书架同步完成"),Toast.LENGTH_SHORT).show();
                 });
             }catch(Exception e){
-                runOnUiThread(()->status.setText("书架同步失败："+(e.getMessage()==null?"请稍后重试":e.getMessage())));
+                runOnUiThread(()->status.setText(LocalizedText.ui("书架同步失败：")+(e.getMessage()==null?LocalizedText.ui("请稍后重试"):e.getMessage())));
             }
         }).start();
     }
@@ -203,14 +203,14 @@ public class PairingActivity extends LocaleAwareActivity {
             !"picalibrary".equalsIgnoreCase(u.getScheme())||
             !"pair".equalsIgnoreCase(u.getHost())
         ){
-            status.setText("这不是 Pica Library 配对二维码");
+            status.setText(LocalizedText.ui("这不是 Pica Library 配对二维码"));
             return;
         }
         String h=u.getQueryParameter("host");
         String c=u.getQueryParameter("code");
         boolean validHost=h!=null&&(h.startsWith("http://")||h.startsWith("https://"));
         if(!validHost||c==null||!c.matches("\\d{6}")){
-            status.setText("配对二维码内容不完整或已损坏");
+            status.setText(LocalizedText.ui("配对二维码内容不完整或已损坏"));
             return;
         }
         host.setText(h);

@@ -28,7 +28,7 @@ public final class DisclaimerActivity extends LocaleAwareActivity {
         };
         for(int i=0;i<items.length;i++){TextView item=Ui.text(this,(i+1)+". "+items[i],13.5f,Ui.TEXT,false);item.setLineSpacing(0,1.15f);item.setPadding(0,Ui.dp(this,6),0,Ui.dp(this,6));root.addView(item);}
         if(review){Button close=Ui.button(this,"关闭",v->finish(),false);LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.setMargins(0,Ui.dp(this,14),0,0);root.addView(close,cp);}else{
-            CheckBox confirm=new CheckBox(this);confirm.setText("我已阅读并理解上述提示，并确认只访问、下载和使用我有权访问或使用的内容。");confirm.setTextColor(Ui.TEXT);confirm.setTextSize(13.5f);confirm.setPadding(0,Ui.dp(this,14),0,Ui.dp(this,10));root.addView(confirm);
+            CheckBox confirm=new CheckBox(this);confirm.setText(LocalizedText.ui("我已阅读并理解上述提示，并确认只访问、下载和使用我有权访问或使用的内容。"));confirm.setTextColor(Ui.TEXT);confirm.setTextSize(13.5f);confirm.setPadding(0,Ui.dp(this,14),0,Ui.dp(this,10));root.addView(confirm);
             Button accept=Ui.button(this,"同意并继续",v->{getSharedPreferences(PREF,MODE_PRIVATE).edit().putString(KEY_VERSION,VERSION).apply();continueIntoApp();},false);accept.setEnabled(false);confirm.setOnCheckedChangeListener((button,checked)->accept.setEnabled(checked));root.addView(accept);
             Button exit=Ui.button(this,"不同意并退出",v->finishAndRemoveTask(),true);LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(-1,-2);ep.setMargins(0,Ui.dp(this,8),0,0);root.addView(exit,ep);
             TextView note=Ui.text(this,"免责声明版本更新后会再次提示。",12,Ui.MUTED,false);note.setGravity(Gravity.CENTER);note.setPadding(0,Ui.dp(this,14),0,0);root.addView(note);

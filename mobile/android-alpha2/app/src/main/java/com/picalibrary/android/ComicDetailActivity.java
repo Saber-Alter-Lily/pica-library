@@ -53,7 +53,7 @@ public class ComicDetailActivity extends LocaleAwareActivity {
     private void showChapters(List<BridgeClient.ChapterItem> chapters){
         loading.setVisibility(View.GONE);
         if(chapters.isEmpty()){content.addView(Ui.text(this,"没有可读取章节。",14,Ui.MUTED,false));return;}
-        Button continueRead=new Button(this);continueRead.setText("继续阅读");continueRead.setAllCaps(false);continueRead.setOnClickListener(v->openReader(chapters.get(chapters.size()-1)));content.addView(continueRead,new LinearLayout.LayoutParams(-1,Ui.dp(this,50)));
+        Button continueRead=new Button(this);continueRead.setText(LocalizedText.ui("继续阅读"));continueRead.setAllCaps(false);continueRead.setOnClickListener(v->openReader(chapters.get(chapters.size()-1)));content.addView(continueRead,new LinearLayout.LayoutParams(-1,Ui.dp(this,50)));
         Ui.gap(content,this,8);
         for(BridgeClient.ChapterItem c:chapters){LinearLayout row=Ui.card(this);row.setPadding(Ui.dp(this,15),Ui.dp(this,12),Ui.dp(this,15),Ui.dp(this,12));LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);TextView name=Ui.text(this,c.title,15.5f,Ui.TEXT,true);top.addView(name,new LinearLayout.LayoutParams(0,-2,1));top.addView(Ui.text(this,"›",22,Ui.MUTED,false));row.addView(top);row.addView(Ui.text(this,("remote".equals(sourceKind)?"云端 ":"已下载 ")+c.downloadedPictures+" 页",11.5f,Ui.MUTED,false));row.setOnClickListener(v->openReader(c));content.addView(row);}
     }

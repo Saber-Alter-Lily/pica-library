@@ -48,11 +48,11 @@ final class RecommendationItemControlDialog {
         addDisposition(activity,entry,onChanged,labels,actions,"temporary","暂时不想看（30 天）","取消暂时隐藏");
 
         new AlertDialog.Builder(activity)
-            .setTitle("调节推荐")
+            .setTitle(LocalizedText.ui("调节推荐"))
             .setItems(labels.toArray(new String[0]),(d,which)->{
                 if(which>=0&&which<actions.size())actions.get(which).run();
             })
-            .setNegativeButton("关闭",null)
+            .setNegativeButton(LocalizedText.ui("关闭"),null)
             .show();
     }
 
@@ -92,7 +92,7 @@ final class RecommendationItemControlDialog {
     }
 
     private static void changed(Activity activity,Runnable onChanged,String message){
-        Toast.makeText(activity,message+" · 下次连接可与电脑同步",Toast.LENGTH_SHORT).show();
+        Toast.makeText(activity,message+LocalizedText.ui(" · 下次连接可与电脑同步"),Toast.LENGTH_SHORT).show();
         if(onChanged!=null)onChanged.run();
     }
 }

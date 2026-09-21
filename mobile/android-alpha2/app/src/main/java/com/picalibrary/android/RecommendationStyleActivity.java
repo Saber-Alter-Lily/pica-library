@@ -78,9 +78,9 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         new Thread(()->{
             try{
                 BridgeClient.recommendationPortablePackage(this,500);
-                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,"推荐基础数据已同步；当前手机推荐周期未被替换",Toast.LENGTH_LONG).show();renderContent();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,LocalizedText.ui("推荐基础数据已同步；当前手机推荐周期未被替换"),Toast.LENGTH_LONG).show();renderContent();});
             }catch(Exception e){
-                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"基础数据同步失败":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?LocalizedText.ui("基础数据同步失败"):e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
             }
         }).start();
     }
@@ -92,7 +92,7 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
                 JSONObject value=BridgeClient.visualStatus(this);
                 runOnUiThread(()->{if(destroyed)return;loading=false;desktopVisual=value;renderContent();});
             }catch(Exception e){
-                runOnUiThread(()->{if(destroyed)return;loading=false;if(feedback)Toast.makeText(this,e.getMessage()==null?"无法读取 Desktop 画风状态":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;if(feedback)Toast.makeText(this,e.getMessage()==null?LocalizedText.ui("无法读取 Desktop 画风状态"):e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
             }
         }).start();
     }
@@ -103,17 +103,17 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         String[] values={MobileVisualPolicyStore.OFF,MobileVisualPolicyStore.SHADOW,MobileVisualPolicyStore.LIVE};
         int checked=MobileVisualPolicyStore.OFF.equals(current)?0:MobileVisualPolicyStore.LIVE.equals(current)?2:1;
         new AlertDialog.Builder(this)
-            .setTitle("手机画风接入模式")
+            .setTitle(LocalizedText.ui("手机画风接入模式"))
             .setSingleChoiceItems(labels,checked,(d,w)->{
                 d.dismiss();
                 MobileVisualPolicyStore.setMode(this,values[w]);
                 renderContent();
                 if(NativeRecommendationStore.load(this).available()){
                     NativeRecommendationJobs.refresh(this);
-                    Toast.makeText(this,"手机画风模式已更新，正在独立生成新的推荐周期",Toast.LENGTH_LONG).show();
+                    Toast.makeText(this,LocalizedText.ui("手机画风模式已更新，正在独立生成新的推荐周期"),Toast.LENGTH_LONG).show();
                 }
             })
-            .setNegativeButton("取消",null)
+            .setNegativeButton(LocalizedText.ui("取消"),null)
             .show();
     }
 
@@ -123,17 +123,17 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         String[] values={MobileVisualPolicyStore.LIGHT,MobileVisualPolicyStore.STANDARD,MobileVisualPolicyStore.STRONG};
         int checked=MobileVisualPolicyStore.LIGHT.equals(current)?0:MobileVisualPolicyStore.STRONG.equals(current)?2:1;
         new AlertDialog.Builder(this)
-            .setTitle("手机画风影响强度")
+            .setTitle(LocalizedText.ui("手机画风影响强度"))
             .setSingleChoiceItems(labels,checked,(d,w)->{
                 d.dismiss();
                 MobileVisualPolicyStore.setStrength(this,values[w]);
                 renderContent();
                 if(MobileVisualPolicyStore.live(this)&&NativeRecommendationStore.load(this).available()){
                     NativeRecommendationJobs.refresh(this);
-                    Toast.makeText(this,"手机画风强度已更新，正在独立生成新的推荐周期",Toast.LENGTH_LONG).show();
+                    Toast.makeText(this,LocalizedText.ui("手机画风强度已更新，正在独立生成新的推荐周期"),Toast.LENGTH_LONG).show();
                 }
             })
-            .setNegativeButton("取消",null)
+            .setNegativeButton(LocalizedText.ui("取消"),null)
             .show();
     }
 
@@ -150,14 +150,14 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
             "Desktop 画风强度 · "+strength
         };
         new AlertDialog.Builder(this)
-            .setTitle("Desktop 画风设置")
+            .setTitle(LocalizedText.ui("Desktop 画风设置"))
             .setItems(labels,(d,w)->{
                 if(w==0)loadDesktopVisual(true);
                 else if(w==1)updateDesktopVisual(!enabled,null,null);
                 else if(w==2)chooseDesktopMode(mode);
                 else chooseDesktopStrength(strength);
             })
-            .setNegativeButton("关闭",null)
+            .setNegativeButton(LocalizedText.ui("关闭"),null)
             .show();
     }
 
@@ -165,14 +165,14 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         String[] labels={"关闭排序影响","仅分析 · 不改变排序","参与排序 · 按所选强度生效"};
         String[] values={"OFF","SHADOW","LIVE"};
         int checked="OFF".equals(current)?0:"LIVE".equals(current)?2:1;
-        new AlertDialog.Builder(this).setTitle("Desktop 推荐接入模式").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w],null);}).setNegativeButton("取消",null).show();
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("Desktop 推荐接入模式")).setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,values[w],null);}).setNegativeButton(LocalizedText.ui("取消"),null).show();
     }
 
     private void chooseDesktopStrength(String current){
         String[] labels={"轻度 · 兼容旧权重","标准 · 推荐","强 · 更强调画风"};
         String[] values={"LIGHT","STANDARD","STRONG"};
         int checked="LIGHT".equals(current)?0:"STRONG".equals(current)?2:1;
-        new AlertDialog.Builder(this).setTitle("Desktop 画风影响强度").setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,null,values[w]);}).setNegativeButton("取消",null).show();
+        new AlertDialog.Builder(this).setTitle(LocalizedText.ui("Desktop 画风影响强度")).setSingleChoiceItems(labels,checked,(d,w)->{d.dismiss();updateDesktopVisual(null,null,values[w]);}).setNegativeButton(LocalizedText.ui("取消"),null).show();
     }
 
     private void updateDesktopVisual(Boolean enabled,String mode,String strength){
@@ -182,7 +182,7 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
                 JSONObject value=BridgeClient.updateVisualSettings(this,enabled,mode,strength);
                 runOnUiThread(()->{if(destroyed)return;loading=false;desktopVisual=value;renderContent();});
             }catch(Exception e){
-                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?"更新失败":e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
+                runOnUiThread(()->{if(destroyed)return;loading=false;Toast.makeText(this,e.getMessage()==null?LocalizedText.ui("更新失败"):e.getMessage(),Toast.LENGTH_LONG).show();renderContent();});
             }
         }).start();
     }

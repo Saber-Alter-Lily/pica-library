@@ -44,7 +44,7 @@ final class RecommendationProgressPanel extends LinearLayout {
         setVisibility(GONE);
     }
 
-    void begin(){sawActive=true;finishedDispatched=false;phase.setText("正在启动推荐生成…");detail.setText("请保持网络可用，完成后本区域会自动消失。");bar.setIndeterminate(true);progressHead.setVisibility(GONE);setVisibility(VISIBLE);pollSoon(60);}
+    void begin(){sawActive=true;finishedDispatched=false;phase.setText(LocalizedText.ui("正在启动推荐生成…"));detail.setText(LocalizedText.ui("请保持网络可用，完成后本区域会自动消失。"));bar.setIndeterminate(true);progressHead.setVisibility(GONE);setVisibility(VISIBLE);pollSoon(60);}
 
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();attached=true;pollSoon(0);}
     @Override protected void onDetachedFromWindow(){attached=false;main.removeCallbacksAndMessages(null);io.shutdownNow();super.onDetachedFromWindow();}
@@ -56,7 +56,7 @@ final class RecommendationProgressPanel extends LinearLayout {
         if(state==null){if(!sawActive)setVisibility(GONE);return;}
         if(state.active){sawActive=true;setVisibility(VISIBLE);phase.setText(state.phase);detail.setText(state.detail);if(state.total>0){bar.setIndeterminate(false);bar.setMax(Math.max(1,state.total));bar.setProgress(Math.max(0,Math.min(state.done,state.total)));moveHead(state.done,state.total);}else{bar.setIndeterminate(true);progressHead.setVisibility(GONE);}return;}
         progressHead.setVisibility(GONE);
-        if(state.failed){setVisibility(VISIBLE);bar.setIndeterminate(false);bar.setProgress(0);phase.setText("推荐生成失败");detail.setText(state.detail.isEmpty()?"请检查网络后重新生成。":state.detail);return;}
+        if(state.failed){setVisibility(VISIBLE);bar.setIndeterminate(false);bar.setProgress(0);phase.setText(LocalizedText.ui("推荐生成失败"));detail.setText(state.detail.isEmpty()?LocalizedText.ui("请检查网络后重新生成。"):state.detail);return;}
         setVisibility(GONE);
         if(sawActive&&!finishedDispatched&&state.succeeded){finishedDispatched=true;if(onFinished!=null)onFinished.run();}
     }

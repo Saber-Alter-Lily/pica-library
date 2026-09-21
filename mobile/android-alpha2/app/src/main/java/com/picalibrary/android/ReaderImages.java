@@ -40,7 +40,7 @@ final class ReaderImages implements AutoCloseable {
         request.future=workers.submit(()->{
             if(isLocal(path)){
                 try{Bitmap bitmap=decodeLocal(path,width);if(bitmap==null)throw new IOException("decode failed");failures.remove(path);if(request.cancelled||closed){bitmap.recycle();return;}main.post(()->{if(!request.cancelled&&!closed)callback.complete(bitmap);else bitmap.recycle();});}
-                catch(Exception|OutOfMemoryError e){String reason=failureReason(e);failures.put(path,reason);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,"图片读取失败 · "+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
+                catch(Exception|OutOfMemoryError e){String reason=failureReason(e);failures.put(path,reason);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,LocalizedText.ui("图片读取失败 · ")+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
                 return;
             }
             File target=new File(cache,ReaderPolicy.hash(path));File partial=null;
@@ -48,7 +48,7 @@ final class ReaderImages implements AutoCloseable {
                 if(!target.isFile()){partial=fetchNetworkToPartial(path,request);validateImage(partial);synchronized(ReaderImages.class){if(!target.exists()&&!partial.renameTo(target))throw new IOException("cache rename failed");}}
                 if(request.cancelled||closed)return;
                 Bitmap bitmap=decodeFile(target,width);if(bitmap==null){target.delete();throw new IOException("decode failed");}failures.remove(path);target.setLastModified(System.currentTimeMillis());main.post(()->{if(!request.cancelled&&!closed)callback.complete(bitmap);else bitmap.recycle();});trim(target);
-            }catch(Exception|OutOfMemoryError e){String reason=failureReason(e);failures.put(path,reason);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,"图片读取失败 · "+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
+            }catch(Exception|OutOfMemoryError e){String reason=failureReason(e);failures.put(path,reason);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,LocalizedText.ui("图片读取失败 · ")+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
             finally{if(partial!=null)partial.delete();}
         });
         return request;

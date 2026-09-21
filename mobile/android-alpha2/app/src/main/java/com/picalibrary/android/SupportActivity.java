@@ -37,6 +37,6 @@ public final class SupportActivity extends LocaleAwareActivity {
 
     private void open(String url){
         try{startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));}
-        catch(Exception e){Toast.makeText(this,"无法打开页面",Toast.LENGTH_SHORT).show();}
+        catch(Exception e){Toast.makeText(this,LocalizedText.ui("无法打开页面"),Toast.LENGTH_SHORT).show();}
     }
 }

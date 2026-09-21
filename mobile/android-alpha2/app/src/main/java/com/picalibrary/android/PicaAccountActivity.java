@@ -87,7 +87,7 @@ public final class PicaAccountActivity extends LocaleAwareActivity {
             content.addView(SettingsRow.statusLine(this,"账号",session.account));
             Button sync=Ui.button(this,"同步",v->{
                 PicaBootstrapJobs.enqueue(this);
-                Toast.makeText(this,"同步已开始",Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,LocalizedText.ui("同步已开始"),Toast.LENGTH_SHORT).show();
             },false);
             content.addView(sync,new LinearLayout.LayoutParams(-1,-2));
             Ui.gap(content,this,8);
@@ -133,7 +133,7 @@ public final class PicaAccountActivity extends LocaleAwareActivity {
         password=new EditText(this);
         password.setSingleLine(true);
         password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        password.setHint(session.password.isEmpty()?"密码":"已保存；留空则保留");
+        password.setHint(session.password.isEmpty()?LocalizedText.ui("密码"):LocalizedText.ui("已保存；留空则保留"));
         password.setSaveEnabled(false);
         Ui.styleField(password,this);
         content.addView(password);
@@ -160,21 +160,21 @@ public final class PicaAccountActivity extends LocaleAwareActivity {
     private void showAccountActions(){
         String[] labels={"重新登录","注册账号","退出登录"};
         new AlertDialog.Builder(this)
-            .setTitle("账号操作")
+            .setTitle(LocalizedText.ui("账号操作"))
             .setItems(labels,(d,w)->{
                 if(w==0){editing=true;renderContent();}
                 else if(w==1)startActivity(new Intent(this,PicaRegisterActivity.class));
                 else confirmLogout();
             })
-            .setNegativeButton("取消",null)
+            .setNegativeButton(LocalizedText.ui("取消"),null)
             .show();
     }
 
     private void confirmLogout(){
         new AlertDialog.Builder(this)
-            .setTitle("退出 Pica？")
-            .setNegativeButton("取消",null)
-            .setPositiveButton("退出",(d,w)->logout())
+            .setTitle(LocalizedText.ui("退出 Pica？"))
+            .setNegativeButton(LocalizedText.ui("取消"),null)
+            .setPositiveButton(LocalizedText.ui("退出"),(d,w)->logout())
             .show();
     }
 
@@ -195,7 +195,7 @@ public final class PicaAccountActivity extends LocaleAwareActivity {
                 runOnUiThread(()->{
                     busy=false;
                     editing=false;
-                    Toast.makeText(this,"Pica 已登录",Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this,LocalizedText.ui("Pica 已登录"),Toast.LENGTH_SHORT).show();
                     renderContent();
                 });
             }catch(Exception e){
@@ -213,7 +213,7 @@ public final class PicaAccountActivity extends LocaleAwareActivity {
         PicaAccountStore.clear(this);
         UnifiedPicaCatalogSync.clearAvailability(this);
         editing=false;
-        Toast.makeText(this,"已退出手机本机 Pica；Desktop 连接不受影响",Toast.LENGTH_SHORT).show();
+        Toast.makeText(this,LocalizedText.ui("已退出手机本机 Pica；Desktop 连接不受影响"),Toast.LENGTH_SHORT).show();
         renderContent();
     }
 

@@ -1,14 +1,14 @@
 # Pica Library 快速开始
 
-当前稳定版：**v0.4.6**。第一次使用 Windows 版通常只需要完成下载安装、首次设置、同步书库和按需配置推荐。
+当前稳定版：**v0.4.7**。第一次使用 Windows 版通常只需要完成下载安装、首次设置、同步书库和按需配置推荐。
 
 ## 01 下载与解压
 
 从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包。
 
-v0.4.6 对应：
+v0.4.7 对应：
 
-`Pica-Library-v0.4.6-windows-x64.zip`
+`Pica-Library-v0.4.7-windows-x64.zip`
 
 完整解压到普通文件夹，不要直接在压缩软件中运行。
 

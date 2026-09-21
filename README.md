@@ -67,7 +67,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 ### 更新与维护
 
 - Windows 支持兼容增量更新、官方 Release 检查、本地更新 ZIP 与更新回滚。
-- v0.4.0 → v0.4.1 推荐使用 Release 中的 **Windows 升级助手**，无需手工覆盖数据目录。
+- v0.4.1 → v0.4.2 可直接使用软件内增量更新；仍为 v0.4.0 时，使用 v0.4.2 Release 中的 **Windows 升级助手** 可直接跨代升级到 v0.4.2，无需先安装 v0.4.1，也无需手工覆盖数据目录。
 - Android 使用官方更新元数据进行 APK 原地升级，并校验版本、包名、SHA-256 与签名身份。
 - 提供日志、文件修复、缓存、导出与诊断入口。
 
@@ -104,7 +104,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 
 ### Android
 
-Android APK 不通过应用商店分发，请只使用本仓库正式 Release。现有 v43 / 0.4.1 可通过应用内更新链原地升级到 v44 / 0.4.2。
+Android APK 不通过应用商店分发，请只使用本仓库正式 Release。现有 v42 / 0.4.0 与 v43 / 0.4.1 均可通过应用内更新链直接原地升级到 v44 / 0.4.2。
 
 ## 本地优先与安全
 

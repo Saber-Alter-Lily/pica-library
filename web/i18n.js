@@ -1398,7 +1398,7 @@ export function localizeAuthorEvidence(language, author) {
 }
 
 export const domTranslations = [
-    ['.app-header > div > p', 'app.subtitle'],
+    ['.app-brand p', 'app.subtitle'],
     ['.language-control span', 'app.language'],
     ['nav', 'nav.label', 'aria-label'],
     ['#mode', 'mode.detecting'],
@@ -1406,6 +1406,7 @@ export const domTranslations = [
     ['[data-view="library"]', 'nav.library'],
     ['[data-view="shelves"]', 'nav.shelves'],
     ['[data-view="discover"]', 'nav.discover'],
+    ['[data-view="chronicle"]', 'chronicle.book'],
     ['[data-view="downloads"]', 'nav.downloads'],
     ['[data-view="downloaded"]', 'nav.downloaded'],
     ['[data-view="maintenance"]', 'nav.maintenance'],

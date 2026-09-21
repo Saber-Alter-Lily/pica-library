@@ -44,6 +44,8 @@ jobs:
           pnpm web:check
           pnpm test
           pnpm build
+      - name: Run trilingual real-browser smoke
+        run: bash scripts/run-web-browser-smoke.sh
 
   android:
     runs-on: ubuntu-latest

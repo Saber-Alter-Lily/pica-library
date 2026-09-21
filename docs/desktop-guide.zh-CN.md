@@ -127,7 +127,7 @@ Desktop 与 Android 各自保存当前启用主题，不要求两端显示完全
 
 面向普通用户的公开升级路径只有一条：
 
-- **v0.4.0 → 当前最新版 v0.4.4**：使用 v0.4.4 Release 中的 `Pica-Library-v0.4.4-upgrade-assistant.zip` 一次直达，不需要安装 v0.4.1、v0.4.2 或 v0.4.3。
+- **v0.4.0 → 当前最新版 v0.4.4**：使用 v0.4.4 Release 中的 `Pica-Library-v0.4.4-upgrade-assistant.zip` 一次直达，无需安装任何中间版本。
 
 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\Pica Library`、建立程序和数据库安全快照、替换程序并执行健康检查；失败时自动回滚。
 

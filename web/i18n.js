@@ -1,4 +1,10 @@
-export const supportedLanguages = ['zh-CN', 'en']
+import { jaCoreTranslations } from './i18n-ja-core.js'
+import { jaLibraryTranslations } from './i18n-ja-library.js'
+import { jaReaderUpdateTranslations } from './i18n-ja-reader-update.js'
+import { jaCommonChronicleTranslations } from './i18n-ja-common.js'
+import { jaChronicleTranslations } from './i18n-ja-chronicle.js'
+
+export const supportedLanguages = ['zh-CN', 'ja', 'en']
 export const languageStorageKey = 'pica-library-language'
 
 export const translations = {
@@ -251,21 +257,21 @@ export const translations = {
         'recommend.addShelf': 'Add selected to shelf',
         'recommend.restartConfirm':
             'Clear viewed items from this session and restart recommendations?',
-        'recommend.feedbackLabel': '推荐反馈',
-        'recommend.like': '喜欢',
-        'recommend.dislike': '不喜欢',
-        'recommend.whyLike': '为什么喜欢？（可选）',
-        'recommend.whyDislike': '为什么不喜欢？（可选）',
-        'visual.similarStyle': '相似画风',
-        'visual.similarFound': '找到 {count} 本画风相近作品。',
-        'visual.similarEmpty': '这本作品还没有可比较的画风向量。',
-        'visual.indexStatus': '画风索引：{indexed}/{target}，待分析 {pending}。',
-        'visual.processing': '正在分析 {current}/{total}…',
-        'visual.processingPage': '正在分析 {current}/{total} · 页面 {page}/{pages}',
-        'visual.loadingModel': '正在加载本地视觉模型…',
-        'visual.itemFailed': '第 {current}/{total} 本分析失败：{error}',
-        'visual.stopped': '画风索引已停止，可稍后继续。',
-        'visual.finished': '画风索引本轮完成，已建立 {indexed} 本。',
+        'recommend.feedbackLabel': 'Recommendation feedback',
+        'recommend.like': 'Like',
+        'recommend.dislike': 'Dislike',
+        'recommend.whyLike': 'Why do you like it? (optional)',
+        'recommend.whyDislike': 'Why is it not for you? (optional)',
+        'visual.similarStyle': 'Similar visual style',
+        'visual.similarFound': 'Found {count} works with a similar visual style.',
+        'visual.similarEmpty': 'This work does not have a comparable visual-style vector yet.',
+        'visual.indexStatus': 'Visual index: {indexed}/{target}; {pending} pending.',
+        'visual.processing': 'Analyzing {current}/{total}…',
+        'visual.processingPage': 'Analyzing {current}/{total} · page {page}/{pages}',
+        'visual.loadingModel': 'Loading the local visual model…',
+        'visual.itemFailed': 'Item {current}/{total} failed to analyze: {error}',
+        'visual.stopped': 'Visual indexing stopped. You can resume later.',
+        'visual.finished': 'Visual indexing completed for this run; {indexed} works are indexed.',
         'recommend.exhausted':
             'This recommendation round is complete. Generate a new round to explore another set.',
         'recommend.round': 'Recommendation session {session} · {batch}{next}',
@@ -1285,14 +1291,24 @@ export const translations = {
     }
 }
 
+translations.ja = {
+    ...jaCoreTranslations,
+    ...jaLibraryTranslations,
+    ...jaReaderUpdateTranslations,
+    ...jaCommonChronicleTranslations,
+    ...jaChronicleTranslations
+}
+
 export function normalizeLanguage(value) {
     const language = String(value || '').toLowerCase()
-    return language === 'zh' ||
+    if (
+        language === 'zh' ||
         language.startsWith('zh-cn') ||
         language.startsWith('zh-hans') ||
         language.startsWith('zh-sg')
-        ? 'zh-CN'
-        : 'en'
+    ) return 'zh-CN'
+    if (language === 'ja' || language.startsWith('ja-')) return 'ja'
+    return 'en'
 }
 
 export function detectLanguage(languages = []) {

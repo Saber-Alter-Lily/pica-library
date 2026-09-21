@@ -7,6 +7,19 @@
 - 面向普通用户，v0.4 系列的公开升级基线按 **v0.4.0 → 当前最新版** 表达：Windows 使用当前 Release 的升级助手一次直达，Android 通过应用内更新链直接原地升级。
 - v0.4.1–v0.4.3 是短周期过渡版本，继续保留在版本历史、兼容测试和发布资产中，但普通用户无需逐个安装，也不作为主页和使用指南的推荐升级路径。
 
+## v0.4.7 — 长任务稳定性、可观测性与恢复能力
+
+- 推荐生成改为可观测、可暂停、可继续、可取消的后端任务；阶段、done/total、失败原因与控制能力由后端权威状态提供，Web 切页不丢任务状态。
+- 修复坏网络下推荐生成可能永久挂起、强杀进程后 `library.db` 中残留 `buildingCycleId` 导致重启仍卡住的问题：Pica 普通 API 增加 15 秒超时，连续 Provider 失败三次后快速止损，Desktop 启动自动清理上次中断的 building state。
+- 新推荐候选不足或生成失败时保留上一轮可用周期，不再将 `FAILED_INSUFFICIENT_POOL` 周期提升为 active；前端发现后端失败后立即结束等待，不再傻等 120 秒。
+- Desktop 画风索引增加暂停 / 继续 / 取消；暂停与取消在当前漫画完成后生效，模型加载和单页推理均增加上限，未完成作品继续保持 pending。
+- Desktop 收藏同步按分页 checkpoint，支持暂停 / 继续 / 取消；取消完整校验不会提交不完整 reconciliation。
+- WebDAV 同步增加扫描、漫画、章节、页面、发布 checkpoint；本地文件 hashing 改为异步读取并在漫画之间让出事件循环，降低大库扫描期间对本地 API 的影响。
+- Android 推荐、Pica 收藏同步、电脑收藏 / 封面导入和下载统一进入后台任务中心；推荐与同步采用安全停止语义，下载按页面持久化实现真正断点续传。
+- Android 推荐在 Pica / E-H 收藏分页、Provider 召回、排序与最终提交前均检查停止状态；连续三次 Pica 网络失败后本轮停止 Pica 召回但继续其他来源，取消不会偷偷写入新 Snapshot。
+- 新增 `LONG_TASK_STABILITY_V047.md` 与 CI 长任务稳定性契约；v0.4.7 发布门槛包含网络中断恢复、任务控制、真实 Chromium、Android unit/lint/assemble、Windows 包 smoke 与正式签名检查。
+- Desktop v0.4.7 / Android versionCode 50；Windows v0.4.1–v0.4.6 提供 scoped 增量更新，v0.4.0 使用 v0.4.7 直达升级助手。
+
 ## v0.4.6 — 推荐控制中心本地化回归热修
 
 - 修复 Desktop/Web 推荐控制中心在渲染 V5 Shadow 时触发 `Maximum call stack size exceeded`：本地化 helper `v5Channels()` 被误写成自递归，导致后续“你的调整”和完整 0–10 微调区域未继续绘制。

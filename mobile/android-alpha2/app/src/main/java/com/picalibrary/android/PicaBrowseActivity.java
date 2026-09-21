@@ -10,7 +10,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Unified online discovery. Core providers stay independent; ExH is an optional E-H capability. */
-public final class PicaBrowseActivity extends Activity {
+public final class PicaBrowseActivity extends LocaleAwareActivity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();private EditText search;private TextView status;private ProgressBar loading;private LinearLayout results;private int page=1;private String keyword="",category="",mode="search",sourceMode="all";private boolean destroyed;
     private EhOnlineFilterSpec ehFilter=new EhOnlineFilterSpec();private List<String> lastIds=new ArrayList<>();private String lastLabel="";private int lastPages=1;
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);String requested=getIntent()==null?"":getIntent().getStringExtra("sourceMode");if(requested!=null&&!requested.trim().isEmpty())sourceMode=SourceCapabilities.byId(requested).id;render();EhTagTranslationStore.scheduleUpdate(this,()->{if(!destroyed&&!lastIds.isEmpty())showIds(new ArrayList<>(lastIds),lastLabel,lastPages);});loadPublicHome();}

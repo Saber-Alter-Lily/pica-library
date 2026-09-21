@@ -100,7 +100,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 
 `设置 → 软件更新 → 检查并更新（兼容时自动）`
 
-已有 **v0.4.0** 的用户无需安装 v0.4.1、v0.4.2 或 v0.4.3。直接下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.4.cmd`，即可一次升级到当前最新版；助手会保护 `%LOCALAPPDATA%\Pica Library`，并自动完成校验、备份、替换、健康检查与失败回滚。
+已有 **v0.4.0** 的用户直接下载 `Pica-Library-v0.4.4-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.4.cmd`，即可一次升级到当前最新版；无需安装任何中间版本。助手会保护 `%LOCALAPPDATA%\Pica Library`，并自动完成校验、备份、替换、健康检查与失败回滚。
 
 ### Android
 

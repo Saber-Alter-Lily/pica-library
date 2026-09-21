@@ -3777,10 +3777,11 @@ export class LibraryService {
                 let lastPersistedAt = 0
                 const persistProgress = (
                     progress: DownloadProgress,
-                    force = false
+                    force = false,
+                    emit = true
                 ) => {
                     latestProgress = progress
-                    options.onProgress?.(progress)
+                    if (emit) options.onProgress?.(progress)
                     const now = Date.now()
                     if (
                         !force &&
@@ -3819,7 +3820,7 @@ export class LibraryService {
                     })
                 } finally {
                     if (latestProgress)
-                        persistProgress(latestProgress, true)
+                        persistProgress(latestProgress, true, false)
                 }
             },
             {

@@ -116,7 +116,9 @@ function supportPanel() {
     panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project')}</h3><p data-a83-product-copy="support-text">${productText('Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。', 'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.')}</p><div class="a83-row"><button type="button" id="a83-afdian">${productText('❤ 爱发电支持', '❤ Support on AFDIAN')}</button><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page')}</button></div>`
     panel.querySelector('#a83-afdian').onclick = () => window.open('https://afdian.com/a/PicaLibrary', '_blank', 'noopener')
     panel.querySelector('#a83-star').onclick = () => window.open('https://github.com/Saber-Alter-Lily/pica-library', '_blank', 'noopener')
-    settings.appendChild(panel)
+    const appearance = $('#a83-appearance')
+    if (appearance) appearance.insertAdjacentElement('afterend', panel)
+    else settings.prepend(panel)
 }
 
 async function personalizationPanel() {

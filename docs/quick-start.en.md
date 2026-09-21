@@ -95,13 +95,13 @@ On Windows, open **Settings → Software Update**.
 
 Existing **v0.4.0** users should move directly to the current release:
 
-- download `Pica-Library-v0.4.6-upgrade-assistant.zip` from the v0.4.6 Release;
-- run `Upgrade-Pica-Library-v0.4.6.cmd`;
+- download `Pica-Library-v0.4.7-upgrade-assistant.zip` from the v0.4.7 Release;
+- run `Upgrade-Pica-Library-v0.4.7.cmd`;
 - no intermediate versions are required.
 
 The assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database backups, replaces the application, runs health checks, and rolls back on failure.
 
-Android v42 / 0.4.0 users can update directly through the in-app chain to v49 / 0.4.4; intermediate versions are not required.
+Android v42 / 0.4.0 users can update directly through the in-app chain to v50 / 0.4.7; intermediate versions are not required.
 
 Application files and user data are separate. Do not delete `%LOCALAPPDATA%\Pica Library` during an upgrade.
 

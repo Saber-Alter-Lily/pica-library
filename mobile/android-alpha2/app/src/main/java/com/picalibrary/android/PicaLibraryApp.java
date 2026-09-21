@@ -2,12 +2,14 @@ package com.picalibrary.android;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
 
 /** Application entrypoint for appearance, update checks and lightweight maintenance jobs. */
 public final class PicaLibraryApp extends Application {
+    @Override protected void attachBaseContext(Context base){super.attachBaseContext(LocaleStore.wrap(base));}
     @Override public void onCreate(){
         super.onCreate();
         ThemeStore.applyPlatformNightMode(this,ThemeStore.mode(this));

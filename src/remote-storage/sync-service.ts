@@ -81,9 +81,12 @@ export interface RemoteSyncPlan {
     }>
 }
 
-function hashFile(file: string) {
-    const data = fs.readFileSync(file)
-    return { sha256: createHash('sha256').update(data).digest('hex'), bytes: data.byteLength }
+async function hashFile(file: string) {
+    const data = await fs.promises.readFile(file)
+    return {
+        sha256: createHash('sha256').update(data).digest('hex'),
+        bytes: data.byteLength
+    }
 }
 
 async function eachConcurrent<T>(
@@ -138,7 +141,7 @@ export class RemoteLibrarySyncService {
         return real
     }
 
-    private localComic(comicId: string): LocalComic | null {
+    private async localComic(comicId: string): Promise<LocalComic | null> {
         const comic = this.database.getComic(comicId)
         if (!comic || comic.downloadedPictures <= 0) return null
         const episodes: LocalEpisode[] = []
@@ -150,7 +153,7 @@ export class RemoteLibrarySyncService {
                 const extension = path.extname(file).toLowerCase()
                 const contentType = imageTypes[extension]
                 if (!contentType) throw new Error('发现不支持的本地图片类型')
-                const digest = hashFile(file)
+                const digest = await hashFile(file)
                 return {
                     file,
                     manifest: {
@@ -183,7 +186,7 @@ export class RemoteLibrarySyncService {
             const extension = path.extname(file).toLowerCase()
             const contentType = imageTypes[extension]
             if (contentType) {
-                const digest = hashFile(file)
+                const digest = await hashFile(file)
                 cover = {
                     file,
                     path: remoteLayout.comicCover(comicId, extension),
@@ -235,7 +238,7 @@ export class RemoteLibrarySyncService {
         }
     }
 
-    private localLibrary(selectedIds?: string[]): LocalScan {
+    private async localLibrary(selectedIds?: string[]): Promise<LocalScan> {
         const summaries = this.query.query({ scope: 'downloaded', limit: 5000, offset: 0 }).items
             .filter((item) => !selectedIds || selectedIds.includes(item.comicId))
         const comics: LocalComic[] = []
@@ -244,8 +247,10 @@ export class RemoteLibrarySyncService {
         for (const summary of summaries) {
             localIds.add(summary.comicId)
             try {
-                const value = this.localComic(summary.comicId)
+                await this.checkpoint()
+                const value = await this.localComic(summary.comicId)
                 if (value) comics.push(value)
+                await new Promise<void>((resolve) => setImmediate(resolve))
                 else issues.push({ comicId: summary.comicId, title: summary.title, reason: '没有可同步的本地章节文件' })
             } catch (error) {
                 issues.push({
@@ -328,7 +333,7 @@ export class RemoteLibrarySyncService {
     }
 
     async plan(selectedIds?: string[]): Promise<RemoteSyncPlan> {
-        const scan = this.localLibrary(selectedIds)
+        const scan = await this.localLibrary(selectedIds)
         const local = scan.comics
         const remoteCatalog = await this.remoteCatalog()
         const remoteById = new Map((remoteCatalog?.comics ?? []).map((comic) => [comic.comicId, comic]))
@@ -397,7 +402,7 @@ export class RemoteLibrarySyncService {
 
         try {
             await this.checkpoint()
-            const scan = this.localLibrary(selectedIds)
+            const scan = await this.localLibrary(selectedIds)
             await this.checkpoint()
             const local = scan.comics
             const totalPages = local.reduce((sum, comic) => sum + comic.entry.pageCount, 0)

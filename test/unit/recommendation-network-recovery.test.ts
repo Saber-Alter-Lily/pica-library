@@ -99,7 +99,7 @@ describe('recommendation network interruption recovery', () => {
             let next: BuiltRecommendationCycleV3 = {
                 ...base,
                 readiness: 'READY_LIMITED'
-            } as BuiltRecommendationCycleV3
+            } as unknown as BuiltRecommendationCycleV3
             const coordinator = new CycleCoordinatorV3(
                 database,
                 async () => next,
@@ -113,7 +113,7 @@ describe('recommendation network interruption recovery', () => {
             next = {
                 ...base,
                 readiness: 'FAILED_INSUFFICIENT_POOL'
-            } as BuiltRecommendationCycleV3
+            } as unknown as BuiltRecommendationCycleV3
             coordinator.forceNew('bad-network-refresh')
             await expect(coordinator.waitForBuild()).rejects.toThrow(
                 'previous recommendations were kept'

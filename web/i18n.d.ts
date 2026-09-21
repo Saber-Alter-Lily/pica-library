@@ -1,20 +1,20 @@
-export const supportedLanguages: readonly ['zh-CN', 'en']
+export const supportedLanguages: readonly ['zh-CN', 'ja', 'en']
 export const languageStorageKey: string
 export const translations: Record<string, Record<string, string>>
 export const domTranslations: ReadonlyArray<
     readonly [selector: string, key: string, attribute?: string]
 >
 
-export function normalizeLanguage(value: unknown): 'zh-CN' | 'en'
-export function detectLanguage(languages?: string[] | string): 'zh-CN' | 'en'
+export function normalizeLanguage(value: unknown): 'zh-CN' | 'ja' | 'en'
+export function detectLanguage(languages?: string[] | string): 'zh-CN' | 'ja' | 'en'
 export function resolveLanguage(
     storage: Pick<Storage, 'getItem'> | undefined,
     languages: string[] | string
-): 'zh-CN' | 'en'
+): 'zh-CN' | 'ja' | 'en'
 export function saveLanguage(
     storage: Pick<Storage, 'setItem'> | undefined,
     language: string
-): 'zh-CN' | 'en'
+): 'zh-CN' | 'ja' | 'en'
 export function translate(
     language: string,
     key: string,

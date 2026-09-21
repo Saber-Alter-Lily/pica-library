@@ -213,8 +213,24 @@ class RecommendationBuildCancelledError extends Error {
     }
 }
 
+class FavoritesSyncCancelledError extends Error {
+    constructor() {
+        super('Favorites sync was cancelled')
+        this.name = 'FavoritesSyncCancelledError'
+    }
+}
+
 export interface FavoritesSyncProgress {
-    phase: 'idle' | 'reading' | 'processing' | 'complete' | 'failed'
+    phase:
+        | 'idle'
+        | 'reading'
+        | 'processing'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
     mode?: FavoritesSyncMode
     page?: number
     pages?: number
@@ -265,6 +281,18 @@ export class LibraryService {
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
     private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
+    private favoritesTaskState:
+        | 'idle'
+        | 'running'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled' = 'idle'
+    private favoritesPauseRequested = false
+    private favoritesCancelRequested = false
+    private readonly favoritesResumeWaiters = new Set<() => void>()
     private recommendationProgress: {
         state:
             | 'idle'
@@ -2904,7 +2932,74 @@ export class LibraryService {
     }
 
     favoritesSyncProgress() {
-        return { ...this.favoritesProgress }
+        return {
+            ...this.favoritesProgress,
+            state: this.favoritesTaskState,
+            canPause:
+                this.favoritesTaskState === 'running' ||
+                this.favoritesTaskState === 'pausing',
+            canResume: this.favoritesTaskState === 'paused',
+            canCancel: [
+                'running',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(this.favoritesTaskState)
+        }
+    }
+
+    favoritesSyncControl(action: 'pause' | 'resume' | 'cancel') {
+        if (action === 'pause') {
+            if (this.favoritesTaskState === 'running') {
+                this.favoritesPauseRequested = true
+                this.favoritesTaskState = 'pausing'
+            }
+            return this.favoritesSyncProgress()
+        }
+        if (action === 'resume') {
+            this.favoritesPauseRequested = false
+            for (const resolve of this.favoritesResumeWaiters) resolve()
+            this.favoritesResumeWaiters.clear()
+            if (
+                this.favoritesTaskState === 'paused' ||
+                this.favoritesTaskState === 'pausing'
+            )
+                this.favoritesTaskState = 'running'
+            return this.favoritesSyncProgress()
+        }
+        this.favoritesCancelRequested = true
+        this.favoritesPauseRequested = false
+        for (const resolve of this.favoritesResumeWaiters) resolve()
+        this.favoritesResumeWaiters.clear()
+        if (
+            this.favoritesTaskState === 'running' ||
+            this.favoritesTaskState === 'pausing' ||
+            this.favoritesTaskState === 'paused'
+        )
+            this.favoritesTaskState = 'cancelling'
+        return this.favoritesSyncProgress()
+    }
+
+    private async favoritesSyncCheckpoint() {
+        if (this.favoritesCancelRequested) throw new FavoritesSyncCancelledError()
+        if (!this.favoritesPauseRequested) return
+        this.favoritesTaskState = 'paused'
+        this.favoritesProgress = {
+            ...this.favoritesProgress,
+            phase: 'paused'
+        }
+        await new Promise<void>((resolve) =>
+            this.favoritesResumeWaiters.add(resolve)
+        )
+        if (this.favoritesCancelRequested) throw new FavoritesSyncCancelledError()
+        this.favoritesTaskState = 'running'
+    }
+
+    private finishFavoritesSyncControl() {
+        this.favoritesPauseRequested = false
+        this.favoritesCancelRequested = false
+        for (const resolve of this.favoritesResumeWaiters) resolve()
+        this.favoritesResumeWaiters.clear()
     }
 
     private tasteChroniclePath() {
@@ -2955,16 +3050,32 @@ export class LibraryService {
     }
 
     async syncFavorites(mode: FavoritesSyncMode = 'quick') {
+        if (
+            this.favoritesTaskState === 'running' ||
+            this.favoritesTaskState === 'pausing' ||
+            this.favoritesTaskState === 'paused' ||
+            this.favoritesTaskState === 'cancelling'
+        )
+            throw new Error('Favorites sync is already running')
+        this.favoritesPauseRequested = false
+        this.favoritesCancelRequested = false
+        this.favoritesResumeWaiters.clear()
+        this.favoritesTaskState = 'running'
         this.favoritesProgress = { phase: 'reading' }
         try {
             const provider = this.providerService()
-            const result = await provider.syncFavorites(mode, (progress) => {
-                this.favoritesProgress = {
-                    ...progress
-                }
-            })
+            const result = await provider.syncFavorites(
+                mode,
+                (progress) => {
+                    this.favoritesProgress = {
+                        ...progress
+                    }
+                },
+                () => this.favoritesSyncCheckpoint()
+            )
             if (result.syncMode === 'full' && result.favoriteOrderIds?.length)
                 this.rebuildTasteChronicle(result.favoriteOrderIds)
+            this.favoritesTaskState = 'complete'
             this.favoritesProgress = {
                 phase: 'complete',
                 mode: result.syncMode,
@@ -2977,11 +3088,19 @@ export class LibraryService {
             }
             return result
         } catch (error) {
+            const cancelled = error instanceof FavoritesSyncCancelledError
+            this.favoritesTaskState = cancelled ? 'cancelled' : 'failed'
             this.favoritesProgress = {
-                phase: 'failed',
-                error: error instanceof Error ? error.message : String(error)
+                phase: cancelled ? 'cancelled' : 'failed',
+                error: cancelled
+                    ? undefined
+                    : error instanceof Error
+                      ? error.message
+                      : String(error)
             }
             throw error
+        } finally {
+            this.finishFavoritesSyncControl()
         }
     }
 

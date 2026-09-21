@@ -12,6 +12,7 @@ import org.json.*;
 
 /** Native Android implementation of the same Pica protocol used by Desktop. */
 final class PicaClient {
+    interface FavoritePageProgress { void update(int page,int pages,int fetched,int total) throws Exception; }
     private static final String API="https://picaapi.picacomic.com/";
     private static final String API_KEY="C69BAF41DA5ABD1FFEDC6D2FEA56B",NONCE="b1ab87b4800d4d4590a11701b8551afa",SECRET="~d}$Q7$eIni=V)9\\RK/P.RM4;9[7|@/CA}b~OW!3?EV`:<>M7pddUBL5n|0/*Cn";
     private final Context context;private String token;
@@ -43,7 +44,8 @@ final class PicaClient {
     List<Comic> leaderboard(String range) throws Exception {String tt=normalizeLeaderboardRange(range);if(useDesktopRelay())return parseComics(BridgeClient.picaRelayLeaderboard(context,tt).optJSONArray("comics"));JSONObject data=request("GET","comics/leaderboard?tt="+tt+"&ct=VC",null);return parseComics(data.optJSONArray("comics"));}
     List<Comic> related(String comicId) throws Exception {if(useDesktopRelay())return parseComics(BridgeClient.picaRelayRelated(context,comicId).optJSONArray("comics"));JSONObject data=request("GET","comics/"+encode(comicId)+"/recommendation",null);return parseComics(data.optJSONArray("comics"));}
     ComicPage favorites(int page,String sort) throws Exception {if(useDesktopRelay())return parseComicPage(BridgeClient.picaRelayFavorites(context,page,sort).optJSONObject("comics"));JSONObject data=request("GET","users/favourite?page="+Math.max(1,page)+"&s="+encode(sort==null||sort.isEmpty()?"dd":sort),null);return parseComicPage(data.optJSONObject("comics"));}
-    List<Comic> favoritesAll() throws Exception {List<Comic> out=new ArrayList<>();ComicPage first=favorites(1,"dd");out.addAll(first.comics);for(int page=2;page<=first.pages;page++)out.addAll(favorites(page,"dd").comics);return out;}
+    List<Comic> favoritesAll() throws Exception {return favoritesAll(null);}
+    List<Comic> favoritesAll(FavoritePageProgress progress) throws Exception {List<Comic> out=new ArrayList<>();ComicPage first=favorites(1,"dd");out.addAll(first.comics);if(progress!=null)progress.update(1,first.pages,out.size(),first.total);for(int page=2;page<=first.pages;page++){ComicPage next=favorites(page,"dd");out.addAll(next.comics);if(progress!=null)progress.update(page,first.pages,out.size(),first.total);}return out;}
     List<String> categories() throws Exception {JSONObject data=useDesktopRelay()?BridgeClient.picaRelayCategories(context):request("GET","categories",null);JSONArray arr=data.optJSONArray("categories");List<String> out=new ArrayList<>();if(arr!=null)for(int i=0;i<arr.length();i++){Object value=arr.opt(i);if(value instanceof JSONObject){String title=((JSONObject)value).optString("title",((JSONObject)value).optString("name",""));if(!title.isEmpty())out.add(title);}else if(value!=null&&!String.valueOf(value).isEmpty())out.add(String.valueOf(value));}return out;}
     void toggleFavorite(String comicId) throws Exception {request("POST","comics/"+encode(comicId)+"/favourite",new JSONObject());}
     boolean setFavorite(String comicId,boolean desired) throws Exception {if(useDesktopRelay()){JSONObject result=BridgeClient.picaRelayFavorite(context,comicId,desired);return result.optBoolean("changed",false);}Comic before=comic(comicId);if(before.id.isEmpty())throw new IOException("Pica 漫画不存在");if(before.favorite==desired)return false;toggleFavorite(comicId);Comic after=comic(comicId);if(after.favorite!=desired)throw new IOException("Pica 收藏状态未能得到远端确认");return true;}

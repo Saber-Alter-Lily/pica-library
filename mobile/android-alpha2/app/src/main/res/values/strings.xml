@@ -1,3 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pica Library</string>
+    <string name="common_back">‹ Back</string>
+    <string name="language_title">Language &amp; Region</string>
+    <string name="language_help">Choose the interface language. Changes apply immediately and are kept for the next launch.</string>
+    <string name="language_current">Current</string>
+    <string name="settings_language">Language &amp; Region</string>
+    <string name="settings_language_summary">Simplified Chinese / 日本語 / English</string>
 </resources>

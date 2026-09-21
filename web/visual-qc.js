@@ -1,3 +1,5 @@
+import { copy as a88t } from './locale-runtime.js'
+
 const A88_RATINGS_KEY = 'pica-visual-qc-ratings-v1'
 const A88_FAILURES_KEY = 'pica-visual-index-failures-v1'
 const a88$ = (selector, root = document) => root.querySelector(selector)
@@ -139,14 +141,14 @@ function a88EnsurePanel() {
     panel.id = 'a88-visual-qc'
     panel.className = 'panel'
     panel.innerHTML = `
-      <div class="a88-qc-head"><div><h3>Visual V1 QC · 画风审计</h3><p id="a88-qc-status" class="status">正在读取 Visual V1…</p></div><div class="a88-qc-actions"><button id="a88-qc-refresh" type="button">刷新</button><button id="a88-qc-export" type="button">导出 QC JSON</button></div></div>
-      <p>只读取已冻结的 Visual V1 embedding，不会重建或覆盖向量。人工评分：2=明显相似，1=部分相似，0=明显不相似。</p>
-      <div class="a88-qc-search"><input id="a88-qc-query" placeholder="搜索已索引漫画或作者"><button id="a88-qc-random" type="button">随机 Anchor</button><button id="a88-qc-diagnose" type="button">诊断 Pending</button></div>
+      <div class="a88-qc-head"><div><h3>Visual V1 QC · ${a88t('画风审计','Visual-style audit','画風監査')}</h3><p id="a88-qc-status" class="status">${a88t('正在读取 Visual V1…','Reading Visual V1…','Visual V1 を読み込み中…')}</p></div><div class="a88-qc-actions"><button id="a88-qc-refresh" type="button">${a88t('刷新','Refresh','更新')}</button><button id="a88-qc-export" type="button">${a88t('导出 QC JSON','Export QC JSON','QC JSONを書き出す')}</button></div></div>
+      <p>${a88t('只读取已冻结的 Visual V1 embedding，不会重建或覆盖向量。人工评分：2=明显相似，1=部分相似，0=明显不相似。','Reads only the frozen Visual V1 embeddings and never rebuilds or overwrites vectors. Manual rating: 2=clearly similar, 1=partly similar, 0=clearly dissimilar.','凍結済みの Visual V1 embedding のみを読み取り、ベクトルの再構築や上書きは行いません。手動評価：2=明確に類似、1=一部類似、0=明確に非類似。')}</p>
+      <div class="a88-qc-search"><input id="a88-qc-query" placeholder="${a88t('搜索已索引漫画或作者','Search indexed works or authors','インデックス済み作品または作者を検索')}"><button id="a88-qc-random" type="button">${a88t('随机 Anchor','Random Anchor','ランダム Anchor')}</button><button id="a88-qc-diagnose" type="button">${a88t('诊断 Pending','Diagnose Pending','Pending を診断')}</button></div>
       <div id="a88-qc-metrics" class="a88-qc-metrics"></div>
       <div id="a88-anchor-list" class="a88-anchor-list"></div>
       <div id="a88-qc-message" class="status"></div>
       <div id="a88-qc-results" class="a88-similar-grid"></div>
-      <details id="a88-failure-details"><summary>Pending / 失败原因</summary><div id="a88-failure-summary" class="a88-failure-summary"></div><div id="a88-failure-list" class="a88-failure-list"></div></details>`
+      <details id="a88-failure-details"><summary>Pending / ${a88t('失败原因','Failure reasons','失敗理由')}</summary><div id="a88-failure-summary" class="a88-failure-summary"></div><div id="a88-failure-list" class="a88-failure-list"></div></details>`
     host.appendChild(panel)
     a88$('#a88-qc-query').addEventListener('input', () => a88RenderAnchorList())
     a88$('#a88-qc-refresh').onclick = () => void a88RefreshPanel()
@@ -154,19 +156,19 @@ function a88EnsurePanel() {
     a88$('#a88-qc-diagnose').onclick = () => void a88DiagnosePending()
     a88$('#a88-qc-export').onclick = () => a88ExportQc()
     a88$('#a88-qc-status').textContent =
-        'Visual V1 QC 尚未读取。点击“刷新”或“随机 Anchor”后才加载当前索引；打开设置页不会自动扫描。'
+        a88t('Visual V1 QC 尚未读取。点击“刷新”或“随机 Anchor”后才加载当前索引；打开设置页不会自动扫描。','Visual V1 QC is not loaded yet. Use Refresh or Random Anchor to load the current index; opening Settings never starts a scan.','Visual V1 QC はまだ読み込まれていません。「更新」または「ランダム Anchor」で現在のインデックスを読み込みます。設定画面を開くだけではスキャンしません。')
     return true
 }
 
 async function a88RefreshPanel() {
     const message = a88$('#a88-qc-message')
-    if (message) message.textContent = '正在刷新 Visual V1 数据…'
+    if (message) message.textContent = a88t('正在刷新 Visual V1 数据…','Refreshing Visual V1 data…','Visual V1 データを更新中…')
     try {
         await a88LoadDataset(true)
         a88RenderAnchorList()
         if (message) message.textContent = ''
     } catch (error) {
-        if (message) message.textContent = `读取失败：${error.message}`
+        if (message) message.textContent = a88t(`读取失败：${error.message}`,`Load failed: ${error.message}`,`読み込みに失敗しました：${error.message}`)
     }
 }
 
@@ -181,7 +183,7 @@ function a88RenderAnchorList() {
       <button type="button" class="a88-anchor" data-a88-anchor="${a88Escape(comic.comicId)}">
         <img src="/api/v1/covers/${encodeURIComponent(comic.comicId)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
         <span><strong>${a88Escape(comic.title)}</strong><br><small>${a88Escape(comic.canonicalAuthor || comic.author || '')} · ${a88Provider(comic)}</small></span>
-      </button>`).join('') || '<p class="status">没有匹配的已索引漫画。</p>'
+      </button>`).join('') || `<p class="status">${a88t('没有匹配的已索引漫画。','No matching indexed works.','一致するインデックス済み作品がありません。')}</p>`
     a88$$('[data-a88-anchor]', target).forEach((button) => {
         button.onclick = () => void a88RunQcAnchor(button.dataset.a88Anchor)
     })
@@ -206,7 +208,7 @@ async function a88FetchSimilar(comicId) {
         a88State.similarCache.set(comicId, value)
         return value
     } catch (error) {
-        if (error?.name === 'AbortError') throw new Error('相似画风检索超过 20 秒，已停止等待；可稍后重试。')
+        if (error?.name === 'AbortError') throw new Error(a88t('相似画风检索超过 20 秒，已停止等待；可稍后重试。','Visual-similarity search exceeded 20 seconds and was stopped; try again later.','画風類似検索が20秒を超えたため待機を停止しました。後でもう一度お試しください。'))
         throw error
     } finally {
         clearTimeout(timer)
@@ -220,29 +222,31 @@ async function a88RunQcAnchor(comicId) {
     const target = a88$('#a88-qc-results')
     const message = a88$('#a88-qc-message')
     if (!a88State.indexedIds.has(comicId)) {
-        if (message) message.textContent = '该漫画不在当前 Visual V1 索引中，不能作为 Anchor。'
+        if (message) message.textContent = a88t('该漫画不在当前 Visual V1 索引中，不能作为 Anchor。','This work is not in the current Visual V1 index and cannot be used as an Anchor.','この作品は現在の Visual V1 インデックスに含まれておらず、Anchor として使えません。')
         if (target) target.innerHTML = ''
         return
     }
-    if (message) message.textContent = `正在从 ${a88State.status?.indexedCount || 0} 个 Visual V1 向量中检索：${comic?.title || comicId}`
-    if (target) target.innerHTML = '<div class="a88-loading">正在计算 cosine similarity 并读取 Top 12…</div>'
+    if (message) message.textContent = a88t(`正在从 ${a88State.status?.indexedCount || 0} 个 Visual V1 向量中检索：${comic?.title || comicId}`,`Searching ${a88State.status?.indexedCount || 0} Visual V1 vectors for: ${comic?.title || comicId}`,`${a88State.status?.indexedCount || 0} 個の Visual V1 ベクトルから検索：${comic?.title || comicId}`)
+    if (target) target.innerHTML = `<div class="a88-loading">${a88t('正在计算 cosine similarity 并读取 Top 12…','Calculating cosine similarity and loading Top 12…','cosine similarity を計算して Top 12 を読み込み中…')}</div>`
     try {
         const rows = await a88FetchSimilar(comicId)
-        if (message) message.textContent = rows.length ? `Anchor：${comic?.title || comicId} · 返回 ${rows.length} 个候选` : 'Anchor 有向量，但没有可比较结果。'
+        if (message) message.textContent = rows.length ? a88t(`Anchor：${comic?.title || comicId} · 返回 ${rows.length} 个候选`,`Anchor: ${comic?.title || comicId} · ${rows.length} candidates`,`Anchor：${comic?.title || comicId} · 候補 ${rows.length} 件`) : a88t('Anchor 有向量，但没有可比较结果。','The Anchor has a vector, but there are no comparable results.','Anchor にベクトルはありますが、比較可能な結果がありません。')
         a88RenderSimilar(comicId, rows, target, true)
     } catch (error) {
-        if (message) message.textContent = `相似画风检索失败：${error.message}`
+        if (message) message.textContent = a88t(`相似画风检索失败：${error.message}`,`Visual-similarity search failed: ${error.message}`,`画風類似検索に失敗しました：${error.message}`)
         if (target) target.innerHTML = ''
     }
 }
 
-const A88_REASON_LABELS = {
-    same_author: '同作者',
-    same_ip: '同IP/角色',
-    same_topic: '同题材',
-    color: '同配色',
-    composition: '同构图',
-    source_effect: '扫描/来源效应'
+function a88ReasonLabels() {
+    return {
+        same_author: a88t('同作者','Same author','同じ作者'),
+        same_ip: a88t('同IP/角色','Same IP / character','同じIP / キャラクター'),
+        same_topic: a88t('同题材','Same topic','同じ題材'),
+        color: a88t('同配色','Similar colors','似た配色'),
+        composition: a88t('同构图','Similar composition','似た構図'),
+        source_effect: a88t('扫描/来源效应','Scan / source effect','スキャン / 配信元の影響')
+    }
 }
 
 function a88RatingKey(anchorId, candidateId) { return `${anchorId}::${candidateId}` }
@@ -264,8 +268,8 @@ function a88RenderSimilar(anchorId, rows, target, ratingEnabled) {
           <img src="/api/v1/covers/${encodeURIComponent(comic.comicId || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="a88-similar-copy"><h4>#${index + 1} ${a88Escape(comic.title || comic.comicId || '')}</h4>
             <div class="a88-meta">${a88Escape(comic.canonicalAuthor || comic.author || '')} · ${a88Provider(comic)}<br>cosine=${Number(item.similarity || 0).toFixed(4)} · ${a88Escape(item.sourceKind || '')} · n=${Number(item.sampleCount || 0)} · confidence=${Number(item.confidence || 0).toFixed(2)}</div>
-            <div class="a88-detail-actions"><button type="button" data-a88-open="${a88Escape(comic.comicId)}">详情</button></div>
-            ${ratingEnabled ? `<div class="a88-rating-actions"><button type="button" data-a88-rating="2" class="${rating?.rating === 2 ? 'active' : ''}">2 明显</button><button type="button" data-a88-rating="1" class="${rating?.rating === 1 ? 'active' : ''}">1 部分</button><button type="button" data-a88-rating="0" class="${rating?.rating === 0 ? 'active' : ''}">0 不像</button></div><details class="a88-reasons"><summary>混杂/相似原因</summary>${Object.entries(A88_REASON_LABELS).map(([key,label]) => `<label><input type="checkbox" data-a88-reason="${key}" ${rating?.reasons?.includes(key) ? 'checked' : ''}>${label}</label>`).join('')}</details>` : ''}
+            <div class="a88-detail-actions"><button type="button" data-a88-open="${a88Escape(comic.comicId)}">${a88t('详情','Details','詳細')}</button></div>
+            ${ratingEnabled ? `<div class="a88-rating-actions"><button type="button" data-a88-rating="2" class="${rating?.rating === 2 ? 'active' : ''}">2 ${a88t('明显','Clear','明確')}</button><button type="button" data-a88-rating="1" class="${rating?.rating === 1 ? 'active' : ''}">1 ${a88t('部分','Partial','一部')}</button><button type="button" data-a88-rating="0" class="${rating?.rating === 0 ? 'active' : ''}">0 ${a88t('不像','No','非類似')}</button></div><details class="a88-reasons"><summary>${a88t('混杂/相似原因','Confounders / similarity reasons','交絡 / 類似理由')}</summary>${Object.entries(a88ReasonLabels()).map(([key,label]) => `<label><input type="checkbox" data-a88-reason="${key}" ${rating?.reasons?.includes(key) ? 'checked' : ''}>${label}</label>`).join('')}</details>` : ''}
           </div></article>`
     }).join('')
     a88$$('[data-a88-open]', target).forEach((button) => button.onclick = () => void a88OpenDetail(button.dataset.a88Open))
@@ -293,7 +297,7 @@ function a88RenderMetrics(anchorId, rows) {
         const subset = rows.slice(0, k)
         const values = subset.map((item) => ratingMap[a88RatingKey(anchorId, item.comic?.comicId)]?.rating)
         const rated = values.filter((value) => Number.isInteger(value))
-        if (rated.length < Math.min(k, subset.length)) return `P@${k} 待完成 ${rated.length}/${Math.min(k, subset.length)}`
+        if (rated.length < Math.min(k, subset.length)) return a88t(`P@${k} 待完成 ${rated.length}/${Math.min(k, subset.length)}`,`P@${k} pending ${rated.length}/${Math.min(k, subset.length)}`,`P@${k} 未完了 ${rated.length}/${Math.min(k, subset.length)}`)
         const broad = rated.filter((value) => value >= 1).length / rated.length
         const strict = rated.filter((value) => value === 2).length / rated.length
         return `P@${k}(≥1)=${broad.toFixed(2)} · strict(=2)=${strict.toFixed(2)}`
@@ -311,15 +315,18 @@ function a88ClassifyFailure(message) {
     if (/timeout|timed out|network|fetch|econn|enotfound|429|50\d|cloudflare|网络|超时/.test(text)) return 'NETWORK_TRANSIENT'
     return 'UNKNOWN'
 }
-const A88_FAILURE_META = {
-    READY_TO_RETRY: ['取样可用', '可以重试；准备阶段正常，之前更像瞬时图片/模型问题。'],
-    NETWORK_TRANSIENT: ['网络/限流', '稍后重试通常有意义。'],
-    PROVIDER_ACCESS: ['Provider/权限', '先检查登录、ExH 权限或来源可用性，再重试。'],
-    NO_BODY_PAGES: ['无可用正文', '重复运行通常无效；保持 pending 比强行封面补齐更合适。'],
-    IMAGE_INVALID: ['图片异常', '少量可重试；持续失败则建议跳过。'],
-    MODEL_FAILURE: ['模型推理', '重启桌面后可重试；若固定同一本失败需检查页面格式。'],
-    SAVE_FAILURE: ['数据库/保存', '停止重复运行，先检查磁盘和数据库状态。'],
-    UNKNOWN: ['未分类', '查看原始错误后决定。']
+function a88FailureMeta(category) {
+    const rows = {
+        READY_TO_RETRY: [a88t('取样可用','Sampling ready','サンプリング可能'), a88t('可以重试；准备阶段正常，之前更像瞬时图片/模型问题。','Retry is reasonable; preparation is normal and the previous issue looks transient.','再試行可能です。準備段階は正常で、前回は一時的な画像/モデル問題の可能性があります。')],
+        NETWORK_TRANSIENT: [a88t('网络/限流','Network / rate limit','ネットワーク / レート制限'), a88t('稍后重试通常有意义。','Retrying later is usually worthwhile.','時間を置いて再試行する価値があります。')],
+        PROVIDER_ACCESS: [a88t('Provider/权限','Provider / access','Provider / 権限'), a88t('先检查登录、ExH 权限或来源可用性，再重试。','Check login, ExH access or source availability before retrying.','ログイン、ExH 権限、配信元の利用可否を確認してから再試行してください。')],
+        NO_BODY_PAGES: [a88t('无可用正文','No body pages','本文ページなし'), a88t('重复运行通常无效；保持 pending 比强行封面补齐更合适。','Repeated runs usually do not help; keeping it pending is safer than forcing a cover fallback.','繰り返し実行しても改善しにくいため、表紙で無理に補完せず pending のままにする方が適切です。')],
+        IMAGE_INVALID: [a88t('图片异常','Image issue','画像異常'), a88t('少量可重试；持续失败则建议跳过。','A small number can be retried; skip persistent failures.','少数なら再試行できますが、継続して失敗する場合はスキップを推奨します。')],
+        MODEL_FAILURE: [a88t('模型推理','Model inference','モデル推論'), a88t('重启桌面后可重试；若固定同一本失败需检查页面格式。','Retry after restarting Desktop; repeated failure on the same work suggests a page-format issue.','Desktop 再起動後に再試行できます。同じ作品で繰り返し失敗する場合はページ形式を確認してください。')],
+        SAVE_FAILURE: [a88t('数据库/保存','Database / save','データベース / 保存'), a88t('停止重复运行，先检查磁盘和数据库状态。','Stop repeated runs and check disk/database status first.','繰り返し実行せず、先にディスクとデータベース状態を確認してください。')],
+        UNKNOWN: [a88t('未分类','Unclassified','未分類'), a88t('查看原始错误后决定。','Review the original error before deciding.','元のエラーを確認して判断してください。')]
+    }
+    return rows[category] || rows.UNKNOWN
 }
 
 function a88RecordFailure(comicId, category, error, stage = 'INDEX') {
@@ -346,10 +353,10 @@ function a88RenderFailureSummary() {
     const failures = Object.values(a88Failures()).filter((item) => !pending.size || pending.has(item.comicId))
     const counts = new Map()
     for (const item of failures) counts.set(item.category, (counts.get(item.category) || 0) + 1)
-    summary.innerHTML = [...counts.entries()].map(([category,count]) => `<span class="a88-failure-pill">${a88Escape(A88_FAILURE_META[category]?.[0] || category)} ${count}</span>`).join('') || '<span class="status">尚无失败分类记录；可运行“诊断 Pending”。</span>'
+    summary.innerHTML = [...counts.entries()].map(([category,count]) => `<span class="a88-failure-pill">${a88Escape(a88FailureMeta(category)[0])} ${count}</span>`).join('') || `<span class="status">${a88t('尚无失败分类记录；可运行“诊断 Pending”。','No classified failures yet; you can run Diagnose Pending.','分類済みの失敗記録はありません。「Pending を診断」を実行できます。')}</span>`
     list.innerHTML = failures.sort((a,b) => String(b.lastAttemptAt).localeCompare(String(a.lastAttemptAt))).map((item) => {
         const comic = a88State.comicsById.get(item.comicId)
-        const meta = A88_FAILURE_META[item.category] || A88_FAILURE_META.UNKNOWN
+        const meta = a88FailureMeta(item.category)
         return `<div class="a88-failure-row"><strong>${a88Escape(comic?.title || item.comicId)}</strong> · ${a88Escape(meta[0])}<br><span>${a88Escape(meta[1])}</span><br><small>${a88Escape(item.error || '')}</small></div>`
     }).join('')
 }
@@ -361,12 +368,12 @@ async function a88DiagnosePending() {
     try {
         await a88LoadDataset(true)
         const pending = [...(a88State.status?.pendingComicIds || [])]
-        if (!pending.length) { message.textContent = '当前没有 Pending。'; return }
+        if (!pending.length) { message.textContent = a88t('当前没有 Pending。','There are no Pending items.','Pending 項目はありません。'); return }
         const mode = a88State.status?.settings?.samplingMode || 'standard'
         for (let index = 0; index < pending.length; index++) {
             const comicId = pending[index]
             const comic = a88State.comicsById.get(comicId)
-            message.textContent = `诊断 Pending ${index + 1}/${pending.length}：${comic?.title || comicId}（不会保存 embedding）`
+            message.textContent = a88t(`诊断 Pending ${index + 1}/${pending.length}：${comic?.title || comicId}（不会保存 embedding）`,`Diagnosing Pending ${index + 1}/${pending.length}: ${comic?.title || comicId} (embedding will not be saved)`,`Pending 診断 ${index + 1}/${pending.length}：${comic?.title || comicId}（embedding は保存しません）`)
             try {
                 const prepared = await a88Post('/api/v1/visual/prepare', { comicId, mode, limit: 6 })
                 if (prepared?.samples?.length) a88RecordFailure(comicId, 'READY_TO_RETRY', `prepare OK: ${prepared.sourceKind || 'unknown'} · ${prepared.samples.length} samples`, 'PREPARE_DIAGNOSTIC')
@@ -375,7 +382,7 @@ async function a88DiagnosePending() {
                 a88RecordFailure(comicId, a88ClassifyFailure(error.message), error.message, 'PREPARE_DIAGNOSTIC')
             }
         }
-        message.textContent = `Pending 诊断完成：${pending.length} 本。此操作未生成或覆盖任何 embedding。`
+        message.textContent = a88t(`Pending 诊断完成：${pending.length} 本。此操作未生成或覆盖任何 embedding。`,`Pending diagnosis complete: ${pending.length} works. No embeddings were generated or overwritten.`,`Pending 診断完了：${pending.length} 作品。この操作では embedding を生成・上書きしていません。`)
         a88RenderFailureSummary()
         a88$('#a88-failure-details').open = true
     } finally {
@@ -415,8 +422,8 @@ async function a88OpenDetail(comicId) {
     const dialog = a88EnsureDetailDialog()
     const indexed = a88State.indexedIds.has(comicId)
     dialog.querySelector('.a88-dialog-shell').innerHTML = `
-      <div class="a88-dialog-head"><div><h2>${a88Escape(comic.title)}</h2><p>${a88Escape(comic.canonicalAuthor || comic.author || '')} · ${a88Provider(comic)}</p></div><button type="button" data-a88-close>关闭</button></div>
-      <div class="a88-dialog-main"><img src="/api/v1/covers/${encodeURIComponent(comicId)}" alt=""><div><p>${a88Escape(comic.description || '暂无简介')}</p><p class="a88-meta">页数 ${Number(comic.pagesCount || comic.knownPictures || 0)} · 章节 ${Number(comic.epsCount || comic.knownEpisodes || 0)} · ${comic.finished ? '已完结' : '连载/未知'}</p><div>${(comic.categories || []).slice(0,6).map((tag) => `<span class="tag">${a88Escape(tag)}</span>`).join(' ')} ${(comic.tags || []).slice(0,18).map((tag) => `<span class="tag">${a88Escape(tag)}</span>`).join(' ')}</div><p class="a88-meta">Visual V1：${indexed ? '已索引，可比较' : (a88State.status?.pendingComicIds || []).includes(comicId) ? 'Pending' : '未纳入当前索引'}</p><div class="a88-detail-actions"><button type="button" data-a88-similar="${a88Escape(comicId)}" ${indexed ? '' : 'disabled'}>相似画风</button><button type="button" data-a88-local-read="${a88Escape(comicId)}">本地阅读</button><button type="button" data-a88-online-read="${a88Escape(comicId)}">在线阅读</button></div></div></div>
+      <div class="a88-dialog-head"><div><h2>${a88Escape(comic.title)}</h2><p>${a88Escape(comic.canonicalAuthor || comic.author || '')} · ${a88Provider(comic)}</p></div><button type="button" data-a88-close>${a88t('关闭','Close','閉じる')}</button></div>
+      <div class="a88-dialog-main"><img src="/api/v1/covers/${encodeURIComponent(comicId)}" alt=""><div><p>${a88Escape(comic.description || a88t('暂无简介','No description','説明なし'))}</p><p class="a88-meta">${a88t('页数','Pages','ページ数')} ${Number(comic.pagesCount || comic.knownPictures || 0)} · ${a88t('章节','Chapters','チャプター')} ${Number(comic.epsCount || comic.knownEpisodes || 0)} · ${comic.finished ? a88t('已完结','Completed','完結') : a88t('连载/未知','Ongoing / unknown','連載中 / 不明')}</p><div>${(comic.categories || []).slice(0,6).map((tag) => `<span class="tag">${a88Escape(tag)}</span>`).join(' ')} ${(comic.tags || []).slice(0,18).map((tag) => `<span class="tag">${a88Escape(tag)}</span>`).join(' ')}</div><p class="a88-meta">Visual V1：${indexed ? a88t('已索引，可比较','Indexed, comparable','インデックス済み・比較可能') : (a88State.status?.pendingComicIds || []).includes(comicId) ? 'Pending' : a88t('未纳入当前索引','Not in current index','現在のインデックス対象外')}</p><div class="a88-detail-actions"><button type="button" data-a88-similar="${a88Escape(comicId)}" ${indexed ? '' : 'disabled'}>${a88t('相似画风','Similar visual style','似た画風')}</button><button type="button" data-a88-local-read="${a88Escape(comicId)}">${a88t('本地阅读','Read locally','ローカルで読む')}</button><button type="button" data-a88-online-read="${a88Escape(comicId)}">${a88t('在线阅读','Read online','オンラインで読む')}</button></div></div></div>
       <p id="a88-detail-message" class="status"></p><div id="a88-detail-results" class="a88-similar-grid"></div>`
     dialog.querySelector('[data-a88-close]').onclick = () => dialog.close()
     dialog.querySelector('[data-a88-similar]')?.addEventListener('click', (event) => void a88RunDetailSimilar(comicId, event.currentTarget))
@@ -439,14 +446,14 @@ async function a88RunDetailSimilar(comicId, button) {
     const message = a88$('#a88-detail-message')
     const target = a88$('#a88-detail-results')
     button.disabled = true
-    message.textContent = `正在从 ${a88State.status?.indexedCount || 0} 个 Visual V1 向量中检索…`
-    target.innerHTML = '<div class="a88-loading">正在读取 Top 12…</div>'
+    message.textContent = a88t(`正在从 ${a88State.status?.indexedCount || 0} 个 Visual V1 向量中检索…`,`Searching ${a88State.status?.indexedCount || 0} Visual V1 vectors…`,`${a88State.status?.indexedCount || 0} 個の Visual V1 ベクトルから検索中…`)
+    target.innerHTML = `<div class="a88-loading">${a88t('正在读取 Top 12…','Loading Top 12…','Top 12 を読み込み中…')}</div>`
     try {
         const rows = await a88FetchSimilar(comicId)
-        message.textContent = rows.length ? `找到 ${rows.length} 个画风相近候选。` : '当前 Anchor 没有可比较结果。'
+        message.textContent = rows.length ? a88t(`找到 ${rows.length} 个画风相近候选。`,`Found ${rows.length} visually similar candidates.`,`画風が近い候補を ${rows.length} 件見つけました。`) : a88t('当前 Anchor 没有可比较结果。','The current Anchor has no comparable results.','現在の Anchor に比較可能な結果はありません。')
         a88RenderSimilar(comicId, rows, target, false)
     } catch (error) {
-        message.textContent = `检索失败：${error.message}`
+        message.textContent = a88t(`检索失败：${error.message}`,`Search failed: ${error.message}`,`検索に失敗しました：${error.message}`)
         target.innerHTML = ''
     } finally {
         button.disabled = false
@@ -470,7 +477,7 @@ function a88InstallDetailButtons() {
             button.type = 'button'
             button.className = 'a88-detail-trigger'
             button.dataset.a88Details = comicId
-            button.textContent = '详情'
+            button.textContent = a88t('详情','Details','詳細')
             host.appendChild(button)
         }
     }
@@ -484,19 +491,19 @@ async function a88HandleExistingSimilar(button) {
     const message = a88$('#recommend-preview-message')
     const target = a88$('#recommend-preview')
     if (!a88State.indexedIds.has(comicId)) {
-        message.textContent = '这本漫画没有当前 Visual V1 向量；请从 Visual V1 QC 中选择已索引 Anchor。'
+        message.textContent = a88t('这本漫画没有当前 Visual V1 向量；请从 Visual V1 QC 中选择已索引 Anchor。','This work has no current Visual V1 vector; choose an indexed Anchor from Visual V1 QC.','この作品には現在の Visual V1 ベクトルがありません。Visual V1 QC からインデックス済み Anchor を選択してください。')
         target.innerHTML = ''
         return
     }
     button.disabled = true
-    message.textContent = `正在从 ${a88State.status?.indexedCount || 0} 个 Visual V1 向量中检索…`
-    target.innerHTML = '<div class="a88-loading">正在计算并读取 Top 12…</div>'
+    message.textContent = a88t(`正在从 ${a88State.status?.indexedCount || 0} 个 Visual V1 向量中检索…`,`Searching ${a88State.status?.indexedCount || 0} Visual V1 vectors…`,`${a88State.status?.indexedCount || 0} 個の Visual V1 ベクトルから検索中…`)
+    target.innerHTML = `<div class="a88-loading">${a88t('正在计算并读取 Top 12…','Calculating and loading Top 12…','計算して Top 12 を読み込み中…')}</div>`
     try {
         const rows = await a88FetchSimilar(comicId)
-        message.textContent = rows.length ? `找到 ${rows.length} 个画风相近候选。` : '没有可比较结果。'
+        message.textContent = rows.length ? a88t(`找到 ${rows.length} 个画风相近候选。`,`Found ${rows.length} visually similar candidates.`,`画風が近い候補を ${rows.length} 件見つけました。`) : a88t('没有可比较结果。','No comparable results.','比較可能な結果がありません。')
         a88RenderSimilar(comicId, rows, target, false)
     } catch (error) {
-        message.textContent = `相似画风检索失败：${error.message}`
+        message.textContent = a88t(`相似画风检索失败：${error.message}`,`Visual-similarity search failed: ${error.message}`,`画風類似検索に失敗しました：${error.message}`)
         target.innerHTML = ''
     } finally {
         button.disabled = false
@@ -567,3 +574,15 @@ function a88Bootstrap() {
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', a88Bootstrap)
 else a88Bootstrap()
+
+
+document.addEventListener('pica-language-change', () => {
+    a88$('#a88-visual-qc')?.remove()
+    a88EnsurePanel()
+    if (a88State.status) {
+        a88RenderPanelStatus()
+        a88RenderAnchorList()
+        a88RenderFailureSummary()
+    }
+    a88$$('.a88-detail-trigger').forEach((button) => { button.textContent = a88t('详情','Details','詳細') })
+})

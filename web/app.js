@@ -3062,7 +3062,7 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
     } catch (error) {
         clearProgress($('#library-operation'))
         const reason = String(error?.message || error)
-        message.textContent = /cancelled|canceled|已取消|キャンセル/i.test(reason)
+        message.textContent = /cancelled|canceled/i.test(reason)
             ? t('sync.cancelled')
             : localizeError(language, error)
     } finally {

@@ -37,6 +37,9 @@ function webClampLevel(value) {
     const numeric = Number(value)
     return Math.max(0, Math.min(10, Math.round(Number.isFinite(numeric) ? numeric : 5)))
 }
+function v5Works(count){ return v5t(`${count} 本`,`${count} works`,`${count} 作品`) }
+function v5Items(count){ return v5t(`${count} 项`,`${count} items`,`${count} 件`) }
+function v5Channels(count){ return v5t(`${v5Channels(count)}`,`${count} channels`,`${count} チャンネル`) }
 
 async function request(path, options = {}) {
     const response = await fetch(path, options)
@@ -365,15 +368,15 @@ async function setLevel(signal, desiredLevel) {
     if (!delta)
         showToast(
             signal.manual
-                ? `「${signal.label}」已恢复为“系统未判断”，不再保留手动偏好。`
-                : `「${signal.label}」已恢复系统基准 ${baseline}/10。`,
+                ? v5t(`「${signal.label}」已恢复为“系统未判断”，不再保留手动偏好。`,`“${signal.label}” is back to “no system judgment”; the manual preference was removed.`,`「${signal.label}」を「システム未判断」に戻し、手動嗜好を削除しました。`)
+                : v5t(`「${signal.label}」已恢复系统基准 ${baseline}/10。`,`“${signal.label}” restored to the system baseline ${baseline}/10.`,`「${signal.label}」をシステム基準 ${baseline}/10 に戻しました。`),
             'positive'
         )
     else
         showToast(
             signal.manual
-                ? `已将「${signal.label}」设为 ${desired}/10；系统此前没有稳定判断。`
-                : `「${signal.label}」已从系统基准 ${baseline}/10 调到 ${desired}/10。`,
+                ? v5t(`已将「${signal.label}」设为 ${desired}/10；系统此前没有稳定判断。`,`Set “${signal.label}” to ${desired}/10; the system previously had no stable judgment.`,`「${signal.label}」を ${desired}/10 に設定しました。システムには安定した判断がありませんでした。`)
+                : v5t(`「${signal.label}」已从系统基准 ${baseline}/10 调到 ${desired}/10。`,`“${signal.label}” changed from the system baseline ${baseline}/10 to ${desired}/10.`,`「${signal.label}」をシステム基準 ${baseline}/10 から ${desired}/10 に変更しました。`),
             delta > 0 ? 'positive' : 'negative'
         )
 }
@@ -418,17 +421,17 @@ function lifetimeSignals() {
 }
 
 function preferenceWindowChips(window) {
-    if (!window) return '<span class="status">暂无足够行为证据</span>'
+    if (!window) return `<span class="status">${v5t('暂无足够行为证据','Not enough behavioral evidence yet','行動エビデンスがまだ十分ではありません')}</span>`
     const rows = [
-        ...(window.positive?.authors || []).map((item) => ({ ...item, kind: '作者' })),
-        ...(window.positive?.tags || []).map((item) => ({ ...item, kind: '标签' })),
-        ...(window.positive?.categories || []).map((item) => ({ ...item, kind: '分类' }))
+        ...(window.positive?.authors || []).map((item) => ({ ...item, kind: v5t('作者','Author','作者') })),
+        ...(window.positive?.tags || []).map((item) => ({ ...item, kind: v5t('标签','Tag','タグ') })),
+        ...(window.positive?.categories || []).map((item) => ({ ...item, kind: v5t('分类','Category','カテゴリ') }))
     ]
         .sort((a,b) => Number(b.score || 0) - Number(a.score || 0) || Number(b.supportItems || 0) - Number(a.supportItems || 0))
         .slice(0, 8)
-    if (!rows.length) return '<span class="status">暂无足够行为证据</span>'
+    if (!rows.length) return `<span class="status">${v5t('暂无足够行为证据','Not enough behavioral evidence yet','行動エビデンスがまだ十分ではありません')}</span>`
     return rows.map((item) =>
-        `<span class="v5-interest-chip"><small>${esc(item.kind)}</small><strong>${esc(item.label)}</strong><span>${Number(item.supportItems || 0)} 本</span></span>`
+        `<span class="v5-interest-chip"><small>${esc(item.kind)}</small><strong>${esc(item.label)}</strong><span>${v5Works(Number(item.supportItems || 0))}</span></span>`
     ).join('')
 }
 
@@ -451,8 +454,8 @@ function renderProfileOverview() {
             .slice(0, 4)
             .map((item) => item.label || item.key)
         summary.textContent =
-            `${Number(counts.favorites || 0)} 本收藏` +
-            (topLifetime.length ? ` · 主要：${topLifetime.join(' · ')}` : '')
+            v5t(`${Number(counts.favorites || 0)} 本收藏`,`${Number(counts.favorites || 0)} favorites`,`${Number(counts.favorites || 0)} 件のお気に入り`) +
+            (topLifetime.length ? v5t(` · 主要：${topLifetime.join(' · ')}`,` · Top: ${topLifetime.join(' · ')}`,` · 主な傾向：${topLifetime.join(' · ')}`) : '')
     }
     const card = (title, help, window) => `
         <section class="v5-overview-card">
@@ -461,14 +464,14 @@ function renderProfileOverview() {
         </section>`
     target.innerHTML =
         `<section class="v5-overview-card">
-            <div class="v5-heading-inline"><h5>数据基础</h5>${infoButton('收藏用于长期画像；Ownership 用于避免把已经拥有的作品继续当作新作推荐；正向行为证据还可以来自 Like、阅读等真实使用。')}</div>
-            <p><strong>${Number(counts.favorites || 0)}</strong> 本收藏</p>
-            <p><strong>${Number(counts.owned || 0)}</strong> 本已拥有 / 已入库</p>
-            <p><strong>${Number(inferred.lifetime?.positiveItemCount || 0)}</strong> 本作品形成正向行为证据</p>
+            <div class="v5-heading-inline"><h5>${v5t('数据基础','Data foundation','データ基盤')}</h5>${infoButton(v5t('收藏用于长期画像；Ownership 用于避免把已经拥有的作品继续当作新作推荐；正向行为证据还可以来自 Like、阅读等真实使用。','Favorites build the long-term profile; Ownership prevents already-owned works from being recommended as new; positive evidence can also come from likes and reading behavior.','お気に入りは長期プロフィールに使い、Ownership は所有済み作品を新作として再推薦しないために使います。Like や閲覧などの実利用も正向きエビデンスになります。'))}</div>
+            <p><strong>${Number(counts.favorites || 0)}</strong> ${v5t('本收藏','favorites','件のお気に入り')}</p>
+            <p><strong>${Number(counts.owned || 0)}</strong> ${v5t('本已拥有 / 已入库','owned / in library','件所有済み / ライブラリ登録済み')}</p>
+            <p><strong>${Number(inferred.lifetime?.positiveItemCount || 0)}</strong> ${v5t('本作品形成正向行为证据','works with positive behavioral evidence','作品が正向き行動エビデンスを形成')}</p>
         </section>` +
-        card('长期兴趣', '累计收藏和历史行为形成的长期偏好层。', inferred.lifetime) +
-        card('最近 30 天', '近期层用于识别最近兴趣变化，不会直接覆盖长期画像。', inferred.days30) +
-        card('本次会话', '只统计当前这次打开应用后、appSessionId 相同的有效行为。', inferred.session)
+        card(v5t('长期兴趣','Long-term interests','長期的な興味'), v5t('累计收藏和历史行为形成的长期偏好层。','Long-term preferences formed from accumulated favorites and historical behavior.','蓄積したお気に入りと過去の行動から形成される長期嗜好層です。'), inferred.lifetime) +
+        card(v5t('最近 30 天','Last 30 days','直近30日'), v5t('近期层用于识别最近兴趣变化，不会直接覆盖长期画像。','The recent layer detects current shifts without directly overwriting the long-term profile.','最近層は直近の興味変化を検出しますが、長期プロフィールを直接上書きしません。'), inferred.days30) +
+        card(v5t('本次会话','Current session','現在のセッション'), v5t('只统计当前这次打开应用后、appSessionId 相同的有效行为。','Counts only valid behavior from the current app session with the same appSessionId.','同じ appSessionId の現在のアプリセッション内で発生した有効な行動だけを集計します。'), inferred.session)
 }
 
 function renderServingOverview() {
@@ -477,25 +480,25 @@ function renderServingOverview() {
     if (!target) return
     const serving = V5.serving
     if (!serving?.available) {
-        if (summary) summary.textContent = '尚无已落盘的当前批次'
-        target.innerHTML = '<p class="status">还没有可读取的实际 serving 批次。</p>'
+        if (summary) summary.textContent = v5t('尚无已落盘的当前批次','No persisted current batch yet','保存済みの現在バッチはまだありません')
+        target.innerHTML = `<p class="status">${v5t('还没有可读取的实际 serving 批次。','No actual serving batch is available yet.','読み取れる実際の serving バッチはまだありません。')}</p>`
         return
     }
     const familyLabels = {
-        FANDOM: '作品 / IP',
-        CREATOR: '作者',
-        SEMANTIC_CONJUNCTION: '组合偏好',
-        SEMANTIC_ANCHOR: '标签 / 题材',
-        EXPLORATION: '探索',
-        RELATED: '相似作品',
-        UNATTRIBUTED: '其他'
+        FANDOM: v5t('作品 / IP','Work / IP','作品 / IP'),
+        CREATOR: v5t('作者','Author','作者'),
+        SEMANTIC_CONJUNCTION: v5t('组合偏好','Combined preference','組み合わせ嗜好'),
+        SEMANTIC_ANCHOR: v5t('标签 / 题材','Tag / theme','タグ / テーマ'),
+        EXPLORATION: v5t('探索','Exploration','探索'),
+        RELATED: v5t('相似作品','Related works','類似作品'),
+        UNATTRIBUTED: v5t('其他','Other','その他')
     }
     const families = Object.entries(serving.primaryFamilies || {})
         .filter(([,count]) => Number(count) > 0)
         .sort((a,b) => Number(b[1])-Number(a[1]))
     const chips = families.map(([key,count]) =>
-        `<span class="v5-interest-chip"><strong>${esc(familyLabels[key] || key)}</strong><span>${Number(count)} 本</span></span>`
-    ).join('') || '<span class="status">当前批次没有可用归因</span>'
+        `<span class="v5-interest-chip"><strong>${esc(familyLabels[key] || key)}</strong><span>${v5Works(Number(count))}</span></span>`
+    ).join('') || `<span class="status">${v5t('当前批次没有可用归因','No attribution is available for the current batch','現在のバッチに利用可能な帰属情報がありません')}</span>`
     const intents = Array.isArray(serving.primaryIntents)
         ? serving.primaryIntents.filter((item) => Number(item?.count || 0) > 0)
         : []
@@ -503,29 +506,29 @@ function renderServingOverview() {
         const labels = Array.isArray(item.anchors) ? item.anchors.filter(Boolean).slice(0, 3) : []
         const label = labels.length
             ? labels.join(' + ')
-            : familyLabels[item.type] || item.type || '其他'
-        return `<span class="v5-interest-chip"><small>${esc(familyLabels[item.type] || item.type || '来源')}</small><strong>${esc(label)}</strong><span>${Number(item.count || 0)} 本</span></span>`
-    }).join('') || '<span class="status">当前批次没有可展示的具体意图锚点</span>'
+            : familyLabels[item.type] || item.type || v5t('其他','Other','その他')
+        return `<span class="v5-interest-chip"><small>${esc(familyLabels[item.type] || item.type || v5t('来源','Source','配信元'))}</small><strong>${esc(label)}</strong><span>${v5Works(Number(item.count || 0))}</span></span>`
+    }).join('') || `<span class="status">${v5t('当前批次没有可展示的具体意图锚点','No specific intent anchors are available for this batch','このバッチに表示できる具体的な意図アンカーはありません')}</span>`
     if (summary) {
         const intentSummary = intents.slice(0,3).map((item) => {
             const labels = Array.isArray(item.anchors) ? item.anchors.filter(Boolean) : []
-            return labels[0] || familyLabels[item.type] || item.type || '其他'
+            return labels[0] || familyLabels[item.type] || item.type || v5t('其他','Other','その他')
         }).filter(Boolean)
         summary.textContent =
-            `第 ${Number(serving.batchIndex || 0) + 1} 批 · ${Number(serving.itemCount || 0)} 本` +
-            (intentSummary.length ? ` · 主要：${intentSummary.join(' · ')}` : '')
+            v5t(`第 ${Number(serving.batchIndex || 0) + 1} 批 · ${Number(serving.itemCount || 0)} 本`,`Batch ${Number(serving.batchIndex || 0) + 1} · ${Number(serving.itemCount || 0)} works`,`第 ${Number(serving.batchIndex || 0) + 1} バッチ · ${Number(serving.itemCount || 0)} 作品`) +
+            (intentSummary.length ? v5t(` · 主要：${intentSummary.join(' · ')}`,` · Top: ${intentSummary.join(' · ')}`,` · 主な傾向：${intentSummary.join(' · ')}`) : '')
     }
     target.innerHTML = `
         <section class="v5-compose-card">
-            <div class="v5-heading-inline"><h5>当前批次</h5>${infoButton('这是 Final V3 已经实际分配并落盘的当前 serving 批次；打开本页不会生成或切换批次。')}</div>
-            <p><strong>第 ${Number(serving.batchIndex || 0) + 1} 批</strong> · ${Number(serving.itemCount || 0)} 本</p>
+            <div class="v5-heading-inline"><h5>${v5t('当前批次','Current batch','現在のバッチ')}</h5>${infoButton(v5t('这是 Final V3 已经实际分配并落盘的当前 serving 批次；打开本页不会生成或切换批次。','This is the current Final V3 serving batch that has actually been assigned and persisted. Opening this page does not generate or switch batches.','実際に割り当て・保存された Final V3 の現在 serving バッチです。このページを開いても生成や切り替えは行いません。'))}</div>
+            <p><strong>${v5t(`第 ${Number(serving.batchIndex || 0) + 1} 批`,`Batch ${Number(serving.batchIndex || 0) + 1}`,`第 ${Number(serving.batchIndex || 0) + 1} バッチ`)}</strong> · ${v5Works(Number(serving.itemCount || 0))}</p>
         </section>
         <section class="v5-compose-card">
-            <div class="v5-heading-inline"><h5>实际来源构成</h5>${infoButton('按当前批次每本作品的 primaryFamily 汇总，表示这批实际展示结果主要由哪些推荐意图贡献。')}</div>
+            <div class="v5-heading-inline"><h5>${v5t('实际来源构成','Actual source composition','実際の配信元構成')}</h5>${infoButton(v5t('按当前批次每本作品的 primaryFamily 汇总，表示这批实际展示结果主要由哪些推荐意图贡献。','Summarized by each work’s primaryFamily in the current batch, showing which recommendation intents contributed most to the displayed results.','現在バッチの各作品の primaryFamily を集計し、表示結果に主に寄与したおすすめ意図を示します。'))}</div>
             <div class="v5-interest-chips">${chips}</div>
         </section>
         <section class="v5-compose-card">
-            <div class="v5-heading-inline"><h5>实际主要锚点</h5>${infoButton('这些锚点来自当前 serving 批次真正使用的 primaryIntent，而不是 V5 Shadow 的实验规划。')}</div>
+            <div class="v5-heading-inline"><h5>${v5t('实际主要锚点','Actual primary anchors','実際の主要アンカー')}</h5>${infoButton(v5t('这些锚点来自当前 serving 批次真正使用的 primaryIntent，而不是 V5 Shadow 的实验规划。','These anchors come from the primaryIntent actually used by the current serving batch, not the V5 Shadow experimental plan.','これらのアンカーは現在の serving バッチで実際に使われた primaryIntent 由来で、V5 Shadow の実験計画ではありません。'))}</div>
             <div class="v5-interest-chips">${intentChips}</div>
         </section>`
 }
@@ -536,26 +539,26 @@ function renderCompositionOverview() {
     if (!target) return
     const plan = V5.channels
     if (!plan) {
-        if (summary) summary.textContent = '暂无 Shadow 规划'
-        target.innerHTML = '<p class="status">当前没有可读取的 V5 Shadow 规划。</p>'
+        if (summary) summary.textContent = v5t('暂无 Shadow 规划','No Shadow plan','Shadow 計画なし')
+        target.innerHTML = `<p class="status">${v5t('当前没有可读取的 V5 Shadow 规划。','No V5 Shadow plan is available.','読み取れる V5 Shadow 計画はありません。')}</p>`
         return
     }
     const channels = Array.isArray(plan.channels)
         ? plan.channels.filter((item) => item.enabled)
         : []
     const sourceLabels = {
-        EXPLICIT_SESSION: '本次明确指定',
-        EXPLICIT_PERSISTENT: '你的长期调整',
-        SESSION: '本次行为',
-        RECENT_7D: '最近 7 天',
-        RECENT_30D: '最近 30 天',
-        LIFETIME: '长期兴趣',
-        SYSTEM: '系统探索 / 重发现'
+        EXPLICIT_SESSION: v5t('本次明确指定','Explicit session intent','今回の明示指定'),
+        EXPLICIT_PERSISTENT: v5t('你的长期调整','Your persistent adjustments','長期調整'),
+        SESSION: v5t('本次行为','Current-session behavior','今回の行動'),
+        RECENT_7D: v5t('最近 7 天','Last 7 days','直近7日'),
+        RECENT_30D: v5t('最近 30 天','Last 30 days','直近30日'),
+        LIFETIME: v5t('长期兴趣','Long-term interests','長期的な興味'),
+        SYSTEM: v5t('系统探索 / 重发现','System exploration / rediscovery','システム探索 / 再発見')
     }
     const familyLabels = {
-        TARGET: '定向目标', AUTHOR: '作者', FANDOM: '作品 / IP',
-        TAG: '标签', CATEGORY: '分类', RELATED: '相似作品',
-        EXPLORATION: '探索', REDISCOVERY: '旧藏重发现', VISUAL: '画风'
+        TARGET: v5t('定向目标','Targeted intent','定向ターゲット'), AUTHOR: v5t('作者','Author','作者'), FANDOM: v5t('作品 / IP','Work / IP','作品 / IP'),
+        TAG: v5t('标签','Tag','タグ'), CATEGORY: v5t('分类','Category','カテゴリ'), RELATED: v5t('相似作品','Related works','類似作品'),
+        EXPLORATION: v5t('探索','Exploration','探索'), REDISCOVERY: v5t('旧藏重发现','Rediscovery','旧作の再発見'), VISUAL: v5t('画风','Visual style','画風')
     }
     const sourceCounts = new Map()
     for (const channel of channels)
@@ -563,15 +566,15 @@ function renderCompositionOverview() {
     const sourceHtml = [...sourceCounts.entries()]
         .sort((a,b) => b[1]-a[1])
         .map(([key,count]) => `<p><strong>${esc(sourceLabels[key] || key)}</strong> · ${count} 条通道</p>`)
-        .join('') || '<p class="status">暂无启用通道</p>'
+        .join('') || `<p class="status">${v5t('暂无启用通道','No enabled channels','有効なチャンネルなし')}</p>`
     const familyEntries = Object.entries(plan.summary?.families || {})
         .filter(([,count]) => Number(count) > 0)
         .sort((a,b) => Number(b[1])-Number(a[1]))
     const familyHtml = familyEntries
         .map(([key,count]) => `<span class="v5-interest-chip"><strong>${esc(familyLabels[key] || key)}</strong><span>${Number(count)}</span></span>`)
-        .join('') || '<span class="status">暂无</span>'
+        .join('') || `<span class="status">${v5t('暂无','None','なし')}</span>`
     const providerHtml = Object.entries(plan.providerBudgets || {})
-        .map(([key,value]) => `<p><strong>${esc(key.toUpperCase())}</strong> · ${Number(value?.plannedRequests || 0)} / ${Number(value?.maxRequests || 0)} 次请求${value?.eligible ? '' : ' · 当前不可用'}</p>`)
+        .map(([key,value]) => `<p><strong>${esc(key.toUpperCase())}</strong> · ${Number(value?.plannedRequests || 0)} / ${Number(value?.maxRequests || 0)} ${v5t('次请求',' requests',' リクエスト')}${value?.eligible ? '' : v5t(' · 当前不可用',' · unavailable',' · 現在利用不可')}</p>`)
         .join('')
     const anchors = channels
         .flatMap((channel) => (channel.anchors || []).map((anchor) => ({
@@ -583,15 +586,15 @@ function renderCompositionOverview() {
         .filter((item,index,array) => array.findIndex((other) => webNorm(other.label)===webNorm(item.label))===index)
         .slice(0,8)
         .map((item) => `<span class="v5-interest-chip"><small>${esc(familyLabels[item.family] || item.family)}</small><strong>${esc(item.label)}</strong></span>`)
-        .join('') || '<span class="status">暂无明确锚点</span>'
+        .join('') || `<span class="status">${v5t('暂无明确锚点','No clear anchors','明確なアンカーなし')}</span>`
     if (summary)
         summary.textContent =
-            `${Number(plan.summary?.enabledChannelCount || channels.length)} 条实验通道 · servingImpact=${String(plan.servingImpact)}`
+            v5t(`${Number(plan.summary?.enabledChannelCount || channels.length)} 条实验通道 · servingImpact=${String(plan.servingImpact)}`,`${Number(plan.summary?.enabledChannelCount || channels.length)} experimental channels · servingImpact=${String(plan.servingImpact)}`,`${Number(plan.summary?.enabledChannelCount || channels.length)} 実験チャンネル · servingImpact=${String(plan.servingImpact)}`)
     target.innerHTML = `
-        <section class="v5-compose-card"><h5>来源层</h5>${sourceHtml}</section>
-        <section class="v5-compose-card"><h5>召回通道</h5><div class="v5-interest-chips">${familyHtml}</div></section>
-        <section class="v5-compose-card"><h5>Provider 预算</h5>${providerHtml}</section>
-        <section class="v5-compose-card"><h5>实验主要锚点</h5><div class="v5-interest-chips">${anchors}</div></section>`
+        <section class="v5-compose-card"><h5>${v5t('来源层','Source layer','ソース層')}</h5>${sourceHtml}</section>
+        <section class="v5-compose-card"><h5>${v5t('召回通道','Retrieval channels','取得チャンネル')}</h5><div class="v5-interest-chips">${familyHtml}</div></section>
+        <section class="v5-compose-card"><h5>${v5t('Provider 预算','Provider budget','Provider 予算')}</h5>${providerHtml}</section>
+        <section class="v5-compose-card"><h5>${v5t('实验主要锚点','Experimental primary anchors','実験の主要アンカー')}</h5><div class="v5-interest-chips">${anchors}</div></section>`
 }
 
 function updatePendingBar() {

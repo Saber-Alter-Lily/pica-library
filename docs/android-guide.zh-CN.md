@@ -5,7 +5,7 @@
 ## 1. 下载与安装
 
 1. 打开 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest)。
-2. 下载当前版本 APK；v0.4.6 对应 `Pica-Library-Android-v49.apk`。
+2. 下载当前版本 APK；v0.4.6 对应 `Pica-Library-Android-v50.apk`。
 3. 在手机上打开 APK，并按 Android 系统提示允许本次安装。
 4. 首次启动后阅读并确认使用说明，再进入应用。
 
@@ -105,7 +105,7 @@ Android 也可以本地下载漫画。下载队列支持进度显示、失败恢
 - 应用包名；
 - 官方签名身份。
 
-已有 **v42 / 0.4.0** 的普通用户可直接通过应用内更新链原地升级到 **v49 / 0.4.4**，无需安装任何中间版本。
+已有 **v42 / 0.4.0** 的普通用户可直接通过应用内更新链原地升级到 **v50 / 0.4.7**，无需安装任何中间版本。
 
 如果下载更新时短暂显示等待系统下载服务，通常是 Android DownloadManager 正在排队；可以稍后继续或重新开始任务。
 

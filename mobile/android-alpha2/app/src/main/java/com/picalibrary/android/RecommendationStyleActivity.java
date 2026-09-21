@@ -47,7 +47,7 @@ public final class RecommendationStyleActivity extends Activity {
         content.addView(runtimeCard);
 
         content.addView(SettingsRow.row(this,"推荐画像","长期 / 最近 / 本次 / 当前构成",v->startActivity(new Intent(this,RecommendationProfileActivity.class))));
-        content.addView(SettingsRow.row(this,"人工调整",RecommendationPolicyStore.pendingControlCount(this)>0?"有 "+RecommendationPolicyStore.pendingControlCount(this)+" 项待同步":"1–10 档 / 屏蔽 / 本次想看",v->startActivity(new Intent(this,RecommendationControlActivity.class))));
+        content.addView(SettingsRow.row(this,"人工调整",RecommendationPolicyStore.pendingControlCount(this)>0?"有 "+RecommendationPolicyStore.pendingControlCount(this)+" 项待同步":"0–10 档 / 屏蔽 / 本次想看",v->startActivity(new Intent(this,RecommendationControlActivity.class))));
         content.addView(SettingsRow.row(this,"推荐同步",BridgeStore.paired(this)?"与 Desktop 比较并双向合并":"未连接电脑",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
         boolean reasons=RecommendationFeedbackStore.askReasons(this);
         content.addView(SettingsRow.row(this,"反馈原因",reasons?"开启":"关闭",v->{RecommendationFeedbackStore.setAskReasons(this,!RecommendationFeedbackStore.askReasons(this));renderContent();}));

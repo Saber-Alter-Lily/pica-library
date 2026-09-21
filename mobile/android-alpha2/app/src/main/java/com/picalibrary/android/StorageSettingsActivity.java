@@ -9,7 +9,7 @@ import android.widget.*;
 import java.util.Locale;
 
 /** User-facing storage, prefetch and persistent-download policy. */
-public final class StorageSettingsActivity extends Activity {
+public final class StorageSettingsActivity extends LocaleAwareActivity {
     private static final int PICK_DOWNLOAD_TREE=401;private LinearLayout content;
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();}
     private Button button(String label,android.view.View.OnClickListener action){return Ui.button(this,label,action,false);}

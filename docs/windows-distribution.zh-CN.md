@@ -57,13 +57,13 @@ Desktop 设置中心当前分为：
 
 ### 公开升级路径：v0.4.0 → v0.4.6
 
-从 **v0.4.6 Release** 下载：
+从 **v0.4.7 Release** 下载：
 
-`Pica-Library-v0.4.6-upgrade-assistant.zip`
+`Pica-Library-v0.4.7-upgrade-assistant.zip`
 
 解压后双击：
 
-`Upgrade-Pica-Library-v0.4.6.cmd`
+`Upgrade-Pica-Library-v0.4.7.cmd`
 
 升级助手会：
 

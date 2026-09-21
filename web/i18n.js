@@ -803,6 +803,8 @@ export const translations = {
         'library.sizeLarge': '大',
         'library.catalogHelp':
             '漫画库可能包含收藏、搜索、推荐或下载过程中建立的本地记录。',
+        'library.helpLabel': '查看漫画库说明',
+        'library.helpText': '在这里筛选、核对和整理本地漫画库，并选择需要下载的作品。',
         'library.loadMore': '加载更多',
         'library.author': '作者',
         'library.tags': '标签',

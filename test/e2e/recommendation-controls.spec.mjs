@@ -102,8 +102,14 @@ test('recommendation controls render persisted adjustments after localization', 
         await page.locator('#pica-disclaimer-accept').click()
     }
 
+    await page.locator('nav [data-view="maintenance"]').click()
+    await expect(page.locator('#a87-hub-layout')).toBeVisible()
+    await page.locator('#a87-recommendations-tab').click()
+    await expect(page.locator('#a87-recommendations-panel')).toBeVisible()
+
     await expect(page.locator('#v5-policy-status')).toContainText('你调整 1 项', { timeout: 10_000 })
     await expect(page.locator('#v5-shadow-summary')).toContainText('1 条实验通道')
+    await expect(page.locator('#v5-control-list .v5-control-chip')).toBeVisible()
     await expect(page.locator('#v5-control-list .v5-control-chip')).toContainText('剧情向')
     await expect(page.locator('#v5-control-list .v5-control-chip')).toContainText('8/10')
     const row = page.locator('[data-v5-signal="TAG:story-focus"]')

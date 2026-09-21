@@ -97,13 +97,13 @@ Windows 打开 **设置 → 软件更新**。
 
 已有 **v0.4.0** 的用户直接升级到当前最新版即可：
 
-- 从 v0.4.6 Release 下载 `Pica-Library-v0.4.6-upgrade-assistant.zip`；
-- 解压后运行 `Upgrade-Pica-Library-v0.4.6.cmd`；
+- 从 v0.4.7 Release 下载 `Pica-Library-v0.4.7-upgrade-assistant.zip`；
+- 解压后运行 `Upgrade-Pica-Library-v0.4.7.cmd`；
 - 无需安装任何中间版本。
 
 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\\Pica Library`、备份旧程序和数据库、替换程序并执行健康检查；失败时自动回滚。
 
-Android 已有 v42 / 0.4.0 用户可直接通过应用内更新链升级到 v49 / 0.4.4，无需安装中间版本。
+Android 已有 v42 / 0.4.0 用户可直接通过应用内更新链升级到 v50 / 0.4.7，无需安装中间版本。
 
 应用程序文件与用户数据目录彼此独立。升级不需要卸载，也不需要重新导入数据库、书架、历史或设置；不要为了升级删除 `%LOCALAPPDATA%\\Pica Library`。
 

@@ -1,18 +1,14 @@
+import { copy as productText } from './locale-runtime.js'
+
 const $ = (selector) => document.querySelector(selector)
 const THEME_KEY = 'pica-library-web-theme-v1'
 let desktopStatus = null
 
-function productLanguage() {
-    return $('#language-select')?.value === 'en' ? 'en' : 'zh-CN'
-}
-function productText(zh, en) {
-    return productLanguage() === 'en' ? en : zh
-}
 function themeLabel(mode) {
     return {
-        system: productText('跟随系统', 'System'),
-        light: productText('浅色', 'Light'),
-        dark: productText('深色', 'Dark')
+        system: productText('跟随系统', 'System', 'システムに従う'),
+        light: productText('浅色', 'Light', 'ライト'),
+        dark: productText('深色', 'Dark', 'ダーク')
     }[mode] || mode
 }
 
@@ -78,7 +74,7 @@ function bytes(value) {
 function readFileBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader()
-        reader.onerror = () => reject(reader.error || new Error('读取文件失败'))
+        reader.onerror = () => reject(reader.error || new Error(productText('读取文件失败', 'Could not read the file', 'ファイルを読み込めませんでした')))
         reader.onload = () => {
             const value = String(reader.result || '')
             resolve(value.slice(value.indexOf(',') + 1))
@@ -93,7 +89,7 @@ function appearancePanel() {
     const panel = document.createElement('article')
     panel.id = 'a83-appearance'
     panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3 data-a83-product-copy="appearance">${productText('外观', 'Appearance')}</h3><div class="a83-row"></div>`
+    panel.innerHTML = `<h3 data-a83-product-copy="appearance">${productText('外观', 'Appearance', '外観')}</h3><div class="a83-row"></div>`
     const row = panel.querySelector('.a83-row')
     for (const mode of ['system','light','dark']) {
         const button = document.createElement('button')
@@ -113,7 +109,7 @@ function supportPanel() {
     if (!settings || $('#a83-support')) return
     const panel = document.createElement('article')
     panel.id = 'a83-support'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project')}</h3><p data-a83-product-copy="support-text">${productText('Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。', 'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.')}</p><div class="a83-row"><button type="button" id="a83-afdian">${productText('❤ 爱发电支持', '❤ Support on AFDIAN')}</button><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page')}</button></div>`
+    panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project', 'プロジェクトを支援')}</h3><p data-a83-product-copy="support-text">${productText('Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。', 'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.', 'Pica Libraryは無料のオープンソースです。今後の開発・テスト・保守を支援したい場合は、AFDIANから任意で支援できます。支援によって追加機能・コンテンツ・アクセス権が解放されることはありません。')}</p><div class="a83-row"><button type="button" id="a83-afdian">${productText('❤ 爱发电支持', '❤ Support on AFDIAN', '❤ AFDIANで支援')}</button><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page', '⭐ GitHubプロジェクト')}</button></div>`
     panel.querySelector('#a83-afdian').onclick = () => window.open('https://afdian.com/a/PicaLibrary', '_blank', 'noopener')
     panel.querySelector('#a83-star').onclick = () => window.open('https://github.com/Saber-Alter-Lily/pica-library', '_blank', 'noopener')
     const appearance = $('#a83-appearance')
@@ -133,14 +129,14 @@ async function personalizationPanel() {
     if (!settings) return
     const panel = document.createElement('article')
     panel.id = 'a83-personalization'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<div class="section-heading"><div><h3>个性化装扮</h3></div><span class="a83-state a83-good">已解锁</span></div><label class="a83-drop" id="a83-theme-drop"><strong>拖入 Pica Theme Pack</strong><br><span>或点击选择 .pica-theme / .zip</span><input id="a83-theme-file" type="file" accept=".pica-theme,.zip,application/zip" hidden></label><p id="a83-theme-message" class="status"></p><div id="a83-theme-list"></div>`
+    panel.innerHTML = `<div class="section-heading"><div><h3>${productText('个性化装扮','Personalization','カスタマイズ')}</h3></div><span class="a83-state a83-good">${productText('已解锁','Unlocked','利用可能')}</span></div><label class="a83-drop" id="a83-theme-drop"><strong>${productText('拖入 Pica Theme Pack','Drop a Pica Theme Pack','Pica Theme Packをドロップ')}</strong><br><span>${productText('或点击选择 .pica-theme / .zip','or click to choose .pica-theme / .zip','またはクリックして .pica-theme / .zip を選択')}</span><input id="a83-theme-file" type="file" accept=".pica-theme,.zip,application/zip" hidden></label><p id="a83-theme-message" class="status"></p><div id="a83-theme-list"></div>`
     settings.appendChild(panel)
     const drop = panel.querySelector('#a83-theme-drop')
     const input = panel.querySelector('#a83-theme-file')
     const message = panel.querySelector('#a83-theme-message')
     const render = (packs = []) => {
-        const list = panel.querySelector('#a83-theme-list'); list.innerHTML = '<h4>已安装装扮</h4>'
-        if (!packs.length) { list.insertAdjacentHTML('beforeend','<p class="status">暂时没有装扮包。</p>'); return }
+        const list = panel.querySelector('#a83-theme-list'); list.innerHTML = `<h4>${productText('已安装装扮','Installed themes','インストール済みテーマ')}</h4>`
+        if (!packs.length) { list.insertAdjacentHTML('beforeend',`<p class="status">${productText('暂时没有装扮包。','No theme packs installed yet.','テーマパックはまだありません。')}</p>`); return }
         for (const pack of packs) {
             const row = document.createElement('div'); row.className = 'a83-pack'
             row.innerHTML = `<div><strong>${String(pack.name || pack.id)}</strong><div class="status">${String(pack.author || '')} · ${String(pack.version || '')}</div></div><span class="status">${bytes(pack.size)}</span>`
@@ -150,15 +146,15 @@ async function personalizationPanel() {
     render(p.themePacks || [])
     async function install(file) {
         if (!file) return
-        if (file.size > 7 * 1024 * 1024) { message.textContent = '装扮包过大；请控制在 7 MB 以内。'; return }
-        message.textContent = '正在校验并安装装扮包…'
+        if (file.size > 7 * 1024 * 1024) { message.textContent = productText('装扮包过大；请控制在 7 MB 以内。','Theme pack is too large; keep it under 7 MB.','テーマパックが大きすぎます。7 MB以下にしてください。'); return }
+        message.textContent = productText('正在校验并安装装扮包…','Validating and installing theme pack…','テーマパックを検証してインストール中…')
         try {
             const dataBase64 = await readFileBase64(file)
             const result = await desktopPost('/api/v1/desktop/settings', { personalizationAction:'import-theme', fileName:file.name, dataBase64 })
-            message.textContent = `已安装：${result.themePack?.name || file.name}。手机连上电脑后可同步。`
+            message.textContent = productText(`已安装：${result.themePack?.name || file.name}。手机连上电脑后可同步。`,`Installed: ${result.themePack?.name || file.name}. It can sync when the phone connects to this computer.`,`インストール済み：${result.themePack?.name || file.name}。スマートフォンをPCに接続すると同期できます。`)
             desktopStatus = null
             const fresh = await status(); render(fresh.personalization?.themePacks || [])
-        } catch (error) { message.textContent = `安装失败：${error.message}` }
+        } catch (error) { message.textContent = productText(`安装失败：${error.message}`,`Installation failed: ${error.message}`,`インストールに失敗しました：${error.message}`) }
         input.value = ''
     }
     input.onchange = () => install(input.files?.[0])
@@ -170,10 +166,10 @@ async function personalizationPanel() {
 function refreshProductCopy() {
     const appearance = $('[data-a83-product-copy="appearance"]')
     if (appearance)
-        appearance.textContent = productText('外观', 'Appearance')
+        appearance.textContent = productText('外观', 'Appearance', '外観')
     const supportTitle = $('[data-a83-product-copy="support-title"]')
     if (supportTitle)
-        supportTitle.textContent = productText('支持项目', 'Support the project')
+        supportTitle.textContent = productText('支持项目', 'Support the project', 'プロジェクトを支援')
     const supportText = $('[data-a83-product-copy="support-text"]')
     if (supportText)
         supportText.textContent = productText(
@@ -218,7 +214,10 @@ async function init() {
             if (storedTheme() === 'system') applyTheme('system')
         }
     )
-    document.addEventListener('pica-language-change', refreshProductCopy)
+    document.addEventListener('pica-language-change', () => {
+        refreshProductCopy()
+        void personalizationPanel()
+    })
     let cleanupQueued = false
     const scheduleSourceCleanup = () => {
         if (cleanupQueued) return

@@ -138,6 +138,8 @@ export async function retrieveCandidatesV3(input: {
     let safetyExcludedCount = 0
     let duplicateCollapsedCount = 0
     let stoppedBy = 'ROUTES_EXHAUSTED'
+    let consecutiveProviderFailures = 0
+    let providerFailureBudgetExhausted = false
 
     const load = async (route: RetrievalRouteV3, page: number) => {
         if (route.routeType === 'RELATED')
@@ -188,8 +190,14 @@ export async function retrieveCandidatesV3(input: {
             stat.productive = false
             stat.exhausted = true
             if (status === 401 || status === 403) throw error
+            consecutiveProviderFailures += 1
+            if (consecutiveProviderFailures >= 3) {
+                providerFailureBudgetExhausted = true
+                stoppedBy = 'PROVIDER_FAILURE_BUDGET'
+            }
             return
         }
+        consecutiveProviderFailures = 0
         rawResultCount += docs.length
         stat.rawReturned += docs.length
         let pageUniqueNew = 0
@@ -323,6 +331,7 @@ export async function retrieveCandidatesV3(input: {
     for (const route of routes) {
         if (requestCount >= RETRIEVER_CONFIG.maxProviderRequests) break
         await run(route, 1)
+        if (providerFailureBudgetExhausted) break
         if (candidates.size >= RETRIEVER_CONFIG.targetPool) {
             stoppedBy = 'TARGET_REACHED'
             break
@@ -330,7 +339,8 @@ export async function retrieveCandidatesV3(input: {
     }
     while (
         candidates.size < RETRIEVER_CONFIG.targetPool &&
-        requestCount < RETRIEVER_CONFIG.maxProviderRequests
+        requestCount < RETRIEVER_CONFIG.maxProviderRequests &&
+        !providerFailureBudgetExhausted
     ) {
         const familyCounts = new Map<string, number>()
         for (const value of candidates.values())

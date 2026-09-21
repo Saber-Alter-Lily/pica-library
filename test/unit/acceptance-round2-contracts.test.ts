@@ -259,7 +259,13 @@ describe('Round 2 progress and download observability contracts', () => {
     })
     it('download_cancel_progress_visible', () => {
         expect(app).toContain("t('downloads.cancelConfirm'")
-        expect(app).toContain('completed: job.progressCompleted')
+        expect(app).toContain(
+            "completed = Number(card?.dataset.progressCompleted || 0)"
+        )
+        expect(app).toContain(
+            "total = Number(card?.dataset.progressTotal || 0)"
+        )
+        expect(app).not.toContain("api('/api/v1/downloads').then")
     })
 })
 

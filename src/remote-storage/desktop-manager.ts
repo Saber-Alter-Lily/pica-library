@@ -31,11 +31,30 @@ interface SelectedRemoteTarget {
     saved: boolean
 }
 
+class RemoteSyncCancelledError extends Error {
+    constructor() {
+        super('Remote sync was cancelled')
+        this.name = 'RemoteSyncCancelledError'
+    }
+}
+
 export class RemoteStorageDesktopManager {
     private registry: RemoteStorageRegistry
     private credentials: StoredCredentials | null
     private readonly query: LibraryQueryService
     private mutationInFlight = false
+    private syncTaskState:
+        | 'idle'
+        | 'running'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled' = 'idle'
+    private syncPauseRequested = false
+    private syncCancelRequested = false
+    private readonly syncResumeWaiters = new Set<() => void>()
     private readonly scopeIds = new Map<string, string>()
     private syncProgress: Record<string, unknown> = {
         phase: 'idle',
@@ -212,7 +231,20 @@ export class RemoteStorageDesktopManager {
             configured: targets.length > 0,
             targets,
             presets: REMOTE_STORAGE_PRESETS,
-            syncProgress: this.syncProgress
+            syncProgress: {
+                ...this.syncProgress,
+                state: this.syncTaskState,
+                canPause:
+                    this.syncTaskState === 'running' ||
+                    this.syncTaskState === 'pausing',
+                canResume: this.syncTaskState === 'paused',
+                canCancel: [
+                    'running',
+                    'pausing',
+                    'paused',
+                    'cancelling'
+                ].includes(this.syncTaskState)
+            }
         }
         return targets.length === 1 ? { ...common, ...targets[0] } : common
     }
@@ -231,6 +263,82 @@ export class RemoteStorageDesktopManager {
         }
     }
 
+    syncControl(action: 'pause' | 'resume' | 'cancel') {
+        if (action === 'pause') {
+            if (this.syncTaskState === 'running') {
+                this.syncPauseRequested = true
+                this.syncTaskState = 'pausing'
+                this.syncProgress = {
+                    ...this.syncProgress,
+                    phase: 'pausing',
+                    message:
+                        '已请求暂停；当前正在上传的页面完成后会暂停',
+                    updatedAt: new Date().toISOString()
+                }
+            }
+            return this.status().syncProgress
+        }
+        if (action === 'resume') {
+            this.syncPauseRequested = false
+            for (const resolve of this.syncResumeWaiters) resolve()
+            this.syncResumeWaiters.clear()
+            if (
+                this.syncTaskState === 'paused' ||
+                this.syncTaskState === 'pausing'
+            ) {
+                this.syncTaskState = 'running'
+                this.syncProgress = {
+                    ...this.syncProgress,
+                    phase: 'uploading',
+                    message: '正在继续同步',
+                    updatedAt: new Date().toISOString()
+                }
+            }
+            return this.status().syncProgress
+        }
+        this.syncCancelRequested = true
+        this.syncPauseRequested = false
+        for (const resolve of this.syncResumeWaiters) resolve()
+        this.syncResumeWaiters.clear()
+        if (
+            this.syncTaskState === 'running' ||
+            this.syncTaskState === 'pausing' ||
+            this.syncTaskState === 'paused'
+        ) {
+            this.syncTaskState = 'cancelling'
+            this.syncProgress = {
+                ...this.syncProgress,
+                phase: 'cancelling',
+                message:
+                    '正在取消；当前正在上传的页面完成后停止',
+                updatedAt: new Date().toISOString()
+            }
+        }
+        return this.status().syncProgress
+    }
+
+    private async syncCheckpoint() {
+        if (this.syncCancelRequested) throw new RemoteSyncCancelledError()
+        if (!this.syncPauseRequested) return
+        this.syncTaskState = 'paused'
+        this.syncProgress = {
+            ...this.syncProgress,
+            phase: 'paused',
+            message: '同步已暂停',
+            updatedAt: new Date().toISOString()
+        }
+        await new Promise<void>((resolve) => this.syncResumeWaiters.add(resolve))
+        if (this.syncCancelRequested) throw new RemoteSyncCancelledError()
+        this.syncTaskState = 'running'
+    }
+
+    private finishSyncControl() {
+        this.syncPauseRequested = false
+        this.syncCancelRequested = false
+        for (const resolve of this.syncResumeWaiters) resolve()
+        this.syncResumeWaiters.clear()
+    }
+
     private syncService(
         selected: SelectedRemoteTarget,
         provider = this.providerFrom(selected)
@@ -245,7 +353,9 @@ export class RemoteStorageDesktopManager {
                     targetId: selected.targetId,
                     targetLabel: selected.label
                 }
-            }
+            },
+            4,
+            { checkpoint: () => this.syncCheckpoint() }
         )
     }
 
@@ -552,6 +662,10 @@ export class RemoteStorageDesktopManager {
         const ids = this.selectedComics(input, selected)
         if (!ids.length) throw new Error('没有选中可上传漫画')
         this.mutationInFlight = true
+        this.syncTaskState = 'running'
+        this.syncPauseRequested = false
+        this.syncCancelRequested = false
+        this.syncResumeWaiters.clear()
         try {
             const result = await this.syncSelected(selected, ids)
             if (input.comicIds !== undefined) {
@@ -571,8 +685,16 @@ export class RemoteStorageDesktopManager {
                     )
                 )
             }
+            this.syncTaskState = 'complete'
             return { ...result, targetId: selected.targetId }
+        } catch (error) {
+            this.syncTaskState =
+                error instanceof RemoteSyncCancelledError
+                    ? 'cancelled'
+                    : 'failed'
+            throw error
         } finally {
+            this.finishSyncControl()
             this.mutationInFlight = false
         }
     }

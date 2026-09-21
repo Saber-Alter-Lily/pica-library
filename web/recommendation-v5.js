@@ -39,7 +39,7 @@ function webClampLevel(value) {
 }
 function v5Works(count){ return v5t(`${count} 本`,`${count} works`,`${count} 作品`) }
 function v5Items(count){ return v5t(`${count} 项`,`${count} items`,`${count} 件`) }
-function v5Channels(count){ return v5t(`${v5Channels(count)}`,`${count} channels`,`${count} チャンネル`) }
+function v5Channels(count){ return v5t(`${count} 条通道`,`${count} channels`,`${count} チャンネル`) }
 
 async function request(path, options = {}) {
     const response = await fetch(path, options)

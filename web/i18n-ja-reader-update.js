@@ -2,6 +2,7 @@ export const jaReaderUpdateTranslations = {
     'recommend.preparing': 'おすすめを準備中…',
     'recommend.rebuilding': '新しいおすすめサイクルを生成中です。現在のバッチはそのまま利用できます…',
     'recommend.buildTimeout': 'おすすめの生成を続行中です。少し待ってからもう一度お試しください。',
+    'recommend.buildFailed': 'おすすめの生成に失敗しました。前回の利用可能なおすすめは保持されています。ネットワークが安定してから再生成してください。',
     'result.details': '詳細 / プレビュー',
     'result.favorite': 'Picaのお気に入りに追加',
     'provider.publicMetadata': '公開メタデータ',

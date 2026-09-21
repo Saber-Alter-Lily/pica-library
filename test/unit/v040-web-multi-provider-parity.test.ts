@@ -21,8 +21,10 @@ describe('v0.4 Web/Desktop parity', () => {
     expect(libraryQuery).toContain('const selectedProviders = new Set(query.providerIds ?? [])')
     expect(libraryQuery).toContain("selectedProviders.has(comic.providerId ?? 'pica')")
     expect(web).toContain("provider.id = 'v040-library-provider'")
-    expect(web).toContain("<option value=\"pica\">来源：Pica</option>")
-    expect(web).toContain("<option value=\"eh\">来源：E-H</option>")
+    expect(web).toContain('<option value="pica">')
+    expect(web).toContain('<option value="eh">')
+    expect(web).toContain("t('来源：Pica','Source: Pica','配信元：Pica')")
+    expect(web).toContain("t('来源：E-H','Source: E-H','配信元：E-H')")
   })
 
   it('wires native E-H browse modes and advanced filtering end to end', () => {
@@ -45,6 +47,7 @@ describe('v0.4 Web/Desktop parity', () => {
     expect(web).toContain('db.text.json')
     expect(web).toContain('parityState.translations')
     expect(web).toContain('tag.dataset.rawValue = raw')
+    expect(web).toContain("currentLanguage() !== 'zh-CN'")
     expect(web).toContain('canonical')
   })
 

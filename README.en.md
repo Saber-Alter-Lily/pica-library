@@ -104,7 +104,7 @@ For **v0.4.1 → v0.4.2**, use the normal in-app updater. Users still on **v0.4.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing v43 / 0.4.1 installs can upgrade in place to v44 / 0.4.2 through the in-app update chain.
+Android APKs are distributed only through this repository's official Release. Existing v42 / 0.4.0 and v43 / 0.4.1 installs can both upgrade directly in place to v44 / 0.4.2 through the in-app update chain.
 
 ## Local-first and security
 

@@ -22,7 +22,7 @@ jobs:
         with:
           name: localization-inventory
           path: _reports/localization-inventory.json
-          retention-days: 3
+          retention-days: 1
 
   web:
     runs-on: ubuntu-latest

@@ -16,7 +16,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class ReaderActivity extends Activity {
+public class ReaderActivity extends LocaleAwareActivity {
     private FrameLayout root, canvas;
     private LinearLayout top, bottom;
     private TextView heading, counter;

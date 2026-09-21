@@ -80,12 +80,12 @@ jobs:
           $full='artifacts\Pica-Library-v0.4.6-windows-x64.zip'
           $fullHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $full).Hash.ToLowerInvariant()
           $src='packaging\windows\upgrade-assistant-v041'
-          $work=Join-Path $env:RUNNER_TEMP 'pica-v045-assistant'
+          $work=Join-Path $env:RUNNER_TEMP 'pica-v046-assistant'
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work
           New-Item -ItemType Directory -Force -Path $work | Out-Null
 
           $ps1=Get-Content -Raw -LiteralPath (Join-Path $src 'Upgrade-Pica-Library-v0.4.1.ps1')
-          $ps1=$ps1.Replace('0.4.1','0.4.6').Replace('v041','v045')
+          $ps1=$ps1.Replace('0.4.1','0.4.6').Replace('v041','v046')
           $ps1=$ps1.Replace('88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d',$fullHash)
           $ps1=$ps1.Replace('974d4e9b22379aeed379b71711008332acc213a4',$env:GITHUB_SHA)
           [IO.File]::WriteAllText((Join-Path $work 'Upgrade-Pica-Library-v0.4.6.ps1'),$ps1,(New-Object Text.UTF8Encoding($true)))
@@ -108,6 +108,7 @@ jobs:
             'Pica-Library-v0.4.6-update-from-v0.4.2.zip',
             'Pica-Library-v0.4.6-update-from-v0.4.3.zip',
             'Pica-Library-v0.4.6-update-from-v0.4.4.zip',
+            'Pica-Library-v0.4.6-update-from-v0.4.5.zip',
             'Pica-Library-v0.4.6-upgrade-assistant.zip'
           )
           $lines=@()
@@ -124,7 +125,7 @@ jobs:
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 'artifacts\BUILD_TRANSPARENCY-Windows.json'
       - uses: actions/upload-artifact@v4
         with:
-          name: v045-windows-release
+          name: v046-windows-release
           path: |
             artifacts/Pica-Library-v0.4.6-windows-x64.zip
             artifacts/Pica-Library-v0.4.6-update-from-v0.4.1.zip
@@ -162,7 +163,7 @@ jobs:
       - name: Test and lint Android
         working-directory: mobile/android-alpha2
         run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
-      - name: Build and verify formal v48
+      - name: Build and verify formal v49
         working-directory: mobile/android-alpha2
         env:
           ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
@@ -176,7 +177,7 @@ jobs:
           test "$oldcert" = "$EXPECTED_CERT"
 
           umask 077
-          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-v045-signing-XXXXXXXX")
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-v046-signing-XXXXXXXX")
           export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
           trap 'rm -rf -- "$signing_dir"' EXIT
           printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
@@ -216,7 +217,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: v045-android-release
+          name: v046-android-release
           path: mobile/android-alpha2/publish/
           retention-days: 1
           if-no-files-found: error
@@ -235,11 +236,11 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
-          name: v045-windows-release
+          name: v046-windows-release
           path: release/windows
       - uses: actions/download-artifact@v4
         with:
-          name: v045-android-release
+          name: v046-android-release
           path: release/android
       - name: Assemble release metadata
         run: |

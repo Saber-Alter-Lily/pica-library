@@ -170,6 +170,7 @@ public final class HomeActivity extends LocaleAwareActivity {
         boolean paired=BridgeStore.paired(this);
         boolean pica=PicaAccountStore.load(this).configured();
         boolean eh=EhAccountStore.load(this).configured();
+        p.addView(SettingsRow.row(this,getString(R.string.settings_language),getString(R.string.settings_language_summary),v->startActivity(new Intent(this,LanguageActivity.class))));
         p.addView(SettingsRow.row(this,"账号与来源",(pica||eh)?"本机已配置":"",v->startActivity(new Intent(this,AccountSourcesActivity.class))));
         p.addView(SettingsRow.row(this,"连接电脑",paired?"已连接":"未连接",v->startActivity(new Intent(this,PairingActivity.class))));
         p.addView(SettingsRow.row(this,"存储与下载","目录 / WebDAV / 下载策略",v->startActivity(new Intent(this,StorageHubActivity.class))));

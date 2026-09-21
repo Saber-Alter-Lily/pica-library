@@ -44,6 +44,18 @@ final class LocalizedText {
         return value==null?source:value;
     }
 
+    static String ui(String zh,String en,String ja){
+        Context c=applicationContext;
+        return c==null?zh:ui(c,zh,en,ja);
+    }
+
+    static String ui(Context c,String zh,String en,String ja){
+        String language=LocaleStore.language(c);
+        if(LocaleStore.EN.equals(language))return en;
+        if(LocaleStore.JA.equals(language))return ja;
+        return zh;
+    }
+
     static String[] ui(String[] source){
         if(source==null)return null;
         String[] out=new String[source.length];

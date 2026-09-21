@@ -54,6 +54,10 @@ export const translations = {
         'home.modes': 'Two modes',
         'home.modesText':
             'Browser Lite stores imported data in this browser. Connected mode uses the local service to access the provider; account credentials are not written to exported Bundles.',
+        'home.helpLabel': 'View getting-started help',
+        'home.helpText': 'Use Browser Lite for quick viewing, or connect the local service to sync, search and download.',
+        'home.modesHelpLabel': 'View mode help',
+        'home.modesHelpText': 'Browser Lite stores imported data in this browser. Connected mode uses the local service to access the provider; account credentials are not written to exported Bundles.',
         'browserLite.title': 'Get started with Browser Lite',
         'browserLite.intro':
             'Browser Lite uses a data package exported by Pica Library. You do not need to enter your Pica account or password on this page.',
@@ -718,6 +722,10 @@ export const translations = {
         'home.modes': '两种模式',
         'home.modesText':
             'Browser Lite 将导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号凭据不会写入导出数据包。',
+        'home.helpLabel': '查看开始使用说明',
+        'home.helpText': '网页轻量查看；连接本地服务后可以同步、搜索和下载。',
+        'home.modesHelpLabel': '查看模式说明',
+        'home.modesHelpText': 'Browser Lite 把导入的数据保存在当前浏览器；连接模式由本地服务访问站点，账号不会写入导出包。',
         'browserLite.title': '开始使用 Browser Lite',
         'browserLite.intro':
             'Browser Lite 使用从 Pica Library 导出的数据包，无需在网页中填写 Pica 账号或密码。',
@@ -1439,6 +1447,10 @@ export const domTranslations = [
     ['[data-go="downloads"] span', 'home.downloadsHint'],
     ['#home .notice strong', 'home.modes'],
     ['#home .notice p', 'home.modesText'],
+    ['#home .page-heading .info-tip', 'home.helpLabel', 'aria-label'],
+    ['#home .page-heading .info-tip', 'home.helpText', 'data-info-tip'],
+    ['#home-mode-notice .info-tip', 'home.modesHelpLabel', 'aria-label'],
+    ['#home-mode-notice .info-tip', 'home.modesHelpText', 'data-info-tip'],
     ['#browser-lite-onboarding h3', 'browserLite.title'],
     ['#browser-lite-onboarding .onboarding-intro', 'browserLite.intro'],
     ['#browser-lite-onboarding li:nth-child(1)', 'browserLite.step1'],

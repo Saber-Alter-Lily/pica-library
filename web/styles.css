@@ -2385,8 +2385,8 @@ select:focus {
     position: absolute;
     width: 86px;
     height: 86px;
-    right: -30px;
-    bottom: -38px;
+    right: 0;
+    bottom: 0;
     border-radius: 50%;
     background: rgb(95 110 232 / 8%);
     content: '';

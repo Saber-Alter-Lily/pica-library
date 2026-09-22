@@ -8,6 +8,8 @@ import android.widget.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /** Comic-first detail screen with actionable creator identity and explicit source/read actions. */
 public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
@@ -20,16 +22,94 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
         ProbeResult(String sourceKind,String label,int priority,List<BridgeClient.ChapterItem> chapters,boolean pica,boolean eh){this.sourceKind=sourceKind;this.label=label;this.priority=priority;this.chapters=chapters;this.pica=pica;this.eh=eh;}
     }
     private final ExecutorService worker=Executors.newFixedThreadPool(5);private final LinkedHashMap<String,ResolvedChapter> resolved=new LinkedHashMap<>();private final LinkedHashSet<String> availableSources=new LinkedHashSet<>();private final AtomicInteger remaining=new AtomicInteger();
-    private LinearLayout chapterArea,actionArea;private TextView sourceState;private Button sourceDetails;private ProgressBar loading;private ImageView coverView;private UnifiedCatalogStore.Entry entry;private volatile Boolean picaFavoriteState;private volatile String ehProbeError="";private boolean destroyed,picaReady,ehReady;
+    private LinearLayout chapterArea,actionArea,workVariantArea;private TextView sourceState;private Button sourceDetails,workVariantToggle;private ProgressBar loading;private ImageView coverView;private UnifiedCatalogStore.Entry entry;private JSONObject workVariantPayload;private volatile Boolean picaFavoriteState;private volatile String ehProbeError="";private boolean destroyed,picaReady,ehReady,workVariantsExpanded;
 
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);String comicId=getIntent().getStringExtra("comicId");entry=UnifiedCatalogStore.load(this).byId.get(comicId);if(entry==null)entry=new UnifiedCatalogStore.Entry(comicId==null?"":comicId,getIntent().getStringExtra("title"),getIntent().getStringExtra("author"));render();resolveSources();}
-    private void render(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));bar.addView(small("‹ 返回",v->finish()));bar.addView(Ui.text(this,"漫画详情",20,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,16),Ui.dp(this,4),Ui.dp(this,16),Ui.dp(this,28));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout hero=new LinearLayout(this);coverView=new ImageView(this);coverView.setScaleType(ImageView.ScaleType.CENTER_CROP);coverView.setBackgroundColor(Ui.PLACEHOLDER);hero.addView(coverView,new LinearLayout.LayoutParams(Ui.dp(this,116),Ui.dp(this,164)));CoverRepository.load(this,coverView,entry,Ui.PLACEHOLDER);LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,15),0,0,0);TextView title=Ui.text(this,entry.title,20,Ui.TEXT,true);title.setMaxLines(4);copy.addView(title);if(!entry.alternateTitles.isEmpty()){TextView alternate=Ui.text(this,entry.alternateTitles.get(0),11.5f,Ui.MUTED,false);alternate.setMaxLines(2);alternate.setPadding(0,Ui.dp(this,4),0,0);copy.addView(alternate);}TextView author=Ui.text(this,"作者 · "+authorSummary()+"  ›",13,Ui.PRIMARY,true);author.setPadding(0,Ui.dp(this,7),0,Ui.dp(this,5));author.setOnClickListener(v->openAuthors());copy.addView(author);String meta=detailMeta();if(!meta.isEmpty())copy.addView(Ui.text(this,meta,11.5f,Ui.MUTED,false));hero.addView(copy,new LinearLayout.LayoutParams(0,-2,1));content.addView(hero);String tags=tagLine();if(!tags.isEmpty()){TextView t=Ui.text(this,tags,11.5f,Ui.PRIMARY,false);t.setPadding(0,Ui.dp(this,10),0,0);content.addView(t);}if(entry.description!=null&&!entry.description.trim().isEmpty()){TextView desc=Ui.text(this,entry.description.trim(),12,Ui.MUTED,false);desc.setMaxLines(5);desc.setPadding(0,Ui.dp(this,8),0,0);content.addView(desc);}actionArea=new LinearLayout(this);actionArea.setPadding(0,Ui.dp(this,10),0,0);content.addView(actionArea);sourceState=Ui.text(this,"正在检查可读来源…",12,Ui.MUTED,false);sourceState.setPadding(0,Ui.dp(this,8),0,0);content.addView(sourceState);sourceDetails=small("来源与副本 ▾",v->showSourceDetails());sourceDetails.setEnabled(false);content.addView(sourceDetails,new LinearLayout.LayoutParams(-2,-2));loading=new ProgressBar(this);content.addView(loading);chapterArea=new LinearLayout(this);chapterArea.setOrientation(LinearLayout.VERTICAL);content.addView(chapterArea);setContentView(root);root.requestApplyInsets();renderActions();}
+    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);String comicId=getIntent().getStringExtra("comicId");entry=UnifiedCatalogStore.load(this).byId.get(comicId);if(entry==null)entry=new UnifiedCatalogStore.Entry(comicId==null?"":comicId,getIntent().getStringExtra("title"),getIntent().getStringExtra("author"));render();resolveSources();loadWorkVariants();}
+    private void render(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));bar.addView(small("‹ 返回",v->finish()));bar.addView(Ui.text(this,"漫画详情",20,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,16),Ui.dp(this,4),Ui.dp(this,16),Ui.dp(this,28));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout hero=new LinearLayout(this);coverView=new ImageView(this);coverView.setScaleType(ImageView.ScaleType.CENTER_CROP);coverView.setBackgroundColor(Ui.PLACEHOLDER);hero.addView(coverView,new LinearLayout.LayoutParams(Ui.dp(this,116),Ui.dp(this,164)));CoverRepository.load(this,coverView,entry,Ui.PLACEHOLDER);LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,15),0,0,0);TextView title=Ui.text(this,entry.title,20,Ui.TEXT,true);title.setMaxLines(4);copy.addView(title);if(!entry.alternateTitles.isEmpty()){TextView alternate=Ui.text(this,entry.alternateTitles.get(0),11.5f,Ui.MUTED,false);alternate.setMaxLines(2);alternate.setPadding(0,Ui.dp(this,4),0,0);copy.addView(alternate);}TextView author=Ui.text(this,"作者 · "+authorSummary()+"  ›",13,Ui.PRIMARY,true);author.setPadding(0,Ui.dp(this,7),0,Ui.dp(this,5));author.setOnClickListener(v->openAuthors());copy.addView(author);String meta=detailMeta();if(!meta.isEmpty())copy.addView(Ui.text(this,meta,11.5f,Ui.MUTED,false));hero.addView(copy,new LinearLayout.LayoutParams(0,-2,1));content.addView(hero);String tags=tagLine();if(!tags.isEmpty()){TextView t=Ui.text(this,tags,11.5f,Ui.PRIMARY,false);t.setPadding(0,Ui.dp(this,10),0,0);content.addView(t);}if(entry.description!=null&&!entry.description.trim().isEmpty()){TextView desc=Ui.text(this,entry.description.trim(),12,Ui.MUTED,false);desc.setMaxLines(5);desc.setPadding(0,Ui.dp(this,8),0,0);content.addView(desc);}actionArea=new LinearLayout(this);actionArea.setPadding(0,Ui.dp(this,10),0,0);content.addView(actionArea);workVariantToggle=small(LocalizedText.ui(this,"相似作品 · …","Similar works · …","類似作品 · …"),v->toggleWorkVariants());LinearLayout.LayoutParams wtp=new LinearLayout.LayoutParams(-1,-2);wtp.setMargins(0,Ui.dp(this,10),0,0);content.addView(workVariantToggle,wtp);workVariantArea=new LinearLayout(this);workVariantArea.setOrientation(LinearLayout.VERTICAL);workVariantArea.setVisibility(View.GONE);content.addView(workVariantArea);sourceState=Ui.text(this,"正在检查可读来源…",12,Ui.MUTED,false);sourceState.setPadding(0,Ui.dp(this,8),0,0);content.addView(sourceState);sourceDetails=small("来源与副本 ▾",v->showSourceDetails());sourceDetails.setEnabled(false);content.addView(sourceDetails,new LinearLayout.LayoutParams(-2,-2));loading=new ProgressBar(this);content.addView(loading);chapterArea=new LinearLayout(this);chapterArea.setOrientation(LinearLayout.VERTICAL);content.addView(chapterArea);setContentView(root);root.requestApplyInsets();renderActions();}
     private Button button(String text,View.OnClickListener action){return Ui.button(this,text,action,false);}
     private Button small(String text,View.OnClickListener action){return Ui.button(this,text,action,true);}
     private String authorSummary(){List<AuthorConceptStore.Concept> concepts=AuthorConceptStore.build(this).forComic(entry.id);if(concepts.isEmpty())return entry.displayAuthor();ArrayList<String> names=new ArrayList<>();for(AuthorConceptStore.Concept c:concepts){if(!names.contains(c.canonicalName))names.add(c.canonicalName);if(names.size()>=3)break;}return names.isEmpty()?entry.displayAuthor():String.join(" / ",names);}
     private void openAuthors(){Intent i=new Intent(this,AuthorDirectoryActivity.class);i.putExtra("comicId",entry.id);startActivity(i);}
     private String detailMeta(){ArrayList<String> values=new ArrayList<>();if(entry.sourceBindings.contains("pica")||entry.picaAvailable)values.add("Pica");if(entry.sourceBindings.contains("eh"))values.add("E-H");if(entry.sourceBindings.contains("exh"))values.add("ExH");if(values.isEmpty())values.add(EhClient.isEhId(entry.id)?"E-H":"本地");if(!Double.isNaN(entry.rating))values.add("★ "+String.format(Locale.ROOT,"%.2f",entry.rating));if("FINISHED".equals(entry.completionStatus)||entry.finished)values.add("完结");else if("ONGOING".equals(entry.completionStatus))values.add("连载");return String.join(" · ",values);}
     private String tagLine(){if("eh".equals(entry.providerId)||EhClient.isEhId(entry.id)){EhSemanticStore.Record record=EhSemanticStore.get(this,entry.id);if(record!=null&&!record.rawTags.isEmpty()){EhTagTranslationStore tr=EhTagTranslationStore.load(this);ArrayList<String> values=new ArrayList<>();for(EhSemanticStore.Tag tag:record.rawTags){if("language".equals(tag.namespace)||"reclass".equals(tag.namespace))continue;String display=tr.display(tag.namespace,tag.value);if(!values.contains(display))values.add(display);if(values.size()>=6)break;}if(!values.isEmpty())return String.join(" · ",values);}}if(entry.tags.isEmpty())return "";StringBuilder out=new StringBuilder();for(int i=0;i<entry.tags.size()&&i<6;i++){if(i>0)out.append(" · ");out.append(entry.tags.get(i));}return out.toString();}
+    private String workVariantRelation(JSONObject row){
+        String relation=row.optString("relation","");
+        if("CONFIRMED_SAME_EDITION".equals(relation))return LocalizedText.ui(this,"同作品 · 同版本上传","Same work · same edition upload","同一作品 · 同版アップロード");
+        if("CONFIRMED_WORK_VARIANT".equals(relation))return LocalizedText.ui(this,"同作品 · 其他版本","Same work · another edition","同一作品 · 別バージョン");
+        if("ADJUDICATED_EDITION_VARIANT".equals(relation))return LocalizedText.ui(this,"人工确认 · 不同版本","Reviewed · edition variant","レビュー済み · 別バージョン");
+        if("ADJUDICATED_SAME_WORK".equals(relation))return LocalizedText.ui(this,"人工确认 · 同作品","Reviewed · same work","レビュー済み · 同一作品");
+        return LocalizedText.ui(this,"可能是同一作品","Possibly the same work","同一作品の可能性");
+    }
+
+    private void loadWorkVariants(){
+        if(workVariantToggle==null||entry==null)return;
+        final String comicId=entry.id;
+        worker.submit(()->{
+            JSONObject value=WorkVariantResolver.load(this,comicId);
+            runOnUiThread(()->{
+                if(destroyed||entry==null||!comicId.equals(entry.id))return;
+                workVariantPayload=value;
+                int count=value==null?0:value.optInt("count",0);
+                workVariantToggle.setText(LocalizedText.ui(this,"相似作品 · "+count,"Similar works · "+count,"類似作品 · "+count)+(workVariantsExpanded?" ▾":" ▸"));
+                workVariantToggle.setEnabled(count>0);
+                if(workVariantsExpanded)renderWorkVariants();
+            });
+        });
+    }
+
+    private void toggleWorkVariants(){
+        int count=workVariantPayload==null?0:workVariantPayload.optInt("count",0);
+        if(count<=0)return;
+        workVariantsExpanded=!workVariantsExpanded;
+        workVariantArea.setVisibility(workVariantsExpanded?View.VISIBLE:View.GONE);
+        workVariantToggle.setText(LocalizedText.ui(this,"相似作品 · "+count,"Similar works · "+count,"類似作品 · "+count)+(workVariantsExpanded?" ▾":" ▸"));
+        if(workVariantsExpanded)renderWorkVariants();
+    }
+
+    private UnifiedCatalogStore.Entry workVariantEntry(JSONObject row){
+        String id=row.optString("comicId","");
+        UnifiedCatalogStore.Entry cached=UnifiedCatalogStore.load(this).byId.get(id);
+        UnifiedCatalogStore.Entry out=cached==null?new UnifiedCatalogStore.Entry(id,row.optString("title",""),row.optString("author","")):cached;
+        if(cached==null){
+            out.canonicalAuthor=row.optString("canonicalAuthor","");
+            out.providerId=row.optString("providerId",id.startsWith("eh:")?"eh":"pica");
+            out.knownPictures=Math.max(0,row.optInt("knownPictures",row.optInt("pagesCount",0)));
+            out.favorite=row.optBoolean("isFavorite",false);
+            out.desktopDownloadedPictures=Math.max(0,row.optInt("downloadedPictures",0));
+            String coverPath=row.optString("coverPath","");
+            if(!coverPath.isEmpty()){out.desktopCoverPath=coverPath;out.desktopAvailable=true;}
+            String coverUrl=row.optString("coverUrl","");
+            if(!coverUrl.isEmpty()){if("eh".equals(out.providerId))out.ehCoverUrl=coverUrl;else out.picaCoverUrl=coverUrl;}
+        }else{
+            String coverPath=row.optString("coverPath","");
+            if(out.desktopCoverPath.isEmpty()&&!coverPath.isEmpty()){out.desktopCoverPath=coverPath;out.desktopAvailable=true;}
+        }
+        return out;
+    }
+
+    private void renderWorkVariants(){
+        if(workVariantArea==null)return;
+        workVariantArea.removeAllViews();
+        JSONArray items=workVariantPayload==null?null:workVariantPayload.optJSONArray("items");
+        if(items==null||items.length()==0){workVariantArea.setVisibility(View.GONE);return;}
+        workVariantArea.setVisibility(View.VISIBLE);
+        for(int i=0;i<items.length();i++){
+            JSONObject row=items.optJSONObject(i);if(row==null)continue;
+            UnifiedCatalogStore.Entry variant=workVariantEntry(row);
+            LinearLayout card=Ui.card(this);card.setOrientation(LinearLayout.HORIZONTAL);
+            ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(Ui.PLACEHOLDER);
+            LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(Ui.dp(this,72),Ui.dp(this,98));card.addView(cover,cp);CoverRepository.load(this,cover,variant,Ui.PLACEHOLDER);
+            LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,12),0,0,0);
+            TextView title=Ui.text(this,row.optString("title",variant.title),15,Ui.TEXT,true);title.setMaxLines(2);copy.addView(title);
+            String author=row.optString("canonicalAuthor",row.optString("author",variant.displayAuthor()));copy.addView(Ui.text(this,author,11.5f,Ui.MUTED,false));
+            ArrayList<String> meta=new ArrayList<>();int pages=row.optInt("pagesCount",variant.knownPictures);if(pages>0)meta.add(LocalizedText.ui(this,pages+" 页",pages+" pages",pages+" ページ"));meta.add("eh".equals(row.optString("providerId",variant.providerId))?"E-H":"Pica");String editionLanguage=row.optString("editionLanguage",""),editionLabel=row.optString("editionLabel",""),team=row.optString("chineseTeam","");if(!editionLanguage.isEmpty())meta.add(editionLanguage);if(!editionLabel.isEmpty())meta.add(editionLabel);if(!team.isEmpty())meta.add(team);double rating=row.optDouble("rating",Double.NaN);if(!Double.isNaN(rating)&&rating>0)meta.add("★ "+String.format(Locale.ROOT,"%.2f",rating));if(row.optBoolean("isFavorite",variant.favorite))meta.add(LocalizedText.ui(this,"已收藏","Favorited","お気に入り済み"));if(row.optInt("downloadedPictures",variant.desktopDownloadedPictures)>0)meta.add(LocalizedText.ui(this,"已下载","Downloaded","ダウンロード済み"));
+            copy.addView(Ui.text(this,String.join(" · ",meta),11,Ui.MUTED,false));copy.addView(Ui.text(this,workVariantRelation(row),11,Ui.PRIMARY,true));
+            card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+            final UnifiedCatalogStore.Entry target=variant;card.setOnClickListener(v->{Intent intent=new Intent(this,UnifiedComicDetailActivity.class);intent.putExtra("comicId",target.id);intent.putExtra("title",target.title);intent.putExtra("author",target.displayAuthor());startActivity(intent);});
+            workVariantArea.addView(card);
+        }
+    }
+
     private static String ehEpisodeId(String comicId){String[] parts=comicId==null?new String[0]:comicId.split(":",3);return parts.length>=2?"eh-"+parts[1]:"eh-gallery";}
     private static String shortError(Exception e){String value=e.getMessage()==null?"":e.getMessage().trim();if(value.isEmpty())return "暂时无法读取";if(value.contains("HTTP 509"))return "请求过于频繁，请稍后重试";if(value.contains("HTTP 403"))return "站点暂时拒绝访问";return value.length()>64?value.substring(0,64):value;}
 

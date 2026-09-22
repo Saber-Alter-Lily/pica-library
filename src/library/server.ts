@@ -1914,6 +1914,33 @@ export async function startLibraryServer(options: {
                     })
                 )
             }
+            const comicDetailRequest = url.pathname.match(
+                /^\/api\/v1\/comics\/([^/]+)$/
+            )
+            if (comicDetailRequest && request.method === 'GET') {
+                const comic = options.database.getComic(
+                    decodeURIComponent(comicDetailRequest[1])
+                )
+                return json(
+                    response,
+                    comic ? 200 : 404,
+                    comic ?? { error: 'Comic not found' }
+                )
+            }
+
+            const workVariantsRequest = url.pathname.match(
+                /^\/api\/v1\/comics\/([^/]+)\/work-variants$/
+            )
+            if (workVariantsRequest && request.method === 'GET')
+                return json(
+                    response,
+                    200,
+                    options.service.workVariantsForComic(
+                        decodeURIComponent(workVariantsRequest[1]),
+                        Number(url.searchParams.get('limit') ?? 24)
+                    )
+                )
+
             const coverRequest = url.pathname.match(
                 /^\/api\/v1\/covers\/([^/]+)$/
             )

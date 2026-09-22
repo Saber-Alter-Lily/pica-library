@@ -38,6 +38,7 @@ export interface BuiltRecommendationCycleV3 {
 
 interface FrozenCycleServingSnapshotV3 {
     poolId: string
+    ownershipKey: string
     catalog: StoredComic[]
     catalogById: Map<string, StoredComic>
     eligibleRanked: RankedCandidateWithEvidenceV3[]
@@ -45,6 +46,7 @@ interface FrozenCycleServingSnapshotV3 {
     intents: RecommendationIntentV3[]
     favoriteIds: Set<string>
     recentlyDisplayedComicIds: Set<string>
+    servingFilterTelemetry: Record<string, unknown>
 }
 
 interface CoordinatorStateV3 {
@@ -125,30 +127,65 @@ export class CycleCoordinatorV3 {
         pool = this.pool(cycleId)
     ): FrozenCycleServingSnapshotV3 {
         if (!pool) throw new Error('Active V3 candidate pool is unavailable')
-        const existing = this.servingSnapshots.get(cycleId)
-        if (existing?.poolId === pool.id) return existing
         const telemetry = pool.telemetry as {
             intentPlan?: RecommendationIntentV3[]
             rankedCandidates?: Array<
                 Omit<RankedCandidateWithEvidenceV3, 'comic'>
             >
         }
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const ownership = this.database.recommendationOwnershipState()
+        const ownedComicIds = new Set([
+            ...ownership.ownedComicIds,
+            ...policy.ownedComicIds
+        ])
+        const ownershipKey = JSON.stringify({
+            ownedComicIds: [...ownedComicIds].sort(),
+            identityBindingsVersion: ownership.identityBindingsVersion,
+            explicitDistinctPairs: [...policy.explicitDistinctPairs].sort()
+        })
+        const existing = this.servingSnapshots.get(cycleId)
+        if (
+            existing?.poolId === pool.id &&
+            existing.ownershipKey === ownershipKey
+        )
+            return existing
+
         const catalog = this.database.listComics({ limit: 10000 })
         const catalogById = new Map(
             catalog.map((comic) => [comic.comicId, comic])
         )
+        const bindings = this.database.listWorkIdentityBindings(10000)
+        const ownedWorkIds = new Set(
+            bindings
+                .filter((binding) => ownedComicIds.has(binding.comicId))
+                .map((binding) => binding.workId)
+        )
+        const canonicalOwnedComicIds = bindings
+            .filter((binding) => ownedWorkIds.has(binding.workId))
+            .map((binding) => binding.comicId)
+        const servingPolicy = {
+            ...policy,
+            ownedComicIds: [
+                ...new Set([
+                    ...policy.ownedComicIds,
+                    ...canonicalOwnedComicIds
+                ])
+            ]
+        }
         const ranked = (telemetry.rankedCandidates ?? []).flatMap((item) => {
             const comic = catalogById.get(item.comicId)
             return comic ? [{ ...item, comic }] : []
         })
-        const policy = new RecommendationPolicyStoreV5(this.database).state()
-        const eligibleRanked = filterCandidatesAgainstOwnedV5(
+        const serving = filterCandidatesAgainstOwnedV5(
             ranked,
             catalog,
-            policy
-        ).rows
+            servingPolicy
+        )
+        const eligibleRanked = serving.rows
         const snapshot: FrozenCycleServingSnapshotV3 = {
             poolId: pool.id,
+            ownershipKey,
             catalog,
             catalogById,
             eligibleRanked,
@@ -162,7 +199,12 @@ export class CycleCoordinatorV3 {
                     .map((comic) => comic.comicId)
             ),
             recentlyDisplayedComicIds:
-                this.recentlyDisplayedComicIds(cycleId)
+                this.recentlyDisplayedComicIds(cycleId),
+            servingFilterTelemetry: {
+                ...serving.telemetry,
+                canonicalOwnedWorkCount: ownedWorkIds.size,
+                canonicalOwnedUploadCount: canonicalOwnedComicIds.length
+            }
         }
         this.servingSnapshots.set(cycleId, snapshot)
         while (this.servingSnapshots.size > 2) {
@@ -346,7 +388,8 @@ export class CycleCoordinatorV3 {
                 batch.itemIds.length - recommendations.length,
             servingFilterTelemetry: {
                 frozenCycleSnapshot: true,
-                cacheSize: snapshot.eligibleRanked.length
+                cacheSize: snapshot.eligibleRanked.length,
+                ...snapshot.servingFilterTelemetry
             },
             evidence: batch.evidence,
             exhausted,

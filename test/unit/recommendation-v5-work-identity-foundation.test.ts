@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { StoredComic } from '../../src/library/types'
 import { LibraryDatabase } from '../../src/library/database'
+import { LibraryService } from '../../src/library/service'
 import {
     buildWorkIdentityAuditV5,
     buildWorkIdentityMaterializationPlanV5,
@@ -247,6 +248,85 @@ describe('Canonical Work Identity foundation', () => {
         expect(database.listWorkIdentityDecisions()).toHaveLength(0)
         database.close()
         fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('resolves detail work variants read-only and respects keep-separate', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-work-variants-')
+        )
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        try {
+            database.importCatalog(
+                [
+                    {
+                        comicId: 'pica:1',
+                        title: 'Work Title',
+                        author: 'Artist',
+                        tags: [],
+                        categories: [],
+                        finished: true,
+                        pagesCount: 24
+                    },
+                    {
+                        comicId: 'eh:2',
+                        providerId: 'eh',
+                        title: '[Chinese] Work Title',
+                        author: 'Artist',
+                        tags: [],
+                        categories: [],
+                        finished: true,
+                        pagesCount: 25
+                    },
+                    {
+                        comicId: 'pica:3',
+                        title: 'Different Release Name',
+                        author: 'Artist',
+                        tags: [],
+                        categories: [],
+                        finished: true,
+                        pagesCount: 31
+                    }
+                ],
+                'test'
+            )
+            const service = new LibraryService(database, dir)
+            const probable = service.workVariantsForComic('pica:1')
+            expect(probable.count).toBe(1)
+            expect(probable.items[0]).toMatchObject({
+                comicId: 'eh:2',
+                relation: 'PROBABLE_SAME_WORK'
+            })
+
+            database.saveWorkIdentityDecision({
+                leftComicId: 'pica:1',
+                rightComicId: 'pica:3',
+                decision: 'EDITION_VARIANT',
+                source: 'USER'
+            })
+            const adjudicated = service.workVariantsForComic('pica:1')
+            expect(adjudicated.items).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        comicId: 'pica:3',
+                        relation: 'ADJUDICATED_EDITION_VARIANT'
+                    })
+                ])
+            )
+
+            database.saveWorkIdentityDecision({
+                leftComicId: 'pica:1',
+                rightComicId: 'eh:2',
+                decision: 'KEEP_SEPARATE',
+                source: 'USER'
+            })
+            const separated = service.workVariantsForComic('pica:1')
+            expect(
+                separated.items.some((item) => item.comicId === 'eh:2')
+            ).toBe(false)
+        } finally {
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
     })
 
     it('respects an explicit keep-separate override from the existing policy', () => {

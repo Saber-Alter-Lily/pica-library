@@ -7,6 +7,16 @@
 - 面向普通用户，v0.4 系列的公开升级基线按 **v0.4.0 → 当前最新版** 表达：Windows 使用当前 Release 的升级助手一次直达，Android 通过应用内更新链直接原地升级。
 - v0.4.1–v0.4.3 是短周期过渡版本，继续保留在版本历史、兼容测试和发布资产中，但普通用户无需逐个安装，也不作为主页和使用指南的推荐升级路径。
 
+
+## Unreleased — Work 级已拥有排除与版本互链
+
+- Final V3 serving 将“已拥有”提升为最终展示前硬约束：继续排除 exact upload，并把已拥有条目的 Canonical Work binding 展开到同 Work 的其他 upload；收藏/书库/已下载状态变化通过轻量 ownership fingerprint 使 serving cache 失效，不恢复每次切批全量扫描。
+- 增加 Final V3 行为回归：已收藏 Pica upload 与高置信同作品 E-H 版本均不得进入当前推荐批次，剩余新作品仍可正常补足 12 本。
+- 新增只读 `/api/v1/comics/:comicId/work-variants` 与 Mobile Bridge 对应接口；优先使用 Canonical Work/Edition binding 和人工裁决，再以不落盘、不自动绑定的定向高置信 resolver 补充“可能同作品”，`KEEP_SEPARATE` 始终优先。
+- Desktop/Web 与 Android 的作品详情增加可折叠“相似作品 · N”；默认只显示数量，展开后展示封面、标题、作者、页数、来源、版本/语言、收藏/下载及可用评分/汉化信息，并可直接跳转到对应版本详情。
+- Web 书库、已下载、书架、搜索与推荐统一进入同一作品详情；普通详情不再为了打开页面预加载 Visual QC 数据。Android 配对时读取 Desktop 完整关系，离线时仅消费已同步的 confirmed Canonical binding，不在手机本地猜测 probable identity。
+- 本阶段不自动执行 Canonical materialization，不改版本号、不发布 Release。
+
 ## v0.4.8 — 大下载队列运行时稳定性
 
 - Desktop 本地下载 runner 改为单实例；同一进程内重复点击“运行队列”、刷新页面或多个入口同时请求运行时，只复用已有 runner，不再创建竞争 scheduler。

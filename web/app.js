@@ -1358,6 +1358,35 @@ function mountOnlineReadButtons(container) {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-online-comic]')
     if (button && state.mode === 'connected') void openReaderComic(button.dataset.onlineComic, true)
+    const detail = event.target.closest('[data-library-detail]')
+    if (detail) openRecommendationDetail(detail.dataset.libraryDetail, 'library')
+})
+document.addEventListener('pica-open-comic-detail', (event) => {
+    void (async () => {
+        let comic = event.detail?.comic || null
+        const comicId = event.detail?.comicId || comic?.comicId
+        if (!comicId) return
+        if (!comic)
+            comic =
+                state.records.find((item) => item.comicId === comicId) ||
+                state.searchResults
+                    .map((item) => item.comic || item)
+                    .find((item) => item.comicId === comicId) ||
+                state.recommendations
+                    .map((item) => item.comic || item)
+                    .find((item) => item.comicId === comicId) ||
+                null
+        if (!comic && state.mode === 'connected') {
+            try {
+                comic = await api(
+                    `/api/v1/comics/${encodeURIComponent(comicId)}`
+                )
+            } catch {
+                comic = null
+            }
+        }
+        if (comic) openRecommendationDetail(comicId, 'library', comic)
+    })()
 })
 
 function librarySourceBindings(comic) {
@@ -1380,7 +1409,7 @@ function libraryDetails(comic) {
     const sources = librarySourceBindings(comic)
     const replicas = libraryReplicaLabels(comic)
     const status = comic?.completionStatus === 'UNKNOWN' ? t('library.status.unknown') : comic?.completionStatus === 'FINISHED' ? t('library.status.finished') : t('library.status.ongoing')
-    return `<details class="comic-bindings"><summary>${escapeHtml(t('library.bindings.summary'))}</summary><p><strong>${escapeHtml(t('library.bindings.version'))}</strong> · ${escapeHtml(status)}</p><p><strong>${escapeHtml(t('library.bindings.online'))}</strong> · ${escapeHtml(sources.join(' / ') || t('library.bindings.noneSource'))}</p><p><strong>${escapeHtml(t('library.bindings.replicas'))}</strong> · ${escapeHtml(replicas.join(' / ') || t('library.bindings.noneReplica'))}</p></details>`
+    return `<div class="detail-actions"><button type="button" data-library-detail="${escapeHtml(comic.comicId)}">${escapeHtml(t('result.details'))}</button></div><details class="comic-bindings"><summary>${escapeHtml(t('library.bindings.summary'))}</summary><p><strong>${escapeHtml(t('library.bindings.version'))}</strong> · ${escapeHtml(status)}</p><p><strong>${escapeHtml(t('library.bindings.online'))}</strong> · ${escapeHtml(sources.join(' / ') || t('library.bindings.noneSource'))}</p><p><strong>${escapeHtml(t('library.bindings.replicas'))}</strong> · ${escapeHtml(replicas.join(' / ') || t('library.bindings.noneReplica'))}</p></details>`
 }
 
 function renderComics(records = state.records) {
@@ -1465,7 +1494,7 @@ function renderComics(records = state.records) {
         .map(
             (comic) => `<tr data-comic-id="${escapeHtml(comic.comicId)}" data-is-favorite="${comic.isFavorite ? 'true' : 'false'}">
                 <td><input type="checkbox" data-selection-context="library" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.library.has(comic.comicId) ? 'checked' : ''} /></td>
-                <td><strong>${escapeHtml(comic.title)}</strong></td>
+                <td><strong>${escapeHtml(comic.title)}</strong><br><button type="button" data-library-detail="${escapeHtml(comic.comicId)}">${escapeHtml(t('result.details'))}</button></td>
                 <td>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknown'))}</td>
                 <td>${tagsFor(comic)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)
@@ -2181,25 +2210,117 @@ $('#preview-cache-clear').onclick = async (event) => {
 }
 
 function recommendationRecord(comicId, context) {
+    const dialog = $('#recommend-detail-dialog')
+    if (
+        dialog?.dataset.comicId === comicId &&
+        dialog._comicRecord?.comicId === comicId
+    )
+        return dialog._comicRecord
     const source =
-        context === 'search' ? state.searchResults : state.recommendations
+        context === 'library'
+            ? state.records
+            : context === 'search'
+              ? state.searchResults
+              : state.recommendations
     const item = source.find(
         (candidate) => (candidate.comic || candidate).comicId === comicId
     )
     return item?.comic || item
 }
 
-function openRecommendationDetail(comicId, context = 'recommendation') {
-    const comic = recommendationRecord(comicId, context)
+function workVariantRelationLabel(item) {
+    const relation = String(item?.relation || '')
+    if (relation.startsWith('CONFIRMED_'))
+        return t('workVariants.confirmed')
+    if (relation === 'ADJUDICATED_EDITION_VARIANT')
+        return t('workVariants.editionVariant')
+    if (relation === 'ADJUDICATED_SAME_WORK')
+        return t('workVariants.adjudicated')
+    return t('workVariants.probable')
+}
+
+function renderWorkVariantList(panel) {
+    const value = panel?._workVariantPayload
+    const target = panel?.querySelector('[data-work-variants-list]')
+    if (!target || !value) return
+    const items = Array.isArray(value.items) ? value.items : []
+    target.innerHTML = items.length
+        ? items
+              .map((item) => {
+                  const meta = [
+                      Number(item.pagesCount || 0) > 0
+                          ? t('workVariants.pages', {
+                                count: Number(item.pagesCount || 0)
+                            })
+                          : '',
+                      item.providerId === 'eh' ? 'E-H' : 'Pica',
+                      item.editionLanguage || '',
+                      item.editionLabel || '',
+                      item.chineseTeam || '',
+                      Number(item.rating || 0) > 0
+                          ? `★ ${Number(item.rating).toFixed(2)}`
+                          : '',
+                      item.isFavorite ? t('workVariants.favorite') : '',
+                      Number(item.downloadedPictures || 0) > 0
+                          ? t('workVariants.downloaded')
+                          : ''
+                  ]
+                      .filter(Boolean)
+                      .join(' · ')
+                  const cover = item.coverPath
+                      ? `<img src="${escapeHtml(item.coverPath)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
+                      : '<span aria-hidden="true">P</span>'
+                  return `<article class="work-variant-card" data-work-variant-card="${escapeHtml(item.comicId)}">
+                      <div class="work-variant-cover">${cover}</div>
+                      <div class="work-variant-copy">
+                          <strong>${escapeHtml(item.title || item.comicId)}</strong>
+                          <span>${escapeHtml(item.canonicalAuthor || item.author || t('common.unknownAuthor'))}</span>
+                          <small>${escapeHtml(meta)}</small>
+                          <small>${escapeHtml(workVariantRelationLabel(item))}</small>
+                          <button type="button" data-work-variant-open="${escapeHtml(item.comicId)}">${escapeHtml(t('workVariants.open'))}</button>
+                      </div>
+                  </article>`
+              })
+              .join('')
+        : `<p class="status">${escapeHtml(t('workVariants.empty'))}</p>`
+}
+
+async function loadWorkVariantsForDetail(comicId) {
+    const panel = $('#work-variants-panel')
+    if (!panel) return
+    const summary = panel.querySelector('summary')
+    try {
+        const value =
+            state.mode === 'connected'
+                ? await api(
+                      `/api/v1/comics/${encodeURIComponent(comicId)}/work-variants?limit=24`
+                  )
+                : { count: 0, items: [] }
+        if ($('#recommend-detail-dialog')?.dataset.comicId !== comicId) return
+        panel._workVariantPayload = value
+        summary.textContent = t('workVariants.summary', {
+            count: Number(value.count || 0)
+        })
+        panel.toggleAttribute('data-empty', Number(value.count || 0) === 0)
+        if (panel.open) renderWorkVariantList(panel)
+    } catch {
+        summary.textContent = t('workVariants.summary', { count: 0 })
+        panel._workVariantPayload = { count: 0, items: [] }
+    }
+}
+
+function openRecommendationDetail(comicId, context = 'recommendation', comicOverride = null) {
+    const comic = comicOverride || recommendationRecord(comicId, context)
     if (!comic) return
     const dialog = $('#recommend-detail-dialog')
     dialog.dataset.comicId = comicId
     dialog.dataset.context = context
+    dialog._comicRecord = comic
     dialog.dataset.previewOffset = '0'
     $('#recommend-preview').innerHTML = ''
     $('#recommend-preview-message').textContent = ''
     $('#recommend-detail-content').innerHTML =
-        `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${state.capabilities?.features?.providerFavoriteMutation ? `<button data-detail-favorite="true">${t('result.favorite')}</button>` : ''}<button data-detail-download="true">${t('action.download')}</button></div>`
+        `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${state.capabilities?.features?.providerFavoriteMutation ? `<button data-detail-favorite="true">${t('result.favorite')}</button>` : ''}<button data-detail-download="true">${t('action.download')}</button></div><details id="work-variants-panel" class="work-variants-panel"><summary>${escapeHtml(t('workVariants.loading'))}</summary><div data-work-variants-list></div></details>`
     if (state.mode === 'connected') {
         const button = document.createElement('button')
         button.dataset.detailOnline = 'true'
@@ -2213,7 +2334,13 @@ function openRecommendationDetail(comicId, context = 'recommendation') {
         styleButton.textContent = t('visual.similarStyle')
         $('#recommend-detail-content .detail-actions').append(styleButton)
     }
-    dialog.showModal()
+    const variantsPanel = $('#work-variants-panel')
+    if (variantsPanel)
+        variantsPanel.addEventListener('toggle', () => {
+            if (variantsPanel.open) renderWorkVariantList(variantsPanel)
+        })
+    if (!dialog.open) dialog.showModal()
+    void loadWorkVariantsForDetail(comicId)
     recordRecommendationEvent(
         context === 'search' ? 'search_result_open' : 'recommend_detail_open',
         {
@@ -2305,6 +2432,12 @@ $('#recommend-detail-dialog').onclick = async (event) => {
                 error
             )
         }
+    }
+    else if (event.target.dataset.workVariantOpen) {
+        const id = event.target.dataset.workVariantOpen
+        const payload = $('#work-variants-panel')?._workVariantPayload
+        const item = (payload?.items || []).find((row) => row.comicId === id)
+        if (item) openRecommendationDetail(id, 'work-variant', item)
     }
     else if (event.target.dataset.detailPreviewMore)
         await loadRecommendationPreview(

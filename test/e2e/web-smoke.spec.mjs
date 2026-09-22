@@ -143,9 +143,13 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
     await expect(page.locator('#recommend-detail-content h2')).toHaveText(
         'Variant title'
     )
-    await expect(
-        page.locator('#recommend-detail-content [data-detail-favorite]')
-    ).toBeDisabled()
+    expect(
+        await page.evaluate(
+            () =>
+                document.querySelector('#recommend-detail-dialog')
+                    ?._comicRecord?.isFavorite
+        )
+    ).toBe(true)
     await page.locator('#recommend-detail-close').click()
 
     const help = page.locator('#library .info-tip').first()

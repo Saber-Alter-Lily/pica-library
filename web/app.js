@@ -1361,6 +1361,11 @@ document.addEventListener('click', (event) => {
     const detail = event.target.closest('[data-library-detail]')
     if (detail) openRecommendationDetail(detail.dataset.libraryDetail, 'library')
 })
+document.addEventListener('pica-open-comic-detail', (event) => {
+    const comic = event.detail?.comic
+    const comicId = event.detail?.comicId || comic?.comicId
+    if (comicId) openRecommendationDetail(comicId, 'library', comic || null)
+})
 
 function librarySourceBindings(comic) {
     const values = []

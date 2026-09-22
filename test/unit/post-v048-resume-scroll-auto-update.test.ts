@@ -47,6 +47,7 @@ describe('post-v0.4.8 mobile resume, preference scroll and update notices', () =
         expect(app).toContain('async function maybePromptForUpdate()')
         expect(app).toContain("api('/api/v1/update/check')")
         expect(app).toContain("askConfirm(t('update.availablePrompt'")
+        expect(app).toContain(".a87-hub-nav button[data-hub-panel=\"software\"]")
         expect(app).toContain("$('#settings-update')?.scrollIntoView")
         expect(app).toContain('setTimeout(() => void maybePromptForUpdate(), 1400)')
         expect(app).not.toContain('maybePromptForUpdate().then(applyStagedUpdate')

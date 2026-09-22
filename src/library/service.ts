@@ -1733,11 +1733,10 @@ export class LibraryService {
                 // If no comparable cover exists, keep only stronger creator-
                 // scoped metadata candidates visible as "possibly same work".
                 // If a comparable cover exists and disagrees, do not surface it.
-                const minimumWithoutCover = item.evidence.creatorMatch
-                    ? 0.8
-                    : 0.86
+                const minimumWithoutCover = 0.8
                 if (
                     !comparableCover &&
+                    item.evidence.creatorMatch &&
                     item.evidence.confidence >= minimumWithoutCover
                 )
                     add(

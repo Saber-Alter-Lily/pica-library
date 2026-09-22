@@ -2233,6 +2233,11 @@ function renderWorkVariantList(panel) {
                           : '',
                       item.providerId === 'eh' ? 'E-H' : 'Pica',
                       item.editionLanguage || '',
+                      item.editionLabel || '',
+                      item.chineseTeam || '',
+                      Number(item.rating || 0) > 0
+                          ? `★ ${Number(item.rating).toFixed(2)}`
+                          : '',
                       item.isFavorite ? t('workVariants.favorite') : '',
                       Number(item.downloadedPictures || 0) > 0
                           ? t('workVariants.downloaded')

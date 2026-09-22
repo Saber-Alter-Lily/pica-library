@@ -52,6 +52,7 @@ final class AutoUpdatePrompt {
         long now=System.currentTimeMillis();
         if(prefs.getInt("lastPromptedVersionCode",-1)==code&&now-prefs.getLong("lastPromptedAt",0)<PROMPT_INTERVAL_MS)return;
         prefs.edit().putInt("lastPromptedVersionCode",code).putLong("lastPromptedAt",now).apply();
+        ((android.app.NotificationManager)activity.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(0x55410001);
         String version=(versionName==null||versionName.trim().isEmpty())?("v"+code):versionName.trim();
         new AlertDialog.Builder(activity)
             .setTitle(LocalizedText.ui(activity,"发现新版本","Update available","新しいバージョンがあります"))

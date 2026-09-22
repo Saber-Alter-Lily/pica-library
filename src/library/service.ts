@@ -331,18 +331,13 @@ export class LibraryService {
     private recommendationBuildCycleId: string | null = null
 
     private allComicsForIdentity(): StoredComic[] {
-        const catalog: StoredComic[] = []
-        for (let offset = 0; ; ) {
-            const page = this.database.listComics({
-                limit: 5000,
-                offset,
+        return this.database.listComics(
+            {
+                limit: Number.MAX_SAFE_INTEGER,
                 sort: 'latest'
-            })
-            catalog.push(...page)
-            if (page.length < 5000) break
-            offset += page.length
-        }
-        return catalog
+            },
+            Number.MAX_SAFE_INTEGER
+        )
     }
 
     recommendationBuildProgress() {

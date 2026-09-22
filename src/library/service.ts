@@ -1577,9 +1577,13 @@ export class LibraryService {
                     String(a.title || '').localeCompare(String(b.title || ''))
             )
             .slice(0, bounded)
-        const confirmedCount = items.filter((item) =>
-            String(item.relation).startsWith('CONFIRMED_')
-        ).length
+        const confirmedCount = items.filter((item) => {
+            const relation = String(item.relation)
+            return (
+                relation.startsWith('CONFIRMED_') ||
+                relation.startsWith('ADJUDICATED_')
+            )
+        }).length
         return {
             comicId: id,
             count: items.length,

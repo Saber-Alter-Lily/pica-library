@@ -248,13 +248,27 @@ export function workIdentityKeys(comic: WorkIdentityComicV2) {
     ].filter(Boolean)
     const creatorAliases: string[] = []
     const expandedTitles: string[] = []
-    for (const raw of rawTitles) {
+    const trustedCoreTitles: string[] = []
+
+    rawTitles.forEach((raw, index) => {
         const value = String(raw)
         expandedTitles.push(value)
         const credit = leadingCreatorCredit(value)
         creatorAliases.push(...credit.creatorAliases)
         if (credit.stripped !== value) expandedTitles.push(credit.stripped)
-    }
+
+        // A provider-supplied alternate title or an explicit creator-credit
+        // title is stronger than generic upload-noise stripping. Its cleaned
+        // core may bridge language/provider naming even when page count is not
+        // available. A plain primary title such as "[Chinese] Work Title"
+        // does NOT enter this set.
+        if (index > 0 || credit.creatorAliases.length > 0) {
+            const core = stripUploadNoise(
+                normalizeTitleStrict(credit.stripped)
+            )
+            if (core) trustedCoreTitles.push(core)
+        }
+    })
 
     const strictTitles = uniqueNormalized(
         expandedTitles.map(normalizeTitleStrict)
@@ -276,6 +290,7 @@ export function workIdentityKeys(comic: WorkIdentityComicV2) {
         looseTitle: looseTitles[0] ?? '',
         strictTitles,
         looseTitles,
+        trustedCoreTitles: uniqueNormalized(trustedCoreTitles),
         pages: Math.max(0, Number(comic.pagesCount ?? 0) || 0)
     }
 }
@@ -297,6 +312,7 @@ export interface WorkIdentitySignalsV2 {
     authorAliasMatch: boolean
     authorsCompatible: boolean
     strictTitleMatch: boolean
+    trustedCoreTitleMatch: boolean
     looseTitleMatch: boolean
     pageCountCompatible: boolean
 }
@@ -311,12 +327,28 @@ export function workIdentitySignalsV2(
         a.authorId && b.authorId && a.authorId === b.authorId
     )
     const authorAliasMatch = intersects(a.authorAliases, b.authorAliases)
+    const strictTitleMatch = intersects(a.strictTitles, b.strictTitles)
+    const looseTitleMatch = intersects(a.looseTitles, b.looseTitles)
+    const trustedCoreTitleMatch =
+        a.trustedCoreTitles.some(
+            (title) =>
+                b.strictTitles.includes(title) ||
+                b.looseTitles.includes(title) ||
+                b.trustedCoreTitles.includes(title)
+        ) ||
+        b.trustedCoreTitles.some(
+            (title) =>
+                a.strictTitles.includes(title) ||
+                a.looseTitles.includes(title) ||
+                a.trustedCoreTitles.includes(title)
+        )
     return {
         authorIdMatch,
         authorAliasMatch,
         authorsCompatible: authorIdMatch || authorAliasMatch,
-        strictTitleMatch: intersects(a.strictTitles, b.strictTitles),
-        looseTitleMatch: intersects(a.looseTitles, b.looseTitles),
+        strictTitleMatch,
+        trustedCoreTitleMatch,
+        looseTitleMatch,
         pageCountCompatible: closePageCount(a.pages, b.pages)
     }
 }
@@ -345,12 +377,19 @@ export function workIdentityEvidenceV5(
                     ? 'same title alias and canonical author identity'
                     : 'same title alias and author alias'
         }
-    if (signals.authorsCompatible && signals.looseTitleMatch)
+    if (signals.authorsCompatible && signals.trustedCoreTitleMatch)
         return {
             relation: 'HIGH_CONFIDENCE_WORK',
-            reason: signals.pageCountCompatible
-                ? 'same normalized core title alias/author with compatible page count'
-                : 'same normalized core title alias and author identity'
+            reason: 'provider alternate/credit title alias matches with author identity'
+        }
+    if (
+        signals.authorsCompatible &&
+        signals.looseTitleMatch &&
+        signals.pageCountCompatible
+    )
+        return {
+            relation: 'HIGH_CONFIDENCE_WORK',
+            reason: 'same normalized core title/author with compatible page count'
         }
 
     const a = workIdentityKeys(left)

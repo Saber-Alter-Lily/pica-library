@@ -568,7 +568,21 @@ function a88Bootstrap() {
             return
         }
         const detail = event.target.closest?.('[data-a88-details]')
-        if (detail) void a88OpenDetail(detail.dataset.a88Details)
+        if (detail) {
+            event.preventDefault()
+            event.stopImmediatePropagation()
+            void a88LoadDataset().then(() => {
+                const comicId = detail.dataset.a88Details
+                document.dispatchEvent(
+                    new CustomEvent('pica-open-comic-detail', {
+                        detail: {
+                            comicId,
+                            comic: a88State.comicsById.get(comicId) || null
+                        }
+                    })
+                )
+            })
+        }
     }, true)
 }
 

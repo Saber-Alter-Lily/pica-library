@@ -15,8 +15,10 @@ final class NativeRecommendationJobs {
     }
     static void enqueue(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.KEEP,request());}
     static void refresh(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.REPLACE,request());}
-    static void pause(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,true);}
-    static void resume(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.KEEP,request());}
-    static void cancel(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
+    static void pause(Context context){MobileTaskPauseStore.putBoolean(context,"recommendation",UNIQUE_NAME,"pauseAck",false);MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,true);}
+    static void resume(Context context){MobileTaskPauseStore.putBoolean(context,"recommendation",UNIQUE_NAME,"pauseAck",false);MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.KEEP,request());}
+    static void cancel(Context context){MobileTaskPauseStore.putBoolean(context,"recommendation",UNIQUE_NAME,"pauseAck",false);MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
     static boolean paused(Context context){return MobileTaskPauseStore.isPaused(context,"recommendation",UNIQUE_NAME);}
+    static boolean pauseAcknowledged(Context context){return MobileTaskPauseStore.getBoolean(context,"recommendation",UNIQUE_NAME,"pauseAck",false);}
+    static void acknowledgePause(Context context,boolean value){MobileTaskPauseStore.putBoolean(context,"recommendation",UNIQUE_NAME,"pauseAck",value);}
 }

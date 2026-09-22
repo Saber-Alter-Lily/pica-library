@@ -57,6 +57,8 @@ $name = if ($version -eq '0.2.0') {
     'Pica-Library-v0.4.9-windows-x64'
 } elseif ($version -eq '0.4.10') {
     'Pica-Library-v0.4.10-windows-x64'
+} elseif ($version -eq '0.4.11') {
+    'Pica-Library-v0.4.11-windows-x64'
 } elseif ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {
@@ -156,7 +158,7 @@ if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework comp
 & $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll "/out:$stage\Pica Library.exe" (Join-Path $root 'packaging\windows\Launcher.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 
-if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10')) {
+if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10','0.4.11')) {
     $baseZip = if ($version -eq '0.2.0-dev.1') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
     } elseif ($version -eq '0.2.0-dev.2') {
@@ -213,6 +215,8 @@ if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','
         Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.8-windows-x64.zip'
     } elseif ($version -eq '0.4.10') {
         Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.9-windows-x64.zip'
+    } elseif ($version -eq '0.4.11') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.10-windows-x64.zip'
     }
     if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
     if ($version -eq '0.3.12' -and (Get-Sha256 $baseZip) -ne '0356f2c81259c1d8c43022be7be03232c376eb469242b8e41480f6c5f2e4e660') {
@@ -257,6 +261,9 @@ if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','
     if ($version -eq '0.4.10' -and (Get-Sha256 $baseZip) -ne '862570ee4517453da594a21e937b6d8ebc6114df6724ac3976457fa38f544941') {
         throw 'The v0.4.9 official base package checksum does not match'
     }
+    if ($version -eq '0.4.11' -and (Get-Sha256 $baseZip) -ne '6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab') {
+        throw 'The v0.4.10 official base package checksum does not match'
+    }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [IO.Compression.ZipFile]::OpenRead($baseZip)
     try {
@@ -265,7 +272,7 @@ if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','
         if (-not $baseSourceEntry -or -not $baseLauncherEntry) { throw 'The dev.0 package is missing launcher provenance' }
         $reader = New-Object IO.StreamReader($baseSourceEntry.Open())
         try { $baseSourceSha = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
-        if ($version -in @('0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10')) {
+        if ($version -in @('0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10','0.4.11')) {
             # Stable packages intentionally store opaque public provenance rather than private Git SHAs.
             # Verify the launcher source itself is still byte-identical before reusing the accepted launcher binary.
             $launcherBlob = (git -C $root hash-object 'packaging/windows/Launcher.cs').Trim()

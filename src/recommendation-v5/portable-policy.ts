@@ -345,14 +345,12 @@ export function workIdentityEvidenceV5(
                     ? 'same title alias and canonical author identity'
                     : 'same title alias and author alias'
         }
-    if (
-        signals.authorsCompatible &&
-        signals.looseTitleMatch &&
-        signals.pageCountCompatible
-    )
+    if (signals.authorsCompatible && signals.looseTitleMatch)
         return {
             relation: 'HIGH_CONFIDENCE_WORK',
-            reason: 'same normalized core title alias/author with compatible page count'
+            reason: signals.pageCountCompatible
+                ? 'same normalized core title alias/author with compatible page count'
+                : 'same normalized core title alias and author identity'
         }
 
     const a = workIdentityKeys(left)

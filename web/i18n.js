@@ -519,7 +519,7 @@ export const translations = {
             'The update package is verified and staged. Confirm to update and restart.',
         'update.checking': 'Checking the official stable release…',
         'update.current': 'You already have the latest version.',
-        'update.availablePrompt': 'Pica Library v{version} is available. Open Software Update now?'
+        'update.availablePrompt': 'Pica Library v{version} is available. Open Software Update now?',
         'update.fullFound':
             'Found v{version}. This update requires the full Windows package.',
         'update.fullGuide':
@@ -1281,7 +1281,7 @@ export const translations = {
         'update.staged': '更新包已验证并暂存。确认后可更新并重启。',
         'update.checking': '正在检查官方稳定版本…',
         'update.current': '当前已是最新版本。',
-        'update.availablePrompt': '发现 Pica Library v{version} 更新。现在打开“软件更新”查看并安装吗？'
+        'update.availablePrompt': '发现 Pica Library v{version} 更新。现在打开“软件更新”查看并安装吗？',
         'update.fullFound': '发现 v{version}。本次需要完整 Windows 程序包。',
         'update.fullGuide':
             '<strong>发现 v{version}：本次需要完整 Windows 程序包升级。</strong><span class="full-install-note">这是一次程序文件替换，个人漫画库数据与程序目录分开保存。</span><ol><li><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">下载 Pica-Library-v{version}-windows-x64.zip</a>。</li><li>先完全退出 Pica Library，再处理旧程序目录。</li><li>推荐把 ZIP 解压到新文件夹后直接运行；也可以在旧版退出后，用新程序文件替换旧程序目录。</li><li><strong>不要删除 <code>%LOCALAPPDATA%\\Pica Library</code>。</strong>数据库、书架、历史、设置、账号凭据和已下载内容都保存在这里；不需要卸载，也不需要重新导入。</li></ol><div class="full-install-actions"><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">下载 Windows 完整包</a><a href="{releaseUrl}" target="_blank" rel="noopener noreferrer">查看 Release 与校验值</a></div>',

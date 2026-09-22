@@ -8,13 +8,13 @@ describe('account onboarding distribution candidate', () => {
             'mobile/android-alpha2/app/build.gradle',
             'utf8'
         )
-        expect(pkg.version).toBe('0.4.10')
+        expect(pkg.version).toBe('0.4.11')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '53'"
+            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '54'"
         )
         expect(gradle).toContain('versionCode buildVersionCode')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.10'"
+            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.11'"
         )
         expect(gradle).toContain('versionName buildVersionName')
     })
@@ -24,7 +24,7 @@ describe('account onboarding distribution candidate', () => {
             'scripts/build-windows-package.ps1',
             'utf8'
         )
-        expect(script).toContain("$version -eq '0.4.10'")
+        expect(script).toContain("$version -eq '0.4.11'")
         expect(script).toContain(
             'artifacts\\release-base\\Pica-Library-v0.4.9-windows-x64.zip'
         )

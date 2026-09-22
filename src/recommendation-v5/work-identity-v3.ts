@@ -108,8 +108,19 @@ export function workIdentityTitleSimilarityV3(
         .filter(Boolean)
     let best = 0
     for (const x of a)
-        for (const y of b)
+        for (const y of b) {
             best = Math.max(best, editSimilarity(x, y), diceSimilarity(x, y))
+            if (
+                x.length >= 4 &&
+                y.length >= 4 &&
+                (x.includes(y) || y.includes(x))
+            ) {
+                const ratio =
+                    Math.min(x.length, y.length) /
+                    Math.max(x.length, y.length)
+                best = Math.max(best, 0.86 + 0.14 * ratio)
+            }
+        }
     return best
 }
 

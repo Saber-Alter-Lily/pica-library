@@ -1,11 +1,7 @@
 name: v0.4.7 Formal Release
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'package.json'
-      - '.github/workflows/v047-release.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write

@@ -155,7 +155,8 @@ import {
     normalizePreferenceKey,
     preferenceAdjustmentV5,
     workIdentityEvidenceV5,
-    workIdentityKeys
+    workIdentityKeys,
+    workIdentitySignalsV2
 } from '../recommendation-v5/portable-policy'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 import {
@@ -1428,7 +1429,8 @@ export class LibraryService {
             otherId: string,
             relation: string,
             confidence: number,
-            binding = bindingByComic.get(otherId) ?? null
+            binding = bindingByComic.get(otherId) ?? null,
+            extraEvidence: Record<string, unknown> = {}
         ) => {
             if (!otherId || otherId === id) return
             const comic = catalogById.get(otherId)
@@ -1477,7 +1479,8 @@ export class LibraryService {
                 downloadedPictures: Number(comic.downloadedPictures || 0),
                 knownPictures: Number(comic.knownPictures || 0),
                 inLibrary: Boolean(comic.inLibrary),
-                coverPath: `/api/v1/covers/${encodeURIComponent(comic.comicId)}`
+                coverPath: `/api/v1/covers/${encodeURIComponent(comic.comicId)}`,
+                identityEvidence: extraEvidence
             })
         }
 
@@ -1541,6 +1544,7 @@ export class LibraryService {
         // writing identity evidence or promoting a probable match into Canonical bindings.
         const policy = new RecommendationPolicyStoreV5(this.database).state()
         const currentKeys = workIdentityKeys(current)
+        const coverBridgeCandidates: StoredComic[] = []
         for (const other of catalog) {
             if (other.comicId === id || rows.has(other.comicId)) continue
             const pairKey = [id, other.comicId].sort().join('\u0000')
@@ -1551,18 +1555,89 @@ export class LibraryService {
                 other,
                 policy.explicitDistinctPairs
             )
-            if (identity.relation !== 'HIGH_CONFIDENCE_WORK') continue
-            const otherKeys = workIdentityKeys(other)
-            const strict =
-                Boolean(currentKeys.strictTitle) &&
-                currentKeys.strictTitle === otherKeys.strictTitle &&
-                Boolean(currentKeys.author) &&
-                currentKeys.author === otherKeys.author
-            add(
-                other.comicId,
-                'PROBABLE_SAME_WORK',
-                strict ? 0.99 : 0.94
+            const signals = workIdentitySignalsV2(current, other)
+            if (identity.relation === 'HIGH_CONFIDENCE_WORK') {
+                add(
+                    other.comicId,
+                    'PROBABLE_SAME_WORK',
+                    signals.strictTitleMatch ? 0.99 : 0.94
+                )
+                continue
+            }
+            // Cover Identity is deliberately an auxiliary bridge, not a
+            // replacement for Work Identity. Only compare covers when there
+            // is at least one independent metadata support signal.
+            if (
+                signals.authorsCompatible ||
+                signals.pageCountCompatible ||
+                signals.strictTitleMatch ||
+                signals.looseTitleMatch
             )
+                coverBridgeCandidates.push(other)
+        }
+
+        if (coverBridgeCandidates.length) {
+            const requestedIds = [
+                id,
+                ...coverBridgeCandidates.map((comic) => comic.comicId)
+            ]
+            const coverEmbeddings = this.database
+                .listVisualEmbeddings(requestedIds)
+                .filter((embedding) => embedding.embeddingKind === 'cover')
+            const latestCover = new Map<
+                string,
+                (typeof coverEmbeddings)[number]
+            >()
+            for (const embedding of coverEmbeddings) {
+                const existing = latestCover.get(embedding.comicId)
+                if (
+                    !existing ||
+                    String(embedding.generatedAt) >
+                        String(existing.generatedAt)
+                )
+                    latestCover.set(embedding.comicId, embedding)
+            }
+            const currentCover = latestCover.get(id)
+            if (currentCover) {
+                for (const other of coverBridgeCandidates) {
+                    if (rows.has(other.comicId)) continue
+                    const otherCover = latestCover.get(other.comicId)
+                    if (
+                        !otherCover ||
+                        otherCover.modelId !== currentCover.modelId ||
+                        otherCover.modelVersion !== currentCover.modelVersion ||
+                        otherCover.dimension !== currentCover.dimension
+                    )
+                        continue
+                    const similarity = cosineSimilarity(
+                        currentCover.vector,
+                        otherCover.vector
+                    )
+                    if (!Number.isFinite(similarity) || similarity < 0.995)
+                        continue
+                    const signals = workIdentitySignalsV2(current, other)
+                    add(
+                        other.comicId,
+                        'PROBABLE_SAME_WORK',
+                        Math.min(
+                            0.985,
+                            0.95 +
+                                (similarity - 0.995) * 3 +
+                                (signals.authorsCompatible ? 0.015 : 0) +
+                                (signals.pageCountCompatible ? 0.01 : 0)
+                        ),
+                        undefined,
+                        {
+                            coverIdentitySimilarity: similarity,
+                            coverIdentityModel:
+                                currentCover.modelId +
+                                '@' +
+                                currentCover.modelVersion,
+                            coverIdentityAuxiliaryOnly: true
+                        }
+                    )
+                }
+            }
         }
 
         const items = [...rows.values()]

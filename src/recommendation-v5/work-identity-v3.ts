@@ -188,20 +188,20 @@ export function workIdentityDetailEvidenceV3(
 
     if (
         signals.authorsCompatible &&
-        (fuzzy >= 0.68 || (signals.pageCountCompatible && fuzzy >= 0.58))
+        (fuzzy >= 0.68 || signals.pageCountCompatible)
     )
         return {
             relation: 'REVIEW_CANDIDATE',
             confidence: Math.min(
                 0.92,
-                0.68 +
-                    Math.max(0, fuzzy - 0.58) * 0.65 +
-                    (signals.pageCountCompatible ? 0.05 : 0)
+                0.6 +
+                    Math.max(0, fuzzy - 0.45) * 0.7 +
+                    (signals.pageCountCompatible ? 0.06 : 0)
             ),
             stage: 'CREATOR_TITLE_FUZZY',
             creatorMatch: true,
             creatorMatchKind,
-            titleMatch: 'FUZZY',
+            titleMatch: fuzzy >= 0.5 ? 'FUZZY' : 'NONE',
             titleSimilarity: fuzzy,
             pageCountCompatible: signals.pageCountCompatible
         }

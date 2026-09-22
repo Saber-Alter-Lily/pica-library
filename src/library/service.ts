@@ -1385,6 +1385,175 @@ export class LibraryService {
         return buildBehaviorEvidenceLedgerV5(events, catalog, state)
     }
 
+    workVariantsForComic(comicId: string, limit = 24) {
+        const id = String(comicId ?? '').trim()
+        const bounded = Math.max(1, Math.min(48, Math.floor(limit)))
+        const catalog = this.database.listComics({ limit: 10000 })
+        const catalogById = new Map(catalog.map((comic) => [comic.comicId, comic] as const))
+        const current = catalogById.get(id)
+        if (!id || !current)
+            return {
+                comicId: id,
+                count: 0,
+                confirmedCount: 0,
+                probableCount: 0,
+                workId: null,
+                editionId: null,
+                items: []
+            }
+
+        const bindings = this.database.listWorkIdentityBindings(10000)
+        const bindingByComic = new Map(
+            bindings.map((binding) => [binding.comicId, binding] as const)
+        )
+        const currentBinding = bindingByComic.get(id) ?? null
+        const decisions = this.database.listWorkIdentityDecisions(5000)
+        const decisionByPair = new Map(
+            decisions.map((item) => [
+                [item.leftComicId, item.rightComicId].sort().join('\u0000'),
+                item
+            ] as const)
+        )
+        const rows = new Map<string, Record<string, unknown>>()
+        const relationPriority: Record<string, number> = {
+            CONFIRMED_SAME_EDITION: 0,
+            CONFIRMED_WORK_VARIANT: 1,
+            ADJUDICATED_EDITION_VARIANT: 2,
+            ADJUDICATED_SAME_WORK: 3,
+            PROBABLE_SAME_WORK: 4
+        }
+        const add = (
+            otherId: string,
+            relation: string,
+            confidence: number,
+            binding = bindingByComic.get(otherId) ?? null
+        ) => {
+            if (!otherId || otherId === id) return
+            const comic = catalogById.get(otherId)
+            if (!comic) return
+            const pairKey = [id, otherId].sort().join('\u0000')
+            const decision = decisionByPair.get(pairKey)
+            if (decision?.decision === 'KEEP_SEPARATE') return
+            const existing = rows.get(otherId)
+            const existingPriority = existing
+                ? relationPriority[String(existing.relation)] ?? 99
+                : 99
+            const nextPriority = relationPriority[relation] ?? 99
+            if (existing && existingPriority <= nextPriority) return
+            rows.set(otherId, {
+                comicId: comic.comicId,
+                relation,
+                confidence,
+                workId: binding?.workId ?? null,
+                editionId: binding?.editionId ?? null,
+                editionLabel: binding?.editionLabel ?? '',
+                editionLanguage: binding?.editionLanguage ?? null,
+                editionKind: binding?.editionKind ?? null,
+                title: comic.title,
+                alternateTitles: comic.alternateTitles ?? [],
+                author: comic.author,
+                canonicalAuthor: comic.canonicalAuthor,
+                pagesCount:
+                    Number(comic.pagesCount || 0) ||
+                    Number(comic.knownPictures || 0),
+                providerId:
+                    comic.providerId ||
+                    (comic.comicId.startsWith('eh:') ? 'eh' : 'pica'),
+                rating:
+                    Number.isFinite(Number(comic.rating))
+                        ? Number(comic.rating)
+                        : null,
+                chineseTeam: comic.chineseTeam ?? '',
+                isFavorite: Boolean(comic.isFavorite),
+                downloadedPictures: Number(comic.downloadedPictures || 0),
+                knownPictures: Number(comic.knownPictures || 0),
+                inLibrary: Boolean(comic.inLibrary),
+                coverPath: `/api/v1/covers/${encodeURIComponent(comic.comicId)}`
+            })
+        }
+
+        if (currentBinding) {
+            for (const binding of bindings) {
+                if (
+                    binding.comicId === id ||
+                    binding.workId !== currentBinding.workId
+                )
+                    continue
+                add(
+                    binding.comicId,
+                    binding.editionId &&
+                        currentBinding.editionId &&
+                        binding.editionId === currentBinding.editionId
+                        ? 'CONFIRMED_SAME_EDITION'
+                        : 'CONFIRMED_WORK_VARIANT',
+                    Math.max(
+                        Number(binding.confidence || 0),
+                        Number(currentBinding.confidence || 0)
+                    ),
+                    binding
+                )
+            }
+        }
+
+        for (const decision of decisions) {
+            if (
+                decision.decision === 'KEEP_SEPARATE' ||
+                (decision.leftComicId !== id && decision.rightComicId !== id)
+            )
+                continue
+            const otherId =
+                decision.leftComicId === id
+                    ? decision.rightComicId
+                    : decision.leftComicId
+            add(
+                otherId,
+                decision.decision === 'EDITION_VARIANT'
+                    ? 'ADJUDICATED_EDITION_VARIANT'
+                    : 'ADJUDICATED_SAME_WORK',
+                1
+            )
+        }
+
+        for (const evidence of this.database.listWorkIdentityEvidence(5000)) {
+            if (
+                evidence.relation !== 'PROBABLE_SAME_WORK' ||
+                Number(evidence.confidence || 0) < 0.94 ||
+                (evidence.leftComicId !== id && evidence.rightComicId !== id)
+            )
+                continue
+            const otherId =
+                evidence.leftComicId === id
+                    ? evidence.rightComicId
+                    : evidence.leftComicId
+            add(otherId, 'PROBABLE_SAME_WORK', Number(evidence.confidence || 0))
+        }
+
+        const items = [...rows.values()]
+            .sort(
+                (a, b) =>
+                    (relationPriority[String(a.relation)] ?? 99) -
+                        (relationPriority[String(b.relation)] ?? 99) ||
+                    Number(Boolean(b.isFavorite)) -
+                        Number(Boolean(a.isFavorite)) ||
+                    Number(b.downloadedPictures || 0) -
+                        Number(a.downloadedPictures || 0) ||
+                    String(a.title || '').localeCompare(String(b.title || ''))
+            )
+            .slice(0, bounded)
+        const confirmedCount = items.filter((item) =>
+            String(item.relation).startsWith('CONFIRMED_')
+        ).length
+        return {
+            comicId: id,
+            count: items.length,
+            confirmedCount,
+            probableCount: items.length - confirmedCount,
+            workId: currentBinding?.workId ?? null,
+            editionId: currentBinding?.editionId ?? null,
+            items
+        }
+    }
+
     recommendationV5WorkIdentityAudit(limit = 200) {
         const catalog = this.database.listComics({ limit: 10000 })
         const state = new RecommendationPolicyStoreV5(this.database).state()

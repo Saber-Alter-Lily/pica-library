@@ -107,6 +107,57 @@ let downloadPollBusy = false
 let importPending = false
 let activeView = 'home'
 const viewScrollPositions = new Map()
+let lastDocumentScrollY = Math.max(0, window.scrollY)
+const dialogScrollOrigins = new WeakMap()
+
+function installDialogScrollRestoration() {
+    window.addEventListener(
+        'scroll',
+        () => {
+            if (!document.querySelector('dialog[open]'))
+                lastDocumentScrollY = Math.max(0, window.scrollY)
+        },
+        { passive: true }
+    )
+    const observer = new MutationObserver((records) => {
+        for (const record of records) {
+            const dialog = record.target
+            if (
+                record.attributeName !== 'open' ||
+                !(dialog instanceof HTMLDialogElement)
+            )
+                continue
+            if (dialog.open) {
+                if (!dialogScrollOrigins.has(dialog))
+                    dialogScrollOrigins.set(dialog, {
+                        y: lastDocumentScrollY,
+                        view: activeView
+                    })
+                const origin = dialogScrollOrigins.get(dialog)
+                requestAnimationFrame(() => {
+                    if (origin && activeView === origin.view)
+                        window.scrollTo(0, origin.y)
+                })
+                continue
+            }
+            const origin = dialogScrollOrigins.get(dialog)
+            if (!origin) continue
+            dialogScrollOrigins.delete(dialog)
+            lastDocumentScrollY = origin.y
+            requestAnimationFrame(() => {
+                if (activeView === origin.view)
+                    window.scrollTo(0, origin.y)
+            })
+        }
+    })
+    observer.observe(document.documentElement, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['open']
+    })
+}
+
+installDialogScrollRestoration()
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]

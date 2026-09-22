@@ -2188,6 +2188,12 @@ $('#preview-cache-clear').onclick = async (event) => {
 }
 
 function recommendationRecord(comicId, context) {
+    const dialog = $('#recommend-detail-dialog')
+    if (
+        dialog?.dataset.comicId === comicId &&
+        dialog._comicRecord?.comicId === comicId
+    )
+        return dialog._comicRecord
     const source =
         context === 'library'
             ? state.records
@@ -2282,6 +2288,7 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
     const dialog = $('#recommend-detail-dialog')
     dialog.dataset.comicId = comicId
     dialog.dataset.context = context
+    dialog._comicRecord = comic
     dialog.dataset.previewOffset = '0'
     $('#recommend-preview').innerHTML = ''
     $('#recommend-preview-message').textContent = ''

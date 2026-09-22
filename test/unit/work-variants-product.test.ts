@@ -35,6 +35,9 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(service).toContain('workIdentitySignalsV2(')
         expect(service).toContain("embedding.embeddingKind === 'cover'")
         expect(service).toContain("coverIdentityStage: 'REVIEW_CONFIRMATION'")
+        expect(service).toContain('favoriteCount')
+        expect(service).toContain('downloadedCount')
+        expect(service).toContain('count: rankedItems.length')
         expect(service).not.toMatch(
             /workVariantsForComic[\s\S]{0,800}saveWorkIdentityEvidence/
         )
@@ -44,7 +47,7 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(bridge).toContain('work-variants$')
     })
 
-    it('keeps Desktop details collapsed to only the related-work count until opened', () => {
+    it('shows same-work ownership status before expansion and makes every variant navigable', () => {
         const app = read('web/app.js')
         const css = read('web/styles.css')
         expect(app).toContain('id="work-variants-panel"')
@@ -52,11 +55,18 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         const i18n = read('web/i18n.js')
         expect(i18n).toContain("'workVariants.summary': '同一作品 · {count}'")
         expect(i18n).toContain("'workVariants.summary': 'Same work · {count}'")
-        expect(app).toContain("t('workVariants.summary'")
+        expect(i18n).toContain("'workVariants.favoriteCount': '已有收藏 · {count}'")
+        expect(i18n).toContain("'workVariants.noFavorite': '无已收藏版本'")
+        expect(app).toContain('function renderWorkVariantSummary(panel, value)')
+        expect(app).toContain('value?.favoriteCount')
+        expect(app).toContain('workVariants.notFavorite')
+        expect(app).toContain('role="link" tabindex="0"')
+        expect(app).toContain("event.target.closest?.('[data-work-variant-open]')")
+        expect(app).toContain("openRecommendationDetail(id, 'work-variant', item)")
         expect(app).toContain('if (panel.open) renderWorkVariantList(panel)')
-        expect(app).toContain('data-work-variant-open')
-        expect(css).toContain('.work-variants-panel:not([open])')
-        expect(css).toContain('.work-variant-card')
+        expect(css).toContain('.work-variant-summary-chip')
+        expect(css).toContain('.work-variant-card:hover')
+        expect(css).toContain('.work-variant-card:focus-visible')
     })
 
     it('keeps Android work variants collapsed and independently resolves probable works offline', () => {
@@ -67,9 +77,16 @@ describe('owned-work exclusion and work-variant detail UX', () => {
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/WorkVariantResolver.java'
         )
         expect(detail).toContain('"同一作品 · "+count')
+        expect(detail).toContain('" · 已收藏 "+favoriteCount')
+        expect(detail).toContain('" · 无收藏"')
         expect(detail).toContain('workVariantArea.setVisibility(View.GONE)')
         expect(detail).toContain('toggleWorkVariants()')
         expect(detail).toContain('renderWorkVariants()')
+        expect(detail).toContain('"查看版本 →"')
+        expect(detail).toContain('card.setOnClickListener(openAction)')
+        expect(detail).toContain('open.setOnClickListener(openAction)')
+        expect(resolver).toContain('root.put("favoriteCount",favoriteCount)')
+        expect(resolver).toContain('root.put("downloadedCount",downloadedCount)')
         expect(resolver).toContain('BridgeClient.workVariants')
         expect(resolver).toContain('portable.identityByComic')
         expect(resolver).toContain('"CONFIRMED_WORK_VARIANT"')

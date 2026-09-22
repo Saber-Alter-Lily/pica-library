@@ -41,6 +41,33 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
         return LocalizedText.ui(this,"可能是同一作品","Possibly the same work","同一作品の可能性");
     }
 
+    private int workVariantDerivedCount(JSONObject value,String field){
+        if(value==null)return 0;
+        if(value.has(field))return Math.max(0,value.optInt(field,0));
+        JSONArray items=value.optJSONArray("items");if(items==null)return 0;
+        int count=0;
+        for(int i=0;i<items.length();i++){
+            JSONObject row=items.optJSONObject(i);if(row==null)continue;
+            if("favoriteCount".equals(field)&&row.optBoolean("isFavorite",false))count++;
+            if("downloadedCount".equals(field)&&row.optInt("downloadedPictures",0)>0)count++;
+        }
+        return count;
+    }
+
+    private String workVariantToggleText(JSONObject value){
+        int count=value==null?0:value.optInt("count",0);
+        int favoriteCount=workVariantDerivedCount(value,"favoriteCount");
+        int downloadedCount=workVariantDerivedCount(value,"downloadedCount");
+        StringBuilder text=new StringBuilder(LocalizedText.ui(this,"同一作品 · "+count,"Same work · "+count,"同一作品 · "+count));
+        if(count>0){
+            if(favoriteCount>0)text.append(LocalizedText.ui(this," · 已收藏 "+favoriteCount," · Favorited "+favoriteCount," · お気に入り "+favoriteCount));
+            else text.append(LocalizedText.ui(this," · 无收藏"," · None favorited"," · お気に入りなし"));
+            if(downloadedCount>0)text.append(LocalizedText.ui(this," · 已下载 "+downloadedCount," · Downloaded "+downloadedCount," · ダウンロード "+downloadedCount));
+        }
+        text.append(workVariantsExpanded?" ▾":" ▸");
+        return text.toString();
+    }
+
     private void loadWorkVariants(){
         if(workVariantToggle==null||entry==null)return;
         final String comicId=entry.id;
@@ -50,7 +77,7 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
                 if(destroyed||entry==null||!comicId.equals(entry.id))return;
                 workVariantPayload=value;
                 int count=value==null?0:value.optInt("count",0);
-                workVariantToggle.setText(LocalizedText.ui(this,"同一作品 · "+count,"Same work · "+count,"同一作品 · "+count)+(workVariantsExpanded?" ▾":" ▸"));
+                workVariantToggle.setText(workVariantToggleText(value));
                 workVariantToggle.setEnabled(count>0);
                 if(workVariantsExpanded)renderWorkVariants();
             });
@@ -62,7 +89,7 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
         if(count<=0)return;
         workVariantsExpanded=!workVariantsExpanded;
         workVariantArea.setVisibility(workVariantsExpanded?View.VISIBLE:View.GONE);
-        workVariantToggle.setText(LocalizedText.ui(this,"同一作品 · "+count,"Same work · "+count,"同一作品 · "+count)+(workVariantsExpanded?" ▾":" ▸"));
+        workVariantToggle.setText(workVariantToggleText(workVariantPayload));
         if(workVariantsExpanded)renderWorkVariants();
     }
 
@@ -81,10 +108,20 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
             String coverUrl=row.optString("coverUrl","");
             if(!coverUrl.isEmpty()){if("eh".equals(out.providerId))out.ehCoverUrl=coverUrl;else out.picaCoverUrl=coverUrl;}
         }else{
+            out.favorite=row.optBoolean("isFavorite",out.favorite);
+            out.desktopDownloadedPictures=Math.max(out.desktopDownloadedPictures,row.optInt("downloadedPictures",0));
             String coverPath=row.optString("coverPath","");
             if(out.desktopCoverPath.isEmpty()&&!coverPath.isEmpty()){out.desktopCoverPath=coverPath;out.desktopAvailable=true;}
         }
         return out;
+    }
+
+    private void openWorkVariant(UnifiedCatalogStore.Entry target){
+        Intent intent=new Intent(this,UnifiedComicDetailActivity.class);
+        intent.putExtra("comicId",target.id);
+        intent.putExtra("title",target.title);
+        intent.putExtra("author",target.displayAuthor());
+        startActivity(intent);
     }
 
     private void renderWorkVariants(){
@@ -96,16 +133,27 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
         for(int i=0;i<items.length();i++){
             JSONObject row=items.optJSONObject(i);if(row==null)continue;
             UnifiedCatalogStore.Entry variant=workVariantEntry(row);
-            LinearLayout card=Ui.card(this);card.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout card=Ui.card(this);card.setOrientation(LinearLayout.HORIZONTAL);card.setClickable(true);card.setFocusable(true);
             ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);cover.setBackgroundColor(Ui.PLACEHOLDER);
             LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(Ui.dp(this,72),Ui.dp(this,98));card.addView(cover,cp);CoverRepository.load(this,cover,variant,Ui.PLACEHOLDER);
             LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,12),0,0,0);
             TextView title=Ui.text(this,row.optString("title",variant.title),15,Ui.TEXT,true);title.setMaxLines(2);copy.addView(title);
             String author=row.optString("canonicalAuthor",row.optString("author",variant.displayAuthor()));copy.addView(Ui.text(this,author,11.5f,Ui.MUTED,false));
-            ArrayList<String> meta=new ArrayList<>();int pages=row.optInt("pagesCount",variant.knownPictures);if(pages>0)meta.add(LocalizedText.ui(this,pages+" 页",pages+" pages",pages+" ページ"));meta.add("eh".equals(row.optString("providerId",variant.providerId))?"E-H":"Pica");String editionLanguage=row.optString("editionLanguage",""),editionLabel=row.optString("editionLabel",""),team=row.optString("chineseTeam","");if(!editionLanguage.isEmpty())meta.add(editionLanguage);if(!editionLabel.isEmpty())meta.add(editionLabel);if(!team.isEmpty())meta.add(team);double rating=row.optDouble("rating",Double.NaN);if(!Double.isNaN(rating)&&rating>0)meta.add("★ "+String.format(Locale.ROOT,"%.2f",rating));if(row.optBoolean("isFavorite",variant.favorite))meta.add(LocalizedText.ui(this,"已收藏","Favorited","お気に入り済み"));if(row.optInt("downloadedPictures",variant.desktopDownloadedPictures)>0)meta.add(LocalizedText.ui(this,"已下载","Downloaded","ダウンロード済み"));
+
+            boolean favorite=row.optBoolean("isFavorite",variant.favorite);
+            boolean downloaded=row.optInt("downloadedPictures",variant.desktopDownloadedPictures)>0;
+            ArrayList<String> status=new ArrayList<>();
+            status.add(favorite?LocalizedText.ui(this,"★ 已收藏","★ Favorited","★ お気に入り済み"):LocalizedText.ui(this,"未收藏","Not favorited","未お気に入り"));
+            if(downloaded)status.add(LocalizedText.ui(this,"✓ 已下载","✓ Downloaded","✓ ダウンロード済み"));
+            copy.addView(Ui.text(this,String.join("   ",status),11.5f,favorite||downloaded?Ui.PRIMARY:Ui.MUTED,true));
+
+            ArrayList<String> meta=new ArrayList<>();int pages=row.optInt("pagesCount",variant.knownPictures);if(pages>0)meta.add(LocalizedText.ui(this,pages+" 页",pages+" pages",pages+" ページ"));meta.add("eh".equals(row.optString("providerId",variant.providerId))?"E-H":"Pica");String editionLanguage=row.optString("editionLanguage",""),editionLabel=row.optString("editionLabel",""),team=row.optString("chineseTeam","");if(!editionLanguage.isEmpty())meta.add(editionLanguage);if(!editionLabel.isEmpty())meta.add(editionLabel);if(!team.isEmpty())meta.add(team);double rating=row.optDouble("rating",Double.NaN);if(!Double.isNaN(rating)&&rating>0)meta.add("★ "+String.format(Locale.ROOT,"%.2f",rating));
             copy.addView(Ui.text(this,String.join(" · ",meta),11,Ui.MUTED,false));copy.addView(Ui.text(this,workVariantRelation(row),11,Ui.PRIMARY,true));
+            TextView open=Ui.text(this,LocalizedText.ui(this,"查看版本 →","Open version →","この版を開く →"),11.5f,Ui.PRIMARY,true);open.setPadding(0,Ui.dp(this,4),0,0);copy.addView(open);
             card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
-            final UnifiedCatalogStore.Entry target=variant;card.setOnClickListener(v->{Intent intent=new Intent(this,UnifiedComicDetailActivity.class);intent.putExtra("comicId",target.id);intent.putExtra("title",target.title);intent.putExtra("author",target.displayAuthor());startActivity(intent);});
+            final UnifiedCatalogStore.Entry target=variant;
+            View.OnClickListener openAction=v->openWorkVariant(target);
+            card.setOnClickListener(openAction);open.setOnClickListener(openAction);
             workVariantArea.addView(card);
         }
     }

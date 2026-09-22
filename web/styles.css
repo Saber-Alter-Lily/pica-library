@@ -3226,11 +3226,53 @@ select:focus {
     list-style: none;
     padding: 11px 12px;
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.work-variant-summary-title {
+    min-width: 0;
+}
+.work-variant-summary-badges,
+.work-variant-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.work-variant-summary-chip,
+.work-variant-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line, #ddd);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+    background: var(--surface-soft, #f3f3f3);
+}
+.work-variant-summary-chip.favorite,
+.work-variant-chip.favorite {
+    border-color: color-mix(in srgb, var(--accent, #3f7cff) 45%, var(--line, #ddd));
+    color: var(--accent, #3f7cff);
+}
+.work-variant-summary-chip.downloaded,
+.work-variant-chip.downloaded,
+.work-variant-chip.library {
+    color: var(--text, #222);
+}
+.work-variant-summary-chip.muted,
+.work-variant-chip.muted {
+    color: var(--muted, #777);
+    font-weight: 600;
 }
 .work-variants-panel > summary::-webkit-details-marker { display: none; }
 .work-variants-panel > summary::after {
     content: '▾';
-    float: right;
+    margin-left: auto;
     opacity: .62;
 }
 .work-variants-panel:not([open]) > summary::after { content: '▸'; }
@@ -3242,12 +3284,23 @@ select:focus {
 }
 .work-variant-card {
     display: grid;
+    cursor: pointer;
+    transition: border-color .15s ease, transform .15s ease, background .15s ease;
     grid-template-columns: 72px minmax(0, 1fr);
     gap: 12px;
     align-items: start;
     padding: 10px;
     border: 1px solid var(--line, #ddd);
     border-radius: 10px;
+}
+.work-variant-card:hover,
+.work-variant-card:focus-visible {
+    border-color: var(--accent, #3f7cff);
+    background: var(--surface-soft, #f7f7f7);
+    outline: none;
+}
+.work-variant-card:active {
+    transform: translateY(1px);
 }
 .work-variant-cover {
     width: 72px;

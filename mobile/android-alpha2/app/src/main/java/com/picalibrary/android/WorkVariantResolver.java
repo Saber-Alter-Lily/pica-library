@@ -140,14 +140,18 @@ final class WorkVariantResolver {
                 int downloaded=Integer.compare(b.optInt("downloadedPictures",0),a.optInt("downloadedPictures",0));if(downloaded!=0)return downloaded;
                 return a.optString("title","").compareToIgnoreCase(b.optString("title",""));
             });
+            int confirmed=0,favoriteCount=0,downloadedCount=0;
+            for(JSONObject row:sorted){
+                String relation=row.optString("relation","");
+                if(relation.startsWith("CONFIRMED_")||relation.startsWith("ADJUDICATED_"))confirmed++;
+                if(row.optBoolean("isFavorite",false))favoriteCount++;
+                if(row.optInt("downloadedPictures",0)>0)downloadedCount++;
+            }
             for(int i=0;i<sorted.size()&&i<48;i++)items.put(sorted.get(i));
 
-            int confirmed=0;
-            for(int i=0;i<items.length();i++){
-                String relation=items.optJSONObject(i).optString("relation","");
-                if(relation.startsWith("CONFIRMED_")||relation.startsWith("ADJUDICATED_"))confirmed++;
-            }
-            root.put("count",items.length());root.put("confirmedCount",confirmed);root.put("probableCount",items.length()-confirmed);
+            root.put("count",sorted.size());root.put("shownCount",items.length());
+            root.put("confirmedCount",confirmed);root.put("probableCount",sorted.size()-confirmed);
+            root.put("favoriteCount",favoriteCount);root.put("downloadedCount",downloadedCount);
             root.put("workId",currentIdentity!=null&&!currentIdentity.workId.isEmpty()?currentIdentity.workId:JSONObject.NULL);
             root.put("editionId",currentIdentity!=null&&!currentIdentity.editionId.isEmpty()?currentIdentity.editionId:JSONObject.NULL);
         }catch(Exception ignored){
@@ -157,7 +161,8 @@ final class WorkVariantResolver {
     }
 
     private static JSONObject empty(JSONObject root,JSONArray items)throws Exception{
-        root.put("count",0);root.put("confirmedCount",0);root.put("probableCount",0);root.put("items",items);
+        root.put("count",0);root.put("shownCount",0);root.put("confirmedCount",0);root.put("probableCount",0);
+        root.put("favoriteCount",0);root.put("downloadedCount",0);root.put("items",items);
         root.put("workId",JSONObject.NULL);root.put("editionId",JSONObject.NULL);return root;
     }
 

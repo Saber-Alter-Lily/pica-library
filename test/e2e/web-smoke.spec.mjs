@@ -103,6 +103,55 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
         window.scrollTo(0, 0)
     })
 
+    await page.evaluate(() => {
+        const dialog = document.querySelector('#recommend-detail-dialog')
+        const content = document.querySelector('#recommend-detail-content')
+        if (!(dialog instanceof HTMLDialogElement) || !content)
+            throw new Error('recommend detail surface missing')
+        dialog.dataset.comicId = 'origin'
+        dialog.dataset.context = 'recommendation'
+        content.innerHTML =
+            '<details id="work-variants-panel" open><summary>Same work</summary><div data-work-variants-list><article class="work-variant-card" data-work-variant-open="eh:test" tabindex="0"><span id="work-variant-child">Variant title</span></article></div></details>'
+        const panel = document.querySelector('#work-variants-panel')
+        panel._workVariantPayload = {
+            count: 1,
+            favoriteCount: 1,
+            downloadedCount: 0,
+            items: [
+                {
+                    comicId: 'eh:test',
+                    providerId: 'eh',
+                    title: 'Variant title',
+                    author: 'Variant author',
+                    canonicalAuthor: 'Variant author',
+                    description: '',
+                    tags: [],
+                    finished: true,
+                    totalLikes: 0,
+                    isFavorite: true,
+                    downloadedPictures: 0
+                }
+            ]
+        }
+        dialog.showModal()
+    })
+    await page.locator('#work-variant-child').click()
+    await expect(page.locator('#recommend-detail-dialog')).toHaveAttribute(
+        'data-comic-id',
+        'eh:test'
+    )
+    await expect(page.locator('#recommend-detail-content h2')).toHaveText(
+        'Variant title'
+    )
+    expect(
+        await page.evaluate(
+            () =>
+                document.querySelector('#recommend-detail-dialog')
+                    ?._comicRecord?.isFavorite
+        )
+    ).toBe(true)
+    await page.locator('#recommend-detail-close').click()
+
     const help = page.locator('#library .info-tip').first()
     await expect(help).toBeVisible()
     await help.hover()

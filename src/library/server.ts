@@ -1914,6 +1914,20 @@ export async function startLibraryServer(options: {
                     })
                 )
             }
+            const comicDetailRequest = url.pathname.match(
+                /^\/api\/v1\/comics\/([^/]+)$/
+            )
+            if (comicDetailRequest && request.method === 'GET') {
+                const comic = options.database.getComic(
+                    decodeURIComponent(comicDetailRequest[1])
+                )
+                return json(
+                    response,
+                    comic ? 200 : 404,
+                    comic ?? { error: 'Comic not found' }
+                )
+            }
+
             const workVariantsRequest = url.pathname.match(
                 /^\/api\/v1\/comics\/([^/]+)\/work-variants$/
             )

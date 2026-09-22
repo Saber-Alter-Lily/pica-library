@@ -25,6 +25,7 @@ function comic(
         canonicalAuthor: input.canonicalAuthor ?? input.author ?? '',
         circle: input.circle ?? null,
         authorId: input.authorId ?? null,
+        alternateTitles: input.alternateTitles ?? [],
         tags: input.tags ?? [],
         categories: input.categories ?? [],
         finished: input.finished ?? true,

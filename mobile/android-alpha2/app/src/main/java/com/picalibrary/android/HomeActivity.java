@@ -15,7 +15,7 @@ import java.util.concurrent.*;
 /** Product shell: library and recommendations live here; Online and Settings own separate screens. */
 public final class HomeActivity extends LocaleAwareActivity {
     private FrameLayout body;private SharedPreferences prefs;private final ExecutorService worker=Executors.newFixedThreadPool(4);private Future<?> pending;private int serial,current,collectionMode;private String libraryQuery="",activeShelfId="",themeKey="";private boolean showingShelves;
-    private LinearLayout recommendationBatchList;private TextView recommendationBatchLabel;private UnifiedCatalogStore.Snapshot recommendationCatalog;
+    private LinearLayout recommendationBatchList;private TextView recommendationBatchLabel;private UnifiedCatalogStore.Snapshot recommendationCatalog;private NativeRecommendationStore.Snapshot recommendationVisibleSnapshot;
     private UnifiedLibraryFilter.Spec librarySpec;private UnifiedLibraryFilter.Facets libraryFacets=new UnifiedLibraryFilter.Facets(new ArrayList<>(),new ArrayList<>(),new ArrayList<>());
     private final int[] tabScrollY=new int[4],tabListPosition=new int[4],tabListOffset=new int[4];private ScrollView activeScroll;private RecyclerView activeList;private int activeViewportTab=-1;private boolean onboardingPromptScheduled;
 
@@ -63,7 +63,7 @@ public final class HomeActivity extends LocaleAwareActivity {
         p.addView(progress);
 
         NativeRecommendationStore.Snapshot stored=NativeRecommendationStore.load(this);
-        NativeRecommendationStore.Snapshot snapshot=RecommendationPolicyStore.applyLocalPolicy(this,stored);
+        NativeRecommendationStore.Snapshot snapshot=RecommendationPolicyStore.applyLocalPolicy(this,stored);recommendationVisibleSnapshot=snapshot;
         PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
 
         LinearLayout statusCard=SettingsRow.panel(this,null);
@@ -104,7 +104,7 @@ public final class HomeActivity extends LocaleAwareActivity {
     private void switchHomeRecommendationBatch(int delta){
         if(recommendationBatchList==null||recommendationBatchLabel==null)return;
         RecommendationPolicyStore.moveVisibleBatch(this,delta);
-        NativeRecommendationStore.Snapshot visible=RecommendationPolicyStore.applyLocalPolicy(this,NativeRecommendationStore.load(this));
+        NativeRecommendationStore.Snapshot visible=RecommendationPolicyStore.applyLocalPolicy(this,NativeRecommendationStore.load(this));recommendationVisibleSnapshot=visible;
         renderHomeRecommendationBatch(visible);
         NativeRecommendationStore.markSeen(this,visible.current());
     }
@@ -122,9 +122,15 @@ public final class HomeActivity extends LocaleAwareActivity {
             LinearLayout copy=new LinearLayout(this);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(Ui.dp(this,12),0,0,0);
             copy.addView(Ui.text(this,item.title,16,Ui.TEXT,true));copy.addView(Ui.text(this,item.author,12,Ui.MUTED,false));
             TextView why=Ui.text(this,item.reason,12,Ui.PRIMARY,false);why.setPadding(0,Ui.dp(this,6),0,0);copy.addView(why);
+            String sentiment=RecommendationFeedbackStore.sentiment(this,item.comicId);boolean liked="like".equals(sentiment),disliked="dislike".equals(sentiment);
+            if(liked||disliked){
+                TextView feedbackState=Ui.rawText(this,liked?LocalizedText.ui(this,"已记录喜欢 · 后续会增加类似推荐","Liked · similar recommendations will increase","好きとして記録 · 類似おすすめを増やします"):LocalizedText.ui(this,"已记录不喜欢 · 后续会减少此类推荐","Disliked · similar recommendations will decrease","苦手として記録 · この種類のおすすめを減らします"),11.5f,liked?Ui.PRIMARY:Ui.BAD,true);
+                feedbackState.setPadding(0,Ui.dp(this,7),0,0);copy.addView(feedbackState);
+                if(disliked)cover.setAlpha(.55f);
+            }
             LinearLayout feedback=new LinearLayout(this);feedback.setPadding(0,Ui.dp(this,8),0,0);
-            feedback.addView(compact("👍 喜欢",v->recommendationFeedback(item,"like")));Ui.gap(feedback,this,6);
-            feedback.addView(compact("👎 不喜欢",v->recommendationFeedback(item,"dislike")));Ui.gap(feedback,this,6);
+            feedback.addView(compact(liked?"👍 已喜欢":"👍 喜欢",v->recommendationFeedback(item,"like")));Ui.gap(feedback,this,6);
+            feedback.addView(compact(disliked?"👎 已不喜欢":"👎 不喜欢",v->recommendationFeedback(item,"dislike")));Ui.gap(feedback,this,6);
             UnifiedCatalogStore.Entry target=e;
             feedback.addView(compact("⚙ 调节",v->RecommendationItemControlDialog.show(this,target,this::show)));copy.addView(feedback);
             card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));card.setOnClickListener(v->openRecommendation(target));CoverRepository.load(this,cover,e,Ui.PLACEHOLDER);recommendationBatchList.addView(card);
@@ -147,7 +153,8 @@ public final class HomeActivity extends LocaleAwareActivity {
         Toast.makeText(this,LocalizedText.ui("请先连接电脑或配置可用的在线来源"),Toast.LENGTH_LONG).show();
     }
 
-    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);if(!RecommendationFeedbackStore.askReasons(this)){show();return;}String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?LocalizedText.ui("为什么喜欢？（可选）"):LocalizedText.ui("为什么不喜欢？（可选）")).setMultiChoiceItems(LocalizedText.ui(labels),checked,(d,which,value)->checked[which]=value).setNegativeButton(LocalizedText.ui("跳过"),(d,w)->show()).setPositiveButton(LocalizedText.ui("保存原因"),(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,30);if(reasons.contains("repetitive"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"duplicate",true,30);show();}).setOnCancelListener(d->show()).show();}
+    private void refreshCurrentRecommendationFeedback(){if(recommendationVisibleSnapshot!=null&&recommendationBatchList!=null&&recommendationBatchLabel!=null)renderHomeRecommendationBatch(recommendationVisibleSnapshot);}
+    private void recommendationFeedback(NativeRecommendationStore.Item item,String sentiment){RecommendationFeedbackStore.setSentiment(this,item.comicId,sentiment);refreshCurrentRecommendationFeedback();if(!RecommendationFeedbackStore.askReasons(this))return;String[] labels={"画风","题材 / 标签","作者","角色 / IP","已经看过","推荐太重复"};String[] keys={"style","topic","author","character","already_seen","repetitive"};boolean[] checked=new boolean[labels.length];new AlertDialog.Builder(this).setTitle("like".equals(sentiment)?LocalizedText.ui("为什么喜欢？（可选）"):LocalizedText.ui("为什么不喜欢？（可选）")).setMultiChoiceItems(LocalizedText.ui(labels),checked,(d,which,value)->checked[which]=value).setNegativeButton(LocalizedText.ui("跳过"),(d,w)->refreshCurrentRecommendationFeedback()).setPositiveButton(LocalizedText.ui("保存原因"),(d,w)->{List<String> reasons=new ArrayList<>();for(int i=0;i<keys.length;i++)if(checked[i])reasons.add(keys[i]);RecommendationFeedbackStore.setReasons(this,item.comicId,sentiment,reasons);if(reasons.contains("already_seen"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"already_seen",true,30);if(reasons.contains("repetitive"))RecommendationPolicyStore.setItemDisposition(this,item.comicId,"duplicate",true,30);refreshCurrentRecommendationFeedback();}).setOnCancelListener(d->refreshCurrentRecommendationFeedback()).show();}
 
     private void openOnlineSource(String sourceMode){
         Intent i=new Intent(this,PicaBrowseActivity.class);

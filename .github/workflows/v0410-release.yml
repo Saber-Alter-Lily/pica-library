@@ -1,11 +1,11 @@
-name: v0.4.9 Formal Release
+name: v0.4.10 Formal Release
 
 on:
   push:
     branches: [main]
     paths:
       - 'package.json'
-      - '.github/workflows/v049-release.yml'
+      - '.github/workflows/v0410-release.yml'
 
 permissions:
   contents: write
@@ -56,7 +56,8 @@ jobs:
             @('0.4.5','f5b93b4a81c78df17bbee793354d4e8df002fad6dcc9c432e334bb7c14fee901'),
             @('0.4.6','914d691b441e8dbc95a9ef0bb7a7ebc46940bfc44907e0595a8953a293bda50c'),
             @('0.4.7','dafea5417e27055c6a4871b7386f31b66a51f82a5ce01136d467ee1176659947'),
-            @('0.4.8','6fd3eb5a1346cd2211efe5b47588b38d4099d6e768f836461969eaf22d64e26d')
+            @('0.4.8','6fd3eb5a1346cd2211efe5b47588b38d4099d6e768f836461969eaf22d64e26d'),
+            @('0.4.9','862570ee4517453da594a21e937b6d8ebc6114df6724ac3976457fa38f544941')
           )
           foreach($row in $bases){
             $version=$row[0]
@@ -71,51 +72,52 @@ jobs:
         shell: pwsh
         run: |
           pnpm build:windows
-          $target='artifacts\Pica-Library-v0.4.9-windows-x64.zip'
+          $target='artifacts\Pica-Library-v0.4.10-windows-x64.zip'
           ./scripts/test-windows-artifact.ps1 -Zip $target
-          foreach($source in @('0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8')){
-            pnpm build:local-update "artifacts\release-base\Pica-Library-v$source-windows-x64.zip" $target "artifacts\Pica-Library-v0.4.9-update-from-v$source.zip"
+          foreach($source in @('0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9')){
+            pnpm build:local-update "artifacts\release-base\Pica-Library-v$source-windows-x64.zip" $target "artifacts\Pica-Library-v0.4.10-update-from-v$source.zip"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
       - name: Build v0.4.0 direct upgrade assistant
         shell: pwsh
         run: |
-          $full='artifacts\Pica-Library-v0.4.9-windows-x64.zip'
+          $full='artifacts\Pica-Library-v0.4.10-windows-x64.zip'
           $fullHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $full).Hash.ToLowerInvariant()
           $src='packaging\windows\upgrade-assistant-v041'
-          $work=Join-Path $env:RUNNER_TEMP 'pica-v049-assistant'
+          $work=Join-Path $env:RUNNER_TEMP 'pica-v0410-assistant'
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work
           New-Item -ItemType Directory -Force -Path $work | Out-Null
 
           $ps1=Get-Content -Raw -LiteralPath (Join-Path $src 'Upgrade-Pica-Library-v0.4.1.ps1')
-          $ps1=$ps1.Replace('0.4.1','0.4.9').Replace('v041','v049')
+          $ps1=$ps1.Replace('0.4.1','0.4.10').Replace('v041','v0410')
           $ps1=$ps1.Replace('88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d',$fullHash)
           $ps1=$ps1.Replace('974d4e9b22379aeed379b71711008332acc213a4',$env:GITHUB_SHA)
-          [IO.File]::WriteAllText((Join-Path $work 'Upgrade-Pica-Library-v0.4.9.ps1'),$ps1,(New-Object Text.UTF8Encoding($true)))
+          [IO.File]::WriteAllText((Join-Path $work 'Upgrade-Pica-Library-v0.4.10.ps1'),$ps1,(New-Object Text.UTF8Encoding($true)))
 
-          $cmd=(Get-Content -Raw -LiteralPath (Join-Path $src 'Upgrade-Pica-Library-v0.4.1.cmd')).Replace('0.4.1','0.4.9')
-          [IO.File]::WriteAllText((Join-Path $work 'Upgrade-Pica-Library-v0.4.9.cmd'),$cmd,(New-Object Text.UTF8Encoding($false)))
-          $readme=(Get-Content -Raw -LiteralPath (Join-Path $src 'README.txt')).Replace('0.4.1','0.4.9')
+          $cmd=(Get-Content -Raw -LiteralPath (Join-Path $src 'Upgrade-Pica-Library-v0.4.1.cmd')).Replace('0.4.1','0.4.10')
+          [IO.File]::WriteAllText((Join-Path $work 'Upgrade-Pica-Library-v0.4.10.cmd'),$cmd,(New-Object Text.UTF8Encoding($false)))
+          $readme=(Get-Content -Raw -LiteralPath (Join-Path $src 'README.txt')).Replace('0.4.1','0.4.10')
           [IO.File]::WriteAllText((Join-Path $work 'README.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
 
-          $assistant='artifacts\Pica-Library-v0.4.9-upgrade-assistant.zip'
+          $assistant='artifacts\Pica-Library-v0.4.10-upgrade-assistant.zip'
           Compress-Archive -Path (Join-Path $work '*') -DestinationPath $assistant -CompressionLevel Optimal
           $assistantHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $assistant).Hash.ToLowerInvariant()
-          "$assistantHash  Pica-Library-v0.4.9-upgrade-assistant.zip" | Set-Content -Encoding ascii 'artifacts\Pica-Library-v0.4.9-upgrade-assistant.sha256'
+          "$assistantHash  Pica-Library-v0.4.10-upgrade-assistant.zip" | Set-Content -Encoding ascii 'artifacts\Pica-Library-v0.4.10-upgrade-assistant.sha256'
       - name: Write Windows release evidence
         shell: pwsh
         run: |
           $names=@(
-            'Pica-Library-v0.4.9-windows-x64.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.1.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.2.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.3.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.4.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.5.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.6.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.7.zip',
-            'Pica-Library-v0.4.9-update-from-v0.4.8.zip',
-            'Pica-Library-v0.4.9-upgrade-assistant.zip'
+            'Pica-Library-v0.4.10-windows-x64.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.1.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.2.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.3.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.4.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.5.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.6.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.7.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.8.zip',
+            'Pica-Library-v0.4.10-update-from-v0.4.9.zip',
+            'Pica-Library-v0.4.10-upgrade-assistant.zip'
           )
           $lines=@()
           foreach($name in $names){
@@ -124,26 +126,27 @@ jobs:
           }
           $lines | Set-Content -Encoding ascii 'artifacts\SHA256SUMS-Windows.txt'
           [ordered]@{
-            release='v0.4.9'; sourceSha=$env:GITHUB_SHA; productVersion='0.4.9';
+            release='v0.4.10'; sourceSha=$env:GITHUB_SHA; productVersion='0.4.10';
             publicUpgradeBaseline='0.4.0'; databaseSchema=13;
-            scopedUpdateSources=@('0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8');
+            scopedUpdateSources=@('0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9');
             gates=@('type-check','web-syntax','unit-integration-tests','production-build','windows-artifact-smoke','official-base-checksums','scoped-update-builds','direct-upgrade-assistant')
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 'artifacts\BUILD_TRANSPARENCY-Windows.json'
       - uses: actions/upload-artifact@v4
         with:
-          name: v049-windows-release
+          name: v0410-windows-release
           path: |
-            artifacts/Pica-Library-v0.4.9-windows-x64.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.1.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.2.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.3.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.4.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.5.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.6.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.7.zip
-            artifacts/Pica-Library-v0.4.9-update-from-v0.4.8.zip
-            artifacts/Pica-Library-v0.4.9-upgrade-assistant.zip
-            artifacts/Pica-Library-v0.4.9-upgrade-assistant.sha256
+            artifacts/Pica-Library-v0.4.10-windows-x64.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.1.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.2.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.3.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.4.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.5.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.6.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.7.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.8.zip
+            artifacts/Pica-Library-v0.4.10-update-from-v0.4.9.zip
+            artifacts/Pica-Library-v0.4.10-upgrade-assistant.zip
+            artifacts/Pica-Library-v0.4.10-upgrade-assistant.sha256
             artifacts/SHA256SUMS-Windows.txt
             artifacts/BUILD_TRANSPARENCY-Windows.json
           retention-days: 1
@@ -172,7 +175,7 @@ jobs:
       - name: Test and lint Android
         working-directory: mobile/android-alpha2
         run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
-      - name: Build and verify formal v52
+      - name: Build and verify formal v53
         working-directory: mobile/android-alpha2
         env:
           ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
@@ -181,12 +184,12 @@ jobs:
           set -euo pipefail
           test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
           test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
-          curl -fL --retry 3 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.8/Pica-Library-Android-Preview.cert-sha256' -o "$RUNNER_TEMP/old-cert.txt"
+          curl -fL --retry 3 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.9/Pica-Library-Android-Preview.cert-sha256' -o "$RUNNER_TEMP/old-cert.txt"
           oldcert=$(tr -d '\r\n ' < "$RUNNER_TEMP/old-cert.txt")
           test "$oldcert" = "$EXPECTED_CERT"
 
           umask 077
-          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-v049-signing-XXXXXXXX")
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-v0410-signing-XXXXXXXX")
           export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
           trap 'rm -rf -- "$signing_dir"' EXIT
           printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
@@ -195,7 +198,7 @@ jobs:
           apk=app/build/outputs/apk/release/app-release.apk
 
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/package.txt"
-          grep -q "package: name='com.picalibrary.android' versionCode='52' versionName='0.4.9'" "$RUNNER_TEMP/package.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='53' versionName='0.4.10'" "$RUNNER_TEMP/package.txt"
           grep -q "application-label:'Pica Library'" "$RUNNER_TEMP/package.txt"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/cert.txt"
           cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/cert.txt" | head -1 | tr 'A-F' 'a-f')
@@ -203,30 +206,30 @@ jobs:
           test "$cert" = "$oldcert"
 
           mkdir -p publish
-          cp "$apk" publish/Pica-Library-Android-v52.apk
+          cp "$apk" publish/Pica-Library-Android-v53.apk
           cp "$apk" publish/Pica-Library-Android-Preview.apk
           printf '%s\n' "$cert" > publish/Pica-Library-Android-Preview.cert-sha256
-          sha=$(sha256sum publish/Pica-Library-Android-v52.apk | awk '{print $1}')
+          sha=$(sha256sum publish/Pica-Library-Android-v53.apk | awk '{print $1}')
           cat > publish/android-update.json <<JSON
           {
-            "versionCode": 52,
-            "versionName": "0.4.9",
+            "versionCode": 53,
+            "versionName": "0.4.10",
             "apkUrl": "https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk",
             "sha256": "$sha",
-            "releaseNotes": "v0.4.9 推荐交互与作品身份更新：Android 推荐原位暂停/继续、反馈批次冻结与人工调整滚动稳定；双端自动更新提示；已拥有 Work 排除与可折叠相似作品版本互链。",
+            "releaseNotes": "v0.4.10 Work Identity V2：支持 alternateTitles、E-H creator alias 与跨语言同作品识别；详情区改为“同一作品”；Cover Identity 作为保守辅助证据。",
             "minimumSupportedVersionCode": 42
           }
           JSON
-          printf '%s  %s\n' "$sha" 'Pica-Library-Android-v52.apk' > publish/SHA256SUMS-Android.txt
+          printf '%s  %s\n' "$sha" 'Pica-Library-Android-v53.apk' > publish/SHA256SUMS-Android.txt
           python - "$sha" "$cert" "$GITHUB_SHA" <<'PY'
           import json,sys
           sha,cert,source=sys.argv[1:]
-          out={"release":"v0.4.9","versionCode":52,"versionName":"0.4.9","sourceSha":source,"apkSha256":sha,"signerCertificateSha256":cert,"minimumSupportedVersionCode":42,"upgradeValidation":["same-package-id","higher-than-v51-formal-version","same-signing-certificate","formal-label","unit-tests","lint","R8-release-build"]}
+          out={"release":"v0.4.10","versionCode":53,"versionName":"0.4.10","sourceSha":source,"apkSha256":sha,"signerCertificateSha256":cert,"minimumSupportedVersionCode":42,"upgradeValidation":["same-package-id","higher-than-v52-formal-version","same-signing-certificate","formal-label","unit-tests","lint","R8-release-build"]}
           with open("publish/BUILD_TRANSPARENCY-Android.json","w",encoding="utf-8") as f: json.dump(out,f,ensure_ascii=False,indent=2)
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: v049-android-release
+          name: v0410-android-release
           path: mobile/android-alpha2/publish/
           retention-days: 1
           if-no-files-found: error
@@ -245,11 +248,11 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
-          name: v049-windows-release
+          name: v0410-windows-release
           path: release/windows
       - uses: actions/download-artifact@v4
         with:
-          name: v049-android-release
+          name: v0410-android-release
           path: release/android
       - name: Assemble release metadata
         run: |
@@ -259,60 +262,57 @@ jobs:
           from pathlib import Path
           w=json.loads(Path("release/windows/BUILD_TRANSPARENCY-Windows.json").read_text(encoding="utf-8-sig"))
           a=json.loads(Path("release/android/BUILD_TRANSPARENCY-Android.json").read_text(encoding="utf-8-sig"))
-          Path("release/BUILD_TRANSPARENCY.json").write_text(json.dumps({"release":"v0.4.9","windows":w,"android":a},ensure_ascii=False,indent=2),encoding="utf-8")
+          Path("release/BUILD_TRANSPARENCY.json").write_text(json.dumps({"release":"v0.4.10","windows":w,"android":a},ensure_ascii=False,indent=2),encoding="utf-8")
           PY
           cat > release/RELEASE_NOTES.md <<'EOF'
-          Pica Library v0.4.9
+          Pica Library v0.4.10
 
-          ## 推荐交互稳定性
-          - Android 推荐“暂停”不再取消 WorkManager；正常暂停后继续会在同一存活 Worker 内原位恢复，并保留已完成阶段与可见进度。
-          - 如果 Android / 系统终止了暂停中的 Worker，会明确显示“暂停状态已保留”，继续时只重做未完成阶段，不伪装成跨进程精确 checkpoint。
-          - Android Like / Dislike 与 Desktop 对齐：当前可见批次保持冻结，反馈后只更新卡片状态，不再删除卡片并从下一批提前补位。
-          - 重复点击已经激活的 Like / Dislike 为 no-op，不会清除之前保存的反馈原因。
-          - Android 0–10 人工调整、屏蔽和 Session 意图更新后恢复原滚动位置，不再跳回页面顶部。
+          ## Work Identity V2
+          - 同作品识别由主标题扩展为 title + alternateTitles，并解析 E-H 常见 [Circle (Author)] 前缀中的 creator alias。
+          - 作者身份优先使用 canonical authorId，其次使用 canonical/raw/title-credit alias；跨语言 Provider 主标题不再必须字面相同。
+          - Pica《盗まれた人妻。》与 E-H `Nusumareta Hitozuma. - Stolen Wife [Digital]` 已作为固定双向回归样本。
+          - 普通 [Chinese] / [Digital] / 汉化等上传噪声去除后仍要求页数等兼容证据，避免把同作者不同内容误合并。
 
-          ## 自动更新发现
-          - Desktop/Web 与 Android 增加前台自动检查正式更新。
-          - 网络检查按 6 小时节流，同一版本提示按 12 小时节流；前台弹窗与 Android 通知做去重。
-          - 自动发现只负责提示并导向既有更新页，不会自动下载或静默安装。
+          ## 同一作品详情
+          - 作品详情中的“相似作品 · N”改名为“同一作品 · N”，避免与推荐系统的 Related / 相似作品召回混淆。
+          - 默认继续折叠，只显示数量；展开后仍展示封面、标题、作者、页数、来源、版本/语言、收藏/下载状态等对比信息。
 
-          ## 已拥有作品与版本互链
-          - Final V3 在 exact upload 过滤之外增加 Canonical Work 级 ownership gate：已收藏、已入库或已下载作品的已确认其他上传版本不再作为“新作品”进入最终推荐。
-          - Work ownership 使用轻量 fingerprint 使缓存按需失效，不恢复每切批都全量扫描书库的性能回退。
-          - Desktop/Web 与 Android 详情页新增可折叠“相似作品 · N”；默认只显示数量，展开后显示封面、标题、作者、页数、来源、版本/语言、收藏/下载状态以及可用评分/汉化信息。
-          - Canonical binding 与人工 SAME_WORK / EDITION_VARIANT 裁决优先；高置信 probable 关系只作为详情提示，不自动物化，也不直接作为推荐硬排除；KEEP_SEPARATE 始终优先。
-          - Web 书库、已下载、书架、搜索与推荐统一使用同一作品详情入口；普通详情不再预加载完整 Visual QC 数据。
+          ## Cover Identity
+          - Cover Identity 与 Visual Style 分离；只读取现有 cover embedding。
+          - 只有存在独立元数据支持时才使用极高阈值封面相似度作为辅助 evidence。
+          - Cover Identity 只产生 PROBABLE_SAME_WORK，不自动 materialize Canonical Work，不覆盖 KEEP_SEPARATE，也不单独成为推荐硬排除依据。
 
           ## 升级
-          - Windows v0.4.1–v0.4.8：应用内兼容增量更新。
-          - Windows v0.4.0：使用 Pica-Library-v0.4.9-upgrade-assistant.zip 一次直达。
-          - Android：v52 / 0.4.9；保持正式包名与签名，可从 v42–v51 原地升级。
+          - Windows v0.4.1–v0.4.9：应用内兼容增量更新。
+          - Windows v0.4.0：使用 Pica-Library-v0.4.10-upgrade-assistant.zip 一次直达。
+          - Android：v53 / 0.4.10；保持正式包名与签名，可从 v42–v52 原地升级。
           EOF
       - name: Publish stable release and Android channel
         run: |
           assets=(
-            release/windows/Pica-Library-v0.4.9-windows-x64.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.1.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.2.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.3.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.4.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.5.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.6.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.7.zip
-            release/windows/Pica-Library-v0.4.9-update-from-v0.4.8.zip
-            release/windows/Pica-Library-v0.4.9-upgrade-assistant.zip
-            release/windows/Pica-Library-v0.4.9-upgrade-assistant.sha256
+            release/windows/Pica-Library-v0.4.10-windows-x64.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.1.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.2.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.3.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.4.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.5.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.6.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.7.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.8.zip
+            release/windows/Pica-Library-v0.4.10-update-from-v0.4.9.zip
+            release/windows/Pica-Library-v0.4.10-upgrade-assistant.zip
+            release/windows/Pica-Library-v0.4.10-upgrade-assistant.sha256
             release/windows/BUILD_TRANSPARENCY-Windows.json
-            release/android/Pica-Library-Android-v52.apk
+            release/android/Pica-Library-Android-v53.apk
             release/android/Pica-Library-Android-Preview.cert-sha256
             release/android/android-update.json
             release/android/BUILD_TRANSPARENCY-Android.json
             release/BUILD_TRANSPARENCY.json
             release/SHA256SUMS.txt
           )
-          gh release create v0.4.9 "${assets[@]}" --target "$GITHUB_SHA" --title 'Pica Library v0.4.9 · Recommendation Stability & Work Variants' --notes-file release/RELEASE_NOTES.md
+          gh release create v0.4.10 "${assets[@]}" --target "$GITHUB_SHA" --title 'Pica Library v0.4.10 · Work Identity V2' --notes-file release/RELEASE_NOTES.md
 
           git tag -f android-preview "$GITHUB_SHA"
           git push --force origin refs/tags/android-preview
           gh release upload android-preview             release/android/Pica-Library-Android-Preview.apk             release/android/Pica-Library-Android-Preview.cert-sha256             release/android/android-update.json             release/android/BUILD_TRANSPARENCY-Android.json             release/BUILD_TRANSPARENCY.json             --clobber
-          gh release edit android-preview --title 'Android Preview v52 · Pica Library 0.4.9' --notes 'Android v52 / 0.4.9 正式更新通道。与既有正式版本保持相同包名和签名；可从 v42–v51 原地升级。' --prerelease
+          gh release edit android-preview --title 'Android Preview v53 · Pica Library 0.4.10' --notes 'Android v53 / 0.4.10 正式更新通道。与既有正式版本保持相同包名和签名；可从 v42–v52 原地升级。' --prerelease

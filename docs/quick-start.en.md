@@ -1,14 +1,14 @@
 # Pica Library Quick Start
 
-Current stable release: **v0.4.9**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
+Current stable release: **v0.4.10**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
 
 ## 01 Download and extract
 
 Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest).
 
-For v0.4.9:
+For v0.4.10:
 
-`Pica-Library-v0.4.9-windows-x64.zip`
+`Pica-Library-v0.4.10-windows-x64.zip`
 
 Extract the complete archive to a normal folder. Do not run the executable from inside an archive viewer.
 
@@ -95,8 +95,8 @@ On Windows, open **Settings → Software Update**.
 
 Existing **v0.4.0** users should move directly to the current release:
 
-- download `Pica-Library-v0.4.9-upgrade-assistant.zip` from the v0.4.9 Release;
-- run `Upgrade-Pica-Library-v0.4.9.cmd`;
+- download `Pica-Library-v0.4.10-upgrade-assistant.zip` from the v0.4.10 Release;
+- run `Upgrade-Pica-Library-v0.4.10.cmd`;
 - no intermediate versions are required.
 
 The assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database backups, replaces the application, runs health checks, and rolls back on failure.

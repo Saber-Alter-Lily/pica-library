@@ -112,6 +112,9 @@ const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
 
 const VISUAL_SETTINGS_CACHE_KEY = 'pica-visual-settings-confirmed-v1'
+const AUTO_UPDATE_PROMPT_KEY = 'pica-auto-update-prompt-v1'
+const AUTO_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+const AUTO_UPDATE_PROMPT_INTERVAL_MS = 12 * 60 * 60 * 1000
 let visualSettingsMutationVersion = 0
 
 function readConfirmedVisualSettings() {
@@ -814,6 +817,90 @@ $('#update-apply').onclick = async () => {
     } catch (error) {
         $('#update-message').textContent = localizeError(language, error)
         renderUpdateProgress({ phase: 'failed' })
+    }
+}
+
+function readAutoUpdatePromptState() {
+    try {
+        const value = JSON.parse(localStorage.getItem(AUTO_UPDATE_PROMPT_KEY) || 'null')
+        return value && typeof value === 'object' ? value : {}
+    } catch {
+        return {}
+    }
+}
+
+function writeAutoUpdatePromptState(patch) {
+    localStorage.setItem(
+        AUTO_UPDATE_PROMPT_KEY,
+        JSON.stringify({ ...readAutoUpdatePromptState(), ...patch })
+    )
+}
+
+function automaticUpdateCheckDue() {
+    const value = readAutoUpdatePromptState()
+    return (
+        Date.now() - Number(value.checkedAt || 0) >=
+        AUTO_UPDATE_CHECK_INTERVAL_MS
+    )
+}
+
+function updatePromptDue(version) {
+    const value = readAutoUpdatePromptState()
+    return (
+        value.version !== version ||
+        Date.now() - Number(value.promptedAt || 0) >=
+            AUTO_UPDATE_PROMPT_INTERVAL_MS
+    )
+}
+
+function markUpdatePrompted(version) {
+    writeAutoUpdatePromptState({ version, promptedAt: Date.now() })
+}
+
+function showAvailableUpdateInSettings(value) {
+    const message = $('#update-message')
+    clearFullInstallGuide()
+    if (value.status === 'full-install') {
+        renderFullInstallGuide(value)
+    } else if (message) {
+        message.innerHTML = t('update.incrementalFound', {
+            version: escapeHtml(value.version),
+            url: escapeHtml(value.releaseUrl)
+        })
+    }
+    activateView('settings')
+    requestAnimationFrame(() => {
+        const softwareHub = document.querySelector(
+            '.a87-hub-nav button[data-hub-panel="software"]'
+        )
+        if (softwareHub) softwareHub.click()
+        else
+            $('#settings-update')?.scrollIntoView({
+                block: 'start',
+                behavior: 'smooth'
+            })
+    })
+}
+
+async function maybePromptForUpdate() {
+    if (
+        !desktop ||
+        state.mode === 'lite' ||
+        document.body.classList.contains('browser-lite-forced') ||
+        !automaticUpdateCheckDue()
+    )
+        return
+    try {
+        const available = await api('/api/v1/update/check')
+        writeAutoUpdatePromptState({ checkedAt: Date.now() })
+        if (!available || available.status === 'current') return
+        const version = String(available.version || '').trim()
+        if (!version || !updatePromptDue(version)) return
+        markUpdatePrompted(version)
+        if (!(await askConfirm(t('update.availablePrompt', { version })))) return
+        showAvailableUpdateInSettings(available)
+    } catch {
+        // Startup update discovery is fail-open; manual update check remains available.
     }
 }
 
@@ -4490,4 +4577,6 @@ async function detect() {
     }
 }
 
-detect()
+void detect().then(() => {
+    setTimeout(() => void maybePromptForUpdate(), 1400)
+})

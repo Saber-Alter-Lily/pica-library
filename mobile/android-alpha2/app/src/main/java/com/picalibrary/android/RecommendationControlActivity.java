@@ -19,6 +19,7 @@ import org.json.*;
  */
 public final class RecommendationControlActivity extends LocaleAwareActivity {
     private LinearLayout content;
+    private ScrollView outerScroll;
     private EditText search;
     private String activeQuery="";
     private JSONObject manualSignal;
@@ -28,7 +29,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
     private final Set<String> expandedFacets=new LinkedHashSet<>();
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private int loadGeneration;
-    private boolean destroyed;
+    private boolean destroyed,loadedOnce;
 
     @Override public void onCreate(Bundle state){
         super.onCreate(state);Ui.applyWindow(this);expanded.add("people");activeQuery=getIntent().getStringExtra("query");if(activeQuery==null)activeQuery="";renderShell();
@@ -42,7 +43,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));
         bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
         bar.addView(Ui.text(this,"人工调整",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
-        ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,10),Ui.dp(this,14),Ui.dp(this,28));scroll.addView(content);
+        ScrollView scroll=new ScrollView(this);outerScroll=scroll;content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,10),Ui.dp(this,14),Ui.dp(this,28));scroll.addView(content);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();showLoading();
     }
 
@@ -58,7 +59,8 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
     private void loadAsync(){
         if(content==null||destroyed)return;
         final int generation=++loadGeneration;
-        showLoading();
+        final int restoreY=outerScroll==null?0:Math.max(0,outerScroll.getScrollY());
+        if(!loadedOnce)showLoading();
         worker.submit(()->{
             try{
                 Context app=getApplicationContext();
@@ -67,7 +69,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
                 UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(app);
                 JSONArray inferred=RecommendationLocalProfile.inferred(app,catalog,state);
                 final JSONObject finalState=state;final JSONArray finalControls=controls,finalInferred=inferred;
-                runOnUiThread(()->{if(destroyed||generation!=loadGeneration)return;renderLoaded(finalState,finalControls,finalInferred);});
+                runOnUiThread(()->{if(destroyed||generation!=loadGeneration)return;renderLoaded(finalState,finalControls,finalInferred);loadedOnce=true;restoreOuterScroll(restoreY);});
             }catch(Exception e){
                 runOnUiThread(()->{
                     if(destroyed||generation!=loadGeneration)return;
@@ -80,6 +82,8 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
             }
         });
     }
+
+    private void restoreOuterScroll(int y){if(outerScroll!=null)outerScroll.post(()->outerScroll.scrollTo(0,Math.max(0,y)));}
 
     private void renderLoaded(JSONObject state,JSONArray currentControls,JSONArray inferred){
         if(content==null)return;content.removeAllViews();

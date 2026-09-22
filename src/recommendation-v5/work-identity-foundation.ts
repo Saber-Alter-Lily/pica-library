@@ -119,20 +119,22 @@ export function buildWorkIdentityAuditV5(
 
     for (const comic of catalog) {
         const keys = workIdentityKeys(comic)
-        if (!keys.author) continue
-        if (keys.strictTitle) {
-            const key = keys.author + '\u0000' + keys.strictTitle
-            strictBuckets.set(key, [
-                ...(strictBuckets.get(key) || []),
-                comic
-            ])
-        }
-        if (keys.looseTitle) {
-            const key = keys.author + '\u0000' + keys.looseTitle
-            looseBuckets.set(key, [
-                ...(looseBuckets.get(key) || []),
-                comic
-            ])
+        if (!keys.authorAliases.length) continue
+        for (const author of keys.authorAliases) {
+            for (const title of keys.strictTitles) {
+                const key = author + '\u0000' + title
+                strictBuckets.set(key, [
+                    ...(strictBuckets.get(key) || []),
+                    comic
+                ])
+            }
+            for (const title of keys.looseTitles) {
+                const key = author + '\u0000' + title
+                looseBuckets.set(key, [
+                    ...(looseBuckets.get(key) || []),
+                    comic
+                ])
+            }
         }
     }
 

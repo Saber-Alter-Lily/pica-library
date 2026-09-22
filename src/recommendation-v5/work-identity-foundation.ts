@@ -65,6 +65,7 @@ function addPairs(
             if (selected.size >= limit) return
             const left = bucket[leftIndex]
             const right = bucket[rightIndex]
+            if (left.comicId === right.comicId) continue
             const key = stablePair(left.comicId, right.comicId)
             if (selected.has(key)) continue
             const pair = [left.comicId, right.comicId]
@@ -129,7 +130,10 @@ export function buildWorkIdentityAuditV5(
         // Exact/core title buckets are retained only as the author-uncertain
         // fallback. Fuzzy title matching never scans the whole catalog.
         const keys = workIdentityKeys(comic)
-        for (const title of [...keys.strictTitles, ...keys.looseTitles]) {
+        for (const title of new Set([
+            ...keys.strictTitles,
+            ...keys.looseTitles
+        ])) {
             const bucketKey = `title:${title}`
             titleFallbackBuckets.set(bucketKey, [
                 ...(titleFallbackBuckets.get(bucketKey) || []),

@@ -66,7 +66,7 @@ final class RecommendationProgressPanel extends LinearLayout {
         if(paused){
             sawActive=true;setVisibility(VISIBLE);bar.setIndeterminate(false);progressHead.setVisibility(GONE);
             phase.setText(LocalizedText.ui("推荐生成已暂停"));
-            detail.setText(LocalizedText.ui("继续会重新开始本轮生成；上一轮可用推荐保持不变。"));
+            detail.setText(LocalizedText.ui("继续会从当前检查点继续本轮生成；上一轮可用推荐保持不变。"));
             setControls(false,true,true);
             return;
         }

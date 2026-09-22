@@ -468,7 +468,7 @@ function a88InstallDetailButtons() {
         const section = a88$(root)
         if (!section) continue
         for (const card of a88$$('article.comic-card, tr', section)) {
-            if (card.querySelector('.a88-detail-trigger')) continue
+            if (card.querySelector('.a88-detail-trigger, [data-library-detail]')) continue
             const comicId = a88ComicIdFromCard(card)
             if (!comicId) continue
             const host = card.querySelector('.comic-card-body') || card.querySelector('td:nth-child(2)') || card.querySelector('td:first-child')
@@ -571,17 +571,11 @@ function a88Bootstrap() {
         if (detail) {
             event.preventDefault()
             event.stopImmediatePropagation()
-            void a88LoadDataset().then(() => {
-                const comicId = detail.dataset.a88Details
-                document.dispatchEvent(
-                    new CustomEvent('pica-open-comic-detail', {
-                        detail: {
-                            comicId,
-                            comic: a88State.comicsById.get(comicId) || null
-                        }
-                    })
-                )
-            })
+            document.dispatchEvent(
+                new CustomEvent('pica-open-comic-detail', {
+                    detail: { comicId: detail.dataset.a88Details }
+                })
+            )
         }
     }, true)
 }

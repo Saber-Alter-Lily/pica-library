@@ -13,6 +13,7 @@ import androidx.work.*;
 public final class NativeRecommendationWorker extends Worker {
     static final String KEY_PHASE="phase",KEY_DONE="done",KEY_TOTAL="total";
     private static final String CHANNEL="native-recommendation";
+    private boolean pauseAnnounced;
     public NativeRecommendationWorker(@NonNull Context context,@NonNull WorkerParameters params){super(context,params);}
 
     @NonNull @Override public Result doWork(){
@@ -20,7 +21,7 @@ public final class NativeRecommendationWorker extends Worker {
             setForegroundAsync(foreground("正在准备手机推荐",0,0));
             NativeRecommendationStore.Snapshot snapshot=NativeRecommendationEngine.build(getApplicationContext(),(phase,done,total)->{
                 Data data=new Data.Builder().putString(KEY_PHASE,phase).putInt(KEY_DONE,done).putInt(KEY_TOTAL,total).build();setProgressAsync(data);setForegroundAsync(foreground(phase,done,total));
-            },()->{if(isStopped())throw new InterruptedException("推荐任务已停止");});
+            },this::checkpoint);
             if(!snapshot.available()&&NativeRecommendationPolicy.readinessRank(snapshot.candidateCount)==0){
                 return Result.failure(new Data.Builder().putString(KEY_PHASE,"候选池不足："+snapshot.candidateCount+" 本").putInt(KEY_DONE,snapshot.candidateCount).putInt(KEY_TOTAL,NativeRecommendationPolicy.TARGET_POOL).build());
             }
@@ -31,6 +32,21 @@ public final class NativeRecommendationWorker extends Worker {
             if(getRunAttemptCount()<2)return Result.retry();
             return Result.failure(new Data.Builder().putString(KEY_PHASE,message).build());
         }
+    }
+
+    private void checkpoint() throws Exception {
+        Context app=getApplicationContext();
+        while(NativeRecommendationJobs.paused(app)){
+            if(isStopped())throw new InterruptedException("推荐任务已取消");
+            if(!pauseAnnounced){
+                pauseAnnounced=true;
+                Data data=new Data.Builder().putString(KEY_PHASE,"推荐生成已暂停").build();
+                setProgressAsync(data);setForegroundAsync(foreground("推荐生成已暂停",0,0));
+            }
+            Thread.sleep(250L);
+        }
+        pauseAnnounced=false;
+        if(isStopped())throw new InterruptedException("推荐任务已取消");
     }
 
     private ForegroundInfo foreground(String text,int done,int total){

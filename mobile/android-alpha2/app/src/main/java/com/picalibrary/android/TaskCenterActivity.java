@@ -50,17 +50,17 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         WorkInfo rec=latest(recommendation);
         LinearLayout recCard=Ui.card(this);
         recCard.addView(Ui.text(this,"推荐更新",18,Ui.TEXT,true));
-        boolean recPaused=NativeRecommendationJobs.paused(this),recPauseAck=NativeRecommendationJobs.pauseAcknowledged(this);
+        boolean recPaused=NativeRecommendationJobs.paused(this),recWorkerActive=rec!=null&&active(rec),recPauseAck=NativeRecommendationJobs.pauseAcknowledged(this)&&recWorkerActive;
         if(rec==null&&!recPaused){
             recCard.addView(Ui.text(this,"暂无推荐任务",13,Ui.MUTED,false));
         }else{
             androidx.work.Data d=rec==null?androidx.work.Data.EMPTY:(active(rec)?rec.getProgress():rec.getOutputData());
             String phase=d.getString(NativeRecommendationWorker.KEY_PHASE);
             int done=d.getInt(NativeRecommendationWorker.KEY_DONE,0),total=d.getInt(NativeRecommendationWorker.KEY_TOTAL,0);
-            recCard.addView(Ui.text(this,recPaused?(recPauseAck?"已暂停":"正在暂停…"):(rec==null?"等待继续":status(rec))+(phase==null||phase.isEmpty()?"":" · "+phase),13,Ui.MUTED,false));
+            recCard.addView(Ui.text(this,recPaused?(recPauseAck?"已暂停":recWorkerActive?"正在暂停…":"暂停状态已保留"):(rec==null?"等待继续":status(rec))+(phase==null||phase.isEmpty()?"":" · "+phase),13,Ui.MUTED,false));
             if(total>0)recCard.addView(Ui.text(this,done+" / "+total,12,Ui.PRIMARY,false));
             if(recPaused){
-                recCard.addView(Ui.text(this,recPauseAck?"继续会从当前检查点继续本轮生成；上一轮可用推荐不会被覆盖。":"当前有界请求结束后进入暂停；继续不会重新开始本轮。",12,Ui.MUTED,false));
+                recCard.addView(Ui.text(this,recPauseAck?"继续会从当前检查点继续本轮生成；上一轮可用推荐不会被覆盖。":recWorkerActive?"当前有界请求结束后进入暂停；继续不会重新开始本轮。":"后台 Worker 已结束；继续会重新执行未完成阶段，上一轮可用推荐不会被覆盖。",12,Ui.MUTED,false));
                 recCard.addView(actions(button("继续",v->NativeRecommendationJobs.resume(this)),button("取消本轮",v->NativeRecommendationJobs.cancel(this))));
             }else if(rec!=null&&active(rec)){
                 recCard.addView(actions(button("暂停",v->NativeRecommendationJobs.pause(this)),button("取消本轮",v->NativeRecommendationJobs.cancel(this))));

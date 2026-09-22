@@ -302,4 +302,4 @@ jobs:
           git tag -f android-preview "$GITHUB_SHA"
           git push --force origin refs/tags/android-preview
           gh release upload android-preview             release/android/Pica-Library-Android-Preview.apk             release/android/Pica-Library-Android-Preview.cert-sha256             release/android/android-update.json             release/android/BUILD_TRANSPARENCY-Android.json             release/BUILD_TRANSPARENCY.json             --clobber
-          gh release edit android-preview --title 'Android Preview v51 · Pica Library 0.4.8' --notes 'Android v51 / 0.4.8 正式更新通道。与既有正式版本保持相同包名和签名；可从 v42–v49 原地升级。' --prerelease
+          gh release edit android-preview --title 'Android Preview v51 · Pica Library 0.4.8' --notes 'Android v51 / 0.4.8 正式更新通道。与既有正式版本保持相同包名和签名；可从 v42–v50 原地升级。' --prerelease

@@ -2290,6 +2290,58 @@ function workVariantRelationLabel(item) {
     return t('workVariants.probable')
 }
 
+function workVariantStatusCounts(value) {
+    const items = Array.isArray(value?.items) ? value.items : []
+    const numberOrFallback = (candidate, fallback) => {
+        const parsed = Number(candidate)
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+    }
+    return {
+        count: numberOrFallback(value?.count, items.length),
+        favoriteCount: numberOrFallback(
+            value?.favoriteCount,
+            items.filter((item) => Boolean(item?.isFavorite)).length
+        ),
+        downloadedCount: numberOrFallback(
+            value?.downloadedCount,
+            items.filter(
+                (item) => Number(item?.downloadedPictures || 0) > 0
+            ).length
+        )
+    }
+}
+
+function renderWorkVariantSummary(panel, value) {
+    const summary = panel?.querySelector('summary')
+    if (!summary) return
+    const counts = workVariantStatusCounts(value)
+    const badges = []
+    if (counts.count > 0) {
+        badges.push(
+            counts.favoriteCount > 0
+                ? `<span class="work-variant-summary-chip favorite">${escapeHtml(
+                      t('workVariants.favoriteCount', {
+                          count: counts.favoriteCount
+                      })
+                  )}</span>`
+                : `<span class="work-variant-summary-chip muted">${escapeHtml(
+                      t('workVariants.noFavorite')
+                  )}</span>`
+        )
+        if (counts.downloadedCount > 0)
+            badges.push(
+                `<span class="work-variant-summary-chip downloaded">${escapeHtml(
+                    t('workVariants.downloadedCount', {
+                        count: counts.downloadedCount
+                    })
+                )}</span>`
+            )
+    }
+    summary.innerHTML = `<span class="work-variant-summary-title">${escapeHtml(
+        t('workVariants.summary', { count: counts.count })
+    )}</span><span class="work-variant-summary-badges">${badges.join('')}</span>`
+}
+
 function renderWorkVariantList(panel) {
     const value = panel?._workVariantPayload
     const target = panel?.querySelector('[data-work-variants-list]')
@@ -2310,22 +2362,50 @@ function renderWorkVariantList(panel) {
                       item.chineseTeam || '',
                       Number(item.rating || 0) > 0
                           ? `★ ${Number(item.rating).toFixed(2)}`
-                          : '',
-                      item.isFavorite ? t('workVariants.favorite') : '',
-                      Number(item.downloadedPictures || 0) > 0
-                          ? t('workVariants.downloaded')
                           : ''
                   ]
                       .filter(Boolean)
                       .join(' · ')
+                  const favorite = Boolean(item.isFavorite)
+                  const downloaded =
+                      Number(item.downloadedPictures || 0) > 0
+                  const badges = [
+                      `<span class="work-variant-chip ${favorite ? 'favorite' : 'muted'}">${escapeHtml(
+                          t(
+                              favorite
+                                  ? 'workVariants.favorite'
+                                  : 'workVariants.notFavorite'
+                          )
+                      )}</span>`,
+                      item.inLibrary
+                          ? `<span class="work-variant-chip library">${escapeHtml(
+                                t('workVariants.inLibrary')
+                            )}</span>`
+                          : '',
+                      downloaded
+                          ? `<span class="work-variant-chip downloaded">${escapeHtml(
+                                t('workVariants.downloaded')
+                            )}</span>`
+                          : ''
+                  ]
+                      .filter(Boolean)
+                      .join('')
                   const cover = item.coverPath
                       ? `<img src="${escapeHtml(item.coverPath)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
                       : '<span aria-hidden="true">P</span>'
-                  return `<article class="work-variant-card" data-work-variant-card="${escapeHtml(item.comicId)}">
+                  const title = item.title || item.comicId
+                  return `<article class="work-variant-card" data-work-variant-card="${escapeHtml(
+                      item.comicId
+                  )}" data-work-variant-open="${escapeHtml(
+                      item.comicId
+                  )}" role="link" tabindex="0" aria-label="${escapeHtml(
+                      t('workVariants.openLabel', { title })
+                  )}">
                       <div class="work-variant-cover">${cover}</div>
                       <div class="work-variant-copy">
-                          <strong>${escapeHtml(item.title || item.comicId)}</strong>
+                          <strong>${escapeHtml(title)}</strong>
                           <span>${escapeHtml(item.canonicalAuthor || item.author || t('common.unknownAuthor'))}</span>
+                          <div class="work-variant-badges">${badges}</div>
                           <small>${escapeHtml(meta)}</small>
                           <small>${escapeHtml(workVariantRelationLabel(item))}</small>
                           <button type="button" data-work-variant-open="${escapeHtml(item.comicId)}">${escapeHtml(t('workVariants.open'))}</button>
@@ -2339,24 +2419,27 @@ function renderWorkVariantList(panel) {
 async function loadWorkVariantsForDetail(comicId) {
     const panel = $('#work-variants-panel')
     if (!panel) return
-    const summary = panel.querySelector('summary')
     try {
         const value =
             state.mode === 'connected'
                 ? await api(
                       `/api/v1/comics/${encodeURIComponent(comicId)}/work-variants?limit=24`
                   )
-                : { count: 0, items: [] }
+                : { count: 0, favoriteCount: 0, downloadedCount: 0, items: [] }
         if ($('#recommend-detail-dialog')?.dataset.comicId !== comicId) return
         panel._workVariantPayload = value
-        summary.textContent = t('workVariants.summary', {
-            count: Number(value.count || 0)
-        })
+        renderWorkVariantSummary(panel, value)
         panel.toggleAttribute('data-empty', Number(value.count || 0) === 0)
         if (panel.open) renderWorkVariantList(panel)
     } catch {
-        summary.textContent = t('workVariants.summary', { count: 0 })
-        panel._workVariantPayload = { count: 0, items: [] }
+        const empty = {
+            count: 0,
+            favoriteCount: 0,
+            downloadedCount: 0,
+            items: []
+        }
+        renderWorkVariantSummary(panel, empty)
+        panel._workVariantPayload = empty
     }
 }
 
@@ -2370,8 +2453,13 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
     dialog.dataset.previewOffset = '0'
     $('#recommend-preview').innerHTML = ''
     $('#recommend-preview-message').textContent = ''
+    const favoriteButton = state.capabilities?.features?.providerFavoriteMutation
+        ? `<button data-detail-favorite="true"${comic.isFavorite ? ' disabled' : ''}>${t(
+              comic.isFavorite ? 'result.favorited' : 'result.favorite'
+          )}</button>`
+        : ''
     $('#recommend-detail-content').innerHTML =
-        `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${state.capabilities?.features?.providerFavoriteMutation ? `<button data-detail-favorite="true">${t('result.favorite')}</button>` : ''}<button data-detail-download="true">${t('action.download')}</button></div><details id="work-variants-panel" class="work-variants-panel"><summary>${escapeHtml(t('workVariants.loading'))}</summary><div data-work-variants-list></div></details>`
+        `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${favoriteButton}<button data-detail-download="true">${t('action.download')}</button></div><details id="work-variants-panel" class="work-variants-panel"><summary>${escapeHtml(t('workVariants.loading'))}</summary><div data-work-variants-list></div></details>`
     if (state.mode === 'connected') {
         const button = document.createElement('button')
         button.dataset.detailOnline = 'true'
@@ -2457,6 +2545,15 @@ $('#recommend-detail-close').onclick = () =>
 $('#recommend-detail-dialog').onclick = async (event) => {
     const dialog = $('#recommend-detail-dialog')
     const comicId = dialog.dataset.comicId
+    const variantTrigger = event.target.closest?.('[data-work-variant-open]')
+    if (variantTrigger) {
+        event.preventDefault()
+        const id = variantTrigger.dataset.workVariantOpen
+        const payload = $('#work-variants-panel')?._workVariantPayload
+        const item = (payload?.items || []).find((row) => row.comicId === id)
+        if (item) openRecommendationDetail(id, 'work-variant', item)
+        return
+    }
     if (event.target.dataset.detailOnline) {
         dialog.close()
         await openReaderComic(comicId, true)
@@ -2483,12 +2580,6 @@ $('#recommend-detail-dialog').onclick = async (event) => {
                 error
             )
         }
-    }
-    else if (event.target.dataset.workVariantOpen) {
-        const id = event.target.dataset.workVariantOpen
-        const payload = $('#work-variants-panel')?._workVariantPayload
-        const item = (payload?.items || []).find((row) => row.comicId === id)
-        if (item) openRecommendationDetail(id, 'work-variant', item)
     }
     else if (event.target.dataset.detailPreviewMore)
         await loadRecommendationPreview(
@@ -2518,6 +2609,14 @@ $('#recommend-detail-dialog').onclick = async (event) => {
     } else if (event.target.dataset.detailDownload)
         await enqueue([comicId], dialog.dataset.context)
 }
+
+$('#recommend-detail-dialog').addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    if (!event.target.matches?.('.work-variant-card[data-work-variant-open]'))
+        return
+    event.preventDefault()
+    event.target.click()
+})
 
 let readerProgressTimer = null
 let readerScrollHandler = null

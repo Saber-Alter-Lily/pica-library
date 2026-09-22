@@ -222,14 +222,22 @@ export function workIdentityDetailEvidenceV3(
         (signals.strictTitleMatch ||
             signals.trustedCoreTitleMatch ||
             signals.looseTitleMatch)
-    )
+    ) {
+        const a = workIdentityKeys(left)
+        const b = workIdentityKeys(right)
+        const bothCreatorsUnknown =
+            a.authorAliases.length === 0 && b.authorAliases.length === 0
         return {
             relation:
-                signals.pageCountCompatible && signals.strictTitleMatch
+                bothCreatorsUnknown &&
+                signals.pageCountCompatible &&
+                signals.strictTitleMatch
                     ? 'HIGH_CONFIDENCE_WORK'
                     : 'REVIEW_CANDIDATE',
             confidence:
-                signals.pageCountCompatible && signals.strictTitleMatch
+                bothCreatorsUnknown &&
+                signals.pageCountCompatible &&
+                signals.strictTitleMatch
                     ? 0.94
                     : signals.pageCountCompatible
                       ? 0.88
@@ -241,6 +249,7 @@ export function workIdentityDetailEvidenceV3(
             titleSimilarity: Math.max(signals.strictTitleMatch ? 1 : 0.92, fuzzy),
             pageCountCompatible: signals.pageCountCompatible
         }
+    }
 
     return {
         relation: 'DISTINCT_OR_UNKNOWN',

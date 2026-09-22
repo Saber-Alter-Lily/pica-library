@@ -117,8 +117,8 @@ jobs:
             'Pica-Library-v0.4.11-update-from-v0.4.6.zip',
             'Pica-Library-v0.4.11-update-from-v0.4.7.zip',
             'Pica-Library-v0.4.11-update-from-v0.4.8.zip',
-            'Pica-Library-v0.4.11-update-from-v0.4.9.zip
-            Pica-Library-v0.4.11-update-from-v0.4.10.zip',
+            'Pica-Library-v0.4.11-update-from-v0.4.9.zip',
+            'Pica-Library-v0.4.11-update-from-v0.4.10.zip',
             'Pica-Library-v0.4.11-upgrade-assistant.zip'
           )
           $lines=@()
@@ -147,7 +147,7 @@ jobs:
             artifacts/Pica-Library-v0.4.11-update-from-v0.4.7.zip
             artifacts/Pica-Library-v0.4.11-update-from-v0.4.8.zip
             artifacts/Pica-Library-v0.4.11-update-from-v0.4.9.zip
-            Pica-Library-v0.4.11-update-from-v0.4.10.zip
+            artifacts/Pica-Library-v0.4.11-update-from-v0.4.10.zip
             artifacts/Pica-Library-v0.4.11-upgrade-assistant.zip
             artifacts/Pica-Library-v0.4.11-upgrade-assistant.sha256
             artifacts/SHA256SUMS-Windows.txt
@@ -227,7 +227,7 @@ jobs:
           python - "$sha" "$cert" "$GITHUB_SHA" <<'PY'
           import json,sys
           sha,cert,source=sys.argv[1:]
-          out={"release":"v0.4.11","versionCode":53,"versionName":"0.4.11","sourceSha":source,"apkSha256":sha,"signerCertificateSha256":cert,"minimumSupportedVersionCode":42,"upgradeValidation":["same-package-id","higher-than-v52-formal-version","same-signing-certificate","formal-label","unit-tests","lint","R8-release-build"]}
+          out={"release":"v0.4.11","versionCode":54,"versionName":"0.4.11","sourceSha":source,"apkSha256":sha,"signerCertificateSha256":cert,"minimumSupportedVersionCode":42,"upgradeValidation":["same-package-id","higher-than-v53-formal-version","same-signing-certificate","formal-label","unit-tests","lint","R8-release-build"]}
           with open("publish/BUILD_TRANSPARENCY-Android.json","w",encoding="utf-8") as f: json.dump(out,f,ensure_ascii=False,indent=2)
           PY
       - uses: actions/upload-artifact@v4
@@ -294,7 +294,7 @@ jobs:
             release/windows/Pica-Library-v0.4.11-update-from-v0.4.7.zip
             release/windows/Pica-Library-v0.4.11-update-from-v0.4.8.zip
             release/windows/Pica-Library-v0.4.11-update-from-v0.4.9.zip
-            Pica-Library-v0.4.11-update-from-v0.4.10.zip
+            release/windows/Pica-Library-v0.4.11-update-from-v0.4.10.zip
             release/windows/Pica-Library-v0.4.11-upgrade-assistant.zip
             release/windows/Pica-Library-v0.4.11-upgrade-assistant.sha256
             release/windows/BUILD_TRANSPARENCY-Windows.json

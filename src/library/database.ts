@@ -2133,6 +2133,42 @@ export class LibraryDatabase {
         ).map((row) => String(row.id))
     }
 
+    recommendationOwnershipState() {
+        const ownedComicIds = (
+            this.db
+                .prepare(
+                    `SELECT c.id
+                     FROM comics c
+                     WHERE c.is_favorite = 1
+                        OR EXISTS(
+                            SELECT 1 FROM library_membership lm
+                            WHERE lm.comic_id = c.id
+                        )
+                        OR EXISTS(
+                            SELECT 1 FROM pictures p
+                            WHERE p.comic_id = c.id
+                              AND p.status = 'completed'
+                        )
+                     ORDER BY c.id`
+                )
+                .all() as SqlRow[]
+        ).map((row) => String(row.id))
+        const bindingState = this.db
+            .prepare(
+                `SELECT COUNT(*) AS count,
+                        COALESCE(MAX(updated_at), '') AS updated_at
+                 FROM work_upload_bindings`
+            )
+            .get() as SqlRow
+        return {
+            ownedComicIds,
+            identityBindingsVersion:
+                numberValue(bindingState.count) +
+                ':' +
+                String(bindingState.updated_at ?? '')
+        }
+    }
+
     favoritesSyncState(): FavoritesSyncState {
         const row = this.db
             .prepare('SELECT * FROM favorites_sync_state WHERE id = 1')

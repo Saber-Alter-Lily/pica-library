@@ -145,7 +145,7 @@ describe('Canonical Work Identity foundation', () => {
             [pica, eh],
             defaultPortablePolicyStateV5()
         )
-        expect(result.resolverVersion).toContain('work-identity-v2')
+        expect(result.resolverVersion).toContain('work-identity-v3')
         expect(result.candidates).toHaveLength(1)
         expect(result.candidates[0]).toMatchObject({
             leftComicId: 'pica:stolen-wife',

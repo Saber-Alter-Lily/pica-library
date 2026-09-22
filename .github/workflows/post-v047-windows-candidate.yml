@@ -1,4 +1,4 @@
-name: Post-v0.4.7 Windows candidate (unpublished)
+name: v0.4.8 Windows release candidate (unpublished)
 
 on:
   push:
@@ -44,33 +44,33 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Download checksum-pinned v0.4.6 Windows baseline
+      - name: Download checksum-pinned v0.4.7 Windows baseline
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts\release-base | Out-Null
-          $name='Pica-Library-v0.4.6-windows-x64.zip'
+          $name='Pica-Library-v0.4.7-windows-x64.zip'
           $path=Join-Path 'artifacts\release-base' $name
-          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.6/$name" -OutFile $path
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.7/$name" -OutFile $path
           $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
-          $expected='914d691b441e8dbc95a9ef0bb7a7ebc46940bfc44907e0595a8953a293bda50c'
-          if($actual -ne $expected){ throw "Official v0.4.6 package checksum mismatch: $actual" }
+          $expected='dafea5417e27055c6a4871b7386f31b66a51f82a5ce01136d467ee1176659947'
+          if($actual -ne $expected){ throw "Official v0.4.7 package checksum mismatch: $actual" }
 
       - name: Build and smoke Windows package
         shell: pwsh
         run: |
           pnpm build:windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $zip='artifacts\Pica-Library-v0.4.7-windows-x64.zip'
+          $zip='artifacts\Pica-Library-v0.4.8-windows-x64.zip'
           if (-not (Test-Path -LiteralPath $zip)) { throw 'Windows package was not created' }
           ./scripts/test-windows-artifact.ps1 -Zip $zip
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           New-Item -ItemType Directory -Force -Path candidate | Out-Null
-          Copy-Item -LiteralPath $zip -Destination 'candidate\Pica-Library-v0.4.7-post-release-download-stability-test.zip'
-          $sha=(Get-FileHash -Algorithm SHA256 -LiteralPath 'candidate\Pica-Library-v0.4.7-post-release-download-stability-test.zip').Hash.ToLowerInvariant()
-          "$sha  Pica-Library-v0.4.7-post-release-download-stability-test.zip" | Set-Content -Encoding ascii 'candidate\SHA256SUMS.txt'
+          Copy-Item -LiteralPath $zip -Destination 'candidate\Pica-Library-v0.4.8-download-runtime-stability-rc.zip'
+          $sha=(Get-FileHash -Algorithm SHA256 -LiteralPath 'candidate\Pica-Library-v0.4.8-download-runtime-stability-rc.zip').Hash.ToLowerInvariant()
+          "$sha  Pica-Library-v0.4.8-download-runtime-stability-rc.zip" | Set-Content -Encoding ascii 'candidate\SHA256SUMS.txt'
           $env:GITHUB_SHA | Set-Content -Encoding ascii 'candidate\SOURCE_SHA.txt'
-          'UNPUBLISHED MANUAL-QA BUILD. Post-v0.4.7 download runtime stability candidate. Not connected to the stable update channel.' | Set-Content -Encoding utf8 'candidate\STATUS.txt'
+          'UNPUBLISHED MANUAL-QA BUILD. v0.4.8 download runtime stability release candidate. Not connected to the stable update channel.' | Set-Content -Encoding utf8 'candidate\STATUS.txt'
       - uses: actions/upload-artifact@v4
         with:
           name: post-v047-download-stability-windows

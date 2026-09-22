@@ -83,6 +83,8 @@ describe('v0.4.7 long-task stability contract', () => {
         const bootstrap = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBootstrapWorker.java')
         expect(recJobs).toContain('static void pause(Context context)')
         expect(recJobs).toContain('static void resume(Context context)')
+        expect(recJobs).not.toContain('setPaused(context,"recommendation",UNIQUE_NAME,true);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME)')
+        expect(recJobs).toContain('ExistingWorkPolicy.KEEP')
         expect(recEngine).toContain('interface Control { void checkpoint() throws Exception; }')
         expect(recEngine).toContain('consecutivePicaFailures>=3')
         expect(downloadJobs).toContain('static void pause(Context context,String comicId,String episodeId)')
@@ -92,7 +94,7 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(favoriteJobs).toContain('static void resume(Context context)')
         expect(bootstrap).toContain('正在读取 Pica 收藏 · 第 ')
         expect(taskCenter).toContain('继续会从已经完成并校验的页面续传。')
-        expect(taskCenter).toContain('继续会重新开始本轮生成；上一轮可用推荐不会被覆盖。')
+        expect(taskCenter).toContain('继续会从当前检查点继续本轮生成；上一轮可用推荐不会被覆盖。')
     })
 
     it('retains mature Desktop download and Android updater controls', () => {

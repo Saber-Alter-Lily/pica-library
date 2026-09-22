@@ -849,9 +849,17 @@ function showAvailableUpdateInSettings(value) {
         })
     }
     activateView('settings')
-    requestAnimationFrame(() =>
-        $('#settings-update')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-    )
+    requestAnimationFrame(() => {
+        const softwareHub = document.querySelector(
+            '.a87-hub-nav button[data-hub-panel="software"]'
+        )
+        if (softwareHub) softwareHub.click()
+        else
+            $('#settings-update')?.scrollIntoView({
+                block: 'start',
+                behavior: 'smooth'
+            })
+    })
 }
 
 async function maybePromptForUpdate() {

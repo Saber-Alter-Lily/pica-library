@@ -81,8 +81,8 @@ final class WorkVariantResolver {
                         "CREATOR_TITLE",similarity,pages,Double.NaN));
                     continue;
                 }
-                if(creator&&(similarity>=.68d||(pages&&similarity>=.58d))){
-                    double confidence=Math.min(.91d,.70d+Math.max(0d,similarity-.58d)*.55d+(pages?.04d:0d));
+                if(creator&&(similarity>=.68d||pages)){
+                    double confidence=Math.min(.91d,.60d+Math.max(0d,similarity-.45d)*.70d+(pages?.06d:0d));
                     review.add(new MetadataCandidate(other,true,pages,similarity,confidence));
                     continue;
                 }

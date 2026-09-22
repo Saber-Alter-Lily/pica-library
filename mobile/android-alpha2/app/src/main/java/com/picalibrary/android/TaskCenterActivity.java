@@ -60,7 +60,7 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
             recCard.addView(Ui.text(this,recPaused?"已暂停":(rec==null?"等待继续":status(rec))+(phase==null||phase.isEmpty()?"":" · "+phase),13,Ui.MUTED,false));
             if(total>0)recCard.addView(Ui.text(this,done+" / "+total,12,Ui.PRIMARY,false));
             if(recPaused){
-                recCard.addView(Ui.text(this,"继续会重新开始本轮生成；上一轮可用推荐不会被覆盖。",12,Ui.MUTED,false));
+                recCard.addView(Ui.text(this,"继续会从当前检查点继续本轮生成；上一轮可用推荐不会被覆盖。",12,Ui.MUTED,false));
                 recCard.addView(actions(button("继续",v->NativeRecommendationJobs.resume(this)),button("取消本轮",v->NativeRecommendationJobs.cancel(this))));
             }else if(rec!=null&&active(rec)){
                 recCard.addView(actions(button("暂停",v->NativeRecommendationJobs.pause(this)),button("取消本轮",v->NativeRecommendationJobs.cancel(this))));

@@ -133,23 +133,29 @@ export class CycleCoordinatorV3 {
                 Omit<RankedCandidateWithEvidenceV3, 'comic'>
             >
         }
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const ownership = this.database.recommendationOwnershipState()
+        const ownedComicIds = new Set([
+            ...ownership.ownedComicIds,
+            ...policy.ownedComicIds
+        ])
+        const ownershipKey = JSON.stringify({
+            ownedComicIds: [...ownedComicIds].sort(),
+            identityBindingsVersion: ownership.identityBindingsVersion,
+            explicitDistinctPairs: [...policy.explicitDistinctPairs].sort()
+        })
+        const existing = this.servingSnapshots.get(cycleId)
+        if (
+            existing?.poolId === pool.id &&
+            existing.ownershipKey === ownershipKey
+        )
+            return existing
+
         const catalog = this.database.listComics({ limit: 10000 })
         const catalogById = new Map(
             catalog.map((comic) => [comic.comicId, comic])
         )
-        const policy = new RecommendationPolicyStoreV5(this.database).state()
         const bindings = this.database.listWorkIdentityBindings(10000)
-        const ownedComicIds = new Set([
-            ...policy.ownedComicIds,
-            ...catalog
-                .filter(
-                    (comic) =>
-                        comic.isFavorite ||
-                        comic.inLibrary ||
-                        comic.downloadedPictures > 0
-                )
-                .map((comic) => comic.comicId)
-        ])
         const ownedWorkIds = new Set(
             bindings
                 .filter((binding) => ownedComicIds.has(binding.comicId))
@@ -167,17 +173,6 @@ export class CycleCoordinatorV3 {
                 ])
             ]
         }
-        const ownershipKey = JSON.stringify({
-            ownedComicIds: [...ownedComicIds].sort(),
-            canonicalOwnedComicIds: [...canonicalOwnedComicIds].sort(),
-            explicitDistinctPairs: [...policy.explicitDistinctPairs].sort()
-        })
-        const existing = this.servingSnapshots.get(cycleId)
-        if (
-            existing?.poolId === pool.id &&
-            existing.ownershipKey === ownershipKey
-        )
-            return existing
         const ranked = (telemetry.rankedCandidates ?? []).flatMap((item) => {
             const comic = catalogById.get(item.comicId)
             return comic ? [{ ...item, comic }] : []

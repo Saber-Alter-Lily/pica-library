@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest'
 
 const read = (file: string) => fs.readFileSync(file, 'utf8')
 
-describe('v0.4.7 stability release contract', () => {
-    it('coordinates current Desktop and Android versions', () => {
-        const pkg = JSON.parse(read('package.json'))
-        const gradle = read('mobile/android-alpha2/app/build.gradle')
-        expect(pkg.version).toBe('0.4.7')
-        expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '50'")
-        expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.4.7'")
+describe('v0.4.7 historical stability release contract', () => {
+    it('keeps the published v0.4.7 workflow retired from automatic main pushes', () => {
+        const workflow = read('.github/workflows/v047-release.yml')
+        expect(workflow).toContain('name: v0.4.7 Formal Release')
+        expect(workflow).toContain('workflow_dispatch:')
+        expect(workflow).not.toContain('branches: [main]')
+        expect(workflow).toContain("versionCode='50' versionName='0.4.7'")
+        expect(workflow).toContain('Pica-Library-Android-v50.apk')
     })
 
     it('pins v0.4.6 as the immediate formal upgrade baseline', () => {
@@ -41,7 +42,8 @@ describe('v0.4.7 stability release contract', () => {
     it('retires older automatic release publishers', () => {
         for (const file of [
             '.github/workflows/v045-release.yml',
-            '.github/workflows/v046-release.yml'
+            '.github/workflows/v046-release.yml',
+            '.github/workflows/v047-release.yml'
         ]) {
             const workflow = read(file)
             expect(workflow).toContain('workflow_dispatch:')

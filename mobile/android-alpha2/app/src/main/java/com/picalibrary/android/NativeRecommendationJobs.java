@@ -15,8 +15,8 @@ final class NativeRecommendationJobs {
     }
     static void enqueue(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.KEEP,request());}
     static void refresh(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.REPLACE,request());}
-    static void pause(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,true);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
-    static void resume(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.REPLACE,request());}
+    static void pause(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,true);}
+    static void resume(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,ExistingWorkPolicy.KEEP,request());}
     static void cancel(Context context){MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
     static boolean paused(Context context){return MobileTaskPauseStore.isPaused(context,"recommendation",UNIQUE_NAME);}
 }

@@ -60,13 +60,13 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(app).toContain('function renderWorkVariantSummary(panel, value)')
         expect(app).toContain('value?.favoriteCount')
         expect(app).toContain('workVariants.notFavorite')
-        expect(app).toContain('role="link" tabindex="0"')
+        expect(app).toContain('class="work-variant-open-link"')
         expect(app).toContain("event.target.closest?.('[data-work-variant-open]')")
         expect(app).toContain("openRecommendationDetail(id, 'work-variant', item)")
         expect(app).toContain('if (panel.open) renderWorkVariantList(panel)')
         expect(css).toContain('.work-variant-summary-chip')
         expect(css).toContain('.work-variant-card:hover')
-        expect(css).toContain('.work-variant-card:focus-visible')
+        expect(css).toContain('.work-variant-open-link:focus-visible')
     })
 
     it('keeps Android work variants collapsed and independently resolves probable works offline', () => {

@@ -8,13 +8,14 @@
 - v0.4.1–v0.4.3 是短周期过渡版本，继续保留在版本历史、兼容测试和发布资产中，但普通用户无需逐个安装，也不作为主页和使用指南的推荐升级路径。
 
 
-## Unreleased — Work Identity V2
+## v0.4.10 — Work Identity V2 与同作品识别
 
 - 作品详情区块由“相似作品”改名为“同一作品”，避免与推荐系统的 Related / 相似作品召回混淆；推荐通道中的“相似作品”术语保持不变。
 - Work Identity resolver 升级为 V2：主标题与 `alternateTitles` 全部参与 strict/loose identity keys，并识别 E-H 常见 `[Circle (Author)]` 前缀中的 creator alias。
 - 作者身份判定优先使用现有 canonical `authorId`，其次使用 canonical/raw/标题 credit 中的 alias 交集；同作者 + 同 core title alias 可直接形成 high-confidence Work evidence，不再要求两个 Provider 的主标题使用同一种语言。
 - 增加 Cover Identity 辅助证据：只读取既有 `embeddingKind=cover` 的 cover embedding，在至少存在一项独立元数据支持时才比较；阈值极高且只生成 `PROBABLE_SAME_WORK`，不自动 materialize Canonical Work，也不作为单独硬排除依据。
 - 固化跨语言回归样本：Pica《盗まれた人妻。》与 E-H `Nusumareta Hitozuma. - Stolen Wife [Digital]` 必须通过 E-H 日文 alternate title / creator alias 双向互链；`KEEP_SEPARATE` 仍拥有最高优先级。
+- Desktop v0.4.10 / Android versionCode 53；Windows v0.4.1–v0.4.9 提供 scoped 增量更新，v0.4.0 使用 v0.4.10 直达升级助手。
 
 ## v0.4.9 — 推荐交互稳定性、自动更新与 Work 版本互链
 

@@ -113,6 +113,7 @@ const $$ = (selector) => [...document.querySelectorAll(selector)]
 
 const VISUAL_SETTINGS_CACHE_KEY = 'pica-visual-settings-confirmed-v1'
 const AUTO_UPDATE_PROMPT_KEY = 'pica-auto-update-prompt-v1'
+const AUTO_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 const AUTO_UPDATE_PROMPT_INTERVAL_MS = 12 * 60 * 60 * 1000
 let visualSettingsMutationVersion = 0
 
@@ -819,22 +820,41 @@ $('#update-apply').onclick = async () => {
     }
 }
 
-function updatePromptDue(version) {
+function readAutoUpdatePromptState() {
     try {
         const value = JSON.parse(localStorage.getItem(AUTO_UPDATE_PROMPT_KEY) || 'null')
-        return !value ||
-            value.version !== version ||
-            Date.now() - Number(value.promptedAt || 0) >= AUTO_UPDATE_PROMPT_INTERVAL_MS
+        return value && typeof value === 'object' ? value : {}
     } catch {
-        return true
+        return {}
     }
 }
 
-function markUpdatePrompted(version) {
+function writeAutoUpdatePromptState(patch) {
     localStorage.setItem(
         AUTO_UPDATE_PROMPT_KEY,
-        JSON.stringify({ version, promptedAt: Date.now() })
+        JSON.stringify({ ...readAutoUpdatePromptState(), ...patch })
     )
+}
+
+function automaticUpdateCheckDue() {
+    const value = readAutoUpdatePromptState()
+    return (
+        Date.now() - Number(value.checkedAt || 0) >=
+        AUTO_UPDATE_CHECK_INTERVAL_MS
+    )
+}
+
+function updatePromptDue(version) {
+    const value = readAutoUpdatePromptState()
+    return (
+        value.version !== version ||
+        Date.now() - Number(value.promptedAt || 0) >=
+            AUTO_UPDATE_PROMPT_INTERVAL_MS
+    )
+}
+
+function markUpdatePrompted(version) {
+    writeAutoUpdatePromptState({ version, promptedAt: Date.now() })
 }
 
 function showAvailableUpdateInSettings(value) {
@@ -863,10 +883,16 @@ function showAvailableUpdateInSettings(value) {
 }
 
 async function maybePromptForUpdate() {
-    if (!desktop || state.mode === 'lite' || document.body.classList.contains('browser-lite-forced'))
+    if (
+        !desktop ||
+        state.mode === 'lite' ||
+        document.body.classList.contains('browser-lite-forced') ||
+        !automaticUpdateCheckDue()
+    )
         return
     try {
         const available = await api('/api/v1/update/check')
+        writeAutoUpdatePromptState({ checkedAt: Date.now() })
         if (!available || available.status === 'current') return
         const version = String(available.version || '').trim()
         if (!version || !updatePromptDue(version)) return

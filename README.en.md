@@ -10,17 +10,16 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV** across discovery, fa
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.9 highlights
+## v0.4.10 highlights
 
-- **Android recommendation pause now resumes in place**: a normal user pause no longer cancels the WorkManager job. Resume continues the same live Worker and completed stage boundaries; if Android kills the process, the UI explicitly reports the durable fallback instead of claiming an exact cross-process checkpoint.
-- **Feedback no longer reshuffles the current batch**: Android Like / Dislike now matches Desktop. The visible 12-work batch stays frozen and only the selected card's feedback state changes; later-batch works are not pulled forward.
-- **Manual preference controls keep their scroll position**: Android 0–10 sliders, blocks, and session-intent mutations no longer jump the page back to the top.
-- **Automatic update discovery on both clients**: Desktop/Web and Android periodically check the official update channel while foregrounded and present throttled prompts, while reusing the existing verification/install flow. Updates are never silently downloaded or installed.
-- **Owned Works stay out of new-work recommendations**: Final V3 adds a Canonical Work-level ownership gate on top of exact-upload filtering, so known alternate uploads of favorited, library-owned, or downloaded Works are excluded from final serving.
-- **Collapsible “Similar works · N” in comic details**: collapsed state shows only the count; expanding reveals cover, title, author, page count, provider, edition/language, favorite/download state, and available rating/translation-team metadata, with direct navigation to each version.
-- **Conservative Work Identity semantics**: materialized bindings and human adjudication have priority. High-confidence probable matches are detail-only hints and are not automatically materialized or promoted into hard recommendation suppression. `KEEP_SEPARATE` always wins.
-- **One common Web detail surface**: Library, Downloaded, Shelves, Search, and Recommendation now converge on the same detail view, and opening a normal detail no longer preloads the full Visual QC dataset.
-- **Upgrade path**: Windows v0.4.0 uses the v0.4.9 upgrade assistant; v0.4.1–v0.4.8 can use scoped incremental updates. Android formal release is v52 / 0.4.9.
+- **Work Identity V2**: identity matching now considers both `title` and `alternateTitles`, and extracts creator aliases from common E-H `[Circle (Author)]` prefixes.
+- **Cross-language same-work detection**: a Pica Japanese title can match an E-H romanized/English primary title when provider alternate titles and creator identity support the same Work.
+- **Stronger creator identity**: canonical `authorId` is preferred, with canonical/raw/title-credit aliases as fallback evidence.
+- **Cover Identity as auxiliary evidence**: near-duplicate cover evidence is separate from visual-style similarity. It is considered only when independent metadata also supports the pair, uses a very high threshold, and only yields `PROBABLE_SAME_WORK`.
+- **Detail terminology is now “Same work”**: the former “Similar works · N” row is renamed to “Same work · N” to avoid confusion with recommendation-channel Related works. It remains collapsed by default.
+- **Conservative anti-merge rules remain**: generic upload-noise stripping such as `[Chinese]`, `[Digital]`, or translation labels still requires compatible supporting evidence such as page count; `KEEP_SEPARATE` always wins.
+- **Cross-provider regression fixture**: Pica `盗まれた人妻。` and E-H `Nusumareta Hitozuma. - Stolen Wife [Digital]` are locked as a bidirectional identity regression case.
+- **Upgrade path**: Windows v0.4.0 uses the v0.4.10 upgrade assistant; v0.4.1–v0.4.9 can use scoped incremental updates. Android formal release is v53 / 0.4.10.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
@@ -72,7 +71,7 @@ See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 ### Updates and maintenance
 
 - Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.9 Release to move directly to the latest release without installing intermediate versions.
+- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.10 Release to move directly to the latest release without installing intermediate versions.
 - Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
 - Logs, repair, cache, export, and diagnostic tools are available from the app.
 
@@ -105,11 +104,11 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-Existing **v0.4.0** users should download `Pica-Library-v0.4.9-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.9.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+Existing **v0.4.0** users should download `Pica-Library-v0.4.10-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.10.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v52 / 0.4.9** through the in-app update chain; no intermediate versions are required.
+Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v53 / 0.4.10** through the in-app update chain; no intermediate versions are required.
 
 ## Local-first and security
 

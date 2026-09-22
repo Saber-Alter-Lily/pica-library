@@ -64,9 +64,10 @@ final class RecommendationProgressPanel extends LinearLayout {
     private void apply(State state){
         boolean paused=NativeRecommendationJobs.paused(getContext());
         if(paused){
+            boolean acknowledged=NativeRecommendationJobs.pauseAcknowledged(getContext());
             sawActive=true;setVisibility(VISIBLE);bar.setIndeterminate(false);progressHead.setVisibility(GONE);
-            phase.setText(LocalizedText.ui("推荐生成已暂停"));
-            detail.setText(LocalizedText.ui("继续会从当前检查点继续本轮生成；上一轮可用推荐保持不变。"));
+            phase.setText(LocalizedText.ui(acknowledged?"推荐生成已暂停":"正在暂停推荐生成…"));
+            detail.setText(LocalizedText.ui(acknowledged?"继续会从当前检查点继续本轮生成；上一轮可用推荐保持不变。":"当前有界请求完成后进入暂停，不会丢弃本轮已完成工作。"));
             setControls(false,true,true);
             return;
         }

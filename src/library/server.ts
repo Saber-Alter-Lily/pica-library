@@ -1914,6 +1914,19 @@ export async function startLibraryServer(options: {
                     })
                 )
             }
+            const workVariantsRequest = url.pathname.match(
+                /^\/api\/v1\/comics\/([^/]+)\/work-variants$/
+            )
+            if (workVariantsRequest && request.method === 'GET')
+                return json(
+                    response,
+                    200,
+                    options.service.workVariantsForComic(
+                        decodeURIComponent(workVariantsRequest[1]),
+                        Number(url.searchParams.get('limit') ?? 24)
+                    )
+                )
+
             const coverRequest = url.pathname.match(
                 /^\/api\/v1\/covers\/([^/]+)$/
             )

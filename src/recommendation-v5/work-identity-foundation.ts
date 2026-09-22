@@ -74,7 +74,7 @@ function addPairs(
                 .join('\u0000')
             if (state.explicitDistinctPairs.includes(pair)) continue
             const identity = workIdentityDetailEvidenceV3(left, right)
-            if (identity.relation === 'DISTINCT_OR_UNKNOWN') continue
+            if (identity.relation !== 'HIGH_CONFIDENCE_WORK') continue
             const a = workIdentityKeys(left)
             const b = workIdentityKeys(right)
             const leftProvider = providerId(left)

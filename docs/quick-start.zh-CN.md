@@ -1,14 +1,14 @@
 # Pica Library 快速开始
 
-当前稳定版：**v0.4.7**。第一次使用 Windows 版通常只需要完成下载安装、首次设置、同步书库和按需配置推荐。
+当前稳定版：**v0.4.8**。第一次使用 Windows 版通常只需要完成下载安装、首次设置、同步书库和按需配置推荐。
 
 ## 01 下载与解压
 
 从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包。
 
-v0.4.7 对应：
+v0.4.8 对应：
 
-`Pica-Library-v0.4.7-windows-x64.zip`
+`Pica-Library-v0.4.8-windows-x64.zip`
 
 完整解压到普通文件夹，不要直接在压缩软件中运行。
 
@@ -97,13 +97,13 @@ Windows 打开 **设置 → 软件更新**。
 
 已有 **v0.4.0** 的用户直接升级到当前最新版即可：
 
-- 从 v0.4.7 Release 下载 `Pica-Library-v0.4.7-upgrade-assistant.zip`；
-- 解压后运行 `Upgrade-Pica-Library-v0.4.7.cmd`；
+- 从 v0.4.8 Release 下载 `Pica-Library-v0.4.8-upgrade-assistant.zip`；
+- 解压后运行 `Upgrade-Pica-Library-v0.4.8.cmd`；
 - 无需安装任何中间版本。
 
 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\\Pica Library`、备份旧程序和数据库、替换程序并执行健康检查；失败时自动回滚。
 
-Android 已有 v42 / 0.4.0 用户可直接通过应用内更新链升级到 v50 / 0.4.7，无需安装中间版本。
+Android 已有 v42 / 0.4.0 用户可直接通过应用内更新链升级到 v51 / 0.4.7，无需安装中间版本。
 
 应用程序文件与用户数据目录彼此独立。升级不需要卸载，也不需要重新导入数据库、书架、历史或设置；不要为了升级删除 `%LOCALAPPDATA%\\Pica Library`。
 

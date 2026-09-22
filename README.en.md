@@ -10,17 +10,17 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV** across discovery, fa
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.8 highlights
+## v0.4.9 highlights
 
-- **Single-instance Desktop download runtime**: only one local scheduler can own the queue. Reloading the Web UI or pressing Run again cannot start a second competing runner.
-- **Download execution is detached from the Web request lifecycle**: the Web UI starts the background runner and returns immediately instead of keeping one HTTP request open until a large queue drains.
-- **Crash recovery for interrupted download jobs**: on startup, stale local `PREPARING / RUNNING / RETRY_WAIT` jobs are returned to `QUEUED` while completed-page progress is preserved. User-requested `PAUSED` jobs stay paused.
-- **Bounded large-queue UI**: cancel confirmation no longer fetches the entire queue. Summary + bounded-page APIs remain the only normal UI path for 1000+ jobs.
-- **Lower SQLite write pressure**: download progress writes are coalesced/throttled during sustained activity and force-flushed at pause, failure, completion, and shutdown boundaries.
-- **Visible runtime recovery**: after reload, the UI can show whether the background runner is active or has recovered interrupted work instead of appearing frozen or disconnected.
-- **Expanded stress coverage**: regression tests cover 1500 jobs / 350 completed, single-runner behavior, interrupted-runtime recovery, progress-write coalescing, and bounded UI reads.
-- **Keeps all v0.4.7 long-task controls**: recommendation, visual analysis, favorites sync, WebDAV, and Android background task pause/resume/cancel/timeout/recovery behavior remains in place.
-- **Upgrade path**: Windows v0.4.0 uses the v0.4.8 upgrade assistant; v0.4.1–v0.4.7 can use scoped incremental updates. Android formal release is v51 / 0.4.8.
+- **Android recommendation pause now resumes in place**: a normal user pause no longer cancels the WorkManager job. Resume continues the same live Worker and completed stage boundaries; if Android kills the process, the UI explicitly reports the durable fallback instead of claiming an exact cross-process checkpoint.
+- **Feedback no longer reshuffles the current batch**: Android Like / Dislike now matches Desktop. The visible 12-work batch stays frozen and only the selected card's feedback state changes; later-batch works are not pulled forward.
+- **Manual preference controls keep their scroll position**: Android 0–10 sliders, blocks, and session-intent mutations no longer jump the page back to the top.
+- **Automatic update discovery on both clients**: Desktop/Web and Android periodically check the official update channel while foregrounded and present throttled prompts, while reusing the existing verification/install flow. Updates are never silently downloaded or installed.
+- **Owned Works stay out of new-work recommendations**: Final V3 adds a Canonical Work-level ownership gate on top of exact-upload filtering, so known alternate uploads of favorited, library-owned, or downloaded Works are excluded from final serving.
+- **Collapsible “Similar works · N” in comic details**: collapsed state shows only the count; expanding reveals cover, title, author, page count, provider, edition/language, favorite/download state, and available rating/translation-team metadata, with direct navigation to each version.
+- **Conservative Work Identity semantics**: materialized bindings and human adjudication have priority. High-confidence probable matches are detail-only hints and are not automatically materialized or promoted into hard recommendation suppression. `KEEP_SEPARATE` always wins.
+- **One common Web detail surface**: Library, Downloaded, Shelves, Search, and Recommendation now converge on the same detail view, and opening a normal detail no longer preloads the full Visual QC dataset.
+- **Upgrade path**: Windows v0.4.0 uses the v0.4.9 upgrade assistant; v0.4.1–v0.4.8 can use scoped incremental updates. Android formal release is v52 / 0.4.9.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
@@ -72,7 +72,7 @@ See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 ### Updates and maintenance
 
 - Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.8 Release to move directly to the latest release without installing intermediate versions.
+- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.9 Release to move directly to the latest release without installing intermediate versions.
 - Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
 - Logs, repair, cache, export, and diagnostic tools are available from the app.
 
@@ -105,11 +105,11 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-Existing **v0.4.0** users should download `Pica-Library-v0.4.8-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.8.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+Existing **v0.4.0** users should download `Pica-Library-v0.4.9-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.9.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v51 / 0.4.8** through the in-app update chain; no intermediate versions are required.
+Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v52 / 0.4.9** through the in-app update chain; no intermediate versions are required.
 
 ## Local-first and security
 

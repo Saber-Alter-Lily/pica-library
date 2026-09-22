@@ -4,93 +4,63 @@
 
 **Local-first manga library, reader, and download manager for Windows & Android.**
 
-Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV** across discovery, favorites, unified library management, downloading, reading, recommendations, and Desktop ↔ Android access.
+Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV**, bringing discovery, favorites, library management, downloads, reading, recommendations, and cross-device access into one app.
 
 **[Download latest](https://github.com/Saber-Alter-Lily/pica-library/releases/latest)** · [Quick start](docs/quick-start.en.md) · [Android guide](docs/android-guide.en.md) · [Version log](PROJECT_LOG.md)
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.10 highlights
+## v0.4.11 highlights
 
-- **Work Identity V2**: identity matching now considers both `title` and `alternateTitles`, and extracts creator aliases from common E-H `[Circle (Author)]` prefixes.
-- **Cross-language same-work detection**: a Pica Japanese title can match an E-H romanized/English primary title when provider alternate titles and creator identity support the same Work.
-- **Stronger creator identity**: canonical `authorId` is preferred, with canonical/raw/title-credit aliases as fallback evidence.
-- **Cover Identity as auxiliary evidence**: near-duplicate cover evidence is separate from visual-style similarity. It is considered only when independent metadata also supports the pair, uses a very high threshold, and only yields `PROBABLE_SAME_WORK`.
-- **Detail terminology is now “Same work”**: the former “Similar works · N” row is renamed to “Same work · N” to avoid confusion with recommendation-channel Related works. It remains collapsed by default.
-- **Conservative anti-merge rules remain**: generic upload-noise stripping such as `[Chinese]`, `[Digital]`, or translation labels still requires compatible supporting evidence such as page count; `KEEP_SEPARATE` always wins.
-- **Cross-provider regression fixture**: Pica `盗まれた人妻。` and E-H `Nusumareta Hitozuma. - Stolen Wife [Digital]` are locked as a bidirectional identity regression case.
-- **Upgrade path**: Windows v0.4.0 uses the v0.4.10 upgrade assistant; v0.4.1–v0.4.9 can use scoped incremental updates. Android formal release is v53 / 0.4.10.
+- **Better “Same work” detection**: cross-provider, cross-language, and alternate uploads are more likely to be linked from comic details.
+- **Android can resolve same-work candidates independently** even when Desktop is not connected.
+- **Large libraries are handled more completely**, without dropping older entries from identity checks.
+- **Web detail pages preserve your position**: closing a comic detail returns to the same place in Library, Shelves, Search, or Recommendations.
 
-See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
+See [PROJECT_LOG.md](PROJECT_LOG.md) for the core version history.
 
-## Main capabilities
+## Main features
 
 ### Unified library
 
-- Unifies Pica, E-H, Desktop, local, Android, and WebDAV state into one comic record.
-- Filters by title, author, tag, category, provider, storage location, and online availability.
-- Includes shelves, reading history, resume, list view, and multiple grid densities.
-- Normalized authors retain canonical name, aliases, circle, and provider bindings for cross-source navigation.
+- Browse Pica, E-H, Desktop, Android, and WebDAV content in one library.
+- Filter by title, author, tag, category, source, favorite state, and download state.
+- Shelves, reading history, resume, list view, and multiple grid sizes.
+- Comic details can show other versions of the same work for quick comparison.
 
-### Online discovery and accounts
+### Online discovery
 
-- **Pica**: login, registration, search, categories, rankings, favorites, and sync.
-- **E-Hentai**: public search, details, online reading, downloads, Latest / Popular / Favorites / Watched / Toplists, and advanced filters.
-- **ExHentai**: optional E-H account capability; unavailability never blocks E-H or recommendations.
-- E-H supports official web login; Windows protects secrets with DPAPI and Android with Android Keystore.
-
-### Chinese tags and cross-source semantics
-
-- E-H keeps native `namespace:value` canonical tags; Chinese is a presentation and reverse-lookup layer only.
-- EhTagTranslation provides Chinese tag display and search assistance.
-- Pica and E-H tags map into shared interest concepts only when justified, while each provider keeps its native retrieval syntax.
+- **Pica**: sign in, register, search, categories, rankings, favorites, online reading, and downloads.
+- **E-Hentai / ExHentai**: search, details, favorites, online reading, downloads, popular lists, and advanced filters.
+- Chinese E-H tag display and search assistance are supported.
 
 ### Recommendations
 
-- Pica and E-H favorites form the long-term preference profile, with recent behavior, explicit controls, and explainable evidence kept separately.
-- Providers recall candidates independently before unified ranking, deduplication, and batch allocation.
-- Includes profile views, manual adjustment, explicit feedback, batch navigation, and recommendation reasons.
-- Visual-style recommendation is fully optional and has no effect on normal ranking when disabled.
-- Desktop and Android can recommend independently; pairing syncs portable preferences and foundations without forcing the current batch or session to match.
+- Personalized recommendations based on favorites and usage.
+- 0–10 manual controls, reduce, block, session intent, and feedback.
+- Batch navigation and recommendation reasons.
+- Visual-style recommendations are optional and can be disabled without affecting normal recommendations.
+- Desktop and Android can both recommend independently; pairing can synchronize portable preferences.
 
 ### Reading and downloads
 
-- Reads from Android local storage, Desktop downloads, WebDAV, Pica online, and E-H online.
-- Reader supports left-to-right, right-to-left, vertical continuous mode, chapter navigation, progress saving, and resume.
-- Reading history groups by comic while retaining exact chapter and page.
-- Downloads use a persistent queue with bounded concurrency, pause/resume, failure recovery, and completed-task tracking.
-- Android can download locally or directly read Desktop-downloaded comics after pairing.
+- Read phone-local comics, Desktop downloads, WebDAV, Pica online, and E-H online.
+- Left-to-right, right-to-left, vertical continuous reading, chapter navigation, progress saving, and resume.
+- Persistent download queues with progress, pause/resume, and failure recovery.
+- Android can download locally or read Desktop-downloaded comics after pairing.
 
-### Storage, cross-device, and personalization
+### Cross-device and storage
 
-- Multiple WebDAV targets with selected upload, remote deletion, switching, and mobile fallback access.
-- Desktop ↔ Android pairing shares portable library/recommendation foundations and access to Desktop content.
-- `.pica-theme` theme packs can be created, imported, and synced; active theme remains device-local.
-- Reader cache, preloading, download directories, and storage policies are configurable.
+- Pair Desktop and Android over the local network.
+- Use WebDAV as remote storage and a fallback reading source.
+- Multiple WebDAV configurations with remote sync and mobile switching.
+- Theme packs, light/dark appearance, and personalization.
 
 ### Updates and maintenance
 
-- Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.10 Release to move directly to the latest release without installing intermediate versions.
-- Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
-- Logs, repair, cache, export, and diagnostic tools are available from the app.
-
-## Platform capability matrix
-
-| Capability | Windows / Web | Android |
-| --- | --- | --- |
-| Unified library, filters, shelves | ✓ | ✓ |
-| Pica / E-H online | ✓ | ✓ |
-| Optional ExH capability | ✓ | ✓ |
-| Recommendation profile & controls | ✓ | ✓ |
-| Visual-style recommendations | ✓ | ✓ |
-| Reading history & resume | ✓ | ✓ |
-| Online reader | ✓ | ✓ |
-| Local downloads | Primary download side | ✓ |
-| Read Desktop downloads | Local | Direct after pairing |
-| Multiple WebDAV targets | Configure / sync / manage | Read / switch / fallback |
-| Theme packs | Create / import / sync | Receive / use |
-| App updates | Incremental / full-package assistant | Official in-place APK |
+- Windows supports in-app updates, local update ZIPs, and rollback.
+- Android supports checking and installing official APK updates in app.
+- Cache, logs, export, repair, and storage tools are available.
 
 ## Install and update
 
@@ -98,58 +68,47 @@ Official builds are published through [GitHub Releases](https://github.com/Saber
 
 ### Windows
 
-Download and fully extract `Pica-Library-vX.Y.Z-windows-x64.zip`, then run `Pica Library.exe`.
+New users should download and fully extract:
 
-User data is stored separately from application files. Compatible releases use:
+`Pica-Library-v0.4.11-windows-x64.zip`
 
-`Settings → Software Update → Check and update (automatic when compatible)`
+Then run `Pica Library.exe`.
 
-Existing **v0.4.0** users should download `Pica-Library-v0.4.10-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.10.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+Existing **v0.4.0** users can download:
+
+`Pica-Library-v0.4.11-upgrade-assistant.zip`
+
+Extract it and run `Upgrade-Pica-Library-v0.4.11.cmd` to move directly to the latest release without installing intermediate versions. Personal data is stored separately; the assistant verifies, backs up, and rolls back on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v53 / 0.4.10** through the in-app update chain; no intermediate versions are required.
+The formal Android release is **v54 / 0.4.11**. Existing **v42 / 0.4.0** and later users can update in place through the in-app update chain.
+
+Android APKs are distributed only through this repository's official Release.
 
 ## Local-first and security
 
-- Library data, shelves, history, and settings remain local or in the user-selected WebDAV target.
-- Windows credentials use the current Windows user's DPAPI; Android sensitive sessions use Android Keystore.
-- User data is separated from application files so program replacement does not overwrite the personal database.
-- Official Releases include SHA-256, signing identity, and build-transparency metadata.
-- Theme packs contain controlled data and images only and cannot execute arbitrary scripts.
+- Library data, shelves, history, and settings remain local or in the WebDAV target you choose.
+- User data is separated from application files, so application updates do not replace the personal database.
+- Windows credentials use the current Windows user's protection; Android sensitive sessions use Android Keystore.
+- Formal Releases publish SHA-256 and Android signing verification information.
 
 ## Support
 
 Pica Library is free and open source. Development can be supported voluntarily through [AFDIAN](https://afdian.com/a/PicaLibrary).
 
-Support does not unlock extra features, content, or download privileges and does not affect the complete free version.
+Support does not unlock extra features, content, or download privileges.
 
 ## Usage boundary
 
-Pica Library is a local-first personal digital-content management tool. It does not sell, host, or redistribute manga content. Users are responsible for ensuring that account use, access, downloading, storage, reading, and backups comply with applicable law, platform terms, and authorization scope.
+Pica Library is a local-first personal digital-content management tool. It does not sell, host, or redistribute manga content. Users are responsible for ensuring that account use, access, downloads, storage, reading, and backups comply with applicable law, platform terms, and authorization scope.
 
 See [DISCLAIMER.md](DISCLAIMER.md).
 
 ## Documentation
 
-[Quick start](docs/quick-start.en.md) · [Desktop / Web](docs/desktop-guide.en.md) · [Android](docs/android-guide.en.md) · [Windows distribution](docs/windows-distribution.md) · [Version log](PROJECT_LOG.md) · [Architecture](docs/architecture.md)
-
-## Development
-
-```bash
-pnpm install --frozen-lockfile
-pnpm type:check
-pnpm web:check
-pnpm test
-pnpm build
-```
-
-The Android project is under `mobile/android-alpha2`. Official Android release signing private keys are not stored in the repository.
+[Quick start](docs/quick-start.en.md) · [Desktop / Web](docs/desktop-guide.en.md) · [Android](docs/android-guide.en.md) · [Windows distribution](docs/windows-distribution.md) · [Version log](PROJECT_LOG.md)
 
 ## Credits
 
 CLI capabilities continue to build on upstream `pica-cli` work. See [UPSTREAM.md](UPSTREAM.md).
-
----
-
-Only download and store content you are authorized to access. Do not redistribute comic files.

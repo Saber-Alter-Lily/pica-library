@@ -30,10 +30,11 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         const bridge = read('src/mobile/bridge-server.ts')
         expect(service).toContain('workVariantsForComic(comicId: string')
         expect(service).toContain("'PROBABLE_SAME_WORK'")
-        expect(service).toContain('workIdentityEvidenceV5(')
+        expect(service).toContain('workIdentityCreatorBucketKeysV3(')
+        expect(service).toContain('workIdentityDetailEvidenceV3(')
         expect(service).toContain('workIdentitySignalsV2(')
         expect(service).toContain("embedding.embeddingKind === 'cover'")
-        expect(service).toContain('coverIdentityAuxiliaryOnly: true')
+        expect(service).toContain("coverIdentityStage: 'REVIEW_CONFIRMATION'")
         expect(service).not.toMatch(
             /workVariantsForComic[\s\S]{0,800}saveWorkIdentityEvidence/
         )
@@ -58,7 +59,7 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(css).toContain('.work-variant-card')
     })
 
-    it('keeps Android work variants collapsed to a count and supports offline confirmed bindings', () => {
+    it('keeps Android work variants collapsed and independently resolves probable works offline', () => {
         const detail = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java'
         )
@@ -72,7 +73,10 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(resolver).toContain('BridgeClient.workVariants')
         expect(resolver).toContain('portable.identityByComic')
         expect(resolver).toContain('"CONFIRMED_WORK_VARIANT"')
-        expect(resolver).not.toContain('PROBABLE_SAME_WORK')
+        expect(resolver).toContain('"PROBABLE_SAME_WORK"')
+        expect(resolver).toContain('AuthorConceptStore.build(context)')
+        expect(resolver).toContain('CoverIdentityHash.similarity')
+        expect(resolver).toContain('MAX_COVER_REVIEWS=4')
     })
 
     it('routes library, downloaded and shelf entries through the common detail surface', () => {

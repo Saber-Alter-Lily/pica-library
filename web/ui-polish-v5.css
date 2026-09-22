@@ -241,8 +241,9 @@ select:disabled {
     float: right;
 }
 
-body:has(dialog[open]) {
+html:has(dialog[open]) {
     overflow: hidden;
+    scrollbar-gutter: stable;
 }
 
 /* Reader: controls must remain reachable regardless of scroll position. */

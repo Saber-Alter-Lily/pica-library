@@ -49,6 +49,19 @@ describe('V5 Web UX audit contract', () => {
         expect(readerKeyHandlers).toHaveLength(1)
     })
 
+    it('preserves list position across modal detail and other dialogs', () => {
+        const app = read('web/app.js')
+        const css = read('web/ui-polish-v5.css')
+        expect(app).toContain('const dialogScrollOrigins = new WeakMap()')
+        expect(app).toContain('function installDialogScrollRestoration()')
+        expect(app).toContain("attributeFilter: ['open']")
+        expect(app).toContain('if (activeView === origin.view)')
+        expect(app).toContain('window.scrollTo(0, origin.y)')
+        expect(css).toContain('html:has(dialog[open])')
+        expect(css).toContain('scrollbar-gutter: stable')
+        expect(css).not.toContain('body:has(dialog[open])')
+    })
+
     it('separates normal settings from experimental recommendation diagnostics', () => {
         const polish = read('web/ui-polish-v5.js')
         expect(polish).toContain('实验与诊断（高级）')

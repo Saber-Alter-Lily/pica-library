@@ -1839,7 +1839,10 @@ export class LibraryDatabase {
             : null
     }
 
-    listComics(query: ComicQuery = {}): StoredComic[] {
+    listComics(
+        query: ComicQuery = {},
+        internalLimitCap = 5000
+    ): StoredComic[] {
         const rows = this.db
             .prepare(
                 `SELECT c.*, a.canonical_name,
@@ -1998,7 +2001,13 @@ export class LibraryDatabase {
             )
         })
         const offset = Math.max(0, query.offset ?? 0)
-        const limit = Math.max(1, Math.min(5000, query.limit ?? 100))
+        const limit = Math.max(
+            1,
+            Math.min(
+                Math.max(1, internalLimitCap),
+                query.limit ?? 100
+            )
+        )
         return comics.slice(offset, offset + limit)
     }
 

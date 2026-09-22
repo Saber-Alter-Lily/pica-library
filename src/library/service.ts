@@ -153,7 +153,9 @@ import {
 import {
     filterCandidatesAgainstOwnedV5,
     normalizePreferenceKey,
-    preferenceAdjustmentV5
+    preferenceAdjustmentV5,
+    workIdentityEvidenceV5,
+    workIdentityKeys
 } from '../recommendation-v5/portable-policy'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 import {
@@ -1533,6 +1535,34 @@ export class LibraryService {
                     ? evidence.rightComicId
                     : evidence.leftComicId
             add(otherId, 'PROBABLE_SAME_WORK', Number(evidence.confidence || 0))
+        }
+
+        // Read-only targeted fallback for detail UX. This improves coverage without
+        // writing identity evidence or promoting a probable match into Canonical bindings.
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const currentKeys = workIdentityKeys(current)
+        for (const other of catalog) {
+            if (other.comicId === id || rows.has(other.comicId)) continue
+            const pairKey = [id, other.comicId].sort().join('\u0000')
+            if (decisionByPair.get(pairKey)?.decision === 'KEEP_SEPARATE')
+                continue
+            const identity = workIdentityEvidenceV5(
+                current,
+                other,
+                policy.explicitDistinctPairs
+            )
+            if (identity.relation !== 'HIGH_CONFIDENCE_WORK') continue
+            const otherKeys = workIdentityKeys(other)
+            const strict =
+                Boolean(currentKeys.strictTitle) &&
+                currentKeys.strictTitle === otherKeys.strictTitle &&
+                Boolean(currentKeys.author) &&
+                currentKeys.author === otherKeys.author
+            add(
+                other.comicId,
+                'PROBABLE_SAME_WORK',
+                strict ? 0.99 : 0.94
+            )
         }
 
         const items = [...rows.values()]

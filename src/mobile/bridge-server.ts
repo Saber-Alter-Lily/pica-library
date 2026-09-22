@@ -1130,6 +1130,27 @@ export async function startMobileBridge(options: {
                 return
             }
 
+            const workVariantsRoute = url.pathname.match(
+                /^\/mobile\/v1\/comics\/([^/]+)\/work-variants$/
+            )
+            if (workVariantsRoute && request.method === 'GET') {
+                const value = options.service.workVariantsForComic(
+                    decodeURIComponent(workVariantsRoute[1]),
+                    boundedInt(url.searchParams.get('limit'), 24, 1, 48)
+                )
+                return json(response, 200, {
+                    ...value,
+                    items: (value.items as Array<Record<string, unknown>>).map(
+                        (item) => ({
+                            ...item,
+                            coverPath: `/mobile/v1/covers/${encodeURIComponent(
+                                String(item.comicId ?? '')
+                            )}`
+                        })
+                    )
+                })
+            }
+
             const chaptersRoute = url.pathname.match(
                 /^\/mobile\/v1\/comics\/([^/]+)\/chapters$/
             )

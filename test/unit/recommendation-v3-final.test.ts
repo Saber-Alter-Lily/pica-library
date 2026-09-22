@@ -560,6 +560,115 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
         }
     })
 
+    it('excludes an owned upload and its same-work variant from Final V3 serving', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v3-owned-work-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.db'))
+        try {
+            const owned = {
+                ...comic('owned'),
+                title: 'Example Work',
+                author: 'Artist',
+                canonicalAuthor: 'Artist',
+                pagesCount: 24,
+                knownPictures: 24,
+                providerId: 'pica' as const
+            }
+            const variant = {
+                ...comic('eh:variant'),
+                title: '[Chinese] Example Work',
+                author: 'Artist',
+                canonicalAuthor: 'Artist',
+                pagesCount: 25,
+                knownPictures: 25,
+                providerId: 'eh' as const
+            }
+            const novel = Array.from({ length: 13 }, (_, index) => ({
+                ...comic(`novel-${index}`),
+                title: `Novel ${index}`,
+                author: `Artist ${index}`,
+                canonicalAuthor: `Artist ${index}`,
+                pagesCount: 40 + index,
+                knownPictures: 40 + index
+            }))
+            const comics = [owned, variant, ...novel]
+            database.importCatalog(comics, 'test')
+            database.setLocalFavoriteState('owned', true)
+
+            const profile = plannerProfile()
+            const intents = buildRecommendationIntentsV3({
+                profile,
+                favorites: [owned]
+            })
+            const evidence = (
+                id: string,
+                index: number
+            ): CandidateEvidenceV3 => ({
+                comicId: id,
+                originIntentIds: [intents[0].intentId],
+                originRouteIds: ['r'],
+                routeFamilies: [intents[0].type],
+                primaryFamily: intents[0].type,
+                routeHitCount: 1,
+                intentHitCount: 1,
+                providerBestRank: index + 1,
+                providerRanks: [index + 1],
+                queryTerms: [],
+                conjunctionEvidence: [],
+                relatedSeedIds: [],
+                exploration: false,
+                firstSeenAt: '2026-01-01T00:00:00.000Z'
+            })
+            const ranked = comics.map((item, index) => ({
+                comicId: item.comicId,
+                score: 100 - index,
+                rawRank: index + 1,
+                comic: item,
+                features: {} as never,
+                reasons: [],
+                provenance: [],
+                evidence: evidence(item.comicId, index)
+            }))
+            const built: BuiltRecommendationCycleV3 = {
+                profile,
+                intents,
+                routes: [],
+                ranked,
+                readiness: 'READY_DEGRADED',
+                telemetry: {},
+                versions: {
+                    profileVersion: profile.profileVersion,
+                    registryVersion: profile.registryVersion,
+                    rankerModelVersion: 'frozen',
+                    candidatePoolVersion: 'test-owned-work',
+                    allocatorVersion: 'test'
+                }
+            }
+            const coordinator = new CycleCoordinatorV3(
+                database,
+                async () => built,
+                built.versions
+            )
+            coordinator.resumeOrCreate('owned-work')
+            await coordinator.waitForBuild()
+            const current = coordinator.current() as {
+                recommendations: Array<{ comicId: string }>
+                servingFilterTelemetry: {
+                    exactOrOwnedRemoved?: number
+                    workDuplicateRemoved?: number
+                }
+            }
+            const ids = current.recommendations.map((item) => item.comicId)
+            expect(ids).not.toContain('owned')
+            expect(ids).not.toContain('eh:variant')
+            expect(current.recommendations).toHaveLength(12)
+            expect(current.servingFilterTelemetry.exactOrOwnedRemoved).toBeGreaterThanOrEqual(1)
+            expect(current.servingFilterTelemetry.workDuplicateRemoved).toBeGreaterThanOrEqual(1)
+        } finally {
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
+
     it('persists SUPERSEDED and EXHAUSTED states for real cycle history', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-v3-state-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))

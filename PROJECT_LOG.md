@@ -8,14 +8,18 @@
 - v0.4.1–v0.4.3 是短周期过渡版本，继续保留在版本历史、兼容测试和发布资产中，但普通用户无需逐个安装，也不作为主页和使用指南的推荐升级路径。
 
 
-## Unreleased — Work 级已拥有排除与版本互链
+## v0.4.9 — 推荐交互稳定性、自动更新与 Work 版本互链
 
 - Final V3 serving 将“已拥有”提升为最终展示前硬约束：继续排除 exact upload，并把已拥有条目的 Canonical Work binding 展开到同 Work 的其他 upload；收藏/书库/已下载状态变化通过轻量 ownership fingerprint 使 serving cache 失效，不恢复每次切批全量扫描。
 - 增加 Final V3 行为回归：已收藏 Pica upload 与高置信同作品 E-H 版本均不得进入当前推荐批次，剩余新作品仍可正常补足 12 本。
 - 新增只读 `/api/v1/comics/:comicId/work-variants` 与 Mobile Bridge 对应接口；优先使用 Canonical Work/Edition binding 和人工裁决，再以不落盘、不自动绑定的定向高置信 resolver 补充“可能同作品”，`KEEP_SEPARATE` 始终优先。
 - Desktop/Web 与 Android 的作品详情增加可折叠“相似作品 · N”；默认只显示数量，展开后展示封面、标题、作者、页数、来源、版本/语言、收藏/下载及可用评分/汉化信息，并可直接跳转到对应版本详情。
 - Web 书库、已下载、书架、搜索与推荐统一进入同一作品详情；普通详情不再为了打开页面预加载 Visual QC 数据。Android 配对时读取 Desktop 完整关系，离线时仅消费已同步的 confirmed Canonical binding，不在手机本地猜测 probable identity。
-- 本阶段不自动执行 Canonical materialization，不改版本号、不发布 Release。
+- Android 推荐暂停 / 继续改为同 Worker 协作式暂停；进程仍存活时原位继续，系统终止后的回退语义明确可见，不宣称跨进程精确 checkpoint。
+- Android Like / Dislike 与 Desktop 统一为冻结当前批次；反馈只改变卡片状态和后续推荐，不再从后续批次动态补位；重复点击同一反馈为 no-op，不清除既有原因。
+- Android 人工推荐调整保存并恢复滚动位置；Desktop/Web 与 Android 增加节流的前台自动更新发现与去重提示，仍由用户进入既有更新流程完成下载、校验和安装。
+- Desktop v0.4.9 / Android versionCode 52；Windows v0.4.1–v0.4.8 提供 scoped 增量更新，v0.4.0 使用 v0.4.9 直达升级助手。
+- 本版本仍不自动执行 Canonical materialization；probable Work relation 仅用于详情提示，不直接升级为权威 binding。
 
 ## v0.4.8 — 大下载队列运行时稳定性
 

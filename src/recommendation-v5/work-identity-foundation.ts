@@ -2,13 +2,16 @@ import type { StoredComic } from '../library/types'
 import type { PortablePolicyStateV5 } from './portable-policy'
 import {
     normalizePreferenceKey,
-    workIdentityEvidenceV5,
-    workIdentityKeys,
-    workIdentitySignalsV2
+    workIdentityKeys
 } from './portable-policy'
+import {
+    WORK_IDENTITY_V3_RESOLVER_VERSION,
+    workIdentityCreatorBucketKeysV3,
+    workIdentityDetailEvidenceV3
+} from './work-identity-v3'
 
 export const WORK_IDENTITY_RESOLVER_VERSION =
-    'work-identity-v2-title-alias-author-cover-evidence'
+    WORK_IDENTITY_V3_RESOLVER_VERSION
 
 export interface WorkIdentityAuditCandidateV5 {
     pairKey: string
@@ -23,10 +26,11 @@ export interface WorkIdentityAuditCandidateV5 {
     relation: 'PROBABLE_SAME_WORK'
     confidence: number
     evidence: {
-        titleMatch: 'STRICT' | 'LOOSE'
-        titleAliasMatch: true
-        authorMatch: true
-        authorIdentityMatch: 'CANONICAL_ID' | 'ALIAS'
+        titleMatch: 'STRICT' | 'LOOSE' | 'FUZZY' | 'NONE'
+        titleAliasMatch: boolean
+        authorMatch: boolean
+        authorIdentityMatch: 'CANONICAL_ID' | 'ALIAS' | 'NONE'
+        titleSimilarity: number
         pageCountCompatible: boolean
         leftPages: number
         rightPages: number
@@ -63,20 +67,15 @@ function addPairs(
             const right = bucket[rightIndex]
             const key = stablePair(left.comicId, right.comicId)
             if (selected.has(key)) continue
-            const identity = workIdentityEvidenceV5(
-                left,
-                right,
-                state.explicitDistinctPairs
-            )
-            if (identity.relation !== 'HIGH_CONFIDENCE_WORK') continue
+            const pair = [left.comicId, right.comicId]
+                .map(normalizePreferenceKey)
+                .sort()
+                .join('\u0000')
+            if (state.explicitDistinctPairs.includes(pair)) continue
+            const identity = workIdentityDetailEvidenceV3(left, right)
+            if (identity.relation === 'DISTINCT_OR_UNKNOWN') continue
             const a = workIdentityKeys(left)
             const b = workIdentityKeys(right)
-            const signals = workIdentitySignalsV2(left, right)
-            if (!signals.authorsCompatible) continue
-            const strict = signals.strictTitleMatch
-            const loose = signals.looseTitleMatch
-            if (!strict && !loose) continue
-            const pageCountCompatible = signals.pageCountCompatible
             const leftProvider = providerId(left)
             const rightProvider = providerId(right)
             selected.set(key, {
@@ -90,15 +89,17 @@ function addPairs(
                 rightProvider,
                 crossProvider: leftProvider !== rightProvider,
                 relation: 'PROBABLE_SAME_WORK',
-                confidence: strict ? 0.99 : 0.94,
+                confidence: identity.confidence,
                 evidence: {
-                    titleMatch: strict ? 'STRICT' : 'LOOSE',
-                    titleAliasMatch: true,
-                    authorMatch: true,
-                    authorIdentityMatch: signals.authorIdMatch
-                        ? 'CANONICAL_ID'
-                        : 'ALIAS',
-                    pageCountCompatible,
+                    titleMatch:
+                        identity.titleMatch === 'CORE'
+                            ? 'LOOSE'
+                            : identity.titleMatch,
+                    titleAliasMatch: identity.titleMatch !== 'NONE',
+                    authorMatch: identity.creatorMatch,
+                    authorIdentityMatch: identity.creatorMatchKind,
+                    titleSimilarity: identity.titleSimilarity,
+                    pageCountCompatible: identity.pageCountCompatible,
                     leftPages: a.pages,
                     rightPages: b.pages
                 },
@@ -114,34 +115,33 @@ export function buildWorkIdentityAuditV5(
     requestedLimit = 200
 ) {
     const limit = Math.max(1, Math.min(1000, Math.floor(requestedLimit)))
-    const strictBuckets = new Map<string, StoredComic[]>()
-    const looseBuckets = new Map<string, StoredComic[]>()
+    const creatorBuckets = new Map<string, StoredComic[]>()
+    const titleFallbackBuckets = new Map<string, StoredComic[]>()
 
     for (const comic of catalog) {
+        const creatorKeys = workIdentityCreatorBucketKeysV3(comic)
+        for (const creator of creatorKeys)
+            creatorBuckets.set(creator, [
+                ...(creatorBuckets.get(creator) || []),
+                comic
+            ])
+
+        // Exact/core title buckets are retained only as the author-uncertain
+        // fallback. Fuzzy title matching never scans the whole catalog.
         const keys = workIdentityKeys(comic)
-        if (!keys.authorAliases.length) continue
-        for (const author of keys.authorAliases) {
-            for (const title of keys.strictTitles) {
-                const key = author + '\u0000' + title
-                strictBuckets.set(key, [
-                    ...(strictBuckets.get(key) || []),
-                    comic
-                ])
-            }
-            for (const title of keys.looseTitles) {
-                const key = author + '\u0000' + title
-                looseBuckets.set(key, [
-                    ...(looseBuckets.get(key) || []),
-                    comic
-                ])
-            }
+        for (const title of [...keys.strictTitles, ...keys.looseTitles]) {
+            const bucketKey = `title:${title}`
+            titleFallbackBuckets.set(bucketKey, [
+                ...(titleFallbackBuckets.get(bucketKey) || []),
+                comic
+            ])
         }
     }
 
     const selected = new Map<string, WorkIdentityAuditCandidateV5>()
     const candidateBuckets = [
-        ...strictBuckets.values(),
-        ...looseBuckets.values()
+        ...creatorBuckets.values(),
+        ...titleFallbackBuckets.values()
     ]
         .filter((items) => items.length > 1)
         .sort((a, b) => b.length - a.length)

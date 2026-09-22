@@ -389,8 +389,10 @@ describe('post-v0.4.7 Desktop download runtime stability', () => {
                 schedulers: 1
             })
         } finally {
+            const quiescing = service.quiesceLocalDownloads(10_000)
             release()
-            await waitFor(() => !service.localDownloadRuntime().running, 5000)
+            await quiescing
+            expect(service.localDownloadRuntime().running).toBe(false)
             await new Promise<void>((resolve, reject) =>
                 started.server.close((error) =>
                     error ? reject(error) : resolve()

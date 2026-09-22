@@ -3,11 +3,12 @@ import type { PortablePolicyStateV5 } from './portable-policy'
 import {
     normalizePreferenceKey,
     workIdentityEvidenceV5,
-    workIdentityKeys
+    workIdentityKeys,
+    workIdentitySignalsV2
 } from './portable-policy'
 
 export const WORK_IDENTITY_RESOLVER_VERSION =
-    'work-identity-v1-title-author-pages'
+    'work-identity-v2-title-alias-author-cover-evidence'
 
 export interface WorkIdentityAuditCandidateV5 {
     pairKey: string
@@ -23,7 +24,9 @@ export interface WorkIdentityAuditCandidateV5 {
     confidence: number
     evidence: {
         titleMatch: 'STRICT' | 'LOOSE'
+        titleAliasMatch: true
         authorMatch: true
+        authorIdentityMatch: 'CANONICAL_ID' | 'ALIAS'
         pageCountCompatible: boolean
         leftPages: number
         rightPages: number
@@ -68,24 +71,12 @@ function addPairs(
             if (identity.relation !== 'HIGH_CONFIDENCE_WORK') continue
             const a = workIdentityKeys(left)
             const b = workIdentityKeys(right)
-            if (!a.author || a.author !== b.author) continue
-            const strict = Boolean(
-                a.strictTitle &&
-                    a.strictTitle === b.strictTitle
-            )
-            const loose = Boolean(
-                a.looseTitle &&
-                    a.looseTitle === b.looseTitle
-            )
+            const signals = workIdentitySignalsV2(left, right)
+            if (!signals.authorsCompatible) continue
+            const strict = signals.strictTitleMatch
+            const loose = signals.looseTitleMatch
             if (!strict && !loose) continue
-            const pageCountCompatible =
-                a.pages > 0 &&
-                b.pages > 0 &&
-                Math.abs(a.pages - b.pages) <=
-                    Math.max(
-                        4,
-                        Math.ceil(Math.max(a.pages, b.pages) * 0.08)
-                    )
+            const pageCountCompatible = signals.pageCountCompatible
             const leftProvider = providerId(left)
             const rightProvider = providerId(right)
             selected.set(key, {
@@ -102,7 +93,11 @@ function addPairs(
                 confidence: strict ? 0.99 : 0.94,
                 evidence: {
                     titleMatch: strict ? 'STRICT' : 'LOOSE',
+                    titleAliasMatch: true,
                     authorMatch: true,
+                    authorIdentityMatch: signals.authorIdMatch
+                        ? 'CANONICAL_ID'
+                        : 'ALIAS',
                     pageCountCompatible,
                     leftPages: a.pages,
                     rightPages: b.pages

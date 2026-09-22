@@ -54,6 +54,7 @@ final class WorkVariantResolver {
                 String provider=entry!=null&&!entry.providerId.isEmpty()?entry.providerId:candidate!=null?candidate.providerId:identity.comicId.startsWith("eh:")?"eh":"pica";
                 row.put("title",title);row.put("author",author);row.put("canonicalAuthor",canonical);
                 row.put("pagesCount",Math.max(0,pages));row.put("providerId",provider);
+                if(candidate!=null&&!candidate.coverUrl.isEmpty())row.put("coverUrl",candidate.coverUrl);
                 row.put("isFavorite",entry!=null&&entry.favorite);
                 int downloaded=entry==null?0:Math.max(entry.desktopDownloadedPictures,entry.phoneDownloaded?entry.knownPictures:0);
                 row.put("downloadedPictures",Math.max(0,downloaded));

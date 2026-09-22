@@ -366,6 +366,145 @@ describe('Canonical Work Identity foundation', () => {
         }
     })
 
+    it('links the cross-language example bidirectionally in comic details without materializing a Work', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-work-v2-cross-language-')
+        )
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        try {
+            database.importCatalog(
+                [
+                    {
+                        comicId: 'pica:stolen-wife',
+                        providerId: 'pica',
+                        title: '盗まれた人妻。',
+                        author: '平つくね',
+                        tags: [],
+                        categories: [],
+                        finished: true,
+                        pagesCount: 0
+                    },
+                    {
+                        comicId: 'eh:stolen-wife',
+                        providerId: 'eh',
+                        title:
+                            '[ROUTE1 (Taira Tsukune)] Nusumareta Hitozuma. - Stolen Wife [Digital]',
+                        alternateTitles: [
+                            '[ROUTE1 (平つくね)] 盗まれた人妻。[DL版]'
+                        ],
+                        author: 'taira tsukune',
+                        tags: [],
+                        categories: [],
+                        finished: true,
+                        pagesCount: 0
+                    }
+                ],
+                'test'
+            )
+            const service = new LibraryService(database, dir)
+            const fromPica = service.workVariantsForComic(
+                'pica:stolen-wife'
+            )
+            const fromEh = service.workVariantsForComic('eh:stolen-wife')
+            expect(fromPica.items).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        comicId: 'eh:stolen-wife',
+                        relation: 'PROBABLE_SAME_WORK'
+                    })
+                ])
+            )
+            expect(fromEh.items).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        comicId: 'pica:stolen-wife',
+                        relation: 'PROBABLE_SAME_WORK'
+                    })
+                ])
+            )
+            expect(database.workIdentityStorageStatus().counts.bindings).toBe(
+                0
+            )
+        } finally {
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
+
+    it('uses cover identity only as auxiliary detail evidence', () => {
+        const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-work-v2-cover-')
+        )
+        const database = new LibraryDatabase(path.join(dir, 'library.sqlite'))
+        try {
+            database.importCatalog(
+                [
+                    {
+                        comicId: 'pica:cover-a',
+                        providerId: 'pica',
+                        title: 'Localized Title A',
+                        author: 'Same Artist',
+                        tags: [],
+                        categories: [],
+                        finished: true,
+                        pagesCount: 30
+                    },
+                    {
+                        comicId: 'eh:cover-b',
+                        providerId: 'eh',
+                        title: 'Completely Different Translation',
+                        author: 'Same Artist',
+                        tags: [],
+                        categories: [],
+                        finished: true,
+                        pagesCount: 30
+                    }
+                ],
+                'test'
+            )
+            for (const [comicId, vector] of [
+                ['pica:cover-a', [1, 0, 0]],
+                ['eh:cover-b', [0.9999, 0.01, 0]]
+            ] as const)
+                database.saveVisualEmbedding({
+                    comicId,
+                    modelId: 'cover-identity-test',
+                    modelVersion: '1',
+                    samplingPolicyVersion: 'cover-only-test',
+                    embeddingKind: 'cover',
+                    vector: [...vector],
+                    dimension: 3,
+                    sourceKind: 'LOCAL_PAGES',
+                    sampleCount: 1,
+                    confidence: 1,
+                    generatedAt: new Date(0).toISOString(),
+                    metadata: {}
+                })
+
+            const service = new LibraryService(database, dir)
+            const value = service.workVariantsForComic('pica:cover-a')
+            const linked = value.items.find(
+                (item) => item.comicId === 'eh:cover-b'
+            )
+            expect(linked).toMatchObject({
+                relation: 'PROBABLE_SAME_WORK'
+            })
+            expect(
+                Number(
+                    (
+                        linked?.identityEvidence as Record<string, unknown>
+                    )?.coverIdentitySimilarity
+                )
+            ).toBeGreaterThanOrEqual(0.995)
+            expect(database.workIdentityStorageStatus().counts.bindings).toBe(
+                0
+            )
+        } finally {
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
+
     it('respects an explicit keep-separate override from the existing policy', () => {
         const state = {
             ...defaultPortablePolicyStateV5(),

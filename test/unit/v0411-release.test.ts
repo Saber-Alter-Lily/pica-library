@@ -27,29 +27,22 @@ describe('v0.4.11 formal release contract', () => {
         })
     })
 
-    it('publishes complete Windows and Android upgrade assets', () => {
-        const workflow = read('.github/workflows/v0411-release.yml')
-        expect(workflow).toContain('name: v0.4.11 Formal Release')
-        expect(workflow).toContain(
-            'Pica-Library-v0.4.11-windows-x64.zip'
-        )
-        expect(workflow).toContain(
-            'Pica-Library-v0.4.11-update-from-v0.4.10.zip'
-        )
-        expect(workflow).toContain(
+    it('retires the one-shot v0.4.11 publisher after publication', () => {
+        expect(
+            fs.existsSync(
+                path.join(root, '.github/workflows/v0411-release.yml')
+            )
+        ).toBe(false)
+
+        const log = read('PROJECT_LOG.md')
+        const readme = read('README.md')
+        expect(log).toContain('Desktop v0.4.11 / Android versionCode 54')
+        expect(log).toContain('v0.4.1–v0.4.10')
+        expect(readme).toContain('Pica-Library-v0.4.11-windows-x64.zip')
+        expect(readme).toContain(
             'Pica-Library-v0.4.11-upgrade-assistant.zip'
         )
-        expect(workflow).toContain(
-            "versionCode='54' versionName='0.4.11'"
-        )
-        expect(workflow).toContain('Pica-Library-Android-v54.apk')
-        expect(workflow).toContain(
-            'releases/download/v0.4.10/Pica-Library-Android-Preview.cert-sha256'
-        )
-        expect(workflow).toContain('gh release create v0.4.11')
-        expect(workflow).toContain(
-            "Android Preview v54 · Pica Library 0.4.11"
-        )
+        expect(readme).toContain('v54 / 0.4.11')
     })
 
     it('keeps the public homepage focused on user-visible capabilities', () => {

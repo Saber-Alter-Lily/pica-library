@@ -1418,6 +1418,8 @@ export class LibraryService {
                 probableCount: 0,
                 workId: null,
                 editionId: null,
+                favoriteCount: 0,
+                downloadedCount: 0,
                 items: []
             }
 
@@ -1749,30 +1751,38 @@ export class LibraryService {
             }
         }
 
-        const items = [...rows.values()]
-            .sort(
-                (a, b) =>
-                    (relationPriority[String(a.relation)] ?? 99) -
-                        (relationPriority[String(b.relation)] ?? 99) ||
-                    Number(Boolean(b.isFavorite)) -
-                        Number(Boolean(a.isFavorite)) ||
-                    Number(b.downloadedPictures || 0) -
-                        Number(a.downloadedPictures || 0) ||
-                    String(a.title || '').localeCompare(String(b.title || ''))
-            )
-            .slice(0, bounded)
-        const confirmedCount = items.filter((item) => {
+        const rankedItems = [...rows.values()].sort(
+            (a, b) =>
+                (relationPriority[String(a.relation)] ?? 99) -
+                    (relationPriority[String(b.relation)] ?? 99) ||
+                Number(Boolean(b.isFavorite)) -
+                    Number(Boolean(a.isFavorite)) ||
+                Number(b.downloadedPictures || 0) -
+                    Number(a.downloadedPictures || 0) ||
+                String(a.title || '').localeCompare(String(b.title || ''))
+        )
+        const confirmedCount = rankedItems.filter((item) => {
             const relation = String(item.relation)
             return (
                 relation.startsWith('CONFIRMED_') ||
                 relation.startsWith('ADJUDICATED_')
             )
         }).length
+        const favoriteCount = rankedItems.filter((item) =>
+            Boolean(item.isFavorite)
+        ).length
+        const downloadedCount = rankedItems.filter(
+            (item) => Number(item.downloadedPictures || 0) > 0
+        ).length
+        const items = rankedItems.slice(0, bounded)
         return {
             comicId: id,
-            count: items.length,
+            count: rankedItems.length,
+            shownCount: items.length,
             confirmedCount,
-            probableCount: items.length - confirmedCount,
+            probableCount: rankedItems.length - confirmedCount,
+            favoriteCount,
+            downloadedCount,
             workId: currentBinding?.workId ?? null,
             editionId: currentBinding?.editionId ?? null,
             items

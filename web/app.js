@@ -1362,9 +1362,31 @@ document.addEventListener('click', (event) => {
     if (detail) openRecommendationDetail(detail.dataset.libraryDetail, 'library')
 })
 document.addEventListener('pica-open-comic-detail', (event) => {
-    const comic = event.detail?.comic
-    const comicId = event.detail?.comicId || comic?.comicId
-    if (comicId) openRecommendationDetail(comicId, 'library', comic || null)
+    void (async () => {
+        let comic = event.detail?.comic || null
+        const comicId = event.detail?.comicId || comic?.comicId
+        if (!comicId) return
+        if (!comic)
+            comic =
+                state.records.find((item) => item.comicId === comicId) ||
+                state.searchResults
+                    .map((item) => item.comic || item)
+                    .find((item) => item.comicId === comicId) ||
+                state.recommendations
+                    .map((item) => item.comic || item)
+                    .find((item) => item.comicId === comicId) ||
+                null
+        if (!comic && state.mode === 'connected') {
+            try {
+                comic = await api(
+                    `/api/v1/comics/${encodeURIComponent(comicId)}`
+                )
+            } catch {
+                comic = null
+            }
+        }
+        if (comic) openRecommendationDetail(comicId, 'library', comic)
+    })()
 })
 
 function librarySourceBindings(comic) {

@@ -10,15 +10,17 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV** across discovery, fa
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.7 highlights
+## v0.4.8 highlights
 
-- **Long-running work is no longer a black box**: recommendation generation, visual indexing, favorites sync, and WebDAV sync expose phases, progress, pause/resume, cancellation, and failure states while backend task state remains authoritative across page navigation.
-- **Fixes recommendation deadlocks on unstable networks and after restart**: ordinary Pica API calls are bounded to 15 seconds, repeated provider failures stop early, and Desktop startup clears stale persisted `buildingCycleId` state left by an interrupted process. Deleting `library.db` is no longer a recovery step.
-- **Failed refreshes keep the last usable recommendations**: an insufficient or failed replacement cycle never supersedes the previous usable cycle; Desktop and Android commit new recommendation results only after a complete successful run.
-- **Visual analysis is bounded and controllable**: Desktop visual indexing supports pause/resume/cancel, model loading is bounded to 120 seconds, and each page analysis to 45 seconds. Unfinished works remain pending for later continuation.
-- **Favorites and WebDAV sync are checkpointed**: favorites sync pauses at page boundaries; WebDAV pauses at comic/chapter/page boundaries and reuses already uploaded SHA-matched objects on the next run. Local WebDAV scanning now uses asynchronous file reads so large scans do not monopolize the Node event loop.
-- **Android background jobs are unified**: recommendation, Pica favorites sync, Desktop favorites/covers import, and downloads have task-center controls for pause/resume/cancel/retry. Downloads persist each completed page for true resume; pausing recommendation restarts the current computation on resume while preserving the last usable snapshot.
-- **Upgrade path**: Windows v0.4.0 uses the v0.4.7 upgrade assistant; v0.4.1–v0.4.6 can use scoped incremental updates. Android formal release is v50 / 0.4.7.
+- **Single-instance Desktop download runtime**: only one local scheduler can own the queue. Reloading the Web UI or pressing Run again cannot start a second competing runner.
+- **Download execution is detached from the Web request lifecycle**: the Web UI starts the background runner and returns immediately instead of keeping one HTTP request open until a large queue drains.
+- **Crash recovery for interrupted download jobs**: on startup, stale local `PREPARING / RUNNING / RETRY_WAIT` jobs are returned to `QUEUED` while completed-page progress is preserved. User-requested `PAUSED` jobs stay paused.
+- **Bounded large-queue UI**: cancel confirmation no longer fetches the entire queue. Summary + bounded-page APIs remain the only normal UI path for 1000+ jobs.
+- **Lower SQLite write pressure**: download progress writes are coalesced/throttled during sustained activity and force-flushed at pause, failure, completion, and shutdown boundaries.
+- **Visible runtime recovery**: after reload, the UI can show whether the background runner is active or has recovered interrupted work instead of appearing frozen or disconnected.
+- **Expanded stress coverage**: regression tests cover 1500 jobs / 350 completed, single-runner behavior, interrupted-runtime recovery, progress-write coalescing, and bounded UI reads.
+- **Keeps all v0.4.7 long-task controls**: recommendation, visual analysis, favorites sync, WebDAV, and Android background task pause/resume/cancel/timeout/recovery behavior remains in place.
+- **Upgrade path**: Windows v0.4.0 uses the v0.4.8 upgrade assistant; v0.4.1–v0.4.7 can use scoped incremental updates. Android formal release is v51 / 0.4.8.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 
@@ -70,7 +72,7 @@ See [PROJECT_LOG.md](PROJECT_LOG.md) for the core project evolution.
 ### Updates and maintenance
 
 - Windows supports compatible incremental updates, official Release checks, local update ZIPs, and rollback.
-- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.7 Release to move directly to the latest release without installing intermediate versions.
+- The public user upgrade baseline is v0.4.0. Windows v0.4.0 users should use the **Windows upgrade assistant** from the v0.4.8 Release to move directly to the latest release without installing intermediate versions.
 - Android performs in-place APK updates using official metadata and verifies version, package ID, SHA-256, and signing identity.
 - Logs, repair, cache, export, and diagnostic tools are available from the app.
 
@@ -103,11 +105,11 @@ User data is stored separately from application files. Compatible releases use:
 
 `Settings → Software Update → Check and update (automatic when compatible)`
 
-Existing **v0.4.0** users should download `Pica-Library-v0.4.7-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.7.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
+Existing **v0.4.0** users should download `Pica-Library-v0.4.8-upgrade-assistant.zip`, extract it, and run `Upgrade-Pica-Library-v0.4.8.cmd` to move directly to the current release; no intermediate versions are required. The assistant protects `%LOCALAPPDATA%\Pica Library` and performs package verification, backup, replacement, health checks, and rollback on failure.
 
 ### Android
 
-Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v50 / 0.4.7** through the in-app update chain; no intermediate versions are required.
+Android APKs are distributed only through this repository's official Release. Existing **v42 / 0.4.0** users can update in place directly to **v51 / 0.4.8** through the in-app update chain; no intermediate versions are required.
 
 ## Local-first and security
 

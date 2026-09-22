@@ -1453,6 +1453,13 @@ export class LibraryService {
                 alternateTitles: comic.alternateTitles ?? [],
                 author: comic.author,
                 canonicalAuthor: comic.canonicalAuthor,
+                description: comic.description ?? '',
+                tags: comic.tags ?? [],
+                categories: comic.categories ?? [],
+                finished: Boolean(comic.finished),
+                completionStatus: comic.completionStatus ?? 'UNKNOWN',
+                totalLikes: Number(comic.totalLikes || 0),
+                totalViews: Number(comic.totalViews || 0),
                 pagesCount:
                     Number(comic.pagesCount || 0) ||
                     Number(comic.knownPictures || 0),

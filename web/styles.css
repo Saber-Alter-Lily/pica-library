@@ -3272,7 +3272,7 @@ select:focus {
 .work-variants-panel > summary::-webkit-details-marker { display: none; }
 .work-variants-panel > summary::after {
     content: '▾';
-    float: right;
+    margin-left: auto;
     opacity: .62;
 }
 .work-variants-panel:not([open]) > summary::after { content: '▸'; }

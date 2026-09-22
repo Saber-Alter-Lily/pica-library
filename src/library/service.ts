@@ -155,7 +155,6 @@ import {
     normalizePreferenceKey,
     preferenceAdjustmentV5,
     workIdentityEvidenceV5,
-    workIdentityKeys,
     workIdentitySignalsV2
 } from '../recommendation-v5/portable-policy'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
@@ -1543,7 +1542,6 @@ export class LibraryService {
         // Read-only targeted fallback for detail UX. This improves coverage without
         // writing identity evidence or promoting a probable match into Canonical bindings.
         const policy = new RecommendationPolicyStoreV5(this.database).state()
-        const currentKeys = workIdentityKeys(current)
         const coverBridgeCandidates: StoredComic[] = []
         for (const other of catalog) {
             if (other.comicId === id || rows.has(other.comicId)) continue

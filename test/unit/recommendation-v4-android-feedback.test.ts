@@ -24,16 +24,23 @@ describe('Recommendation V4 Android feedback parity',()=>{
     expect(visualSettings).toContain('RecommendationFeedbackStore.setAskReasons')
   })
 
-  it('uses likes as native seeds and suppresses every explicitly feedbacked item',()=>{
+  it('keeps the presented batch stable while feedback affects later recommendation cycles',()=>{
     const engine=read('NativeRecommendationEngine.java')
     const home=read('HomeActivity.java')
     const portablePolicy=read('RecommendationPolicyStore.java')
     expect(engine).toContain('RecommendationFeedbackStore.isLiked(app,known.id)')
     expect(engine).toContain('!RecommendationFeedbackStore.isDisliked(app,known.id)')
     expect(engine).toContain('allFavoriteIds.addAll(RecommendationFeedbackStore.feedbackIds(app))')
-    // V5 moves display-time suppression into the shared portable-policy filter so
-    // cached Desktop batches and offline Android batches use exactly one rule.
     expect(home).toContain('RecommendationPolicyStore.applyLocalPolicy')
-    expect(portablePolicy).toContain('RecommendationFeedbackStore.hasFeedback(c,item.comicId)')
+    expect(portablePolicy).not.toContain('RecommendationFeedbackStore.hasFeedback(c,item.comicId)||blocked(current,item)')
+    expect(home).toContain('recommendationVisibleSnapshot')
+    expect(home).toContain('refreshCurrentRecommendationFeedback()')
+    expect(home).toContain('liked?"👍 已喜欢":"👍 喜欢"')
+    expect(home).toContain('disliked?"👎 已不喜欢":"👎 不喜欢"')
+    const start=home.indexOf('private void recommendationFeedback(')
+    const method=home.slice(start,home.indexOf('private void openOnlineSource(',start))
+    expect(method).not.toContain('show();')
+    expect(method).not.toContain('switchHomeRecommendationBatch')
+    expect(method).not.toContain('moveVisibleBatch')
   })
 })

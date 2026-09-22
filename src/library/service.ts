@@ -159,6 +159,11 @@ import {
 } from '../recommendation-v5/portable-policy'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 import {
+    WORK_IDENTITY_V3_RESOLVER_VERSION,
+    workIdentityCreatorBucketKeysV3,
+    workIdentityDetailEvidenceV3
+} from '../recommendation-v5/work-identity-v3'
+import {
     buildWorkIdentityAuditV5,
     buildWorkIdentityMaterializationPlanV5,
     buildWorkIdentityMaterializationPreviewV5,
@@ -1390,8 +1395,20 @@ export class LibraryService {
     workVariantsForComic(comicId: string, limit = 24) {
         const id = String(comicId ?? '').trim()
         const bounded = Math.max(1, Math.min(48, Math.floor(limit)))
-        const catalog = this.database.listComics({ limit: 10000 })
-        const catalogById = new Map(catalog.map((comic) => [comic.comicId, comic] as const))
+        const catalog: StoredComic[] = []
+        for (let offset = 0; ; ) {
+            const page = this.database.listComics({
+                limit: 5000,
+                offset,
+                sort: 'latest'
+            })
+            catalog.push(...page)
+            if (page.length < 5000) break
+            offset += page.length
+        }
+        const catalogById = new Map(
+            catalog.map((comic) => [comic.comicId, comic] as const)
+        )
         const current = catalogById.get(id)
         if (!id || !current)
             return {
@@ -1539,45 +1556,104 @@ export class LibraryService {
             add(otherId, 'PROBABLE_SAME_WORK', Number(evidence.confidence || 0))
         }
 
-        // Read-only targeted fallback for detail UX. This improves coverage without
-        // writing identity evidence or promoting a probable match into Canonical bindings.
+        // Work Identity V3 detail funnel:
+        // 1) resolve creator buckets first;
+        // 2) compare titles only inside creator buckets;
+        // 3) use exact-title fallback when creator metadata is incomplete;
+        // 4) use cover identity only for unresolved metadata candidates.
         const policy = new RecommendationPolicyStoreV5(this.database).state()
-        const coverBridgeCandidates: StoredComic[] = []
+        const explicitDistinct = new Set(policy.explicitDistinctPairs)
+        const currentCreatorKeys = new Set(
+            workIdentityCreatorBucketKeysV3(current)
+        )
+        const creatorCandidates: StoredComic[] = []
+        const titleFallbackCandidates: StoredComic[] = []
+
         for (const other of catalog) {
             if (other.comicId === id || rows.has(other.comicId)) continue
             const pairKey = [id, other.comicId].sort().join('\u0000')
-            if (decisionByPair.get(pairKey)?.decision === 'KEEP_SEPARATE')
-                continue
-            const identity = workIdentityEvidenceV5(
-                current,
-                other,
-                policy.explicitDistinctPairs
+            const portablePairKey = [id, other.comicId]
+                .map(normalizePreferenceKey)
+                .sort()
+                .join('\u0000')
+            if (
+                decisionByPair.get(pairKey)?.decision === 'KEEP_SEPARATE' ||
+                explicitDistinct.has(portablePairKey)
             )
+                continue
+
+            const creatorKeys = workIdentityCreatorBucketKeysV3(other)
+            if (
+                creatorKeys.some((key) => currentCreatorKeys.has(key))
+            ) {
+                creatorCandidates.push(other)
+                continue
+            }
+
+            // Author identity is the primary funnel. When it is missing or uses
+            // an unresolved cross-language alias, only exact/core title overlap
+            // is allowed into the fallback pool. We deliberately do not run a
+            // full-catalog fuzzy title search.
             const signals = workIdentitySignalsV2(current, other)
-            if (identity.relation === 'HIGH_CONFIDENCE_WORK') {
+            if (
+                signals.strictTitleMatch ||
+                signals.trustedCoreTitleMatch ||
+                signals.looseTitleMatch
+            )
+                titleFallbackCandidates.push(other)
+        }
+
+        const reviewCandidates: Array<{
+            comic: StoredComic
+            evidence: ReturnType<typeof workIdentityDetailEvidenceV3>
+            source: 'CREATOR_BUCKET' | 'TITLE_FALLBACK'
+        }> = []
+        const evaluate = (
+            other: StoredComic,
+            source: 'CREATOR_BUCKET' | 'TITLE_FALLBACK'
+        ) => {
+            const evidence = workIdentityDetailEvidenceV3(current, other)
+            const detailEvidence = {
+                resolverVersion: WORK_IDENTITY_V3_RESOLVER_VERSION,
+                funnelSource: source,
+                ...evidence
+            }
+            if (evidence.relation === 'HIGH_CONFIDENCE_WORK') {
                 add(
                     other.comicId,
                     'PROBABLE_SAME_WORK',
-                    signals.strictTitleMatch ? 0.99 : 0.94
+                    evidence.confidence,
+                    undefined,
+                    detailEvidence
                 )
-                continue
+                return
             }
-            // Cover Identity is deliberately an auxiliary bridge, not a
-            // replacement for Work Identity. Only compare covers when there
-            // is at least one independent metadata support signal.
-            if (
-                signals.authorsCompatible ||
-                signals.pageCountCompatible ||
-                signals.strictTitleMatch ||
-                signals.looseTitleMatch
-            )
-                coverBridgeCandidates.push(other)
+            if (evidence.relation === 'REVIEW_CANDIDATE')
+                reviewCandidates.push({ comic: other, evidence, source })
         }
 
-        if (coverBridgeCandidates.length) {
+        for (const other of creatorCandidates)
+            evaluate(other, 'CREATOR_BUCKET')
+        for (const other of titleFallbackCandidates)
+            if (!rows.has(other.comicId)) evaluate(other, 'TITLE_FALLBACK')
+
+        // Stage 3 only touches covers for metadata candidates that remain
+        // ambiguous. This keeps the normal path cheap while allowing a near-
+        // duplicate cover to rescue translated/retitled editions.
+        const rankedReviews = reviewCandidates
+            .sort(
+                (a, b) =>
+                    b.evidence.confidence - a.evidence.confidence ||
+                    b.evidence.titleSimilarity -
+                        a.evidence.titleSimilarity ||
+                    a.comic.comicId.localeCompare(b.comic.comicId)
+            )
+            .slice(0, 96)
+
+        if (rankedReviews.length) {
             const requestedIds = [
                 id,
-                ...coverBridgeCandidates.map((comic) => comic.comicId)
+                ...rankedReviews.map((item) => item.comic.comicId)
             ]
             const coverEmbeddings = this.database
                 .listVisualEmbeddings(requestedIds)
@@ -1595,46 +1671,82 @@ export class LibraryService {
                 )
                     latestCover.set(embedding.comicId, embedding)
             }
+
             const currentCover = latestCover.get(id)
-            if (currentCover) {
-                for (const other of coverBridgeCandidates) {
-                    if (rows.has(other.comicId)) continue
-                    const otherCover = latestCover.get(other.comicId)
-                    if (
-                        !otherCover ||
-                        otherCover.modelId !== currentCover.modelId ||
-                        otherCover.modelVersion !== currentCover.modelVersion ||
-                        otherCover.dimension !== currentCover.dimension
-                    )
-                        continue
-                    const similarity = cosineSimilarity(
+            for (const item of rankedReviews) {
+                if (rows.has(item.comic.comicId)) continue
+                const otherCover = latestCover.get(item.comic.comicId)
+                let comparableCover = false
+                let similarity: number | null = null
+                if (
+                    currentCover &&
+                    otherCover &&
+                    otherCover.modelId === currentCover.modelId &&
+                    otherCover.modelVersion === currentCover.modelVersion &&
+                    otherCover.dimension === currentCover.dimension
+                ) {
+                    comparableCover = true
+                    const value = cosineSimilarity(
                         currentCover.vector,
                         otherCover.vector
                     )
-                    if (!Number.isFinite(similarity) || similarity < 0.995)
-                        continue
-                    const signals = workIdentitySignalsV2(current, other)
+                    if (Number.isFinite(value)) similarity = value
+                }
+
+                if (similarity !== null && similarity >= 0.992) {
                     add(
-                        other.comicId,
+                        item.comic.comicId,
                         'PROBABLE_SAME_WORK',
-                        Math.min(
-                            0.985,
-                            0.95 +
-                                (similarity - 0.995) * 3 +
-                                (signals.authorsCompatible ? 0.015 : 0) +
-                                (signals.pageCountCompatible ? 0.01 : 0)
+                        Math.max(
+                            item.evidence.confidence,
+                            Math.min(
+                                0.985,
+                                0.94 +
+                                    (similarity - 0.992) * 4 +
+                                    (item.evidence.creatorMatch ? 0.015 : 0) +
+                                    (item.evidence.pageCountCompatible
+                                        ? 0.01
+                                        : 0)
+                            )
                         ),
                         undefined,
                         {
+                            resolverVersion: WORK_IDENTITY_V3_RESOLVER_VERSION,
+                            funnelSource: item.source,
+                            ...item.evidence,
                             coverIdentitySimilarity: similarity,
                             coverIdentityModel:
-                                currentCover.modelId +
+                                currentCover!.modelId +
                                 '@' +
-                                currentCover.modelVersion,
-                            coverIdentityAuxiliaryOnly: true
+                                currentCover!.modelVersion,
+                            coverIdentityStage: 'REVIEW_CONFIRMATION'
                         }
                     )
+                    continue
                 }
+
+                // If no comparable cover exists, keep only stronger creator-
+                // scoped metadata candidates visible as "possibly same work".
+                // If a comparable cover exists and disagrees, do not surface it.
+                const minimumWithoutCover = item.evidence.creatorMatch
+                    ? 0.8
+                    : 0.86
+                if (
+                    !comparableCover &&
+                    item.evidence.confidence >= minimumWithoutCover
+                )
+                    add(
+                        item.comic.comicId,
+                        'PROBABLE_SAME_WORK',
+                        item.evidence.confidence,
+                        undefined,
+                        {
+                            resolverVersion: WORK_IDENTITY_V3_RESOLVER_VERSION,
+                            funnelSource: item.source,
+                            ...item.evidence,
+                            coverIdentityStage: 'UNAVAILABLE'
+                        }
+                    )
             }
         }
 

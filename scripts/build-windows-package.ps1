@@ -57,6 +57,8 @@ $name = if ($version -eq '0.2.0') {
     'Pica-Library-v0.4.9-windows-x64'
 } elseif ($version -eq '0.4.10') {
     'Pica-Library-v0.4.10-windows-x64'
+} elseif ($version -eq '0.4.11') {
+    'Pica-Library-v0.4.11-windows-x64'
 } elseif ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {

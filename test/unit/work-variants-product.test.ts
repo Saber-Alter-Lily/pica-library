@@ -31,6 +31,9 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(service).toContain('workVariantsForComic(comicId: string')
         expect(service).toContain("'PROBABLE_SAME_WORK'")
         expect(service).toContain('workIdentityEvidenceV5(')
+        expect(service).toContain('workIdentitySignalsV2(')
+        expect(service).toContain("embedding.embeddingKind === 'cover'")
+        expect(service).toContain('coverIdentityAuxiliaryOnly: true')
         expect(service).not.toMatch(
             /workVariantsForComic[\s\S]{0,800}saveWorkIdentityEvidence/
         )
@@ -45,6 +48,10 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         const css = read('web/styles.css')
         expect(app).toContain('id="work-variants-panel"')
         expect(app).toContain("t('workVariants.summary'")
+        const i18n = read('web/i18n.js')
+        expect(i18n).toContain("'workVariants.summary': '同一作品 · {count}'")
+        expect(i18n).toContain("'workVariants.summary': 'Same work · {count}'")
+        expect(app).toContain("t('workVariants.summary'")
         expect(app).toContain('if (panel.open) renderWorkVariantList(panel)')
         expect(app).toContain('data-work-variant-open')
         expect(css).toContain('.work-variants-panel:not([open])')
@@ -58,7 +65,7 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         const resolver = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/WorkVariantResolver.java'
         )
-        expect(detail).toContain('"相似作品 · "+count')
+        expect(detail).toContain('"同一作品 · "+count')
         expect(detail).toContain('workVariantArea.setVisibility(View.GONE)')
         expect(detail).toContain('toggleWorkVariants()')
         expect(detail).toContain('renderWorkVariants()')

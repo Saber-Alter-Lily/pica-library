@@ -1358,6 +1358,8 @@ function mountOnlineReadButtons(container) {
 document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-online-comic]')
     if (button && state.mode === 'connected') void openReaderComic(button.dataset.onlineComic, true)
+    const detail = event.target.closest('[data-library-detail]')
+    if (detail) openRecommendationDetail(detail.dataset.libraryDetail, 'library')
 })
 
 function librarySourceBindings(comic) {
@@ -1380,7 +1382,7 @@ function libraryDetails(comic) {
     const sources = librarySourceBindings(comic)
     const replicas = libraryReplicaLabels(comic)
     const status = comic?.completionStatus === 'UNKNOWN' ? t('library.status.unknown') : comic?.completionStatus === 'FINISHED' ? t('library.status.finished') : t('library.status.ongoing')
-    return `<details class="comic-bindings"><summary>${escapeHtml(t('library.bindings.summary'))}</summary><p><strong>${escapeHtml(t('library.bindings.version'))}</strong> · ${escapeHtml(status)}</p><p><strong>${escapeHtml(t('library.bindings.online'))}</strong> · ${escapeHtml(sources.join(' / ') || t('library.bindings.noneSource'))}</p><p><strong>${escapeHtml(t('library.bindings.replicas'))}</strong> · ${escapeHtml(replicas.join(' / ') || t('library.bindings.noneReplica'))}</p></details>`
+    return `<div class="detail-actions"><button type="button" data-library-detail="${escapeHtml(comic.comicId)}">${escapeHtml(t('result.details'))}</button></div><details class="comic-bindings"><summary>${escapeHtml(t('library.bindings.summary'))}</summary><p><strong>${escapeHtml(t('library.bindings.version'))}</strong> · ${escapeHtml(status)}</p><p><strong>${escapeHtml(t('library.bindings.online'))}</strong> · ${escapeHtml(sources.join(' / ') || t('library.bindings.noneSource'))}</p><p><strong>${escapeHtml(t('library.bindings.replicas'))}</strong> · ${escapeHtml(replicas.join(' / ') || t('library.bindings.noneReplica'))}</p></details>`
 }
 
 function renderComics(records = state.records) {
@@ -1465,7 +1467,7 @@ function renderComics(records = state.records) {
         .map(
             (comic) => `<tr data-comic-id="${escapeHtml(comic.comicId)}" data-is-favorite="${comic.isFavorite ? 'true' : 'false'}">
                 <td><input type="checkbox" data-selection-context="library" data-comic-id="${escapeHtml(comic.comicId)}" ${state.selections.library.has(comic.comicId) ? 'checked' : ''} /></td>
-                <td><strong>${escapeHtml(comic.title)}</strong></td>
+                <td><strong>${escapeHtml(comic.title)}</strong><br><button type="button" data-library-detail="${escapeHtml(comic.comicId)}">${escapeHtml(t('result.details'))}</button></td>
                 <td>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknown'))}</td>
                 <td>${tagsFor(comic)
                     .map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`)

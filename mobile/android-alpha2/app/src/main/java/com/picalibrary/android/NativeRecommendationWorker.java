@@ -42,13 +42,13 @@ public final class NativeRecommendationWorker extends Worker {
         while(NativeRecommendationJobs.paused(app)){
             if(isStopped())throw new InterruptedException("推荐任务已取消");
             if(!pauseAnnounced){
-                pauseAnnounced=true;
+                pauseAnnounced=true;NativeRecommendationJobs.acknowledgePause(app,true);
                 Data data=new Data.Builder().putString(KEY_PHASE,"推荐生成已暂停 · "+lastPhase).putInt(KEY_DONE,lastDone).putInt(KEY_TOTAL,lastTotal).build();
                 setProgressAsync(data);setForegroundAsync(foreground("推荐生成已暂停 · "+lastPhase,lastDone,lastTotal));
             }
             Thread.sleep(250L);
         }
-        pauseAnnounced=false;
+        pauseAnnounced=false;NativeRecommendationJobs.acknowledgePause(app,false);
         if(isStopped())throw new InterruptedException("推荐任务已取消");
     }
 

@@ -2398,8 +2398,6 @@ function renderWorkVariantList(panel) {
                       item.comicId
                   )}" data-work-variant-open="${escapeHtml(
                       item.comicId
-                  )}" role="link" tabindex="0" aria-label="${escapeHtml(
-                      t('workVariants.openLabel', { title })
                   )}">
                       <div class="work-variant-cover">${cover}</div>
                       <div class="work-variant-copy">
@@ -2408,7 +2406,7 @@ function renderWorkVariantList(panel) {
                           <div class="work-variant-badges">${badges}</div>
                           <small>${escapeHtml(meta)}</small>
                           <small>${escapeHtml(workVariantRelationLabel(item))}</small>
-                          <button type="button" data-work-variant-open="${escapeHtml(item.comicId)}">${escapeHtml(t('workVariants.open'))}</button>
+                          <a href="#" class="work-variant-open-link" data-work-variant-open="${escapeHtml(item.comicId)}" aria-label="${escapeHtml(t('workVariants.openLabel', { title }))}">${escapeHtml(t('workVariants.open'))} →</a>
                       </div>
                   </article>`
               })
@@ -2609,14 +2607,6 @@ $('#recommend-detail-dialog').onclick = async (event) => {
     } else if (event.target.dataset.detailDownload)
         await enqueue([comicId], dialog.dataset.context)
 }
-
-$('#recommend-detail-dialog').addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    if (!event.target.matches?.('.work-variant-card[data-work-variant-open]'))
-        return
-    event.preventDefault()
-    event.target.click()
-})
 
 let readerProgressTimer = null
 let readerScrollHandler = null

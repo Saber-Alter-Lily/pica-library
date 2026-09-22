@@ -15,6 +15,7 @@ describe('post-v0.4.8 mobile resume, preference scroll and update notices', () =
         expect(jobs).toContain('ExistingWorkPolicy.KEEP')
         expect(worker).toContain('while(NativeRecommendationJobs.paused(app))')
         expect(worker).toContain('Thread.sleep(250L)')
+        expect(worker).toContain('putInt(KEY_DONE,lastDone).putInt(KEY_TOTAL,lastTotal)')
         expect(worker).toContain('this::checkpoint')
         expect(panel).toContain('继续会从当前检查点继续本轮生成')
     })
@@ -36,7 +37,9 @@ describe('post-v0.4.8 mobile resume, preference scroll and update notices', () =
         expect(prompt).toContain('UpdateClient.newer')
         expect(prompt).toContain('new AlertDialog.Builder(activity)')
         expect(prompt).toContain('PROMPT_INTERVAL_MS=12L*60*60*1000')
+        expect(prompt).toContain('cancel(0x55410001)')
         expect(home).toContain('AutoUpdatePrompt.maybePrompt(this)')
+        expect(background).toContain('lastPromptedVersionCode')
         expect(background).toContain('notifyUpdate(app,info)')
     })
 

@@ -199,15 +199,83 @@ function stripUploadNoise(value: string) {
         .trim()
 }
 
-export function workIdentityKeys(comic: Pick<StoredComic, 'comicId' | 'title' | 'author' | 'canonicalAuthor' | 'pagesCount'>) {
-    const author = normalizePreferenceKey(comic.canonicalAuthor ?? comic.author)
-    const strictTitle = normalizeTitleStrict(comic.title)
-    const looseTitle = stripUploadNoise(strictTitle)
+function leadingCreatorCredit(value: string) {
+    const prefix = value.match(/^\s*\[([^\]]{1,120})\]\s*/)
+    if (!prefix) return { stripped: value, creatorAliases: [] as string[] }
+    const inner = prefix[1]
+    const creators = [
+        ...inner.matchAll(/\(([^()]{1,80})\)/g),
+        ...inner.matchAll(/（([^（）]{1,80})）/g)
+    ]
+        .map((match) => String(match[1] ?? '').trim())
+        .filter(Boolean)
+    // Only treat a leading bracket as a provider/upload credit block when it
+    // contains an explicit parenthesized creator. This avoids stripping real
+    // title prefixes such as "[Series A] Story".
+    return creators.length
+        ? {
+              stripped: value.slice(prefix[0].length).trim(),
+              creatorAliases: creators
+          }
+        : { stripped: value, creatorAliases: [] as string[] }
+}
+
+function uniqueNormalized(values: Iterable<unknown>) {
+    return [
+        ...new Set(
+            [...values]
+                .map((value) => normalizePreferenceKey(value))
+                .filter(Boolean)
+        )
+    ]
+}
+
+export type WorkIdentityComicV2 = Pick<
+    StoredComic,
+    | 'comicId'
+    | 'title'
+    | 'author'
+    | 'canonicalAuthor'
+    | 'authorId'
+    | 'pagesCount'
+    | 'alternateTitles'
+>
+
+export function workIdentityKeys(comic: WorkIdentityComicV2) {
+    const rawTitles = [
+        comic.title,
+        ...(comic.alternateTitles ?? [])
+    ].filter(Boolean)
+    const creatorAliases: string[] = []
+    const expandedTitles: string[] = []
+    for (const raw of rawTitles) {
+        const value = String(raw)
+        expandedTitles.push(value)
+        const credit = leadingCreatorCredit(value)
+        creatorAliases.push(...credit.creatorAliases)
+        if (credit.stripped !== value) expandedTitles.push(credit.stripped)
+    }
+
+    const strictTitles = uniqueNormalized(
+        expandedTitles.map(normalizeTitleStrict)
+    )
+    const looseTitles = uniqueNormalized(
+        strictTitles.map(stripUploadNoise)
+    )
+    const authorAliases = uniqueNormalized([
+        comic.canonicalAuthor,
+        comic.author,
+        ...creatorAliases
+    ])
     return {
         uploadKey: normalizePreferenceKey(comic.comicId),
-        author,
-        strictTitle,
-        looseTitle,
+        author: authorAliases[0] ?? '',
+        authorId: normalizePreferenceKey(comic.authorId),
+        authorAliases,
+        strictTitle: strictTitles[0] ?? '',
+        looseTitle: looseTitles[0] ?? '',
+        strictTitles,
+        looseTitles,
         pages: Math.max(0, Number(comic.pagesCount ?? 0) || 0)
     }
 }
@@ -218,13 +286,48 @@ function closePageCount(left: number, right: number) {
     return delta <= Math.max(4, Math.ceil(Math.max(left, right) * 0.08))
 }
 
+function intersects(left: string[], right: string[]) {
+    if (!left.length || !right.length) return false
+    const values = new Set(left)
+    return right.some((value) => values.has(value))
+}
+
+export interface WorkIdentitySignalsV2 {
+    authorIdMatch: boolean
+    authorAliasMatch: boolean
+    authorsCompatible: boolean
+    strictTitleMatch: boolean
+    looseTitleMatch: boolean
+    pageCountCompatible: boolean
+}
+
+export function workIdentitySignalsV2(
+    left: WorkIdentityComicV2,
+    right: WorkIdentityComicV2
+): WorkIdentitySignalsV2 {
+    const a = workIdentityKeys(left)
+    const b = workIdentityKeys(right)
+    const authorIdMatch = Boolean(
+        a.authorId && b.authorId && a.authorId === b.authorId
+    )
+    const authorAliasMatch = intersects(a.authorAliases, b.authorAliases)
+    return {
+        authorIdMatch,
+        authorAliasMatch,
+        authorsCompatible: authorIdMatch || authorAliasMatch,
+        strictTitleMatch: intersects(a.strictTitles, b.strictTitles),
+        looseTitleMatch: intersects(a.looseTitles, b.looseTitles),
+        pageCountCompatible: closePageCount(a.pages, b.pages)
+    }
+}
+
 function pairKey(leftId: string, rightId: string) {
     return [leftId, rightId].map(normalizePreferenceKey).sort().join('\u0000')
 }
 
 export function workIdentityEvidenceV5(
-    left: Pick<StoredComic, 'comicId' | 'title' | 'author' | 'canonicalAuthor' | 'pagesCount'>,
-    right: Pick<StoredComic, 'comicId' | 'title' | 'author' | 'canonicalAuthor' | 'pagesCount'>,
+    left: WorkIdentityComicV2,
+    right: WorkIdentityComicV2,
     explicitDistinctPairs: Iterable<string> = []
 ): WorkIdentityEvidenceV5 {
     if (normalizePreferenceKey(left.comicId) === normalizePreferenceKey(right.comicId))
@@ -232,31 +335,37 @@ export function workIdentityEvidenceV5(
     const distinct = new Set(explicitDistinctPairs)
     if (distinct.has(pairKey(left.comicId, right.comicId)))
         return { relation: 'DISTINCT_OR_UNKNOWN', reason: 'user-confirmed distinct' }
-    const a = workIdentityKeys(left)
-    const b = workIdentityKeys(right)
-    const authorsCompatible = a.author && b.author ? a.author === b.author : false
-    if (authorsCompatible && a.strictTitle && a.strictTitle === b.strictTitle)
-        return { relation: 'HIGH_CONFIDENCE_WORK', reason: 'same normalized title and author' }
-    if (
-        authorsCompatible &&
-        a.looseTitle &&
-        a.looseTitle === b.looseTitle &&
-        closePageCount(a.pages, b.pages)
-    )
+
+    const signals = workIdentitySignalsV2(left, right)
+    if (signals.authorsCompatible && signals.strictTitleMatch)
         return {
             relation: 'HIGH_CONFIDENCE_WORK',
-            reason: 'same normalized core title/author with compatible page count'
+            reason:
+                signals.authorIdMatch
+                    ? 'same title alias and canonical author identity'
+                    : 'same title alias and author alias'
         }
     if (
-        !a.author &&
-        !b.author &&
-        a.strictTitle &&
-        a.strictTitle === b.strictTitle &&
-        closePageCount(a.pages, b.pages)
+        signals.authorsCompatible &&
+        signals.looseTitleMatch &&
+        signals.pageCountCompatible
     )
         return {
             relation: 'HIGH_CONFIDENCE_WORK',
-            reason: 'same normalized title with compatible page count'
+            reason: 'same normalized core title alias/author with compatible page count'
+        }
+
+    const a = workIdentityKeys(left)
+    const b = workIdentityKeys(right)
+    if (
+        !a.authorAliases.length &&
+        !b.authorAliases.length &&
+        signals.strictTitleMatch &&
+        signals.pageCountCompatible
+    )
+        return {
+            relation: 'HIGH_CONFIDENCE_WORK',
+            reason: 'same title alias with compatible page count'
         }
     return { relation: 'DISTINCT_OR_UNKNOWN', reason: 'insufficient identity evidence' }
 }

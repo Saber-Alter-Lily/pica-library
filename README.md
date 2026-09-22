@@ -10,17 +10,16 @@
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.9 本次更新
+## v0.4.10 本次更新
 
-- **Android 推荐暂停改为原位继续**：正常用户暂停不再取消 WorkManager；继续时沿用同一 Worker 和已完成阶段。若进程被系统终止，会明确提示“暂停状态已保留”，而不是伪装成精确断点续跑。
-- **推荐反馈不再扰乱当前批次**：Android 的 Like / Dislike 与 Desktop 对齐，当前 12 本保持冻结；点击后只更新该卡片反馈状态，不再让作品消失并从下一批提前补位。
-- **人工调整不再跳回页面顶部**：Android 0–10 标签调整、屏蔽和 Session 意图更新后保持原滚动位置。
-- **双端自动发现新版本**：Desktop/Web 与 Android 在前台按节流规则检查官方更新并提示用户，继续复用现有校验与安装流程；不会自动下载或静默安装。
-- **已收藏 Work 不再作为“新作品”推荐**：Final V3 在 exact upload 之外增加 Canonical Work 级 ownership gate；已收藏、已入库或已下载作品的已确认其他版本也从最终 serving 中排除。
-- **作品详情增加“相似作品 · N”折叠区**：默认只显示关联数量；展开后可对比封面、标题、作者、页数、来源、版本/语言、收藏/下载状态以及可用评分/汉化信息，并直接跳转对应版本。
-- **Work Identity 保持保守**：已确认 Canonical binding 与人工裁决优先；高置信 probable 关系只用于详情提示，不会自动物化，也不会直接作为推荐硬排除；`KEEP_SEPARATE` 始终优先。
-- **统一详情入口**：Web 书库、已下载、书架、搜索和推荐都进入同一作品详情；普通详情不再为了打开页面预加载完整 Visual QC 数据。
-- **公开升级路径**：Windows v0.4.0 使用 v0.4.9 升级助手一次直达；v0.4.1–v0.4.8 可使用兼容增量更新。Android 正式版为 v52 / 0.4.9。
+- **Work Identity V2**：作品识别不再只看主标题。现在会同时使用 `title + alternateTitles`，并识别 E-H 常见 `[Circle (Author)]` 前缀中的作者 alias。
+- **跨语言同作品识别**：Pica 日文标题与 E-H 罗马音 / 英文主标题，只要 alternate title 与作者身份能对应，也可以识别为同一 Work；不再要求两个 Provider 主标题使用同一种语言。
+- **作者身份更稳**：优先使用 canonical `authorId`，其次使用 canonical/raw/标题 credit 中的作者 alias。
+- **Cover Identity 辅助证据**：封面近重复与“画风相似”分开处理。只有在存在额外元数据支持时才使用高阈值 cover embedding 辅助判断，而且只产生 `PROBABLE_SAME_WORK`，不会仅凭封面自动绑定。
+- **详情区改名为“同一作品”**：原“相似作品 · N”改为“同一作品 · N”，避免和推荐系统里的“相似作品 / Related”混淆；默认仍折叠，仅显示数量。
+- **保留防误合并规则**：普通 `[Chinese] / [Digital] / 汉化` 等上传噪声去除后，仍需要页数等兼容证据；`KEEP_SEPARATE` 继续拥有最高优先级。
+- **固定跨 Provider 回归**：加入 Pica《盗まれた人妻。》与 E-H `Nusumareta Hitozuma. - Stolen Wife [Digital]` 的双向识别测试，防止后续再次退化。
+- **公开升级路径**：Windows v0.4.0 使用 v0.4.10 升级助手一次直达；v0.4.1–v0.4.9 可使用兼容增量更新。Android 正式版为 v53 / 0.4.10。
 
 完整版本演变见 [PROJECT_LOG.md](PROJECT_LOG.md)。
 
@@ -72,7 +71,7 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 ### 更新与维护
 
 - Windows 支持兼容增量更新、官方 Release 检查、本地更新 ZIP 与更新回滚。
-- 面向普通用户的公开升级基线是 v0.4.0。Windows v0.4.0 使用 v0.4.9 Release 中的 **Windows 升级助手** 一次直达最新版，不需要安装任何中间版本。
+- 面向普通用户的公开升级基线是 v0.4.0。Windows v0.4.0 使用 v0.4.10 Release 中的 **Windows 升级助手** 一次直达最新版，不需要安装任何中间版本。
 - Android 使用官方更新元数据进行 APK 原地升级，并校验版本、包名、SHA-256 与签名身份。
 - 提供日志、文件修复、缓存、导出与诊断入口。
 
@@ -105,11 +104,11 @@ Windows 10/11 x64 · Android · Local-first · Open Source
 
 `设置 → 软件更新 → 检查并更新（兼容时自动）`
 
-已有 **v0.4.0** 的用户直接下载 `Pica-Library-v0.4.9-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.9.cmd`，即可一次升级到当前最新版；无需安装任何中间版本。助手会保护 `%LOCALAPPDATA%\Pica Library`，并自动完成校验、备份、替换、健康检查与失败回滚。
+已有 **v0.4.0** 的用户直接下载 `Pica-Library-v0.4.10-upgrade-assistant.zip`，解压后双击 `Upgrade-Pica-Library-v0.4.10.cmd`，即可一次升级到当前最新版；无需安装任何中间版本。助手会保护 `%LOCALAPPDATA%\Pica Library`，并自动完成校验、备份、替换、健康检查与失败回滚。
 
 ### Android
 
-Android APK 不通过应用商店分发，请只使用本仓库正式 Release。已有 **v42 / 0.4.0** 的用户可直接通过应用内更新链原地升级到 **v52 / 0.4.9**；无需安装任何中间版本。
+Android APK 不通过应用商店分发，请只使用本仓库正式 Release。已有 **v42 / 0.4.0** 的用户可直接通过应用内更新链原地升级到 **v53 / 0.4.10**；无需安装任何中间版本。
 
 ## 本地优先与安全
 

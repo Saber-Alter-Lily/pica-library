@@ -330,6 +330,11 @@ export class LibraryService {
     private readonly recommendationResumeWaiters = new Set<() => void>()
     private recommendationBuildCycleId: string | null = null
 
+    private allComicsForIdentity() {
+        const catalog = this.allComicsForIdentity()
+        return catalog
+    }
+
     recommendationBuildProgress() {
         return {
             ...this.recommendationProgress,
@@ -1781,7 +1786,7 @@ export class LibraryService {
     }
 
     recommendationV5WorkIdentityAudit(limit = 200) {
-        const catalog = this.database.listComics({ limit: 10000 })
+        const catalog = this.allComicsForIdentity()
         const state = new RecommendationPolicyStoreV5(this.database).state()
         return {
             ...buildWorkIdentityAuditV5(catalog, state, limit),
@@ -1850,7 +1855,7 @@ export class LibraryService {
         }))
         const materializationPreview =
             buildWorkIdentityMaterializationPreviewV5(
-                this.database.listComics({ limit: 10000 }),
+                this.allComicsForIdentity(),
                 decisions
             )
         return {
@@ -1865,7 +1870,7 @@ export class LibraryService {
     }
 
     recommendationV5WorkIdentityMaterializationPlan() {
-        const catalog = this.database.listComics({ limit: 10000 })
+        const catalog = this.allComicsForIdentity()
         const decisions = this.database.listWorkIdentityDecisions(5000)
         const existingBindings = this.database.listWorkIdentityBindings(10000)
         const plan = buildWorkIdentityMaterializationPlanV5(

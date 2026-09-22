@@ -21,6 +21,7 @@ describe('post-v0.4.8 mobile resume, preference scroll and update notices', () =
         expect(worker).toContain('this::checkpoint')
         expect(panel).toContain('正在暂停推荐生成…')
         expect(panel).toContain('继续会从当前检查点继续本轮生成')
+        expect(panel).toContain('后台 Worker 已结束；继续会重新执行未完成阶段')
     })
 
     it('restores the Android manual-preference viewport after a mutation reload', () => {

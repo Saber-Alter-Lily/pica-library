@@ -330,8 +330,18 @@ export class LibraryService {
     private readonly recommendationResumeWaiters = new Set<() => void>()
     private recommendationBuildCycleId: string | null = null
 
-    private allComicsForIdentity() {
-        const catalog = this.allComicsForIdentity()
+    private allComicsForIdentity(): StoredComic[] {
+        const catalog: StoredComic[] = []
+        for (let offset = 0; ; ) {
+            const page = this.database.listComics({
+                limit: 5000,
+                offset,
+                sort: 'latest'
+            })
+            catalog.push(...page)
+            if (page.length < 5000) break
+            offset += page.length
+        }
         return catalog
     }
 
@@ -1400,17 +1410,7 @@ export class LibraryService {
     workVariantsForComic(comicId: string, limit = 24) {
         const id = String(comicId ?? '').trim()
         const bounded = Math.max(1, Math.min(48, Math.floor(limit)))
-        const catalog: StoredComic[] = []
-        for (let offset = 0; ; ) {
-            const page = this.database.listComics({
-                limit: 5000,
-                offset,
-                sort: 'latest'
-            })
-            catalog.push(...page)
-            if (page.length < 5000) break
-            offset += page.length
-        }
+        const catalog = this.allComicsForIdentity()
         const catalogById = new Map(
             catalog.map((comic) => [comic.comicId, comic] as const)
         )

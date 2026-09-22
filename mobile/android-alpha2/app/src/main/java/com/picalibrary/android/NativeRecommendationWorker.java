@@ -14,12 +14,15 @@ public final class NativeRecommendationWorker extends Worker {
     static final String KEY_PHASE="phase",KEY_DONE="done",KEY_TOTAL="total";
     private static final String CHANNEL="native-recommendation";
     private boolean pauseAnnounced;
+    private volatile String lastPhase="正在准备手机推荐";
+    private volatile int lastDone,lastTotal;
     public NativeRecommendationWorker(@NonNull Context context,@NonNull WorkerParameters params){super(context,params);}
 
     @NonNull @Override public Result doWork(){
         try{
             setForegroundAsync(foreground("正在准备手机推荐",0,0));
             NativeRecommendationStore.Snapshot snapshot=NativeRecommendationEngine.build(getApplicationContext(),(phase,done,total)->{
+                lastPhase=phase;lastDone=done;lastTotal=total;
                 Data data=new Data.Builder().putString(KEY_PHASE,phase).putInt(KEY_DONE,done).putInt(KEY_TOTAL,total).build();setProgressAsync(data);setForegroundAsync(foreground(phase,done,total));
             },this::checkpoint);
             if(!snapshot.available()&&NativeRecommendationPolicy.readinessRank(snapshot.candidateCount)==0){
@@ -40,8 +43,8 @@ public final class NativeRecommendationWorker extends Worker {
             if(isStopped())throw new InterruptedException("推荐任务已取消");
             if(!pauseAnnounced){
                 pauseAnnounced=true;
-                Data data=new Data.Builder().putString(KEY_PHASE,"推荐生成已暂停").build();
-                setProgressAsync(data);setForegroundAsync(foreground("推荐生成已暂停",0,0));
+                Data data=new Data.Builder().putString(KEY_PHASE,"推荐生成已暂停 · "+lastPhase).putInt(KEY_DONE,lastDone).putInt(KEY_TOTAL,lastTotal).build();
+                setProgressAsync(data);setForegroundAsync(foreground("推荐生成已暂停 · "+lastPhase,lastDone,lastTotal));
             }
             Thread.sleep(250L);
         }

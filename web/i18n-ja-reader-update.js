@@ -126,6 +126,7 @@ export const jaReaderUpdateTranslations = {
     'update.staged': '更新パッケージの検証と準備が完了しました。確認すると更新して再起動します。',
     'update.checking': '公式安定版を確認中…',
     'update.current': 'すでに最新バージョンです。',
+    'update.availablePrompt': 'Pica Library v{version} が利用できます。今すぐ「ソフトウェア更新」を開きますか？',
     'update.fullFound': 'v{version} が見つかりました。この更新にはWindows完全版パッケージが必要です。',
     'update.fullGuide': '<strong>v{version} への更新にはWindows完全版パッケージが必要です。</strong><span class="full-install-note">アプリ本体だけを一度置き換えます。ライブラリデータは別の場所に保存されています。</span><ol><li><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">Pica-Library-v{version}-windows-x64.zipをダウンロード</a>します。</li><li>プログラムファイルを置き換える前にPica Libraryを完全に終了します。</li><li>ZIPを新しいフォルダーに展開して実行するか、旧版終了後にアプリフォルダーだけを置き換えます。</li><li><strong><code>%LOCALAPPDATA%\\Pica Library</code> は削除しないでください。</strong>データベース、本棚、履歴、設定、認証情報、ダウンロード済みコンテンツはここに残ります。アンインストールや再インポートは不要です。</li></ol><div class="full-install-actions"><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">Windowsパッケージをダウンロード</a><a href="{releaseUrl}" target="_blank" rel="noopener noreferrer">Releaseとチェックサムを表示</a></div>',
     'update.incrementalFound': 'v{version} の互換増分更新が見つかりました。<a href="{url}" target="_blank" rel="noopener noreferrer">公式更新パッケージをダウンロード</a>し、上の欄でZIPを選択またはドロップしてください。',

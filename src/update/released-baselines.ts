@@ -89,6 +89,14 @@ export const RELEASED_UPDATE_BASELINES: Record<
         actualMigrationVersion: 13,
         notes:
             'Public v0.4.9 keeps the schema-13 updater contract and is a compatible scoped-update baseline.'
+    },
+    '0.4.10': {
+        version: '0.4.10',
+        appApiVersion: 2,
+        advertisedDatabaseSchemaVersion: 13,
+        actualMigrationVersion: 13,
+        notes:
+            'Public v0.4.10 keeps the schema-13 updater contract and is a compatible scoped-update baseline.'
     }
 }
 

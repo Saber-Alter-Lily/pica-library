@@ -112,6 +112,8 @@ const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
 
 const VISUAL_SETTINGS_CACHE_KEY = 'pica-visual-settings-confirmed-v1'
+const AUTO_UPDATE_PROMPT_KEY = 'pica-auto-update-prompt-v1'
+const AUTO_UPDATE_PROMPT_INTERVAL_MS = 12 * 60 * 60 * 1000
 let visualSettingsMutationVersion = 0
 
 function readConfirmedVisualSettings() {
@@ -814,6 +816,57 @@ $('#update-apply').onclick = async () => {
     } catch (error) {
         $('#update-message').textContent = localizeError(language, error)
         renderUpdateProgress({ phase: 'failed' })
+    }
+}
+
+function updatePromptDue(version) {
+    try {
+        const value = JSON.parse(localStorage.getItem(AUTO_UPDATE_PROMPT_KEY) || 'null')
+        return !value ||
+            value.version !== version ||
+            Date.now() - Number(value.promptedAt || 0) >= AUTO_UPDATE_PROMPT_INTERVAL_MS
+    } catch {
+        return true
+    }
+}
+
+function markUpdatePrompted(version) {
+    localStorage.setItem(
+        AUTO_UPDATE_PROMPT_KEY,
+        JSON.stringify({ version, promptedAt: Date.now() })
+    )
+}
+
+function showAvailableUpdateInSettings(value) {
+    const message = $('#update-message')
+    clearFullInstallGuide()
+    if (value.status === 'full-install') {
+        renderFullInstallGuide(value)
+    } else if (message) {
+        message.innerHTML = t('update.incrementalFound', {
+            version: escapeHtml(value.version),
+            url: escapeHtml(value.releaseUrl)
+        })
+    }
+    activateView('settings')
+    requestAnimationFrame(() =>
+        $('#settings-update')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    )
+}
+
+async function maybePromptForUpdate() {
+    if (!desktop || state.mode === 'lite' || document.body.classList.contains('browser-lite-forced'))
+        return
+    try {
+        const available = await api('/api/v1/update/check')
+        if (!available || available.status === 'current') return
+        const version = String(available.version || '').trim()
+        if (!version || !updatePromptDue(version)) return
+        markUpdatePrompted(version)
+        if (!(await askConfirm(t('update.availablePrompt', { version })))) return
+        showAvailableUpdateInSettings(available)
+    } catch {
+        // Startup update discovery is fail-open; manual update check remains available.
     }
 }
 
@@ -4490,4 +4543,6 @@ async function detect() {
     }
 }
 
-detect()
+void detect().then(() => {
+    setTimeout(() => void maybePromptForUpdate(), 1400)
+})

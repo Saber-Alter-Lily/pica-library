@@ -121,6 +121,43 @@ describe('Canonical Work Identity foundation', () => {
         })
     })
 
+    it('matches the cross-language Pica/E-H example through alternate title and creator aliases', () => {
+        const pica = comic({
+            comicId: 'pica:stolen-wife',
+            providerId: 'pica',
+            title: '盗まれた人妻。',
+            author: '平つくね',
+            pagesCount: 0
+        })
+        const eh = comic({
+            comicId: 'eh:stolen-wife',
+            providerId: 'eh',
+            title:
+                '[ROUTE1 (Taira Tsukune)] Nusumareta Hitozuma. - Stolen Wife [Digital]',
+            author: 'taira tsukune',
+            alternateTitles: [
+                '[ROUTE1 (平つくね)] 盗まれた人妻。[DL版]'
+            ],
+            pagesCount: 0
+        })
+        const result = buildWorkIdentityAuditV5(
+            [pica, eh],
+            defaultPortablePolicyStateV5()
+        )
+        expect(result.resolverVersion).toContain('work-identity-v2')
+        expect(result.candidates).toHaveLength(1)
+        expect(result.candidates[0]).toMatchObject({
+            leftComicId: 'pica:stolen-wife',
+            rightComicId: 'eh:stolen-wife',
+            relation: 'PROBABLE_SAME_WORK',
+            crossProvider: true,
+            evidence: {
+                titleAliasMatch: true,
+                authorMatch: true
+            }
+        })
+    })
+
     it('persists evidence idempotently without creating work bindings', () => {
         const dir = fs.mkdtempSync(
             path.join(os.tmpdir(), 'pica-work-evidence-')

@@ -3328,9 +3328,16 @@ select:focus {
 .work-variant-copy small {
     color: var(--muted, #777);
 }
-.work-variant-copy button {
+.work-variant-open-link {
     align-self: flex-start;
     margin-top: 4px;
+    color: var(--accent, #3f7cff);
+    font-weight: 700;
+    text-decoration: none;
+}
+.work-variant-open-link:hover,
+.work-variant-open-link:focus-visible {
+    text-decoration: underline;
 }
 @media (max-width: 560px) {
     .work-variant-card { grid-template-columns: 58px minmax(0, 1fr); }

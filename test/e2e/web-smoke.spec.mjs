@@ -74,6 +74,35 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
     await page.locator('nav [data-view="library"]').click()
     await expect(page.locator('#library')).toHaveClass(/\bactive\b/)
 
+    await page.evaluate(() => {
+        const filler = document.createElement('div')
+        filler.id = 'scroll-regression-filler'
+        filler.style.height = '2200px'
+        document.querySelector('#library')?.appendChild(filler)
+        window.scrollTo(0, 900)
+    })
+    await page.waitForFunction(() => window.scrollY >= 850)
+    const scrollBeforeDetail = await page.evaluate(() => window.scrollY)
+    await page.evaluate(() => {
+        const dialog = document.querySelector('#recommend-detail-dialog')
+        if (!(dialog instanceof HTMLDialogElement))
+            throw new Error('recommend detail dialog missing')
+        dialog.showModal()
+    })
+    await page.waitForTimeout(50)
+    const scrollWhileDetailOpen = await page.evaluate(() => window.scrollY)
+    expect(Math.abs(scrollWhileDetailOpen - scrollBeforeDetail)).toBeLessThanOrEqual(2)
+    await page.evaluate(() =>
+        document.querySelector('#recommend-detail-dialog')?.close()
+    )
+    await page.waitForTimeout(50)
+    const scrollAfterDetail = await page.evaluate(() => window.scrollY)
+    expect(Math.abs(scrollAfterDetail - scrollBeforeDetail)).toBeLessThanOrEqual(2)
+    await page.evaluate(() => {
+        document.querySelector('#scroll-regression-filler')?.remove()
+        window.scrollTo(0, 0)
+    })
+
     const help = page.locator('#library .info-tip').first()
     await expect(help).toBeVisible()
     await help.hover()

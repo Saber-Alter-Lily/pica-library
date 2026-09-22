@@ -8,7 +8,7 @@ This branch is an unpublished beta. It layers explicit like/dislike feedback and
 - Optional reasons are a separate event/state and may be disabled entirely.
 - Latest sentiment wins for a comic.
 - `already_seen`, `topic`, `author` and `character` do not become strong negative visual-style signals. `style` does.
-- Android mirrors the same immediate-feedback / optional-reason interaction contract. Feedbacked items are suppressed from current and future native recommendation batches; likes can seed later native interest profiles.
+- Android mirrors the same immediate-feedback / optional-reason interaction contract. Like/dislike never removes or backfills a card from the currently presented batch; the card stays visible with an explicit feedback state, matching Desktop. Feedback affects later recommendation generation: likes can seed later native interest profiles, dislikes reduce similar content, and the same feedbacked work is excluded when a new native cycle is built.
 
 ## Visual contract
 

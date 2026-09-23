@@ -1,0 +1,19 @@
+{
+  "id": "/remote/",
+  "name": "Pica Library Remote",
+  "short_name": "Pica Library",
+  "description": "Read-only remote access to your private Pica Library server.",
+  "start_url": "/remote/",
+  "scope": "/remote/",
+  "display": "standalone",
+  "background_color": "#17131d",
+  "theme_color": "#17131d",
+  "icons": [
+    {
+      "src": "/remote/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

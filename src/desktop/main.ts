@@ -15,6 +15,12 @@ import { serializeBrowserLiteDataPackage } from '../library/bundle-export'
 import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
+import {
+    readRemoteApiToken,
+    startRemoteApiGateway,
+    type RemoteApiGateway
+} from '../remote-api/gateway'
+import { remoteApiConfiguration } from '../remote-api/config'
 import { UpdateManager } from '../update/manager'
 import { updateTargetFromRuntime } from '../update/target'
 import { EcosystemPackStore } from '../ecosystem/pack-store'
@@ -55,6 +61,7 @@ import {
 } from './proxy-detection'
 
 const runtimeOptions = desktopRuntimeOptions()
+const remoteApiSettings = remoteApiConfiguration(runtimeOptions.remoteApi)
 const nativePicker = new DesktopNativePicker()
 const managedEhBrowser = findManagedBrowser()
 const paths = desktopPaths()
@@ -112,6 +119,7 @@ let config = loadConfig(paths.config)
 let credentials: StoredCredentials | null = null
 let server: Server | null = null
 let mobileBridge: MobileBridgeController | null = null
+let remoteApiGateway: RemoteApiGateway | null = null
 let database: LibraryDatabase | null = null
 let service: LibraryService | null = null
 let remoteStorageManager: RemoteStorageDesktopManager | null = null
@@ -292,6 +300,9 @@ async function waitForHealth(url: string, timeoutMs = 30_000) {
 }
 
 async function closeEngine() {
+    log.write('Shutdown: closing Remote API gateway')
+    await remoteApiGateway?.close()
+    remoteApiGateway = null
     log.write('Shutdown: closing Mobile Bridge')
     await mobileBridge?.close()
     mobileBridge = null
@@ -625,6 +636,16 @@ async function startEngine(preferredPort: number) {
             lastExportAt: lastBrowserLiteExportAt,
             browserLiteExportProgress,
             mobileBridge: mobileBridge?.status() ?? null,
+            remoteApi: remoteApiGateway
+                ? {
+                      enabled: true,
+                      host: remoteApiGateway.host,
+                      port: remoteApiGateway.port,
+                      allowedHosts: remoteApiSettings?.allowedHosts.length ?? 0,
+                      allowedOrigins:
+                          remoteApiSettings?.allowedOrigins.length ?? 0
+                  }
+                : { enabled: false },
             remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
             ehAccount: {
                 configured: Boolean(
@@ -1093,6 +1114,26 @@ async function startEngine(preferredPort: number) {
         server = started.server
         currentUrl = started.url
         log.write(`Preferred port ${preferredPort} was unavailable; using ${currentUrl}`)
+    }
+    if (remoteApiSettings) {
+        const token = readRemoteApiToken(remoteApiSettings.tokenFile)
+        remoteApiGateway = await startRemoteApiGateway({
+            targetBaseUrl: currentUrl,
+            host: remoteApiSettings.host,
+            port: remoteApiSettings.port,
+            token,
+            allowedHosts: remoteApiSettings.allowedHosts,
+            allowedOrigins: remoteApiSettings.allowedOrigins,
+            onAudit: (event) =>
+                log.write(
+                    `Remote API ${event.method} ${event.path} -> ${event.status} [${event.remoteAddress}]`
+                )
+        })
+        log.write(
+            `Authenticated Remote API started on ${remoteApiGateway.host}:${remoteApiGateway.port}`
+        )
+    } else {
+        remoteApiGateway = null
     }
     if (runtimeOptions.mobileBridge) {
         try {

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#17131d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pica Library">
+  <title>Pica Library Remote</title>
+  <link rel="manifest" href="/remote/manifest.webmanifest">
+  <link rel="icon" href="/remote/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/remote/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">REMOTE WEB · W5 PREVIEW</div>
+      <h1>Pica Library</h1>
+    </div>
+    <div class="header-actions">
+      <span id="connection-state" class="status-pill">Checking…</span>
+      <button id="logout" type="button" class="secondary" hidden>退出</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="login-panel" class="panel auth-panel" hidden>
+      <h2>连接到你的 Pica Library</h2>
+      <p>输入 Server Preview 的访问令牌。令牌只用于本次 HTTPS 登录，不会写入浏览器存储或 Service Worker 缓存。</p>
+      <form id="login-form">
+        <label for="access-token">访问令牌</label>
+        <input id="access-token" name="token" type="password" autocomplete="off" spellcheck="false" required>
+        <button type="submit">登录</button>
+      </form>
+      <p id="login-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <section id="app-shell" hidden>
+      <nav class="tabs" aria-label="Remote Web navigation">
+        <button type="button" data-view="downloaded" class="active">已下载</button>
+        <button type="button" data-view="search">书库搜索</button>
+        <button type="button" data-view="shelves">书架</button>
+      </nav>
+
+      <section id="downloaded-view" class="view">
+        <div class="section-heading">
+          <div>
+            <h2>已下载</h2>
+            <p>仅展示 Server 上已经存在的本地内容。</p>
+          </div>
+          <button id="refresh-downloaded" type="button" class="secondary">刷新</button>
+        </div>
+        <div id="downloaded-list" class="grid"></div>
+      </section>
+
+      <section id="search-view" class="view" hidden>
+        <div class="section-heading">
+          <div>
+            <h2>书库搜索</h2>
+            <p>只读查询，不会修改收藏或书架。</p>
+          </div>
+        </div>
+        <form id="search-form" class="search-row">
+          <input id="search-text" type="search" placeholder="标题、作者、标签…" autocomplete="off">
+          <button type="submit">搜索</button>
+        </form>
+        <div id="search-list" class="grid"></div>
+      </section>
+
+      <section id="shelves-view" class="view" hidden>
+        <div class="section-heading">
+          <div>
+            <h2>书架</h2>
+            <p>Remote Web Preview 目前只读。</p>
+          </div>
+          <button id="refresh-shelves" type="button" class="secondary">刷新</button>
+        </div>
+        <div id="shelf-list" class="shelf-list"></div>
+        <div id="shelf-contents" class="grid"></div>
+      </section>
+
+      <section id="detail-view" class="view" hidden>
+        <button id="detail-back" type="button" class="secondary back">← 返回</button>
+        <div id="detail-content"></div>
+      </section>
+
+      <section id="reader-view" class="view reader-view" hidden>
+        <div class="reader-toolbar">
+          <button id="reader-back" type="button" class="secondary">← 章节</button>
+          <strong id="reader-title">Reader</strong>
+        </div>
+        <div id="reader-pages" class="reader-pages"></div>
+      </section>
+    </section>
+
+    <p id="global-message" class="message" aria-live="polite"></p>
+  </main>
+
+  <noscript>Pica Library Remote Web requires JavaScript.</noscript>
+  <script type="module" src="/remote/app.js"></script>
+</body>
+</html>

@@ -142,7 +142,7 @@ start_caddy() {
     fi
     if docker exec "$CADDY_NAME" test -s /data/caddy/pki/authorities/local/root.crt >/dev/null 2>&1; then
       docker cp "$CADDY_NAME:/data/caddy/pki/authorities/local/root.crt" "$ROOT_CA" >/dev/null
-      if remote_status /healthz "" == "200"; then
+      if [[ "$(remote_status /healthz "")" == "200" ]]; then
         return 0
       fi
     fi
@@ -154,7 +154,7 @@ start_caddy() {
 refresh_caddy() {
   docker restart "$CADDY_NAME" >/dev/null
   for _ in $(seq 1 120); do
-    if remote_status /healthz "" == "200"; then
+    if [[ "$(remote_status /healthz "")" == "200" ]]; then
       return 0
     fi
     sleep 0.25

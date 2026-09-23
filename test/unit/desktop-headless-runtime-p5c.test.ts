@@ -8,13 +8,15 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'interactive',
             openBrowser: true,
             idleBrowserShutdown: true,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
         expect(desktopRuntimeOptions(['--no-open'])).toEqual({
             mode: 'interactive',
             openBrowser: false,
             idleBrowserShutdown: true,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
     })
 
@@ -23,7 +25,8 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'headless',
             openBrowser: false,
             idleBrowserShutdown: false,
-            mobileBridge: false
+            mobileBridge: false,
+            remoteApi: false
         })
         expect(
             desktopRuntimeOptions(['--headless', '--mobile-bridge'])
@@ -31,7 +34,8 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'headless',
             openBrowser: false,
             idleBrowserShutdown: false,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
         expect(
             desktopRuntimeOptions([
@@ -43,8 +47,20 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'headless',
             openBrowser: false,
             idleBrowserShutdown: false,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
+
+        expect(
+            desktopRuntimeOptions(['--headless', '--remote-api'])
+        ).toEqual({
+            mode: 'headless',
+            openBrowser: false,
+            idleBrowserShutdown: false,
+            mobileBridge: false,
+            remoteApi: true
+        })
+        expect(desktopRuntimeOptions(['--remote-api']).remoteApi).toBe(false)
     })
 
     it('keeps the main Web service loopback-only while headless mode is still unauthenticated for remote Web use', () => {

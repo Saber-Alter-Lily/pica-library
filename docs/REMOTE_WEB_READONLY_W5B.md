@@ -98,14 +98,14 @@ The W5B gates require:
 
 ## Deferred
 
-W5B is not a PWA and is not a formal remote-Web release.
+W5C now layers an installable, online-first PWA shell on top of W5B. The W5B read-only API boundary remains unchanged, and user content is still network-only. Neither W5B nor W5C is a formal remote-Web release.
 
 Later gates include:
 
 - operator-friendly bootstrap/onboarding that avoids manual bearer handling;
 - formal CSP/reporting policy and static-asset integrity/release provenance;
-- PWA manifest and service worker;
-- offline cache partitioning and logout cache purge;
+- user-content offline caching beyond W5C's static shell-only cache;
+- cache partitioning and logout purge if user-content caching is ever introduced;
 - multi-user/tenant isolation;
 - any remote mutation workflow;
 - real external-network usability/performance testing;

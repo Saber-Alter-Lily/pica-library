@@ -231,12 +231,17 @@ async function waitForHealth(url: string, timeoutMs = 30_000) {
 }
 
 async function closeEngine() {
+    log.write('Shutdown: closing Mobile Bridge')
     await mobileBridge?.close()
     mobileBridge = null
+    log.write('Shutdown: closing managed E-H login')
     await ehWebLogin?.cancel()
     ehWebLogin = null
+    log.write('Shutdown: quiescing local downloads')
     await service?.quiesceLocalDownloads()
+    log.write('Shutdown: local downloads quiesced')
     if (server) {
+        log.write('Shutdown: closing local HTTP server')
         const closing = server
         closing.closeIdleConnections()
         await new Promise<void>((resolve) => {
@@ -248,26 +253,42 @@ async function closeEngine() {
             }
             closing.close(finish)
             setTimeout(() => {
+                log.write(
+                    'Shutdown: forcing remaining local HTTP connections closed'
+                )
                 closing.closeAllConnections()
                 finish()
-            }, 1_000).unref()
+            }, 1_000)
         })
+        log.write('Shutdown: local HTTP server closed')
     }
     server = null
+    log.write('Shutdown: closing database')
     database?.close()
     database = null
     service = null
     remoteStorageManager = null
+    log.write('Shutdown: engine resources closed')
 }
 
 async function stop(exitCode = 0) {
-    if (stopping) return
+    if (stopping) {
+        log.write(
+            'Shutdown: stop request ignored because shutdown is already in progress'
+        )
+        return
+    }
     stopping = true
     cancelBrowserCloseShutdown()
     log.write('Stopping desktop engine')
     await closeEngine()
     instance.release()
     process.exitCode = exitCode
+    // Durable state and local services are already closed. A third-party handle
+    // can still keep Node alive, especially in persistent/headless runtimes.
+    // Explicit user/container shutdown must therefore have a final bounded exit.
+    const finalExit = setTimeout(() => process.exit(exitCode), 250)
+    finalExit.unref()
 }
 
 function applyCredentials(
@@ -965,7 +986,10 @@ async function startEngine(preferredPort: number) {
         updateProgress: () => updateManager.progress(),
         browserSessionOpened,
         browserSessionClosed,
-        shutdown: () => { void stop() }
+        shutdown: () => {
+            log.write('Shutdown: Desktop controller request received')
+            void stop()
+        }
     }
     try {
         const started = await startLibraryServer({

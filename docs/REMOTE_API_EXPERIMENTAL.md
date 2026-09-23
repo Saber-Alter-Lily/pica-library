@@ -183,9 +183,11 @@ W5B adds an isolated read-only Remote Web shell for local-library browse,
 shelves, downloaded content and downloaded Reader access. The browser-session
 allowlist is narrower than the bearer API and blocks reader-progress mutation.
 
-This still does not provide PWA/offline cache, multi-user isolation, provider
-mutation, or a polished operator UX for supplying the long-lived bearer. The
-operator Server Compose preview keeps browser sessions/shell disabled by
+W5C adds a scoped installable PWA layer whose service worker caches only the
+non-sensitive Remote Web shell. API responses, covers, Reader pages and session
+routes remain network-only. Multi-user isolation, provider mutation, user-content
+offline caching and a polished operator bootstrap UX remain deferred. The
+operator Server Compose preview keeps browser sessions/shell/PWA disabled by
 default.
 
 ## Release state

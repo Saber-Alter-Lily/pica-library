@@ -74,7 +74,10 @@ describe('Desktop headless runtime foundation P5C', () => {
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
         expect(platform).toContain('distributionReady: windows')
         expect(server).toContain(
-            'Remote binding is disabled. Use a loopback host or explicitly set PICA_LIBRARY_ALLOW_REMOTE=true.'
+            'Unauthenticated remote binding is disabled. Configure an authenticated remote-access mode before using a non-loopback host.'
+        )
+        expect(server).not.toContain(
+            "process.env.PICA_LIBRARY_ALLOW_REMOTE !== 'true'"
         )
     })
 })

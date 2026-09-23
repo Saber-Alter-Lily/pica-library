@@ -23,11 +23,14 @@ The Linux experimental workflow must:
 1. download the pinned official Node runtime and verify its upstream SHA-256;
 2. inspect the bundled ELF and fail if its observed GLIBC/GLIBCXX symbol requirements exceed the declared package baseline;
 3. run the package launcher, which performs the runtime preflight;
-4. keep user data outside the application package;
-5. smoke the packaged Desktop/headless runtime;
-6. run the packaged vertical acceptance for library query/detail, shelves, Reader pages/progress, download pause/resume, graceful shutdown and restart persistence;
-7. keep self-update and formal-distribution capabilities disabled;
-8. report credential persistence from the live OS session, falling back to session-only memory when Secret Service is unavailable.
+4. run the exact packaged runtime inside a Rocky Linux 8.9 x86-64 userspace and require the live `glibc 2.28` environment to start the CLI, headless engine, local HTTP API and graceful shutdown successfully;
+5. keep user data outside the application package;
+6. smoke the packaged Desktop/headless runtime;
+7. run the packaged vertical acceptance for library query/detail, shelves, Reader pages/progress, download pause/resume, graceful shutdown and restart persistence;
+8. keep self-update and formal-distribution capabilities disabled;
+9. report credential persistence from the live OS session, falling back to session-only memory when Secret Service is unavailable.
+
+The Rocky container gate closes the runtime-ABI portion of the lower-bound check. It does not test a graphical desktop session, system tray behavior, desktop launchers, Secret Service integration, or native pickers.
 
 ## Gates still open before Linux can be called a user preview
 
@@ -37,7 +40,7 @@ Automated CI does not replace real Linux desktop validation. Before promotion be
 - Secret Service persistence in a real graphical session;
 - native folder/save picker behavior in at least one GNOME/Zenity and one KDE/KDialog environment, or an explicit narrower support statement;
 - application-package replacement using the same external data root, followed by migration/rollback checks when a newer preview build exists;
-- at least one environment close to the declared glibc baseline, not only the current GitHub-hosted runner;
+- at least one real graphical Linux desktop session on a distribution close to the declared glibc baseline; the Rocky Linux 8.9 container covers runtime ABI only and does not substitute for desktop integration;
 - cold start, long-reader and task-concurrency measurements on reference hardware.
 
 Until those gates are recorded, `distributionReady` and `selfUpdate` remain false for Linux.

@@ -9,6 +9,7 @@ on:
       - 'scripts/build-linux-experimental.sh'
       - 'scripts/linux-runtime-preflight.sh'
       - 'scripts/test-linux-experimental.sh'
+      - 'scripts/test-linux-glibc228-container.sh'
       - 'scripts/test-linux-preview-acceptance.sh'
       - 'rollup.config.js'
       - 'package.json'
@@ -59,6 +60,13 @@ jobs:
           archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
           test -n "$archive"
           bash scripts/test-linux-experimental.sh "$archive"
+
+      - name: Run packaged runtime on glibc 2.28 baseline
+        run: |
+          set -euo pipefail
+          archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
+          test -n "$archive"
+          bash scripts/test-linux-glibc228-container.sh "$archive"
 
       - name: Run Linux x64 preview vertical acceptance
         run: |

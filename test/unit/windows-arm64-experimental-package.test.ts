@@ -57,6 +57,33 @@ describe('experimental Windows ARM64 package', () => {
         expect(build).toContain('selfUpdate = $false')
     })
 
+    it('tests preview-to-preview application replacement and rollback', () => {
+        const replacement = read('scripts/test-windows-arm64-preview-replacement.ps1')
+        const workflow = read('.github/workflows/windows-arm64-experimental.yml')
+
+        expect(workflow).toContain(
+            'Build first accepted Windows ARM64 preview baseline'
+        )
+        expect(workflow).toContain(
+            'Pica-Library-windows-arm64-preview-baseline.zip'
+        )
+        expect(workflow).toContain(
+            './scripts/test-windows-arm64-preview-replacement.ps1 -BaselineArchive $baseline.FullName -CandidateArchive $candidate.FullName'
+        )
+        expect(workflow).toContain(
+            "'scripts/test-windows-arm64-preview-replacement.ps1'"
+        )
+        expect(replacement).toContain('ARM64 Replacement Baseline')
+        expect(replacement).toContain('ARM64 Candidate Marker')
+        expect(replacement).toContain('Restore-Data')
+        expect(replacement).toContain(
+            'Schema-changing ARM64 candidate did not create the required pre-migration database backup'
+        )
+        expect(replacement).toContain(
+            'Windows ARM64 preview replacement/rollback acceptance: PASS'
+        )
+    })
+
     it('runs an end-to-end packaged ARM64 Desktop and DPAPI acceptance', () => {
         const acceptance = read('scripts/test-windows-arm64-experimental.ps1')
         const workflow = read('.github/workflows/windows-arm64-experimental.yml')

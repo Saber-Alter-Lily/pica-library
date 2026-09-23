@@ -5,7 +5,8 @@ XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 INSTALL_ROOT="${PICA_LIBRARY_INSTALL_ROOT:-$HOME/.local/opt/pica-library}"
 DATA_ROOT="${PICA_LIBRARY_DESKTOP_HOME:-$XDG_DATA_HOME/pica-library}"
 DESKTOP_DIR="$XDG_DATA_HOME/applications"
-DESKTOP_FILE="$DESKTOP_DIR/org.picalibrary.desktop.desktop"
+DESKTOP_FILE="$DESKTOP_DIR/org.picalibrary.PicaLibrary.desktop"
+ICON_FILE="$XDG_DATA_HOME/icons/hicolor/scalable/apps/org.picalibrary.PicaLibrary.svg"
 
 normalize() {
   realpath -m "$1"
@@ -32,11 +33,14 @@ if [[ "$INSTALL_ROOT" == "/" || "$INSTALL_ROOT" == "$HOME" ]]; then
   exit 1
 fi
 
-rm -f "$DESKTOP_FILE"
+rm -f "$DESKTOP_FILE" "$ICON_FILE"
 rm -rf "$INSTALL_ROOT"
 
 if command -v update-desktop-database >/dev/null 2>&1 && [[ -d "$DESKTOP_DIR" ]]; then
   update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1 && [[ -d "$XDG_DATA_HOME/icons/hicolor" ]]; then
+  gtk-update-icon-cache -f -t "$XDG_DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true
 fi
 
 echo "Pica Library Linux preview application files were removed."

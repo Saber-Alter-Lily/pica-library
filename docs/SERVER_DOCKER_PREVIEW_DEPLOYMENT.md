@@ -120,9 +120,10 @@ unset TOKEN
 ```
 
 A browser request carrying an `Origin` header is rejected unless an origin is
-explicitly configured. The preview intentionally leaves browser origins
-disabled because W5 Remote Web/PWA has a separate authentication/session
-design.
+explicitly configured. W5A now has a separate opt-in browser-session primitive,
+but this operator Compose preview intentionally leaves both browser Origins and
+`PICA_LIBRARY_REMOTE_WEB_SESSIONS` disabled. Enabling them is not part of the
+default server-preview deployment.
 
 ## Verify the security boundary
 
@@ -214,7 +215,8 @@ state disappears after rollback.
 This bundle is still experimental:
 
 - no public registry/server-preview channel is published yet;
-- there is no remote browser/PWA session model;
+- W5A has an opt-in process-local browser-session primitive, but this Compose
+  bundle does not enable it and no Remote Web/PWA UI is published;
 - there is no multi-user or tenant isolation;
 - real Provider credentials and Provider behavior are outside the Docker CI
   fixtures;

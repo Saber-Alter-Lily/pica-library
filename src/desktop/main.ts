@@ -231,12 +231,17 @@ async function waitForHealth(url: string, timeoutMs = 30_000) {
 }
 
 async function closeEngine() {
+    log.write('Shutdown: closing Mobile Bridge')
     await mobileBridge?.close()
     mobileBridge = null
+    log.write('Shutdown: closing managed E-H login')
     await ehWebLogin?.cancel()
     ehWebLogin = null
+    log.write('Shutdown: quiescing local downloads')
     await service?.quiesceLocalDownloads()
+    log.write('Shutdown: local downloads quiesced')
     if (server) {
+        log.write('Shutdown: closing local HTTP server')
         const closing = server
         closing.closeIdleConnections()
         await new Promise<void>((resolve) => {
@@ -248,16 +253,20 @@ async function closeEngine() {
             }
             closing.close(finish)
             setTimeout(() => {
+                log.write('Shutdown: forcing remaining local HTTP connections closed')
                 closing.closeAllConnections()
                 finish()
-            }, 1_000).unref()
+            }, 1_000)
         })
+        log.write('Shutdown: local HTTP server closed')
     }
     server = null
+    log.write('Shutdown: closing database')
     database?.close()
     database = null
     service = null
     remoteStorageManager = null
+    log.write('Shutdown: engine resources closed')
 }
 
 async function stop(exitCode = 0) {

@@ -33,6 +33,19 @@ if [[ "$INSTALL_ROOT" == "/" || "$INSTALL_ROOT" == "$HOME" ]]; then
   exit 1
 fi
 
+if [[ -e "$INSTALL_ROOT" ]]; then
+  MARKER="$INSTALL_ROOT/.pica-library-install-root"
+  if [[ ! -s "$MARKER" ]] || [[ "$(head -n 1 "$MARKER")" != "pica-library-linux-user-install" ]]; then
+    echo "Refusing uninstall: target is not a recognized Pica Library Linux user install: $INSTALL_ROOT" >&2
+    exit 1
+  fi
+  SOURCE_SHA="$(sed -n '2p' "$MARKER" | tr -d '\r\n')"
+  if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Refusing uninstall: install-root provenance marker is invalid." >&2
+    exit 1
+  fi
+fi
+
 rm -f "$DESKTOP_FILE" "$ICON_FILE"
 rm -rf "$INSTALL_ROOT"
 

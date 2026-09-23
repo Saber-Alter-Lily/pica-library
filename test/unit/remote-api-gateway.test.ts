@@ -31,6 +31,7 @@ async function upstream() {
         path: string
         authorization?: string
         origin?: string
+        cookie?: string
         body: string
     }> = []
     const server = http.createServer(async (request, response) => {
@@ -41,6 +42,7 @@ async function upstream() {
             path: request.url ?? '/',
             authorization: request.headers.authorization,
             origin: request.headers.origin,
+            cookie: request.headers.cookie,
             body: Buffer.concat(chunks).toString('utf8')
         })
         if (request.url === '/api/v1/reader/pictures/p1') {
@@ -129,6 +131,7 @@ describe('authenticated Remote API gateway', () => {
             tokenFile: '/run/secrets/pica-token',
             allowedHosts: ['127.0.0.1', 'localhost', '::1'],
             allowedOrigins: [],
+            webSessions: false,
             transportSecurity: 'loopback-http'
         })
 
@@ -165,6 +168,55 @@ describe('authenticated Remote API gateway', () => {
             tokenFile: '/run/secrets/pica-token',
             allowedHosts: ['library.example', '192.0.2.10'],
             allowedOrigins: ['https://reader.example'],
+            webSessions: false,
+            transportSecurity: 'tls-terminated-proxy'
+        })
+
+        expect(() =>
+            remoteApiConfiguration(true, {
+                PICA_LIBRARY_REMOTE_TOKEN_FILE: '/run/secrets/pica-token',
+                PICA_LIBRARY_REMOTE_WEB_SESSIONS: 'true'
+            })
+        ).toThrow(/non-loopback gateway.*TLS-terminating proxy/)
+
+        expect(() =>
+            remoteApiConfiguration(true, {
+                PICA_LIBRARY_REMOTE_TOKEN_FILE: '/run/secrets/pica-token',
+                PICA_LIBRARY_REMOTE_HOST: '0.0.0.0',
+                PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY: 'true',
+                PICA_LIBRARY_REMOTE_ALLOWED_HOSTS: 'library.example',
+                PICA_LIBRARY_REMOTE_WEB_SESSIONS: 'true'
+            })
+        ).toThrow(/REMOTE_ALLOWED_ORIGINS/)
+
+        expect(() =>
+            remoteApiConfiguration(true, {
+                PICA_LIBRARY_REMOTE_TOKEN_FILE: '/run/secrets/pica-token',
+                PICA_LIBRARY_REMOTE_HOST: '0.0.0.0',
+                PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY: 'true',
+                PICA_LIBRARY_REMOTE_ALLOWED_HOSTS: 'library.example',
+                PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS: 'http://library.example',
+                PICA_LIBRARY_REMOTE_WEB_SESSIONS: 'true'
+            })
+        ).toThrow(/exact HTTPS origins/)
+
+        expect(
+            remoteApiConfiguration(true, {
+                PICA_LIBRARY_REMOTE_TOKEN_FILE: '/run/secrets/pica-token',
+                PICA_LIBRARY_REMOTE_HOST: '0.0.0.0',
+                PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY: 'true',
+                PICA_LIBRARY_REMOTE_ALLOWED_HOSTS: 'library.example',
+                PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS:
+                    'https://library.example',
+                PICA_LIBRARY_REMOTE_WEB_SESSIONS: 'true'
+            })
+        ).toEqual({
+            host: '0.0.0.0',
+            port: 8787,
+            tokenFile: '/run/secrets/pica-token',
+            allowedHosts: ['library.example'],
+            allowedOrigins: ['https://library.example'],
+            webSessions: true,
             transportSecurity: 'tls-terminated-proxy'
         })
     })
@@ -236,6 +288,156 @@ describe('authenticated Remote API gateway', () => {
         }
     })
 
+    it('exchanges bearer auth for an in-memory HttpOnly browser session with CSRF binding', async () => {
+        const target = await upstream()
+        const gateway = await startRemoteApiGateway({
+            targetBaseUrl: target.url,
+            host: '127.0.0.1',
+            port: 0,
+            token: 't'.repeat(48),
+            allowedHosts: ['127.0.0.1'],
+            allowedOrigins: ['https://reader.example'],
+            webSessions: true,
+            webSessionTtlMs: 60_000
+        })
+        const base = `http://127.0.0.1:${gateway.port}`
+        try {
+            expect(gateway.webSessionsEnabled).toBe(true)
+            expect(gateway.activeWebSessions()).toBe(0)
+
+            const unauthenticated = await fetch(
+                `${base}/remote/v1/session/bootstrap`,
+                {
+                    method: 'POST',
+                    headers: { origin: 'https://reader.example' }
+                }
+            )
+            expect(unauthenticated.status).toBe(401)
+
+            const bootstrap = await fetch(
+                `${base}/remote/v1/session/bootstrap`,
+                {
+                    method: 'POST',
+                    headers: {
+                        ...authorization(),
+                        origin: 'https://reader.example'
+                    }
+                }
+            )
+            expect(bootstrap.status).toBe(201)
+            const setCookie = bootstrap.headers.get('set-cookie') ?? ''
+            expect(setCookie).toMatch(/^__Host-pica_session=[A-Za-z0-9_-]+;/)
+            expect(setCookie).toContain('Path=/')
+            expect(setCookie).toContain('HttpOnly')
+            expect(setCookie).toContain('Secure')
+            expect(setCookie).toContain('SameSite=Strict')
+            expect(setCookie).not.toMatch(/Domain=/i)
+            const cookie = setCookie.split(';', 1)[0]
+            const boot = (await bootstrap.json()) as {
+                csrfToken: string
+                authenticated: boolean
+            }
+            expect(boot.authenticated).toBe(true)
+            expect(boot.csrfToken).toMatch(/^[A-Za-z0-9_-]+$/)
+            expect(gateway.activeWebSessions()).toBe(1)
+
+            const sessionStatus = await fetch(
+                `${base}/remote/v1/session`,
+                { headers: { cookie } }
+            )
+            expect(sessionStatus.status).toBe(200)
+            expect(await sessionStatus.json()).toMatchObject({
+                authenticated: true,
+                csrfToken: boot.csrfToken
+            })
+
+            const cookieOnly = await fetch(
+                `${base}/api/v1/capabilities`,
+                { headers: { cookie } }
+            )
+            expect(cookieOnly.status).toBe(200)
+            expect(target.requests.at(-1)).toMatchObject({
+                authorization: undefined,
+                origin: undefined,
+                cookie: undefined
+            })
+
+            const noCsrf = await fetch(
+                `${base}/api/v1/library/query`,
+                {
+                    method: 'POST',
+                    headers: {
+                        cookie,
+                        'content-type': 'application/json',
+                        origin: 'https://reader.example'
+                    },
+                    body: JSON.stringify({ text: 'fixture' })
+                }
+            )
+            expect(noCsrf.status).toBe(403)
+
+            const wrongOrigin = await fetch(
+                `${base}/api/v1/library/query`,
+                {
+                    method: 'POST',
+                    headers: {
+                        cookie,
+                        'content-type': 'application/json',
+                        origin: 'https://attacker.example',
+                        'x-pica-csrf': boot.csrfToken
+                    },
+                    body: JSON.stringify({ text: 'fixture' })
+                }
+            )
+            expect(wrongOrigin.status).toBe(403)
+
+            const accepted = await fetch(
+                `${base}/api/v1/library/query`,
+                {
+                    method: 'POST',
+                    headers: {
+                        cookie,
+                        'content-type': 'application/json',
+                        origin: 'https://reader.example',
+                        'x-pica-csrf': boot.csrfToken
+                    },
+                    body: JSON.stringify({ text: 'fixture' })
+                }
+            )
+            expect(accepted.status).toBe(200)
+            expect(target.requests.at(-1)).toMatchObject({
+                authorization: undefined,
+                origin: undefined,
+                cookie: undefined
+            })
+
+            const logout = await fetch(
+                `${base}/remote/v1/session/logout`,
+                {
+                    method: 'POST',
+                    headers: {
+                        cookie,
+                        origin: 'https://reader.example',
+                        'x-pica-csrf': boot.csrfToken
+                    }
+                }
+            )
+            expect(logout.status).toBe(200)
+            expect(logout.headers.get('set-cookie')).toContain('Max-Age=0')
+            expect(gateway.activeWebSessions()).toBe(0)
+
+            expect(
+                (
+                    await fetch(`${base}/api/v1/capabilities`, {
+                        headers: { cookie }
+                    })
+                ).status
+            ).toBe(401)
+        } finally {
+            await gateway.close()
+        }
+    })
+
     it('proxies only the allowlisted library/reader surface and strips gateway credentials', async () => {
         const target = await upstream()
         const gateway = await startRemoteApiGateway({
@@ -265,7 +467,8 @@ describe('authenticated Remote API gateway', () => {
             })
             expect(target.requests.at(-1)).toMatchObject({
                 authorization: undefined,
-                origin: undefined
+                origin: undefined,
+                cookie: undefined
             })
 
             const image = await fetch(

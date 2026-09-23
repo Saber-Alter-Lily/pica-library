@@ -27,7 +27,7 @@ import {
     loadConfig,
     saveConfig
 } from './config'
-import { DpapiCredentialStore } from './credentials'
+import { credentialStoreForPlatform } from './credentials'
 import { PicaAccountError } from '../services/pica-account'
 import { InstanceLock } from './instance'
 import { DesktopLog } from './logging'
@@ -51,7 +51,6 @@ import {
 } from './proxy-detection'
 
 const args = new Set(process.argv.slice(2))
-const platformCapabilities = desktopPlatformCapabilities()
 const paths = desktopPaths()
 const applicationRoot = path.resolve(path.dirname(process.argv[1]), '..')
 const packagedSourceFile = path.join(applicationRoot, 'SOURCE_SHA.txt')
@@ -91,7 +90,13 @@ for (const directory of [
 ])
     fs.mkdirSync(directory, { recursive: true })
 const log = new DesktopLog(paths.logs)
-const credentialsStore = new DpapiCredentialStore(paths.credentials)
+const credentialBackend = credentialStoreForPlatform(paths.credentials)
+const credentialsStore = credentialBackend.store
+const platformCapabilities = {
+    ...desktopPlatformCapabilities(),
+    secureCredentialPersistence:
+        credentialBackend.status.securePersistence
+}
 const instance = new InstanceLock(paths.lock, paths.instance)
 let config = loadConfig(paths.config)
 let credentials: StoredCredentials | null = null
@@ -561,6 +566,7 @@ async function startEngine(preferredPort: number) {
         configured: () => Boolean(config && credentials),
         status: () => ({
             platform: platformCapabilities,
+            credentialBackend: credentialBackend.status,
             profile: config?.profile ?? 'balanced',
             libraryDirectory: config?.libraryDirectory ?? paths.data,
             proxyEnabled: Boolean(config?.proxyUrl),

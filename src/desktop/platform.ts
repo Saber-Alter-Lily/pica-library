@@ -38,21 +38,22 @@ export function desktopPlatformCapabilities(
     const id = desktopPlatformId(platform)
     const runtimeFoundation = id !== 'unsupported'
     const windows = id === 'windows'
+    const windowsX64 = windows && arch === 'x64'
     return {
         id,
         arch,
         runtimeFoundation,
-        // Only Windows has a production package/update/credential chain today.
-        // macOS/Linux are explicit foundation targets until those adapters pass
-        // their own release gates.
-        distributionReady: windows,
+        // Only Windows x64 has a production package/update chain today.
+        // Windows arm64, macOS and Linux remain explicit foundation targets
+        // until their package/update release gates are accepted.
+        distributionReady: windowsX64,
         browserLaunch: runtimeFoundation,
         directoryLaunch: runtimeFoundation,
         secureCredentialPersistence: windows,
         nativeFolderPicker: windows,
         nativeSavePicker: windows,
         managedEhWebLogin: windows,
-        selfUpdate: windows
+        selfUpdate: windowsX64
     }
 }
 

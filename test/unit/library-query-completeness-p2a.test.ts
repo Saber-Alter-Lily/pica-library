@@ -13,7 +13,7 @@ describe('library query completeness P2A', () => {
         expect(database).toContain('listAllComics(query: ComicQuery = {})')
         expect(database).toContain('limit: Number.MAX_SAFE_INTEGER')
         expect(database).toContain('offset: 0')
-        expect(service).toContain('.listAllComics()')
+        expect(service).toContain('.listComicsForLibraryQueryBase(query)')
         expect(service).not.toContain('.listComics({ limit: 5000 })')
         expect(service).toContain('total: evaluated.items.length')
         expect(service).toContain('private evaluate(')

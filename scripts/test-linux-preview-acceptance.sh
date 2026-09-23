@@ -149,6 +149,35 @@ start_engine() {
   URL="$(wait_for_engine)"
 }
 
+wait_for_engine_restart() {
+  local old_token="$1"
+  local instance="$DATA_HOME/runtime-state/instance.json"
+  local status_file="$WORK/status-after-engine-restart.json"
+  for _ in $(seq 1 160); do
+    local candidate=""
+    if [[ -f "$instance" ]]; then
+      candidate="$(
+        "$PACKAGE_ROOT/runtime/bin/node" -e           "try{const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(String(v.url||''))}catch{}"           "$instance"
+      )"
+    fi
+    if [[ -n "$candidate" ]] && curl --fail --silent "$candidate/api/v1/desktop/status" > "$status_file" 2>/dev/null; then
+      local new_token=""
+      new_token="$(
+        "$PACKAGE_ROOT/runtime/bin/node" -e           "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(String(v.csrfToken||''))"           "$status_file"
+      )"
+      if [[ -n "$new_token" && "$new_token" != "$old_token" ]]; then
+        URL="$candidate"
+        return 0
+      fi
+    fi
+    if [[ -n "$ENGINE_PID" ]] && ! kill -0 "$ENGINE_PID" 2>/dev/null; then
+      fail "Desktop engine exited during settings restart"
+    fi
+    sleep 0.25
+  done
+  fail "Desktop engine did not complete the settings restart"
+}
+
 stop_engine() {
   local url="$1"
   local status="$WORK/desktop-status.json"
@@ -276,7 +305,7 @@ process.stdout.write(JSON.stringify({
 NODE
   curl --fail --silent     -X POST     -H "content-type: application/json"     -H "x-pica-csrf: $TOKEN"     -H "Origin: $URL"     --data-binary @"$WORK/session-settings.json"     "$URL/api/v1/desktop/settings" > "$WORK/session-settings-response.json"
 
-  URL="$(wait_for_engine)"
+  wait_for_engine_restart "$TOKEN"
   curl --fail --silent "$URL/api/v1/desktop/status" > "$WORK/status-session-configured.json"
   json_assert "$WORK/status-session-configured.json" credentialSessionConfigured
   if grep -R -a -F 'linux-preview-session-secret' "$DATA_HOME" >/dev/null 2>&1; then

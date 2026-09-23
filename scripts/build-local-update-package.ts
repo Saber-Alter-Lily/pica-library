@@ -14,6 +14,12 @@ import {
 import { classifyUpdateCompatibility } from '../src/update/compatibility'
 import { releasedUpdateBaseline } from '../src/update/released-baselines'
 import type { UpdateManifest } from '../src/update/types'
+import {
+    normalizeUpdateTarget,
+    sameUpdateTarget,
+    updateTargetKey,
+    type UpdateTarget
+} from '../src/update/target'
 
 function sha256(value: Buffer) {
     return createHash('sha256').update(value).digest('hex')
@@ -71,31 +77,28 @@ function incrementalChanges(
     })
 }
 
-function versionFromName(file: string, markers: string[]) {
-    const match = path
-        .basename(file)
-        .match(
-            new RegExp(
-                `^Pica-Library-v(.+)-(?:${markers.join('|')})-windows-x64\\.zip$`
-            )
-        )
-    if (!match)
-        throw new Error(`Could not read version from ${path.basename(file)}`)
-    return match[1]
-}
-
-function windowsPackageVersion(file: string) {
+function packageIdentity(file: string): {
+    version: string
+    stable: boolean
+    target: UpdateTarget
+} {
     const basename = path.basename(file)
     const stable = basename.match(
-        /^Pica-Library-v(\d+\.\d+\.\d+)-windows-x64\.zip$/
+        /^Pica-Library-v(\d+\.\d+\.\d+)-(windows|macos|linux)-(x64|arm64)\.zip$/
     )
-    if (stable) return { version: stable[1], stable: true }
-    const version = versionFromName(file, ['update-base', 'local-test'])
+    const development = basename.match(
+        /^Pica-Library-v(.+)-(?:update-base|local-test)-(windows|macos|linux)-(x64|arm64)\.zip$/
+    )
+    const match = stable ?? development
+    if (!match)
+        throw new Error(`Could not read package identity from ${basename}`)
+    const target = normalizeUpdateTarget(match[2], match[3])
+    if (!target)
+        throw new Error(`Unsupported update target in ${basename}`)
     return {
-        version: version
-            .replace(/-update-base$/, '')
-            .replace(/-local-test$/, ''),
-        stable: false
+        version: match[1],
+        stable: Boolean(stable),
+        target
     }
 }
 
@@ -104,8 +107,12 @@ export function buildLocalUpdatePackage(
     targetZipFile: string,
     outputFile: string
 ) {
-    const source = windowsPackageVersion(sourceZipFile)
-    const target = windowsPackageVersion(targetZipFile)
+    const source = packageIdentity(sourceZipFile)
+    const target = packageIdentity(targetZipFile)
+    if (!sameUpdateTarget(source.target, target.target))
+        throw new Error(
+            `Update package targets do not match: ${updateTargetKey(source.target)} -> ${updateTargetKey(target.target)}`
+        )
     const sourceVersion = source.version
     const targetVersion = target.version
     const sourceEntries = files(new AdmZip(sourceZipFile))
@@ -173,6 +180,8 @@ export function buildLocalUpdatePackage(
         sourceSha: sourceSha(sourceEntries),
         targetVersion,
         targetSourceSha: sourceSha(targetEntries),
+        targetPlatform: target.target.platform,
+        targetArch: target.target.arch,
         appApiVersion: APP_API_VERSION,
         databaseSchemaVersion: DATABASE_SCHEMA_VERSION,
         requiresFullInstall: false,

@@ -163,6 +163,51 @@ describe('Desktop secure credential backends P4B', () => {
         expect(fs.existsSync(file)).toBe(false)
     })
 
+    it('does not claim Secret Service when the tool exists but the session backend is unavailable', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-session-bus-'))
+        roots.push(dir)
+        const file = path.join(dir, 'credentials.dat')
+        const unavailable = ((
+            _command: string,
+            _args: readonly string[],
+            options: { timeout?: number }
+        ) => {
+            expect(options.timeout).toBe(3_000)
+            return result(
+                1,
+                '',
+                'secret-tool: Cannot autolaunch D-Bus without X11 $DISPLAY'
+            )
+        }) as never
+
+        const linux = credentialStoreForPlatform(file, 'linux', {
+            runner: unavailable
+        })
+        expect(linux.status).toMatchObject({
+            kind: 'session-memory',
+            securePersistence: false,
+            sessionOnly: true,
+            reason: 'Secret Service is unavailable in this session'
+        })
+        expect(fs.existsSync(file)).toBe(false)
+    })
+
+    it('treats an empty Secret Service lookup as an available backend when no credential exists yet', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-session-empty-'))
+        roots.push(dir)
+        const file = path.join(dir, 'credentials.dat')
+        const noItem = (() => result(1, '', '')) as never
+
+        const linux = credentialStoreForPlatform(file, 'linux', {
+            runner: noItem
+        })
+        expect(linux.status).toMatchObject({
+            kind: 'linux-secret-service',
+            securePersistence: true,
+            sessionOnly: false
+        })
+    })
+
     it('publishes credential backend status without exposing credential values', () => {
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
         expect(main).toContain(

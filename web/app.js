@@ -2681,6 +2681,7 @@ $('#recommend-detail-dialog').onclick = async (event) => {
 
 let readerProgressTimer = null
 let readerScrollHandler = null
+let readerPageObserver = null
 let readerChapterRequest = 0
 let readerComicRequest = 0
 function readerApiRoot() {
@@ -2714,6 +2715,93 @@ function scrollReaderViewportToTop() {
     if (!target) return
     target.scrollIntoView({ block: 'start' })
 }
+
+function resetReaderViewportTracking() {
+    readerPageObserver?.disconnect()
+    readerPageObserver = null
+    if (readerScrollHandler)
+        window.removeEventListener('scroll', readerScrollHandler)
+    readerScrollHandler = null
+}
+
+function queueReaderProgressFromViewport(target) {
+    const bounds = target.getBoundingClientRect()
+    const centerY = window.innerHeight / 2
+    const sampleXs = [
+        bounds.left + bounds.width / 2,
+        bounds.left + bounds.width * 0.35,
+        bounds.left + bounds.width * 0.65
+    ]
+    const sampleYs = [
+        centerY,
+        Math.max(0, centerY - window.innerHeight * 0.08),
+        Math.min(window.innerHeight - 1, centerY + window.innerHeight * 0.08)
+    ]
+    for (const y of sampleYs) {
+        for (const x of sampleXs) {
+            const element = document.elementFromPoint(x, y)
+            const image = element?.closest?.('[data-reader-page]')
+            if (image && target.contains(image)) {
+                queueReaderProgress(Number(image.dataset.readerPage))
+                return
+            }
+        }
+    }
+}
+
+function observeVerticalReaderProgress(target, resumePage) {
+    if ('IntersectionObserver' in window) {
+        readerPageObserver = new IntersectionObserver(
+            (entries) => {
+                const center = window.innerHeight / 2
+                const nearest = entries
+                    .filter((entry) => entry.isIntersecting)
+                    .map((entry) => ({
+                        pageIndex: Number(entry.target.dataset.readerPage),
+                        distance: Math.abs(
+                            entry.boundingClientRect.top +
+                                entry.boundingClientRect.height / 2 -
+                                center
+                        )
+                    }))
+                    .sort((a, b) => a.distance - b.distance)[0]
+                if (nearest) queueReaderProgress(nearest.pageIndex)
+            },
+            {
+                root: null,
+                rootMargin: '-45% 0px -45% 0px',
+                threshold: [0, 0.01]
+            }
+        )
+        target.querySelectorAll('[data-reader-page]').forEach((image) =>
+            readerPageObserver.observe(image)
+        )
+    } else {
+        let queued = false
+        readerScrollHandler = () => {
+            if (queued) return
+            queued = true
+            requestAnimationFrame(() => {
+                queued = false
+                queueReaderProgressFromViewport(target)
+            })
+        }
+        window.addEventListener('scroll', readerScrollHandler, {
+            passive: true
+        })
+    }
+
+    requestAnimationFrame(() => {
+        target
+            .querySelector(`[data-reader-page="${resumePage}"]`)
+            ?.scrollIntoView({ block: 'center' })
+        requestAnimationFrame(() => {
+            if (readerPageObserver) queueReaderProgress(resumePage)
+            else readerScrollHandler?.()
+        })
+    })
+}
+
 function renderReaderPages() {
     const reader = state.reader
     if (!reader.chapter) return
@@ -2727,6 +2815,7 @@ function renderReaderPages() {
         mode === 'vertical'
             ? allPages
             : allPages.slice(reader.pageIndex, reader.pageIndex + pageCount)
+    resetReaderViewportTracking()
     target.className = `reader-pages reader-${mode} direction-${direction} fit-${fit}`
     target.innerHTML = pages
         .map(
@@ -2744,44 +2833,9 @@ function renderReaderPages() {
             image.after(retry)
         })
     }
-    if (readerScrollHandler)
-        window.removeEventListener('scroll', readerScrollHandler)
-    readerScrollHandler = null
-    if (mode === 'vertical') {
-        const resumePage = reader.pageIndex
-        let queued = false
-        readerScrollHandler = () => {
-            if (queued) return
-            queued = true
-            requestAnimationFrame(() => {
-                queued = false
-                const center = window.innerHeight / 2
-                const nearest = $$('[data-reader-page]')
-                    .map((image) => ({
-                        image,
-                        distance: Math.abs(
-                            image.getBoundingClientRect().top +
-                                image.getBoundingClientRect().height / 2 -
-                                center
-                        )
-                    }))
-                    .sort((a, b) => a.distance - b.distance)[0]
-                if (nearest)
-                    queueReaderProgress(
-                        Number(nearest.image.dataset.readerPage)
-                    )
-            })
-        }
-        window.addEventListener('scroll', readerScrollHandler, {
-            passive: true
-        })
-        requestAnimationFrame(() => {
-            target
-                .querySelector(`[data-reader-page="${resumePage}"]`)
-                ?.scrollIntoView({ block: 'center' })
-            requestAnimationFrame(() => readerScrollHandler?.())
-        })
-    } else queueReaderProgress(reader.pageIndex)
+    if (mode === 'vertical')
+        observeVerticalReaderProgress(target, reader.pageIndex)
+    else queueReaderProgress(reader.pageIndex)
 }
 
 function queueReaderProgress(pageIndex) {
@@ -2827,8 +2881,7 @@ async function flushReaderProgress(keepalive = false) {
 
 async function openReaderChapter(episodeId) {
     const requestId = ++readerChapterRequest
-    if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
-    readerScrollHandler = null
+    resetReaderViewportTracking()
     if (state.reader.episodeId && state.reader.episodeId !== episodeId)
         await flushReaderProgress()
     $('#reader-message').textContent = t('reader.loadingChapter')
@@ -2876,8 +2929,7 @@ async function openReaderComic(comicId, online = false) {
     try {
         await flushReaderProgress()
         if (requestId !== readerComicRequest) return
-        if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
-        readerScrollHandler = null
+        resetReaderViewportTracking()
         const originView = activeView === 'reader' ? state.reader.originView : activeView
         state.reader = { comicId, online, episodeId: null, dirty: false, originView }
         const root = readerApiRoot()
@@ -2985,8 +3037,7 @@ async function exitReader() {
     await flushReaderProgress()
     if (document.fullscreenElement)
         await document.exitFullscreen().catch(() => undefined)
-    if (readerScrollHandler) window.removeEventListener('scroll', readerScrollHandler)
-    readerScrollHandler = null
+    resetReaderViewportTracking()
     activateView(state.reader.originView || 'downloaded')
 }
 $('#reader-exit').onclick = () => void exitReader()

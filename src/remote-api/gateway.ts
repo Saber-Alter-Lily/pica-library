@@ -197,9 +197,9 @@ export function readRemoteApiToken(
         throw new Error('Remote API token path must be a regular file')
     if (platform !== 'win32') {
         const permissions = stat.mode & 0o777
-        if ((permissions & 0o037) !== 0)
+        if ((permissions & 0o077) !== 0)
             throw new Error(
-                'Remote API token file must not be group-writable/executable or accessible to other users'
+                'Remote API token file must not be accessible by group or other users'
             )
         if (
             uid !== undefined &&

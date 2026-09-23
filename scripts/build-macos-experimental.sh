@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NODE_VERSION="24.15.0"
+MIN_MACOS="13.5"
 PRODUCT_VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).version)" "$ROOT/package.json")"
 GIT_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 SOURCE_SHA="${PICA_LIBRARY_BUILD_PROVENANCE:-$GIT_SHA}"
@@ -63,6 +64,31 @@ cp "$RUNTIME_ROOT/bin/node" "$STAGE/runtime/bin/node"
 chmod 0755 "$STAGE/runtime/bin/node"
 cp "$RUNTIME_ROOT/LICENSE" "$STAGE/licenses/Node.js-LICENSE.txt"
 
+NODE_MIN_MACOS="$(
+  otool -l "$STAGE/runtime/bin/node" |
+    awk '/LC_BUILD_VERSION/{found=1;next} found&&/minos/{print $2;exit}'
+)"
+if [[ ! "$NODE_MIN_MACOS" =~ ^[0-9]+(\.[0-9]+)+$ ]]; then
+  echo "Could not determine bundled Node.js minimum macOS version" >&2
+  exit 1
+fi
+if ! "$STAGE/runtime/bin/node" - "$NODE_MIN_MACOS" "$MIN_MACOS" <<'NODE'
+const [observed, declared] = process.argv.slice(2).map((value) =>
+  value.split('.').map(Number)
+)
+const width = Math.max(observed.length, declared.length)
+for (let index = 0; index < width; index++) {
+  const left = observed[index] || 0
+  const right = declared[index] || 0
+  if (left < right) process.exit(0)
+  if (left > right) process.exit(1)
+}
+NODE
+then
+  echo "Bundled Node.js runtime requires macOS $NODE_MIN_MACOS, above the declared $MIN_MACOS baseline" >&2
+  exit 1
+fi
+
 cp "$ROOT"/dist/*.js "$STAGE/app/"
 cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"
 cp -R "$ROOT/web" "$STAGE/web"
@@ -120,6 +146,12 @@ Source: $SOURCE_SHA
 2. Run ./pica-library from Terminal, or use "Pica Library.command".
 3. Pica Library opens in your default browser in interactive mode. Use --headless for a persistent no-GUI local engine.
 
+Runtime baseline for this package:
+- Apple Silicon (arm64)
+- macOS >= $MIN_MACOS
+- bundled official Node.js $NODE_VERSION darwin-arm64 runtime
+- observed Node Mach-O minimum: macOS $NODE_MIN_MACOS
+
 This is an unsigned experimental CI artifact, not a formal macOS release.
 It is not notarized and is not distributed through GitHub Releases.
 Self-update is intentionally disabled on macOS at this stage.
@@ -133,7 +165,21 @@ EOF
 printf '%s
 ' "$SOURCE_SHA" > "$STAGE/SOURCE_SHA.txt"
 
-for required in   "$STAGE/runtime/bin/node"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"
+cat > "$STAGE/PLATFORM_REQUIREMENTS.json" <<EOF
+{
+  "schemaVersion": 1,
+  "platform": "macos",
+  "arch": "arm64",
+  "minimumMacOS": "$MIN_MACOS",
+  "observedNodeMinOS": "$NODE_MIN_MACOS",
+  "nodeVersion": "$NODE_VERSION",
+  "formalRelease": false,
+  "signed": false,
+  "notarized": false
+}
+EOF
+
+for required in   "$STAGE/runtime/bin/node"   "$STAGE/app/pica-library.js"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"   "$STAGE/PLATFORM_REQUIREMENTS.json"
 do
   if [[ ! -s "$required" ]]; then
     echo "Required macOS package file is missing or empty: $required" >&2
@@ -165,4 +211,4 @@ cat > "$ROOT/artifacts/MACOS-EXPERIMENTAL-SHA256SUMS.txt" <<EOF
 $HASH  $(basename "$ARCHIVE")
 EOF
 
-"$STAGE/runtime/bin/node" -e   "console.log(JSON.stringify({path:process.argv[1],sha256:process.argv[2],size_bytes:Number(process.argv[3]),uncompressed_bytes:Number(process.argv[4]),file_count:Number(process.argv[5]),node_version:process.argv[6],product_version:process.argv[7],source_sha:process.argv[8],formal_release:false,signed:false,notarized:false},null,2))"   "$ARCHIVE" "$HASH" "$SIZE" "$UNCOMPRESSED" "$FILE_COUNT" "$NODE_VERSION" "$PRODUCT_VERSION" "$SOURCE_SHA"
+"$STAGE/runtime/bin/node" -e   "console.log(JSON.stringify({path:process.argv[1],sha256:process.argv[2],size_bytes:Number(process.argv[3]),uncompressed_bytes:Number(process.argv[4]),file_count:Number(process.argv[5]),node_version:process.argv[6],product_version:process.argv[7],source_sha:process.argv[8],minimum_macos:process.argv[9],observed_node_minos:process.argv[10],formal_release:false,signed:false,notarized:false},null,2))"   "$ARCHIVE" "$HASH" "$SIZE" "$UNCOMPRESSED" "$FILE_COUNT" "$NODE_VERSION" "$PRODUCT_VERSION" "$SOURCE_SHA" "$MIN_MACOS" "$NODE_MIN_MACOS"

@@ -178,6 +178,7 @@ export class MacKeychainCredentialStore implements CredentialStore {
     }
 
     save(value: StoredCredentials) {
+        const serialized = JSON.stringify(value)
         const result = secureCommand(
             this.runner,
             this.executable,
@@ -188,9 +189,9 @@ export class MacKeychainCredentialStore implements CredentialStore {
                 ACCOUNT,
                 '-s',
                 SERVICE,
-                '-w'
-            ],
-            `${JSON.stringify(value)}\n`
+                '-w',
+                serialized
+            ]
         )
         if (result.status !== 0)
             throw new Error('macOS Keychain credential persistence is unavailable')

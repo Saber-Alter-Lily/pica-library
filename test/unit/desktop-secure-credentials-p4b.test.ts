@@ -33,7 +33,7 @@ afterEach(() => {
 })
 
 describe('Desktop secure credential backends P4B', () => {
-    it('stores macOS Keychain payload through stdin instead of command arguments', () => {
+    it('stores macOS Keychain payload using the security CLI password argument', () => {
         const credentials = {
             account: 'synthetic-account',
             password: 'synthetic-password'
@@ -59,11 +59,9 @@ describe('Desktop secure credential backends P4B', () => {
         expect(store.load()).toEqual(credentials)
         expect(calls[0].command).toBe('/usr/bin/security')
         expect(calls[0].args).toContain('add-generic-password')
-        expect(calls[0].args.at(-1)).toBe('-w')
-        expect(calls[0].args.join(' ')).not.toContain(
-            credentials.password
-        )
-        expect(calls[0].input).toContain(credentials.password)
+        expect(calls[0].args.at(-2)).toBe('-w')
+        expect(calls[0].args.at(-1)).toBe(JSON.stringify(credentials))
+        expect(calls[0].input).toBeUndefined()
     })
 
     it('stores Linux Secret Service payload through stdin and fixed non-secret attributes', () => {

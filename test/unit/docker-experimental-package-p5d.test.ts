@@ -156,6 +156,50 @@ describe('experimental Docker headless package P5D', () => {
         )
     })
 
+    it('ships an operator-facing Compose preview without exposing Pica directly', () => {
+        const compose = read('packaging/docker/server-preview/compose.yaml')
+        const caddy = read('packaging/docker/server-preview/Caddyfile')
+        const acceptance = read('scripts/test-server-compose-preview.sh')
+        const workflow = read('.github/workflows/docker-experimental.yml')
+        const guide = read('docs/SERVER_DOCKER_PREVIEW_DEPLOYMENT.md')
+
+        expect(compose).toContain('pica-init:')
+        expect(compose).toContain('network_mode: "none"')
+        expect(compose).toContain('pica:')
+        expect(compose).toContain('user: "10001:10001"')
+        expect(compose).toContain('read_only: true')
+        expect(compose).toContain('cap_drop:')
+        expect(compose).toContain('- ALL')
+        expect(compose).toContain('PICA_LIBRARY_REMOTE_TOKEN_FILE: /run/pica-secret/token')
+        expect(compose).toContain('PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY: "true"')
+        expect(compose).toContain('condition: service_completed_successfully')
+        expect(compose).toContain('condition: service_healthy')
+        expect(compose).toContain('pica_backend:')
+        expect(compose).toContain('internal: true')
+        expect(compose).not.toMatch(/pica:[\s\S]*?ports:/)
+        expect(caddy).toContain('reverse_proxy pica:8787')
+        expect(caddy).toContain('{\$PICA_LIBRARY_DOMAIN}')
+
+        expect(acceptance).toContain('docker compose')
+        expect(acceptance).toContain('config --format json')
+        expect(acceptance).toContain('runtime secret is not 0600')
+        expect(acceptance).toContain('Pica Compose service published a host port')
+        expect(acceptance).toContain('--cacert "$ROOT_CA"')
+        expect(acceptance).not.toContain('curl -k')
+        expect(acceptance).not.toContain('--insecure')
+        expect(acceptance).toContain('Compose exposed Desktop management')
+        expect(acceptance).toContain('Server Compose preview acceptance: PASS')
+        expect(workflow).toContain(
+            'bash scripts/test-server-compose-preview.sh "$image"'
+        )
+        expect(workflow).toContain("'scripts/test-server-compose-preview.sh'")
+
+        expect(guide).toContain('docker compose down -v')
+        expect(guide).toContain('baseline image -> stopped config snapshot')
+        expect(guide).toContain('PICA_LIBRARY_IMAGE')
+        expect(guide).toContain('PICA_LIBRARY_DOMAIN')
+    })
+
     it('records image provenance and base-image identity for the one-day artifact', () => {
         const build = read('scripts/build-docker-experimental.sh')
         expect(build).toContain('SOURCE_SHA')

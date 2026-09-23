@@ -12,7 +12,7 @@ async function refreshShellCache() {
   const cache = await caches.open(CACHE_NAME)
   for (const url of SHELL_ASSETS) {
     const response = await fetch(url, {
-      credentials: 'same-origin',
+      credentials: 'omit',
       cache: 'reload'
     })
     if (!response.ok)
@@ -57,21 +57,18 @@ self.addEventListener('fetch', (event) => {
     return
 
   event.respondWith(
-    fetch(request)
-      .then((response) => {
+    (async () => {
+      try {
+        const response = await fetch(request)
         if (response.ok) {
-          const copy = response.clone()
-          event.waitUntil(
-            caches
-              .open(CACHE_NAME)
-              .then((cache) => cache.put(request, copy))
-          )
+          const cache = await caches.open(CACHE_NAME)
+          await cache.put(url.pathname, response.clone())
         }
         return response
-      })
-      .catch(async () => {
-        const cached = await caches.match(request)
+      } catch {
+        const cached = await caches.match(url.pathname)
         return cached || Response.error()
-      })
+      }
+    })()
   )
 })

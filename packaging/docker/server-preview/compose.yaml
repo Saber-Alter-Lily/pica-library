@@ -92,7 +92,7 @@ services:
 
 secrets:
   pica_remote_token:
-    file: ${PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST:-./secrets/remote-api-token}
+    file: ${PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST:?Set PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST to the absolute host token-file path}
 
 volumes:
   pica_config:

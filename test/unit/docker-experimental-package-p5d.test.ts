@@ -69,6 +69,9 @@ describe('experimental Docker headless package P5D', () => {
         expect(smoke).toContain('docker stop --time 10')
         expect(smoke).toContain('docker start "$NAME"')
         expect(smoke).toContain(
+            "docker exec -i \"$NAME\" /opt/pica/runtime/bin/node - \"$URL\""
+        )
+        expect(smoke).toContain(
             "url+'/api/v1/desktop/shutdown'"
         )
     })

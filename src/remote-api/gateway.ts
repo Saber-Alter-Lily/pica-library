@@ -35,13 +35,22 @@ const REMOTE_WEB_CSP = [
     "frame-ancestors 'none'",
     "object-src 'none'",
     "font-src 'none'",
-    "manifest-src 'none'",
-    "worker-src 'none'"
+    "manifest-src 'self'",
+    "worker-src 'self'"
 ].join('; ')
 const REMOTE_WEB_ASSETS = new Map([
     ['/remote/', { file: 'index.html', type: 'text/html; charset=utf-8' }],
     ['/remote/remote.js', { file: 'remote.js', type: 'text/javascript; charset=utf-8' }],
-    ['/remote/remote.css', { file: 'remote.css', type: 'text/css; charset=utf-8' }]
+    ['/remote/remote.css', { file: 'remote.css', type: 'text/css; charset=utf-8' }],
+    [
+        '/remote/manifest.webmanifest',
+        {
+            file: 'manifest.webmanifest',
+            type: 'application/manifest+json; charset=utf-8'
+        }
+    ],
+    ['/remote/sw.js', { file: 'sw.js', type: 'text/javascript; charset=utf-8' }],
+    ['/remote/icon.svg', { file: 'icon.svg', type: 'image/svg+xml; charset=utf-8' }]
 ])
 
 export interface RemoteApiGatewayOptions {
@@ -70,6 +79,7 @@ export interface RemoteApiGateway {
     port: number
     webSessionsEnabled: boolean
     webShellEnabled: boolean
+    webPwaEnabled: boolean
     activeWebSessions(): number
     close(): Promise<void>
 }
@@ -694,6 +704,7 @@ export async function startRemoteApiGateway(
         port,
         webSessionsEnabled: Boolean(webSessions),
         webShellEnabled: Boolean(webRoot),
+        webPwaEnabled: Boolean(webRoot),
         activeWebSessions: () => webSessions?.activeCount() ?? 0,
         close: async () => {
             webSessions?.clear()

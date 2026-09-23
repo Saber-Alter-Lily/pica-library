@@ -157,6 +157,33 @@ function isAuthorized(request: IncomingMessage, expectedDigest: Buffer) {
     return timingSafeEqual(tokenDigest(token), expectedDigest)
 }
 
+function allowlistedBrowserSessionRoute(method: string, pathname: string) {
+    if (method === 'GET' && pathname === '/api/v1/status') return true
+    if (method === 'GET' && pathname === '/api/v1/capabilities') return true
+    if (method === 'POST' && pathname === '/api/v1/library/query') return true
+    if (method === 'GET' && pathname === '/api/v1/downloaded') return true
+    if (method === 'GET' && pathname === '/api/v1/shelves') return true
+    if (method === 'GET' && /^\/api\/v1\/shelves\/[^/]+$/.test(pathname))
+        return true
+    if (method === 'GET' && /^\/api\/v1\/comics\/[^/]+$/.test(pathname))
+        return true
+    if (method === 'GET' && /^\/api\/v1\/covers\/[^/]+$/.test(pathname))
+        return true
+    if (
+        method === 'GET' &&
+        /^\/api\/v1\/reader\/comics\/[^/]+\/chapters(?:\/[^/]+)?$/.test(
+            pathname
+        )
+    )
+        return true
+    if (
+        method === 'GET' &&
+        /^\/api\/v1\/reader\/pictures\/[^/]+$/.test(pathname)
+    )
+        return true
+    return false
+}
+
 function allowlistedRoute(method: string, pathname: string) {
     if (method === 'GET' && pathname === '/api/v1/status') return true
     if (method === 'GET' && pathname === '/api/v1/capabilities') return true
@@ -564,6 +591,17 @@ export async function startRemoteApiGateway(
                 audit(request, pathname, 401)
                 return json(response, 401, {
                     error: 'Authentication required'
+                })
+            }
+
+            if (
+                browserSession &&
+                !bearerAuthorized &&
+                !allowlistedBrowserSessionRoute(method, pathname)
+            ) {
+                audit(request, pathname, 404)
+                return json(response, 404, {
+                    error: 'Remote route unavailable'
                 })
             }
 

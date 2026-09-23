@@ -13,6 +13,9 @@ describe('experimental Linux x64 package P5A', () => {
         expect(build).toContain('Self-update is intentionally disabled')
         expect(workflow).toContain('actions/upload-artifact@v4')
         expect(workflow).toContain('retention-days: 1')
+        expect(workflow).toContain(
+            'if: github.event.repository.private == false'
+        )
         expect(workflow).not.toContain('gh release')
         expect(workflow).not.toContain('releases/latest')
         expect(workflow).not.toContain('contents: write')

@@ -174,10 +174,15 @@ use the normal Caddyfile and a real DNS hostname.
 
 ## Browser/PWA boundary
 
-This gateway is an API foundation for W4B. It does not yet provide the CORS,
-session/bootstrap, offline shell, or browser secret-handling model required by
-W5 Remote Web/PWA. Do not treat successful bearer API access as a remotely
-deployable Web UI.
+W5A adds an opt-in bearer-to-browser-session primitive with an in-memory
+HttpOnly/Secure/Strict cookie, exact HTTPS Origin binding and CSRF protection.
+It is disabled by default and documented in
+`docs/REMOTE_WEB_SESSION_W5A.md`.
+
+This still does not provide a Remote Web application shell, PWA/offline cache,
+multi-user isolation, or a browser UX for supplying the long-lived bearer.
+Do not treat successful bearer or session API access as a remotely deployable
+Web UI.
 
 ## Release state
 
@@ -188,4 +193,5 @@ capability.
 After the TLS and image-replacement gates pass, the remaining W4B work is
 operator-facing deployment packaging: a reviewed Compose/secret setup, pinned
 published-image provenance, health-driven promotion procedure, and a documented
-rollback command/path. W5 browser/PWA authentication remains a later layer.
+rollback command/path. The W5A session primitive is additive and opt-in; the
+browser application/PWA layers remain later gates.

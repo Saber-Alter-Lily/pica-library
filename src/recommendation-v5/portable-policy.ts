@@ -187,7 +187,7 @@ function normalizeTitleStrict(value: unknown) {
         .replace(/\s*[-–—_]\s*/g, '-')
 }
 
-function stripUploadNoise(value: string) {
+export function stripUploadNoise(value: string) {
     const noise = /(chinese|english|translated|translation|汉化|漢化|翻译|翻譯|中文|中国翻訳|無修正|无修正|decensored|digital|dl版|修正|重制|重製|rev(?:ision)?\.?\s*\d*|v\d+)/i
     return value
         .replace(/\[[^\]]{1,48}\]/g, (token) => (noise.test(token) ? ' ' : token))
@@ -199,7 +199,7 @@ function stripUploadNoise(value: string) {
         .trim()
 }
 
-function leadingCreatorCredit(value: string) {
+export function leadingCreatorCredit(value: string) {
     const prefix = value.match(/^\s*\[([^\]]{1,120})\]\s*/)
     if (!prefix) return { stripped: value, creatorAliases: [] as string[] }
     const inner = prefix[1]

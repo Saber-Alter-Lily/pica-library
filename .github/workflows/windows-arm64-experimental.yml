@@ -1,0 +1,80 @@
+name: Experimental Windows ARM64 Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'packaging/windows/Launcher.cs'
+      - 'scripts/build-windows-arm64-experimental.ps1'
+      - 'scripts/test-windows-arm64-experimental.ps1'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/windows-arm64-experimental.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'packaging/windows/Launcher.cs'
+      - 'scripts/build-windows-arm64-experimental.ps1'
+      - 'scripts/test-windows-arm64-experimental.ps1'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/windows-arm64-experimental.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-arm64-experimental:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert native Windows ARM64 runner
+        shell: pwsh
+        run: |
+          if (-not $IsWindows) { throw 'Windows runner required' }
+          if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::Arm64) {
+            throw "Expected ARM64 runner, got $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build experimental Windows ARM64 package
+        shell: pwsh
+        run: ./scripts/build-windows-arm64-experimental.ps1
+
+      - name: Run Windows ARM64 packaged acceptance
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          $archive = @(Get-ChildItem artifacts -File -Filter 'Pica-Library-*-windows-arm64-experimental.zip')[0]
+          if (-not $archive) { throw 'Windows ARM64 experimental archive not found' }
+          ./scripts/test-windows-arm64-experimental.ps1 -Archive $archive.FullName
+
+      - name: Upload experimental Windows ARM64 artifact
+        if: github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-library-windows-arm64-experimental-${{ github.sha }}
+          path: |
+            artifacts/Pica-Library-*-windows-arm64-experimental.zip
+            artifacts/WINDOWS-ARM64-EXPERIMENTAL-SHA256SUMS.txt
+          retention-days: 1
+          if-no-files-found: error

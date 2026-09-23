@@ -169,6 +169,32 @@ describe('Desktop native picker P4B-2', () => {
         expect(calls[0].args).toContain('--directory')
     })
 
+    it('keeps platform capability messaging localized and hides unsupported managed login', () => {
+        const i18n = fs.readFileSync('web/i18n.js', 'utf8')
+        const ja = fs.readFileSync('web/i18n-ja-core.js', 'utf8')
+        const eh = fs.readFileSync('web/eh-account.js', 'utf8')
+
+        for (const key of [
+            'setup.securityWindows',
+            'setup.securityMacos',
+            'setup.securityLinux',
+            'setup.securitySessionOnly',
+            'setup.folderManual'
+        ]) {
+            expect(i18n).toContain(`'${key}'`)
+            expect(ja).toContain(`'${key}'`)
+        }
+        expect(eh).toContain('let managedWebLogin = true')
+        expect(eh).toContain(
+            'managedWebLogin = value?.platform?.managedEhWebLogin !== false'
+        )
+        expect(eh).toContain('start.hidden = !managedWebLogin')
+        expect(eh).toContain(
+            'cancel.hidden = !managedWebLogin || !active'
+        )
+        expect(eh).toContain('if (!managedWebLogin) return')
+    })
+
     it('keeps Windows selection behind the adapter and publishes picker capability truth', () => {
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
         expect(main).toContain('const nativePicker = new DesktopNativePicker()')
@@ -186,13 +212,23 @@ describe('Desktop native picker P4B-2', () => {
 
         const app = fs.readFileSync('web/app.js', 'utf8')
         expect(app).toContain('function applyDesktopPlatformCapabilities()')
-        expect(app).toContain('platform.nativeFolderPicker')
         expect(app).toContain(
-            "state.capabilities?.features?.updatePackages === false"
+            'picker.folderPicker ?? platform.nativeFolderPicker'
         )
-        expect(app).toContain("desktop?.platform?.selfUpdate === false")
         expect(app).toContain(
-            "button.hidden = !folderPicker"
+            "input.title = folderPicker ? '' : t('setup.folderManual')"
         )
+        expect(app).toContain('backend.sessionOnly')
+        expect(app).toContain("'setup.securitySessionOnly'")
+        expect(app).toContain("'setup.securityMacos'")
+        expect(app).toContain("'setup.securityLinux'")
+        expect(app).toContain("'setup.securityWindows'")
+        expect(app).toContain('platform.managedEhWebLogin !== false')
+        expect(app).toContain('ehLoginStart.hidden = true')
+        expect(app).toContain(
+            'state.capabilities?.features?.updatePackages !== false'
+        )
+        expect(app).toContain('platform.selfUpdate !== false')
+        expect(app).toContain('button.hidden = !folderPicker')
     })
 })

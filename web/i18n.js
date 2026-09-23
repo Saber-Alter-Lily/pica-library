@@ -34,7 +34,17 @@ export const translations = {
         'setup.advanced': 'Advanced',
         'setup.proxy': 'HTTP/HTTPS proxy (optional)',
         'setup.security':
-            'Your account and password are used only to connect to the Pica service. The Windows version protects saved credentials for the current Windows user with DPAPI.',
+            'Your account and password are used only to connect to the Pica service.',
+        'setup.securityWindows':
+            'Saved credentials are protected for the current Windows user with DPAPI.',
+        'setup.securityMacos':
+            'Saved credentials are protected by macOS Keychain.',
+        'setup.securityLinux':
+            'Saved credentials are protected by the desktop Secret Service.',
+        'setup.securitySessionOnly':
+            'No secure credential store is available on this system. Credentials are kept only for this running session and must be entered again after restart.',
+        'setup.folderManual':
+            'No native folder picker is available. Enter or paste the library path manually.',
         'action.testConnection': 'Test Connection',
         'action.saveContinue': 'Save and Continue',
         'profile.conservative': 'Conservative',
@@ -841,8 +851,15 @@ export const translations = {
         'setup.profile': '下载模式',
         'setup.advanced': '高级设置',
         'setup.proxy': 'HTTP/HTTPS 代理（可选）',
-        'setup.security':
-            '账号和密码仅用于连接 Pica 服务。Windows 版本使用当前 Windows 用户的 DPAPI 加密保存凭据。',
+        'setup.security': '账号和密码仅用于连接 Pica 服务。',
+        'setup.securityWindows':
+            '已保存凭据使用当前 Windows 用户的 DPAPI 加密保护。',
+        'setup.securityMacos': '已保存凭据由 macOS 钥匙串保护。',
+        'setup.securityLinux': '已保存凭据由桌面 Secret Service 安全存储。',
+        'setup.securitySessionOnly':
+            '当前系统没有可用的安全凭据存储。账号凭据只保留在本次运行会话中，重启后需要重新输入。',
+        'setup.folderManual':
+            '当前系统没有可用的原生文件夹选择器，请直接输入或粘贴漫画库路径。',
         'action.testConnection': '测试连接',
         'action.saveContinue': '保存并开始使用',
         'profile.conservative': '保守',

@@ -365,6 +365,7 @@ function applyLanguage(nextLanguage, persist = false) {
     if (persist) language = saveLanguage(localStorage, language)
     $('#language-select').value = language
     applyTranslations(language)
+    if (desktop) applyDesktopPlatformCapabilities()
     document.dispatchEvent(new Event('pica-language-change'))
     if (persist) {
         renderAll()
@@ -510,10 +511,42 @@ function activateView(id) {
 
 function applyDesktopPlatformCapabilities() {
     const platform = desktop?.platform || {}
-    const folderPicker = Boolean(platform.nativeFolderPicker)
-    for (const id of ['#setup-folder', '#settings-folder']) {
-        const button = $(id)
+    const picker = desktop?.nativePicker || {}
+    const folderPicker = Boolean(
+        picker.folderPicker ?? platform.nativeFolderPicker
+    )
+    for (const [buttonId, inputId] of [
+        ['#setup-folder', '#setup-directory'],
+        ['#settings-folder', '#settings-directory']
+    ]) {
+        const button = $(buttonId)
+        const input = $(inputId)
         if (button) button.hidden = !folderPicker
+        if (input)
+            input.title = folderPicker ? '' : t('setup.folderManual')
+    }
+
+    const backend = desktop?.credentialBackend || {}
+    const security = $('#setup-security')
+    if (security) {
+        const key = backend.sessionOnly
+            ? 'setup.securitySessionOnly'
+            : backend.kind === 'macos-keychain'
+              ? 'setup.securityMacos'
+              : backend.kind === 'linux-secret-service'
+                ? 'setup.securityLinux'
+                : backend.kind === 'windows-dpapi'
+                  ? 'setup.securityWindows'
+                  : 'setup.security'
+        security.textContent = t(key)
+    }
+
+    const managedEhWebLogin = platform.managedEhWebLogin !== false
+    const ehLoginStart = $('#eh-web-login-start')
+    const ehLoginCancel = $('#eh-web-login-cancel')
+    if (!managedEhWebLogin) {
+        if (ehLoginStart) ehLoginStart.hidden = true
+        if (ehLoginCancel) ehLoginCancel.hidden = true
     }
 
     const updatePackages =

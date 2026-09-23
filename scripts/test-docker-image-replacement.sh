@@ -198,19 +198,21 @@ local_api() {
   docker exec -i "$PICA_NAME" /opt/pica/runtime/bin/node - "$method" "$path" "$payload" <<'NODE'
 const fs=require('fs')
 const [method,path,payload]=process.argv.slice(2)
-const instance=JSON.parse(fs.readFileSync('/config/runtime-state/instance.json','utf8'))
-const options={method,headers:{}}
-if(payload){
-  options.headers['content-type']='application/json'
-  options.body=payload
-}
-const response=await fetch(instance.url+path,options)
-const text=await response.text()
-if(!response.ok){
-  console.error(text)
+;(async()=>{
+  const instance=JSON.parse(fs.readFileSync('/config/runtime-state/instance.json','utf8'))
+  const options={method,headers:{}}
+  if(payload){
+    options.headers['content-type']='application/json'
+    options.body=payload
+  }
+  const response=await fetch(instance.url+path,options)
+  const text=await response.text()
+  if(!response.ok)throw new Error(text)
+  process.stdout.write(text)
+})().catch((error)=>{
+  console.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
-}
-process.stdout.write(text)
+})
 NODE
 }
 

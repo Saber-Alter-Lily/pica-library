@@ -353,7 +353,7 @@ describe('server binding security', () => {
 })
 
 describe('desktop shutdown lifecycle', () => {
-    it('flushes the success response before invoking the Desktop shutdown callback', async () => {
+    it('returns success and invokes the Desktop shutdown callback in the same request lifecycle', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-shutdown-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
         const service = new LibraryService(database, dir)

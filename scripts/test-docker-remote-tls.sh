@@ -176,8 +176,89 @@ if(value.runtime?.mode!=='headless')fail('Remote runtime mode is not headless')
 if(value.capabilityStates?.remoteApi?.supported!==true)fail('Remote API support missing')
 if(value.capabilityStates?.remoteApi?.available!==true)fail('Remote API availability missing')
 if(value.features?.remoteApi!==true)fail('Remote API compatibility flag missing')
+if(value.capabilityStates?.remoteWebSessions?.available!==true)fail('Remote Web session capability missing')
+if(value.features?.remoteWebSessions!==true)fail('Remote Web session compatibility flag missing')
 if(value.features?.updatePackages!==false)fail('Remote Linux runtime must not self-update')
 NODE
+
+SESSION_HEADERS="$WORK/session-headers.txt"
+SESSION_BODY="$WORK/session-bootstrap.json"
+curl --fail "${CURL_TLS[@]}" \
+  --dump-header "$SESSION_HEADERS" \
+  -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Origin: https://pica.test" \
+  "$BASE/remote/v1/session/bootstrap" > "$SESSION_BODY"
+
+SESSION_SET_COOKIE="$(
+  tr -d '\r' < "$SESSION_HEADERS" |
+    sed -n 's/^[Ss]et-[Cc]ookie:[[:space:]]*//p' |
+    head -n 1
+)"
+if [[ ! "$SESSION_SET_COOKIE" =~ ^__Host-pica_session=[A-Za-z0-9_-]+\; ]]; then
+  fail "Remote Web bootstrap did not return the expected __Host cookie"
+fi
+for required in 'Path=/' 'HttpOnly' 'Secure' 'SameSite=Strict'; do
+  if [[ "$SESSION_SET_COOKIE" != *"$required"* ]]; then
+    fail "Remote Web session cookie is missing $required"
+  fi
+done
+if grep -qi 'Domain=' <<<"$SESSION_SET_COOKIE"; then
+  fail "Remote Web __Host cookie must not contain Domain"
+fi
+SESSION_COOKIE="${SESSION_SET_COOKIE%%;*}"
+SESSION_CSRF="$(
+  node -e "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(v.authenticated!==true||typeof v.csrfToken!=='string'||!v.csrfToken)process.exit(1);process.stdout.write(v.csrfToken)" "$SESSION_BODY"
+)"
+if [[ -z "$SESSION_COOKIE" || -z "$SESSION_CSRF" ]]; then
+  fail "Remote Web bootstrap values are incomplete"
+fi
+if grep -F "$TOKEN" "$SESSION_HEADERS" "$SESSION_BODY" >/dev/null 2>&1; then
+  fail "Long-lived bearer token leaked into Remote Web session response"
+fi
+
+SESSION_CAP_STATUS="$(
+  curl "${CURL_TLS[@]}" \
+    -H "Cookie: $SESSION_COOKIE" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$BASE/api/v1/capabilities"
+)"
+if [[ "$SESSION_CAP_STATUS" != "200" ]]; then
+  fail "Remote Web cookie-only capability request failed: $SESSION_CAP_STATUS"
+fi
+
+SESSION_STATUS_FILE="$WORK/browser-session.json"
+curl --fail "${CURL_TLS[@]}" \
+  -H "Cookie: $SESSION_COOKIE" \
+  "$BASE/remote/v1/session" > "$SESSION_STATUS_FILE"
+node -e "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(v.authenticated!==true||v.csrfToken!==process.argv[2])process.exit(1)" "$SESSION_STATUS_FILE" "$SESSION_CSRF"
+
+SESSION_NO_CSRF="$(
+  curl "${CURL_TLS[@]}" \
+    -X POST \
+    -H "Cookie: $SESSION_COOKIE" \
+    -H "Origin: https://pica.test" \
+    -H 'Content-Type: application/json' \
+    --data '{"scope":"favorites","text":"fixture","limit":1}' \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$BASE/api/v1/library/query"
+)"
+if [[ "$SESSION_NO_CSRF" != "403" ]]; then
+  fail "Remote Web session write succeeded without CSRF: $SESSION_NO_CSRF"
+fi
+
+SESSION_QUERY="$WORK/session-query.json"
+curl --fail "${CURL_TLS[@]}" \
+  -X POST \
+  -H "Cookie: $SESSION_COOKIE" \
+  -H "Origin: https://pica.test" \
+  -H "X-Pica-CSRF: $SESSION_CSRF" \
+  -H 'Content-Type: application/json' \
+  --data '{"scope":"favorites","text":"fixture","limit":1}' \
+  "$BASE/api/v1/library/query" > "$SESSION_QUERY"
+node -e "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(!v||typeof v!=='object')process.exit(1)" "$SESSION_QUERY"
 
 BLOCKED_DESKTOP="$(
   curl "${CURL_TLS[@]}"     -H "Authorization: Bearer $TOKEN"     --output /dev/null     --write-out '%{http_code}'     "$BASE/api/v1/desktop/status"
@@ -231,6 +312,18 @@ done
 if [[ "$RECOVERED" != "200" ]]; then
   fail "Remote HTTPS path did not recover after Pica container restart"
 fi
+
+STALE_SESSION="$(
+  curl "${CURL_TLS[@]}" \
+    -H "Cookie: $SESSION_COOKIE" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$BASE/api/v1/capabilities" 2>/dev/null || true
+)"
+if [[ "$STALE_SESSION" != "401" ]]; then
+  fail "Process-local Remote Web session survived Pica restart: $STALE_SESSION"
+fi
+
 if [[ -n "$(docker port "$PICA_NAME" 2>/dev/null)" ]]; then
   fail "Pica container published a host port after restart"
 fi

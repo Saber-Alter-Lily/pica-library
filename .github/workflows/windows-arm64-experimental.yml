@@ -61,6 +61,7 @@ jobs:
         run: ./scripts/build-windows-arm64-experimental.ps1
 
       - name: Run Windows ARM64 packaged acceptance
+        timeout-minutes: 6
         shell: pwsh
         run: |
           $archive = @(Get-ChildItem artifacts -File -Filter 'Pica-Library-*-windows-arm64-experimental.zip')[0]

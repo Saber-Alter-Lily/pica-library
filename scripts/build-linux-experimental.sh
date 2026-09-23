@@ -138,6 +138,10 @@ for notice in NOTICE.md UPSTREAM.md DISCLAIMER.md; do
   cp "$ROOT/$notice" "$STAGE/$notice"
 done
 
+cp "$ROOT/scripts/install-linux-user.sh" "$STAGE/install-linux-user.sh"
+cp "$ROOT/scripts/uninstall-linux-user.sh" "$STAGE/uninstall-linux-user.sh"
+chmod 0755 "$STAGE/install-linux-user.sh" "$STAGE/uninstall-linux-user.sh"
+
 cat > "$STAGE/pica-library" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -161,8 +165,13 @@ Product version: $PRODUCT_VERSION
 Source: $SOURCE_SHA
 
 1. Extract the entire archive.
-2. Run ./pica-library or ./Pica\ Library.sh
-3. Pica Library opens in your default browser in interactive mode. Use --headless for a persistent no-GUI local engine.
+2. For a user-level desktop-menu install, run ./install-linux-user.sh.
+   The application is copied to ~/.local/opt/pica-library by default while
+   databases/download state stay under the normal XDG user-data root.
+3. You can also run ./pica-library or ./Pica\ Library.sh directly without installing.
+4. Pica Library opens in your default browser in interactive mode. Use --headless for a persistent no-GUI local engine.
+5. To remove only application/menu files, run the installed uninstall-linux-user.sh.
+   The uninstaller intentionally preserves Pica Library user data.
 
 Runtime baseline for this package:
 - GNU/Linux x86-64
@@ -204,7 +213,7 @@ EOF
 printf '%s
 ' "$SOURCE_SHA" > "$STAGE/SOURCE_SHA.txt"
 
-for required in   "$STAGE/runtime/bin/node"   "$STAGE/runtime/linux-preflight.sh"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"   "$STAGE/PLATFORM_REQUIREMENTS.json"
+for required in   "$STAGE/runtime/bin/node"   "$STAGE/runtime/linux-preflight.sh"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"   "$STAGE/PLATFORM_REQUIREMENTS.json"   "$STAGE/install-linux-user.sh"   "$STAGE/uninstall-linux-user.sh"
 do
   if [[ ! -s "$required" ]]; then
     echo "Required Linux package file is missing or empty: $required" >&2

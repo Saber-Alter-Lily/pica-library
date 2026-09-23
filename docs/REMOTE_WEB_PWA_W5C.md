@@ -21,7 +21,7 @@ The Remote Web shell now publishes:
 - `/remote/icon.svg`;
 - `/remote/sw.js`.
 
-The manifest is scoped to `/remote/`, starts at `/remote/`, uses `display: standalone`, and identifies the application as `Pica Library Remote`.
+The manifest is scoped to `/remote/`, starts at `/remote/`, uses `display: standalone`, and identifies the application as `Pica Library Remote`. The scalable icon is declared at both 192x192 and 512x512 so Chromium installability checks see the expected manifest sizes while the project keeps one reviewed SVG source.
 
 The service worker is registered with scope `/remote/`; it is never granted a broader root scope.
 

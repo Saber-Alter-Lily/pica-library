@@ -35,7 +35,7 @@ describe('experimental macOS arm64 package P5B', () => {
             'Experimental macOS package must be built on an arm64 macOS runner'
         )
         expect(build).toContain('unsigned, unnotarized experimental CI artifact')
-        expect(build).toContain('Self-update is intentionally disabled')
+        expect(build).toContain('Self-update remains disabled on macOS')
     })
 
     it('locks the official Node macOS arm64 runtime baseline', () => {

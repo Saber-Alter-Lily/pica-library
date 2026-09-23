@@ -153,6 +153,88 @@ const downloadJobSelect = `
     JOIN comics c ON c.id = j.comic_id
 `
 
+const comicSelect = `
+    SELECT c.*, a.canonical_name,
+           pm.provider_id, pm.provider_remote_id,
+           pm.alternate_titles_json, pm.completion_status,
+           pm.rating, pm.provider_metadata_json,
+           EXISTS(SELECT 1 FROM library_membership lm
+                  WHERE lm.comic_id = c.id) AS in_library,
+           (SELECT COUNT(*) FROM episodes e WHERE e.comic_id = c.id)
+               AS known_episodes,
+           (SELECT COUNT(*) FROM pictures p WHERE p.comic_id = c.id)
+               AS known_pictures,
+           (SELECT COUNT(*) FROM pictures p
+            WHERE p.comic_id = c.id AND p.status = 'completed')
+               AS downloaded_pictures
+    FROM comics c
+    LEFT JOIN authors a ON a.id = c.canonical_author_id
+    LEFT JOIN comic_provider_metadata pm ON pm.comic_id = c.id
+`
+
+function storedComicFromRow(row: SqlRow): StoredComic {
+    const canonicalAuthor = row.canonical_name
+        ? String(row.canonical_name)
+        : null
+    return {
+        comicId: String(row.id),
+        providerId: row.provider_id
+            ? (String(row.provider_id) as 'pica' | 'eh')
+            : String(row.id).startsWith('eh:')
+              ? 'eh'
+              : 'pica',
+        providerRemoteId: row.provider_remote_id
+            ? String(row.provider_remote_id)
+            : String(row.id).startsWith('eh:')
+              ? String(row.id).slice(3)
+              : String(row.id),
+        alternateTitles: jsonArray(row.alternate_titles_json),
+        completionStatus: row.completion_status
+            ? (String(row.completion_status) as
+                  | 'FINISHED'
+                  | 'ONGOING'
+                  | 'UNKNOWN')
+            : Boolean(row.finished)
+              ? 'FINISHED'
+              : 'ONGOING',
+        rating:
+            row.rating === null || row.rating === undefined
+                ? undefined
+                : numberValue(row.rating),
+        providerMetadata: jsonObject(row.provider_metadata_json),
+        title: String(row.title),
+        author: String(row.raw_author),
+        description: String(row.description ?? ''),
+        chineseTeam: String(row.chinese_team ?? ''),
+        categories: jsonArray(row.categories_json),
+        tags: jsonArray(row.tags_json),
+        finished: Boolean(row.finished),
+        createdAt: row.created_at_source
+            ? String(row.created_at_source)
+            : undefined,
+        updatedAt: row.updated_at_source
+            ? String(row.updated_at_source)
+            : undefined,
+        totalLikes: numberValue(row.total_likes),
+        totalViews: numberValue(row.total_views),
+        pagesCount: numberValue(row.pages_count),
+        epsCount: numberValue(row.eps_count),
+        coverUrl: row.cover_url ? String(row.cover_url) : undefined,
+        canonicalAuthor,
+        circle: row.circle ? String(row.circle) : null,
+        authorId: row.canonical_author_id
+            ? String(row.canonical_author_id)
+            : null,
+        isFavorite: Boolean(row.is_favorite),
+        firstSeenAt: String(row.first_seen_at),
+        lastSeenAt: String(row.last_seen_at),
+        knownEpisodes: numberValue(row.known_episodes),
+        knownPictures: numberValue(row.known_pictures),
+        downloadedPictures: numberValue(row.downloaded_pictures),
+        inLibrary: Boolean(row.in_library)
+    }
+}
+
 export class LibraryDatabase {
     readonly file: string
     private readonly db: DatabaseSyncType
@@ -1843,26 +1925,7 @@ export class LibraryDatabase {
         query: ComicQuery = {},
         internalLimitCap = 5000
     ): StoredComic[] {
-        const rows = this.db
-            .prepare(
-                `SELECT c.*, a.canonical_name,
-                        pm.provider_id, pm.provider_remote_id,
-                        pm.alternate_titles_json, pm.completion_status,
-                        pm.rating, pm.provider_metadata_json,
-                        EXISTS(SELECT 1 FROM library_membership lm
-                               WHERE lm.comic_id = c.id) AS in_library,
-                        (SELECT COUNT(*) FROM episodes e WHERE e.comic_id = c.id)
-                            AS known_episodes,
-                        (SELECT COUNT(*) FROM pictures p WHERE p.comic_id = c.id)
-                            AS known_pictures,
-                        (SELECT COUNT(*) FROM pictures p
-                         WHERE p.comic_id = c.id AND p.status = 'completed')
-                            AS downloaded_pictures
-                 FROM comics c
-                 LEFT JOIN authors a ON a.id = c.canonical_author_id
-                 LEFT JOIN comic_provider_metadata pm ON pm.comic_id = c.id`
-            )
-            .all() as SqlRow[]
+        const rows = this.db.prepare(comicSelect).all() as SqlRow[]
         const text = query.text?.toLocaleLowerCase('und').trim()
         const author = query.author
             ? normalizeAuthorKey(query.author)
@@ -1873,68 +1936,7 @@ export class LibraryDatabase {
             []
 
         const comics = rows
-            .map((row): StoredComic => {
-                const canonicalAuthor = row.canonical_name
-                    ? String(row.canonical_name)
-                    : null
-                return {
-                    comicId: String(row.id),
-                    providerId: row.provider_id
-                        ? (String(row.provider_id) as 'pica' | 'eh')
-                        : String(row.id).startsWith('eh:')
-                          ? 'eh'
-                          : 'pica',
-                    providerRemoteId: row.provider_remote_id
-                        ? String(row.provider_remote_id)
-                        : String(row.id).startsWith('eh:')
-                          ? String(row.id).slice(3)
-                          : String(row.id),
-                    alternateTitles: jsonArray(row.alternate_titles_json),
-                    completionStatus: row.completion_status
-                        ? (String(row.completion_status) as
-                              | 'FINISHED'
-                              | 'ONGOING'
-                              | 'UNKNOWN')
-                        : Boolean(row.finished)
-                          ? 'FINISHED'
-                          : 'ONGOING',
-                    rating:
-                        row.rating === null || row.rating === undefined
-                            ? undefined
-                            : numberValue(row.rating),
-                    providerMetadata: jsonObject(row.provider_metadata_json),
-                    title: String(row.title),
-                    author: String(row.raw_author),
-                    description: String(row.description ?? ''),
-                    chineseTeam: String(row.chinese_team ?? ''),
-                    categories: jsonArray(row.categories_json),
-                    tags: jsonArray(row.tags_json),
-                    finished: Boolean(row.finished),
-                    createdAt: row.created_at_source
-                        ? String(row.created_at_source)
-                        : undefined,
-                    updatedAt: row.updated_at_source
-                        ? String(row.updated_at_source)
-                        : undefined,
-                    totalLikes: numberValue(row.total_likes),
-                    totalViews: numberValue(row.total_views),
-                    pagesCount: numberValue(row.pages_count),
-                    epsCount: numberValue(row.eps_count),
-                    coverUrl: row.cover_url ? String(row.cover_url) : undefined,
-                    canonicalAuthor,
-                    circle: row.circle ? String(row.circle) : null,
-                    authorId: row.canonical_author_id
-                        ? String(row.canonical_author_id)
-                        : null,
-                    isFavorite: Boolean(row.is_favorite),
-                    firstSeenAt: String(row.first_seen_at),
-                    lastSeenAt: String(row.last_seen_at),
-                    knownEpisodes: numberValue(row.known_episodes),
-                    knownPictures: numberValue(row.known_pictures),
-                    downloadedPictures: numberValue(row.downloaded_pictures),
-                    inLibrary: Boolean(row.in_library)
-                }
-            })
+            .map(storedComicFromRow)
             .filter((comic) => {
                 if (query.comicId && comic.comicId !== query.comicId)
                     return false
@@ -2012,7 +2014,12 @@ export class LibraryDatabase {
     }
 
     getComic(comicId: string): StoredComic | undefined {
-        return this.listComics({ comicId, limit: 1 })[0]
+        const id = String(comicId ?? '').trim()
+        if (!id) return undefined
+        const row = this.db
+            .prepare(`${comicSelect} WHERE c.id = ?`)
+            .get(id) as SqlRow | undefined
+        return row ? storedComicFromRow(row) : undefined
     }
 
     private recomputeFavoriteState(comicId?: string) {

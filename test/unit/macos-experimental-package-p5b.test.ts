@@ -10,6 +10,9 @@ describe('experimental macOS arm64 package P5B', () => {
 
         expect(workflow).toContain('runs-on: macos-15')
         expect(workflow).toContain('test "$(uname -m)" = "arm64"')
+        expect(workflow).toContain(
+            "'scripts/test-macos-preview-acceptance.sh'"
+        )
         expect(workflow).toContain('actions/upload-artifact@v4')
         expect(workflow).toContain(
             'if: github.event.repository.private == false'

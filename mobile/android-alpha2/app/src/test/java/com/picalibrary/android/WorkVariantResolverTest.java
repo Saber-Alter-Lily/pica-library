@@ -29,6 +29,22 @@ public class WorkVariantResolverTest {
         assertTrue(score<1d);
     }
 
+    @Test public void preservesChapterAndVolumeStructure(){
+        UnifiedCatalogStore.Entry chapter1=comic("a","Sample Story (Chapter 1)","Artist");
+        UnifiedCatalogStore.Entry chapter2=comic("b","Sample Story (Chapter 2)","Artist");
+        UnifiedCatalogStore.Entry volume1=comic("c","Example Work Vol. 1 [English]","Artist");
+        UnifiedCatalogStore.Entry volume2=comic("d","Example Work Vol. 2 [Digital]","Artist");
+        assertTrue(WorkVariantResolver.structureConflict(chapter1,chapter2));
+        assertTrue(WorkVariantResolver.structureConflict(volume1,volume2));
+    }
+
+    @Test public void sameChapterWithUploadNoiseDoesNotConflict(){
+        UnifiedCatalogStore.Entry left=comic("a","Sample Story (Chapter 1) [Chinese]","Artist");
+        UnifiedCatalogStore.Entry right=comic("b","Sample Story (Chapter 1) [Digital]","Artist");
+        assertFalse(WorkVariantResolver.structureConflict(left,right));
+        assertTrue(WorkVariantResolver.titleSimilarity(left,right)>=.90d);
+    }
+
     @Test public void rejectsUnrelatedTitles(){
         UnifiedCatalogStore.Entry a=comic("a","Blue Summer","Artist");
         UnifiedCatalogStore.Entry b=comic("b","Winter Classroom","Artist");

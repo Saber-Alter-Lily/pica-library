@@ -102,6 +102,69 @@ describe('Work Identity V3 creator-title-cover funnel', () => {
         expect(evidence.confidence).toBeLessThan(0.8)
     })
 
+    it('keeps different chapter and volume numbers separate even when titles are otherwise nearly identical', () => {
+        const chapter1 = comic({
+            comicId: 'pica:chapter-1',
+            title: 'Sample Story (Chapter 1)',
+            author: 'Creator',
+            authorId: 'creator-1',
+            pagesCount: 24
+        })
+        const chapter2 = comic({
+            comicId: 'eh:chapter-2',
+            providerId: 'eh',
+            title: 'Sample Story (Chapter 2)',
+            author: 'Creator',
+            authorId: 'creator-1',
+            pagesCount: 24
+        })
+        const volume1 = comic({
+            comicId: 'pica:volume-1',
+            title: 'Example Work Vol. 1 [English]',
+            author: 'Creator',
+            authorId: 'creator-1',
+            pagesCount: 180
+        })
+        const volume2 = comic({
+            comicId: 'eh:volume-2',
+            providerId: 'eh',
+            title: 'Example Work Vol. 2 [Digital]',
+            author: 'Creator',
+            authorId: 'creator-1',
+            pagesCount: 180
+        })
+
+        expect(workIdentityDetailEvidenceV3(chapter1, chapter2)).toMatchObject({
+            relation: 'DISTINCT_OR_UNKNOWN',
+            stage: 'STRUCTURE_CONFLICT'
+        })
+        expect(workIdentityDetailEvidenceV3(volume1, volume2)).toMatchObject({
+            relation: 'DISTINCT_OR_UNKNOWN',
+            stage: 'STRUCTURE_CONFLICT'
+        })
+    })
+
+    it('still matches the same numbered chapter across upload-language noise', () => {
+        const left = comic({
+            comicId: 'pica:chapter-1',
+            title: 'Sample Story (Chapter 1) [Chinese]',
+            author: 'Creator',
+            authorId: 'creator-1',
+            pagesCount: 24
+        })
+        const right = comic({
+            comicId: 'eh:chapter-1',
+            providerId: 'eh',
+            title: 'Sample Story (Chapter 1) [Digital]',
+            author: 'Creator',
+            authorId: 'creator-1',
+            pagesCount: 24
+        })
+        expect(workIdentityDetailEvidenceV3(left, right).relation).toBe(
+            'HIGH_CONFIDENCE_WORK'
+        )
+    })
+
     it('does not turn unrelated same-author works into high-confidence matches', () => {
         const left = comic({
             comicId: 'pica:a',

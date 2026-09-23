@@ -1,6 +1,8 @@
 import type { StoredComic } from '../library/types'
 import {
+    leadingCreatorCredit,
     normalizePreferenceKey,
+    stripUploadNoise,
     workIdentityKeys,
     workIdentitySignalsV2
 } from './portable-policy'
@@ -21,6 +23,7 @@ export interface WorkIdentityV3Evidence {
         | 'CREATOR_TITLE_CORE'
         | 'CREATOR_TITLE_FUZZY'
         | 'TITLE_FALLBACK'
+        | 'STRUCTURE_CONFLICT'
         | 'INSUFFICIENT'
     creatorMatch: boolean
     creatorMatchKind: 'CANONICAL_ID' | 'ALIAS' | 'NONE'
@@ -30,19 +33,72 @@ export interface WorkIdentityV3Evidence {
 }
 
 function compactTitle(value: string) {
-    return normalizePreferenceKey(value)
-        .replace(/\[[^\]]{0,120}\]/g, ' ')
-        .replace(/\([^)]{0,120}\)/g, ' ')
-        .replace(/\{[^}]{0,120}\}/g, ' ')
-        .replace(
-            /\b(?:chinese|english|translated|translation|digital|decensored|revision|rev|dl|ver(?:sion)?|vol(?:ume)?)\b/giu,
-            ' '
-        )
-        .replace(
-            /(?:汉化|漢化|翻译|翻譯|中文|無修正|无修正|修正|重制|重製|dl版)/giu,
-            ' '
-        )
+    const withoutCreatorCredit = leadingCreatorCredit(value).stripped
+    return stripUploadNoise(normalizePreferenceKey(withoutCreatorCredit))
         .replace(/[\s\p{P}\p{S}_]+/gu, '')
+}
+
+function workStructureTokens(value: string) {
+    const text = normalizePreferenceKey(value)
+    const tokens = new Map<string, Set<string>>()
+    const add = (kind: string, token: string) => {
+        const normalized = token.replace(/^0+(?=\d)/, '')
+        if (!normalized) return
+        const values = tokens.get(kind) ?? new Set<string>()
+        values.add(normalized)
+        tokens.set(kind, values)
+    }
+    for (const match of text.matchAll(
+        /\b(?:chapter|chap|ch)\.?\s*(\d+[a-z]?)\b/giu
+    ))
+        add('chapter', String(match[1] ?? ''))
+    for (const match of text.matchAll(
+        /\b(?:volume|vol)\.?\s*(\d+[a-z]?)\b/giu
+    ))
+        add('volume', String(match[1] ?? ''))
+    for (const match of text.matchAll(
+        /\bpart\.?\s*(\d+[a-z]?)\b/giu
+    ))
+        add('part', String(match[1] ?? ''))
+    for (const match of text.matchAll(
+        /第?\s*(\d+[a-z]?)\s*(話|话|章|巻|卷|冊|册|部)/giu
+    )) {
+        const suffix = String(match[2] ?? '')
+        const kind = /話|话|章/u.test(suffix)
+            ? 'chapter'
+            : /巻|卷|冊|册/u.test(suffix)
+              ? 'volume'
+              : 'part'
+        add(kind, String(match[1] ?? ''))
+    }
+    return tokens
+}
+
+function workIdentityStructureConflictV3(
+    left: Pick<StoredComic, 'title' | 'alternateTitles'>,
+    right: Pick<StoredComic, 'title' | 'alternateTitles'>
+) {
+    const merge = (
+        comic: Pick<StoredComic, 'title' | 'alternateTitles'>
+    ) => {
+        const merged = new Map<string, Set<string>>()
+        for (const title of [comic.title, ...(comic.alternateTitles ?? [])]) {
+            for (const [kind, values] of workStructureTokens(String(title))) {
+                const current = merged.get(kind) ?? new Set<string>()
+                for (const value of values) current.add(value)
+                merged.set(kind, current)
+            }
+        }
+        return merged
+    }
+    const a = merge(left)
+    const b = merge(right)
+    for (const [kind, values] of a) {
+        const other = b.get(kind)
+        if (!other?.size) continue
+        if (![...values].some((value) => other.has(value))) return true
+    }
+    return false
 }
 
 function editSimilarity(left: string, right: string) {
@@ -143,6 +199,21 @@ export function workIdentityDetailEvidenceV3(
 ): WorkIdentityV3Evidence {
     const signals = workIdentitySignalsV2(left, right)
     const fuzzy = workIdentityTitleSimilarityV3(left, right)
+    if (workIdentityStructureConflictV3(left, right))
+        return {
+            relation: 'DISTINCT_OR_UNKNOWN',
+            confidence: 0,
+            stage: 'STRUCTURE_CONFLICT',
+            creatorMatch: signals.authorsCompatible,
+            creatorMatchKind: signals.authorIdMatch
+                ? 'CANONICAL_ID'
+                : signals.authorAliasMatch
+                  ? 'ALIAS'
+                  : 'NONE',
+            titleMatch: fuzzy >= 0.5 ? 'FUZZY' : 'NONE',
+            titleSimilarity: fuzzy,
+            pageCountCompatible: signals.pageCountCompatible
+        }
     const creatorMatchKind = signals.authorIdMatch
         ? ('CANONICAL_ID' as const)
         : signals.authorAliasMatch

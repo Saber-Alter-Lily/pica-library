@@ -45,6 +45,7 @@ export interface AppCapabilities {
         multiTagPreference: boolean
         adaptiveRecommendationBatches: boolean
         remoteApi: boolean
+        remoteWebSessions: boolean
     }
     runtime: {
         role: 'desktop' | 'server' | 'engine'
@@ -59,6 +60,7 @@ export interface AppCapabilities {
         secureCredentialPersistence: CapabilityState
         managedEhWebLogin: CapabilityState
         remoteApi: CapabilityState
+        remoteWebSessions: CapabilityState
     }
 }
 
@@ -191,6 +193,33 @@ export function appCapabilities(
                   execution: 'platform-host',
                   reason: 'DisabledByConfiguration'
               }
+    const remoteWebSessions: CapabilityState = !hostPresent
+        ? {
+              supported: false,
+              available: false,
+              execution: 'platform-host',
+              reason: 'NoPlatformHost'
+          }
+        : mode !== 'headless'
+          ? {
+                supported: false,
+                available: false,
+                execution: 'platform-host',
+                reason: 'UnavailableInRuntime'
+            }
+          : remoteStatus.webSessions === true
+            ? {
+                  supported: true,
+                  available: true,
+                  execution: 'platform-host',
+                  reason: 'Available'
+              }
+            : {
+                  supported: true,
+                  available: false,
+                  execution: 'platform-host',
+                  reason: 'DisabledByConfiguration'
+              }
 
     return {
         appVersion: PRODUCT_VERSION,
@@ -212,7 +241,8 @@ export function appCapabilities(
             behaviorLearning: true,
             multiTagPreference: true,
             adaptiveRecommendationBatches: true,
-            remoteApi: remoteApi.available
+            remoteApi: remoteApi.available,
+            remoteWebSessions: remoteWebSessions.available
         },
         runtime: {
             role,
@@ -226,7 +256,8 @@ export function appCapabilities(
             nativeSavePicker,
             secureCredentialPersistence,
             managedEhWebLogin,
-            remoteApi
+            remoteApi,
+            remoteWebSessions
         }
     }
 }

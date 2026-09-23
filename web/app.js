@@ -508,6 +508,27 @@ function activateView(id) {
     })
 }
 
+function applyDesktopPlatformCapabilities() {
+    const platform = desktop?.platform || {}
+    const folderPicker = Boolean(platform.nativeFolderPicker)
+    for (const id of ['#setup-folder', '#settings-folder']) {
+        const button = $(id)
+        if (button) button.hidden = !folderPicker
+    }
+
+    const updatePackages =
+        state.capabilities?.features?.updatePackages !== false &&
+        platform.selfUpdate !== false
+    const softwareTab = document.querySelector(
+        '#maintenance [data-tab="software-updates"]'
+    )
+    if (softwareTab) softwareTab.hidden = !updatePackages
+    const softwarePanel = $('#software-updates')
+    if (softwarePanel) softwarePanel.hidden = !updatePackages
+    const updatePanel = $('#settings-update')
+    if (updatePanel) updatePanel.hidden = !updatePackages
+}
+
 async function chooseFolder(prefix) {
     const value = await desktopPost('/api/v1/desktop/choose-folder')
     if (value.path) $(`#${prefix}-directory`).value = value.path
@@ -612,6 +633,7 @@ async function loadDesktop() {
         $('#settings-profile').value = desktop.profile || 'balanced'
         $('#settings-proxy').value = desktop.proxyUrl || ''
         $('#setup-directory').value = desktop.libraryDirectory || ''
+        applyDesktopPlatformCapabilities()
         renderTimestamps()
         renderMobileBridge()
         void registerDesktopBrowserSession()
@@ -938,6 +960,8 @@ async function maybePromptForUpdate() {
         !desktop ||
         state.mode === 'lite' ||
         document.body.classList.contains('browser-lite-forced') ||
+        state.capabilities?.features?.updatePackages === false ||
+        desktop?.platform?.selfUpdate === false ||
         !automaticUpdateCheckDue()
     )
         return

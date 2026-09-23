@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Server } from 'node:http'
@@ -42,6 +42,7 @@ import {
 } from './child-process'
 import { connectionCredentials } from './connection'
 import { desktopPlatformCapabilities } from './platform'
+import { DesktopNativePicker } from './pickers'
 import { assertLibraryChangeAllowed } from './lifecycle'
 import {
     isLoopbackListening,
@@ -51,6 +52,7 @@ import {
 } from './proxy-detection'
 
 const args = new Set(process.argv.slice(2))
+const nativePicker = new DesktopNativePicker()
 const paths = desktopPaths()
 const applicationRoot = path.resolve(path.dirname(process.argv[1]), '..')
 const packagedSourceFile = path.join(applicationRoot, 'SOURCE_SHA.txt')
@@ -95,7 +97,9 @@ const credentialsStore = credentialBackend.store
 const platformCapabilities = {
     ...desktopPlatformCapabilities(),
     secureCredentialPersistence:
-        credentialBackend.status.securePersistence
+        credentialBackend.status.securePersistence,
+    nativeFolderPicker: nativePicker.status.folderPicker,
+    nativeSavePicker: nativePicker.status.savePicker
 }
 const instance = new InstanceLock(paths.lock, paths.instance)
 let config = loadConfig(paths.config)
@@ -383,79 +387,25 @@ async function detectProxy(input: Record<string, unknown>) {
 }
 
 async function chooseFolder() {
-    if (process.platform !== 'win32') return null
-    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.FolderBrowserDialog;$d.Description='选择 Pica Library 漫画保存目录'+[Environment]::NewLine+'Choose the Pica Library folder';if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.SelectedPath)}`
-    const powershell = windowsExecutable(
-        'System32',
-        'WindowsPowerShell',
-        'v1.0',
-        'powershell.exe'
+    return await nativePicker.chooseFolder(
+        '选择 Pica Library 漫画保存目录 / Choose the Pica Library folder'
     )
-    return await new Promise<string | null>((resolve, reject) => {
-        const child = spawn(
-            powershell,
-            ['-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-Command', script],
-            { windowsHide: true, env: sanitizedChildEnv() }
-        )
-        let output = ''
-        child.stdout.on('data', (chunk) => { output += String(chunk) })
-        child.once('error', reject)
-        child.once('exit', (code) =>
-            code === 0
-                ? resolve(output.trim() || null)
-                : reject(new Error('Folder picker failed'))
-        )
-    })
 }
 
 async function chooseBrowserLitePackagePath() {
-    if (process.platform !== 'win32') return null
-    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='pica-library-bundle.json';$d.Filter='JSON files (*.json)|*.json';$d.DefaultExt='json';$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
-    const powershell = windowsExecutable('System32','WindowsPowerShell','v1.0','powershell.exe')
-    return await new Promise<string | null>((resolve, reject) => {
-        const child = spawn(
-            powershell,
-            ['-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-Command', script],
-            { windowsHide: true, env: sanitizedChildEnv() }
-        )
-        let output = ''
-        child.stdout.on('data', (chunk) => (output += String(chunk)))
-        child.once('error', reject)
-        child.once('exit', (code) =>
-            code === 0
-                ? resolve(output.trim() || null)
-                : reject(new Error('File picker failed'))
-        )
+    return await nativePicker.chooseSaveFile({
+        title: '保存 Pica Library Browser Lite 数据包 / Save Browser Lite package',
+        defaultName: 'pica-library-bundle.json',
+        extension: 'json'
     })
 }
 
-
 async function chooseRecommendationAuditPath(generatedAt: string) {
-    if (process.platform !== 'win32') return null
     const stamp = generatedAt.replace(/[:.]/g, '-')
-    const fileName = `Pica-Library-Recommendation-Audit-${stamp}.zip`
-    const escaped = fileName.replaceAll("'", "''")
-    const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='${escaped}';$d.Filter='ZIP files (*.zip)|*.zip';$d.DefaultExt='zip';$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
-    const powershell = windowsExecutable(
-        'System32',
-        'WindowsPowerShell',
-        'v1.0',
-        'powershell.exe'
-    )
-    return await new Promise<string | null>((resolve, reject) => {
-        const child = spawn(
-            powershell,
-            ['-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-Command', script],
-            { windowsHide: true, env: sanitizedChildEnv() }
-        )
-        let output = ''
-        child.stdout.on('data', (chunk) => (output += String(chunk)))
-        child.once('error', reject)
-        child.once('exit', (code) =>
-            code === 0
-                ? resolve(output.trim() || null)
-                : reject(new Error('File picker failed'))
-        )
+    return await nativePicker.chooseSaveFile({
+        title: '保存 Pica Library 推荐审计包 / Save recommendation audit',
+        defaultName: `Pica-Library-Recommendation-Audit-${stamp}.zip`,
+        extension: 'zip'
     })
 }
 
@@ -567,6 +517,7 @@ async function startEngine(preferredPort: number) {
         status: () => ({
             platform: platformCapabilities,
             credentialBackend: credentialBackend.status,
+            nativePicker: nativePicker.status,
             profile: config?.profile ?? 'balanced',
             libraryDirectory: config?.libraryDirectory ?? paths.data,
             proxyEnabled: Boolean(config?.proxyUrl),

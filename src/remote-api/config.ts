@@ -8,6 +8,7 @@ export interface RemoteApiConfiguration {
     tokenFile: string
     allowedHosts: string[]
     allowedOrigins: string[]
+    webSessions: boolean
     transportSecurity: RemoteApiTransportSecurity
 }
 
@@ -66,14 +67,47 @@ export function remoteApiConfiguration(
             'Remote API non-loopback binding requires PICA_LIBRARY_REMOTE_ALLOWED_HOSTS'
         )
 
+    const allowedOrigins = list(
+        environment.PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS
+    )
+    const webSessions = enabled(
+        environment.PICA_LIBRARY_REMOTE_WEB_SESSIONS
+    )
+    if (webSessions) {
+        if (loopback || !behindTlsProxy)
+            throw new Error(
+                'Remote Web sessions require a non-loopback gateway behind a trusted TLS-terminating proxy'
+            )
+        if (!allowedOrigins.length)
+            throw new Error(
+                'Remote Web sessions require PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS'
+            )
+        for (const origin of allowedOrigins) {
+            let parsed: URL
+            try {
+                parsed = new URL(origin)
+            } catch {
+                throw new Error(
+                    'Remote Web session origins must be valid HTTPS origins'
+                )
+            }
+            if (
+                parsed.protocol !== 'https:' ||
+                parsed.origin !== origin.replace(/\/$/, '')
+            )
+                throw new Error(
+                    'Remote Web session origins must be exact HTTPS origins'
+                )
+        }
+    }
+
     return {
         host,
         port: rawPort,
         tokenFile,
         allowedHosts,
-        allowedOrigins: list(
-            environment.PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS
-        ),
+        allowedOrigins,
+        webSessions,
         transportSecurity: loopback
             ? 'loopback-http'
             : 'tls-terminated-proxy'

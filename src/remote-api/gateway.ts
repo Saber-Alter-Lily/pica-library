@@ -6,6 +6,7 @@ import http, {
     type ServerResponse
 } from 'node:http'
 import { Readable } from 'node:stream'
+import type { RemoteWebController } from './remote-web'
 
 export const REMOTE_API_VERSION = 1
 const DEFAULT_RATE_LIMIT = 300
@@ -27,6 +28,7 @@ export interface RemoteApiGatewayOptions {
     token: string
     allowedHosts: string[]
     allowedOrigins?: string[]
+    remoteWeb?: RemoteWebController
     rateLimit?: number
     rateWindowMs?: number
     onAudit?: (event: {
@@ -341,11 +343,39 @@ export async function startRemoteApiGateway(
                 }
             }
 
-            if (!isAuthorized(request, expectedDigest)) {
-                response.setHeader('www-authenticate', 'Bearer')
-                audit(request, pathname, 401)
-                return json(response, 401, {
-                    error: 'Authentication required'
+            if (options.remoteWeb) {
+                const staticStatus = options.remoteWeb.serveStatic(
+                    request,
+                    response,
+                    pathname
+                )
+                if (staticStatus !== null) {
+                    audit(request, pathname, staticStatus)
+                    return
+                }
+
+                const sessionStatus = await options.remoteWeb.handleSession(
+                    request,
+                    response,
+                    pathname
+                )
+                if (sessionStatus !== null) {
+                    audit(request, pathname, sessionStatus)
+                    return
+                }
+            }
+
+            const bearerAuthorized = isAuthorized(request, expectedDigest)
+            const sessionAuthorization = options.remoteWeb?.authorizeApi(request)
+            if (!bearerAuthorized && !sessionAuthorization?.authorized) {
+                const status = sessionAuthorization?.status ?? 401
+                if (status === 401)
+                    response.setHeader('www-authenticate', 'Bearer')
+                audit(request, pathname, status)
+                return json(response, status, {
+                    error:
+                        sessionAuthorization?.error ??
+                        'Authentication required'
                 })
             }
 
@@ -413,6 +443,9 @@ export async function startRemoteApiGateway(
         server,
         host: options.host,
         port,
-        close: () => closeServer(server)
+        close: async () => {
+            options.remoteWeb?.clear()
+            await closeServer(server)
+        }
     }
 }

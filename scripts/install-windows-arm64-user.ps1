@@ -156,8 +156,6 @@ Remove-Item -Recurse -Force -LiteralPath $backup -ErrorAction SilentlyContinue
 Remove-Item -Force -LiteralPath $shortcutBackup -ErrorAction SilentlyContinue
 $appSwapped = $false
 $shortcutSwapped = $false
-trap -ErrorAction SilentlyContinue
-
 Write-Host 'Pica Library Windows ARM64 preview installed.'
 Write-Host "Application: $InstallRoot"
 Write-Host "Start Menu shortcut: $shortcutFile"

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryQueryService } from '../../src/services/library-query-service'
-import type { FavoriteRecord } from '../../src/library/types'
+import type { FavoriteRecord, StoredComic } from '../../src/library/types'
 
 const roots: string[] = []
 
@@ -16,6 +16,27 @@ function record(id: string): FavoriteRecord {
         categories: [],
         tags: [`Tag ${Number(id.replace(/\D/g, '')) % 10}`],
         finished: false
+    }
+}
+
+function storedRecord(index: number): StoredComic {
+    const base = record(`catalog-${index}`)
+    return {
+        ...base,
+        providerId: 'pica',
+        providerRemoteId: `catalog-${index}`,
+        alternateTitles: [],
+        completionStatus: 'ONGOING',
+        canonicalAuthor: null,
+        circle: null,
+        authorId: null,
+        isFavorite: false,
+        firstSeenAt: '2026-01-01T00:00:00.000Z',
+        lastSeenAt: '2026-01-01T00:00:00.000Z',
+        knownEpisodes: 0,
+        knownPictures: 0,
+        downloadedPictures: 0,
+        inLibrary: true
     }
 }
 
@@ -106,6 +127,35 @@ describe('catalog and durable Library membership', () => {
         expect(query.query({ scope: 'library' }).total).toBe(3)
         expect(database.getComic('shelved')).toBeDefined()
         database.close()
+    })
+
+    it('does not silently truncate totals, facets, pages, or bulk ids beyond 5000 records', () => {
+        const comics = Array.from({ length: 5005 }, (_, index) =>
+            storedRecord(index)
+        )
+        const database = {
+            listAllComics: () => comics,
+            listAuthors: () => []
+        } as unknown as LibraryDatabase
+        const query = new LibraryQueryService(database)
+
+        const first = query.query({
+            scope: 'catalog',
+            limit: 5000,
+            offset: 0
+        })
+        const tail = query.query({
+            scope: 'catalog',
+            limit: 5000,
+            offset: 5000
+        })
+        expect(first.total).toBe(5005)
+        expect(first.items).toHaveLength(5000)
+        expect(tail.items).toHaveLength(5)
+        expect(first.facets.tags.reduce((sum, item) => sum + item.count, 0)).toBe(
+            5005
+        )
+        expect(query.allIds({ scope: 'catalog' })).toHaveLength(5005)
     })
 
     it('migration_regression_preserves_catalog_and_existing_durable_state', () => {

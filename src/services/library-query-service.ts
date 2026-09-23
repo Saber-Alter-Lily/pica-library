@@ -20,8 +20,8 @@ function downloadedState(comic: StoredComic) {
 export class LibraryQueryService {
     constructor(private readonly database: LibraryDatabase) {}
 
-    query(input: LibraryFacetQuery = {}): LibraryQueryResult {
-        const query: LibraryFacetQuery = {
+    private normalize(input: LibraryFacetQuery = {}): LibraryFacetQuery {
+        return {
             scope: input.scope ?? 'library',
             text: input.text?.trim() || undefined,
             authorIds: [...new Set(input.authorIds ?? [])],
@@ -30,7 +30,8 @@ export class LibraryQueryService {
             ].filter(Boolean),
             tagMode: input.tagMode ?? 'all',
             providerIds: [...new Set(input.providerIds ?? [])].filter(
-                (value): value is 'pica' | 'eh' => value === 'pica' || value === 'eh'
+                (value): value is 'pica' | 'eh' =>
+                    value === 'pica' || value === 'eh'
             ),
             finished: input.finished,
             download: input.download,
@@ -38,6 +39,10 @@ export class LibraryQueryService {
             limit: Math.max(1, Math.min(input.limit ?? 100, 5000)),
             offset: Math.max(0, input.offset ?? 0)
         }
+    }
+
+    private evaluate(input: LibraryFacetQuery = {}) {
+        const query = this.normalize(input)
         const authors = this.database.listAuthors()
         const authorById = new Map(authors.map((author) => [author.id, author]))
         const text = normalizeAuthorKey(query.text ?? '')
@@ -45,7 +50,7 @@ export class LibraryQueryService {
         const selectedAuthors = new Set(query.authorIds ?? [])
         const selectedProviders = new Set(query.providerIds ?? [])
         const items = this.database
-            .listComics({ limit: 5000 })
+            .listAllComics()
             .filter((comic) => {
                 if (query.scope === 'library' && !comic.inLibrary) return false
                 if (query.scope === 'favorites' && !comic.isFavorite)
@@ -55,7 +60,10 @@ export class LibraryQueryService {
                     comic.downloadedPictures === 0
                 )
                     return false
-                if (selectedProviders.size && !selectedProviders.has(comic.providerId ?? 'pica'))
+                if (
+                    selectedProviders.size &&
+                    !selectedProviders.has(comic.providerId ?? 'pica')
+                )
                     return false
                 // `catalog` is the explicit advanced scope. `all` remains a
                 // compatibility alias for older Browser/CLI callers.
@@ -108,7 +116,7 @@ export class LibraryQueryService {
                     return false
                 return true
             })
-        const total = items.length
+
         const direction = query.sort === 'oldest' ? 1 : -1
         items.sort((left, right) => {
             if (query.sort === 'title')
@@ -123,6 +131,7 @@ export class LibraryQueryService {
                 ) * direction
             )
         })
+
         const authorCounts = new Map<string, number>()
         const tagCounts = new Map<string, { label: string; count: number }>()
         for (const comic of items) {
@@ -154,19 +163,28 @@ export class LibraryQueryService {
                 count: item.count
             }))
             .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+
         return {
-            items: items.slice(
-                query.offset ?? 0,
-                (query.offset ?? 0) + (query.limit ?? 100)
-            ),
-            total,
-            facets: { authors: authorFacets, tags: tagFacets },
-            query
+            query,
+            items,
+            facets: { authors: authorFacets, tags: tagFacets }
+        }
+    }
+
+    query(input: LibraryFacetQuery = {}): LibraryQueryResult {
+        const evaluated = this.evaluate(input)
+        const offset = evaluated.query.offset ?? 0
+        const limit = evaluated.query.limit ?? 100
+        return {
+            items: evaluated.items.slice(offset, offset + limit),
+            total: evaluated.items.length,
+            facets: evaluated.facets,
+            query: evaluated.query
         }
     }
 
     allIds(input: LibraryFacetQuery) {
-        return this.query({ ...input, limit: 5000, offset: 0 }).items.map(
+        return this.evaluate({ ...input, offset: 0 }).items.map(
             (comic) => comic.comicId
         )
     }

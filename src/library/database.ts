@@ -2013,6 +2013,13 @@ export class LibraryDatabase {
         return comics.slice(offset, offset + limit)
     }
 
+    listAllComics(query: ComicQuery = {}): StoredComic[] {
+        return this.listComics(
+            { ...query, limit: Number.MAX_SAFE_INTEGER, offset: 0 },
+            Number.MAX_SAFE_INTEGER
+        )
+    }
+
     getComic(comicId: string): StoredComic | undefined {
         const id = String(comicId ?? '').trim()
         if (!id) return undefined

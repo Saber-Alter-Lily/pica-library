@@ -2269,7 +2269,7 @@ function recommendationRecord(comicId, context) {
         return dialog._comicRecord
     const source =
         context === 'library'
-            ? state.records
+            ? state.libraryQueryResult?.items ?? state.records
             : context === 'search'
               ? state.searchResults
               : state.recommendations

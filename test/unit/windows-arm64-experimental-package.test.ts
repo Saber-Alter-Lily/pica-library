@@ -97,10 +97,18 @@ describe('experimental Windows ARM64 package', () => {
         expect(install).toContain('Pica Library ARM64 Preview.lnk')
         expect(install).toContain('.pica-library-arm64-preview-install.json')
         expect(install).toContain('Refusing to replace an unrecognized directory')
+        expect(install).toContain(
+            'Close Pica Library before installing or updating the Windows ARM64 preview'
+        )
         expect(uninstall).toContain('Refusing to remove an unrecognized directory')
+        expect(uninstall).toContain(
+            'Close Pica Library before uninstalling the Windows ARM64 preview'
+        )
         expect(uninstall).toContain('User data was not removed')
         expect(uninstall).not.toContain('Remove-Item -Recurse -Force -LiteralPath $dataRoot')
         expect(acceptance).toContain('stale-application-file.txt')
+        expect(acceptance).toContain('installer did not refuse a running engine')
+        expect(acceptance).toContain('uninstaller did not refuse a running engine')
         expect(acceptance).toContain('uninstaller accepted an unrecognized directory')
         expect(acceptance).toContain('uninstaller removed the user database')
         expect(acceptance).toContain('Windows ARM64 user install/uninstall acceptance: PASS')

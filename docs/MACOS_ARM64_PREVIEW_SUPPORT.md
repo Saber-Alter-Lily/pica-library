@@ -46,7 +46,8 @@ The macOS experimental workflow runs on a native Apple Silicon
    the Pica data root, restart the process, and prove the credentials reload
    from Keychain;
 10. build the first accepted W4A macOS preview and the current candidate as distinct archives, replace the application tree at the same install path while retaining one external data root, verify library/shelf/task state survives, then restore the pre-upgrade data snapshot and baseline application tree to prove rollback removes candidate-only state;
-11. keep `distributionReady=false`, `selfUpdate=false`,
+11. build a self-contained `Pica Library.app` with bundle identifier `org.picalibrary.desktop`, a native `.icns` icon, embedded runtime/application/Web resources, and a standard `Info.plist`; copy the app away from the archive wrapper tree and launch it through macOS LaunchServices to prove the bundle is independently runnable;
+12. keep `distributionReady=false`, `selfUpdate=false`,
     `signed=false` and `notarized=false`.
 
 No real Provider credentials or manga assets are used in this automated flow.
@@ -61,8 +62,7 @@ distribution. Promotion requires separate evidence for:
 - a real interactive native folder picker and save picker session;
 - normal browser launch and `.command`/application launch behavior in a
   graphical user session;
-- a proper `.app` bundle/application identity and application icon/launcher
-  UX rather than only a Terminal-oriented archive;
+- ordinary-user graphical launcher UX validation on a real Mac; the automated gate now proves a self-contained `.app`, Bundle ID, icon resources and LaunchServices startup, but does not substitute for Finder/Dock usability review;
 - Developer ID signing, hardened runtime where appropriate, notarization and
   Gatekeeper acceptance;
 - a schema-changing macOS preview migration/rollback when a future candidate raises the database schema; the current automated replacement gate already covers same-schema application replacement and external-data snapshot rollback;

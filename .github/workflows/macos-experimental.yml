@@ -10,6 +10,7 @@ on:
       - 'scripts/test-macos-experimental.sh'
       - 'scripts/test-macos-preview-acceptance.sh'
       - 'scripts/test-macos-preview-replacement.sh'
+      - 'scripts/test-macos-app-bundle.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -22,6 +23,7 @@ on:
       - 'scripts/test-macos-experimental.sh'
       - 'scripts/test-macos-preview-acceptance.sh'
       - 'scripts/test-macos-preview-replacement.sh'
+      - 'scripts/test-macos-app-bundle.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -107,6 +109,13 @@ jobs:
           test -f "$baseline"
           test -n "$candidate"
           bash scripts/test-macos-preview-replacement.sh "$baseline" "$candidate"
+
+      - name: Run standalone macOS app-bundle acceptance
+        run: |
+          set -euo pipefail
+          archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-macos-arm64-experimental.tar.gz' -print | head -n 1)"
+          test -n "$archive"
+          bash scripts/test-macos-app-bundle.sh "$archive"
 
       - name: Upload experimental macOS arm64 artifact
         if: github.event.repository.private == false

@@ -34,16 +34,15 @@ describe('experimental macOS arm64 package P5B', () => {
         expect(build).toContain(
             'Experimental macOS package must be built on an arm64 macOS runner'
         )
-        expect(build).toContain('unsigned experimental CI artifact')
-        expect(build).toContain('not notarized')
-        expect(build).toContain('Self-update is intentionally disabled')
+        expect(build).toContain('unsigned, unnotarized experimental CI artifact')
+        expect(build).toContain('Self-update remains disabled on macOS')
     })
 
     it('locks the official Node macOS arm64 runtime baseline', () => {
         const build = read('scripts/build-macos-experimental.sh')
 
         expect(build).toContain('MIN_MACOS="13.5"')
-        expect(build).toContain('otool -l "$STAGE/runtime/bin/node"')
+        expect(build).toContain('otool -l "$RESOURCES/runtime/bin/node"')
         expect(build).toContain('LC_BUILD_VERSION')
         expect(build).toContain('NODE_MIN_MACOS')
         expect(build).toContain(
@@ -52,6 +51,42 @@ describe('experimental macOS arm64 package P5B', () => {
         expect(build).toContain('PLATFORM_REQUIREMENTS.json')
         expect(build).toContain('"minimumMacOS": "$MIN_MACOS"')
         expect(build).toContain('"observedNodeMinOS": "$NODE_MIN_MACOS"')
+    })
+
+    it('builds a self-contained macOS application bundle without claiming trust', () => {
+        const build = read('scripts/build-macos-experimental.sh')
+        const acceptance = read('scripts/test-macos-app-bundle.sh')
+        const workflow = read('.github/workflows/macos-experimental.yml')
+
+        expect(build).toContain('APP_BUNDLE="$STAGE/Pica Library.app"')
+        expect(build).toContain('<string>org.picalibrary.desktop</string>')
+        expect(build).toContain('<string>APPL</string>')
+        expect(build).toContain('<key>LSMinimumSystemVersion</key>')
+        expect(build).toContain('iconutil -c icns')
+        expect(build).toContain('PicaLibrary.icns')
+        expect(build).toContain(
+            'Pica Library.app/Contents/Resources/$item'
+        )
+        expect(build).toContain('application_bundle:true')
+        expect(build).toContain('signed:false')
+        expect(build).toContain('notarized:false')
+        expect(acceptance).toContain(
+            'codesign --verify --deep --strict "$SOURCE_APP"'
+        )
+        expect(acceptance).toContain(
+            'find "$STANDALONE_APP" -type f \\('
+        )
+        expect(acceptance).toContain('ditto "$SOURCE_APP" "$STANDALONE_APP"')
+        expect(acceptance).toContain(
+            'open -W -n "$STANDALONE_APP" --args --headless --no-open'
+        )
+        expect(acceptance).toContain(
+            'macOS self-contained app-bundle acceptance: PASS'
+        )
+        expect(workflow).toContain(
+            'bash scripts/test-macos-app-bundle.sh "$archive"'
+        )
+        expect(workflow).toContain("'scripts/test-macos-app-bundle.sh'")
     })
 
     it('tests preview-to-preview application replacement and data rollback', () => {

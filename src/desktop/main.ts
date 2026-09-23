@@ -42,6 +42,7 @@ import {
 } from './child-process'
 import { connectionCredentials } from './connection'
 import { desktopPlatformCapabilities } from './platform'
+import { desktopRuntimeOptions } from './runtime-mode'
 import { DesktopNativePicker } from './pickers'
 import { findManagedBrowser } from './managed-browser'
 import { assertLibraryChangeAllowed } from './lifecycle'
@@ -52,7 +53,7 @@ import {
     validateProxyCandidates
 } from './proxy-detection'
 
-const args = new Set(process.argv.slice(2))
+const runtimeOptions = desktopRuntimeOptions()
 const nativePicker = new DesktopNativePicker()
 const managedEhBrowser = findManagedBrowser()
 const paths = desktopPaths()
@@ -138,6 +139,7 @@ function browserSessionOpened(sessionId: string) {
 function browserSessionClosed(sessionId: string) {
     if (!sessionId) return
     browserSessions.delete(sessionId)
+    if (!runtimeOptions.idleBrowserShutdown) return
     if (browserSessions.size > 0 || mobileBridgeMustStayAlive()) return
     cancelBrowserCloseShutdown()
     browserCloseTimer = setTimeout(() => {
@@ -180,7 +182,7 @@ function saveExportState(generatedAt: string) {
 }
 
 function showStartupError() {
-    if (process.platform !== 'win32') return
+    if (runtimeOptions.mode === 'headless' || process.platform !== 'win32') return
     const script = `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$m=[Console]::In.ReadToEnd();[Windows.Forms.MessageBox]::Show($m,'Pica Library',[Windows.Forms.MessageBoxButtons]::OK,[Windows.Forms.MessageBoxIcon]::Error) | Out-Null`
     spawnSync(
         windowsExecutable(
@@ -200,7 +202,7 @@ function showStartupError() {
 }
 
 function browser(url: string) {
-    if (args.has('--no-open')) return true
+    if (!runtimeOptions.openBrowser || config?.openBrowser === false) return true
     return launchBrowser(url, (error) => {
         log.write(`Browser opening failed: ${String(error)}`)
         showBrowserFallback(url)
@@ -521,6 +523,7 @@ async function startEngine(preferredPort: number) {
                 : { state: 'cancelled', message: '网页登录已取消' },
         configured: () => Boolean(config && credentials),
         status: () => ({
+            runtime: runtimeOptions,
             platform: platformCapabilities,
             credentialBackend: credentialBackend.status,
             nativePicker: nativePicker.status,
@@ -1006,40 +1009,47 @@ async function startEngine(preferredPort: number) {
         currentUrl = started.url
         log.write(`Preferred port ${preferredPort} was unavailable; using ${currentUrl}`)
     }
-    try {
-        mobileBridge = await startMobileBridge({
-            database: database!,
-            service: service!,
-            host: '0.0.0.0',
-            port: 7788,
-            stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
-            accountStatus: () => ({
-                pica: {
-                    configured: Boolean(
-                        credentials?.account?.trim() &&
-                            credentials?.password
-                    )
-                },
-                eh: {
-                    configured: Boolean(
-                        credentials?.ehMemberId &&
-                            credentials?.ehPassHash
-                    )
-                }
+    if (runtimeOptions.mobileBridge) {
+        try {
+            mobileBridge = await startMobileBridge({
+                database: database!,
+                service: service!,
+                host: '0.0.0.0',
+                port: 7788,
+                stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
+                accountStatus: () => ({
+                    pica: {
+                        configured: Boolean(
+                            credentials?.account?.trim() &&
+                                credentials?.password
+                        )
+                    },
+                    eh: {
+                        configured: Boolean(
+                            credentials?.ehMemberId &&
+                                credentials?.ehPassHash
+                        )
+                    }
+                })
             })
-        })
-        const mobile = mobileBridge.status()
-        log.write(
-            `Mobile Bridge started at ${
-                mobile.addresses.join(', ') || `port ${mobile.port}`
-            }`
-        )
-    } catch (error) {
+            const mobile = mobileBridge.status()
+            log.write(
+                `Mobile Bridge started at ${
+                    mobile.addresses.join(', ') || `port ${mobile.port}`
+                }`
+            )
+        } catch (error) {
+            mobileBridge = null
+            log.write(`Mobile Bridge unavailable: ${String(error)}`)
+        }
+    } else {
         mobileBridge = null
-        log.write(`Mobile Bridge unavailable: ${String(error)}`)
+        log.write('Mobile Bridge disabled in headless mode; pass --mobile-bridge to enable it')
     }
     instance.publish(currentUrl)
-    log.write(`Desktop engine ${PRODUCT_VERSION} started at ${currentUrl}`)
+    log.write(
+        `Desktop engine ${PRODUCT_VERSION} started at ${currentUrl} [${runtimeOptions.mode}]`
+    )
 }
 
 async function restartEngine() {

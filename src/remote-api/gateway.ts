@@ -416,20 +416,14 @@ export async function startRemoteApiGateway(
                 return
             }
 
-            if (pathname.startsWith('/remote/')) {
-                if (!webRoot || method !== 'GET') {
-                    audit(request, pathname, 404)
-                    return json(response, 404, {
-                        error: 'Remote route unavailable'
-                    })
-                }
+            if (
+                webRoot &&
+                method === 'GET' &&
+                REMOTE_WEB_ASSETS.has(pathname)
+            ) {
                 const asset = remoteWebAsset(webRoot, pathname)
-                if (!asset) {
-                    audit(request, pathname, 404)
-                    return json(response, 404, {
-                        error: 'Remote route unavailable'
-                    })
-                }
+                if (!asset)
+                    throw new Error('Remote Web shell asset disappeared')
                 response.writeHead(
                     200,
                     remoteWebHeaders(asset.type, asset.body.byteLength)

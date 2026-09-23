@@ -34,8 +34,7 @@ describe('experimental macOS arm64 package P5B', () => {
         expect(build).toContain(
             'Experimental macOS package must be built on an arm64 macOS runner'
         )
-        expect(build).toContain('unsigned experimental CI artifact')
-        expect(build).toContain('not notarized')
+        expect(build).toContain('unsigned, unnotarized experimental CI artifact')
         expect(build).toContain('Self-update is intentionally disabled')
     })
 
@@ -43,7 +42,7 @@ describe('experimental macOS arm64 package P5B', () => {
         const build = read('scripts/build-macos-experimental.sh')
 
         expect(build).toContain('MIN_MACOS="13.5"')
-        expect(build).toContain('otool -l "$STAGE/runtime/bin/node"')
+        expect(build).toContain('otool -l "$RESOURCES/runtime/bin/node"')
         expect(build).toContain('LC_BUILD_VERSION')
         expect(build).toContain('NODE_MIN_MACOS')
         expect(build).toContain(

@@ -43,6 +43,7 @@ import {
 import { connectionCredentials } from './connection'
 import { desktopPlatformCapabilities } from './platform'
 import { DesktopNativePicker } from './pickers'
+import { findManagedBrowser } from './managed-browser'
 import { assertLibraryChangeAllowed } from './lifecycle'
 import {
     isLoopbackListening,
@@ -53,6 +54,7 @@ import {
 
 const args = new Set(process.argv.slice(2))
 const nativePicker = new DesktopNativePicker()
+const managedEhBrowser = findManagedBrowser()
 const paths = desktopPaths()
 const applicationRoot = path.resolve(path.dirname(process.argv[1]), '..')
 const packagedSourceFile = path.join(applicationRoot, 'SOURCE_SHA.txt')
@@ -99,7 +101,8 @@ const platformCapabilities = {
     secureCredentialPersistence:
         credentialBackend.status.securePersistence,
     nativeFolderPicker: nativePicker.status.folderPicker,
-    nativeSavePicker: nativePicker.status.savePicker
+    nativeSavePicker: nativePicker.status.savePicker,
+    managedEhWebLogin: Boolean(managedEhBrowser)
 }
 const instance = new InstanceLock(paths.lock, paths.instance)
 let config = loadConfig(paths.config)
@@ -477,7 +480,10 @@ async function startEngine(preferredPort: number) {
     service = new LibraryService(database, dataDir)
     ehWebLogin = new DesktopEhWebLogin(
         path.join(paths.runtimeState, 'eh-web-login'),
-        async (candidate) => { await persistEhSession(candidate) }
+        async (candidate) => {
+            await persistEhSession(candidate)
+        },
+        managedEhBrowser
     )
     service.setEhSession(
         credentials?.ehMemberId && credentials?.ehPassHash
@@ -518,6 +524,12 @@ async function startEngine(preferredPort: number) {
             platform: platformCapabilities,
             credentialBackend: credentialBackend.status,
             nativePicker: nativePicker.status,
+            managedEhBrowser: managedEhBrowser
+                ? {
+                      kind: managedEhBrowser.kind,
+                      displayName: managedEhBrowser.displayName
+                  }
+                : null,
             profile: config?.profile ?? 'balanced',
             libraryDirectory: config?.libraryDirectory ?? paths.data,
             proxyEnabled: Boolean(config?.proxyUrl),

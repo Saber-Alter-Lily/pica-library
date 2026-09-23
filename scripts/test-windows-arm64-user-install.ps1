@@ -135,6 +135,35 @@ if ($state.Status.platform.id -ne 'windows' -or $state.Status.platform.arch -ne 
 if ($state.Status.platform.distributionReady -ne $false -or $state.Status.platform.selfUpdate -ne $false) { throw 'Installed Windows ARM64 preview was promoted unexpectedly' }
 $caps = Invoke-RestMethod -Uri "$script:CurrentUrl/api/v1/capabilities" -TimeoutSec 5
 if ($caps.features.updatePackages -ne $false) { throw 'Installed Windows ARM64 preview advertised update packages' }
+
+Write-Host '[arm64-install] proving running-engine install and uninstall fail closed'
+$runningInstallRejected = $false
+try {
+    & (Join-Path $packageRoot 'install-windows-arm64-user.ps1') -InstallRoot $installRoot
+} catch {
+    if ($_.Exception.Message -like '*Close Pica Library*') {
+        $runningInstallRejected = $true
+    } else {
+        throw
+    }
+}
+if (-not $runningInstallRejected) { throw 'Windows ARM64 installer did not refuse a running engine' }
+
+$runningUninstallRejected = $false
+try {
+    & (Join-Path $packageRoot 'uninstall-windows-arm64-user.ps1') -InstallRoot $installRoot
+} catch {
+    if ($_.Exception.Message -like '*Close Pica Library*') {
+        $runningUninstallRejected = $true
+    } else {
+        throw
+    }
+}
+if (-not $runningUninstallRejected) { throw 'Windows ARM64 uninstaller did not refuse a running engine' }
+if (-not (Test-Path -LiteralPath $installRoot) -or -not (Test-Path -LiteralPath $shortcutFile)) {
+    throw 'Running-engine safety check damaged the installed preview'
+}
+
 Stop-Installed
 
 $dbFile = Join-Path $dataRoot 'data\library.db'

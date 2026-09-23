@@ -438,6 +438,90 @@ describe('authenticated Remote API gateway', () => {
         }
     })
 
+    it('serves only fixed Remote Web shell assets with a strict browser policy', async () => {
+        const target = await upstream()
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-remote-web-'))
+        roots.push(root)
+        fs.writeFileSync(
+            path.join(root, 'index.html'),
+            '<!doctype html><script type="module" src="/remote/remote.js"></script>'
+        )
+        fs.writeFileSync(path.join(root, 'remote.js'), 'globalThis.remoteShell = true\n')
+        fs.writeFileSync(path.join(root, 'remote.css'), 'body{margin:0}\n')
+
+        const gateway = await startRemoteApiGateway({
+            targetBaseUrl: target.url,
+            host: '127.0.0.1',
+            port: 0,
+            token: 't'.repeat(48),
+            allowedHosts: ['127.0.0.1'],
+            allowedOrigins: ['https://reader.example'],
+            webSessions: true,
+            webRoot: root
+        })
+        const base = `http://127.0.0.1:${gateway.port}`
+        try {
+            expect(gateway.webShellEnabled).toBe(true)
+
+            const redirect = await fetch(`${base}/remote`, {
+                redirect: 'manual'
+            })
+            expect(redirect.status).toBe(308)
+            expect(redirect.headers.get('location')).toBe('/remote/')
+
+            const shell = await fetch(`${base}/remote/`)
+            expect(shell.status).toBe(200)
+            expect(shell.headers.get('content-type')).toContain('text/html')
+            expect(shell.headers.get('cache-control')).toBe('no-store')
+            expect(shell.headers.get('content-security-policy')).toContain(
+                "default-src 'none'"
+            )
+            expect(shell.headers.get('content-security-policy')).toContain(
+                "script-src 'self'"
+            )
+            expect(shell.headers.get('content-security-policy')).toContain(
+                "object-src 'none'"
+            )
+            expect(shell.headers.get('x-frame-options')).toBe('DENY')
+            expect(shell.headers.get('referrer-policy')).toBe('no-referrer')
+            expect(shell.headers.get('permissions-policy')).toContain(
+                'camera=()'
+            )
+            expect(await shell.text()).toContain('/remote/remote.js')
+
+            const script = await fetch(`${base}/remote/remote.js`)
+            expect(script.status).toBe(200)
+            expect(script.headers.get('content-type')).toContain(
+                'text/javascript'
+            )
+            expect(await script.text()).toContain('remoteShell')
+
+            const css = await fetch(`${base}/remote/remote.css`)
+            expect(css.status).toBe(200)
+            expect(css.headers.get('content-type')).toContain('text/css')
+
+            expect(
+                (
+                    await fetch(`${base}/remote/unknown.js`)
+                ).status
+            ).toBe(401)
+
+            const bootstrap = await fetch(
+                `${base}/remote/v1/session/bootstrap`,
+                {
+                    method: 'POST',
+                    headers: {
+                        ...authorization(),
+                        origin: 'https://reader.example'
+                    }
+                }
+            )
+            expect(bootstrap.status).toBe(201)
+        } finally {
+            await gateway.close()
+        }
+    })
+
     it('proxies only the allowlisted library/reader surface and strips gateway credentials', async () => {
         const target = await upstream()
         const gateway = await startRemoteApiGateway({

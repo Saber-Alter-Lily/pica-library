@@ -35,11 +35,13 @@ import { desktopPaths } from './paths'
 import type { DesktopConfig, SetupInput, StoredCredentials } from './types'
 import {
     launchBrowser,
+    launchDirectory,
     sanitizedChildEnv,
     showBrowserFallback,
     windowsExecutable
 } from './child-process'
 import { connectionCredentials } from './connection'
+import { desktopPlatformCapabilities } from './platform'
 import { assertLibraryChangeAllowed } from './lifecycle'
 import {
     isLoopbackListening,
@@ -49,6 +51,7 @@ import {
 } from './proxy-detection'
 
 const args = new Set(process.argv.slice(2))
+const platformCapabilities = desktopPlatformCapabilities()
 const paths = desktopPaths()
 const applicationRoot = path.resolve(path.dirname(process.argv[1]), '..')
 const packagedSourceFile = path.join(applicationRoot, 'SOURCE_SHA.txt')
@@ -464,13 +467,15 @@ function openDirectory(kind: string) {
     const directory = allowed[kind]
     if (!directory) throw new Error('Unknown directory')
     fs.mkdirSync(directory, { recursive: true })
-    const child = spawn(windowsExecutable('explorer.exe'), [directory], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-        env: sanitizedChildEnv()
+    let launchError: unknown = null
+    const started = launchDirectory(directory, (error) => {
+        launchError = error
+        log.write(`Directory opening failed: ${String(error)}`)
     })
-    child.unref()
+    if (!started)
+        throw launchError instanceof Error
+            ? launchError
+            : new Error('Directory opening is unavailable on this platform')
     return Promise.resolve()
 }
 
@@ -555,6 +560,7 @@ async function startEngine(preferredPort: number) {
                 : { state: 'cancelled', message: '网页登录已取消' },
         configured: () => Boolean(config && credentials),
         status: () => ({
+            platform: platformCapabilities,
             profile: config?.profile ?? 'balanced',
             libraryDirectory: config?.libraryDirectory ?? paths.data,
             proxyEnabled: Boolean(config?.proxyUrl),

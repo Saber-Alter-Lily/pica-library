@@ -53,9 +53,8 @@ describe('Desktop headless runtime foundation P5C', () => {
         expect(main).not.toContain(
             "host: runtimeOptions.mode === 'headless' ? '0.0.0.0'"
         )
-        expect(main).toContain(
-            'if (!runtimeOptions.idleBrowserShutdown) return'
-        )
+        expect(main).toContain('!runtimeOptions.idleBrowserShutdown')
+        expect(main).toContain('scheduleBrowserCloseShutdown()')
         expect(main).toContain('if (runtimeOptions.mobileBridge)')
         expect(main).toContain(
             "Mobile Bridge disabled in headless mode; pass --mobile-bridge to enable it"

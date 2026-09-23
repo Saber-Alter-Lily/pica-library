@@ -42,6 +42,8 @@ export interface MobileBridgeStatus {
     addresses: string[]
     pairingCode: string
     pairingExpiresAt: string
+    activeRequests: number
+    lastActivityAt: string | null
     pairedDevices: Array<{
         deviceName: string
         pairedAt: string
@@ -262,6 +264,8 @@ export async function startMobileBridge(options: {
     let pairingCode = ''
     let pairingExpiresAt = 0
     let actualPort = requestedPort
+    let activeRequests = 0
+    let lastActivityAt: string | null = null
 
     const rotatePairingCode = () => {
         pairingCode = String(randomInt(0, 1_000_000)).padStart(6, '0')
@@ -360,6 +364,7 @@ export async function startMobileBridge(options: {
                 }
                 devices.set(device.tokenHash, device)
                 persist()
+                lastActivityAt = nowIso
                 rotatePairingCode()
                 return json(response, 200, {
                     token,
@@ -373,6 +378,17 @@ export async function startMobileBridge(options: {
                 return json(response, 401, {
                     error: 'Mobile device is not paired'
                 })
+            activeRequests += 1
+            lastActivityAt = new Date().toISOString()
+            let activityReleased = false
+            const releaseActivity = () => {
+                if (activityReleased) return
+                activityReleased = true
+                activeRequests = Math.max(0, activeRequests - 1)
+                lastActivityAt = new Date().toISOString()
+            }
+            response.once('finish', releaseActivity)
+            response.once('close', releaseActivity)
 
             if (
                 url.pathname === '/mobile/v1/accounts/status' &&
@@ -1289,6 +1305,8 @@ export async function startMobileBridge(options: {
             addresses: privateIpv4Addresses(host, actualPort),
             pairingCode,
             pairingExpiresAt: new Date(pairingExpiresAt).toISOString(),
+            activeRequests,
+            lastActivityAt,
             pairedDevices: (() => {
                 const visible = new Map<string, PersistedDevice>()
                 for (const device of devices.values()) {

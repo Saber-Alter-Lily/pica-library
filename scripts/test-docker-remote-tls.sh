@@ -178,8 +178,40 @@ if(value.capabilityStates?.remoteApi?.available!==true)fail('Remote API availabi
 if(value.features?.remoteApi!==true)fail('Remote API compatibility flag missing')
 if(value.capabilityStates?.remoteWebSessions?.available!==true)fail('Remote Web session capability missing')
 if(value.features?.remoteWebSessions!==true)fail('Remote Web session compatibility flag missing')
+if(value.capabilityStates?.remoteWebShell?.available!==true)fail('Remote Web shell capability missing')
+if(value.features?.remoteWebShell!==true)fail('Remote Web shell compatibility flag missing')
 if(value.features?.updatePackages!==false)fail('Remote Linux runtime must not self-update')
 NODE
+
+REMOTE_SHELL_HEADERS="$WORK/remote-shell-headers.txt"
+REMOTE_SHELL_HTML="$WORK/remote-shell.html"
+curl --fail "${CURL_TLS[@]}" \
+  --dump-header "$REMOTE_SHELL_HEADERS" \
+  "$BASE/remote/" > "$REMOTE_SHELL_HTML"
+
+if ! grep -Fq 'Pica Library Remote' "$REMOTE_SHELL_HTML"; then
+  fail "Remote Web shell HTML was not served through Caddy TLS"
+fi
+if ! grep -qi "^content-security-policy: .*default-src 'none'" "$REMOTE_SHELL_HEADERS"; then
+  fail "Remote Web shell strict CSP header is missing"
+fi
+if ! grep -qi '^x-frame-options: DENY' "$REMOTE_SHELL_HEADERS"; then
+  fail "Remote Web shell framing protection is missing"
+fi
+if ! grep -qi '^referrer-policy: no-referrer' "$REMOTE_SHELL_HEADERS"; then
+  fail "Remote Web shell referrer policy is missing"
+fi
+if ! grep -qi '^permissions-policy: .*camera=()' "$REMOTE_SHELL_HEADERS"; then
+  fail "Remote Web shell permissions policy is missing"
+fi
+REMOTE_JS="$WORK/remote.js"
+curl --fail "${CURL_TLS[@]}" "$BASE/remote/remote.js" > "$REMOTE_JS"
+if ! grep -Fq '/remote/v1/session/bootstrap' "$REMOTE_JS"; then
+  fail "Remote Web shell JavaScript bootstrap path is missing"
+fi
+if grep -Eq 'serviceWorker|localStorage|sessionStorage' "$REMOTE_JS"; then
+  fail "Remote Web shell unexpectedly uses offline/browser persistent storage"
+fi
 
 SESSION_HEADERS="$WORK/session-headers.txt"
 SESSION_BODY="$WORK/session-bootstrap.json"
@@ -259,6 +291,36 @@ curl --fail "${CURL_TLS[@]}" \
   --data '{"scope":"favorites","text":"fixture","limit":1}' \
   "$BASE/api/v1/library/query" > "$SESSION_QUERY"
 node -e "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(!v||typeof v!=='object')process.exit(1)" "$SESSION_QUERY"
+
+SESSION_PROGRESS_WRITE="$(
+  curl "${CURL_TLS[@]}" \
+    -X POST \
+    -H "Cookie: $SESSION_COOKIE" \
+    -H "Origin: https://pica.test" \
+    -H "X-Pica-CSRF: $SESSION_CSRF" \
+    -H 'Content-Type: application/json' \
+    --data '{"comicId":"fixture","episodeId":"fixture","pageIndex":0}' \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$BASE/api/v1/reader/progress"
+)"
+if [[ "$SESSION_PROGRESS_WRITE" != "404" ]]; then
+  fail "Remote Web read-only session escaped into reader-progress mutation: $SESSION_PROGRESS_WRITE"
+fi
+
+BEARER_PROGRESS_STATUS="$(
+  curl "${CURL_TLS[@]}" \
+    -X POST \
+    -H "Authorization: Bearer $TOKEN" \
+    -H 'Content-Type: application/json' \
+    --data '{"comicId":"fixture","episodeId":"fixture","pageIndex":0}' \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$BASE/api/v1/reader/progress"
+)"
+if [[ "$BEARER_PROGRESS_STATUS" == "404" || "$BEARER_PROGRESS_STATUS" == "401" ]]; then
+  fail "W5-B unexpectedly removed bearer access to the W4B reader-progress route: $BEARER_PROGRESS_STATUS"
+fi
 
 BLOCKED_DESKTOP="$(
   curl "${CURL_TLS[@]}"     -H "Authorization: Bearer $TOKEN"     --output /dev/null     --write-out '%{http_code}'     "$BASE/api/v1/desktop/status"

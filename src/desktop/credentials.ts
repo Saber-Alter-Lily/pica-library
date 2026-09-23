@@ -31,6 +31,7 @@ type SyncRunner = (
         windowsHide: boolean
         env: NodeJS.ProcessEnv
         maxBuffer: number
+        timeout: number
     }
 ) => SpawnSyncReturns<string>
 
@@ -101,7 +102,8 @@ function secureCommand(
         encoding: 'utf8',
         windowsHide: true,
         env: sanitizedChildEnv(),
-        maxBuffer: 1024 * 1024
+        maxBuffer: 1024 * 1024,
+        timeout: 3_000
     })
 }
 
@@ -245,12 +247,31 @@ export class MemoryCredentialStore implements CredentialStore {
     }
 }
 
-function linuxSecretToolAvailable(runner: SyncRunner) {
-    const result = secureCommand(runner, 'secret-tool', ['--help'])
-    return !(
+function linuxSecretServiceProbe(runner: SyncRunner) {
+    const result = secureCommand(runner, 'secret-tool', [
+        'lookup',
+        ...LINUX_ATTRIBUTES
+    ])
+    if (
         result.error &&
         (result.error as NodeJS.ErrnoException).code === 'ENOENT'
     )
+        return {
+            available: false,
+            reason: 'Secret Service tooling is unavailable'
+        }
+    if (
+        result.error ||
+        result.signal ||
+        (result.status !== 0 && String(result.stderr ?? '').trim())
+    )
+        return {
+            available: false,
+            reason: 'Secret Service is unavailable in this session'
+        }
+    // secret-tool exits non-zero with no stderr when the service is reachable
+    // but no matching credential exists yet. That is still a usable backend.
+    return { available: true, reason: undefined }
 }
 
 export function credentialStoreForPlatform(
@@ -284,15 +305,21 @@ export function credentialStoreForPlatform(
                 sessionOnly: false
             }
         }
-    if (platform === 'linux' && linuxSecretToolAvailable(runner))
-        return {
-            store: new SecretServiceCredentialStore(runner),
-            status: {
-                kind: 'linux-secret-service',
-                securePersistence: true,
-                sessionOnly: false
+    let linuxProbe:
+        | { available: boolean; reason?: string }
+        | undefined
+    if (platform === 'linux') {
+        linuxProbe = linuxSecretServiceProbe(runner)
+        if (linuxProbe.available)
+            return {
+                store: new SecretServiceCredentialStore(runner),
+                status: {
+                    kind: 'linux-secret-service',
+                    securePersistence: true,
+                    sessionOnly: false
+                }
             }
-        }
+    }
     return {
         store: new MemoryCredentialStore(),
         status: {
@@ -303,7 +330,8 @@ export function credentialStoreForPlatform(
                 platform === 'darwin'
                     ? 'macOS Keychain tooling is unavailable'
                     : platform === 'linux'
-                      ? 'Secret Service tooling is unavailable'
+                      ? linuxProbe?.reason ??
+                        'Secret Service is unavailable in this session'
                       : 'No secure persistent credential backend is configured'
         }
     }

@@ -105,6 +105,15 @@ const checks = {
   },
   readerChapterResumed(v) {
     assert(v.progress?.pageIndex === 0, 'reader chapter did not restore saved progress')
+  },
+  credentialSessionConfigured(v) {
+    assert(v.credentialBackend?.sessionOnly === true, 'credential fixture expected session-only mode')
+    assert(v.credentialBackend?.securePersistence === false, 'session-only credential mode claimed secure persistence')
+    assert(v.configured === true, 'session credentials did not configure the current process')
+  },
+  credentialSessionCleared(v) {
+    assert(v.credentialBackend?.sessionOnly === true, 'credential backend changed unexpectedly after restart')
+    assert(v.configured === false, 'session-only credentials survived a process restart')
   }
 }
 if (!checks[source]) throw new Error(`unknown assertion set: ${source}`)
@@ -138,6 +147,35 @@ start_engine() {
   PICA_LIBRARY_DESKTOP_HOME="$DATA_HOME"     "$PACKAGE_ROOT/pica-library" --headless >"$LOG" 2>&1 &
   ENGINE_PID="$!"
   URL="$(wait_for_engine)"
+}
+
+wait_for_engine_restart() {
+  local old_token="$1"
+  local instance="$DATA_HOME/runtime-state/instance.json"
+  local status_file="$WORK/status-after-engine-restart.json"
+  for _ in $(seq 1 160); do
+    local candidate=""
+    if [[ -f "$instance" ]]; then
+      candidate="$(
+        "$PACKAGE_ROOT/runtime/bin/node" -e           "try{const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(String(v.url||''))}catch{}"           "$instance"
+      )"
+    fi
+    if [[ -n "$candidate" ]] && curl --fail --silent "$candidate/api/v1/desktop/status" > "$status_file" 2>/dev/null; then
+      local new_token=""
+      new_token="$(
+        "$PACKAGE_ROOT/runtime/bin/node" -e           "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(String(v.csrfToken||''))"           "$status_file"
+      )"
+      if [[ -n "$new_token" && "$new_token" != "$old_token" ]]; then
+        URL="$candidate"
+        return 0
+      fi
+    fi
+    if [[ -n "$ENGINE_PID" ]] && ! kill -0 "$ENGINE_PID" 2>/dev/null; then
+      fail "Desktop engine exited during settings restart"
+    fi
+    sleep 0.25
+  done
+  fail "Desktop engine did not complete the settings restart"
 }
 
 stop_engine() {
@@ -244,6 +282,37 @@ grep -q "Pica Library" "$WORK/index.html" || fail "packaged Web UI was not serve
 curl --fail --silent "$URL/api/v1/capabilities" > "$WORK/capabilities.json"
 json_assert "$WORK/capabilities.json" capabilities
 
+curl --fail --silent "$URL/api/v1/desktop/status" > "$WORK/status-before-credentials.json"
+SESSION_ONLY="$(
+  "$PACKAGE_ROOT/runtime/bin/node" -e     "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(String(Boolean(v.credentialBackend?.sessionOnly)))"     "$WORK/status-before-credentials.json"
+)"
+if [[ "$SESSION_ONLY" == "true" ]]; then
+  TOKEN="$(
+    "$PACKAGE_ROOT/runtime/bin/node" -e       "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(String(v.csrfToken||''))"       "$WORK/status-before-credentials.json"
+  )"
+  LIBRARY_DIRECTORY="$(
+    "$PACKAGE_ROOT/runtime/bin/node" -e       "const v=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write(String(v.libraryDirectory||''))"       "$WORK/status-before-credentials.json"
+  )"
+  [[ -n "$TOKEN" && -n "$LIBRARY_DIRECTORY" ]] || fail "session credential setup metadata missing"
+  "$PACKAGE_ROOT/runtime/bin/node" - "$LIBRARY_DIRECTORY" > "$WORK/session-settings.json" <<'NODE'
+const libraryDirectory = process.argv[2]
+process.stdout.write(JSON.stringify({
+  account: 'linux-preview-session-account',
+  password: 'linux-preview-session-secret',
+  libraryDirectory,
+  profile: 'balanced'
+}))
+NODE
+  curl --fail --silent     -X POST     -H "content-type: application/json"     -H "x-pica-csrf: $TOKEN"     -H "Origin: $URL"     --data-binary @"$WORK/session-settings.json"     "$URL/api/v1/desktop/settings" > "$WORK/session-settings-response.json"
+
+  wait_for_engine_restart "$TOKEN"
+  curl --fail --silent "$URL/api/v1/desktop/status" > "$WORK/status-session-configured.json"
+  json_assert "$WORK/status-session-configured.json" credentialSessionConfigured
+  if grep -R -a -F 'linux-preview-session-secret' "$DATA_HOME" >/dev/null 2>&1; then
+    fail "session-only Linux credential was written to disk"
+  fi
+fi
+
 curl --fail --silent   -X POST   -H "content-type: application/json"   -H "Origin: $URL"   --data '{"scope":"favorites","text":"Linux Preview Fixture","limit":20}'   "$URL/api/v1/library/query" > "$WORK/query.json"
 json_assert "$WORK/query.json" query
 
@@ -291,6 +360,14 @@ stop_engine "$URL"
 [[ -f "$DATA_HOME/data/library.db" ]] || fail "database was not persisted outside the package"
 
 start_engine
+
+if [[ "$SESSION_ONLY" == "true" ]]; then
+  curl --fail --silent "$URL/api/v1/desktop/status" > "$WORK/status-after-process-restart.json"
+  json_assert "$WORK/status-after-process-restart.json" credentialSessionCleared
+  if grep -R -a -F 'linux-preview-session-secret' "$DATA_HOME" >/dev/null 2>&1; then
+    fail "session-only Linux credential appeared on disk after restart"
+  fi
+fi
 
 curl --fail --silent   -X POST   -H "content-type: application/json"   -H "Origin: $URL"   --data '{"scope":"favorites","text":"Linux Preview Fixture","limit":20}'   "$URL/api/v1/library/query" > "$WORK/query-after-restart.json"
 json_assert "$WORK/query-after-restart.json" query

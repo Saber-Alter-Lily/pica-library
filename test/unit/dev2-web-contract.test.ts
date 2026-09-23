@@ -84,6 +84,14 @@ describe('dev.2 connected Web lifecycle contracts', () => {
             '.querySelector(`[data-reader-page="${resumePage}"]`)'
         )
         expect(app).toContain("?.scrollIntoView({ block: 'center' })")
+        const tracker = app.slice(
+            app.indexOf('function observeVerticalReaderProgress'),
+            app.indexOf('function renderReaderPages')
+        )
+        expect(tracker.indexOf('scrollIntoView')).toBeGreaterThanOrEqual(0)
+        expect(
+            tracker.indexOf('readerPageObserver = new IntersectionObserver')
+        ).toBeGreaterThan(tracker.indexOf('scrollIntoView'))
         expect(app).toContain("t('reader.resume'")
     })
 

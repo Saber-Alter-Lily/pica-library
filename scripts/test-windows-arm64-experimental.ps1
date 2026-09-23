@@ -34,9 +34,7 @@ trap { Cleanup; throw $_ }
 
 New-Item -ItemType Directory -Force -Path $extract,$dataHome | Out-Null
 Expand-Archive -LiteralPath $Archive -DestinationPath $extract
-$packageRootItem = @(Get-ChildItem -LiteralPath $extract -Directory | Where-Object { $_.Name -like 'Pica-Library-*-windows-arm64-experimental' })[0]
-if (-not $packageRootItem) { throw 'Windows ARM64 package root was not found' }
-$packageRoot = $packageRootItem.FullName
+$packageRoot = $extract
 
 $node = Join-Path $packageRoot 'runtime\node.exe'
 $launcher = Join-Path $packageRoot 'Pica Library.exe'

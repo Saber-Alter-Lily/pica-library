@@ -15,7 +15,8 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'interactive',
             openBrowser: false,
             idleBrowserShutdown: true,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
     })
 
@@ -61,7 +62,7 @@ describe('Desktop headless runtime foundation P5C', () => {
         expect(desktopRuntimeOptions(['--remote-api']).remoteApi).toBe(false)
     })
 
-    it('keeps the main Web service loopback-only while headless mode is still unauthenticated for remote Web use', () => {
+    it('keeps the main Web service loopback-only and remote access behind the separate authenticated gateway', () => {
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
         expect(main).toContain("host: '127.0.0.1'")
         expect(main).not.toContain(

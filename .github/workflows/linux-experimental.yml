@@ -57,6 +57,7 @@ jobs:
           bash scripts/test-linux-experimental.sh "$archive"
 
       - name: Upload experimental Linux x64 artifact
+        if: github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
           name: pica-library-linux-x64-experimental-${{ github.sha }}

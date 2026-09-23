@@ -14,6 +14,11 @@ if [[ -z "$IMAGE" ]]; then
 fi
 
 NAME="pica-library-headless-smoke-$$"
+dump_engine_log() {
+  echo "----- Pica Library container log -----" >&2
+  docker exec "$NAME" /bin/sh -c 'cat /config/logs/pica-library.log 2>/dev/null || true' >&2 2>/dev/null || true
+  echo "----- end Pica Library container log -----" >&2
+}
 cleanup() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
 }
@@ -133,11 +138,13 @@ done
 if [[ "$(docker inspect "$NAME" --format '{{.State.Running}}')" != "false" ]]; then
   echo "Container did not stop after local shutdown request" >&2
   docker logs "$NAME" >&2 || true
+  dump_engine_log
   exit 1
 fi
 if [[ "$(docker inspect "$NAME" --format '{{.State.ExitCode}}')" != "0" ]]; then
   echo "Container shutdown endpoint produced a non-zero exit" >&2
   docker logs "$NAME" >&2 || true
+  dump_engine_log
   exit 1
 fi
 

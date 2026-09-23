@@ -152,14 +152,14 @@ start_caddy() {
 }
 
 refresh_caddy() {
-  docker restart "$CADDY_NAME" >/dev/null
-  for _ in $(seq 1 120); do
-    if [[ "$(remote_status /healthz "")" == "200" ]]; then
-      return 0
-    fi
-    sleep 0.25
-  done
-  fail "Caddy did not recover after application image switch"
+  # Recreate the proxy container rather than only restarting its process.
+  # This forces a fresh Docker DNS/network view after the Pica container was
+  # removed and recreated under the same service alias. Caddy certificate
+  # state remains in the persistent data/config volumes.
+  docker rm -f "$CADDY_NAME" >/dev/null 2>&1 || true
+  HOST_PORT=""
+  BASE=""
+  start_caddy
 }
 
 remote_status() {

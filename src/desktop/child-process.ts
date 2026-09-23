@@ -1,5 +1,10 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import path from 'node:path'
+import {
+    browserLaunchSpec,
+    directoryLaunchSpec,
+    type DesktopLaunchSpec
+} from './platform'
 
 export function sanitizedChildEnv(
     environment: NodeJS.ProcessEnv = process.env
@@ -16,7 +21,10 @@ export function windowsExecutable(...parts: string[]) {
 }
 
 export function showBrowserFallback(url: string) {
-    if (process.platform !== 'win32') return
+    if (process.platform !== 'win32') {
+        console.error(`Pica Library is running at: ${url}`)
+        return
+    }
     const script =
         "[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');" +
         '$u=[Console]::In.ReadToEnd();' +
@@ -46,23 +54,24 @@ export function showBrowserFallback(url: string) {
     )
 }
 
-export function launchBrowser(
-    url: string,
+function launchSpec(
+    spec: DesktopLaunchSpec | null,
     onFailure: (error: unknown) => void,
-    spawnProcess: typeof spawn = spawn
+    spawnProcess: typeof spawn,
+    platform: NodeJS.Platform
 ) {
+    if (!spec) {
+        onFailure(new Error(`Desktop launch is not supported on ${platform}`))
+        return false
+    }
     let child: ChildProcess
     try {
-        child = spawnProcess(
-            windowsExecutable('System32', 'cmd.exe'),
-            ['/d', '/s', '/c', 'start', '', url],
-            {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true,
-                env: sanitizedChildEnv()
-            }
-        )
+        child = spawnProcess(spec.command, spec.args, {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: platform === 'win32',
+            env: sanitizedChildEnv()
+        })
     } catch (error) {
         onFailure(error)
         return false
@@ -76,8 +85,36 @@ export function launchBrowser(
     child.once('error', fail)
     child.once('exit', (code, signal) => {
         if (code !== 0 || signal)
-            fail(new Error(`Browser launcher exited with code ${code}`))
+            fail(new Error(`Desktop launcher exited with code ${code}`))
     })
     child.unref()
     return true
+}
+
+export function launchBrowser(
+    url: string,
+    onFailure: (error: unknown) => void,
+    spawnProcess: typeof spawn = spawn,
+    platform: NodeJS.Platform = process.platform
+) {
+    return launchSpec(
+        browserLaunchSpec(url, platform),
+        onFailure,
+        spawnProcess,
+        platform
+    )
+}
+
+export function launchDirectory(
+    directory: string,
+    onFailure: (error: unknown) => void,
+    spawnProcess: typeof spawn = spawn,
+    platform: NodeJS.Platform = process.platform
+) {
+    return launchSpec(
+        directoryLaunchSpec(directory, platform),
+        onFailure,
+        spawnProcess,
+        platform
+    )
 }

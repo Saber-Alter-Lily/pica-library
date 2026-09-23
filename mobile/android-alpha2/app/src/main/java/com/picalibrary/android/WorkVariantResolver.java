@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import java.text.Normalizer;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -18,6 +20,16 @@ import org.json.JSONObject;
 final class WorkVariantResolver {
     private static final String RESOLVER_VERSION="work-identity-v3-creator-title-cover-funnel";
     private static final int MAX_COVER_REVIEWS=4;
+    private static final Pattern UPLOAD_NOISE=Pattern.compile("(chinese|english|translated|translation|汉化|漢化|翻译|翻譯|中文|中国翻訳|無修正|无修正|decensored|digital|dl版|修正|重制|重製|rev(?:ision)?\\.?\\s*\\d*|v\\d+)",Pattern.CASE_INSENSITIVE);
+    private static final Pattern BRACKET_BLOCK=Pattern.compile("\\[[^\\]]{1,48}\\]");
+    private static final Pattern PAREN_BLOCK=Pattern.compile("\\([^)]{1,48}\\)");
+    private static final Pattern BRACE_BLOCK=Pattern.compile("\\{[^}]{1,48}\\}");
+    private static final Pattern LEADING_CREATOR=Pattern.compile("^\\s*\\[([^\\]]{1,120})\\]\\s*");
+    private static final Pattern CREATOR_PARENS=Pattern.compile("[（(][^（）()]{1,80}[）)]");
+    private static final Pattern CHAPTER=Pattern.compile("\\b(?:chapter|chap|ch)\\.?\\s*(\\d+[a-z]?)\\b",Pattern.CASE_INSENSITIVE);
+    private static final Pattern VOLUME=Pattern.compile("\\b(?:volume|vol)\\.?\\s*(\\d+[a-z]?)\\b",Pattern.CASE_INSENSITIVE);
+    private static final Pattern PART=Pattern.compile("\\bpart\\.?\\s*(\\d+[a-z]?)\\b",Pattern.CASE_INSENSITIVE);
+    private static final Pattern CJK_STRUCTURE=Pattern.compile("第?\\s*(\\d+[a-z]?)\\s*(話|话|章|巻|卷|冊|册|部)",Pattern.CASE_INSENSITIVE);
     private WorkVariantResolver(){}
 
     private static final class MetadataCandidate {
@@ -74,6 +86,7 @@ final class WorkVariantResolver {
                 boolean creator=sameCreator(authors,current,other);
                 double similarity=titleSimilarity(current,other);
                 boolean pages=closePages(pageCount(current),pageCount(other));
+                if(structureConflict(current,other))continue;
 
                 if(creator&&similarity>=.90d){
                     rows.put(other.id,probableRow(other,
@@ -213,12 +226,51 @@ final class WorkVariantResolver {
         ArrayList<String> out=new ArrayList<>();addTitle(out,entry.title);for(String value:entry.alternateTitles)addTitle(out,value);return out;
     }
     private static void addTitle(ArrayList<String> out,String value){String title=cleanTitle(value);if(!title.isEmpty()&&!out.contains(title))out.add(title);}
+    private static String replaceNoiseBlocks(String text,Pattern pattern){
+        Matcher matcher=pattern.matcher(text);StringBuffer out=new StringBuffer();
+        while(matcher.find())matcher.appendReplacement(out,UPLOAD_NOISE.matcher(matcher.group()).find()?" ":Matcher.quoteReplacement(matcher.group()));
+        matcher.appendTail(out);return out.toString();
+    }
+    private static String stripLeadingCreatorCredit(String value){
+        Matcher prefix=LEADING_CREATOR.matcher(value);
+        if(!prefix.find()||!CREATOR_PARENS.matcher(prefix.group(1)).find())return value;
+        return value.substring(prefix.end()).trim();
+    }
     private static String cleanTitle(String value){
         String text=Normalizer.normalize(value==null?"":value,Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
-        text=text.replaceAll("\\[[^\\]]{0,120}\\]"," ").replaceAll("\\([^)]{0,120}\\)"," ").replaceAll("\\{[^}]{0,120}\\}"," ");
-        text=text.replaceAll("(?i)\\b(chinese|english|translated|translation|digital|decensored|revision|rev|dl|version|vol(?:ume)?)\\b"," ");
-        text=text.replaceAll("(汉化|漢化|翻译|翻譯|中文|無修正|无修正|修正|重制|重製|dl版)"," ");
+        text=stripLeadingCreatorCredit(text);
+        text=replaceNoiseBlocks(text,BRACKET_BLOCK);
+        text=replaceNoiseBlocks(text,PAREN_BLOCK);
+        text=replaceNoiseBlocks(text,BRACE_BLOCK);
+        text=text.replaceAll("(?i)\\b(chinese|english|translated|digital|decensored|rev(?:ision)?\\.?\\s*\\d*|v\\d+)\\b"," ");
+        text=text.replaceAll("(汉化|漢化|翻译|翻譯|中文|無修正|无修正|修正|重制|重製)"," ");
         return text.replaceAll("[\\p{P}\\p{S}_\\s]+","").trim();
+    }
+    private static void addStructure(Map<String,Set<String>> out,String kind,String token){
+        String normalized=token==null?"":token.toLowerCase(Locale.ROOT).replaceFirst("^0+(?=\\d)","");
+        if(normalized.isEmpty())return;out.computeIfAbsent(kind,k->new LinkedHashSet<>()).add(normalized);
+    }
+    private static void collectStructure(Map<String,Set<String>> out,String raw){
+        String text=Normalizer.normalize(raw==null?"":raw,Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
+        Matcher m=CHAPTER.matcher(text);while(m.find())addStructure(out,"chapter",m.group(1));
+        m=VOLUME.matcher(text);while(m.find())addStructure(out,"volume",m.group(1));
+        m=PART.matcher(text);while(m.find())addStructure(out,"part",m.group(1));
+        m=CJK_STRUCTURE.matcher(text);while(m.find()){
+            String suffix=m.group(2),kind=("話".equals(suffix)||"话".equals(suffix)||"章".equals(suffix))?"chapter":(("巻".equals(suffix)||"卷".equals(suffix)||"冊".equals(suffix)||"册".equals(suffix))?"volume":"part");
+            addStructure(out,kind,m.group(1));
+        }
+    }
+    private static Map<String,Set<String>> structure(UnifiedCatalogStore.Entry entry){
+        Map<String,Set<String>> out=new LinkedHashMap<>();collectStructure(out,entry.title);for(String value:entry.alternateTitles)collectStructure(out,value);return out;
+    }
+    static boolean structureConflict(UnifiedCatalogStore.Entry left,UnifiedCatalogStore.Entry right){
+        Map<String,Set<String>> a=structure(left),b=structure(right);
+        for(Map.Entry<String,Set<String>> item:a.entrySet()){
+            Set<String> other=b.get(item.getKey());if(other==null||other.isEmpty())continue;
+            boolean overlap=false;for(String value:item.getValue())if(other.contains(value)){overlap=true;break;}
+            if(!overlap)return true;
+        }
+        return false;
     }
 
     private static double editSimilarity(String left,String right){

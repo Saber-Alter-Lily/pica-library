@@ -179,7 +179,7 @@ cat > "$STAGE/PLATFORM_REQUIREMENTS.json" <<EOF
 }
 EOF
 
-for required in   "$STAGE/runtime/bin/node"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"   "$STAGE/PLATFORM_REQUIREMENTS.json"
+for required in   "$STAGE/runtime/bin/node"   "$STAGE/app/pica-library.js"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"   "$STAGE/PLATFORM_REQUIREMENTS.json"
 do
   if [[ ! -s "$required" ]]; then
     echo "Required macOS package file is missing or empty: $required" >&2

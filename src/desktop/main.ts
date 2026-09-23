@@ -118,10 +118,52 @@ let stopping = false
 let currentUrl = ''
 const browserSessions = new Set<string>()
 const BROWSER_CLOSE_GRACE_MS = 5_000
+const MOBILE_BRIDGE_ACTIVITY_GRACE_MS = 30_000
+const ACTIVE_DESKTOP_TASK_STATES = new Set([
+    'running',
+    'pausing',
+    'paused',
+    'cancelling'
+])
 let browserCloseTimer: NodeJS.Timeout | null = null
+let browserCloseLeaseKey = ''
 
-function mobileBridgeMustStayAlive() {
-    return Boolean(mobileBridge?.status().pairedDevices.length)
+function activeDesktopTaskState(value: unknown) {
+    return ACTIVE_DESKTOP_TASK_STATES.has(String(value ?? ''))
+}
+
+function mobileBridgeHasActiveLease(now = Date.now()) {
+    const mobile = mobileBridge?.status()
+    if (!mobile) return false
+    if (mobile.activeRequests > 0) return true
+    const lastActivity = Date.parse(mobile.lastActivityAt ?? '')
+    return (
+        Number.isFinite(lastActivity) &&
+        now - lastActivity <= MOBILE_BRIDGE_ACTIVITY_GRACE_MS
+    )
+}
+
+function activeDesktopWorkLeases() {
+    const leases: string[] = []
+    if (
+        database?.hasActiveDownloadJobs('LOCAL') ||
+        service?.localDownloadRuntime().running
+    )
+        leases.push('local-downloads')
+    if (activeDesktopTaskState(service?.favoritesSyncProgress().state))
+        leases.push('favorites-sync')
+    if (activeDesktopTaskState(service?.recommendationBuildProgress().state))
+        leases.push('recommendation-build')
+    if (
+        activeDesktopTaskState(
+            remoteStorageManager?.status().syncProgress?.state
+        )
+    )
+        leases.push('remote-sync')
+    if (browserLiteExportProgress.state === 'running')
+        leases.push('browser-lite-export')
+    if (mobileBridgeHasActiveLease()) leases.push('mobile-bridge-activity')
+    return leases
 }
 
 function cancelBrowserCloseShutdown() {
@@ -130,30 +172,47 @@ function cancelBrowserCloseShutdown() {
     browserCloseTimer = null
 }
 
+function scheduleBrowserCloseShutdown() {
+    if (
+        stopping ||
+        !runtimeOptions.idleBrowserShutdown ||
+        browserSessions.size > 0
+    )
+        return
+    cancelBrowserCloseShutdown()
+    browserCloseTimer = setTimeout(() => {
+        browserCloseTimer = null
+        if (stopping || browserSessions.size > 0) return
+        const leases = activeDesktopWorkLeases()
+        if (leases.length > 0) {
+            const leaseKey = leases.join(',')
+            if (leaseKey !== browserCloseLeaseKey) {
+                browserCloseLeaseKey = leaseKey
+                log.write(
+                    `Browser UI closed; keeping desktop engine alive for: ${leases.join(', ')}`
+                )
+            }
+            scheduleBrowserCloseShutdown()
+            return
+        }
+        browserCloseLeaseKey = ''
+        log.write('Last browser session closed; stopping idle desktop engine')
+        void stop()
+    }, BROWSER_CLOSE_GRACE_MS)
+    browserCloseTimer.unref()
+}
+
 function browserSessionOpened(sessionId: string) {
     if (!sessionId) return
     browserSessions.add(sessionId)
+    browserCloseLeaseKey = ''
     cancelBrowserCloseShutdown()
 }
 
 function browserSessionClosed(sessionId: string) {
     if (!sessionId) return
     browserSessions.delete(sessionId)
-    if (!runtimeOptions.idleBrowserShutdown) return
-    if (browserSessions.size > 0 || mobileBridgeMustStayAlive()) return
-    cancelBrowserCloseShutdown()
-    browserCloseTimer = setTimeout(() => {
-        browserCloseTimer = null
-        if (
-            stopping ||
-            browserSessions.size > 0 ||
-            mobileBridgeMustStayAlive()
-        )
-            return
-        log.write('Last browser session closed; stopping idle desktop engine')
-        void stop()
-    }, BROWSER_CLOSE_GRACE_MS)
-    browserCloseTimer.unref()
+    scheduleBrowserCloseShutdown()
 }
 let lastBrowserLiteExportDirectory: string | null = null
 let browserLiteExportProgress: {

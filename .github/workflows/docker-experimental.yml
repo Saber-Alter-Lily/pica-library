@@ -10,6 +10,7 @@ on:
       - 'scripts/build-docker-experimental.sh'
       - 'scripts/test-docker-experimental.sh'
       - 'scripts/test-docker-remote-tls.sh'
+      - 'scripts/test-docker-image-replacement.sh'
       - 'scripts/build-linux-experimental.sh'
       - 'rollup.config.js'
       - 'package.json'
@@ -57,6 +58,33 @@ jobs:
       - name: Build experimental Docker amd64 image
         run: bash scripts/build-docker-experimental.sh
 
+      - name: Build first W4B Remote API baseline image
+        env:
+          BASE_SHA: 76305939ee7561694a885f7a069189583955a7ec
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/pica-docker-remote-baseline"
+          rm -rf "$baseline"
+          git worktree add --detach "$baseline" "$BASE_SHA"
+          cleanup() {
+            git worktree remove --force "$baseline" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mkdir -p "$baseline/artifacts/cache"
+          if [ -d artifacts/cache ]; then
+            cp -a artifacts/cache/. "$baseline/artifacts/cache/"
+          fi
+          (
+            cd "$baseline"
+            pnpm install --frozen-lockfile
+            bash scripts/build-docker-experimental.sh
+          )
+          baseline_image="$(tr -d '\r\n' < "$baseline/artifacts/DOCKER-EXPERIMENTAL-IMAGE.txt")"
+          test -n "$baseline_image"
+          printf '%s\n' "$baseline_image" > artifacts/DOCKER-REMOTE-BASELINE-IMAGE.txt
+          cleanup
+          trap - EXIT
+
       - name: Smoke experimental headless container
         run: |
           set -euo pipefail
@@ -70,6 +98,15 @@ jobs:
           image="$(tr -d '\r\n' < artifacts/DOCKER-EXPERIMENTAL-IMAGE.txt)"
           test -n "$image"
           bash scripts/test-docker-remote-tls.sh "$image"
+
+      - name: Test Docker image replacement and rollback
+        run: |
+          set -euo pipefail
+          baseline="$(tr -d '\r\n' < artifacts/DOCKER-REMOTE-BASELINE-IMAGE.txt)"
+          candidate="$(tr -d '\r\n' < artifacts/DOCKER-EXPERIMENTAL-IMAGE.txt)"
+          test -n "$baseline"
+          test -n "$candidate"
+          bash scripts/test-docker-image-replacement.sh "$baseline" "$candidate"
 
       - name: Upload experimental Docker artifact
         if: github.event.repository.private == false

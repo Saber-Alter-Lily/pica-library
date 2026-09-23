@@ -118,7 +118,7 @@ Source: $SOURCE_SHA
 
 1. Extract the entire archive.
 2. Run ./pica-library from Terminal, or use "Pica Library.command".
-3. Pica Library opens in your default browser unless --no-open is supplied.
+3. Pica Library opens in your default browser in interactive mode. Use --headless for a persistent no-GUI local engine.
 
 This is an unsigned experimental CI artifact, not a formal macOS release.
 It is not notarized and is not distributed through GitHub Releases.

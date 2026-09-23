@@ -13,6 +13,7 @@ $dataRoot = if ($env:PICA_LIBRARY_DESKTOP_HOME) {
 $markerFile = Join-Path $InstallRoot '.pica-library-arm64-preview-install.json'
 $shortcutFile = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Pica Library ARM64 Preview.lnk'
 $expectedLauncher = Join-Path $InstallRoot 'Pica Library.exe'
+$instanceFile = Join-Path $dataRoot 'runtime-state\instance.json'
 
 function Normalize-WithSeparator([string]$PathValue) {
     $full = [IO.Path]::GetFullPath($PathValue).TrimEnd('\')
@@ -27,6 +28,19 @@ if ($app.StartsWith($data, [StringComparison]::OrdinalIgnoreCase) -or $data.Star
 if ($InstallRoot -eq [IO.Path]::GetPathRoot($InstallRoot)) {
     throw "Refusing unsafe application uninstall root: $InstallRoot"
 }
+if (Test-Path -LiteralPath $instanceFile) {
+    try {
+        $instance = Get-Content -Raw -LiteralPath $instanceFile | ConvertFrom-Json
+        $pidValue = [int]$instance.pid
+        if ($pidValue -gt 0 -and (Get-Process -Id $pidValue -ErrorAction SilentlyContinue)) {
+            throw 'Close Pica Library before uninstalling the Windows ARM64 preview'
+        }
+    } catch {
+        if ($_.Exception.Message -like 'Close Pica Library*') { throw }
+        # Ignore stale instance metadata.
+    }
+}
+
 if (-not (Test-Path -LiteralPath $markerFile)) {
     throw "Refusing to remove an unrecognized directory: $InstallRoot"
 }

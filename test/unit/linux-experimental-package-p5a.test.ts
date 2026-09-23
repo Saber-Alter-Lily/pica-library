@@ -45,6 +45,9 @@ describe('experimental Linux x64 package P5A', () => {
         expect(smoke).toContain("status.platform.selfUpdate!==false")
         expect(smoke).toContain('caps.features.updatePackages!==false')
         expect(smoke).toContain(
+            'Credential capability disagrees with live backend status'
+        )
+        expect(smoke).toContain(
             '"$URL/api/v1/desktop/shutdown"'
         )
         expect(smoke).toContain(
@@ -77,5 +80,9 @@ describe('experimental Linux x64 package P5A', () => {
         expect(preview).toContain(
             'preview flow wrote user state into the application package'
         )
+        expect(preview).toContain('credentialSessionConfigured')
+        expect(preview).toContain('credentialSessionCleared')
+        expect(preview).toContain('session-only Linux credential was written to disk')
+        expect(preview).toContain('linux-preview-session-secret')
     })
 })

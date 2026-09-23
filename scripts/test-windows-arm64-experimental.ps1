@@ -30,7 +30,12 @@ function Cleanup {
     } catch {}
     Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue
 }
-trap { Cleanup; throw $_ }
+trap {
+    $message = ($_ | Out-String)
+    Cleanup
+    Write-Error $message
+    exit 1
+}
 
 New-Item -ItemType Directory -Force -Path $extract,$dataHome | Out-Null
 Expand-Archive -LiteralPath $Archive -DestinationPath $extract

@@ -56,6 +56,9 @@ MINIMUM_MACOS="$(plutil -extract LSMinimumSystemVersion raw -o - "$PLIST")"
 [[ "$BUNDLE_EXECUTABLE" == "Pica Library" ]] || fail "unexpected bundle executable: $BUNDLE_EXECUTABLE"
 [[ "$BUNDLE_PACKAGE_TYPE" == "APPL" ]] || fail "bundle package type is not APPL"
 [[ "$MINIMUM_MACOS" == "13.5" ]] || fail "bundle minimum macOS is not 13.5"
+if codesign --verify --deep --strict "$SOURCE_APP" >/dev/null 2>&1; then
+  fail "experimental macOS app unexpectedly carries a valid bundle signature"
+fi
 
 # The .app must remain functional when separated from the debug/CLI wrapper tree.
 STANDALONE_ROOT="$WORK/standalone"
@@ -130,7 +133,7 @@ if [[ -n "$OPEN_PID" ]] && kill -0 "$OPEN_PID" 2>/dev/null; then
 fi
 
 [[ -f "$DATA_HOME/data/library.db" ]] || fail "standalone app did not use the external data root"
-if find "$STANDALONE_APP" -type f ( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' -o -name '*.sqlite' ) -print | grep -q .; then
+if find "$STANDALONE_APP" -type f \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' -o -name '*.sqlite' \) -print | grep -q .; then
   fail "standalone app wrote user database state inside the bundle"
 fi
 

@@ -183,6 +183,8 @@ describe('experimental Docker headless package P5D', () => {
         expect(picaService).not.toContain('    ports:')
         expect(caddy).toContain('reverse_proxy pica:8787')
         expect(caddy).toContain('{\$PICA_LIBRARY_DOMAIN}')
+        expect(caddy).not.toContain('tls internal')
+        expect(compose).not.toContain('PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS')
 
         expect(acceptance).toContain('docker compose')
         expect(acceptance).toContain('config --format json')

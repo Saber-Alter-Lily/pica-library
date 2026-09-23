@@ -2750,54 +2750,56 @@ function queueReaderProgressFromViewport(target) {
 }
 
 function observeVerticalReaderProgress(target, resumePage) {
-    if ('IntersectionObserver' in window) {
-        readerPageObserver = new IntersectionObserver(
-            (entries) => {
-                const center = window.innerHeight / 2
-                const nearest = entries
-                    .filter((entry) => entry.isIntersecting)
-                    .map((entry) => ({
-                        pageIndex: Number(entry.target.dataset.readerPage),
-                        distance: Math.abs(
-                            entry.boundingClientRect.top +
-                                entry.boundingClientRect.height / 2 -
-                                center
-                        )
-                    }))
-                    .sort((a, b) => a.distance - b.distance)[0]
-                if (nearest) queueReaderProgress(nearest.pageIndex)
-            },
-            {
-                root: null,
-                rootMargin: '-45% 0px -45% 0px',
-                threshold: [0, 0.01]
-            }
-        )
-        target.querySelectorAll('[data-reader-page]').forEach((image) =>
-            readerPageObserver.observe(image)
-        )
-    } else {
-        let queued = false
-        readerScrollHandler = () => {
-            if (queued) return
-            queued = true
-            requestAnimationFrame(() => {
-                queued = false
-                queueReaderProgressFromViewport(target)
-            })
-        }
-        window.addEventListener('scroll', readerScrollHandler, {
-            passive: true
-        })
-    }
-
     requestAnimationFrame(() => {
         target
             .querySelector(`[data-reader-page="${resumePage}"]`)
             ?.scrollIntoView({ block: 'center' })
         requestAnimationFrame(() => {
-            if (readerPageObserver) queueReaderProgress(resumePage)
-            else readerScrollHandler?.()
+            if ('IntersectionObserver' in window) {
+                readerPageObserver = new IntersectionObserver(
+                    (entries) => {
+                        const center = window.innerHeight / 2
+                        const nearest = entries
+                            .filter((entry) => entry.isIntersecting)
+                            .map((entry) => ({
+                                pageIndex: Number(
+                                    entry.target.dataset.readerPage
+                                ),
+                                distance: Math.abs(
+                                    entry.boundingClientRect.top +
+                                        entry.boundingClientRect.height / 2 -
+                                        center
+                                )
+                            }))
+                            .sort((a, b) => a.distance - b.distance)[0]
+                        if (nearest) queueReaderProgress(nearest.pageIndex)
+                    },
+                    {
+                        root: null,
+                        rootMargin: '-45% 0px -45% 0px',
+                        threshold: [0, 0.01]
+                    }
+                )
+                target
+                    .querySelectorAll('[data-reader-page]')
+                    .forEach((image) => readerPageObserver.observe(image))
+                queueReaderProgress(resumePage)
+                return
+            }
+
+            let queued = false
+            readerScrollHandler = () => {
+                if (queued) return
+                queued = true
+                requestAnimationFrame(() => {
+                    queued = false
+                    queueReaderProgressFromViewport(target)
+                })
+            }
+            window.addEventListener('scroll', readerScrollHandler, {
+                passive: true
+            })
+            readerScrollHandler()
         })
     })
 }
@@ -2833,9 +2835,10 @@ function renderReaderPages() {
             image.after(retry)
         })
     }
-    if (mode === 'vertical')
-        observeVerticalReaderProgress(target, reader.pageIndex)
-    else queueReaderProgress(reader.pageIndex)
+    if (mode === 'vertical') {
+        const resumePage = reader.pageIndex
+        observeVerticalReaderProgress(target, resumePage)
+    } else queueReaderProgress(reader.pageIndex)
 }
 
 function queueReaderProgress(pageIndex) {

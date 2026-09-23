@@ -260,7 +260,7 @@ DARWIN_MIN="$(
     awk '/LC_BUILD_VERSION/{found=1;next} found&&/minos/{print $2;exit}'
 )"
 [[ -n "$DARWIN_MIN" ]] || fail "bundled Node runtime did not expose LC_BUILD_VERSION minos"
-"$PACKAGE_ROOT/runtime/bin/node" - "$DARWIN_MIN" <<'NODE'
+if ! "$PACKAGE_ROOT/runtime/bin/node" - "$DARWIN_MIN" <<'NODE'
 const value=process.argv[2].split('.').map(Number)
 const minimum=[13,5]
 for(let i=0;i<minimum.length;i++){
@@ -270,7 +270,7 @@ for(let i=0;i<minimum.length;i++){
   if(left<right)process.exit(1)
 }
 NODE
-if [[ "$?" -ne 0 ]]; then
+then
   fail "bundled Node runtime targets macOS below the declared 13.5 baseline: $DARWIN_MIN"
 fi
 

@@ -110,6 +110,52 @@ describe('experimental Docker headless package P5D', () => {
         expect(workflow).toContain("'scripts/test-docker-remote-tls.sh'")
     })
 
+    it('gates immutable image replacement and data-volume rollback', () => {
+        const replacement = read('scripts/test-docker-image-replacement.sh')
+        const workflow = read('.github/workflows/docker-experimental.yml')
+
+        expect(workflow).toContain(
+            'BASE_SHA: 76305939ee7561694a885f7a069189583955a7ec'
+        )
+        expect(workflow).toContain(
+            'DOCKER-REMOTE-BASELINE-IMAGE.txt'
+        )
+        expect(workflow).toContain(
+            'bash scripts/test-docker-image-replacement.sh "$baseline" "$candidate"'
+        )
+        expect(workflow).toContain(
+            "'scripts/test-docker-image-replacement.sh'"
+        )
+
+        expect(replacement).toContain(
+            'replacement gate requires distinct source builds'
+        )
+        expect(replacement).toContain(
+            'config-before-candidate.tar.gz'
+        )
+        expect(replacement).toContain(
+            'tar -C /config -czf /backup/config-before-candidate.tar.gz .'
+        )
+        expect(replacement).toContain(
+            'schema-changing candidate did not create a pre-migration database backup'
+        )
+        expect(replacement).toContain(
+            'Docker Candidate Marker'
+        )
+        expect(replacement).toContain(
+            'candidate-only state survived restored rollback snapshot'
+        )
+        expect(replacement).toContain(
+            'baseline image rollback did not take effect'
+        )
+        expect(replacement).toContain(
+            'docker port "$PICA_NAME"'
+        )
+        expect(replacement).toContain(
+            'Docker image replacement/rollback acceptance: PASS'
+        )
+    })
+
     it('records image provenance and base-image identity for the one-day artifact', () => {
         const build = read('scripts/build-docker-experimental.sh')
         expect(build).toContain('SOURCE_SHA')

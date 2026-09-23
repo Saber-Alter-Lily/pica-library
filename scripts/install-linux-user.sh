@@ -78,6 +78,11 @@ trap cleanup EXIT
 
 mkdir -p "$PARENT" "$DESKTOP_DIR" "$ICON_DIR"
 
+if [[ "$SOURCE_ROOT" == "$INSTALL_ROOT" && ! -s "$INSTALL_ROOT/.pica-library-install-root" ]]; then
+  echo "Refusing to refresh an unrecognized application root: $INSTALL_ROOT" >&2
+  exit 1
+fi
+
 if [[ "$SOURCE_ROOT" != "$INSTALL_ROOT" ]]; then
   rm -rf "$STAGING" "$BACKUP"
   mkdir -p "$STAGING"
@@ -89,6 +94,13 @@ if [[ "$SOURCE_ROOT" != "$INSTALL_ROOT" ]]; then
       exit 1
     fi
   done
+  SOURCE_SHA="$(tr -d '\r\n' < "$STAGING/SOURCE_SHA.txt")"
+  if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Install payload has invalid source provenance." >&2
+    exit 1
+  fi
+  printf 'pica-library-linux-user-install\n%s\n' "$SOURCE_SHA" > "$STAGING/.pica-library-install-root"
+  chmod 0644 "$STAGING/.pica-library-install-root"
 
   if [[ -d "$INSTALL_ROOT" ]]; then
     mv "$INSTALL_ROOT" "$BACKUP"

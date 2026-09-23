@@ -87,7 +87,9 @@ describe('Desktop headless runtime foundation P5C', () => {
     it('does not treat headless mode as a formal remote-server or release capability', () => {
         const platform = fs.readFileSync('src/desktop/platform.ts', 'utf8')
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
-        expect(platform).toContain('distributionReady: windows')
+        expect(platform).toContain("const productionWindows = windows && arch === 'x64'")
+        expect(platform).toContain('distributionReady: productionWindows')
+        expect(platform).toContain('selfUpdate: productionWindows')
         expect(server).toContain(
             'Unauthenticated remote binding is disabled. Configure an authenticated remote-access mode before using a non-loopback host.'
         )

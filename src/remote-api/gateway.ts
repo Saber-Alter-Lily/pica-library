@@ -61,8 +61,11 @@ function json(response: ServerResponse, status: number, value: unknown) {
 function normalizedHost(value: string) {
     const raw = value.trim()
     if (!raw) return null
+    if (raw === '::1') return '::1'
     try {
-        return new URL(`http://${raw}`).hostname.toLowerCase()
+        return new URL(`http://${raw}`)
+            .hostname.toLowerCase()
+            .replace(/^\[|\]$/g, '')
     } catch {
         return null
     }
@@ -303,6 +306,11 @@ export async function startRemoteApiGateway(
 
             const remoteAddress = request.socket.remoteAddress ?? 'unknown'
             const now = Date.now()
+            if (rateWindows.size > 1024) {
+                for (const [key, value] of rateWindows)
+                    if (now - value.startedAt >= rateWindowMs)
+                        rateWindows.delete(key)
+            }
             let window = rateWindows.get(remoteAddress)
             if (!window || now - window.startedAt >= rateWindowMs) {
                 window = { startedAt: now, count: 0 }
@@ -362,6 +370,11 @@ export async function startRemoteApiGateway(
             })
         }
     })
+
+    server.maxHeadersCount = 50
+    server.headersTimeout = 10_000
+    server.requestTimeout = 30_000
+    server.keepAliveTimeout = 5_000
 
     await new Promise<void>((resolve, reject) => {
         server.once('error', reject)

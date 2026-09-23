@@ -484,6 +484,23 @@ describe('authenticated Remote API gateway', () => {
         )
         fs.writeFileSync(path.join(root, 'remote.js'), 'globalThis.remoteShell = true\n')
         fs.writeFileSync(path.join(root, 'remote.css'), 'body{margin:0}\n')
+        fs.writeFileSync(
+            path.join(root, 'manifest.webmanifest'),
+            JSON.stringify({
+                name: 'Pica Library Remote',
+                start_url: '/remote/',
+                scope: '/remote/',
+                display: 'standalone'
+            })
+        )
+        fs.writeFileSync(
+            path.join(root, 'sw.js'),
+            "const CACHE_NAME = 'pica-remote-shell-w5c-v1'\n"
+        )
+        fs.writeFileSync(
+            path.join(root, 'icon.svg'),
+            '<svg xmlns="http://www.w3.org/2000/svg"></svg>\n'
+        )
 
         const gateway = await startRemoteApiGateway({
             targetBaseUrl: target.url,
@@ -498,6 +515,7 @@ describe('authenticated Remote API gateway', () => {
         const base = `http://127.0.0.1:${gateway.port}`
         try {
             expect(gateway.webShellEnabled).toBe(true)
+            expect(gateway.webPwaEnabled).toBe(true)
 
             const redirect = await fetch(`${base}/remote`, {
                 redirect: 'manual'
@@ -518,6 +536,12 @@ describe('authenticated Remote API gateway', () => {
             expect(shell.headers.get('content-security-policy')).toContain(
                 "object-src 'none'"
             )
+            expect(shell.headers.get('content-security-policy')).toContain(
+                "manifest-src 'self'"
+            )
+            expect(shell.headers.get('content-security-policy')).toContain(
+                "worker-src 'self'"
+            )
             expect(shell.headers.get('x-frame-options')).toBe('DENY')
             expect(shell.headers.get('referrer-policy')).toBe('no-referrer')
             expect(shell.headers.get('permissions-policy')).toContain(
@@ -535,6 +559,35 @@ describe('authenticated Remote API gateway', () => {
             const css = await fetch(`${base}/remote/remote.css`)
             expect(css.status).toBe(200)
             expect(css.headers.get('content-type')).toContain('text/css')
+
+            const manifest = await fetch(
+                `${base}/remote/manifest.webmanifest`
+            )
+            expect(manifest.status).toBe(200)
+            expect(manifest.headers.get('content-type')).toContain(
+                'application/manifest+json'
+            )
+            expect(await manifest.json()).toMatchObject({
+                start_url: '/remote/',
+                scope: '/remote/',
+                display: 'standalone'
+            })
+
+            const worker = await fetch(`${base}/remote/sw.js`)
+            expect(worker.status).toBe(200)
+            expect(worker.headers.get('content-type')).toContain(
+                'text/javascript'
+            )
+            expect(await worker.text()).toContain(
+                'pica-remote-shell-w5c-v1'
+            )
+
+            const icon = await fetch(`${base}/remote/icon.svg`)
+            expect(icon.status).toBe(200)
+            expect(icon.headers.get('content-type')).toContain(
+                'image/svg+xml'
+            )
+            expect(await icon.text()).toContain('<svg')
 
             expect(
                 (

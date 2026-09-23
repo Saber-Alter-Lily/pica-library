@@ -82,7 +82,10 @@ describe('download job scheduler', () => {
             queue,
             async (running) => {
                 if (running.id === 'slow') await slowGate
-                if (running.id === 'third') thirdStarted()
+                if (running.id === 'third') {
+                    thirdStarted()
+                    await slowGate
+                }
             },
             { jobConcurrency: 2 }
         )

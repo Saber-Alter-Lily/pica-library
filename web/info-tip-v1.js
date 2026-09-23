@@ -91,4 +91,6 @@ document.addEventListener('keydown',(event)=>{
     if(event.key==='Escape'&&active)hide(true)
 })
 window.addEventListener('resize',()=>{if(active)place(active)})
-window.addEventListener('scroll',()=>{if(active&&!pinned)hide()},true)
+window.addEventListener('scroll',()=>{
+    if(active&&!pinned&&!active.matches(':hover'))hide()
+},true)

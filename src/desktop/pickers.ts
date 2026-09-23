@@ -94,7 +94,12 @@ function pickerCommand(input: {
     title: string
     defaultName?: string
     extension?: string
-}): { command: string; args: string[]; cancelCodes: number[] } | null {
+}): {
+    command: string
+    args: string[]
+    cancelCodes: number[]
+    cancelErrorPattern?: RegExp
+} | null {
     if (input.backend === 'windows-winforms') {
         const title = input.title.replaceAll("'", "''")
         const script =
@@ -135,7 +140,8 @@ function pickerCommand(input: {
         return {
             command: '/usr/bin/osascript',
             args: ['-e', script],
-            cancelCodes: [1]
+            cancelCodes: [1],
+            cancelErrorPattern: /User canceled|-128/i
         }
     }
     if (input.backend === 'linux-zenity') {
@@ -217,7 +223,12 @@ function runPicker(
                 resolve(output.trim() || null)
                 return
             }
-            if (code !== null && spec.cancelCodes.includes(code)) {
+            if (
+                code !== null &&
+                spec.cancelCodes.includes(code) &&
+                (!spec.cancelErrorPattern ||
+                    spec.cancelErrorPattern.test(errorOutput))
+            ) {
                 resolve(null)
                 return
             }

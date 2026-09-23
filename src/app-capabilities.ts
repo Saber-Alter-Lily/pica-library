@@ -7,6 +7,22 @@ export const BUNDLE_FORMAT_VERSION = 1
 export const UPDATE_MANIFEST_VERSION = 1
 export const READER_API_VERSION = 1
 
+export type CapabilityExecution = 'engine' | 'platform-host' | 'client'
+
+export interface CapabilityState {
+    supported: boolean
+    available: boolean
+    execution: CapabilityExecution
+    reason:
+        | 'Available'
+        | 'NoPlatformHost'
+        | 'UnsupportedPlatform'
+        | 'MissingSystemDependency'
+        | 'MissingSecureCredentialBackend'
+        | 'MissingManagedBrowser'
+        | 'UnavailableInRuntime'
+}
+
 export interface AppCapabilities {
     appVersion: string
     appApiVersion: number
@@ -28,12 +44,123 @@ export interface AppCapabilities {
         multiTagPreference: boolean
         adaptiveRecommendationBatches: boolean
     }
+    runtime: {
+        role: 'desktop' | 'server' | 'engine'
+        mode: 'interactive' | 'headless' | 'embedded'
+        platform: string
+        arch: string
+    }
+    capabilityStates: {
+        selfUpdate: CapabilityState
+        nativeFolderPicker: CapabilityState
+        nativeSavePicker: CapabilityState
+        secureCredentialPersistence: CapabilityState
+        managedEhWebLogin: CapabilityState
+    }
+}
+
+function record(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object'
+        ? (value as Record<string, unknown>)
+        : {}
+}
+
+function stringValue(value: unknown) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function platformId(platform: NodeJS.Platform) {
+    if (platform === 'win32') return 'windows'
+    if (platform === 'darwin') return 'macos'
+    if (platform === 'linux') return 'linux'
+    return 'unsupported'
+}
+
+function capabilityState(input: {
+    supported: boolean
+    available: boolean
+    hostPresent: boolean
+    unavailableReason: CapabilityState['reason']
+}): CapabilityState {
+    const reason: CapabilityState['reason'] = !input.supported
+        ? 'UnsupportedPlatform'
+        : !input.hostPresent
+          ? 'NoPlatformHost'
+          : input.available
+            ? 'Available'
+            : input.unavailableReason
+    return {
+        supported: input.supported,
+        available: input.supported && input.hostPresent && input.available,
+        execution: 'platform-host',
+        reason
+    }
 }
 
 export function appCapabilities(
     providerFavoriteMutation = false,
-    platform: NodeJS.Platform = process.platform
+    platform: NodeJS.Platform = process.platform,
+    arch = process.arch,
+    hostStatus?: Record<string, unknown> | null
 ): AppCapabilities {
+    const hostPresent = Boolean(hostStatus)
+    const host = record(hostStatus)
+    const runtimeStatus = record(host.runtime)
+    const platformStatus = record(host.platform)
+    const credentialBackend = record(host.credentialBackend)
+    const nativePicker = record(host.nativePicker)
+
+    const fallbackPlatform = platformId(platform)
+    const runtimePlatform =
+        stringValue(platformStatus.id) ?? fallbackPlatform
+    const runtimeArch = stringValue(platformStatus.arch) ?? arch
+    const runtimeFoundation =
+        platformStatus.runtimeFoundation === true ||
+        (!hostPresent &&
+            (fallbackPlatform === 'windows' ||
+                fallbackPlatform === 'macos' ||
+                fallbackPlatform === 'linux'))
+    const mode =
+        stringValue(runtimeStatus.mode) === 'headless'
+            ? 'headless'
+            : hostPresent
+              ? 'interactive'
+              : 'embedded'
+    const role = mode === 'headless' ? 'server' : hostPresent ? 'desktop' : 'engine'
+
+    const selfUpdateSupported =
+        runtimePlatform === 'windows' && runtimeArch === 'x64'
+    const selfUpdate = capabilityState({
+        supported: selfUpdateSupported,
+        available: platformStatus.selfUpdate === true,
+        hostPresent,
+        unavailableReason: 'UnavailableInRuntime'
+    })
+    const nativeFolderPicker = capabilityState({
+        supported: runtimeFoundation,
+        available: nativePicker.folderPicker === true,
+        hostPresent,
+        unavailableReason: 'MissingSystemDependency'
+    })
+    const nativeSavePicker = capabilityState({
+        supported: runtimeFoundation,
+        available: nativePicker.savePicker === true,
+        hostPresent,
+        unavailableReason: 'MissingSystemDependency'
+    })
+    const secureCredentialPersistence = capabilityState({
+        supported: runtimeFoundation,
+        available: credentialBackend.securePersistence === true,
+        hostPresent,
+        unavailableReason: 'MissingSecureCredentialBackend'
+    })
+    const managedEhWebLogin = capabilityState({
+        supported: runtimeFoundation,
+        available: Boolean(host.managedEhBrowser),
+        hostPresent,
+        unavailableReason: 'MissingManagedBrowser'
+    })
+
     return {
         appVersion: PRODUCT_VERSION,
         appApiVersion: APP_API_VERSION,
@@ -47,13 +174,26 @@ export function appCapabilities(
             shelves: true,
             reader: true,
             archiveReader: false,
-            updatePackages: platform === 'win32',
+            updatePackages: selfUpdate.available,
             recommendationSessions: true,
             previewPages: true,
             recommendationV3: true,
             behaviorLearning: true,
             multiTagPreference: true,
             adaptiveRecommendationBatches: true
+        },
+        runtime: {
+            role,
+            mode,
+            platform: runtimePlatform,
+            arch: runtimeArch
+        },
+        capabilityStates: {
+            selfUpdate,
+            nativeFolderPicker,
+            nativeSavePicker,
+            secureCredentialPersistence,
+            managedEhWebLogin
         }
     }
 }

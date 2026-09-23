@@ -294,12 +294,9 @@ export async function startLibraryServer(options: {
             ttlMs: 24 * 60 * 60 * 1000
         }))
     const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1'])
-    if (
-        !loopbackHosts.has(host) &&
-        process.env.PICA_LIBRARY_ALLOW_REMOTE !== 'true'
-    ) {
+    if (!loopbackHosts.has(host)) {
         throw new Error(
-            'Remote binding is disabled. Use a loopback host or explicitly set PICA_LIBRARY_ALLOW_REMOTE=true.'
+            'Unauthenticated remote binding is disabled. Configure an authenticated remote-access mode before using a non-loopback host.'
         )
     }
     const server = http.createServer(async (request, response) => {

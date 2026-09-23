@@ -3,6 +3,7 @@ import { copy as ehT } from './locale-runtime.js'
 const $ = (selector) => document.querySelector(selector)
 let csrf = ''
 let webLoginPoll = null
+let managedWebLogin = true
 
 function setLabelPrefix(input, value) {
     const label = input?.closest('label')
@@ -166,11 +167,20 @@ function exhLabel(value, configured = true) {
     return ehT('待检查','Not checked','未確認')
 }
 
+function applyPlatformStatus(value) {
+    managedWebLogin = value?.platform?.managedEhWebLogin !== false
+    const start = $('#eh-web-login-start')
+    const cancel = $('#eh-web-login-cancel')
+    if (start) start.hidden = !managedWebLogin
+    if (!managedWebLogin && cancel) cancel.hidden = true
+}
+
 async function status() {
     const response = await fetch('/api/v1/desktop/status', { cache: 'no-store' })
     if (!response.ok) throw new Error('Desktop status unavailable')
     const value = await response.json()
     csrf = value.csrfToken || csrf
+    applyPlatformStatus(value)
     render(value.ehAccount || { configured: false })
 }
 
@@ -222,8 +232,11 @@ function renderWebLoginState(value) {
     const start = $('#eh-web-login-start')
     const cancel = $('#eh-web-login-cancel')
     const active = ['opening', 'waiting', 'verifying'].includes(value?.state)
-    if (start) start.disabled = active
-    if (cancel) cancel.hidden = !active
+    if (start) {
+        start.hidden = !managedWebLogin
+        start.disabled = active
+    }
+    if (cancel) cancel.hidden = !managedWebLogin || !active
     if (message && value?.message) message.textContent = value.message
     if (value?.state === 'complete') {
         stopWebLoginPoll()
@@ -250,6 +263,7 @@ async function pollWebLogin() {
 
 async function startWebLogin() {
     const message = $('#eh-account-message')
+    if (!managedWebLogin) return
     try {
         if (message) message.textContent = ehT('正在打开 E-H 官方登录窗口…','Opening the official E-H login window…','E-H 公式ログインウィンドウを開いています…')
         renderWebLoginState(

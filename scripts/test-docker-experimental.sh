@@ -127,6 +127,9 @@ const response=await fetch(url+'/api/v1/desktop/shutdown',{
   body:'{}'
 })
 if(!response.ok)throw new Error('Headless shutdown endpoint failed')
+const payload=await response.json()
+if(payload.success!==true||payload.shutdownScheduled!==true)
+  throw new Error('Headless shutdown endpoint did not confirm scheduling')
 NODE
 
 for _ in $(seq 1 60); do

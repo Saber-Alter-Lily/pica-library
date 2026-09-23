@@ -125,6 +125,29 @@ This is still not a deployment release. A formal Docker/Server channel must
 add an operator-facing compose/secret setup, image registry/signing policy,
 versioned image promotion, health-driven replacement and rollback evidence.
 
+## Image replacement and rollback gate
+
+The Docker workflow also pins the first accepted W4B authenticated Remote API
+image as a baseline. It builds that historical image and the candidate image as
+distinct immutable source builds, seeds one external `/config` volume, and
+then exercises this sequence:
+
+1. start the baseline image and record library, shelf, task and schema state;
+2. stop the baseline cleanly and create a tar snapshot of the external config
+   volume;
+3. start the candidate image against the same volume and verify inherited state;
+4. create candidate-only state;
+5. if the candidate schema is newer, require the normal pre-migration database
+   backup;
+6. stop the candidate, restore the pre-candidate volume snapshot, and start the
+   baseline image again;
+7. verify the baseline source identity and state return, while candidate-only
+   state disappears.
+
+This follows Docker's volume backup/restore model rather than treating image
+rollback as data rollback. The image and the mutable volume are separate
+artifacts and must be handled separately during recovery.
+
 ## Browser/PWA boundary
 
 This gateway is an API foundation for W4B. It does not yet provide the CORS,
@@ -137,3 +160,8 @@ deployable Web UI.
 Remote API remains experimental. It does not change the product version,
 formal release channel, Linux `distributionReady`, or Linux `selfUpdate`
 capability.
+
+After the TLS and image-replacement gates pass, the remaining W4B work is
+operator-facing deployment packaging: a reviewed Compose/secret setup, pinned
+published-image provenance, health-driven promotion procedure, and a documented
+rollback command/path. W5 browser/PWA authentication remains a later layer.

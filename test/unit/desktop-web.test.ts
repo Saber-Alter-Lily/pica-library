@@ -43,10 +43,21 @@ describe('desktop setup and settings UI contract', () => {
         expect(server).toContain('browserSessionOpened')
         expect(server).toContain('browserSessionClosed')
         expect(main).toContain('BROWSER_CLOSE_GRACE_MS = 5_000')
-        expect(main).toContain('mobileBridge?.status().pairedDevices.length')
+        expect(main).toContain('MOBILE_BRIDGE_ACTIVITY_GRACE_MS = 30_000')
+        expect(main).toContain("database?.hasActiveDownloadJobs('LOCAL')")
+        expect(main).toContain('service?.localDownloadRuntime().running')
+        expect(main).toContain('service?.favoritesSyncProgress().state')
+        expect(main).toContain('service?.recommendationBuildProgress().state')
         expect(main).toContain(
-            'browserSessions.size > 0 || mobileBridgeMustStayAlive()'
+            'remoteStorageManager?.status().syncProgress?.state'
         )
+        expect(main).toContain("browserLiteExportProgress.state === 'running'")
+        expect(main).toContain('mobile.activeRequests > 0')
+        expect(main).toContain('mobile.lastActivityAt')
+        expect(main).not.toContain(
+            'mobileBridge?.status().pairedDevices.length'
+        )
+        expect(main).toContain('scheduleBrowserCloseShutdown()')
         expect(main).toContain(
             "log.write('Last browser session closed; stopping idle desktop engine')"
         )

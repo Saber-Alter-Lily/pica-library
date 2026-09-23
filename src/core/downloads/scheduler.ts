@@ -50,10 +50,18 @@ export class DownloadScheduler {
         this.stopSignal = new Promise<void>((resolve) => {
             this.stopWaiter = resolve
         })
+        await Promise.all(
+            Array.from({ length: this.jobConcurrency }, () =>
+                this.workerLoop()
+            )
+        )
+    }
+
+    private async workerLoop() {
         while (!this.stopped) {
-            const jobs = this.store.nextDownloadJobs(this.jobConcurrency)
-            if (jobs.length === 0) return
-            await Promise.all(jobs.map((job) => this.run(job)))
+            const [job] = this.store.nextDownloadJobs(1)
+            if (!job) return
+            await this.run(job)
         }
     }
 

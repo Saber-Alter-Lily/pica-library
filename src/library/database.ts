@@ -22,6 +22,7 @@ import type {
     FavoriteRecord,
     FavoritesSyncState,
     ImportResult,
+    LibraryFacetQuery,
     LibraryReconciliation,
     LibrarySummary,
     ReaderEpisode,
@@ -2017,6 +2018,76 @@ export class LibraryDatabase {
         return this.listComics(
             { ...query, limit: Number.MAX_SAFE_INTEGER, offset: 0 },
             Number.MAX_SAFE_INTEGER
+        )
+    }
+
+    listComicsForLibraryQueryBase(
+        query: Pick<
+            LibraryFacetQuery,
+            'scope' | 'authorIds' | 'providerIds' | 'finished' | 'download'
+        >
+    ): StoredComic[] {
+        const where: string[] = []
+        const values: Array<string | number> = []
+        const scope = query.scope ?? 'library'
+        if (scope === 'library')
+            where.push(
+                'EXISTS(SELECT 1 FROM library_membership lm WHERE lm.comic_id = c.id)'
+            )
+        else if (scope === 'favorites') where.push('c.is_favorite = 1')
+        else if (scope === 'downloaded')
+            where.push(
+                "EXISTS(SELECT 1 FROM pictures pd WHERE pd.comic_id = c.id AND pd.status = 'completed')"
+            )
+
+        const providers = [...new Set(query.providerIds ?? [])]
+        if (providers.length) {
+            where.push(
+                `COALESCE(
+                    pm.provider_id,
+                    CASE WHEN c.id LIKE 'eh:%' THEN 'eh' ELSE 'pica' END
+                ) IN (${providers.map(() => '?').join(', ')})`
+            )
+            values.push(...providers)
+        }
+
+        const authorIds = [...new Set(query.authorIds ?? [])].filter(Boolean)
+        if (authorIds.length) {
+            where.push(
+                `c.canonical_author_id IN (${authorIds
+                    .map(() => '?')
+                    .join(', ')})`
+            )
+            values.push(...authorIds)
+        }
+
+        if (query.finished !== undefined) {
+            where.push('c.finished = ?')
+            values.push(query.finished ? 1 : 0)
+        }
+
+        const downloadedCount =
+            "(SELECT COUNT(*) FROM pictures px WHERE px.comic_id = c.id AND px.status = 'completed')"
+        const knownCount =
+            '(SELECT COUNT(*) FROM pictures pk WHERE pk.comic_id = c.id)'
+        if (query.download === 'downloaded')
+            where.push(`${downloadedCount} > 0`)
+        else if (query.download === 'not-downloaded')
+            where.push(`${downloadedCount} = 0`)
+        else if (query.download === 'complete')
+            where.push(
+                `${knownCount} > 0 AND ${downloadedCount} >= ${knownCount}`
+            )
+        else if (query.download === 'partial')
+            where.push(
+                `${downloadedCount} > 0 AND (${knownCount} = 0 OR ${downloadedCount} < ${knownCount})`
+            )
+
+        const sql =
+            comicSelect +
+            (where.length ? ` WHERE ${where.join(' AND ')}` : '')
+        return (this.db.prepare(sql).all(...values) as SqlRow[]).map(
+            storedComicFromRow
         )
     }
 

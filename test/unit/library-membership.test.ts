@@ -134,7 +134,7 @@ describe('catalog and durable Library membership', () => {
             storedRecord(index)
         )
         const database = {
-            listAllComics: () => comics,
+            listComicsForLibraryQueryBase: () => comics,
             listAuthors: () => []
         } as unknown as LibraryDatabase
         const query = new LibraryQueryService(database)

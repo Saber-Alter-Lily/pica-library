@@ -988,7 +988,7 @@ async function startEngine(preferredPort: number) {
         browserSessionClosed,
         shutdown: () => {
             log.write('Shutdown: Desktop controller request received')
-            setImmediate(() => void stop())
+            void stop()
         }
     }
     try {

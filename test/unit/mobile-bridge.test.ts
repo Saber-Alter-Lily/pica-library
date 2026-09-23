@@ -74,6 +74,9 @@ describe('Mobile Bridge', () => {
             { headers }
         )
         expect(accountStatus.status).toBe(200)
+        const activity = bridge.status()
+        expect(activity.activeRequests).toBe(0)
+        expect(activity.lastActivityAt).not.toBeNull()
         const accountValue = await accountStatus.json()
         expect(accountValue).toMatchObject({
             authority: 'desktop',

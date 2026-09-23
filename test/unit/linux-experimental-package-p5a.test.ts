@@ -107,6 +107,32 @@ describe('experimental Linux x64 package P5A', () => {
         )
     })
 
+    it('tests application replacement and rollback against the first W4A preview baseline', () => {
+        const replacement = read('scripts/test-linux-preview-replacement.sh')
+        const workflow = read('.github/workflows/linux-experimental.yml')
+
+        expect(workflow).toContain(
+            'BASE_SHA: 9104ed6774b33d903becf73ee1f16168c9bc5f3d'
+        )
+        expect(workflow).toContain('git worktree add --detach')
+        expect(workflow).toContain(
+            'artifacts/Pica-Library-linux-x64-preview-baseline.tar.gz'
+        )
+        expect(workflow).toContain(
+            'bash scripts/test-linux-preview-replacement.sh "$baseline" "$candidate"'
+        )
+        expect(workflow).toContain(
+            "'scripts/test-linux-preview-replacement.sh'"
+        )
+        expect(replacement).toContain('replacement gate requires distinct preview builds')
+        expect(replacement).toContain('cp -a "$DATA_HOME" "$DATA_SNAPSHOT"')
+        expect(replacement).toContain('candidate application replacement did not take effect')
+        expect(replacement).toContain('schema upgrade did not create the required pre-migration backup')
+        expect(replacement).toContain('rollback did not restore the pre-upgrade data snapshot')
+        expect(replacement).toContain('baseline application rollback did not take effect')
+        expect(replacement).toContain('Linux preview replacement/rollback acceptance: PASS')
+    })
+
     it('locks the GNU/Linux x64 runtime compatibility baseline', () => {
         const build = read('scripts/build-linux-experimental.sh')
         const preflight = read('scripts/linux-runtime-preflight.sh')

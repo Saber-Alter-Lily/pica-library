@@ -27,8 +27,10 @@ The Linux experimental workflow must:
 5. keep user data outside the application package;
 6. smoke the packaged Desktop/headless runtime;
 7. run the packaged vertical acceptance for library query/detail, shelves, Reader pages/progress, download pause/resume, graceful shutdown and restart persistence;
-8. keep self-update and formal-distribution capabilities disabled;
-9. report credential persistence from the live OS session, falling back to session-only memory when Secret Service is unavailable.
+8. build the first accepted W4A Linux preview baseline and replace that application tree with the candidate while reusing one external data root; verify library/shelf/download state survives, then restore the pre-upgrade data snapshot and the old application tree and verify rollback;
+9. if a candidate raises the database schema above that baseline, require the normal pre-migration database backup before the replacement gate can pass;
+10. keep self-update and formal-distribution capabilities disabled;
+11. report credential persistence from the live OS session, falling back to session-only memory when Secret Service is unavailable.
 
 The Rocky container gate closes the runtime-ABI portion of the lower-bound check. It does not test a graphical desktop session, system tray behavior, desktop launchers, Secret Service integration, or native pickers.
 
@@ -39,7 +41,7 @@ Automated CI does not replace real Linux desktop validation. Before promotion be
 - an authorized real Provider login and ordinary browse/detail/read flow on Linux;
 - Secret Service persistence in a real graphical session;
 - native folder/save picker behavior in at least one GNOME/Zenity and one KDE/KDialog environment, or an explicit narrower support statement;
-- application-package replacement using the same external data root, followed by migration/rollback checks when a newer preview build exists;
+- a schema-changing Linux preview must still exercise the migration-specific rollback path on real preview packages; the current replacement gate covers distinct source builds and data-snapshot rollback, but both packages currently use the same database schema;
 - at least one real graphical Linux desktop session on a distribution close to the declared glibc baseline; the Rocky Linux 8.9 container covers runtime ABI only and does not substitute for desktop integration;
 - cold start, long-reader and task-concurrency measurements on reference hardware.
 

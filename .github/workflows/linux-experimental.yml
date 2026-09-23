@@ -11,6 +11,7 @@ on:
       - 'scripts/test-linux-experimental.sh'
       - 'scripts/test-linux-glibc228-container.sh'
       - 'scripts/test-linux-preview-acceptance.sh'
+      - 'scripts/test-linux-preview-replacement.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -54,6 +55,33 @@ jobs:
       - name: Build experimental Linux x64 package
         run: bash scripts/build-linux-experimental.sh
 
+      - name: Build first W4A preview baseline for replacement gate
+        env:
+          BASE_SHA: 9104ed6774b33d903becf73ee1f16168c9bc5f3d
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/pica-linux-preview-baseline"
+          rm -rf "$baseline"
+          git worktree add --detach "$baseline" "$BASE_SHA"
+          cleanup() {
+            git worktree remove --force "$baseline" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mkdir -p "$baseline/artifacts/cache"
+          if [ -d artifacts/cache ]; then
+            cp -a artifacts/cache/. "$baseline/artifacts/cache/"
+          fi
+          (
+            cd "$baseline"
+            pnpm install --frozen-lockfile
+            bash scripts/build-linux-experimental.sh
+          )
+          baseline_archive="$(find "$baseline/artifacts" -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
+          test -n "$baseline_archive"
+          cp "$baseline_archive" artifacts/Pica-Library-linux-x64-preview-baseline.tar.gz
+          cleanup
+          trap - EXIT
+
       - name: Smoke packaged Linux runtime
         run: |
           set -euo pipefail
@@ -74,6 +102,15 @@ jobs:
           archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
           test -n "$archive"
           bash scripts/test-linux-preview-acceptance.sh "$archive"
+
+      - name: Run Linux preview replacement and rollback acceptance
+        run: |
+          set -euo pipefail
+          baseline="artifacts/Pica-Library-linux-x64-preview-baseline.tar.gz"
+          candidate="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
+          test -f "$baseline"
+          test -n "$candidate"
+          bash scripts/test-linux-preview-replacement.sh "$baseline" "$candidate"
 
       - name: Upload experimental Linux x64 artifact
         if: github.event.repository.private == false

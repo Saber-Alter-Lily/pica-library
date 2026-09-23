@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { StoredCredentials } from './types'
@@ -8,6 +8,40 @@ export interface CredentialStore {
     load(): StoredCredentials | null
     save(value: StoredCredentials): void
 }
+
+export type CredentialBackendKind =
+    | 'windows-dpapi'
+    | 'macos-keychain'
+    | 'linux-secret-service'
+    | 'session-memory'
+
+export interface CredentialBackendStatus {
+    kind: CredentialBackendKind
+    securePersistence: boolean
+    sessionOnly: boolean
+    reason?: string
+}
+
+type SyncRunner = (
+    command: string,
+    args: readonly string[],
+    options: {
+        input?: string
+        encoding: 'utf8'
+        windowsHide: boolean
+        env: NodeJS.ProcessEnv
+        maxBuffer: number
+    }
+) => SpawnSyncReturns<string>
+
+const SERVICE = 'org.picalibrary.desktop'
+const ACCOUNT = 'desktop-credentials'
+const LINUX_ATTRIBUTES = [
+    'application',
+    'pica-library',
+    'purpose',
+    'desktop-credentials'
+] as const
 
 const protectScript = `
 $ErrorActionPreference='Stop'
@@ -56,6 +90,32 @@ function powershell(script: string, stdin: string) {
     return result.stdout
 }
 
+function secureCommand(
+    runner: SyncRunner,
+    command: string,
+    args: readonly string[],
+    input?: string
+) {
+    return runner(command, args, {
+        input,
+        encoding: 'utf8',
+        windowsHide: true,
+        env: sanitizedChildEnv(),
+        maxBuffer: 1024 * 1024
+    })
+}
+
+function credentialJson(value: string, backend: string) {
+    try {
+        const parsed = JSON.parse(value.trim())
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+            throw new Error('Credential payload is not an object')
+        return parsed as StoredCredentials
+    } catch {
+        throw new Error(`${backend} returned invalid credential data`)
+    }
+}
+
 export class DpapiCredentialStore implements CredentialStore {
     constructor(readonly file: string) {}
 
@@ -65,7 +125,7 @@ export class DpapiCredentialStore implements CredentialStore {
             unprotectScript,
             fs.readFileSync(this.file, 'utf8')
         )
-        return JSON.parse(json) as StoredCredentials
+        return credentialJson(json, 'Windows DPAPI')
     }
 
     save(value: StoredCredentials) {
@@ -84,6 +144,97 @@ export class DpapiCredentialStore implements CredentialStore {
     }
 }
 
+export class MacKeychainCredentialStore implements CredentialStore {
+    constructor(
+        private readonly runner: SyncRunner = spawnSync as SyncRunner,
+        private readonly executable = '/usr/bin/security'
+    ) {}
+
+    load() {
+        const result = secureCommand(
+            this.runner,
+            this.executable,
+            [
+                'find-generic-password',
+                '-a',
+                ACCOUNT,
+                '-s',
+                SERVICE,
+                '-w'
+            ]
+        )
+        if (result.status === 0)
+            return credentialJson(result.stdout, 'macOS Keychain')
+        const error = String(result.stderr ?? '')
+        if (
+            /could not be found|SecKeychainSearchCopyNext|specified item.*not.*found/i.test(
+                error
+            )
+        )
+            return null
+        throw new Error('macOS Keychain credential retrieval is unavailable')
+    }
+
+    save(value: StoredCredentials) {
+        const result = secureCommand(
+            this.runner,
+            this.executable,
+            [
+                'add-generic-password',
+                '-U',
+                '-a',
+                ACCOUNT,
+                '-s',
+                SERVICE,
+                '-w'
+            ],
+            `${JSON.stringify(value)}\n`
+        )
+        if (result.status !== 0)
+            throw new Error('macOS Keychain credential persistence is unavailable')
+    }
+}
+
+export class SecretServiceCredentialStore implements CredentialStore {
+    constructor(
+        private readonly runner: SyncRunner = spawnSync as SyncRunner,
+        private readonly executable = 'secret-tool'
+    ) {}
+
+    load() {
+        const result = secureCommand(
+            this.runner,
+            this.executable,
+            ['lookup', ...LINUX_ATTRIBUTES]
+        )
+        if (result.error && (result.error as NodeJS.ErrnoException).code === 'ENOENT')
+            throw new Error('Linux Secret Service tooling is unavailable')
+        if (result.status === 0)
+            return result.stdout.trim()
+                ? credentialJson(result.stdout, 'Linux Secret Service')
+                : null
+        if (!String(result.stderr ?? '').trim()) return null
+        throw new Error('Linux Secret Service credential retrieval is unavailable')
+    }
+
+    save(value: StoredCredentials) {
+        const result = secureCommand(
+            this.runner,
+            this.executable,
+            [
+                'store',
+                '--label=Pica Library',
+                ...LINUX_ATTRIBUTES
+            ],
+            JSON.stringify(value)
+        )
+        if (result.error && (result.error as NodeJS.ErrnoException).code === 'ENOENT')
+            throw new Error('Linux Secret Service tooling is unavailable')
+        if (result.status !== 0)
+            throw new Error('Linux Secret Service credential persistence is unavailable')
+    }
+}
+
 export class MemoryCredentialStore implements CredentialStore {
     value: StoredCredentials | null = null
     load() {
@@ -91,5 +242,69 @@ export class MemoryCredentialStore implements CredentialStore {
     }
     save(value: StoredCredentials) {
         this.value = { ...value }
+    }
+}
+
+function linuxSecretToolAvailable(runner: SyncRunner) {
+    const result = secureCommand(runner, 'secret-tool', ['--help'])
+    return !(
+        result.error &&
+        (result.error as NodeJS.ErrnoException).code === 'ENOENT'
+    )
+}
+
+export function credentialStoreForPlatform(
+    file: string,
+    platform: NodeJS.Platform = process.platform,
+    options: {
+        runner?: SyncRunner
+        fileExists?: (file: string) => boolean
+    } = {}
+): {
+    store: CredentialStore
+    status: CredentialBackendStatus
+} {
+    const runner = options.runner ?? (spawnSync as SyncRunner)
+    const fileExists = options.fileExists ?? fs.existsSync
+    if (platform === 'win32')
+        return {
+            store: new DpapiCredentialStore(file),
+            status: {
+                kind: 'windows-dpapi',
+                securePersistence: true,
+                sessionOnly: false
+            }
+        }
+    if (platform === 'darwin' && fileExists('/usr/bin/security'))
+        return {
+            store: new MacKeychainCredentialStore(runner),
+            status: {
+                kind: 'macos-keychain',
+                securePersistence: true,
+                sessionOnly: false
+            }
+        }
+    if (platform === 'linux' && linuxSecretToolAvailable(runner))
+        return {
+            store: new SecretServiceCredentialStore(runner),
+            status: {
+                kind: 'linux-secret-service',
+                securePersistence: true,
+                sessionOnly: false
+            }
+        }
+    return {
+        store: new MemoryCredentialStore(),
+        status: {
+            kind: 'session-memory',
+            securePersistence: false,
+            sessionOnly: true,
+            reason:
+                platform === 'darwin'
+                    ? 'macOS Keychain tooling is unavailable'
+                    : platform === 'linux'
+                      ? 'Secret Service tooling is unavailable'
+                      : 'No secure persistent credential backend is configured'
+        }
     }
 }

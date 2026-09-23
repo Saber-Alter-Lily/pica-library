@@ -4,6 +4,10 @@ import net from 'node:net'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { sanitizedChildEnv, windowsExecutable } from './child-process'
+import {
+    findManagedBrowser,
+    type ManagedBrowser
+} from './managed-browser'
 
 const LOGIN_URL = 'https://forums.e-hentai.org/index.php?act=Login'
 
@@ -88,40 +92,19 @@ function sessionSignature(value: EhCapturedSession) {
     return [value.memberId, value.passHash, value.igneous ?? ''].join('|')
 }
 
-function findEdgeExecutable() {
-    const roots = [
-        process.env['ProgramFiles(x86)'],
-        process.env.ProgramFiles,
-        process.env.LOCALAPPDATA
-    ].filter((value): value is string => Boolean(value))
-    for (const root of roots) {
-        const candidate = path.join(
-            root,
-            'Microsoft',
-            'Edge',
-            'Application',
-            'msedge.exe'
-        )
-        if (fs.existsSync(candidate)) return candidate
-    }
-    try {
-        const located = spawnSync(
-            windowsExecutable('System32', 'where.exe'),
-            ['msedge.exe'],
-            {
-                encoding: 'utf8',
-                windowsHide: true,
-                env: sanitizedChildEnv()
-            }
-        )
-        const candidate = String(located.stdout ?? '')
-            .split(/\r?\n/)
-            .map((item) => item.trim())
-            .find((item) => item && fs.existsSync(item))
-        return candidate || null
-    } catch {
-        return null
-    }
+export function managedEhBrowserArgs(
+    profileRoot: string,
+    port: number
+) {
+    return [
+        `--user-data-dir=${profileRoot}`,
+        `--remote-debugging-port=${port}`,
+        '--remote-debugging-address=127.0.0.1',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--new-window',
+        LOGIN_URL
+    ]
 }
 
 async function reserveLoopbackPort() {
@@ -247,7 +230,8 @@ export class DesktopEhWebLogin {
 
     constructor(
         private readonly profileRoot: string,
-        private readonly onCaptured: (session: EhCapturedSession) => Promise<void>
+        private readonly onCaptured: (session: EhCapturedSession) => Promise<void>,
+        private readonly browser: ManagedBrowser | null = findManagedBrowser()
     ) {}
 
     status() {
@@ -261,11 +245,10 @@ export class DesktopEhWebLogin {
             this.snapshot.state === 'verifying'
         )
             return this.status()
-        if (process.platform !== 'win32')
-            throw new Error('受控 E-H 网页登录仅在 Windows Desktop 可用')
-        const edge = findEdgeExecutable()
-        if (!edge)
-            throw new Error('未找到 Microsoft Edge，请使用高级手动会话导入')
+        if (!this.browser)
+            throw new Error(
+                '未找到受支持的 Chrome / Chromium / Edge，请使用高级手动会话导入'
+            )
 
         await this.teardown(false)
         const port = await reserveLoopbackPort()
@@ -279,18 +262,10 @@ export class DesktopEhWebLogin {
             startedAt
         }
         this.process = spawn(
-            edge,
-            [
-                `--user-data-dir=${this.profileRoot}`,
-                `--remote-debugging-port=${port}`,
-                '--remote-debugging-address=127.0.0.1',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--new-window',
-                LOGIN_URL
-            ],
+            this.browser.executable,
+            managedEhBrowserArgs(this.profileRoot, port),
             {
-                windowsHide: false,
+                windowsHide: process.platform === 'win32',
                 stdio: 'ignore',
                 env: sanitizedChildEnv()
             }
@@ -407,13 +382,23 @@ export class DesktopEhWebLogin {
             }
             await delay(250)
         }
-        throw new Error('E-H 登录窗口启动失败，请检查 Microsoft Edge')
+        throw new Error(
+            'E-H 登录窗口启动失败，请检查 Chrome / Chromium / Edge'
+        )
     }
 
     private async teardown(removeProfile: boolean) {
-        this.cdp?.close()
-        this.cdp = null
-        const pid = this.process?.pid
+        if (this.cdp) {
+            try {
+                await this.cdp.send('Browser.close')
+            } catch {
+                // The user may already have closed the managed browser.
+            }
+            this.cdp.close()
+            this.cdp = null
+        }
+        const processHandle = this.process
+        const pid = processHandle?.pid
         this.process = null
         if (pid && process.platform === 'win32') {
             try {
@@ -426,6 +411,12 @@ export class DesktopEhWebLogin {
                         env: sanitizedChildEnv()
                     }
                 )
+            } catch {
+                // Browser may already be closed by the user.
+            }
+        } else if (processHandle) {
+            try {
+                processHandle.kill('SIGTERM')
             } catch {
                 // Browser may already be closed by the user.
             }

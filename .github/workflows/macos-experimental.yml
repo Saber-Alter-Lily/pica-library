@@ -9,6 +9,7 @@ on:
       - 'scripts/build-macos-experimental.sh'
       - 'scripts/test-macos-experimental.sh'
       - 'scripts/test-macos-preview-acceptance.sh'
+      - 'scripts/test-macos-preview-replacement.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -20,6 +21,7 @@ on:
       - 'scripts/build-macos-experimental.sh'
       - 'scripts/test-macos-experimental.sh'
       - 'scripts/test-macos-preview-acceptance.sh'
+      - 'scripts/test-macos-preview-replacement.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -56,6 +58,33 @@ jobs:
       - name: Build experimental macOS arm64 package
         run: bash scripts/build-macos-experimental.sh
 
+      - name: Build first W4A macOS preview baseline for replacement gate
+        env:
+          BASE_SHA: 0d11cee2e73f449c66f6aeb42655325a2d8d1760
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/pica-macos-preview-baseline"
+          rm -rf "$baseline"
+          git worktree add --detach "$baseline" "$BASE_SHA"
+          cleanup() {
+            git worktree remove --force "$baseline" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          mkdir -p "$baseline/artifacts/cache"
+          if [ -d artifacts/cache ]; then
+            cp -R artifacts/cache/. "$baseline/artifacts/cache/"
+          fi
+          (
+            cd "$baseline"
+            pnpm install --frozen-lockfile
+            bash scripts/build-macos-experimental.sh
+          )
+          baseline_archive="$(find "$baseline/artifacts" -maxdepth 1 -type f -name 'Pica-Library-*-macos-arm64-experimental.tar.gz' -print | head -n 1)"
+          test -n "$baseline_archive"
+          cp "$baseline_archive" artifacts/Pica-Library-macos-arm64-preview-baseline.tar.gz
+          cleanup
+          trap - EXIT
+
       - name: Smoke packaged macOS arm64 runtime
         run: |
           set -euo pipefail
@@ -69,6 +98,15 @@ jobs:
           archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-macos-arm64-experimental.tar.gz' -print | head -n 1)"
           test -n "$archive"
           bash scripts/test-macos-preview-acceptance.sh "$archive"
+
+      - name: Run macOS preview replacement and rollback acceptance
+        run: |
+          set -euo pipefail
+          baseline="artifacts/Pica-Library-macos-arm64-preview-baseline.tar.gz"
+          candidate="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-macos-arm64-experimental.tar.gz' -print | head -n 1)"
+          test -f "$baseline"
+          test -n "$candidate"
+          bash scripts/test-macos-preview-replacement.sh "$baseline" "$candidate"
 
       - name: Upload experimental macOS arm64 artifact
         if: github.event.repository.private == false

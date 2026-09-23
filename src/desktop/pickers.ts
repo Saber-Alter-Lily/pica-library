@@ -114,7 +114,7 @@ function pickerCommand(input: {
                       const filter = extension
                           ? `${extension.toUpperCase()} files (*.${extension})|*.${extension}`
                           : 'All files (*.*)|*.*'
-                      return `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='${name}';$d.Filter='${filter}';$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
+                      return `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='${name}';$d.Filter='${filter}';${extension ? `$d.DefaultExt='${extension}';` : ''}$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
                   })()
         return {
             command: windowsPowerShell(),
@@ -153,7 +153,9 @@ function pickerCommand(input: {
         else {
             args.push('--save', '--confirm-overwrite')
             if (input.defaultName)
-                args.push(`--filename=${input.defaultName}`)
+                args.push(
+                    `--filename=${path.join(os.homedir(), input.defaultName)}`
+                )
             if (input.extension) {
                 const extension = input.extension.replace(/[^a-z0-9]/gi, '')
                 if (extension)

@@ -76,6 +76,40 @@ describe('experimental Docker headless package P5D', () => {
         )
     })
 
+    it('gates the Remote API behind a real Caddy HTTPS terminator', () => {
+        const remote = read('scripts/test-docker-remote-tls.sh')
+        const workflow = read('.github/workflows/docker-experimental.yml')
+
+        expect(remote).toContain('caddy:2.11.4-alpine')
+        expect(remote).toContain('PICA_LIBRARY_REMOTE_HOST=0.0.0.0')
+        expect(remote).toContain(
+            'PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY=true'
+        )
+        expect(remote).toContain(
+            'PICA_LIBRARY_REMOTE_ALLOWED_HOSTS=pica.test'
+        )
+        expect(remote).toContain(
+            'PICA_LIBRARY_REMOTE_TOKEN_FILE=/run/pica-secret/token'
+        )
+        expect(remote).toContain('chmod 0600 /secret/token')
+        expect(remote).toContain('docker port "$PICA_NAME"')
+        expect(remote).toContain('tls internal')
+        expect(remote).toContain('reverse_proxy pica:8787')
+        expect(remote).toContain('--cacert "$ROOT_CA"')
+        expect(remote).not.toContain('curl -k')
+        expect(remote).not.toContain('--insecure')
+        expect(remote).toContain('Desktop management route escaped')
+        expect(remote).toContain('Unapproved browser Origin')
+        expect(remote).toContain('Bearer token leaked into Pica logs')
+        expect(remote).toContain(
+            'Remote HTTPS path did not recover after Pica container restart'
+        )
+        expect(workflow).toContain(
+            'bash scripts/test-docker-remote-tls.sh "$image"'
+        )
+        expect(workflow).toContain("'scripts/test-docker-remote-tls.sh'")
+    })
+
     it('records image provenance and base-image identity for the one-day artifact', () => {
         const build = read('scripts/build-docker-experimental.sh')
         expect(build).toContain('SOURCE_SHA')

@@ -85,6 +85,26 @@ describe('experimental Linux x64 package P5A', () => {
         expect(preview).toContain('session-only Linux credential was written to disk')
         expect(preview).toContain('linux-preview-session-secret')
     })
+    it('runs the packaged runtime on a real glibc 2.28 userspace', () => {
+        const baseline = read('scripts/test-linux-glibc228-container.sh')
+        const workflow = read('.github/workflows/linux-experimental.yml')
+
+        expect(baseline).toContain('rockylinux:8.9')
+        expect(baseline).toContain('expected Rocky Linux 8.9 glibc 2.28')
+        expect(baseline).toContain('--platform linux/amd64')
+        expect(baseline).toContain('dst=/opt/pica,readonly')
+        expect(baseline).toContain('/opt/pica/pica-library --headless')
+        expect(baseline).toContain('/api/v1/capabilities')
+        expect(baseline).toContain('/api/v1/desktop/shutdown')
+        expect(baseline).toContain('Linux glibc 2.28 packaged runtime gate: PASS')
+        expect(workflow).toContain(
+            'bash scripts/test-linux-glibc228-container.sh "$archive"'
+        )
+        expect(workflow).toContain(
+            "'scripts/test-linux-glibc228-container.sh'"
+        )
+    })
+
     it('locks the GNU/Linux x64 runtime compatibility baseline', () => {
         const build = read('scripts/build-linux-experimental.sh')
         const preflight = read('scripts/linux-runtime-preflight.sh')

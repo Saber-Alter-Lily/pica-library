@@ -24,10 +24,13 @@ never receive those credentials, including redirects and the explicitly opted-in
 ## Local web service
 
 - The service listens on `127.0.0.1` by default.
-- Non-loopback binding is rejected unless `PICA_LIBRARY_ALLOW_REMOTE=true` is set.
+- Unauthenticated non-loopback binding is rejected unconditionally. The historical
+  `PICA_LIBRARY_ALLOW_REMOTE` bypass is not supported.
 - Cross-origin browser writes are rejected.
-- Add trusted TLS, authentication and a reverse proxy before any cross-device use;
-  the current server must not be exposed directly to the public internet.
+- Headless / Docker mode does not change this network boundary.
+- Remote Web / NAS access must use a separately implemented authenticated mode,
+  with trusted TLS or an authenticated TLS-terminating reverse proxy. The local
+  server must not be exposed directly to an untrusted network.
 
 ## Downloaded content
 

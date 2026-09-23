@@ -2015,7 +2015,7 @@ export class LibraryDatabase {
 
     listAllComics(query: ComicQuery = {}): StoredComic[] {
         return this.listComics(
-            { ...query, limit: Number.MAX_SAFE_INTEGER, offset: query.offset ?? 0 },
+            { ...query, limit: Number.MAX_SAFE_INTEGER, offset: 0 },
             Number.MAX_SAFE_INTEGER
         )
     }

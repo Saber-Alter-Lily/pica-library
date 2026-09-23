@@ -30,10 +30,15 @@ CACHE_DIR="$ROOT/artifacts/cache"
 RUNTIME_FILE="node-v${NODE_VERSION}-darwin-arm64.tar.gz"
 RUNTIME_CACHE="$CACHE_DIR/$RUNTIME_FILE"
 RUNTIME_EXTRACT="$BUILD_ROOT/runtime-extract"
+APP_BUNDLE="$STAGE/Pica Library.app"
+CONTENTS="$APP_BUNDLE/Contents"
+MACOS_DIR="$CONTENTS/MacOS"
+RESOURCES="$CONTENTS/Resources"
+ICONSET="$BUILD_ROOT/PicaLibrary.iconset"
 
-rm -rf "$STAGE" "$RUNTIME_EXTRACT"
+rm -rf "$STAGE" "$RUNTIME_EXTRACT" "$ICONSET"
 rm -f "$ARCHIVE"
-mkdir -p   "$STAGE/app"   "$STAGE/runtime/bin"   "$STAGE/licenses"   "$CACHE_DIR"   "$ROOT/artifacts"
+mkdir -p "$MACOS_DIR" "$RESOURCES/app" "$RESOURCES/runtime/bin" "$RESOURCES/licenses" "$CACHE_DIR" "$ROOT/artifacts"
 
 (
   cd "$ROOT"
@@ -60,19 +65,19 @@ fi
 mkdir -p "$RUNTIME_EXTRACT"
 tar -xzf "$RUNTIME_CACHE" -C "$RUNTIME_EXTRACT"
 RUNTIME_ROOT="$RUNTIME_EXTRACT/node-v${NODE_VERSION}-darwin-arm64"
-cp "$RUNTIME_ROOT/bin/node" "$STAGE/runtime/bin/node"
-chmod 0755 "$STAGE/runtime/bin/node"
-cp "$RUNTIME_ROOT/LICENSE" "$STAGE/licenses/Node.js-LICENSE.txt"
+cp "$RUNTIME_ROOT/bin/node" "$RESOURCES/runtime/bin/node"
+chmod 0755 "$RESOURCES/runtime/bin/node"
+cp "$RUNTIME_ROOT/LICENSE" "$RESOURCES/licenses/Node.js-LICENSE.txt"
 
 NODE_MIN_MACOS="$(
-  otool -l "$STAGE/runtime/bin/node" |
+  otool -l "$RESOURCES/runtime/bin/node" |
     awk '/LC_BUILD_VERSION/{found=1;next} found&&/minos/{print $2;exit}'
 )"
 if [[ ! "$NODE_MIN_MACOS" =~ ^[0-9]+(\.[0-9]+)+$ ]]; then
   echo "Could not determine bundled Node.js minimum macOS version" >&2
   exit 1
 fi
-if ! "$STAGE/runtime/bin/node" - "$NODE_MIN_MACOS" "$MIN_MACOS" <<'NODE'
+if ! "$RESOURCES/runtime/bin/node" - "$NODE_MIN_MACOS" "$MIN_MACOS" <<'NODE'
 const [observed, declared] = process.argv.slice(2).map((value) =>
   value.split('.').map(Number)
 )
@@ -89,13 +94,13 @@ then
   exit 1
 fi
 
-cp "$ROOT"/dist/*.js "$STAGE/app/"
-cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"
-cp -R "$ROOT/web" "$STAGE/web"
+cp "$ROOT"/dist/*.js "$RESOURCES/app/"
+cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$RESOURCES/licenses/THIRD_PARTY_LICENSES.txt"
+cp -R "$ROOT/web" "$RESOURCES/web"
 
 REGISTRY_SOURCE="$ROOT/src/data/registry-v3-final"
-REGISTRY_TARGET="$STAGE/src/data/registry-v3-final"
-REGISTRY_MIRROR="$STAGE/app/runtime-assets/registry-v3-final"
+REGISTRY_TARGET="$RESOURCES/src/data/registry-v3-final"
+REGISTRY_MIRROR="$RESOURCES/app/runtime-assets/registry-v3-final"
 mkdir -p "$REGISTRY_TARGET" "$REGISTRY_MIRROR"
 cp -R "$REGISTRY_SOURCE"/. "$REGISTRY_TARGET/"
 cp -R "$REGISTRY_SOURCE"/. "$REGISTRY_MIRROR/"
@@ -106,7 +111,7 @@ if [[ ! -f "$REGISTRY_MANIFEST" ]]; then
   exit 1
 fi
 RUNTIME_SEMANTIC_FILE="$(
-  "$STAGE/runtime/bin/node" -e     "const fs=require('fs');const m=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(String(m.runtime_semantic_file||''));"     "$REGISTRY_MANIFEST"
+  "$RESOURCES/runtime/bin/node" -e     "const fs=require('fs');const m=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.stdout.write(String(m.runtime_semantic_file||''));"     "$REGISTRY_MANIFEST"
 )"
 for asset in   "PICA_REGISTRY_V3_FINAL_MANIFEST.json"   "$RUNTIME_SEMANTIC_FILE"   "PICA_ENTITY_REGISTRY_V3_FINAL.csv"   "PICA_TAG_ALIAS_MAP_V3_FINAL.json"   "PICA_TAG_UNRESOLVED_V3_FINAL_WATCHLIST.csv"   "PICA_TAG_LIBRARY_V2_REVIEWED.csv"   "PICA_TAG_ALIAS_MAP_V2.json"
 do
@@ -116,16 +121,108 @@ do
   fi
 done
 
-cp "$ROOT/LICENSE" "$STAGE/LICENSE"
+cp "$ROOT/LICENSE" "$RESOURCES/LICENSE"
 for notice in NOTICE.md UPSTREAM.md DISCLAIMER.md; do
-  cp "$ROOT/$notice" "$STAGE/$notice"
+  cp "$ROOT/$notice" "$RESOURCES/$notice"
+done
+
+cat > "$MACOS_DIR/Pica Library" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+CONTENTS="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+RESOURCES="$CONTENTS/Resources"
+exec "$RESOURCES/runtime/bin/node" "$RESOURCES/app/desktop.js" "$@"
+EOF
+chmod 0755 "$MACOS_DIR/Pica Library"
+
+cat > "$CONTENTS/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>Pica Library</string>
+  <key>CFBundleExecutable</key>
+  <string>Pica Library</string>
+  <key>CFBundleIdentifier</key>
+  <string>org.picalibrary.desktop</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>Pica Library</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>$PRODUCT_VERSION</string>
+  <key>CFBundleVersion</key>
+  <string>$PRODUCT_VERSION</string>
+  <key>CFBundleIconFile</key>
+  <string>PicaLibrary.icns</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>$MIN_MACOS</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+</dict>
+</plist>
+EOF
+plutil -lint "$CONTENTS/Info.plist" >/dev/null
+
+ICON_SOURCE="$ROOT/web/pica-library-icon.webp"
+if [[ ! -s "$ICON_SOURCE" ]]; then
+  echo "macOS application icon source is missing" >&2
+  exit 1
+fi
+mkdir -p "$ICONSET"
+sips -s format png "$ICON_SOURCE" --out "$BUILD_ROOT/PicaLibrary-icon.png" >/dev/null
+for spec in \
+  "16 icon_16x16.png" \
+  "32 icon_16x16@2x.png" \
+  "32 icon_32x32.png" \
+  "64 icon_32x32@2x.png" \
+  "128 icon_128x128.png" \
+  "256 icon_128x128@2x.png" \
+  "256 icon_256x256.png" \
+  "512 icon_256x256@2x.png" \
+  "512 icon_512x512.png" \
+  "1024 icon_512x512@2x.png"
+do
+  size="${spec%% *}"
+  file="${spec#* }"
+  sips -z "$size" "$size" "$BUILD_ROOT/PicaLibrary-icon.png" --out "$ICONSET/$file" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$RESOURCES/PicaLibrary.icns"
+[[ -s "$RESOURCES/PicaLibrary.icns" ]] || { echo "macOS .icns generation failed" >&2; exit 1; }
+
+printf '%s\n' "$SOURCE_SHA" > "$RESOURCES/SOURCE_SHA.txt"
+
+cat > "$RESOURCES/PLATFORM_REQUIREMENTS.json" <<EOF
+{
+  "schemaVersion": 1,
+  "platform": "macos",
+  "arch": "arm64",
+  "minimumMacOS": "$MIN_MACOS",
+  "observedNodeMinOS": "$NODE_MIN_MACOS",
+  "nodeVersion": "$NODE_VERSION",
+  "bundleIdentifier": "org.picalibrary.desktop",
+  "applicationBundle": true,
+  "formalRelease": false,
+  "signed": false,
+  "notarized": false
+}
+EOF
+
+# Keep the existing CLI/debug surface without duplicating the canonical app payload.
+for item in app runtime web src licenses LICENSE NOTICE.md UPSTREAM.md DISCLAIMER.md SOURCE_SHA.txt PLATFORM_REQUIREMENTS.json; do
+  ln -s "Pica Library.app/Contents/Resources/$item" "$STAGE/$item"
 done
 
 cat > "$STAGE/pica-library" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-exec "$ROOT/runtime/bin/node" "$ROOT/app/desktop.js" "$@"
+exec "$ROOT/Pica Library.app/Contents/MacOS/Pica Library" "$@"
 EOF
 chmod 0755 "$STAGE/pica-library"
 
@@ -133,7 +230,7 @@ cat > "$STAGE/Pica Library.command" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-exec "$ROOT/pica-library" "$@"
+exec "$ROOT/Pica Library.app/Contents/MacOS/Pica Library" "$@"
 EOF
 chmod 0755 "$STAGE/Pica Library.command"
 
@@ -142,44 +239,44 @@ Pica Library experimental macOS arm64 runtime
 Product version: $PRODUCT_VERSION
 Source: $SOURCE_SHA
 
-1. Extract the entire archive.
-2. Run ./pica-library from Terminal, or use "Pica Library.command".
-3. Pica Library opens in your default browser in interactive mode. Use --headless for a persistent no-GUI local engine.
+Primary preview launcher:
+- Pica Library.app
 
-Runtime baseline for this package:
+Compatibility/debug launchers:
+- ./pica-library
+- "Pica Library.command"
+
+Runtime baseline:
 - Apple Silicon (arm64)
 - macOS >= $MIN_MACOS
 - bundled official Node.js $NODE_VERSION darwin-arm64 runtime
 - observed Node Mach-O minimum: macOS $NODE_MIN_MACOS
 
-This is an unsigned experimental CI artifact, not a formal macOS release.
-It is not notarized and is not distributed through GitHub Releases.
-Self-update is intentionally disabled on macOS at this stage.
+The .app bundle is self-contained and uses bundle identifier org.picalibrary.desktop.
+This is still an unsigned, unnotarized experimental CI artifact.
+Self-update remains disabled on macOS.
 Saved credentials use macOS Keychain.
 Folder/save dialogs use native macOS dialogs.
 
-Formal macOS distribution still requires Developer ID signing,
-notarization, package UX, and a platform-specific update strategy.
+Formal macOS distribution still requires Developer ID signing, hardened-runtime
+review, notarization, Gatekeeper acceptance, and release-channel policy.
 EOF
 
-printf '%s
-' "$SOURCE_SHA" > "$STAGE/SOURCE_SHA.txt"
-
-cat > "$STAGE/PLATFORM_REQUIREMENTS.json" <<EOF
-{
-  "schemaVersion": 1,
-  "platform": "macos",
-  "arch": "arm64",
-  "minimumMacOS": "$MIN_MACOS",
-  "observedNodeMinOS": "$NODE_MIN_MACOS",
-  "nodeVersion": "$NODE_VERSION",
-  "formalRelease": false,
-  "signed": false,
-  "notarized": false
-}
-EOF
-
-for required in   "$STAGE/runtime/bin/node"   "$STAGE/app/pica-library.js"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"   "$STAGE/PLATFORM_REQUIREMENTS.json"
+for required in \
+  "$CONTENTS/Info.plist" \
+  "$MACOS_DIR/Pica Library" \
+  "$RESOURCES/PicaLibrary.icns" \
+  "$RESOURCES/runtime/bin/node" \
+  "$RESOURCES/app/pica-library.js" \
+  "$RESOURCES/app/desktop.js" \
+  "$RESOURCES/licenses/Node.js-LICENSE.txt" \
+  "$RESOURCES/licenses/THIRD_PARTY_LICENSES.txt" \
+  "$RESOURCES/web/index.html" \
+  "$RESOURCES/LICENSE" \
+  "$RESOURCES/SOURCE_SHA.txt" \
+  "$RESOURCES/PLATFORM_REQUIREMENTS.json" \
+  "$STAGE/pica-library" \
+  "$STAGE/Pica Library.command"
 do
   if [[ ! -s "$required" ]]; then
     echo "Required macOS package file is missing or empty: $required" >&2
@@ -211,4 +308,4 @@ cat > "$ROOT/artifacts/MACOS-EXPERIMENTAL-SHA256SUMS.txt" <<EOF
 $HASH  $(basename "$ARCHIVE")
 EOF
 
-"$STAGE/runtime/bin/node" -e   "console.log(JSON.stringify({path:process.argv[1],sha256:process.argv[2],size_bytes:Number(process.argv[3]),uncompressed_bytes:Number(process.argv[4]),file_count:Number(process.argv[5]),node_version:process.argv[6],product_version:process.argv[7],source_sha:process.argv[8],minimum_macos:process.argv[9],observed_node_minos:process.argv[10],formal_release:false,signed:false,notarized:false},null,2))"   "$ARCHIVE" "$HASH" "$SIZE" "$UNCOMPRESSED" "$FILE_COUNT" "$NODE_VERSION" "$PRODUCT_VERSION" "$SOURCE_SHA" "$MIN_MACOS" "$NODE_MIN_MACOS"
+"$RESOURCES/runtime/bin/node" -e   "console.log(JSON.stringify({path:process.argv[1],sha256:process.argv[2],size_bytes:Number(process.argv[3]),uncompressed_bytes:Number(process.argv[4]),file_count:Number(process.argv[5]),node_version:process.argv[6],product_version:process.argv[7],source_sha:process.argv[8],minimum_macos:process.argv[9],observed_node_minos:process.argv[10],bundle_identifier:'org.picalibrary.desktop',application_bundle:true,formal_release:false,signed:false,notarized:false},null,2))"   "$ARCHIVE" "$HASH" "$SIZE" "$UNCOMPRESSED" "$FILE_COUNT" "$NODE_VERSION" "$PRODUCT_VERSION" "$SOURCE_SHA" "$MIN_MACOS" "$NODE_MIN_MACOS"

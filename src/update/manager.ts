@@ -16,6 +16,14 @@ import {
     selectReleaseUpdateAsset,
     updateAssetNamesForChecksums
 } from './release-assets'
+import {
+    LEGACY_GENERIC_UPDATE_TARGET,
+    isLegacyGenericUpdateTarget,
+    normalizeUpdateTarget,
+    sameUpdateTarget,
+    updateTargetKey,
+    type UpdateTarget
+} from './target'
 import type {
     StagedUpdate,
     UpdateManifest,
@@ -60,6 +68,22 @@ function exactSourceMatches(range: string, version: string) {
     )
 }
 
+function manifestUpdateTarget(manifest: UpdateManifest) {
+    const hasPlatform = manifest.targetPlatform !== undefined
+    const hasArch = manifest.targetArch !== undefined
+    if (hasPlatform !== hasArch)
+        throw new Error(
+            'Update manifest targetPlatform and targetArch must be declared together'
+        )
+    if (!hasPlatform) return null
+    const target = normalizeUpdateTarget(
+        manifest.targetPlatform,
+        manifest.targetArch
+    )
+    if (!target) throw new Error('Update manifest target is unsupported')
+    return target
+}
+
 function readManifest(zip: AdmZip): UpdateManifest {
     const entry = zip.getEntry('update-manifest.json')
     if (!entry) throw new Error('update-manifest.json is missing')
@@ -94,6 +118,7 @@ function readManifest(zip: AdmZip): UpdateManifest {
         throw new Error('Invalid databaseSchemaVersion')
     if (!Array.isArray(manifest.files) || !Array.isArray(manifest.deletions))
         throw new Error('Update manifest file lists are invalid')
+    manifestUpdateTarget(manifest)
     return manifest
 }
 
@@ -170,6 +195,7 @@ export interface UpdateManagerOptions {
     runtimePath: string
     desktopEntryPath: string
     instanceFile: string
+    target?: UpdateTarget | null
     fetchImplementation?: typeof fetch
 }
 
@@ -180,6 +206,15 @@ export class UpdateManager {
     constructor(private readonly options: UpdateManagerOptions) {
         this.progressFile = path.join(options.stateRoot, 'update-progress.json')
         fs.mkdirSync(options.stateRoot, { recursive: true })
+    }
+
+    private updateTarget() {
+        // Omitted target preserves the historical Windows x64 behavior for
+        // tests and old internal callers. Production Desktop passes an
+        // explicit runtime target (or null when unsupported).
+        return this.options.target === undefined
+            ? LEGACY_GENERIC_UPDATE_TARGET
+            : this.options.target
     }
 
     progress(): UpdateProgress {
@@ -323,11 +358,15 @@ export class UpdateManager {
                 if (!release.draft && !release.prerelease) {
                     const releaseUrl = release.html_url ??
                         `https://github.com/${officialRepository}/releases/tag/${encodeURIComponent(tag)}`
-                    const updateAsset = selectReleaseUpdateAsset(
-                        release.assets,
-                        version,
-                        this.options.currentVersion
-                    )
+                    const target = this.updateTarget()
+                    const updateAsset = target
+                        ? selectReleaseUpdateAsset(
+                              release.assets,
+                              version,
+                              this.options.currentVersion,
+                              target
+                          )
+                        : null
                     return this.availableFromRelease(
                         version,
                         releaseUrl,
@@ -354,10 +393,14 @@ export class UpdateManager {
             if (!match) throw new Error('could not resolve latest version from checksum redirect')
             const version = match[1]
             const sums = await sumsResponse.text()
-            const assetName = updateAssetNamesForChecksums(
-                version,
-                this.options.currentVersion
-            ).find((name) => this.shaFromSums(sums, name))
+            const target = this.updateTarget()
+            const assetName = target
+                ? updateAssetNamesForChecksums(
+                      version,
+                      this.options.currentVersion,
+                      target
+                  ).find((name) => this.shaFromSums(sums, name))
+                : undefined
             const releaseUrl = `https://github.com/${officialRepository}/releases/tag/v${version}`
             return this.availableFromRelease(
                 version,
@@ -381,6 +424,22 @@ export class UpdateManager {
             const archiveHash = sha256(buffer)
         const zip = new AdmZip(buffer)
         const manifest = readManifest(zip)
+        const installedTarget = this.updateTarget()
+        if (!installedTarget)
+            throw new Error(
+                'Automatic updates are not supported on this OS/architecture'
+            )
+        const packageTarget = manifestUpdateTarget(manifest)
+        if (packageTarget) {
+            if (!sameUpdateTarget(packageTarget, installedTarget))
+                throw new Error(
+                    `Update package targets ${updateTargetKey(packageTarget)}; installed runtime is ${updateTargetKey(installedTarget)}`
+                )
+        } else if (!isLegacyGenericUpdateTarget(installedTarget)) {
+            throw new Error(
+                'Legacy update packages without target metadata are supported only on windows-x64'
+            )
+        }
         const compatibility = classifyUpdateCompatibility({
             currentAppApiVersion: APP_API_VERSION,
             currentDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION,
@@ -576,6 +635,7 @@ export const updateInternals = {
     stableVersionParts,
     isNewerStable,
     readManifest,
+    manifestUpdateTarget,
     validateFileList,
     sha256
 }

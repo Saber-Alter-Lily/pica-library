@@ -92,6 +92,8 @@ describe('experimental Linux x64 package P5A', () => {
         expect(baseline).toContain('rockylinux:8.9')
         expect(baseline).toContain('expected Rocky Linux 8.9 glibc 2.28')
         expect(baseline).toContain('--platform linux/amd64')
+        expect(baseline).toContain('--user "$(id -u):$(id -g)"')
+        expect(baseline).toContain('-e HOME=/data/home')
         expect(baseline).toContain('dst=/opt/pica,readonly')
         expect(baseline).toContain('/opt/pica/pica-library --headless')
         expect(baseline).toContain('/api/v1/capabilities')

@@ -70,13 +70,14 @@ than a floating tag.
 
 ## Prepare the bearer token
 
-From the directory that contains the Compose bundle:
+From the repository root (or adapt the paths to your deployment directory):
 
 ```bash
-mkdir -p secrets
+mkdir -p packaging/docker/server-preview/secrets
 umask 077
-openssl rand -hex 32 > secrets/remote-api-token
-chmod 0600 secrets/remote-api-token
+openssl rand -hex 32 > packaging/docker/server-preview/secrets/remote-api-token
+chmod 0600 packaging/docker/server-preview/secrets/remote-api-token
+export PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST="$PWD/packaging/docker/server-preview/secrets/remote-api-token"
 ```
 
 Do not commit this file. Do not put the bearer token into
@@ -90,6 +91,7 @@ Set the immutable/local image reference and hostname:
 ```bash
 export PICA_LIBRARY_IMAGE='pica-library:0.4.11-<source>-docker-amd64-experimental'
 export PICA_LIBRARY_DOMAIN='library.example.com'
+export PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST="$PWD/packaging/docker/server-preview/secrets/remote-api-token"
 
 docker compose -f packaging/docker/server-preview/compose.yaml config
 docker compose -f packaging/docker/server-preview/compose.yaml up -d
@@ -110,7 +112,7 @@ curl https://"$PICA_LIBRARY_DOMAIN"/healthz
 An API call needs the bearer token:
 
 ```bash
-TOKEN="$(cat secrets/remote-api-token)"
+TOKEN="$(cat \"$PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST\")"
 curl   -H "Authorization: Bearer $TOKEN"   "https://$PICA_LIBRARY_DOMAIN/api/v1/capabilities"
 unset TOKEN
 ```

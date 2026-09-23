@@ -69,6 +69,22 @@ describe('Desktop headless runtime foundation P5C', () => {
         )
     })
 
+    it('keeps graceful cleanup but guarantees explicit shutdown cannot be held open by background handles', () => {
+        const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
+        expect(main).toContain('await closeEngine()')
+        expect(main).toContain('instance.release()')
+        expect(main).toContain('process.exitCode = exitCode')
+        expect(main).toContain(
+            'const finalExit = setTimeout(() => process.exit(exitCode), 250)'
+        )
+        expect(main).toContain('finalExit.unref()')
+        expect(main).toContain(
+            'Shutdown: Desktop controller request received'
+        )
+        expect(main).toContain('void stop()')
+        expect(main).not.toContain('setImmediate(() => void stop())')
+    })
+
     it('does not treat headless mode as a formal remote-server or release capability', () => {
         const platform = fs.readFileSync('src/desktop/platform.ts', 'utf8')
         const server = fs.readFileSync('src/library/server.ts', 'utf8')

@@ -89,6 +89,9 @@ fs.writeFileSync(file,JSON.stringify({
   architecture:'amd64',
   headless:true,
   remote_web_exposed:false,
+  remote_api_opt_in:true,
+  remote_api_default_enabled:false,
+  remote_api_secret_file_required:true,
   formal_release:false
 },null,2)+'\n')
 NODE

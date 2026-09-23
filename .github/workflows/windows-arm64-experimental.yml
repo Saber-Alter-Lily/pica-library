@@ -9,6 +9,7 @@ on:
       - 'packaging/windows/Launcher.cs'
       - 'scripts/build-windows-arm64-experimental.ps1'
       - 'scripts/test-windows-arm64-experimental.ps1'
+      - 'scripts/test-windows-arm64-preview-replacement.ps1'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -20,6 +21,7 @@ on:
       - 'packaging/windows/Launcher.cs'
       - 'scripts/build-windows-arm64-experimental.ps1'
       - 'scripts/test-windows-arm64-experimental.ps1'
+      - 'scripts/test-windows-arm64-preview-replacement.ps1'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -60,6 +62,33 @@ jobs:
         shell: pwsh
         run: ./scripts/build-windows-arm64-experimental.ps1
 
+      - name: Build first accepted Windows ARM64 preview baseline
+        shell: pwsh
+        env:
+          BASE_SHA: c820c3f8ccba70dfb09e81602fe2116f992323ed
+        run: |
+          $baseline = Join-Path $env:RUNNER_TEMP 'pica-windows-arm64-preview-baseline'
+          if (Test-Path -LiteralPath $baseline) { Remove-Item -Recurse -Force -LiteralPath $baseline }
+          git worktree add --detach $baseline $env:BASE_SHA
+          try {
+            New-Item -ItemType Directory -Force -Path (Join-Path $baseline 'artifacts\cache') | Out-Null
+            if (Test-Path -LiteralPath 'artifacts\cache') {
+              Copy-Item -Path 'artifacts\cache\*' -Destination (Join-Path $baseline 'artifacts\cache') -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Push-Location $baseline
+            try {
+              pnpm install --frozen-lockfile
+              ./scripts/build-windows-arm64-experimental.ps1
+            } finally {
+              Pop-Location
+            }
+            $baselineArchive = @(Get-ChildItem (Join-Path $baseline 'artifacts') -File -Filter 'Pica-Library-*-windows-arm64-experimental.zip')[0]
+            if (-not $baselineArchive) { throw 'Windows ARM64 baseline archive was not built' }
+            Copy-Item -LiteralPath $baselineArchive.FullName -Destination 'artifacts\Pica-Library-windows-arm64-preview-baseline.zip'
+          } finally {
+            git worktree remove --force $baseline
+          }
+
       - name: Run Windows ARM64 packaged acceptance
         timeout-minutes: 6
         shell: pwsh
@@ -67,6 +96,15 @@ jobs:
           $archive = @(Get-ChildItem artifacts -File -Filter 'Pica-Library-*-windows-arm64-experimental.zip')[0]
           if (-not $archive) { throw 'Windows ARM64 experimental archive not found' }
           ./scripts/test-windows-arm64-experimental.ps1 -Archive $archive.FullName
+
+      - name: Run Windows ARM64 preview replacement and rollback acceptance
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          $baseline = Get-Item 'artifacts\Pica-Library-windows-arm64-preview-baseline.zip'
+          $candidate = @(Get-ChildItem artifacts -File -Filter 'Pica-Library-*-windows-arm64-experimental.zip')[0]
+          if (-not $candidate) { throw 'Windows ARM64 candidate archive not found' }
+          ./scripts/test-windows-arm64-preview-replacement.ps1 -BaselineArchive $baseline.FullName -CandidateArchive $candidate.FullName
 
       - name: Upload experimental Windows ARM64 artifact
         if: github.event.repository.private == false

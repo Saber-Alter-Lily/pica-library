@@ -45,7 +45,8 @@ The macOS experimental workflow runs on a native Apple Silicon
    isolated temporary macOS Keychain, prove the secret does not appear under
    the Pica data root, restart the process, and prove the credentials reload
    from Keychain;
-10. keep `distributionReady=false`, `selfUpdate=false`,
+10. build the first accepted W4A macOS preview and the current candidate as distinct archives, replace the application tree at the same install path while retaining one external data root, verify library/shelf/task state survives, then restore the pre-upgrade data snapshot and baseline application tree to prove rollback removes candidate-only state;
+11. keep `distributionReady=false`, `selfUpdate=false`,
     `signed=false` and `notarized=false`.
 
 No real Provider credentials or manga assets are used in this automated flow.
@@ -64,8 +65,7 @@ distribution. Promotion requires separate evidence for:
   UX rather than only a Terminal-oriented archive;
 - Developer ID signing, hardened runtime where appropriate, notarization and
   Gatekeeper acceptance;
-- a full-package replacement/rollback test using the same external user-data
-  root;
+- a schema-changing macOS preview migration/rollback when a future candidate raises the database schema; the current automated replacement gate already covers same-schema application replacement and external-data snapshot rollback;
 - at least one runtime test near macOS 13.5 instead of relying only on the
   current macOS 15 hosted runner;
 - cold start, long-reader and task-concurrency measurements on reference Apple

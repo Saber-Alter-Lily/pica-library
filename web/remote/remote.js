@@ -652,5 +652,17 @@ $('#reader-next').addEventListener('click', () => {
   renderReaderPage()
 })
 
+async function registerPwaShell() {
+  if (!('serviceWorker' in navigator)) return
+  try {
+    await navigator.serviceWorker.register('/remote/sw.js', {
+      scope: '/remote/'
+    })
+  } catch {
+    // PWA installation is optional; the online Remote Web shell stays usable.
+  }
+}
+
 applyLanguage()
+void registerPwaShell()
 void restoreSession()

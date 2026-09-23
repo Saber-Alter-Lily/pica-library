@@ -54,8 +54,9 @@ export function defaultDesktopRoot(
     home = os.homedir()
 ) {
     if (platform === 'win32')
-        return path.join(
-            environment.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local'),
+        return path.win32.join(
+            environment.LOCALAPPDATA ??
+                path.win32.join(home, 'AppData', 'Local'),
             'Pica Library'
         )
     if (platform === 'darwin')
@@ -74,7 +75,7 @@ export function browserLaunchSpec(
 ): BrowserLaunchSpec | null {
     if (platform === 'win32')
         return {
-            command: path.join(
+            command: path.win32.join(
                 environment.SystemRoot ?? 'C:\\Windows',
                 'System32',
                 'cmd.exe'

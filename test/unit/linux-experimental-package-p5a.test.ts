@@ -133,6 +133,37 @@ describe('experimental Linux x64 package P5A', () => {
         expect(replacement).toContain('Linux preview replacement/rollback acceptance: PASS')
     })
 
+    it('ships and validates a rootless Linux desktop-menu install flow', () => {
+        const build = read('scripts/build-linux-experimental.sh')
+        const install = read('scripts/install-linux-user.sh')
+        const uninstall = read('scripts/uninstall-linux-user.sh')
+        const acceptance = read('scripts/test-linux-user-desktop-install.sh')
+        const workflow = read('.github/workflows/linux-experimental.yml')
+
+        expect(build).toContain('install-linux-user.sh')
+        expect(build).toContain('uninstall-linux-user.sh')
+        expect(install).toContain('$HOME/.local/opt/pica-library')
+        expect(install).toContain('org.picalibrary.PicaLibrary.desktop')
+        expect(install).toContain('icons/hicolor/scalable/apps')
+        expect(install).toContain('data:image/webp;base64,')
+        expect(install).toContain('desktop-file-validate')
+        expect(install).toContain('Refusing install: application root would contain')
+        expect(uninstall).toContain('User data was not removed')
+        expect(uninstall).not.toContain('rm -rf "$DATA_ROOT"')
+        expect(acceptance).toContain('HOME="$WORK/home with space"')
+        expect(acceptance).toContain('desktop-file-validate "$DESKTOP_FILE"')
+        expect(acceptance).toContain('stale-preview-file.txt')
+        expect(acceptance).toContain('uninstaller removed the user database')
+        expect(acceptance).toContain('Linux user desktop-install acceptance: PASS')
+        expect(workflow).toContain('desktop-file-utils')
+        expect(workflow).toContain(
+            'bash scripts/test-linux-user-desktop-install.sh "$archive"'
+        )
+        expect(workflow).toContain("'scripts/install-linux-user.sh'")
+        expect(workflow).toContain("'scripts/uninstall-linux-user.sh'")
+        expect(workflow).toContain("'scripts/test-linux-user-desktop-install.sh'")
+    })
+
     it('locks the GNU/Linux x64 runtime compatibility baseline', () => {
         const build = read('scripts/build-linux-experimental.sh')
         const preflight = read('scripts/linux-runtime-preflight.sh')

@@ -84,6 +84,27 @@ const checks = {
   shelvesPersisted(v) {
     assert(Array.isArray(v), 'shelf list missing after restart')
     assert(v.some((shelf) => shelf.name === 'Linux Preview Acceptance'), 'shelf did not persist across restart')
+  },
+  readerChapters(v) {
+    assert(Array.isArray(v), 'reader chapter list missing')
+    assert(v.some((episode) => episode.id === 'linux-preview-ep-1' && episode.downloadedPictures === 1), 'downloaded reader chapter missing')
+  },
+  readerChapter(v) {
+    assert(v.episode?.id === 'linux-preview-ep-1', 'reader opened the wrong episode')
+    assert(Array.isArray(v.pages) && v.pages.length === 1, 'reader page list mismatch')
+    assert(v.pages[0]?.id === 'linux-preview-pic-1', 'reader returned the wrong page')
+  },
+  readerProgressSaved(v) {
+    assert(v.comicId === 'linux-preview-1', 'reader progress comic mismatch')
+    assert(v.episodeId === 'linux-preview-ep-1', 'reader progress episode mismatch')
+    assert(v.pageIndex === 0, 'reader progress page mismatch')
+  },
+  readerProgressPersisted(v) {
+    assert(Array.isArray(v), 'reader progress list missing after restart')
+    assert(v.some((row) => row.comicId === 'linux-preview-1' && row.episodeId === 'linux-preview-ep-1' && row.pageIndex === 0), 'reader progress did not persist across restart')
+  },
+  readerChapterResumed(v) {
+    assert(v.progress?.pageIndex === 0, 'reader chapter did not restore saved progress')
   }
 }
 if (!checks[source]) throw new Error(`unknown assertion set: ${source}`)
@@ -116,7 +137,7 @@ start_engine() {
   : > "$LOG"
   PICA_LIBRARY_DESKTOP_HOME="$DATA_HOME"     "$PACKAGE_ROOT/pica-library" --headless >"$LOG" 2>&1 &
   ENGINE_PID="$!"
-  wait_for_engine
+  URL="$(wait_for_engine)"
 }
 
 stop_engine() {
@@ -170,7 +191,52 @@ const value=JSON.parse(fs.readFileSync(process.argv[2],'utf8'))
 if(!Array.isArray(value)||value.length!==2)throw new Error('packaged CLI did not reopen the imported library')
 NODE
 
-URL="$(start_engine)"
+PAGE_FILE="$DATA_HOME/data/linux-preview-reader.png"
+"$PACKAGE_ROOT/runtime/bin/node" - "$DATA_HOME/data/library.db" "$PAGE_FILE" <<'NODE'
+const fs = require('fs')
+const crypto = require('crypto')
+const { DatabaseSync } = require('node:sqlite')
+const [databaseFile, pageFile] = process.argv.slice(2)
+const png = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aO0sAAAAASUVORK5CYII=',
+  'base64'
+)
+fs.writeFileSync(pageFile, png)
+const db = new DatabaseSync(databaseFile)
+const now = new Date().toISOString()
+db.prepare(
+  `INSERT INTO episodes(id, comic_id, title, order_no, updated_at_source, first_seen_at, last_seen_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
+).run('linux-preview-ep-1', 'linux-preview-1', 'Preview Chapter', 1, now, now, now)
+db.prepare(
+  `INSERT INTO pictures(id, comic_id, episode_id, position, original_name, media_path, file_server, first_seen_at, last_seen_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+).run(
+  'linux-preview-pic-1',
+  'linux-preview-1',
+  'linux-preview-ep-1',
+  1,
+  'linux-preview-reader.png',
+  'linux-preview-reader.png',
+  'https://fixture.invalid',
+  now,
+  now
+)
+db.prepare(
+  `UPDATE pictures
+   SET status = 'completed', local_path = ?, byte_size = ?, sha256 = ?, last_seen_at = ?
+   WHERE id = ?`
+).run(
+  pageFile,
+  png.length,
+  crypto.createHash('sha256').update(png).digest('hex'),
+  now,
+  'linux-preview-pic-1'
+)
+db.close()
+NODE
+
+start_engine
 
 curl --fail --silent "$URL/" > "$WORK/index.html"
 grep -q "Pica Library" "$WORK/index.html" || fail "packaged Web UI was not served"
@@ -196,6 +262,18 @@ json_assert "$WORK/shelf-add.json" shelfAdd
 curl --fail --silent "$URL/api/v1/shelves/$SHELF_ID" > "$WORK/shelf-contents.json"
 json_assert "$WORK/shelf-contents.json" shelfContents
 
+curl --fail --silent "$URL/api/v1/reader/comics/linux-preview-1/chapters" > "$WORK/reader-chapters.json"
+json_assert "$WORK/reader-chapters.json" readerChapters
+
+curl --fail --silent "$URL/api/v1/reader/comics/linux-preview-1/chapters/linux-preview-ep-1" > "$WORK/reader-chapter.json"
+json_assert "$WORK/reader-chapter.json" readerChapter
+
+curl --fail --silent "$URL/api/v1/reader/pictures/linux-preview-pic-1" > "$WORK/reader-page.png"
+cmp -s "$PAGE_FILE" "$WORK/reader-page.png" || fail "reader page bytes changed in packaged runtime"
+
+curl --fail --silent   -X POST   -H "content-type: application/json"   -H "Origin: $URL"   --data '{"comicId":"linux-preview-1","episodeId":"linux-preview-ep-1","pageIndex":0}'   "$URL/api/v1/reader/progress" > "$WORK/reader-progress-saved.json"
+json_assert "$WORK/reader-progress-saved.json" readerProgressSaved
+
 curl --fail --silent   -X POST   -H "content-type: application/json"   -H "Origin: $URL"   --data '{"comicIds":["linux-preview-1"],"source":"manual","run":false}'   "$URL/api/v1/download" > "$WORK/download-queued.json"
 json_assert "$WORK/download-queued.json" downloadQueued
 JOB_ID="$(
@@ -212,7 +290,7 @@ stop_engine "$URL"
 
 [[ -f "$DATA_HOME/data/library.db" ]] || fail "database was not persisted outside the package"
 
-URL="$(start_engine)"
+start_engine
 
 curl --fail --silent   -X POST   -H "content-type: application/json"   -H "Origin: $URL"   --data '{"scope":"favorites","text":"Linux Preview Fixture","limit":20}'   "$URL/api/v1/library/query" > "$WORK/query-after-restart.json"
 json_assert "$WORK/query-after-restart.json" query
@@ -226,9 +304,18 @@ json_assert "$WORK/downloads-after-restart.json" downloadsPersisted
 curl --fail --silent "$URL/api/v1/shelves/$SHELF_ID" > "$WORK/shelf-after-restart.json"
 json_assert "$WORK/shelf-after-restart.json" shelfContents
 
+curl --fail --silent "$URL/api/v1/reader/progress" > "$WORK/reader-progress-after-restart.json"
+json_assert "$WORK/reader-progress-after-restart.json" readerProgressPersisted
+
+curl --fail --silent "$URL/api/v1/reader/comics/linux-preview-1/chapters/linux-preview-ep-1" > "$WORK/reader-chapter-after-restart.json"
+json_assert "$WORK/reader-chapter-after-restart.json" readerChapterResumed
+
+curl --fail --silent "$URL/api/v1/reader/pictures/linux-preview-pic-1" > "$WORK/reader-page-after-restart.png"
+cmp -s "$PAGE_FILE" "$WORK/reader-page-after-restart.png" || fail "reader page was not readable after restart"
+
 stop_engine "$URL"
 
-if find "$PACKAGE_ROOT" -type f (   -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' -o -name '*.sqlite' ) -print -quit | grep -q .; then
+if find "$PACKAGE_ROOT" -type f \(   -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' -o -name '*.sqlite' \) -print -quit | grep -q .; then
   fail "preview flow wrote user state into the application package"
 fi
 

@@ -53,8 +53,10 @@ describe('Remote Web installable PWA shell W5C', () => {
         expect(worker).toContain("if (request.method !== 'GET') return")
         expect(worker).toContain('url.origin !== self.location.origin')
         expect(worker).toContain('!SHELL_PATHS.has(url.pathname)')
+        expect(worker).toContain("credentials: 'omit'")
         expect(worker).toContain('fetch(request)')
-        expect(worker).toContain('caches.match(request)')
+        expect(worker).toContain('cache.put(url.pathname')
+        expect(worker).toContain('caches.match(url.pathname)')
 
         for (const forbidden of [
             '/api/',

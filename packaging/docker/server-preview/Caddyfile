@@ -1,0 +1,12 @@
+{
+    admin off
+}
+
+{$PICA_LIBRARY_DOMAIN} {
+    header {
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+
+    reverse_proxy pica:8787
+}

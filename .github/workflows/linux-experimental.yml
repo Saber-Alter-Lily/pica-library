@@ -8,6 +8,8 @@ on:
       - 'web/**'
       - 'scripts/build-linux-experimental.sh'
       - 'scripts/test-linux-experimental.sh'
+      - 'scripts/test-linux-preview-acceptance.sh'
+      - 'scripts/test-linux-preview-acceptance.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -55,6 +57,13 @@ jobs:
           archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
           test -n "$archive"
           bash scripts/test-linux-experimental.sh "$archive"
+
+      - name: Run Linux x64 preview vertical acceptance
+        run: |
+          set -euo pipefail
+          archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
+          test -n "$archive"
+          bash scripts/test-linux-preview-acceptance.sh "$archive"
 
       - name: Upload experimental Linux x64 artifact
         if: github.event.repository.private == false

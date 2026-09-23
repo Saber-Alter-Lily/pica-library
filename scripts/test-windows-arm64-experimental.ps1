@@ -198,8 +198,33 @@ if ($status.configured -ne $true) { throw 'DPAPI-backed settings did not configu
 $credentialFile = Join-Path $dataHome 'config\credentials.dat'
 if (-not (Test-Path -LiteralPath $credentialFile)) { throw 'DPAPI credential file was not created' }
 if ((Get-Content -Raw -LiteralPath $credentialFile) -like "*$secret*") { throw 'DPAPI credential file contains plaintext secret' }
-$plaintextHit = Get-ChildItem -LiteralPath $dataHome -File -Recurse -ErrorAction SilentlyContinue | Select-String -SimpleMatch -Pattern $secret -Quiet -ErrorAction SilentlyContinue
-if ($plaintextHit) { throw 'Windows ARM64 synthetic credential leaked into persistent user data' }
+$secretScanScript = Join-Path $work 'scan-secret.mjs'
+@'
+import fs from 'node:fs'
+import path from 'node:path'
+const [root, secret] = process.argv.slice(2)
+const needle = Buffer.from(secret, 'utf8')
+const hits = []
+function visit(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name)
+    if (entry.isDirectory()) {
+      visit(file)
+      continue
+    }
+    if (!entry.isFile()) continue
+    const bytes = fs.readFileSync(file)
+    if (bytes.includes(needle)) hits.push(path.relative(root, file))
+  }
+}
+visit(root)
+process.stdout.write(JSON.stringify(hits))
+'@ | Set-Content -Encoding utf8 -LiteralPath $secretScanScript
+$plaintextPaths = @((& $node $secretScanScript $dataHome $secret | ConvertFrom-Json))
+if ($LASTEXITCODE -ne 0) { throw 'Windows ARM64 binary secret scan failed' }
+if ($plaintextPaths.Count -gt 0) {
+    throw "Windows ARM64 synthetic credential leaked into persistent user data files: $($plaintextPaths -join ', ')"
+}
 
 Write-Host '[arm64] exercising library, shelf, Reader and download APIs'
 $query = JsonPost $url '/api/v1/library/query' @{ scope='favorites'; text='Windows ARM64 Fixture'; limit=20 }

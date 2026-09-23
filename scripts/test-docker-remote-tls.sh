@@ -54,11 +54,19 @@ docker volume create "$SECRET_VOLUME" >/dev/null
 docker volume create "$CADDY_DATA_VOLUME" >/dev/null
 docker volume create "$CADDY_CONFIG_VOLUME" >/dev/null
 
+# Make the persistent application volume writable only by the non-root runtime.
+docker run --rm \
+  --user 0 \
+  --entrypoint /bin/sh \
+  --mount "type=volume,src=$CONFIG_VOLUME,dst=/config" \
+  "$IMAGE" \
+  -c 'set -eu; chown 10001:10001 /config; chmod 0700 /config'
+
 # Prepare an application-owned 0600 bearer token without placing the secret in
 # the Pica container environment or image metadata.
 printf '%s' "$TOKEN" | docker run --rm -i   --user 0   --entrypoint /bin/sh   --mount "type=volume,src=$SECRET_VOLUME,dst=/secret"   "$IMAGE"   -c 'set -eu; umask 077; cat > /secret/token; chown 10001:10001 /secret/token; chmod 0600 /secret/token'
 
-docker run --detach   --name "$PICA_NAME"   --network "$NETWORK"   --network-alias pica   --mount "type=volume,src=$CONFIG_VOLUME,dst=/config"   --mount "type=volume,src=$SECRET_VOLUME,dst=/run/pica-secret,readonly"   -e PICA_LIBRARY_REMOTE_TOKEN_FILE=/run/pica-secret/token   -e PICA_LIBRARY_REMOTE_HOST=0.0.0.0   -e PICA_LIBRARY_REMOTE_PORT=8787   -e PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY=true   -e PICA_LIBRARY_REMOTE_ALLOWED_HOSTS=pica.test   "$IMAGE"   --remote-api >/dev/null
+docker run --detach   --name "$PICA_NAME"   --network "$NETWORK"   --network-alias pica   --mount "type=volume,src=$CONFIG_VOLUME,dst=/config"   --mount "type=volume,src=$SECRET_VOLUME,dst=/run/pica-secret,readonly"   -e PICA_LIBRARY_REMOTE_TOKEN_FILE=/run/pica-secret/token   -e PICA_LIBRARY_REMOTE_HOST=0.0.0.0   -e PICA_LIBRARY_REMOTE_PORT=8787   -e PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY=true   -e PICA_LIBRARY_REMOTE_ALLOWED_HOSTS=pica.test,127.0.0.1   "$IMAGE"   --remote-api >/dev/null
 
 if [[ -n "$(docker port "$PICA_NAME" 2>/dev/null)" ]]; then
   fail "Pica Remote API must not publish a host port directly"
@@ -73,6 +81,9 @@ SECRET_MODE="$(
 if [[ "$SECRET_MODE" != "600 10001 10001" ]]; then
   fail "Remote API bearer secret is not mounted as 0600 owned by UID/GID 10001: $SECRET_MODE"
 fi
+if ! docker exec "$PICA_NAME" /opt/pica/runtime/bin/node -e   "if(!require('fs').existsSync('/config/data/library.db'))process.exit(1)"; then
+  fail "Pica container did not initialize the persistent /config database"
+fi
 
 # Verify the gateway itself is alive before adding the TLS terminator.
 for _ in $(seq 1 120); do
@@ -80,7 +91,7 @@ for _ in $(seq 1 120); do
     fail "Pica Remote API container exited during startup"
   fi
   STATUS="$(
-    docker exec "$PICA_NAME" /opt/pica/runtime/bin/node -e       "fetch('http://127.0.0.1:8787/healthz',{headers:{host:'pica.test'}}).then(async r=>{process.stdout.write(String(r.status))}).catch(()=>process.exit(1))"       2>/dev/null || true
+    docker exec "$PICA_NAME" /opt/pica/runtime/bin/node -e       "fetch('http://127.0.0.1:8787/healthz').then(async r=>{process.stdout.write(String(r.status))}).catch(()=>process.exit(1))"       2>/dev/null || true
   )"
   if [[ "$STATUS" == "200" ]]; then
     break
@@ -116,7 +127,7 @@ for _ in $(seq 1 120); do
   fi
   if docker exec "$CADDY_NAME" test -s /data/caddy/pki/authorities/local/root.crt >/dev/null 2>&1; then
     docker cp "$CADDY_NAME:/data/caddy/pki/authorities/local/root.crt" "$ROOT_CA" >/dev/null
-    if curl --fail --silent --show-error       --cacert "$ROOT_CA"       --resolve "pica.test:$HOST_PORT:127.0.0.1"       "https://pica.test:$HOST_PORT/healthz" >/dev/null 2>&1; then
+    if curl --fail --silent --show-error --noproxy '*'       --cacert "$ROOT_CA"       --resolve "pica.test:$HOST_PORT:127.0.0.1"       "https://pica.test:$HOST_PORT/healthz" >/dev/null 2>&1; then
       break
     fi
   fi
@@ -130,6 +141,7 @@ BASE="https://pica.test:$HOST_PORT"
 CURL_TLS=(
   --silent
   --show-error
+  --noproxy '*'
   --cacert "$ROOT_CA"
   --resolve "pica.test:$HOST_PORT:127.0.0.1"
 )

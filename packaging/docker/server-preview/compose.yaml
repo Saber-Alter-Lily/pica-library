@@ -77,9 +77,9 @@ services:
     environment:
       PICA_LIBRARY_DOMAIN: "${PICA_LIBRARY_DOMAIN:?Set PICA_LIBRARY_DOMAIN}"
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "${PICA_LIBRARY_BIND_ADDRESS:-0.0.0.0}:${PICA_LIBRARY_HTTP_PORT:-80}:80"
+      - "${PICA_LIBRARY_BIND_ADDRESS:-0.0.0.0}:${PICA_LIBRARY_HTTPS_PORT:-443}:443"
+      - "${PICA_LIBRARY_BIND_ADDRESS:-0.0.0.0}:${PICA_LIBRARY_HTTPS_PORT:-443}:443/udp"
     volumes:
       - ${PICA_LIBRARY_CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

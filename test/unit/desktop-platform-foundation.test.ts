@@ -12,6 +12,7 @@ import {
     launchDirectory
 } from '../../src/desktop/child-process'
 import fs from 'node:fs'
+import { appCapabilities } from '../../src/app-capabilities'
 
 describe('Desktop platform foundation', () => {
     it('maps supported Node platforms without claiming unfinished integrations', () => {
@@ -179,6 +180,12 @@ describe('Desktop platform foundation', () => {
                     key.toUpperCase().startsWith('PICA_')
                 )
             ).toBe(false)
+    })
+
+    it('does not advertise Windows update packages on unfinished Desktop targets', () => {
+        expect(appCapabilities(false, 'win32').features.updatePackages).toBe(true)
+        expect(appCapabilities(false, 'darwin').features.updatePackages).toBe(false)
+        expect(appCapabilities(false, 'linux').features.updatePackages).toBe(false)
     })
 
     it('publishes the runtime capability matrix through Desktop status', () => {

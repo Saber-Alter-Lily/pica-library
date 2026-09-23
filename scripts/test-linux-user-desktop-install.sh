@@ -54,7 +54,10 @@ DATA_ROOT="$XDG_DATA_HOME/pica-library"
 DESKTOP_FILE="$XDG_DATA_HOME/applications/org.picalibrary.PicaLibrary.desktop"
 ICON_FILE="$XDG_DATA_HOME/icons/hicolor/scalable/apps/org.picalibrary.PicaLibrary.svg"
 
-bash "$PACKAGE_ROOT/install-linux-user.sh" > "$WORK/install.log"
+if ! bash "$PACKAGE_ROOT/install-linux-user.sh" > "$WORK/install.log" 2>&1; then
+  cat "$WORK/install.log" >&2 || true
+  fail "user-level installer failed"
+fi
 
 [[ -x "$INSTALL_ROOT/pica-library" ]] || fail "installed launcher missing"
 [[ -x "$INSTALL_ROOT/uninstall-linux-user.sh" ]] || fail "installed uninstaller missing"
@@ -142,7 +145,10 @@ printf 'preserve-me\n' > "$DATA_ROOT/desktop-install-sentinel.txt"
 printf 'stale-application-file\n' > "$INSTALL_ROOT/stale-preview-file.txt"
 
 # Reinstall from the extracted candidate to exercise application-tree replacement.
-bash "$PACKAGE_ROOT/install-linux-user.sh" > "$WORK/reinstall.log"
+if ! bash "$PACKAGE_ROOT/install-linux-user.sh" > "$WORK/reinstall.log" 2>&1; then
+  cat "$WORK/reinstall.log" >&2 || true
+  fail "user-level reinstall failed"
+fi
 [[ ! -e "$INSTALL_ROOT/stale-preview-file.txt" ]] || fail "reinstall did not replace the old application tree"
 [[ -f "$DATA_ROOT/desktop-install-sentinel.txt" ]] || fail "reinstall removed external user data"
 [[ "$(tr -d '\r\n' < "$INSTALL_ROOT/SOURCE_SHA.txt")" == "$PACKAGE_SHA" ]] || fail "reinstall provenance mismatch"

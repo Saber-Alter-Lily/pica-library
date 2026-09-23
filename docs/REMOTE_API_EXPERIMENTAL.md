@@ -148,6 +148,30 @@ This follows Docker's volume backup/restore model rather than treating image
 rollback as data rollback. The image and the mutable volume are separate
 artifacts and must be handled separately during recovery.
 
+## Operator Compose preview
+
+The reviewed operator topology lives at
+`packaging/docker/server-preview/compose.yaml`, with the deployment and
+recovery runbook in `docs/SERVER_DOCKER_PREVIEW_DEPLOYMENT.md`.
+
+The Compose bundle preserves the same W4B trust boundary:
+
+- a one-shot network-disabled init service converts the operator's file secret
+  into the private `0600`, UID/GID 10001 runtime secret;
+- the long-running Pica service is non-root, read-only, capability-dropped and
+  has no published host port;
+- Pica and Caddy communicate over an internal backend network while separate
+  egress networks retain Provider/ACME access;
+- Caddy starts only after Pica's Remote API healthcheck passes and remains the
+  only host ingress;
+- image promotion requires a stopped-volume snapshot and explicit rollback
+  procedure.
+
+The CI acceptance renders the real Compose model, boots the services with an
+isolated internal-CA Caddyfile, validates certificate trust, authentication and
+management-route denial, and checks restart recovery. Production deployments
+use the normal Caddyfile and a real DNS hostname.
+
 ## Browser/PWA boundary
 
 This gateway is an API foundation for W4B. It does not yet provide the CORS,

@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import path from 'node:path'
+import { browserLaunchSpec } from './platform'
 
 export function sanitizedChildEnv(
     environment: NodeJS.ProcessEnv = process.env
@@ -16,7 +17,10 @@ export function windowsExecutable(...parts: string[]) {
 }
 
 export function showBrowserFallback(url: string) {
-    if (process.platform !== 'win32') return
+    if (process.platform !== 'win32') {
+        console.error(`Pica Library is running at: ${url}`)
+        return
+    }
     const script =
         "[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');" +
         '$u=[Console]::In.ReadToEnd();' +
@@ -49,20 +53,22 @@ export function showBrowserFallback(url: string) {
 export function launchBrowser(
     url: string,
     onFailure: (error: unknown) => void,
-    spawnProcess: typeof spawn = spawn
+    spawnProcess: typeof spawn = spawn,
+    platform: NodeJS.Platform = process.platform
 ) {
+    const spec = browserLaunchSpec(url, platform)
+    if (!spec) {
+        onFailure(new Error(`Browser launch is not supported on ${platform}`))
+        return false
+    }
     let child: ChildProcess
     try {
-        child = spawnProcess(
-            windowsExecutable('System32', 'cmd.exe'),
-            ['/d', '/s', '/c', 'start', '', url],
-            {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true,
-                env: sanitizedChildEnv()
-            }
-        )
+        child = spawnProcess(spec.command, spec.args, {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: platform === 'win32',
+            env: sanitizedChildEnv()
+        })
     } catch (error) {
         onFailure(error)
         return false

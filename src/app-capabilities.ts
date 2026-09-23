@@ -46,6 +46,7 @@ export interface AppCapabilities {
         adaptiveRecommendationBatches: boolean
         remoteApi: boolean
         remoteWebSessions: boolean
+        remoteWebShell: boolean
     }
     runtime: {
         role: 'desktop' | 'server' | 'engine'
@@ -61,6 +62,7 @@ export interface AppCapabilities {
         managedEhWebLogin: CapabilityState
         remoteApi: CapabilityState
         remoteWebSessions: CapabilityState
+        remoteWebShell: CapabilityState
     }
 }
 
@@ -220,6 +222,33 @@ export function appCapabilities(
                   execution: 'platform-host',
                   reason: 'DisabledByConfiguration'
               }
+    const remoteWebShell: CapabilityState = !hostPresent
+        ? {
+              supported: false,
+              available: false,
+              execution: 'platform-host',
+              reason: 'NoPlatformHost'
+          }
+        : mode !== 'headless'
+          ? {
+                supported: false,
+                available: false,
+                execution: 'platform-host',
+                reason: 'UnavailableInRuntime'
+            }
+          : remoteStatus.webShell === true
+            ? {
+                  supported: true,
+                  available: true,
+                  execution: 'platform-host',
+                  reason: 'Available'
+              }
+            : {
+                  supported: true,
+                  available: false,
+                  execution: 'platform-host',
+                  reason: 'DisabledByConfiguration'
+              }
 
     return {
         appVersion: PRODUCT_VERSION,
@@ -242,7 +271,8 @@ export function appCapabilities(
             multiTagPreference: true,
             adaptiveRecommendationBatches: true,
             remoteApi: remoteApi.available,
-            remoteWebSessions: remoteWebSessions.available
+            remoteWebSessions: remoteWebSessions.available,
+            remoteWebShell: remoteWebShell.available
         },
         runtime: {
             role,
@@ -257,7 +287,8 @@ export function appCapabilities(
             secureCredentialPersistence,
             managedEhWebLogin,
             remoteApi,
-            remoteWebSessions
+            remoteWebSessions,
+            remoteWebShell
         }
     }
 }

@@ -110,6 +110,9 @@ describe('experimental Docker headless package P5D', () => {
         expect(remote).toContain('__Host-pica_session')
         expect(remote).toContain('Remote Web session write succeeded without CSRF')
         expect(remote).toContain('Long-lived bearer token leaked into Remote Web session response')
+        expect(remote).toContain('Remote Web shell HTML was not served through Caddy TLS')
+        expect(remote).toContain('Remote Web shell strict CSP header is missing')
+        expect(remote).toContain('Remote Web read-only session escaped into reader-progress mutation')
         expect(remote).toContain('Process-local Remote Web session survived Pica restart')
         expect(remote).toContain(
             'Remote HTTPS path did not recover after Pica container restart'

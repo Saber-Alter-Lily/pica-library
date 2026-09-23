@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>Pica Library Remote</title>
+  <link rel="stylesheet" href="/remote/remote.css">
+  <script type="module" src="/remote/remote.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Pica Library</p>
+      <h1 data-i18n="title">远程书库</h1>
+    </div>
+    <div class="top-actions">
+      <label class="language-label">
+        <span class="sr-only" data-i18n="language">语言</span>
+        <select id="language-select" aria-label="Language">
+          <option value="zh-CN">中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </label>
+      <button id="logout" type="button" hidden data-i18n="logout">退出</button>
+    </div>
+  </header>
+
+  <section id="auth-panel" class="auth-shell">
+    <form id="auth-form" class="panel auth-card" autocomplete="off">
+      <p class="eyebrow">W5B · Remote Web</p>
+      <h2 data-i18n="signIn">建立浏览器会话</h2>
+      <p class="muted" data-i18n="signInHelp">输入服务器管理员提供的 Remote API bearer。它只用于本次换取 HttpOnly 会话，不会写入浏览器存储。</p>
+      <label>
+        <span data-i18n="bearer">Remote API bearer</span>
+        <input id="bearer-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      </label>
+      <button class="primary" type="submit" data-i18n="connect">连接</button>
+      <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <main id="app-shell" hidden>
+    <nav class="tabs" aria-label="Remote library">
+      <button type="button" data-view="library" class="active" data-i18n="library">书库</button>
+      <button type="button" data-view="shelves" data-i18n="shelves">书架</button>
+      <button type="button" data-view="downloaded" data-i18n="downloaded">已下载</button>
+    </nav>
+
+    <section id="view-library" class="view panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" data-i18n="readOnly">只读远程视图</p>
+          <h2 data-i18n="library">书库</h2>
+        </div>
+        <span id="library-count" class="count"></span>
+      </div>
+      <form id="search-form" class="search-row">
+        <input id="search-input" type="search" maxlength="200" data-i18n-placeholder="searchPlaceholder" placeholder="搜索标题、作者或标签">
+        <button type="submit" data-i18n="search">搜索</button>
+      </form>
+      <div id="library-results" class="card-grid" aria-live="polite"></div>
+    </section>
+
+    <section id="view-shelves" class="view panel" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" data-i18n="readOnly">只读远程视图</p>
+          <h2 data-i18n="shelves">书架</h2>
+        </div>
+      </div>
+      <div class="split">
+        <div id="shelf-list" class="stack"></div>
+        <div id="shelf-items" class="card-grid"></div>
+      </div>
+    </section>
+
+    <section id="view-downloaded" class="view panel" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" data-i18n="readOnly">只读远程视图</p>
+          <h2 data-i18n="downloaded">已下载</h2>
+        </div>
+        <span id="downloaded-count" class="count"></span>
+      </div>
+      <div id="downloaded-results" class="card-grid"></div>
+    </section>
+
+    <section id="detail-panel" class="panel detail-panel" hidden aria-live="polite">
+      <button id="detail-close" type="button" class="subtle" data-i18n="close">关闭</button>
+      <div class="detail-layout">
+        <img id="detail-cover" class="detail-cover" alt="">
+        <div>
+          <p class="eyebrow" data-i18n="details">作品详情</p>
+          <h2 id="detail-title"></h2>
+          <p id="detail-author" class="muted"></p>
+          <div id="detail-tags" class="tags"></div>
+          <dl id="detail-meta" class="meta-list"></dl>
+          <button id="detail-read" type="button" class="primary" data-i18n="readDownloaded">阅读已下载章节</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="reader-panel" class="panel reader-panel" hidden>
+      <div class="reader-heading">
+        <div>
+          <p class="eyebrow" data-i18n="reader">阅读器</p>
+          <h2 id="reader-title"></h2>
+        </div>
+        <button id="reader-close" type="button" class="subtle" data-i18n="close">关闭</button>
+      </div>
+      <div class="reader-controls">
+        <label>
+          <span data-i18n="chapter">章节</span>
+          <select id="reader-chapter"></select>
+        </label>
+        <div class="pager">
+          <button id="reader-prev" type="button" data-i18n="previous">上一页</button>
+          <span id="reader-position"></span>
+          <button id="reader-next" type="button" data-i18n="next">下一页</button>
+        </div>
+      </div>
+      <div class="reader-stage">
+        <img id="reader-image" alt="">
+        <p id="reader-empty" class="muted" data-i18n="noPages" hidden>该章节没有已下载页面。</p>
+      </div>
+      <p class="muted small" data-i18n="readerNoWrite">远程只读模式不会修改本地阅读进度。</p>
+    </section>
+
+    <p id="app-message" class="message" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>

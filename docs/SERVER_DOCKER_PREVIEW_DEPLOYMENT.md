@@ -215,8 +215,9 @@ state disappears after rollback.
 This bundle is still experimental:
 
 - no public registry/server-preview channel is published yet;
-- W5A has an opt-in process-local browser-session primitive, but this Compose
-  bundle does not enable it and no Remote Web/PWA UI is published;
+- W5A/W5B provide an opt-in process-local browser session and isolated
+  read-only Remote Web shell, but this Compose bundle intentionally does not
+  enable browser Origins/sessions by default and no PWA/offline mode is published;
 - there is no multi-user or tenant isolation;
 - real Provider credentials and Provider behavior are outside the Docker CI
   fixtures;

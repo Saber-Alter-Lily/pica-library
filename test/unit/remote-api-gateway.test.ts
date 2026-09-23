@@ -91,9 +91,13 @@ describe('authenticated Remote API gateway', () => {
         fs.chmodSync(tokenFile, 0o600)
         expect(readRemoteApiToken(tokenFile, 'linux')).toBe('a'.repeat(48))
 
+        fs.chmodSync(tokenFile, 0o640)
+        expect(() => readRemoteApiToken(tokenFile, 'linux')).toThrow(
+            /accessible by group or other users/
+        )
         fs.chmodSync(tokenFile, 0o644)
         expect(() => readRemoteApiToken(tokenFile, 'linux')).toThrow(
-            /accessible to other users/
+            /accessible by group or other users/
         )
         fs.chmodSync(tokenFile, 0o600)
         fs.writeFileSync(tokenFile, 'short')

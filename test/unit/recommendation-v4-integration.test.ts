@@ -127,6 +127,7 @@ describe('Recommendation V4 integration', () => {
         const html = read('web/index.html')
         const app = read('web/app.js')
         const runtime = read('web/visual-runtime.js')
+        const worker = read('web/visual-worker.js')
         expect(html).toContain('id="recommend-feedback-reasons-toggle"')
         expect(app).toContain(
             "eventType: sentiment === 'like' ? 'recommend_like' : 'recommend_dislike'"
@@ -135,6 +136,10 @@ describe('Recommendation V4 integration', () => {
             app.indexOf("$('#recommend-feedback-dialog').showModal()")
         )
         expect(runtime).toContain('onnx-community/dinov2-small')
-        expect(runtime).toContain('await import(VISUAL_RUNTIME.libraryUrl)')
+        expect(runtime).toContain(
+            "new Worker(new URL('./visual-worker.js', import.meta.url)"
+        )
+        expect(worker).toContain('await import(runtime.libraryUrl)')
+        expect(worker).toContain('runtime.modelId')
     })
 })

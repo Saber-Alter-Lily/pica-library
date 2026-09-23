@@ -1,0 +1,76 @@
+name: Experimental Docker Headless Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'packaging/docker/**'
+      - 'scripts/build-docker-experimental.sh'
+      - 'scripts/test-docker-experimental.sh'
+      - 'scripts/build-linux-experimental.sh'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/docker-experimental.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'packaging/docker/**'
+      - 'scripts/build-docker-experimental.sh'
+      - 'scripts/test-docker-experimental.sh'
+      - 'scripts/build-linux-experimental.sh'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/docker-experimental.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-amd64-experimental:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify Docker engine
+        run: docker version
+
+      - name: Build experimental Docker amd64 image
+        run: bash scripts/build-docker-experimental.sh
+
+      - name: Smoke experimental headless container
+        run: |
+          set -euo pipefail
+          image="$(tr -d '\r\n' < artifacts/DOCKER-EXPERIMENTAL-IMAGE.txt)"
+          test -n "$image"
+          bash scripts/test-docker-experimental.sh "$image"
+
+      - name: Upload experimental Docker artifact
+        if: github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-library-docker-amd64-experimental-${{ github.sha }}
+          path: |
+            artifacts/Pica-Library-*-docker-amd64-experimental.tar.gz
+            artifacts/DOCKER-EXPERIMENTAL-SHA256SUMS.txt
+            artifacts/DOCKER-EXPERIMENTAL-METADATA.json
+          retention-days: 1
+          if-no-files-found: error

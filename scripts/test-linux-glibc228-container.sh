@@ -30,9 +30,9 @@ if [[ -z "$PACKAGE_ROOT" ]]; then
 fi
 
 DATA_HOME="$WORK/user-data"
-mkdir -p "$DATA_HOME"
+mkdir -p "$DATA_HOME/home"
 
-docker run --rm   --platform linux/amd64   --mount "type=bind,src=$PACKAGE_ROOT,dst=/opt/pica,readonly"   --mount "type=bind,src=$DATA_HOME,dst=/data"   -e PICA_LIBRARY_DESKTOP_HOME=/data   "$BASELINE_IMAGE"   /bin/bash -lc '
+docker run --rm   --platform linux/amd64   --user "$(id -u):$(id -g)"   --mount "type=bind,src=$PACKAGE_ROOT,dst=/opt/pica,readonly"   --mount "type=bind,src=$DATA_HOME,dst=/data"   -e HOME=/data/home   -e PICA_LIBRARY_DESKTOP_HOME=/data   "$BASELINE_IMAGE"   /bin/bash -lc '
 set -euo pipefail
 
 fail() {

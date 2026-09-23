@@ -54,6 +54,34 @@ describe('experimental macOS arm64 package P5B', () => {
         expect(build).toContain('"observedNodeMinOS": "$NODE_MIN_MACOS"')
     })
 
+    it('tests preview-to-preview application replacement and data rollback', () => {
+        const replacement = read('scripts/test-macos-preview-replacement.sh')
+        const workflow = read('.github/workflows/macos-experimental.yml')
+
+        expect(workflow).toContain(
+            'Build first W4A macOS preview baseline for replacement gate'
+        )
+        expect(workflow).toContain(
+            'Pica-Library-macos-arm64-preview-baseline.tar.gz'
+        )
+        expect(workflow).toContain(
+            'bash scripts/test-macos-preview-replacement.sh "$baseline" "$candidate"'
+        )
+        expect(workflow).toContain(
+            "'scripts/test-macos-preview-replacement.sh'"
+        )
+        expect(replacement).toContain('ditto "$source" "$INSTALL_ROOT"')
+        expect(replacement).toContain('ditto "$DATA_HOME" "$DATA_SNAPSHOT"')
+        expect(replacement).toContain('Candidate Marker')
+        expect(replacement).toContain('shelves-rolled-back')
+        expect(replacement).toContain(
+            'schema upgrade did not create the required pre-migration backup'
+        )
+        expect(replacement).toContain(
+            'macOS arm64 preview replacement/rollback acceptance: PASS'
+        )
+    })
+
     it('smokes platform identity, Keychain, native picker and external data placement', () => {
         const smoke = read('scripts/test-macos-experimental.sh')
         expect(smoke).toContain('"$PACKAGE_ROOT/pica-library" --headless')

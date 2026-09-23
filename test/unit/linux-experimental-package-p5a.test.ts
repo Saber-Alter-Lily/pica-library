@@ -70,9 +70,10 @@ describe('experimental Linux x64 package P5A', () => {
         expect(preview).toContain('/api/v1/reader/progress')
         expect(preview).toContain('/api/v1/downloads/$JOB_ID/pause')
         expect(preview).toContain('/api/v1/downloads/$JOB_ID/resume')
+        expect(preview).toContain('download-resumed-after-restart.json')
         expect(preview).toContain('reader progress did not persist across restart')
         expect(preview).toContain('shelf did not persist across restart')
-        expect(preview).toContain('queued job did not persist across restart')
+        expect(preview).toContain('graceful shutdown did not persist the local job as PAUSED')
         expect(preview).toContain(
             'preview flow wrote user state into the application package'
         )

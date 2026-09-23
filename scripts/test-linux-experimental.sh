@@ -25,7 +25,7 @@ if [[ -z "$PACKAGE_ROOT" ]]; then
   exit 1
 fi
 
-for required in   "$PACKAGE_ROOT/pica-library"   "$PACKAGE_ROOT/Pica Library.sh"   "$PACKAGE_ROOT/runtime/bin/node"   "$PACKAGE_ROOT/app/desktop.js"   "$PACKAGE_ROOT/web/index.html"   "$PACKAGE_ROOT/SOURCE_SHA.txt"
+for required in   "$PACKAGE_ROOT/pica-library"   "$PACKAGE_ROOT/Pica Library.sh"   "$PACKAGE_ROOT/runtime/bin/node"   "$PACKAGE_ROOT/runtime/linux-preflight.sh"   "$PACKAGE_ROOT/app/desktop.js"   "$PACKAGE_ROOT/web/index.html"   "$PACKAGE_ROOT/SOURCE_SHA.txt"   "$PACKAGE_ROOT/PLATFORM_REQUIREMENTS.json"
 do
   if [[ ! -s "$required" ]]; then
     echo "Linux package is missing: $required" >&2
@@ -38,6 +38,19 @@ if [[ ! "$PACKAGE_SOURCE" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Linux package SOURCE_SHA is invalid" >&2
   exit 1
 fi
+
+"$PACKAGE_ROOT/runtime/bin/node" - "$PACKAGE_ROOT/PLATFORM_REQUIREMENTS.json" <<'NODE'
+const fs=require('fs')
+const value=JSON.parse(fs.readFileSync(process.argv[2],'utf8'))
+const fail=(message)=>{throw new Error(message)}
+if(value.schemaVersion!==1)fail('Linux platform requirements schema mismatch')
+if(value.platform!=='linux'||value.arch!=='x64')fail('Linux platform requirements identity mismatch')
+if(value.libc!=='glibc'||value.minimumGlibc!=='2.28')fail('Linux glibc baseline mismatch')
+if(value.minimumKernel!=='4.18')fail('Linux kernel support baseline mismatch')
+if(value.minimumGlibcxxSymbol!=='GLIBCXX_3.4.25')fail('Linux libstdc++ baseline mismatch')
+if(value.formalRelease!==false)fail('Experimental Linux requirements claimed formal release')
+if(!/^\d+\.\d+/.test(String(value.runtimeAbiObserved?.maxRequiredGlibc||'')))fail('Observed glibc ABI metadata missing')
+NODE
 
 DATA_HOME="$WORK/user-data"
 mkdir -p "$DATA_HOME"

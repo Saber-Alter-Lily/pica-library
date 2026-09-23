@@ -411,6 +411,42 @@ describe('authenticated Remote API gateway', () => {
                 cookie: undefined
             })
 
+            const blockedProgress = await fetch(
+                `${base}/api/v1/reader/progress`,
+                {
+                    method: 'POST',
+                    headers: {
+                        cookie,
+                        'content-type': 'application/json',
+                        origin: 'https://reader.example',
+                        'x-pica-csrf': boot.csrfToken
+                    },
+                    body: JSON.stringify({
+                        comicId: 'fixture',
+                        episodeId: 'episode',
+                        pageIndex: 0
+                    })
+                }
+            )
+            expect(blockedProgress.status).toBe(404)
+
+            const bearerProgress = await fetch(
+                `${base}/api/v1/reader/progress`,
+                {
+                    method: 'POST',
+                    headers: {
+                        ...authorization(),
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        comicId: 'fixture',
+                        episodeId: 'episode',
+                        pageIndex: 0
+                    })
+                }
+            )
+            expect(bearerProgress.status).toBe(200)
+
             const logout = await fetch(
                 `${base}/remote/v1/session/logout`,
                 {

@@ -68,6 +68,40 @@ describe('download job scheduler', () => {
         )
     })
 
+    it('refills a free slot without waiting for another slow job in the old batch', async () => {
+        const queue = store([job('slow'), job('fast'), job('third')])
+        let releaseSlow!: () => void
+        let thirdStarted!: () => void
+        const slowGate = new Promise<void>((resolve) => {
+            releaseSlow = resolve
+        })
+        const third = new Promise<void>((resolve) => {
+            thirdStarted = resolve
+        })
+        const scheduler = new DownloadScheduler(
+            queue,
+            async (running) => {
+                if (running.id === 'slow') await slowGate
+                if (running.id === 'third') thirdStarted()
+            },
+            { jobConcurrency: 2 }
+        )
+
+        const drain = scheduler.drain()
+        await third
+        expect(queue.jobs.find((item) => item.id === 'slow')?.status).toBe(
+            'RUNNING'
+        )
+        expect(queue.jobs.find((item) => item.id === 'third')?.status).toBe(
+            'RUNNING'
+        )
+        releaseSlow()
+        await drain
+        expect(queue.jobs.every((item) => item.status === 'COMPLETED')).toBe(
+            true
+        )
+    })
+
     it('requeues a transient failure and then completes', async () => {
         const queue = store([job('retry')])
         let attempts = 0

@@ -10,6 +10,8 @@ import android.widget.ImageView;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -22,6 +24,7 @@ final class CoverRepository {
     private static final String ROOT="cover-cache-v2";
     private static final int MEMORY_BYTES=72*1024*1024;
     private static final ExecutorService POOL=Executors.newFixedThreadPool(5);
+    private static final ConcurrentHashMap<String,CompletableFuture<Bitmap>> IN_FLIGHT=new ConcurrentHashMap<>();
     private static final LruCache<String,Bitmap> MEMORY=new LruCache<String,Bitmap>(MEMORY_BYTES){
         @Override protected int sizeOf(String key,Bitmap value){return value.getByteCount();}
     };
@@ -64,12 +67,20 @@ final class CoverRepository {
         try{Bitmap bitmap=BridgeClient.bitmap(context,path);if(bitmap==null)return false;remember(cacheKey,bitmap);save(context,cacheKey,bitmap);return true;}catch(Exception e){return false;}
     }
 
-    static void load(Activity activity,ImageView target,UnifiedCatalogStore.Entry entry,int placeholderColor){
-        if(entry==null||entry.id==null||entry.id.isEmpty()){target.setImageDrawable(new ColorDrawable(placeholderColor));return;}String cacheKey=key(entry);String tag="cover-comic:"+entry.id;target.setTag(tag);Bitmap hit=memory(cacheKey);if(hit==null)hit=diskHit(activity,cacheKey);if(hit!=null){target.setImageBitmap(hit);return;}target.setImageDrawable(new ColorDrawable(placeholderColor));
-        POOL.submit(()->{Bitmap bitmap=cacheNow(activity.getApplicationContext(),entry);if(bitmap==null)return;activity.runOnUiThread(()->{Object current=target.getTag();if(current!=null&&tag.equals(current.toString()))target.setImageBitmap(bitmap);});});
+    private static CompletableFuture<Bitmap> loadFuture(Context context,UnifiedCatalogStore.Entry entry){
+        String cacheKey=key(entry);Context app=context.getApplicationContext();
+        return IN_FLIGHT.computeIfAbsent(cacheKey,k->CompletableFuture.supplyAsync(()->cacheNow(app,entry),POOL).whenComplete((bitmap,error)->IN_FLIGHT.remove(k)));
     }
 
-    static void prefetch(Context context,UnifiedCatalogStore.Entry entry){if(entry==null||entry.id==null||entry.id.isEmpty())return;String cacheKey=key(entry);if(memory(cacheKey)!=null||disk(context,cacheKey).isFile())return;POOL.submit(()->cacheNow(context.getApplicationContext(),entry));}
+    static void load(Activity activity,ImageView target,UnifiedCatalogStore.Entry entry,int placeholderColor){
+        if(entry==null||entry.id==null||entry.id.isEmpty()){target.setImageDrawable(new ColorDrawable(placeholderColor));return;}
+        String cacheKey=key(entry),tag="cover-comic:"+entry.id;target.setTag(tag);
+        Bitmap hit=memory(cacheKey);if(hit!=null){target.setImageBitmap(hit);return;}
+        target.setImageDrawable(new ColorDrawable(placeholderColor));
+        loadFuture(activity,entry).thenAccept(bitmap->{if(bitmap==null||activity.isFinishing()||activity.isDestroyed())return;activity.runOnUiThread(()->{Object current=target.getTag();if(current!=null&&tag.equals(current.toString()))target.setImageBitmap(bitmap);});});
+    }
+
+    static void prefetch(Context context,UnifiedCatalogStore.Entry entry){if(entry==null||entry.id==null||entry.id.isEmpty())return;String cacheKey=key(entry);if(memory(cacheKey)!=null||disk(context,cacheKey).isFile())return;loadFuture(context,entry);}
 
     private static Bitmap decode(HttpURLConnection c,long limit) throws Exception {int status=c.getResponseCode();if(status<200||status>=300)throw new IOException("cover HTTP "+status);String type=String.valueOf(c.getContentType()).toLowerCase(Locale.ROOT);if(!type.startsWith("image/"))throw new IOException("cover is not an image");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))>0){if(out.size()+n>limit)throw new IOException("cover too large");out.write(b,0,n);}byte[] data=out.toByteArray();Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length);if(bitmap==null)throw new IOException("invalid cover");return bitmap;}}
     private static void save(Context context,String cacheKey,Bitmap bitmap){File target=disk(context,cacheKey),tmp=null;try{tmp=File.createTempFile("cover-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){if(!bitmap.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("compress failed");}if(target.exists()&&!target.delete())throw new IOException("replace failed");if(!tmp.renameTo(target))throw new IOException("rename failed");trim(context,target);}catch(Exception ignored){if(tmp!=null)tmp.delete();}}

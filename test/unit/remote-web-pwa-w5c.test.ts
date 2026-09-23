@@ -20,8 +20,15 @@ describe('Remote Web installable PWA shell W5C', () => {
         expect(manifest.icons).toEqual([
             expect.objectContaining({
                 src: '/remote/icon.svg',
-                sizes: 'any',
-                type: 'image/svg+xml'
+                sizes: '192x192',
+                type: 'image/svg+xml',
+                purpose: 'any'
+            }),
+            expect.objectContaining({
+                src: '/remote/icon.svg',
+                sizes: '512x512',
+                type: 'image/svg+xml',
+                purpose: 'any maskable'
             })
         ])
         expect(icon).toContain('<svg')

@@ -13,7 +13,13 @@ if [[ -z "$IMAGE" ]]; then
   exit 2
 fi
 
-NAME="pica-library-headless-smoke-$$"
+NAME="pica-library-headless-smoke-$"
+REMOTE_NAME="${NAME}-remote"
+REMOTE_TOKEN_FILE="$(mktemp)"
+REMOTE_TOKEN="docker-remote-acceptance-token-0123456789abcdef"
+printf '%s\n' "$REMOTE_TOKEN" > "$REMOTE_TOKEN_FILE"
+chmod 0600 "$REMOTE_TOKEN_FILE"
+
 dump_engine_log() {
   echo "----- Pica Library container log -----" >&2
   docker exec "$NAME" /bin/sh -c 'cat /config/logs/pica-library.log 2>/dev/null || true' >&2 2>/dev/null || true
@@ -21,6 +27,8 @@ dump_engine_log() {
 }
 cleanup() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
+  docker rm -f "$REMOTE_NAME" >/dev/null 2>&1 || true
+  rm -f "$REMOTE_TOKEN_FILE"
 }
 trap cleanup EXIT
 
@@ -148,6 +156,105 @@ if [[ "$(docker inspect "$NAME" --format '{{.State.ExitCode}}')" != "0" ]]; then
   echo "Container shutdown endpoint produced a non-zero exit" >&2
   docker logs "$NAME" >&2 || true
   dump_engine_log
+  exit 1
+fi
+
+# The separate Remote API is opt-in. It uses a secret file and never exposes
+# the Desktop controller port itself.
+docker run --detach   --name "$REMOTE_NAME"   -v "$REMOTE_TOKEN_FILE:/run/secrets/pica_remote_token:ro"   -e PICA_LIBRARY_REMOTE_TOKEN_FILE=/run/secrets/pica_remote_token   -e PICA_LIBRARY_REMOTE_HOST=0.0.0.0   -e PICA_LIBRARY_REMOTE_PORT=8787   -e PICA_LIBRARY_REMOTE_ALLOWED_HOSTS=127.0.0.1,localhost   -p 127.0.0.1::8787   "$IMAGE" --remote-api >/dev/null
+
+REMOTE_PORT=""
+for _ in $(seq 1 120); do
+  REMOTE_PORT="$(docker port "$REMOTE_NAME" 8787/tcp 2>/dev/null | sed -n 's/.*://p' | head -n 1 || true)"
+  if [[ -n "$REMOTE_PORT" ]] && curl --fail --silent "http://127.0.0.1:$REMOTE_PORT/healthz" >/dev/null 2>&1; then
+    break
+  fi
+  if ! docker inspect "$REMOTE_NAME" --format '{{.State.Running}}' 2>/dev/null | grep -qx true; then
+    echo "Remote API container exited during startup" >&2
+    docker logs "$REMOTE_NAME" >&2 || true
+    exit 1
+  fi
+  sleep 0.25
+done
+if [[ -z "$REMOTE_PORT" ]]; then
+  echo "Remote API did not publish an explicit test port" >&2
+  exit 1
+fi
+REMOTE_URL="http://127.0.0.1:$REMOTE_PORT"
+
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' "$REMOTE_URL/api/v1/capabilities")" != "401" ]]; then
+  echo "Remote API allowed an unauthenticated capability request" >&2
+  exit 1
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Authorization: Bearer wrong-token-value-that-is-long-enough' "$REMOTE_URL/api/v1/capabilities")" != "401" ]]; then
+  echo "Remote API accepted the wrong token" >&2
+  exit 1
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' -H "Authorization: Bearer $REMOTE_TOKEN" "$REMOTE_URL/api/v1/capabilities")" != "200" ]]; then
+  echo "Remote API rejected the configured token" >&2
+  exit 1
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' -H "Authorization: Bearer $REMOTE_TOKEN" -H 'Host: attacker.example' "$REMOTE_URL/api/v1/capabilities")" != "403" ]]; then
+  echo "Remote API Host allowlist was bypassed" >&2
+  exit 1
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' -H "Authorization: Bearer $REMOTE_TOKEN" -H 'Origin: https://attacker.example' "$REMOTE_URL/api/v1/capabilities")" != "403" ]]; then
+  echo "Remote API Origin allowlist was bypassed" >&2
+  exit 1
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' -H "Authorization: Bearer $REMOTE_TOKEN" "$REMOTE_URL/api/v1/desktop/status")" != "404" ]]; then
+  echo "Remote API exposed the Desktop controller" >&2
+  exit 1
+fi
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST -H "Authorization: Bearer $REMOTE_TOKEN" -H 'content-type: application/json' --data '{}' "$REMOTE_URL/api/v1/import")" != "404" ]]; then
+  echo "Remote API exposed the import mutation" >&2
+  exit 1
+fi
+
+REMOTE_QUERY="$(
+  curl --fail --silent     -X POST     -H "Authorization: Bearer $REMOTE_TOKEN"     -H 'content-type: application/json'     --data '{"scope":"favorites","limit":1}'     "$REMOTE_URL/api/v1/library/query"
+)"
+node - "$REMOTE_QUERY" <<'NODE'
+const value=JSON.parse(process.argv[2])
+if(!Number.isInteger(value.total)||!Array.isArray(value.items))
+  throw new Error('Remote library query contract failed')
+NODE
+
+if docker exec "$REMOTE_NAME" /opt/pica/runtime/bin/node - "$REMOTE_TOKEN" <<'NODE'
+const fs=require('fs')
+const path=require('path')
+const needle=process.argv[2]
+const stack=['/config']
+while(stack.length){
+  const current=stack.pop()
+  for(const name of fs.readdirSync(current)){
+    const file=path.join(current,name)
+    const stat=fs.lstatSync(file)
+    if(stat.isDirectory()){ stack.push(file); continue }
+    if(stat.isFile()&&fs.readFileSync(file).includes(needle))process.exit(1)
+  }
+}
+NODE
+then
+  :
+else
+  echo "Remote API token leaked into persistent /config data" >&2
+  exit 1
+fi
+
+docker stop --time 10 "$REMOTE_NAME" >/dev/null
+if [[ "$(docker inspect "$REMOTE_NAME" --format '{{.State.ExitCode}}')" != "0" ]]; then
+  echo "Remote API container did not exit cleanly" >&2
+  docker logs "$REMOTE_NAME" >&2 || true
+  exit 1
+fi
+docker start "$REMOTE_NAME" >/dev/null
+for _ in $(seq 1 120); do
+  if curl --fail --silent "$REMOTE_URL/healthz" >/dev/null 2>&1; then break; fi
+  sleep 0.25
+done
+if [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' -H "Authorization: Bearer $REMOTE_TOKEN" "$REMOTE_URL/api/v1/capabilities")" != "200" ]]; then
+  echo "Remote API did not recover after container restart" >&2
   exit 1
 fi
 

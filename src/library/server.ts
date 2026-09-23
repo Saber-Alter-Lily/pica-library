@@ -1434,7 +1434,10 @@ export async function startLibraryServer(options: {
                 request.method === 'POST' &&
                 options.desktop
             ) {
-                json(response, 200, { success: true })
+                json(response, 200, {
+                    success: true,
+                    shutdownScheduled: true
+                })
                 options.desktop.shutdown()
                 return
             }

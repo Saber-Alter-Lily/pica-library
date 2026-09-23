@@ -270,7 +270,10 @@ async function closeEngine() {
 }
 
 async function stop(exitCode = 0) {
-    if (stopping) return
+    if (stopping) {
+        log.write('Shutdown: stop request ignored because shutdown is already in progress')
+        return
+    }
     stopping = true
     cancelBrowserCloseShutdown()
     log.write('Stopping desktop engine')
@@ -980,7 +983,10 @@ async function startEngine(preferredPort: number) {
         updateProgress: () => updateManager.progress(),
         browserSessionOpened,
         browserSessionClosed,
-        shutdown: () => { void stop() }
+        shutdown: () => {
+            log.write('Shutdown: Desktop controller request received')
+            void stop()
+        }
     }
     try {
         const started = await startLibraryServer({

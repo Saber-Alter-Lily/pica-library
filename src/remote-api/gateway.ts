@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import fs from 'node:fs'
+import path from 'node:path'
 import http, {
     type IncomingMessage,
     type Server,
@@ -23,6 +24,25 @@ const FORWARDED_RESPONSE_HEADERS = new Set([
     'last-modified',
     'x-content-type-options'
 ])
+const REMOTE_WEB_CSP = [
+    "default-src 'none'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "font-src 'none'",
+    "manifest-src 'none'",
+    "worker-src 'none'"
+].join('; ')
+const REMOTE_WEB_ASSETS = new Map([
+    ['/remote/', { file: 'index.html', type: 'text/html; charset=utf-8' }],
+    ['/remote/remote.js', { file: 'remote.js', type: 'text/javascript; charset=utf-8' }],
+    ['/remote/remote.css', { file: 'remote.css', type: 'text/css; charset=utf-8' }]
+])
 
 export interface RemoteApiGatewayOptions {
     targetBaseUrl: string
@@ -33,6 +53,7 @@ export interface RemoteApiGatewayOptions {
     allowedOrigins?: string[]
     webSessions?: boolean
     webSessionTtlMs?: number
+    webRoot?: string
     rateLimit?: number
     rateWindowMs?: number
     onAudit?: (event: {
@@ -48,6 +69,7 @@ export interface RemoteApiGateway {
     host: string
     port: number
     webSessionsEnabled: boolean
+    webShellEnabled: boolean
     activeWebSessions(): number
     close(): Promise<void>
 }
@@ -64,6 +86,37 @@ function json(response: ServerResponse, status: number, value: unknown) {
         'x-content-type-options': 'nosniff'
     })
     response.end(JSON.stringify(value))
+}
+
+function remoteWebHeaders(contentType: string, size: number) {
+    return {
+        'content-type': contentType,
+        'content-length': String(size),
+        'cache-control': 'no-store',
+        'content-security-policy': REMOTE_WEB_CSP,
+        'cross-origin-opener-policy': 'same-origin',
+        'cross-origin-resource-policy': 'same-origin',
+        'permissions-policy':
+            'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+        'referrer-policy': 'no-referrer',
+        'strict-transport-security': 'max-age=31536000',
+        'x-content-type-options': 'nosniff',
+        'x-frame-options': 'DENY'
+    }
+}
+
+function remoteWebAsset(webRoot: string, pathname: string) {
+    const asset = REMOTE_WEB_ASSETS.get(pathname)
+    if (!asset) return null
+    const root = path.resolve(webRoot)
+    const file = path.resolve(root, asset.file)
+    if (!file.startsWith(root + path.sep))
+        throw new Error('Remote Web asset path escaped the configured root')
+    const body = fs.readFileSync(file)
+    return {
+        body,
+        type: asset.type
+    }
 }
 
 function normalizedHost(value: string) {
@@ -255,6 +308,19 @@ export async function startRemoteApiGateway(
     const webSessions = options.webSessions
         ? new RemoteWebSessionStore(options.webSessionTtlMs)
         : null
+    const webRoot =
+        webSessions && options.webRoot
+            ? path.resolve(options.webRoot)
+            : null
+    if (webRoot) {
+        for (const asset of REMOTE_WEB_ASSETS.values()) {
+            const file = path.resolve(webRoot, asset.file)
+            if (!file.startsWith(webRoot + path.sep) || !fs.statSync(file).isFile())
+                throw new Error(
+                    `Remote Web shell asset is unavailable: ${asset.file}`
+                )
+        }
+    }
     const expectedDigest = tokenDigest(options.token)
     const rateLimit = Math.max(1, options.rateLimit ?? DEFAULT_RATE_LIMIT)
     const rateWindowMs = Math.max(
@@ -331,6 +397,46 @@ export async function startRemoteApiGateway(
                 return json(response, 429, {
                     error: 'Remote rate limit exceeded'
                 })
+            }
+
+            if (pathname === '/remote') {
+                if (!webRoot || method !== 'GET') {
+                    audit(request, pathname, 404)
+                    return json(response, 404, {
+                        error: 'Remote route unavailable'
+                    })
+                }
+                response.writeHead(308, {
+                    location: '/remote/',
+                    'cache-control': 'no-store',
+                    'x-content-type-options': 'nosniff'
+                })
+                audit(request, pathname, 308)
+                response.end()
+                return
+            }
+
+            if (pathname.startsWith('/remote/')) {
+                if (!webRoot || method !== 'GET') {
+                    audit(request, pathname, 404)
+                    return json(response, 404, {
+                        error: 'Remote route unavailable'
+                    })
+                }
+                const asset = remoteWebAsset(webRoot, pathname)
+                if (!asset) {
+                    audit(request, pathname, 404)
+                    return json(response, 404, {
+                        error: 'Remote route unavailable'
+                    })
+                }
+                response.writeHead(
+                    200,
+                    remoteWebHeaders(asset.type, asset.body.byteLength)
+                )
+                audit(request, pathname, 200)
+                response.end(asset.body)
+                return
             }
 
             if (method === 'GET' && pathname === '/healthz') {
@@ -555,6 +661,7 @@ export async function startRemoteApiGateway(
         host: options.host,
         port,
         webSessionsEnabled: Boolean(webSessions),
+        webShellEnabled: Boolean(webRoot),
         activeWebSessions: () => webSessions?.activeCount() ?? 0,
         close: async () => {
             webSessions?.clear()

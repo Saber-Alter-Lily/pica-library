@@ -183,5 +183,16 @@ describe('Desktop native picker P4B-2', () => {
         expect(main).toContain('return await nativePicker.chooseSaveFile({')
         expect(main).not.toContain('Windows.Forms.FolderBrowserDialog')
         expect(main).not.toContain('Windows.Forms.SaveFileDialog')
+
+        const app = fs.readFileSync('web/app.js', 'utf8')
+        expect(app).toContain('function applyDesktopPlatformCapabilities()')
+        expect(app).toContain('platform.nativeFolderPicker')
+        expect(app).toContain(
+            "state.capabilities?.features?.updatePackages === false"
+        )
+        expect(app).toContain("desktop?.platform?.selfUpdate === false")
+        expect(app).toContain(
+            "button.hidden = !folderPicker"
+        )
     })
 })

@@ -51,4 +51,31 @@ describe('experimental Linux x64 package P5A', () => {
             '"$DATA_HOME/data/library.db"'
         )
     })
+
+    it('runs a packaged Linux user-flow acceptance before artifact publication', () => {
+        const preview = read('scripts/test-linux-preview-acceptance.sh')
+        const workflow = read('.github/workflows/linux-experimental.yml')
+
+        expect(workflow).toContain(
+            'bash scripts/test-linux-preview-acceptance.sh "$archive"'
+        )
+        expect(preview).toContain('"$PACKAGE_ROOT/app/pica-library.js"')
+        expect(preview).toContain('/api/v1/library/query')
+        expect(preview).toContain('/api/v1/comics/linux-preview-1')
+        expect(preview).toContain('/api/v1/shelves/$SHELF_ID/items')
+        expect(preview).toContain(
+            '/api/v1/reader/comics/linux-preview-1/chapters/linux-preview-ep-1'
+        )
+        expect(preview).toContain('/api/v1/reader/pictures/linux-preview-pic-1')
+        expect(preview).toContain('/api/v1/reader/progress')
+        expect(preview).toContain('/api/v1/downloads/$JOB_ID/pause')
+        expect(preview).toContain('/api/v1/downloads/$JOB_ID/resume')
+        expect(preview).toContain('download-resumed-after-restart.json')
+        expect(preview).toContain('reader progress did not persist across restart')
+        expect(preview).toContain('shelf did not persist across restart')
+        expect(preview).toContain('graceful shutdown did not persist the local job as PAUSED')
+        expect(preview).toContain(
+            'preview flow wrote user state into the application package'
+        )
+    })
 })

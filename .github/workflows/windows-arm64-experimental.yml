@@ -10,6 +10,9 @@ on:
       - 'scripts/build-windows-arm64-experimental.ps1'
       - 'scripts/test-windows-arm64-experimental.ps1'
       - 'scripts/test-windows-arm64-preview-replacement.ps1'
+      - 'scripts/install-windows-arm64-user.ps1'
+      - 'scripts/uninstall-windows-arm64-user.ps1'
+      - 'scripts/test-windows-arm64-user-install.ps1'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -22,6 +25,9 @@ on:
       - 'scripts/build-windows-arm64-experimental.ps1'
       - 'scripts/test-windows-arm64-experimental.ps1'
       - 'scripts/test-windows-arm64-preview-replacement.ps1'
+      - 'scripts/install-windows-arm64-user.ps1'
+      - 'scripts/uninstall-windows-arm64-user.ps1'
+      - 'scripts/test-windows-arm64-user-install.ps1'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -105,6 +111,14 @@ jobs:
           $candidate = @(Get-ChildItem artifacts -File -Filter 'Pica-Library-*-windows-arm64-experimental.zip')[0]
           if (-not $candidate) { throw 'Windows ARM64 candidate archive not found' }
           ./scripts/test-windows-arm64-preview-replacement.ps1 -BaselineArchive $baseline.FullName -CandidateArchive $candidate.FullName
+
+      - name: Run Windows ARM64 per-user install and uninstall acceptance
+        timeout-minutes: 4
+        shell: pwsh
+        run: |
+          $archive = @(Get-ChildItem artifacts -File -Filter 'Pica-Library-*-windows-arm64-experimental.zip')[0]
+          if (-not $archive) { throw 'Windows ARM64 experimental archive not found' }
+          ./scripts/test-windows-arm64-user-install.ps1 -Archive $archive.FullName
 
       - name: Upload experimental Windows ARM64 artifact
         if: github.event.repository.private == false

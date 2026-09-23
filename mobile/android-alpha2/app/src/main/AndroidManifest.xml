@@ -19,7 +19,7 @@
         </provider>
         <service android:name="androidx.work.impl.foreground.SystemForegroundService" android:foregroundServiceType="dataSync" tools:node="merge" />
         <activity android:name=".ReaderActivity" android:screenOrientation="unspecified" />
-        <activity android:name=".UnifiedComicDetailActivity" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".UnifiedComicDetailActivity" android:exported="false" />
         <activity android:name=".AuthorDirectoryActivity" android:exported="false" />
         <activity android:name=".AuthorWorksActivity" android:exported="false" />
         <activity android:name=".HistoryActivity" android:exported="false" />

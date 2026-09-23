@@ -34,6 +34,19 @@ describe('Desktop platform foundation', () => {
             managedEhWebLogin: true,
             selfUpdate: true
         })
+        expect(desktopPlatformCapabilities('win32', 'arm64')).toMatchObject({
+            id: 'windows',
+            arch: 'arm64',
+            runtimeFoundation: true,
+            distributionReady: false,
+            browserLaunch: true,
+            directoryLaunch: true,
+            secureCredentialPersistence: true,
+            nativeFolderPicker: true,
+            nativeSavePicker: true,
+            managedEhWebLogin: true,
+            selfUpdate: false
+        })
         for (const platform of ['darwin', 'linux'] as const)
             expect(desktopPlatformCapabilities(platform, 'arm64')).toMatchObject({
                 runtimeFoundation: true,
@@ -182,10 +195,96 @@ describe('Desktop platform foundation', () => {
             ).toBe(false)
     })
 
-    it('does not advertise Windows update packages on unfinished Desktop targets', () => {
-        expect(appCapabilities(false, 'win32').features.updatePackages).toBe(true)
-        expect(appCapabilities(false, 'darwin').features.updatePackages).toBe(false)
-        expect(appCapabilities(false, 'linux').features.updatePackages).toBe(false)
+    it('publishes structured supported/available/reason runtime capabilities', () => {
+        const windows = appCapabilities(false, 'win32', 'x64', {
+            runtime: { mode: 'interactive' },
+            platform: {
+                id: 'windows',
+                arch: 'x64',
+                runtimeFoundation: true,
+                selfUpdate: true
+            },
+            credentialBackend: { securePersistence: true },
+            nativePicker: {
+                backend: 'windows-winforms',
+                folderPicker: true,
+                savePicker: true
+            },
+            managedEhBrowser: { kind: 'edge' }
+        })
+        expect(windows.features.updatePackages).toBe(true)
+        expect(windows.runtime).toEqual({
+            role: 'desktop',
+            mode: 'interactive',
+            platform: 'windows',
+            arch: 'x64'
+        })
+        expect(windows.capabilityStates.selfUpdate).toEqual({
+            supported: true,
+            available: true,
+            execution: 'platform-host',
+            reason: 'Available'
+        })
+
+        const linux = appCapabilities(false, 'linux', 'x64', {
+            runtime: { mode: 'headless' },
+            platform: {
+                id: 'linux',
+                arch: 'x64',
+                runtimeFoundation: true,
+                selfUpdate: false
+            },
+            credentialBackend: { securePersistence: false },
+            nativePicker: {
+                backend: 'unavailable',
+                folderPicker: false,
+                savePicker: false
+            },
+            managedEhBrowser: null
+        })
+        expect(linux.features.updatePackages).toBe(false)
+        expect(linux.runtime).toEqual({
+            role: 'server',
+            mode: 'headless',
+            platform: 'linux',
+            arch: 'x64'
+        })
+        expect(linux.capabilityStates.selfUpdate).toMatchObject({
+            supported: false,
+            available: false,
+            reason: 'UnsupportedPlatform'
+        })
+        expect(linux.capabilityStates.nativeFolderPicker).toMatchObject({
+            supported: true,
+            available: false,
+            reason: 'MissingSystemDependency'
+        })
+        expect(linux.capabilityStates.secureCredentialPersistence).toMatchObject({
+            supported: true,
+            available: false,
+            reason: 'MissingSecureCredentialBackend'
+        })
+        expect(linux.capabilityStates.managedEhWebLogin).toMatchObject({
+            supported: true,
+            available: false,
+            reason: 'MissingManagedBrowser'
+        })
+
+        const windowsArm = appCapabilities(false, 'win32', 'arm64', {
+            runtime: { mode: 'interactive' },
+            platform: {
+                id: 'windows',
+                arch: 'arm64',
+                runtimeFoundation: true,
+                selfUpdate: false
+            }
+        })
+        expect(windowsArm.features.updatePackages).toBe(false)
+        expect(windowsArm.capabilityStates.selfUpdate).toMatchObject({
+            supported: false,
+            available: false,
+            reason: 'UnsupportedPlatform'
+        })
     })
 
     it('publishes the runtime capability matrix through Desktop status', () => {

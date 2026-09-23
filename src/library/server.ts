@@ -1434,10 +1434,9 @@ export async function startLibraryServer(options: {
                 request.method === 'POST' &&
                 options.desktop
             ) {
-                response.once('finish', () => {
-                    setImmediate(() => options.desktop?.shutdown())
-                })
-                return json(response, 200, { success: true })
+                json(response, 200, { success: true })
+                options.desktop.shutdown()
+                return
             }
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
                 return json(response, 200, {

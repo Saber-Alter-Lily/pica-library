@@ -33,3 +33,6 @@ _validation/
 *.log
 *.tgz
 .eslintcache
+
+# Experimental Server/Docker operator secrets
+/packaging/docker/server-preview/secrets/

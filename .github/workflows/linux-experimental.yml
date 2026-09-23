@@ -12,6 +12,9 @@ on:
       - 'scripts/test-linux-glibc228-container.sh'
       - 'scripts/test-linux-preview-acceptance.sh'
       - 'scripts/test-linux-preview-replacement.sh'
+      - 'scripts/install-linux-user.sh'
+      - 'scripts/uninstall-linux-user.sh'
+      - 'scripts/test-linux-user-desktop-install.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -23,7 +26,12 @@ on:
       - 'scripts/build-linux-experimental.sh'
       - 'scripts/linux-runtime-preflight.sh'
       - 'scripts/test-linux-experimental.sh'
+      - 'scripts/test-linux-glibc228-container.sh'
       - 'scripts/test-linux-preview-acceptance.sh'
+      - 'scripts/test-linux-preview-replacement.sh'
+      - 'scripts/install-linux-user.sh'
+      - 'scripts/uninstall-linux-user.sh'
+      - 'scripts/test-linux-user-desktop-install.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -111,6 +119,17 @@ jobs:
           test -f "$baseline"
           test -n "$candidate"
           bash scripts/test-linux-preview-replacement.sh "$baseline" "$candidate"
+
+      - name: Validate Linux user desktop install and uninstall
+        run: |
+          set -euo pipefail
+          if ! command -v desktop-file-validate >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y desktop-file-utils
+          fi
+          archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
+          test -n "$archive"
+          bash scripts/test-linux-user-desktop-install.sh "$archive"
 
       - name: Upload experimental Linux x64 artifact
         if: github.event.repository.private == false

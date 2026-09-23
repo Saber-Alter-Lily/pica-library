@@ -2441,7 +2441,10 @@ async function loadWorkVariantsForDetail(comicId) {
     }
 }
 
+let recommendationPreviewRequestId = 0
+
 function openRecommendationDetail(comicId, context = 'recommendation', comicOverride = null) {
+    recommendationPreviewRequestId += 1
     const comic = comicOverride || recommendationRecord(comicId, context)
     if (!comic) return
     const dialog = $('#recommend-detail-dialog')
@@ -2493,6 +2496,7 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
 async function loadRecommendationPreview(offset = 0) {
     const dialog = $('#recommend-detail-dialog')
     const comicId = dialog.dataset.comicId
+    const requestId = ++recommendationPreviewRequestId
     const message = $('#recommend-preview-message')
     recordRecommendationEvent(offset > 0 ? 'preview_more' : 'preview_open', {
         comicId,
@@ -2509,6 +2513,11 @@ async function loadRecommendationPreview(offset = 0) {
             offset,
             count: 3
         })
+        if (
+            requestId !== recommendationPreviewRequestId ||
+            dialog.dataset.comicId !== comicId
+        )
+            return
         if (!value.pages.length) {
             message.textContent = t('preview.empty')
             return
@@ -2534,6 +2543,11 @@ async function loadRecommendationPreview(offset = 0) {
         })
         await loadPreviewCacheStats()
     } catch (error) {
+        if (
+            requestId !== recommendationPreviewRequestId ||
+            dialog.dataset.comicId !== comicId
+        )
+            return
         message.textContent = localizeError(language, error)
     }
 }

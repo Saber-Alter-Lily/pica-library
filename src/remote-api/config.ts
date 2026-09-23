@@ -9,6 +9,7 @@ export interface RemoteApiConfiguration {
     allowedHosts: string[]
     allowedOrigins: string[]
     transportSecurity: RemoteApiTransportSecurity
+    remoteWeb: boolean
 }
 
 function list(value: string | undefined) {
@@ -28,7 +29,8 @@ export function isLoopbackRemoteHost(value: string) {
 
 export function remoteApiConfiguration(
     remoteApiEnabled: boolean,
-    environment: NodeJS.ProcessEnv = process.env
+    environment: NodeJS.ProcessEnv = process.env,
+    remoteWebEnabled = false
 ): RemoteApiConfiguration | null {
     if (!remoteApiEnabled) return null
 
@@ -66,16 +68,27 @@ export function remoteApiConfiguration(
             'Remote API non-loopback binding requires PICA_LIBRARY_REMOTE_ALLOWED_HOSTS'
         )
 
+    const allowedOrigins = list(
+        environment.PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS
+    )
+    if (remoteWebEnabled && loopback)
+        throw new Error(
+            'Remote Web requires a trusted TLS-terminating reverse proxy'
+        )
+    if (remoteWebEnabled && !allowedOrigins.length)
+        throw new Error(
+            'Remote Web requires PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS'
+        )
+
     return {
         host,
         port: rawPort,
         tokenFile,
         allowedHosts,
-        allowedOrigins: list(
-            environment.PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS
-        ),
+        allowedOrigins,
         transportSecurity: loopback
             ? 'loopback-http'
-            : 'tls-terminated-proxy'
+            : 'tls-terminated-proxy',
+        remoteWeb: remoteWebEnabled
     }
 }

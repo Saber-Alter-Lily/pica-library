@@ -114,7 +114,7 @@ Source: $SOURCE_SHA
 
 1. Extract the entire archive.
 2. Run ./pica-library or ./Pica\ Library.sh
-3. Pica Library opens in your default browser unless --no-open is supplied.
+3. Pica Library opens in your default browser in interactive mode. Use --headless for a persistent no-GUI local engine.
 
 This is an experimental CI artifact, not a formal release.
 Self-update is intentionally disabled on Linux at this stage.

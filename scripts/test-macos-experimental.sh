@@ -40,7 +40,7 @@ done
 DATA_HOME="$WORK/user-data"
 mkdir -p "$DATA_HOME"
 LOG="$WORK/macos-engine.log"
-PICA_LIBRARY_DESKTOP_HOME="$DATA_HOME"   "$PACKAGE_ROOT/pica-library" --no-open >"$LOG" 2>&1 &
+PICA_LIBRARY_DESKTOP_HOME="$DATA_HOME"   "$PACKAGE_ROOT/pica-library" --headless >"$LOG" 2>&1 &
 ENGINE_PID="$!"
 
 INSTANCE_FILE="$DATA_HOME/runtime-state/instance.json"
@@ -80,6 +80,11 @@ const status=JSON.parse(fs.readFileSync(statusFile,'utf8'))
 const caps=JSON.parse(fs.readFileSync(capFile,'utf8'))
 const fail=(message)=>{throw new Error(message)}
 if(status.application!=='Pica Library')fail('Unexpected application identity')
+if(!status.runtime||status.runtime.mode!=='headless')fail('Headless runtime mode missing')
+if(status.runtime.openBrowser!==false)fail('Headless mode must not open a browser')
+if(status.runtime.idleBrowserShutdown!==false)fail('Headless mode must not idle-stop on browser close')
+if(status.runtime.mobileBridge!==false)fail('Headless mode must default Mobile Bridge off')
+if(status.mobileBridge!==null)fail('Headless mode unexpectedly started Mobile Bridge')
 if(!status.platform||status.platform.id!=='macos')fail('macOS platform identity missing')
 if(status.platform.arch!=='arm64')fail('macOS package did not run as arm64')
 if(status.platform.runtimeFoundation!==true)fail('macOS runtime foundation not enabled')

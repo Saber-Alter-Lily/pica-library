@@ -38,6 +38,10 @@ describe('experimental macOS arm64 package P5B', () => {
 
     it('smokes platform identity, Keychain, native picker and external data placement', () => {
         const smoke = read('scripts/test-macos-experimental.sh')
+        expect(smoke).toContain('"$PACKAGE_ROOT/pica-library" --headless')
+        expect(smoke).toContain("status.runtime.mode!=='headless'")
+        expect(smoke).toContain('status.runtime.mobileBridge!==false')
+        expect(smoke).toContain('status.mobileBridge!==null')
         expect(smoke).toContain("status.platform.id!=='macos'")
         expect(smoke).toContain("status.platform.arch!=='arm64'")
         expect(smoke).toContain(

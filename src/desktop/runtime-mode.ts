@@ -1,0 +1,21 @@
+export type DesktopRuntimeMode = 'interactive' | 'headless'
+
+export interface DesktopRuntimeOptions {
+    mode: DesktopRuntimeMode
+    openBrowser: boolean
+    idleBrowserShutdown: boolean
+    mobileBridge: boolean
+}
+
+export function desktopRuntimeOptions(
+    argv: string[] = process.argv.slice(2)
+): DesktopRuntimeOptions {
+    const args = new Set(argv)
+    const headless = args.has('--headless')
+    return {
+        mode: headless ? 'headless' : 'interactive',
+        openBrowser: !headless && !args.has('--no-open'),
+        idleBrowserShutdown: !headless,
+        mobileBridge: !headless || args.has('--mobile-bridge')
+    }
+}

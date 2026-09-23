@@ -39,7 +39,7 @@ fi
 PARENT="$(dirname "$INSTALL_ROOT")"
 STAGING="$PARENT/.pica-library-install-$$"
 BACKUP="$PARENT/.pica-library-backup-$$"
-DESKTOP_TMP="$DESKTOP_FILE.tmp.$$"
+DESKTOP_TMP="$DESKTOP_DIR/.org.picalibrary.PicaLibrary.install.$$.desktop"
 DESKTOP_BACKUP="$DESKTOP_FILE.backup.$$"
 ICON_TMP="$ICON_FILE.tmp.$$"
 ICON_BACKUP="$ICON_FILE.backup.$$"

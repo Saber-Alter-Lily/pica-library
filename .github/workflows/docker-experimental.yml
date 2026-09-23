@@ -9,6 +9,7 @@ on:
       - 'packaging/docker/**'
       - 'scripts/build-docker-experimental.sh'
       - 'scripts/test-docker-experimental.sh'
+      - 'scripts/test-docker-remote-tls.sh'
       - 'scripts/build-linux-experimental.sh'
       - 'rollup.config.js'
       - 'package.json'
@@ -62,6 +63,13 @@ jobs:
           image="$(tr -d '\r\n' < artifacts/DOCKER-EXPERIMENTAL-IMAGE.txt)"
           test -n "$image"
           bash scripts/test-docker-experimental.sh "$image"
+
+      - name: Test authenticated Remote API behind Caddy TLS
+        run: |
+          set -euo pipefail
+          image="$(tr -d '\r\n' < artifacts/DOCKER-EXPERIMENTAL-IMAGE.txt)"
+          test -n "$image"
+          bash scripts/test-docker-remote-tls.sh "$image"
 
       - name: Upload experimental Docker artifact
         if: github.event.repository.private == false

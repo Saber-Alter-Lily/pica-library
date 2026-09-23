@@ -16,6 +16,7 @@ import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
 import { UpdateManager } from '../update/manager'
+import { updateTargetFromRuntime } from '../update/target'
 import { EcosystemPackStore } from '../ecosystem/pack-store'
 import { PersonalizationService } from '../services/personalization-service'
 import { GitHubAccountAuthService } from '../services/github-account-auth'
@@ -77,7 +78,8 @@ const updateManager = new UpdateManager({
         ? path.join(applicationRoot, 'runtime', 'node.exe')
         : process.execPath,
     desktopEntryPath: process.argv[1],
-    instanceFile: paths.instance
+    instanceFile: paths.instance,
+    target: updateTargetFromRuntime()
 })
 const ecosystemPacks = new EcosystemPackStore(paths.packs, PRODUCT_VERSION)
 const personalization = new PersonalizationService(

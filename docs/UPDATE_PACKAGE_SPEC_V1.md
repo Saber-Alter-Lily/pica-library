@@ -9,6 +9,7 @@ ZIP 根必须包含 `update-manifest.json`，字段为：
 - `sourceVersionRange`: 当前实现要求精确版本或精确 OR 列表。
 - `sourceSha`: 可选但本地验收包必须绑定完整 40 位来源 SHA。
 - `targetVersion`, `targetSourceSha`。
+- `targetPlatform`, `targetArch`：新包必须成对声明。平台为 `windows|macos|linux`，架构为 `x64|arm64`。为兼容历史发布，缺失这两个字段的 v1 Manifest 只允许解释为 `windows-x64`。
 - `appApiVersion`, `databaseSchemaVersion`。
 - `requiresFullInstall`。
 - `files[]`: `path`, `sha256`, `size`，可选 `category`。
@@ -32,17 +33,27 @@ ZIP 根必须包含 `update-manifest.json`，字段为：
 
 ## Release 资产命名与旧客户端兼容
 
-正式增量包优先使用来源作用域名称：
+新客户端优先使用同时绑定来源版本和目标平台的名称：
+
+`Pica-Library-v<target>-<platform>-<arch>-update-from-v<source>.zip`
+
+例如：
+
+`Pica-Library-v0.5.1-windows-x64-update-from-v0.5.0.zip`
+
+Windows x64 为保持旧客户端连续升级，仍可同时发布历史来源作用域别名：
 
 `Pica-Library-v<target>-update-from-v<source>.zip`
 
-新版客户端会先查找精确来源作用域资产，再兼容旧的通用名称：
+以及在确有旧版兼容需求时保留更早的通用名称：
 
 `Pica-Library-v<target>-update.zip`
 
+这些历史通用名称在协议上**只代表 windows-x64**。Linux/macOS 或其他架构不得 fallback 到它们；它们只能接受与自身 target 精确匹配的目标作用域资产。这样即使同一个 GitHub Release 同时存在多个平台包，也不会跨平台误装。
+
 当一个新版本与 public v0.4.0 不满足增量兼容条件时，**不得发布会被 v0.4.0 旧 updater 误识别的通用 `-update.zip`**。只发布完整 Windows 包时，v0.4.0 会进入其已实现的 `full-install` 路径并显示官方 Release 入口；这比发布一个随后必然在 source/schema 校验阶段失败的通用增量包更安全。
 
-来源作用域命名的目的不是绕过 manifest 校验：包内部 `sourceVersionRange` 仍必须精确匹配，官方 Release digest/SHA-256 校验仍必须通过。
+目标/来源作用域命名都不是绕过 Manifest 校验：包内部 `sourceVersionRange`、`targetPlatform`、`targetArch` 仍必须匹配，官方 Release digest/SHA-256 校验仍必须通过。Manifest v1 不升版，是为了让旧 Windows updater 安全忽略新增 target 字段；无 target 字段的历史包则只在 windows-x64 上继续兼容。
 
 ## 暂存、应用和回滚
 

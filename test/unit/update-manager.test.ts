@@ -11,6 +11,7 @@ import {
     DATABASE_SCHEMA_VERSION
 } from '../../src/app-capabilities'
 import type { UpdateManifest } from '../../src/update/types'
+import type { UpdateTarget } from '../../src/update/target'
 
 const tempDirs: string[] = []
 const sourceSha = '1'.repeat(40)
@@ -61,7 +62,11 @@ function packageBuffer(
     return { buffer: zip.toBuffer(), manifest }
 }
 
-function manager(version = '0.2.0-dev.0', fetchImplementation?: typeof fetch) {
+function manager(
+    version = '0.2.0-dev.0',
+    fetchImplementation?: typeof fetch,
+    target?: UpdateTarget | null
+) {
     const root = temp()
     return new UpdateManager({
         currentVersion: version,
@@ -72,7 +77,8 @@ function manager(version = '0.2.0-dev.0', fetchImplementation?: typeof fetch) {
         runtimePath: process.execPath,
         desktopEntryPath: path.join(root, 'app', 'desktop.js'),
         instanceFile: path.join(root, 'instance.json'),
-        fetchImplementation
+        fetchImplementation,
+        ...(target !== undefined ? { target } : {})
     })
 }
 
@@ -160,6 +166,45 @@ describe('UpdateManager', () => {
         await expect(
             manager('0.2.0').stage('update.zip', update.buffer)
         ).rejects.toThrow(/Stable builds reject local-test/)
+    })
+
+    it('rejects cross-platform packages before extraction and limits targetless legacy packages to windows-x64', async () => {
+        const linux = { platform: 'linux', arch: 'x64' } as const
+        await expect(
+            manager('0.2.0-dev.0', undefined, linux).stage(
+                'wrong-target.zip',
+                packageBuffer({
+                    targetPlatform: 'windows',
+                    targetArch: 'x64'
+                }).buffer
+            )
+        ).rejects.toThrow(/targets windows-x64.*installed runtime is linux-x64/i)
+
+        await expect(
+            manager('0.2.0-dev.0', undefined, linux).stage(
+                'legacy-targetless.zip',
+                packageBuffer().buffer
+            )
+        ).rejects.toThrow(/without target metadata.*windows-x64/i)
+
+        await expect(
+            manager('0.2.0-dev.0', undefined, linux).stage(
+                'linux-target.zip',
+                packageBuffer({
+                    targetPlatform: 'linux',
+                    targetArch: 'x64'
+                }).buffer
+            )
+        ).resolves.toMatchObject({ targetVersion: '0.2.0-dev.1' })
+
+        await expect(
+            manager().stage(
+                'partial-target.zip',
+                packageBuffer({
+                    targetPlatform: 'windows'
+                }).buffer
+            )
+        ).rejects.toThrow(/targetPlatform and targetArch must be declared together/i)
     })
 
     it('rejects wrong source versions and source SHAs', async () => {
@@ -473,6 +518,73 @@ describe('UpdateManager', () => {
             releaseUrl,
             assetName: scopedName,
             assetUrl: `${releaseUrl}/download/${scopedName}`
+        })
+    })
+
+    it('discovers only the matching OS/arch incremental asset', async () => {
+        const releaseUrl =
+            'https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.1'
+        const genericName =
+            'Pica-Library-v0.5.1-update-from-v0.5.0.zip'
+        const linuxName =
+            'Pica-Library-v0.5.1-linux-x64-update-from-v0.5.0.zip'
+        const release = {
+            tag_name: 'v0.5.1',
+            html_url: releaseUrl,
+            draft: false,
+            prerelease: false,
+            assets: [
+                {
+                    name: genericName,
+                    browser_download_url:
+                        `${releaseUrl}/download/${genericName}`
+                },
+                {
+                    name: linuxName,
+                    browser_download_url:
+                        `${releaseUrl}/download/${linuxName}`
+                }
+            ]
+        }
+        const fetchImplementation = vi.fn(
+            async () =>
+                new Response(JSON.stringify(release), { status: 200 })
+        ) as unknown as typeof fetch
+
+        await expect(
+            manager(
+                '0.5.0',
+                fetchImplementation,
+                { platform: 'linux', arch: 'x64' }
+            ).checkForUpdate()
+        ).resolves.toEqual({
+            status: 'incremental',
+            version: '0.5.1',
+            releaseUrl,
+            assetName: linuxName,
+            assetUrl: `${releaseUrl}/download/${linuxName}`
+        })
+
+        const genericOnlyFetch = vi.fn(
+            async () =>
+                new Response(
+                    JSON.stringify({
+                        ...release,
+                        assets: [release.assets[0]]
+                    }),
+                    { status: 200 }
+                )
+        ) as unknown as typeof fetch
+        await expect(
+            manager(
+                '0.5.0',
+                genericOnlyFetch,
+                { platform: 'linux', arch: 'x64' }
+            ).checkForUpdate()
+        ).resolves.toEqual({
+            status: 'full-install',
+            version: '0.5.1',
+            releaseUrl
         })
     })
 

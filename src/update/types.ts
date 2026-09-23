@@ -14,6 +14,8 @@ export interface UpdateManifest {
     sourceSha?: string
     targetVersion: string
     targetSourceSha: string
+    targetPlatform?: 'windows' | 'macos' | 'linux'
+    targetArch?: 'x64' | 'arm64'
     appApiVersion: number
     databaseSchemaVersion: number
     requiresFullInstall: boolean

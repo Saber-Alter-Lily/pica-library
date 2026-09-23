@@ -54,6 +54,8 @@ describe('local incremental update package builder', () => {
         expect(result.manifest).toMatchObject({
             sourceVersionRange: '=0.2.0-dev.0',
             targetVersion: '0.2.0-dev.1',
+            targetPlatform: 'windows',
+            targetArch: 'x64',
             requiresFullInstall: false
         })
         const names = new AdmZip(output)
@@ -171,6 +173,32 @@ describe('local incremental update package builder', () => {
                 )
             ).toThrow()
         }
+    })
+
+    it('rejects source and target packages from different OS/arch identities', () => {
+        const directory = fs.mkdtempSync(
+            path.join(os.tmpdir(), 'pica-update-build-')
+        )
+        directories.push(directory)
+        const source = fullPackage(
+            directory,
+            'Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip',
+            '1'.repeat(40),
+            'old'
+        )
+        const target = fullPackage(
+            directory,
+            'Pica-Library-v0.2.0-dev.1-local-test-macos-arm64.zip',
+            '2'.repeat(40),
+            'new'
+        )
+        expect(() =>
+            buildLocalUpdatePackage(
+                source,
+                target,
+                path.join(directory, 'mismatch.zip')
+            )
+        ).toThrow(/targets do not match.*windows-x64.*macos-arm64/i)
     })
 
     it('refuses to build an unusable direct incremental package from public v0.4.0 to the current schema', () => {

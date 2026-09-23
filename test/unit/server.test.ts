@@ -441,7 +441,31 @@ describe('desktop mutation security', () => {
             desktop: {
                 csrfToken: 'current-nonce',
                 configured: () => true,
-                status: () => ({ profile: 'balanced' }),
+                status: () => ({
+                    runtime: {
+                        mode: 'headless',
+                        openBrowser: false,
+                        idleBrowserShutdown: false,
+                        mobileBridge: false
+                    },
+                    platform: {
+                        id: 'linux',
+                        arch: 'x64',
+                        runtimeFoundation: true,
+                        selfUpdate: false
+                    },
+                    credentialBackend: {
+                        kind: 'memory',
+                        securePersistence: false
+                    },
+                    nativePicker: {
+                        backend: 'unavailable',
+                        folderPicker: false,
+                        savePicker: false
+                    },
+                    managedEhBrowser: null,
+                    profile: 'balanced'
+                }),
                 save,
                 testConnection: async () => ({ success: true }),
                 chooseFolder: async () => null,
@@ -461,6 +485,38 @@ describe('desktop mutation security', () => {
                 csrfToken: 'current-nonce'
             })
             expect(JSON.stringify(status)).not.toContain('password')
+
+            const capabilities = await fetch(
+                `${started.url}/api/v1/capabilities`
+            ).then((response) => response.json())
+            expect(capabilities).toMatchObject({
+                runtime: {
+                    role: 'server',
+                    mode: 'headless',
+                    platform: 'linux',
+                    arch: 'x64'
+                },
+                capabilityStates: {
+                    selfUpdate: {
+                        supported: false,
+                        available: false,
+                        execution: 'platform-host',
+                        reason: 'UnsupportedPlatform'
+                    },
+                    nativeFolderPicker: {
+                        supported: true,
+                        available: false,
+                        execution: 'platform-host',
+                        reason: 'MissingSystemDependency'
+                    },
+                    secureCredentialPersistence: {
+                        supported: true,
+                        available: false,
+                        execution: 'platform-host',
+                        reason: 'MissingSecureCredentialBackend'
+                    }
+                }
+            })
 
             for (const headers of [
                 { origin: started.url },

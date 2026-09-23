@@ -20,13 +20,33 @@ describe('dev.2 connected Web lifecycle contracts', () => {
         )
     })
 
+    it('reader_progress_vertical_visible_window', () => {
+        expect(app).toContain("'IntersectionObserver' in window")
+        expect(app).toContain("rootMargin: '-45% 0px -45% 0px'")
+        expect(app).toContain('entry.boundingClientRect.top')
+        expect(app).toContain('queueReaderProgress(nearest.pageIndex)')
+        expect(app).toContain('document.elementFromPoint(x, y)')
+        expect(app).not.toContain("$('[data-reader-page]')")
+        expect(app).not.toContain('image.getBoundingClientRect().top')
+    })
+
     it.each([
-        'reader_progress_vertical_center_page',
         'reader_progress_single_page',
         'reader_progress_double_page'
     ])('%s', () => {
-        expect(app).toContain('getBoundingClientRect().top')
         expect(app).toContain('queueReaderProgress(reader.pageIndex)')
+    })
+
+    it('reader_vertical_tracking_cleanup', () => {
+        expect(app).toContain('function resetReaderViewportTracking()')
+        expect(app).toContain('readerPageObserver?.disconnect()')
+        expect(app).toMatch(
+            /async function exitReader\(\)[\s\S]*resetReaderViewportTracking\(\)/
+        )
+    })
+
+    it('reader_pages_use_native_lazy_decode', () => {
+        expect(app).toContain('loading="lazy" decoding="async"')
     })
 
     it('reader_progress_flush_on_exit', () => {

@@ -37,6 +37,7 @@ trap {
     exit 1
 }
 
+Write-Host '[arm64] extracting package'
 New-Item -ItemType Directory -Force -Path $extract,$dataHome | Out-Null
 Expand-Archive -LiteralPath $Archive -DestinationPath $extract
 $packageRoot = $extract
@@ -51,6 +52,7 @@ foreach ($required in @($node,$launcher,$cli,$desktop,(Join-Path $packageRoot 'w
     }
 }
 
+Write-Host '[arm64] validating packaged native runtime'
 $identity = (& $node -p "process.platform + '/' + process.arch").Trim()
 if ($identity -ne 'win32/arm64') { throw "Packaged Node runtime is not Windows ARM64: $identity" }
 
@@ -62,6 +64,7 @@ windows-arm64-2,Windows ARM64 Fixture Two,Preview Author,Comedy,Preview | Portab
 
 $dataDir = Join-Path $dataHome 'data'
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+Write-Host '[arm64] importing synthetic library with packaged CLI'
 & $node $cli import $fixture --data-dir $dataDir --json | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Packaged CLI import failed' }
 $cliList = & $node $cli list --data-dir $dataDir --json | ConvertFrom-Json
@@ -104,6 +107,7 @@ db.prepare("UPDATE pictures SET status = 'completed', local_path = ?, byte_size 
 )
 db.close()
 '@ | Set-Content -Encoding utf8 -LiteralPath $seedScript
+Write-Host '[arm64] seeding downloaded Reader fixture'
 & $node $seedScript $dbFile $pageFile
 if ($LASTEXITCODE -ne 0) { throw 'Reader fixture seeding failed' }
 
@@ -126,8 +130,14 @@ function Wait-Desktop([string]$OldCsrf = '') {
 }
 
 function Start-Desktop {
-    $process = Start-Process -FilePath $launcher -ArgumentList @('--headless','--no-open') -PassThru -Wait
+    Write-Host '[arm64] launching packaged Pica Library.exe'
+    $process = Start-Process -FilePath $launcher -ArgumentList @('--headless','--no-open') -PassThru
+    if (-not $process.WaitForExit(15000)) {
+        try { $process.Kill() } catch {}
+        throw 'Windows ARM64 launcher did not exit within 15 seconds; a blocking launcher dialog or startup failure is likely'
+    }
     if ($process.ExitCode -ne 0) { throw "Windows ARM64 launcher failed with code $($process.ExitCode)" }
+    Write-Host '[arm64] launcher exited; waiting for Desktop engine'
     return Wait-Desktop
 }
 
@@ -155,6 +165,7 @@ function JsonPost([string]$Url,[string]$Path,[object]$Payload,[hashtable]$ExtraH
     return Invoke-RestMethod -Method Post -Uri "$Url$Path" -Headers $headers -ContentType 'application/json' -Body ($Payload | ConvertTo-Json -Depth 8) -TimeoutSec 10
 }
 
+Write-Host '[arm64] starting first packaged Desktop session'
 $desktopState = Start-Desktop
 $url = $desktopState.Url
 $status = $desktopState.Status
@@ -177,6 +188,7 @@ $settings = @{
     libraryDirectory = [string]$status.libraryDirectory
     profile = 'balanced'
 }
+Write-Host '[arm64] saving synthetic credentials through DPAPI-backed settings'
 Invoke-RestMethod -Method Post -Uri "$url/api/v1/desktop/settings" -Headers $settingsHeaders -ContentType 'application/json' -Body ($settings | ConvertTo-Json) -TimeoutSec 10 | Out-Null
 $restarted = Wait-Desktop -OldCsrf $oldCsrf
 $url = $restarted.Url
@@ -189,6 +201,7 @@ if ((Get-Content -Raw -LiteralPath $credentialFile) -like "*$secret*") { throw '
 $plaintextHit = Get-ChildItem -LiteralPath $dataHome -File -Recurse -ErrorAction SilentlyContinue | Select-String -SimpleMatch -Pattern $secret -Quiet -ErrorAction SilentlyContinue
 if ($plaintextHit) { throw 'Windows ARM64 synthetic credential leaked into persistent user data' }
 
+Write-Host '[arm64] exercising library, shelf, Reader and download APIs'
 $query = JsonPost $url '/api/v1/library/query' @{ scope='favorites'; text='Windows ARM64 Fixture'; limit=20 }
 if ([int]$query.total -ne 2) { throw 'Windows ARM64 library query returned the wrong fixture count' }
 
@@ -216,9 +229,11 @@ if ($paused.status -ne 'PAUSED') { throw 'Windows ARM64 download pause failed' }
 $resumed = JsonPost $url "/api/v1/downloads/$jobId/resume" @{}
 if ($resumed.status -ne 'QUEUED') { throw 'Windows ARM64 download resume failed' }
 
+Write-Host '[arm64] stopping first Desktop session'
 Stop-Desktop $url
 if (-not (Test-Path -LiteralPath $dbFile)) { throw 'Windows ARM64 database was not persisted outside the package' }
 
+Write-Host '[arm64] starting second Desktop session for persistence checks'
 $desktopState = Start-Desktop
 $url = $desktopState.Url
 $status = $desktopState.Status
@@ -233,6 +248,7 @@ if (-not ($downloadsAfter | Where-Object { $_.comicId -eq 'windows-arm64-1' -and
 $progressAfter = @(Invoke-RestMethod -Uri "$url/api/v1/reader/progress" -TimeoutSec 5)
 if (-not ($progressAfter | Where-Object { $_.comicId -eq 'windows-arm64-1' -and $_.episodeId -eq 'windows-arm64-ep-1' -and [int]$_.pageIndex -eq 0 })) { throw 'Windows ARM64 Reader progress did not persist across restart' }
 
+Write-Host '[arm64] stopping second Desktop session'
 Stop-Desktop $url
 
 $packageDatabases = @(Get-ChildItem -LiteralPath $packageRoot -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '\.(db|sqlite)(-wal|-shm)?$' })

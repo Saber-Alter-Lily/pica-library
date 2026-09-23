@@ -1431,11 +1431,12 @@ export async function startLibraryServer(options: {
                 request.method === 'POST' &&
                 options.desktop
             ) {
-                response.once('finish', () => options.desktop?.shutdown())
-                return json(response, 200, {
+                json(response, 200, {
                     success: true,
                     shutdownScheduled: true
                 })
+                options.desktop.shutdown()
+                return
             }
             if (url.pathname === '/api/v1/status' && request.method === 'GET') {
                 return json(response, 200, {

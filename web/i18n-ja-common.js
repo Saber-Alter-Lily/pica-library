@@ -162,7 +162,7 @@ export const jaCommonChronicleTranslations = {
     'visual.pausePending': '一時停止を要求しました。現在の作品の処理後に停止します。',
     'visual.paused': '画風解析を一時停止しました · {current}/{total}。',
     'visual.resuming': '画風解析を再開しています…',
-    'visual.cancelling': 'キャンセル中です。現在の作品の処理後にこの処理を停止します。',
+    'visual.cancelling': '現在の画風解析をキャンセルしています…',
     'visual.cancelled': '今回の画風解析をキャンセルしました。未完了の作品は解析待ちのまま残り、後で再開できます。',
     'remote.settingsTitle': 'リモートストレージ · WebDAV',
     'remote.urlLabel': 'WebDAV URL',

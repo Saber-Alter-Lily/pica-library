@@ -34,7 +34,7 @@ describe('Remote Web read-only shell W5B', () => {
         expect(app).toContain('/api/v1/downloaded')
         expect(app).toContain('/api/v1/comics/')
         expect(app).toContain('/api/v1/reader/comics/')
-        expect(app).toContain('/api/v1/reader/pictures/')
+        expect(app).toContain("image.src = pages[index].url")
         expect(app).not.toContain('/api/v1/reader/progress')
         expect(app).not.toContain('/api/v1/desktop/')
         expect(app).not.toContain('/api/v1/import')

@@ -66,7 +66,7 @@ docker run --rm \
 # the Pica container environment or image metadata.
 printf '%s' "$TOKEN" | docker run --rm -i   --user 0   --entrypoint /bin/sh   --mount "type=volume,src=$SECRET_VOLUME,dst=/secret"   "$IMAGE"   -c 'set -eu; umask 077; cat > /secret/token; chown 10001:10001 /secret/token; chmod 0600 /secret/token'
 
-docker run --detach   --name "$PICA_NAME"   --network "$NETWORK"   --network-alias pica   --mount "type=volume,src=$CONFIG_VOLUME,dst=/config"   --mount "type=volume,src=$SECRET_VOLUME,dst=/run/pica-secret,readonly"   -e PICA_LIBRARY_REMOTE_TOKEN_FILE=/run/pica-secret/token   -e PICA_LIBRARY_REMOTE_HOST=0.0.0.0   -e PICA_LIBRARY_REMOTE_PORT=8787   -e PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY=true   -e PICA_LIBRARY_REMOTE_ALLOWED_HOSTS=pica.test,127.0.0.1   "$IMAGE"   --remote-api >/dev/null
+docker run --detach   --name "$PICA_NAME"   --network "$NETWORK"   --network-alias pica   --mount "type=volume,src=$CONFIG_VOLUME,dst=/config"   --mount "type=volume,src=$SECRET_VOLUME,dst=/run/pica-secret,readonly"   -e PICA_LIBRARY_REMOTE_TOKEN_FILE=/run/pica-secret/token   -e PICA_LIBRARY_REMOTE_HOST=0.0.0.0   -e PICA_LIBRARY_REMOTE_PORT=8787   -e PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY=true   -e PICA_LIBRARY_REMOTE_ALLOWED_HOSTS=pica.test,127.0.0.1   -e PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS=https://pica.test   -e PICA_LIBRARY_REMOTE_WEB_SESSIONS=true   "$IMAGE"   --remote-api >/dev/null
 
 if [[ -n "$(docker port "$PICA_NAME" 2>/dev/null)" ]]; then
   fail "Pica Remote API must not publish a host port directly"

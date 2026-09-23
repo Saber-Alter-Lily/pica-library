@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import AdmZip from 'adm-zip'
 import { UpdateManager } from '../src/update/manager'
+import { normalizeUpdateTarget } from '../src/update/target'
 import assert from 'node:assert/strict'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -17,6 +18,8 @@ const manifest = JSON.parse(zip.readAsText('update-manifest.json')) as {
     targetSourceSha: string
     targetVersion: string
     sourceVersionRange: string
+    targetPlatform?: string
+    targetArch?: string
 }
 const temp = fs.mkdtempSync(
     path.join(os.tmpdir(), 'pica-v3-update-validation-')
@@ -46,6 +49,13 @@ try {
         runtimePath: process.execPath,
         desktopEntryPath: path.join(temp, 'app', 'desktop.js'),
         instanceFile: path.join(temp, 'instance.json'),
+        target:
+            manifest.targetPlatform || manifest.targetArch
+                ? normalizeUpdateTarget(
+                      manifest.targetPlatform,
+                      manifest.targetArch
+                  )
+                : undefined,
         fetchImplementation: fetchImplementation as typeof fetch
     })
     const staged = await manager.stage(path.basename(updateFile), archive)

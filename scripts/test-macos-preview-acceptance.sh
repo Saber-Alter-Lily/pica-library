@@ -266,12 +266,12 @@ const minimum=[13,5]
 for(let i=0;i<minimum.length;i++){
   const left=value[i]||0
   const right=minimum[i]
-  if(left>right)process.exit(0)
-  if(left<right)process.exit(1)
+  if(left<right)process.exit(0)
+  if(left>right)process.exit(1)
 }
 NODE
 then
-  fail "bundled Node runtime targets macOS below the declared 13.5 baseline: $DARWIN_MIN"
+  fail "bundled Node runtime requires macOS above the declared 13.5 baseline: $DARWIN_MIN"
 fi
 
 mkdir -p "$DATA_HOME/data"

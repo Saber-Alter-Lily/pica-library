@@ -1,0 +1,68 @@
+name: Experimental Linux Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/build-linux-experimental.sh'
+      - 'scripts/test-linux-experimental.sh'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/linux-experimental.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/build-linux-experimental.sh'
+      - 'scripts/test-linux-experimental.sh'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/linux-experimental.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-x64-experimental:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build experimental Linux x64 package
+        run: bash scripts/build-linux-experimental.sh
+
+      - name: Smoke packaged Linux runtime
+        run: |
+          set -euo pipefail
+          archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-linux-x64-experimental.tar.gz' -print -quit)"
+          test -n "$archive"
+          bash scripts/test-linux-experimental.sh "$archive"
+
+      - name: Upload experimental Linux x64 artifact
+        if: github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-library-linux-x64-experimental-${{ github.sha }}
+          path: |
+            artifacts/Pica-Library-*-linux-x64-experimental.tar.gz
+            artifacts/LINUX-EXPERIMENTAL-SHA256SUMS.txt
+          retention-days: 1
+          if-no-files-found: error

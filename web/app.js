@@ -46,6 +46,7 @@ const state = {
     visualIndexPauseRequested: false,
     visualIndexPaused: false,
     visualIndexResume: null,
+    visualIndexAbortController: null,
     searchContextId: null,
     visible: [],
     libraryPage: 1,
@@ -4076,6 +4077,7 @@ async function buildVisualIndex() {
                     current: index + 1,
                     total
                 })
+            let visualController = null
             try {
                 const prepared = await post('/api/v1/visual/prepare', {
                     comicId,
@@ -4084,6 +4086,9 @@ async function buildVisualIndex() {
                 })
                 if (!prepared.samples?.length)
                     throw new Error(t('visual.noSamples'))
+                if (state.visualIndexStopRequested) break
+                visualController = new AbortController()
+                state.visualIndexAbortController = visualController
                 const result = await analyzeVisualSamples(
                     prepared.samples,
                     (progress) => {
@@ -4100,8 +4105,10 @@ async function buildVisualIndex() {
                             )
                         else if (progress.phase === 'model')
                             message.textContent = t('visual.loadingModel')
-                    }
+                    },
+                    { signal: visualController.signal }
                 )
+                if (state.visualIndexStopRequested) break
                 await post('/api/v1/visual/embedding', {
                     comicId,
                     ...result,
@@ -4124,6 +4131,11 @@ async function buildVisualIndex() {
                     }
                 })
             } catch (error) {
+                if (
+                    error?.name === 'AbortError' &&
+                    state.visualIndexStopRequested
+                )
+                    break
                 failures += 1
                 if (message)
                     message.textContent = t('visual.itemFailed', {
@@ -4131,6 +4143,9 @@ async function buildVisualIndex() {
                         total,
                         error: localizeError(language, error)
                     })
+            } finally {
+                if (state.visualIndexAbortController === visualController)
+                    state.visualIndexAbortController = null
             }
         }
         if (progressBar)
@@ -4164,6 +4179,8 @@ async function buildVisualIndex() {
     } finally {
         if (message) delete message.dataset.busy
         setBackgroundTaskIndicator('')
+        state.visualIndexAbortController?.abort()
+        state.visualIndexAbortController = null
         state.visualIndexRunning = false
         state.visualIndexStopRequested = false
         state.visualIndexPauseRequested = false
@@ -4197,6 +4214,7 @@ $('#visual-index-stop').onclick = () => {
     const resume = state.visualIndexResume
     state.visualIndexResume = null
     if (resume) resume()
+    state.visualIndexAbortController?.abort()
     setVisualTaskControls('pausing')
     const message = $('#visual-index-message')
     if (message) message.textContent = t('visual.cancelling')

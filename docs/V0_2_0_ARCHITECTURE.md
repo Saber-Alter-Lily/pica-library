@@ -39,6 +39,8 @@
 
 `GET /api/v1/capabilities` 是 Web UI 的唯一能力发现入口。新增能力应先增加服务接口和 capability，再增加 UI；不要让页面探测私有方法。
 
+兼容字段 `features.*` 继续保留；跨平台宿主能力同时通过 `runtime` 与 `capabilityStates` 暴露。每项宿主能力区分 `supported`（该平台/架构是否实现）、`available`（当前运行环境能否实际执行）、机器可读 `reason` 与 `execution` 位置，避免把“代码里存在适配器”误表示成“当前设备一定可用”。
+
 ## 安全与扩展规则
 
 - 更新只能写应用 allowlist，用户数据根不在更新域。

@@ -351,9 +351,13 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/capabilities' &&
                 request.method === 'GET'
             ) {
+                const desktopStatus = options.desktop?.status() ?? null
                 return json(response, 200, {
                     ...appCapabilities(
-                        providerService.capabilities.favoriteMutation
+                        providerService.capabilities.favoriteMutation,
+                        process.platform,
+                        process.arch,
+                        desktopStatus
                     ),
                     providers: providerService.providerStatus()
                 })

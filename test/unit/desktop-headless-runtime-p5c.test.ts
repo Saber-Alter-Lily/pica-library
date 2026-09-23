@@ -81,7 +81,8 @@ describe('Desktop headless runtime foundation P5C', () => {
         expect(main).toContain(
             'Shutdown: Desktop controller request received'
         )
-        expect(main).toContain('setImmediate(() => void stop())')
+        expect(main).toContain('void stop()')
+        expect(main).not.toContain('setImmediate(() => void stop())')
     })
 
     it('does not treat headless mode as a formal remote-server or release capability', () => {

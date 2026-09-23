@@ -1,5 +1,5 @@
-import os from 'node:os'
 import path from 'node:path'
+import { defaultDesktopRoot } from './platform'
 
 export interface DesktopPaths {
     root: string
@@ -20,11 +20,7 @@ export function desktopPaths(rootOverride?: string): DesktopPaths {
     const local =
         rootOverride ??
         process.env.PICA_LIBRARY_DESKTOP_HOME ??
-        path.join(
-            process.env.LOCALAPPDATA ??
-                path.join(os.homedir(), 'AppData', 'Local'),
-            'Pica Library'
-        )
+        defaultDesktopRoot()
     return {
         root: local,
         config: path.join(local, 'config', 'config.json'),

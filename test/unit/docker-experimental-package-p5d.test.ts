@@ -89,6 +89,12 @@ describe('experimental Docker headless package P5D', () => {
             'PICA_LIBRARY_REMOTE_ALLOWED_HOSTS=pica.test'
         )
         expect(remote).toContain(
+            'PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS=https://pica.test'
+        )
+        expect(remote).toContain(
+            'PICA_LIBRARY_REMOTE_WEB_SESSIONS=true'
+        )
+        expect(remote).toContain(
             'PICA_LIBRARY_REMOTE_TOKEN_FILE=/run/pica-secret/token'
         )
         expect(remote).toContain('chmod 0600 /secret/token')
@@ -101,6 +107,10 @@ describe('experimental Docker headless package P5D', () => {
         expect(remote).toContain('Desktop management route escaped')
         expect(remote).toContain('Unapproved browser Origin')
         expect(remote).toContain('Bearer token leaked into Pica logs')
+        expect(remote).toContain('__Host-pica_session')
+        expect(remote).toContain('Remote Web session write succeeded without CSRF')
+        expect(remote).toContain('Long-lived bearer token leaked into Remote Web session response')
+        expect(remote).toContain('Process-local Remote Web session survived Pica restart')
         expect(remote).toContain(
             'Remote HTTPS path did not recover after Pica container restart'
         )
@@ -185,6 +195,7 @@ describe('experimental Docker headless package P5D', () => {
         expect(caddy).toContain('{\$PICA_LIBRARY_DOMAIN}')
         expect(caddy).not.toContain('tls internal')
         expect(compose).not.toContain('PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS')
+        expect(compose).not.toContain('PICA_LIBRARY_REMOTE_WEB_SESSIONS')
 
         expect(acceptance).toContain('docker compose')
         expect(acceptance).toContain('config --format json')

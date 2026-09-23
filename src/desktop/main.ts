@@ -646,9 +646,16 @@ async function startEngine(preferredPort: number) {
                       allowedHostCount:
                           remoteApiSettings?.allowedHosts.length ?? 0,
                       allowedOriginCount:
-                          remoteApiSettings?.allowedOrigins.length ?? 0
+                          remoteApiSettings?.allowedOrigins.length ?? 0,
+                      webSessions: remoteApiGateway.webSessionsEnabled,
+                      activeWebSessions:
+                          remoteApiGateway.activeWebSessions()
                   }
-                : { enabled: false },
+                : {
+                      enabled: false,
+                      webSessions: false,
+                      activeWebSessions: 0
+                  },
             remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
             ehAccount: {
                 configured: Boolean(
@@ -1127,13 +1134,14 @@ async function startEngine(preferredPort: number) {
             token,
             allowedHosts: remoteApiSettings.allowedHosts,
             allowedOrigins: remoteApiSettings.allowedOrigins,
+            webSessions: remoteApiSettings.webSessions,
             onAudit: (event) =>
                 log.write(
                     `Remote API ${event.method} ${event.path} -> ${event.status} [${event.remoteAddress}]`
                 )
         })
         log.write(
-            `Authenticated Remote API started on ${remoteApiGateway.host}:${remoteApiGateway.port} [${remoteApiSettings.transportSecurity}]`
+            `Authenticated Remote API started on ${remoteApiGateway.host}:${remoteApiGateway.port} [${remoteApiSettings.transportSecurity}; browser-sessions=${remoteApiGateway.webSessionsEnabled ? 'enabled' : 'disabled'}]`
         )
     } else {
         remoteApiGateway = null

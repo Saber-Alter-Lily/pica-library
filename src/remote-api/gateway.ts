@@ -6,6 +6,10 @@ import http, {
     type ServerResponse
 } from 'node:http'
 import { Readable } from 'node:stream'
+import {
+    clearRemoteWebSessionCookie,
+    RemoteWebSessionStore
+} from './browser-session'
 
 export const REMOTE_API_VERSION = 1
 const DEFAULT_RATE_LIMIT = 300
@@ -27,6 +31,8 @@ export interface RemoteApiGatewayOptions {
     token: string
     allowedHosts: string[]
     allowedOrigins?: string[]
+    webSessions?: boolean
+    webSessionTtlMs?: number
     rateLimit?: number
     rateWindowMs?: number
     onAudit?: (event: {
@@ -41,6 +47,8 @@ export interface RemoteApiGateway {
     server: Server
     host: string
     port: number
+    webSessionsEnabled: boolean
+    activeWebSessions(): number
     close(): Promise<void>
 }
 
@@ -240,6 +248,13 @@ export async function startRemoteApiGateway(
             .map((value) => normalizedOrigin(value))
             .filter((value): value is string => Boolean(value))
     )
+    if (options.webSessions && allowedOrigins.size === 0)
+        throw new Error(
+            'Remote Web sessions require at least one allowed browser Origin'
+        )
+    const webSessions = options.webSessions
+        ? new RemoteWebSessionStore(options.webSessionTtlMs)
+        : null
     const expectedDigest = tokenDigest(options.token)
     const rateLimit = Math.max(1, options.rateLimit ?? DEFAULT_RATE_LIMIT)
     const rateWindowMs = Math.max(
@@ -341,12 +356,138 @@ export async function startRemoteApiGateway(
                 }
             }
 
-            if (!isAuthorized(request, expectedDigest)) {
+            const bearerAuthorized = isAuthorized(
+                request,
+                expectedDigest
+            )
+            const browserSession = webSessions?.authenticate(
+                request.headers.cookie
+            )
+
+            if (pathname === '/remote/v1/session/bootstrap') {
+                if (!webSessions || method !== 'POST') {
+                    audit(request, pathname, 404)
+                    return json(response, 404, {
+                        error: 'Remote route unavailable'
+                    })
+                }
+                const origin = normalizedOrigin(originHeader ?? '')
+                if (!origin || !allowedOrigins.has(origin)) {
+                    audit(request, pathname, 403)
+                    return json(response, 403, {
+                        error: 'Browser Origin is required'
+                    })
+                }
+                if (!bearerAuthorized) {
+                    response.setHeader('www-authenticate', 'Bearer')
+                    audit(request, pathname, 401)
+                    return json(response, 401, {
+                        error: 'Authentication required'
+                    })
+                }
+                const created = webSessions.create(origin)
+                response.setHeader('set-cookie', created.cookie)
+                audit(request, pathname, 201)
+                return json(response, 201, {
+                    authenticated: true,
+                    expiresAt: new Date(
+                        created.session.expiresAt
+                    ).toISOString(),
+                    csrfToken: created.session.csrfToken
+                })
+            }
+
+            if (pathname === '/remote/v1/session') {
+                if (!webSessions || method !== 'GET') {
+                    audit(request, pathname, 404)
+                    return json(response, 404, {
+                        error: 'Remote route unavailable'
+                    })
+                }
+                if (!browserSession) {
+                    audit(request, pathname, 401)
+                    return json(response, 401, {
+                        error: 'Browser session required'
+                    })
+                }
+                audit(request, pathname, 200)
+                return json(response, 200, {
+                    authenticated: true,
+                    expiresAt: new Date(
+                        browserSession.expiresAt
+                    ).toISOString(),
+                    csrfToken: browserSession.csrfToken
+                })
+            }
+
+            if (pathname === '/remote/v1/session/logout') {
+                if (!webSessions || method !== 'POST') {
+                    audit(request, pathname, 404)
+                    return json(response, 404, {
+                        error: 'Remote route unavailable'
+                    })
+                }
+                if (!browserSession) {
+                    audit(request, pathname, 401)
+                    return json(response, 401, {
+                        error: 'Browser session required'
+                    })
+                }
+                const origin = normalizedOrigin(originHeader ?? '')
+                const csrfHeader = request.headers['x-pica-csrf']
+                if (
+                    origin !== browserSession.origin ||
+                    typeof csrfHeader !== 'string' ||
+                    !webSessions.csrfMatches(
+                        browserSession,
+                        csrfHeader
+                    )
+                ) {
+                    audit(request, pathname, 403)
+                    return json(response, 403, {
+                        error: 'Browser session verification failed'
+                    })
+                }
+                webSessions.revoke(browserSession)
+                response.setHeader(
+                    'set-cookie',
+                    clearRemoteWebSessionCookie()
+                )
+                audit(request, pathname, 200)
+                return json(response, 200, {
+                    authenticated: false
+                })
+            }
+
+            if (!bearerAuthorized && !browserSession) {
                 response.setHeader('www-authenticate', 'Bearer')
                 audit(request, pathname, 401)
                 return json(response, 401, {
                     error: 'Authentication required'
                 })
+            }
+
+            if (
+                browserSession &&
+                !bearerAuthorized &&
+                method !== 'GET' &&
+                method !== 'HEAD'
+            ) {
+                const origin = normalizedOrigin(originHeader ?? '')
+                const csrfHeader = request.headers['x-pica-csrf']
+                if (
+                    origin !== browserSession.origin ||
+                    typeof csrfHeader !== 'string' ||
+                    !webSessions?.csrfMatches(
+                        browserSession,
+                        csrfHeader
+                    )
+                ) {
+                    audit(request, pathname, 403)
+                    return json(response, 403, {
+                        error: 'Browser session verification failed'
+                    })
+                }
             }
 
             if (!allowlistedRoute(method, pathname)) {
@@ -413,6 +554,11 @@ export async function startRemoteApiGateway(
         server,
         host: options.host,
         port,
-        close: () => closeServer(server)
+        webSessionsEnabled: Boolean(webSessions),
+        activeWebSessions: () => webSessions?.activeCount() ?? 0,
+        close: async () => {
+            webSessions?.clear()
+            await closeServer(server)
+        }
     }
 }

@@ -163,13 +163,13 @@ function t(key, values = {}) {
   const table = COPY[state.language] || COPY.en
   let value = table[key] || COPY.en[key] || key
   for (const [name, replacement] of Object.entries(values))
-    value = value.replaceAll(\`{\${name}}\`, String(replacement))
+    value = value.replaceAll(`{${name}}`, String(replacement))
   return value
 }
 
 function applyLanguage() {
   document.documentElement.lang = state.language
-  document.title = \`Pica Library · \${t('title')}\`
+  document.title = `Pica Library · ${t('title')}`
   document.querySelectorAll('[data-i18n]').forEach((node) => {
     node.textContent = t(node.dataset.i18n)
   })
@@ -238,7 +238,7 @@ async function api(path, options = {}) {
     const message =
       payload && typeof payload === 'object' && payload.error
         ? String(payload.error)
-        : \`\${t('requestFailed')} HTTP \${response.status}\`
+        : `${t('requestFailed')} HTTP ${response.status}`
     throw new Error(message)
   }
   return parseResponse(response)
@@ -276,7 +276,7 @@ async function bootstrapSession(bearer) {
   const response = await sessionCookieRequest('/remote/v1/session/bootstrap', {
     method: 'POST',
     headers: {
-      authorization: \`Bearer \${bearer}\`
+      authorization: `Bearer ${bearer}`
     }
   })
   if (!response.ok) throw new Error('AUTH_FAILED')
@@ -313,7 +313,7 @@ function cardForComic(comic, options = {}) {
   image.decoding = 'async'
   image.referrerPolicy = 'no-referrer'
   image.alt = ''
-  image.src = \`/api/v1/covers/\${encodeURIComponent(comic.comicId)}\`
+  image.src = `/api/v1/covers/${encodeURIComponent(comic.comicId)}`
   image.addEventListener('error', () => {
     image.removeAttribute('src')
     image.alt = 'Pica Library'
@@ -376,7 +376,7 @@ async function loadLibrary() {
     readable: countOf(comic.downloadedPictures) > 0,
     statusText:
       countOf(comic.downloadedPictures) > 0
-        ? \`\${t('downloadedPages')}: \${countOf(comic.downloadedPictures)}\`
+        ? `${t('downloadedPages')}: ${countOf(comic.downloadedPictures)}`
         : ''
   }))
 }
@@ -399,14 +399,14 @@ async function loadShelves() {
     )
     items.replaceChildren(createText('p', t('loading'), 'muted'))
     const result = await api(
-      \`/api/v1/shelves/\${encodeURIComponent(shelf.id)}\`
+      `/api/v1/shelves/${encodeURIComponent(shelf.id)}`
     )
     const comics = Array.isArray(result.items) ? result.items : []
     renderCards(items, comics, 'emptyShelf', (comic) => ({
       readable: countOf(comic.downloadedPictures) > 0,
       statusText:
         countOf(comic.downloadedPictures) > 0
-          ? \`\${t('downloadedPages')}: \${countOf(comic.downloadedPictures)}\`
+          ? `${t('downloadedPages')}: ${countOf(comic.downloadedPictures)}`
           : ''
     }))
   }
@@ -414,7 +414,7 @@ async function loadShelves() {
   shelves.forEach((shelf, index) => {
     const button = createText(
       'button',
-      \`\${shelf.name} · \${Number(shelf.count || 0)}\`
+      `${shelf.name} · ${Number(shelf.count || 0)}`
     )
     button.type = 'button'
     button.addEventListener('click', () => void openShelf(shelf, button))
@@ -432,7 +432,7 @@ async function loadDownloaded() {
   renderCards(container, comics, 'emptyDownloaded', (comic) => ({
     readable: countOf(comic.downloadedPictures) > 0,
     statusText:
-      \`\${t('chapters')}: \${countOf(comic.downloadedChapters)} · \${t('pages')}: \${countOf(comic.downloadedPictures)}\`
+      `${t('chapters')}: ${countOf(comic.downloadedChapters)} · ${t('pages')}: ${countOf(comic.downloadedPictures)}`
   }))
 }
 
@@ -454,7 +454,7 @@ function selectView(view) {
     button.classList.toggle('active', button.dataset.view === view)
   })
   for (const name of ['library', 'shelves', 'downloaded'])
-    $(\`#view-\${name}\`).hidden = name !== view
+    $(`#view-${name}`).hidden = name !== view
   $('#detail-panel').hidden = true
   $('#reader-panel').hidden = true
   void renderActiveView()
@@ -470,7 +470,7 @@ function renderDetail(comic) {
   $('#detail-title').textContent = String(comic.title || comic.comicId)
   $('#detail-author').textContent = authorOf(comic)
   $('#detail-cover').src =
-    \`/api/v1/covers/\${encodeURIComponent(comic.comicId)}\`
+    `/api/v1/covers/${encodeURIComponent(comic.comicId)}`
 
   const tags = $('#detail-tags')
   tags.replaceChildren()
@@ -496,7 +496,7 @@ async function openDetail(comicId) {
   setMessage('#app-message', t('loading'))
   try {
     const comic = await api(
-      \`/api/v1/comics/\${encodeURIComponent(comicId)}\`
+      `/api/v1/comics/${encodeURIComponent(comicId)}`
     )
     renderDetail(comic)
     setMessage('#app-message')
@@ -510,7 +510,7 @@ async function openReader(comicId, title) {
   setMessage('#app-message', t('loading'))
   try {
     const chapters = await api(
-      \`/api/v1/reader/comics/\${encodeURIComponent(comicId)}/chapters\`
+      `/api/v1/reader/comics/${encodeURIComponent(comicId)}/chapters`
     )
     const readable = (Array.isArray(chapters) ? chapters : []).filter(
       (chapter) => countOf(chapter.downloadedPictures) > 0
@@ -545,7 +545,7 @@ async function openReader(comicId, title) {
 
 async function loadReaderChapter(episodeId) {
   const chapter = await api(
-    \`/api/v1/reader/comics/\${encodeURIComponent(state.reader.comicId)}/chapters/\${encodeURIComponent(episodeId)}\`
+    `/api/v1/reader/comics/${encodeURIComponent(state.reader.comicId)}/chapters/${encodeURIComponent(episodeId)}`
   )
   state.reader.chapter = chapter
   state.reader.pageIndex = 0

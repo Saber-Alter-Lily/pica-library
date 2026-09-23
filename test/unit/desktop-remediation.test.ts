@@ -40,7 +40,18 @@ describe('desktop remediation boundaries', () => {
             ),
             'utf8'
         )
-        expect(mainSource.match(/env: sanitizedChildEnv\(\)/g)).toHaveLength(6)
+        const childSource = fs.readFileSync(
+            path.resolve(
+                import.meta.dirname,
+                '../../src/desktop/child-process.ts'
+            ),
+            'utf8'
+        )
+        expect(
+            mainSource.match(/env: sanitizedChildEnv\(\)/g)?.length ?? 0
+        ).toBeGreaterThanOrEqual(5)
+        expect(childSource).toContain('env: sanitizedChildEnv()')
+        expect(childSource).toContain('function launchSpec(')
         expect(mainSource).toContain(
             'if (currentUrl !== previousUrl) browser(currentUrl)'
         )

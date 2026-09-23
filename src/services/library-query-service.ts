@@ -7,16 +7,6 @@ import type {
     StoredComic
 } from '../library/types'
 
-function downloadedState(comic: StoredComic) {
-    if (comic.downloadedPictures === 0) return 'not-downloaded'
-    if (
-        comic.knownPictures > 0 &&
-        comic.downloadedPictures >= comic.knownPictures
-    )
-        return 'complete'
-    return 'partial'
-}
-
 export class LibraryQueryService {
     constructor(private readonly database: LibraryDatabase) {}
 
@@ -47,48 +37,9 @@ export class LibraryQueryService {
         const authorById = new Map(authors.map((author) => [author.id, author]))
         const text = normalizeAuthorKey(query.text ?? '')
         const tags = (query.tags ?? []).map(normalizeAuthorKey)
-        const selectedAuthors = new Set(query.authorIds ?? [])
-        const selectedProviders = new Set(query.providerIds ?? [])
         const items = this.database
-            .listAllComics()
+            .listComicsForLibraryQueryBase(query)
             .filter((comic) => {
-                if (query.scope === 'library' && !comic.inLibrary) return false
-                if (query.scope === 'favorites' && !comic.isFavorite)
-                    return false
-                if (
-                    query.scope === 'downloaded' &&
-                    comic.downloadedPictures === 0
-                )
-                    return false
-                if (
-                    selectedProviders.size &&
-                    !selectedProviders.has(comic.providerId ?? 'pica')
-                )
-                    return false
-                // `catalog` is the explicit advanced scope. `all` remains a
-                // compatibility alias for older Browser/CLI callers.
-                if (
-                    query.finished !== undefined &&
-                    comic.finished !== query.finished
-                )
-                    return false
-                const state = downloadedState(comic)
-                if (
-                    query.download === 'downloaded' &&
-                    state === 'not-downloaded'
-                )
-                    return false
-                if (
-                    query.download &&
-                    query.download !== 'downloaded' &&
-                    state !== query.download
-                )
-                    return false
-                if (
-                    selectedAuthors.size &&
-                    (!comic.authorId || !selectedAuthors.has(comic.authorId))
-                )
-                    return false
                 if (text) {
                     const author = comic.authorId
                         ? authorById.get(comic.authorId)

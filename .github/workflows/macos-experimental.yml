@@ -1,0 +1,73 @@
+name: Experimental macOS arm64 Package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/build-macos-experimental.sh'
+      - 'scripts/test-macos-experimental.sh'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/macos-experimental.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'scripts/build-macos-experimental.sh'
+      - 'scripts/test-macos-experimental.sh'
+      - 'rollup.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/macos-experimental.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-arm64-experimental:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert Apple Silicon runner
+        run: |
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build experimental macOS arm64 package
+        run: bash scripts/build-macos-experimental.sh
+
+      - name: Smoke packaged macOS arm64 runtime
+        run: |
+          set -euo pipefail
+          archive="$(find artifacts -maxdepth 1 -type f -name 'Pica-Library-*-macos-arm64-experimental.tar.gz' -print | head -n 1)"
+          test -n "$archive"
+          bash scripts/test-macos-experimental.sh "$archive"
+
+      - name: Upload experimental macOS arm64 artifact
+        if: github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-library-macos-arm64-experimental-${{ github.sha }}
+          path: |
+            artifacts/Pica-Library-*-macos-arm64-experimental.tar.gz
+            artifacts/MACOS-EXPERIMENTAL-SHA256SUMS.txt
+          retention-days: 1
+          if-no-files-found: error

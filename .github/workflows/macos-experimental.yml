@@ -19,6 +19,7 @@ on:
       - 'web/**'
       - 'scripts/build-macos-experimental.sh'
       - 'scripts/test-macos-experimental.sh'
+      - 'scripts/test-macos-preview-acceptance.sh'
       - 'rollup.config.js'
       - 'package.json'
       - 'pnpm-lock.yaml'

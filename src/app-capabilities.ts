@@ -21,6 +21,7 @@ export interface CapabilityState {
         | 'MissingSecureCredentialBackend'
         | 'MissingManagedBrowser'
         | 'UnavailableInRuntime'
+        | 'DisabledByConfiguration'
 }
 
 export interface AppCapabilities {
@@ -43,6 +44,7 @@ export interface AppCapabilities {
         behaviorLearning: boolean
         multiTagPreference: boolean
         adaptiveRecommendationBatches: boolean
+        remoteApi: boolean
     }
     runtime: {
         role: 'desktop' | 'server' | 'engine'
@@ -56,6 +58,7 @@ export interface AppCapabilities {
         nativeSavePicker: CapabilityState
         secureCredentialPersistence: CapabilityState
         managedEhWebLogin: CapabilityState
+        remoteApi: CapabilityState
     }
 }
 
@@ -160,6 +163,34 @@ export function appCapabilities(
         hostPresent,
         unavailableReason: 'MissingManagedBrowser'
     })
+    const remoteStatus = record(host.remoteApi)
+    const remoteApi: CapabilityState = !hostPresent
+        ? {
+              supported: false,
+              available: false,
+              execution: 'platform-host',
+              reason: 'NoPlatformHost'
+          }
+        : mode !== 'headless'
+          ? {
+                supported: false,
+                available: false,
+                execution: 'platform-host',
+                reason: 'UnavailableInRuntime'
+            }
+          : remoteStatus.enabled === true
+            ? {
+                  supported: true,
+                  available: true,
+                  execution: 'platform-host',
+                  reason: 'Available'
+              }
+            : {
+                  supported: true,
+                  available: false,
+                  execution: 'platform-host',
+                  reason: 'DisabledByConfiguration'
+              }
 
     return {
         appVersion: PRODUCT_VERSION,
@@ -180,7 +211,8 @@ export function appCapabilities(
             recommendationV3: true,
             behaviorLearning: true,
             multiTagPreference: true,
-            adaptiveRecommendationBatches: true
+            adaptiveRecommendationBatches: true,
+            remoteApi: remoteApi.available
         },
         runtime: {
             role,
@@ -193,7 +225,8 @@ export function appCapabilities(
             nativeFolderPicker,
             nativeSavePicker,
             secureCredentialPersistence,
-            managedEhWebLogin
+            managedEhWebLogin,
+            remoteApi
         }
     }
 }

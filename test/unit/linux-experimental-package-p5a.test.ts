@@ -34,7 +34,10 @@ describe('experimental Linux x64 package P5A', () => {
     it('smokes the packaged runtime with an external user-data root', () => {
         const smoke = read('scripts/test-linux-experimental.sh')
         expect(smoke).toContain('PICA_LIBRARY_DESKTOP_HOME="$DATA_HOME"')
-        expect(smoke).toContain('"$PACKAGE_ROOT/pica-library" --no-open')
+        expect(smoke).toContain('"$PACKAGE_ROOT/pica-library" --headless')
+        expect(smoke).toContain("status.runtime.mode!=='headless'")
+        expect(smoke).toContain('status.runtime.mobileBridge!==false')
+        expect(smoke).toContain('status.mobileBridge!==null')
         expect(smoke).toContain("status.platform.id!=='linux'")
         expect(smoke).toContain(
             "status.platform.distributionReady!==false"

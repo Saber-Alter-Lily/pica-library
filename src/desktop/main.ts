@@ -268,6 +268,12 @@ async function stop(exitCode = 0) {
     await closeEngine()
     instance.release()
     process.exitCode = exitCode
+    // Most Desktop runs exit naturally once the server and workers are closed.
+    // A provider preparation or other third-party handle can still outlive the
+    // engine, especially after a fast headless restart. Do not let an explicit
+    // user/container shutdown hang indefinitely after durable state is closed.
+    const finalExit = setTimeout(() => process.exit(exitCode), 250)
+    finalExit.unref()
 }
 
 function applyCredentials(

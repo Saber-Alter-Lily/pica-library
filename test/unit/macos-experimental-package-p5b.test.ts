@@ -70,6 +70,12 @@ describe('experimental macOS arm64 package P5B', () => {
         expect(build).toContain('application_bundle:true')
         expect(build).toContain('signed:false')
         expect(build).toContain('notarized:false')
+        expect(acceptance).toContain(
+            'codesign --verify --deep --strict "$SOURCE_APP"'
+        )
+        expect(acceptance).toContain(
+            'find "$STANDALONE_APP" -type f \\('
+        )
         expect(acceptance).toContain('ditto "$SOURCE_APP" "$STANDALONE_APP"')
         expect(acceptance).toContain(
             'open -W -n "$STANDALONE_APP" --args --headless --no-open'

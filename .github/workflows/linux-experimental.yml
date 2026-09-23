@@ -63,5 +63,5 @@ jobs:
           path: |
             artifacts/Pica-Library-*-linux-x64-experimental.tar.gz
             artifacts/LINUX-EXPERIMENTAL-SHA256SUMS.txt
-          retention-days: 3
+          retention-days: 1
           if-no-files-found: error

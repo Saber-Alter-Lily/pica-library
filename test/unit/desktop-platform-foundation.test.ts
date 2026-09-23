@@ -225,6 +225,12 @@ describe('Desktop platform foundation', () => {
             execution: 'platform-host',
             reason: 'Available'
         })
+        expect(windows.features.remoteApi).toBe(false)
+        expect(windows.capabilityStates.remoteApi).toMatchObject({
+            supported: false,
+            available: false,
+            reason: 'UnavailableInRuntime'
+        })
 
         const linux = appCapabilities(false, 'linux', 'x64', {
             runtime: { mode: 'headless' },
@@ -268,6 +274,31 @@ describe('Desktop platform foundation', () => {
             supported: true,
             available: false,
             reason: 'MissingManagedBrowser'
+        })
+        expect(linux.features.remoteApi).toBe(false)
+        expect(linux.capabilityStates.remoteApi).toMatchObject({
+            supported: true,
+            available: false,
+            execution: 'platform-host',
+            reason: 'DisabledByConfiguration'
+        })
+
+        const linuxRemote = appCapabilities(false, 'linux', 'x64', {
+            runtime: { mode: 'headless' },
+            platform: {
+                id: 'linux',
+                arch: 'x64',
+                runtimeFoundation: true,
+                selfUpdate: false
+            },
+            remoteApi: { enabled: true }
+        })
+        expect(linuxRemote.features.remoteApi).toBe(true)
+        expect(linuxRemote.capabilityStates.remoteApi).toMatchObject({
+            supported: true,
+            available: true,
+            execution: 'platform-host',
+            reason: 'Available'
         })
 
         const windowsArm = appCapabilities(false, 'win32', 'arm64', {

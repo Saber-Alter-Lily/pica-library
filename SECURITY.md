@@ -28,9 +28,18 @@ never receive those credentials, including redirects and the explicitly opted-in
   `PICA_LIBRARY_ALLOW_REMOTE` bypass is not supported.
 - Cross-origin browser writes are rejected.
 - Headless / Docker mode does not change this network boundary.
-- Remote Web / NAS access must use a separately implemented authenticated mode,
-  with trusted TLS or an authenticated TLS-terminating reverse proxy. The local
-  server must not be exposed directly to an untrusted network.
+- Remote Web / NAS access never exposes the local Desktop/Web controller. The
+  experimental Remote API is a separate, bearer-authenticated allowlist gateway,
+  enabled only by explicit headless opt-in.
+- The Remote API defaults to loopback. A non-loopback bind is rejected unless the
+  operator explicitly declares a trusted TLS-terminating reverse proxy, provides
+  an allowed Host list, and supplies the bearer secret through a protected file.
+- The gateway does not implement TLS itself. Use a maintained reverse proxy such
+  as Caddy, nginx, Traefik, or an equivalent TLS terminator. Do not publish the
+  gateway's plaintext port directly to an untrusted network.
+- Browser/PWA remote access is a later surface. The Remote API gateway does not
+  make the local Web UI remotely accessible and does not expose Desktop
+  management, setup, import, update, shutdown, or credential endpoints.
 
 ## Downloaded content
 

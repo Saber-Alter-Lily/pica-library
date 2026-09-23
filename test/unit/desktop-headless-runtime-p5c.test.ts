@@ -8,13 +8,15 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'interactive',
             openBrowser: true,
             idleBrowserShutdown: true,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
         expect(desktopRuntimeOptions(['--no-open'])).toEqual({
             mode: 'interactive',
             openBrowser: false,
             idleBrowserShutdown: true,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
     })
 
@@ -23,7 +25,8 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'headless',
             openBrowser: false,
             idleBrowserShutdown: false,
-            mobileBridge: false
+            mobileBridge: false,
+            remoteApi: false
         })
         expect(
             desktopRuntimeOptions(['--headless', '--mobile-bridge'])
@@ -31,7 +34,8 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'headless',
             openBrowser: false,
             idleBrowserShutdown: false,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
         expect(
             desktopRuntimeOptions([
@@ -43,11 +47,22 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'headless',
             openBrowser: false,
             idleBrowserShutdown: false,
-            mobileBridge: true
+            mobileBridge: true,
+            remoteApi: false
         })
+        expect(
+            desktopRuntimeOptions(['--headless', '--remote-api'])
+        ).toEqual({
+            mode: 'headless',
+            openBrowser: false,
+            idleBrowserShutdown: false,
+            mobileBridge: false,
+            remoteApi: true
+        })
+        expect(desktopRuntimeOptions(['--remote-api']).remoteApi).toBe(false)
     })
 
-    it('keeps the main Web service loopback-only while headless mode is still unauthenticated for remote Web use', () => {
+    it('keeps the main Web service loopback-only and remote access behind the separate authenticated gateway', () => {
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
         expect(main).toContain("host: '127.0.0.1'")
         expect(main).not.toContain(
@@ -56,6 +71,10 @@ describe('Desktop headless runtime foundation P5C', () => {
         expect(main).toContain('!runtimeOptions.idleBrowserShutdown')
         expect(main).toContain('scheduleBrowserCloseShutdown()')
         expect(main).toContain('if (runtimeOptions.mobileBridge)')
+        expect(main).toContain('remoteApiConfiguration(runtimeOptions.remoteApi)')
+        expect(main).toContain('startRemoteApiGateway({')
+        expect(main).toContain('readRemoteApiToken(remoteApiSettings.tokenFile)')
+        expect(main).toContain('Shutdown: closing Remote API gateway')
         expect(main).toContain(
             "Mobile Bridge disabled in headless mode; pass --mobile-bridge to enable it"
         )

@@ -79,7 +79,7 @@ const checks = {
   },
   downloadsPersisted(v) {
     assert(Array.isArray(v), 'download list missing after restart')
-    assert(v.some((job) => job.comicId === 'linux-preview-1' && job.status === 'QUEUED'), 'queued job did not persist across restart')
+    assert(v.some((job) => job.comicId === 'linux-preview-1' && job.status === 'PAUSED'), 'graceful shutdown did not persist the local job as PAUSED')
   },
   shelvesPersisted(v) {
     assert(Array.isArray(v), 'shelf list missing after restart')
@@ -300,6 +300,9 @@ json_assert "$WORK/shelves-after-restart.json" shelvesPersisted
 
 curl --fail --silent "$URL/api/v1/downloads" > "$WORK/downloads-after-restart.json"
 json_assert "$WORK/downloads-after-restart.json" downloadsPersisted
+
+curl --fail --silent   -X POST -H "Origin: $URL"   "$URL/api/v1/downloads/$JOB_ID/resume" > "$WORK/download-resumed-after-restart.json"
+json_assert "$WORK/download-resumed-after-restart.json" downloadResumed
 
 curl --fail --silent "$URL/api/v1/shelves/$SHELF_ID" > "$WORK/shelf-after-restart.json"
 json_assert "$WORK/shelf-after-restart.json" shelfContents

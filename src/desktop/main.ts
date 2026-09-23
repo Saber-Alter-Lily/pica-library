@@ -648,12 +648,14 @@ async function startEngine(preferredPort: number) {
                       allowedOriginCount:
                           remoteApiSettings?.allowedOrigins.length ?? 0,
                       webSessions: remoteApiGateway.webSessionsEnabled,
+                      webShell: remoteApiGateway.webShellEnabled,
                       activeWebSessions:
                           remoteApiGateway.activeWebSessions()
                   }
                 : {
                       enabled: false,
                       webSessions: false,
+                      webShell: false,
                       activeWebSessions: 0
                   },
             remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
@@ -1135,6 +1137,7 @@ async function startEngine(preferredPort: number) {
             allowedHosts: remoteApiSettings.allowedHosts,
             allowedOrigins: remoteApiSettings.allowedOrigins,
             webSessions: remoteApiSettings.webSessions,
+            webRoot: path.join(applicationRoot, 'web', 'remote'),
             onAudit: (event) =>
                 log.write(
                     `Remote API ${event.method} ${event.path} -> ${event.status} [${event.remoteAddress}]`

@@ -69,7 +69,7 @@ describe('experimental Docker headless package P5D', () => {
         expect(smoke).toContain('docker stop --time 10')
         expect(smoke).toContain('docker start "$NAME"')
         expect(smoke).toContain(
-            '"$URL/api/v1/desktop/shutdown"'
+            "url+'/api/v1/desktop/shutdown'"
         )
     })
 

@@ -3,6 +3,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NODE_VERSION="24.15.0"
+MIN_GLIBC="2.28"
+MIN_GLIBCXX="3.4.25"
+SUPPORT_KERNEL="4.18"
 PRODUCT_VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).version)" "$ROOT/package.json")"
 GIT_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 SOURCE_SHA="${PICA_LIBRARY_BUILD_PROVENANCE:-$GIT_SHA}"
@@ -59,6 +62,50 @@ cp "$RUNTIME_ROOT/bin/node" "$STAGE/runtime/bin/node"
 chmod 0755 "$STAGE/runtime/bin/node"
 cp "$RUNTIME_ROOT/LICENSE" "$STAGE/licenses/Node.js-LICENSE.txt"
 
+if ! command -v readelf >/dev/null 2>&1; then
+  echo "readelf is required to verify the Linux runtime ABI" >&2
+  exit 1
+fi
+if ! readelf -h "$STAGE/runtime/bin/node" | grep -q 'Machine:.*Advanced Micro Devices X86-64'; then
+  echo "Bundled Node.js runtime is not Linux x86-64" >&2
+  exit 1
+fi
+RUNTIME_VERSION_INFO="$(readelf --version-info "$STAGE/runtime/bin/node")"
+MAX_REQUIRED_GLIBC="$(
+  printf '%s\n' "$RUNTIME_VERSION_INFO" |
+    grep -oE 'GLIBC_[0-9]+(\.[0-9]+)+' |
+    sed 's/^GLIBC_//' |
+    sort -Vu |
+    tail -n 1 || true
+)"
+MAX_REQUIRED_GLIBCXX="$(
+  printf '%s\n' "$RUNTIME_VERSION_INFO" |
+    grep -oE 'GLIBCXX_[0-9]+(\.[0-9]+)+' |
+    sed 's/^GLIBCXX_//' |
+    sort -Vu |
+    tail -n 1 || true
+)"
+version_gt() {
+  local left="$1"
+  local right="$2"
+  [[ "$left" != "$right" && "$(printf '%s\n%s\n' "$left" "$right" | sort -V | tail -n 1)" == "$left" ]]
+}
+if [[ -z "$MAX_REQUIRED_GLIBC" ]]; then
+  echo "Could not determine the bundled Node.js glibc ABI requirement" >&2
+  exit 1
+fi
+if version_gt "$MAX_REQUIRED_GLIBC" "$MIN_GLIBC"; then
+  echo "Bundled Node.js runtime requires glibc $MAX_REQUIRED_GLIBC, above the declared $MIN_GLIBC baseline" >&2
+  exit 1
+fi
+if [[ -n "$MAX_REQUIRED_GLIBCXX" ]] && version_gt "$MAX_REQUIRED_GLIBCXX" "$MIN_GLIBCXX"; then
+  echo "Bundled Node.js runtime requires GLIBCXX_$MAX_REQUIRED_GLIBCXX, above the declared GLIBCXX_$MIN_GLIBCXX baseline" >&2
+  exit 1
+fi
+
+cp "$ROOT/scripts/linux-runtime-preflight.sh" "$STAGE/runtime/linux-preflight.sh"
+chmod 0755 "$STAGE/runtime/linux-preflight.sh"
+
 cp "$ROOT"/dist/*.js "$STAGE/app/"
 cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"
 cp -R "$ROOT/web" "$STAGE/web"
@@ -95,6 +142,7 @@ cat > "$STAGE/pica-library" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+"$ROOT/runtime/linux-preflight.sh"
 exec "$ROOT/runtime/bin/node" "$ROOT/app/desktop.js" "$@"
 EOF
 chmod 0755 "$STAGE/pica-library"
@@ -116,19 +164,47 @@ Source: $SOURCE_SHA
 2. Run ./pica-library or ./Pica\ Library.sh
 3. Pica Library opens in your default browser in interactive mode. Use --headless for a persistent no-GUI local engine.
 
+Runtime baseline for this package:
+- GNU/Linux x86-64
+- glibc >= $MIN_GLIBC
+- tested support baseline: kernel >= $SUPPORT_KERNEL
+- Node.js official binary compatibility baseline: GLIBCXX_$MIN_GLIBCXX
+- Alpine/musl is not supported by this glibc package.
+
+The launcher checks architecture and glibc before starting Node.js. Kernels below
+$SUPPORT_KERNEL are outside the tested baseline and produce a warning.
+
 This is an experimental CI artifact, not a formal release.
 Self-update is intentionally disabled on Linux at this stage.
-Secure credential persistence uses Secret Service when secret-tool is available.
+Secure credential persistence uses Secret Service only when the current session can reach it.
 Without a secure credential backend, credentials remain in memory for this run only.
 Folder/save dialogs use zenity or kdialog when available; paths can always be entered manually.
 
 No separate Node.js installation is required.
 EOF
 
+cat > "$STAGE/PLATFORM_REQUIREMENTS.json" <<EOF
+{
+  "schemaVersion": 1,
+  "platform": "linux",
+  "arch": "x64",
+  "libc": "glibc",
+  "minimumKernel": "$SUPPORT_KERNEL",
+  "minimumGlibc": "$MIN_GLIBC",
+  "minimumGlibcxxSymbol": "GLIBCXX_$MIN_GLIBCXX",
+  "runtimeAbiObserved": {
+    "maxRequiredGlibc": "$MAX_REQUIRED_GLIBC",
+    "maxRequiredGlibcxx": "$MAX_REQUIRED_GLIBCXX"
+  },
+  "nodeVersion": "$NODE_VERSION",
+  "formalRelease": false
+}
+EOF
+
 printf '%s
 ' "$SOURCE_SHA" > "$STAGE/SOURCE_SHA.txt"
 
-for required in   "$STAGE/runtime/bin/node"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"
+for required in   "$STAGE/runtime/bin/node"   "$STAGE/runtime/linux-preflight.sh"   "$STAGE/app/desktop.js"   "$STAGE/licenses/Node.js-LICENSE.txt"   "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"   "$STAGE/web/index.html"   "$STAGE/LICENSE"   "$STAGE/SOURCE_SHA.txt"   "$STAGE/PLATFORM_REQUIREMENTS.json"
 do
   if [[ ! -s "$required" ]]; then
     echo "Required Linux package file is missing or empty: $required" >&2
@@ -159,4 +235,4 @@ cat > "$ROOT/artifacts/LINUX-EXPERIMENTAL-SHA256SUMS.txt" <<EOF
 $HASH  $(basename "$ARCHIVE")
 EOF
 
-"$STAGE/runtime/bin/node" -e   "console.log(JSON.stringify({path:process.argv[1],sha256:process.argv[2],size_bytes:Number(process.argv[3]),uncompressed_bytes:Number(process.argv[4]),file_count:Number(process.argv[5]),node_version:process.argv[6],product_version:process.argv[7],source_sha:process.argv[8],formal_release:false},null,2))"   "$ARCHIVE" "$HASH" "$SIZE" "$UNCOMPRESSED" "$FILE_COUNT" "$NODE_VERSION" "$PRODUCT_VERSION" "$SOURCE_SHA"
+"$STAGE/runtime/bin/node" -e   "console.log(JSON.stringify({path:process.argv[1],sha256:process.argv[2],size_bytes:Number(process.argv[3]),uncompressed_bytes:Number(process.argv[4]),file_count:Number(process.argv[5]),node_version:process.argv[6],product_version:process.argv[7],source_sha:process.argv[8],minimum_glibc:process.argv[9],observed_max_glibc:process.argv[10],formal_release:false},null,2))"   "$ARCHIVE" "$HASH" "$SIZE" "$UNCOMPRESSED" "$FILE_COUNT" "$NODE_VERSION" "$PRODUCT_VERSION" "$SOURCE_SHA" "$MIN_GLIBC" "$MAX_REQUIRED_GLIBC"

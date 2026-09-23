@@ -99,29 +99,27 @@ function Start-Installed {
 
 function Stop-Installed {
     $status = Invoke-RestMethod -Uri "$script:CurrentUrl/api/v1/desktop/status" -TimeoutSec 5
+    if (-not (Test-Path -LiteralPath $instanceFile)) {
+        throw 'Windows ARM64 replacement instance metadata disappeared before shutdown'
+    }
+    $instanceBeforeShutdown = Get-Content -Raw -LiteralPath $instanceFile | ConvertFrom-Json
+    $enginePid = [int]$instanceBeforeShutdown.pid
+    if ($enginePid -le 0) { throw 'Windows ARM64 replacement engine PID is invalid' }
+
     $headers = @{
         'x-pica-csrf' = [string]$status.csrfToken
         'Origin' = $script:CurrentUrl
     }
     Invoke-RestMethod -Method Post -Uri "$script:CurrentUrl/api/v1/desktop/shutdown" -Headers $headers -ContentType 'application/json' -Body '{}' -TimeoutSec 5 | Out-Null
-    for ($i = 0; $i -lt 100; $i++) {
-        if (-not (Test-Path -LiteralPath $instanceFile)) {
-            $script:CurrentUrl = $null
-            return
-        }
-        try {
-            $info = Get-Content -Raw -LiteralPath $instanceFile | ConvertFrom-Json
-            if (-not (Get-Process -Id ([int]$info.pid) -ErrorAction SilentlyContinue)) {
-                $script:CurrentUrl = $null
-                return
-            }
-        } catch {
+
+    for ($i = 0; $i -lt 120; $i++) {
+        if (-not (Get-Process -Id $enginePid -ErrorAction SilentlyContinue)) {
             $script:CurrentUrl = $null
             return
         }
         Start-Sleep -Milliseconds 250
     }
-    throw 'Windows ARM64 replacement engine did not stop cleanly'
+    throw "Windows ARM64 replacement engine PID $enginePid did not terminate after shutdown"
 }
 
 function Json-Post([string]$Path,[object]$Payload) {

@@ -114,7 +114,7 @@ docker start "$NAME" >/dev/null
 URL="$(wait_for_url)"
 
 # The local authenticated shutdown endpoint must also close PID 1 cleanly.
-docker exec "$NAME" /opt/pica/runtime/bin/node - "$URL" <<'NODE'
+docker exec -i "$NAME" /opt/pica/runtime/bin/node - "$URL" <<'NODE'
 const url=process.argv[2]
 const status=await fetch(url+'/api/v1/desktop/status').then(r=>r.json())
 const response=await fetch(url+'/api/v1/desktop/shutdown',{

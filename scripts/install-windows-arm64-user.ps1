@@ -28,6 +28,21 @@ function Normalize-WithSeparator([string]$PathValue) {
     return "$full\"
 }
 
+function Assert-EngineStopped {
+    $instanceFile = Join-Path $dataRoot 'runtime-state\instance.json'
+    if (-not (Test-Path -LiteralPath $instanceFile)) { return }
+    try {
+        $instance = Get-Content -Raw -LiteralPath $instanceFile | ConvertFrom-Json
+        $pidValue = [int]$instance.pid
+        if ($pidValue -gt 0 -and (Get-Process -Id $pidValue -ErrorAction SilentlyContinue)) {
+            throw 'Close Pica Library before installing or updating the Windows ARM64 preview'
+        }
+    } catch {
+        if ($_.Exception.Message -like 'Close Pica Library*') { throw }
+        # Stale or malformed instance metadata must not block a repair install.
+    }
+}
+
 function Assert-SeparateRoots {
     $app = Normalize-WithSeparator $InstallRoot
     $data = Normalize-WithSeparator $dataRoot
@@ -82,6 +97,7 @@ trap {
 }
 
 Assert-SeparateRoots
+Assert-EngineStopped
 Assert-RecognizedExistingInstall
 
 foreach ($required in @(

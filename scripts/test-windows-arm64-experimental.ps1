@@ -1,8 +1,9 @@
-$ErrorActionPreference = 'Stop'
 param(
     [Parameter(Mandatory=$true)]
     [string]$Archive
 )
+
+$ErrorActionPreference = 'Stop'
 
 if (-not (Test-Path -LiteralPath $Archive)) { throw "Archive not found: $Archive" }
 if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne [System.Runtime.InteropServices.Architecture]::Arm64) {

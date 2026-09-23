@@ -36,13 +36,25 @@ describe('v0.4.7 long-task stability contract', () => {
     it('keeps Desktop visual indexing bounded and pauseable without losing pending work', () => {
         const app = read('web/app.js')
         const runtime = read('web/visual-runtime.js')
+        const worker = read('web/visual-worker.js')
         const html = read('web/index.html')
         expect(html).toContain('id="visual-index-pause"')
         expect(html).toContain('id="visual-index-resume"')
         expect(app).toContain('async function visualTaskCheckpoint')
         expect(app).toContain("t('visual.cancelled')")
+        expect(app).toContain('visualIndexAbortController')
+        expect(app).toContain('state.visualIndexAbortController?.abort()')
         expect(runtime).toContain('MODEL_LOAD_TIMEOUT_MS = 120000')
         expect(runtime).toContain('PAGE_ANALYSIS_TIMEOUT_MS = 45000')
+        expect(runtime).toContain(
+            "new Worker(new URL('./visual-worker.js', import.meta.url)"
+        )
+        expect(runtime).toContain("signal?.addEventListener('abort'")
+        expect(runtime).toContain('terminateVisualWorker(worker)')
+        expect(runtime).not.toContain('Promise.race')
+        expect(worker).toContain("input.type !== 'analyze'")
+        expect(worker).toContain("post(id, 'page-start'")
+        expect(worker).toContain('await extractor(sample.url)')
     })
 
     it('makes favorites sync pauseable at page checkpoints', () => {

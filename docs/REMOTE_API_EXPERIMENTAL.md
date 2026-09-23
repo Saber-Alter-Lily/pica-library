@@ -179,10 +179,14 @@ HttpOnly/Secure/Strict cookie, exact HTTPS Origin binding and CSRF protection.
 It is disabled by default and documented in
 `docs/REMOTE_WEB_SESSION_W5A.md`.
 
-This still does not provide a Remote Web application shell, PWA/offline cache,
-multi-user isolation, or a browser UX for supplying the long-lived bearer.
-Do not treat successful bearer or session API access as a remotely deployable
-Web UI.
+W5B adds an isolated read-only Remote Web shell for local-library browse,
+shelves, downloaded content and downloaded Reader access. The browser-session
+allowlist is narrower than the bearer API and blocks reader-progress mutation.
+
+This still does not provide PWA/offline cache, multi-user isolation, provider
+mutation, or a polished operator UX for supplying the long-lived bearer. The
+operator Server Compose preview keeps browser sessions/shell disabled by
+default.
 
 ## Release state
 

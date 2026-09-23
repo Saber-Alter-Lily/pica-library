@@ -92,6 +92,21 @@ function sessionSignature(value: EhCapturedSession) {
     return [value.memberId, value.passHash, value.igneous ?? ''].join('|')
 }
 
+export function managedEhBrowserArgs(
+    profileRoot: string,
+    port: number
+) {
+    return [
+        `--user-data-dir=${profileRoot}`,
+        `--remote-debugging-port=${port}`,
+        '--remote-debugging-address=127.0.0.1',
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--new-window',
+        LOGIN_URL
+    ]
+}
+
 async function reserveLoopbackPort() {
     return await new Promise<number>((resolve, reject) => {
         const server = net.createServer()
@@ -248,15 +263,7 @@ export class DesktopEhWebLogin {
         }
         this.process = spawn(
             this.browser.executable,
-            [
-                `--user-data-dir=${this.profileRoot}`,
-                `--remote-debugging-port=${port}`,
-                '--remote-debugging-address=127.0.0.1',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--new-window',
-                LOGIN_URL
-            ],
+            managedEhBrowserArgs(this.profileRoot, port),
             {
                 windowsHide: process.platform === 'win32',
                 stdio: 'ignore',

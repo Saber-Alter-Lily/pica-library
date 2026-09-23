@@ -227,12 +227,18 @@ describe('Desktop platform foundation', () => {
         })
         expect(windows.features.remoteApi).toBe(false)
         expect(windows.features.remoteWebSessions).toBe(false)
+        expect(windows.features.remoteWebShell).toBe(false)
         expect(windows.capabilityStates.remoteApi).toMatchObject({
             supported: false,
             available: false,
             reason: 'UnavailableInRuntime'
         })
         expect(windows.capabilityStates.remoteWebSessions).toMatchObject({
+            supported: false,
+            available: false,
+            reason: 'UnavailableInRuntime'
+        })
+        expect(windows.capabilityStates.remoteWebShell).toMatchObject({
             supported: false,
             available: false,
             reason: 'UnavailableInRuntime'
@@ -283,6 +289,7 @@ describe('Desktop platform foundation', () => {
         })
         expect(linux.features.remoteApi).toBe(false)
         expect(linux.features.remoteWebSessions).toBe(false)
+        expect(linux.features.remoteWebShell).toBe(false)
         expect(linux.capabilityStates.remoteApi).toMatchObject({
             supported: true,
             available: false,
@@ -290,6 +297,12 @@ describe('Desktop platform foundation', () => {
             reason: 'DisabledByConfiguration'
         })
         expect(linux.capabilityStates.remoteWebSessions).toMatchObject({
+            supported: true,
+            available: false,
+            execution: 'platform-host',
+            reason: 'DisabledByConfiguration'
+        })
+        expect(linux.capabilityStates.remoteWebShell).toMatchObject({
             supported: true,
             available: false,
             execution: 'platform-host',
@@ -304,10 +317,15 @@ describe('Desktop platform foundation', () => {
                 runtimeFoundation: true,
                 selfUpdate: false
             },
-            remoteApi: { enabled: true, webSessions: true }
+            remoteApi: {
+                enabled: true,
+                webSessions: true,
+                webShell: true
+            }
         })
         expect(linuxRemote.features.remoteApi).toBe(true)
         expect(linuxRemote.features.remoteWebSessions).toBe(true)
+        expect(linuxRemote.features.remoteWebShell).toBe(true)
         expect(linuxRemote.capabilityStates.remoteApi).toMatchObject({
             supported: true,
             available: true,
@@ -315,6 +333,12 @@ describe('Desktop platform foundation', () => {
             reason: 'Available'
         })
         expect(linuxRemote.capabilityStates.remoteWebSessions).toMatchObject({
+            supported: true,
+            available: true,
+            execution: 'platform-host',
+            reason: 'Available'
+        })
+        expect(linuxRemote.capabilityStates.remoteWebShell).toMatchObject({
             supported: true,
             available: true,
             execution: 'platform-host',

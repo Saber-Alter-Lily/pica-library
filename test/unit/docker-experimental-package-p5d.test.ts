@@ -176,7 +176,11 @@ describe('experimental Docker headless package P5D', () => {
         expect(compose).toContain('condition: service_healthy')
         expect(compose).toContain('pica_backend:')
         expect(compose).toContain('internal: true')
-        expect(compose).not.toMatch(/pica:[\s\S]*?ports:/)
+        const picaService = compose.slice(
+            compose.indexOf('  pica:'),
+            compose.indexOf('  caddy:')
+        )
+        expect(picaService).not.toContain('    ports:')
         expect(caddy).toContain('reverse_proxy pica:8787')
         expect(caddy).toContain('{\$PICA_LIBRARY_DOMAIN}')
 

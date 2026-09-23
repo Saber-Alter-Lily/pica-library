@@ -23,6 +23,14 @@ TLS inside Pica Library. Caddy is the reference topology for W4B because it is
 open source and provides automatic HTTPS plus a standard `reverse_proxy`
 primitive. nginx, Traefik, or equivalent maintained TLS proxies are also valid.
 
+The automated Docker acceptance pins the current Caddy `2.11.4-alpine`
+official image for reproducibility. The CI topology keeps the Pica container
+unpublished on the host, exposes only Caddy HTTPS, verifies Caddy's internal CA
+instead of disabling certificate validation, and confirms that the authenticated
+path recovers after the Pica container restarts. `tls internal` is strictly an
+isolated CI mechanism; ordinary deployments should use a real hostname so Caddy
+can obtain and renew a trusted certificate.
+
 ## Enablement
 
 Remote API is available only when the process is headless and started with:
@@ -93,6 +101,29 @@ remote rate limit.
 - Redirect following is disabled.
 - Audit logs contain remote address, method, path, and status, but not bearer
   token values.
+
+## Docker TLS acceptance boundary
+
+The experimental Docker gate models the intended trust topology:
+
+```text
+host/browser
+    -> HTTPS only
+    -> Caddy
+    -> private Docker network
+    -> Pica Remote API :8787
+    -> loopback-only application engine
+```
+
+The Pica container itself has no published host port. The bearer token is stored
+in a dedicated read-only volume as a `0600` file owned by the non-root Pica
+runtime identity, and is not injected through container environment metadata.
+The gate verifies unauthenticated rejection, Host/Origin rejection, Desktop
+management denial, secret non-disclosure in logs, and restart recovery.
+
+This is still not a deployment release. A formal Docker/Server channel must
+add an operator-facing compose/secret setup, image registry/signing policy,
+versioned image promotion, health-driven replacement and rollback evidence.
 
 ## Browser/PWA boundary
 

@@ -58,6 +58,7 @@ bash "$PACKAGE_ROOT/install-linux-user.sh" > "$WORK/install.log"
 
 [[ -x "$INSTALL_ROOT/pica-library" ]] || fail "installed launcher missing"
 [[ -x "$INSTALL_ROOT/uninstall-linux-user.sh" ]] || fail "installed uninstaller missing"
+[[ "$(head -n 1 "$INSTALL_ROOT/.pica-library-install-root")" == "pica-library-linux-user-install" ]] || fail "install-root safety marker missing"
 [[ -s "$DESKTOP_FILE" ]] || fail "XDG desktop entry missing"
 [[ -s "$ICON_FILE" ]] || fail "XDG hicolor icon missing"
 desktop-file-validate "$DESKTOP_FILE"
@@ -152,6 +153,15 @@ curl --fail --silent "$URL/api/v1/desktop/status" > "$WORK/status-after-reinstal
 stop_engine
 
 UNINSTALLER="$INSTALL_ROOT/uninstall-linux-user.sh"
+
+UNRELATED="$WORK/unrelated"
+mkdir -p "$UNRELATED"
+printf 'keep-me\n' > "$UNRELATED/sentinel.txt"
+if PICA_LIBRARY_INSTALL_ROOT="$UNRELATED" bash "$UNINSTALLER" >"$WORK/uninstall-refusal.log" 2>&1; then
+  fail "uninstaller accepted an unrecognized application root"
+fi
+[[ -f "$UNRELATED/sentinel.txt" ]] || fail "uninstaller modified an unrecognized application root"
+
 bash "$UNINSTALLER" > "$WORK/uninstall.log"
 
 [[ ! -e "$INSTALL_ROOT" ]] || fail "uninstaller left application files behind"

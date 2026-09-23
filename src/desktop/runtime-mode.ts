@@ -6,6 +6,7 @@ export interface DesktopRuntimeOptions {
     idleBrowserShutdown: boolean
     mobileBridge: boolean
     remoteApi: boolean
+    remoteWeb: boolean
 }
 
 export function desktopRuntimeOptions(
@@ -13,11 +14,13 @@ export function desktopRuntimeOptions(
 ): DesktopRuntimeOptions {
     const args = new Set(argv)
     const headless = args.has('--headless')
+    const remoteWeb = headless && args.has('--remote-web')
     return {
         mode: headless ? 'headless' : 'interactive',
         openBrowser: !headless && !args.has('--no-open'),
         idleBrowserShutdown: !headless,
         mobileBridge: !headless || args.has('--mobile-bridge'),
-        remoteApi: headless && args.has('--remote-api')
+        remoteApi: headless && (args.has('--remote-api') || remoteWeb),
+        remoteWeb
     }
 }

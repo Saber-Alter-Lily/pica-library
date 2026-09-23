@@ -56,8 +56,10 @@ describe('desktop remediation boundaries', () => {
             'if (currentUrl !== previousUrl) browser(currentUrl)'
         )
         expect(
-            credentialSource.match(/env: sanitizedChildEnv\(\)/g)
-        ).toHaveLength(1)
+            credentialSource.match(/env: sanitizedChildEnv\(\)/g)?.length ?? 0
+        ).toBeGreaterThanOrEqual(2)
+        expect(credentialSource).toContain('function secureCommand(')
+        expect(credentialSource).toContain('env: sanitizedChildEnv()')
     })
 
     it('uses saved credentials for a blank Settings connection test', () => {

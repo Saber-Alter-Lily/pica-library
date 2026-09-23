@@ -190,8 +190,12 @@ describe('Desktop platform foundation', () => {
 
     it('publishes the runtime capability matrix through Desktop status', () => {
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
+        expect(main).toContain('...desktopPlatformCapabilities()')
         expect(main).toContain(
-            'const platformCapabilities = desktopPlatformCapabilities()'
+            'secureCredentialPersistence:'
+        )
+        expect(main).toContain(
+            'credentialBackend.status.securePersistence'
         )
         expect(main).toContain('platform: platformCapabilities')
         expect(main).toContain('launchDirectory(directory')

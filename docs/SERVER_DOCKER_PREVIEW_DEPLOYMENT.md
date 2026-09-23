@@ -112,8 +112,10 @@ curl https://"$PICA_LIBRARY_DOMAIN"/healthz
 An API call needs the bearer token:
 
 ```bash
-TOKEN="$(cat \"$PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST\")"
-curl   -H "Authorization: Bearer $TOKEN"   "https://$PICA_LIBRARY_DOMAIN/api/v1/capabilities"
+TOKEN="$(cat "$PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST")"
+curl \
+  -H "Authorization: Bearer $TOKEN" \
+  "https://$PICA_LIBRARY_DOMAIN/api/v1/capabilities"
 unset TOKEN
 ```
 

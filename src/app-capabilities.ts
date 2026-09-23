@@ -31,7 +31,8 @@ export interface AppCapabilities {
 }
 
 export function appCapabilities(
-    providerFavoriteMutation = false
+    providerFavoriteMutation = false,
+    platform: NodeJS.Platform = process.platform
 ): AppCapabilities {
     return {
         appVersion: PRODUCT_VERSION,
@@ -46,7 +47,7 @@ export function appCapabilities(
             shelves: true,
             reader: true,
             archiveReader: false,
-            updatePackages: true,
+            updatePackages: platform === 'win32',
             recommendationSessions: true,
             previewPages: true,
             recommendationV3: true,

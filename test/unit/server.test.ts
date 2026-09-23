@@ -352,6 +352,65 @@ describe('server binding security', () => {
     })
 })
 
+describe('desktop shutdown lifecycle', () => {
+    it('flushes the success response before invoking the Desktop shutdown callback', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-shutdown-'))
+        const database = new LibraryDatabase(path.join(dir, 'library.db'))
+        const service = new LibraryService(database, dir)
+        let resolveShutdown!: () => void
+        const shutdownCalled = new Promise<void>((resolve) => {
+            resolveShutdown = resolve
+        })
+        const started = await startLibraryServer({
+            database,
+            service,
+            host: '127.0.0.1',
+            port: 0,
+            desktop: {
+                csrfToken: 'shutdown-nonce',
+                configured: () => true,
+                status: () => ({}),
+                save: async () => ({}),
+                testConnection: async () => ({}),
+                chooseFolder: async () => null,
+                exportBrowserLitePackage: async () => ({}),
+                openDirectory: async () => {},
+                shutdown: resolveShutdown
+            }
+        })
+        try {
+            const response = await fetch(
+                `${started.url}/api/v1/desktop/shutdown`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        origin: started.url,
+                        'x-pica-csrf': 'shutdown-nonce'
+                    },
+                    body: '{}'
+                }
+            )
+            expect(response.status).toBe(200)
+            expect(await response.json()).toEqual({ success: true })
+            await expect(
+                Promise.race([
+                    shutdownCalled.then(() => true),
+                    new Promise<boolean>((resolve) =>
+                        setTimeout(() => resolve(false), 1000)
+                    )
+                ])
+            ).resolves.toBe(true)
+        } finally {
+            await new Promise<void>((resolve) =>
+                started.server.close(() => resolve())
+            )
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
+    })
+})
+
 describe('desktop mutation security', () => {
     it('requires a local host, same origin and the current CSRF nonce', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-desktop-api-'))

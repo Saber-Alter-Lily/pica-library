@@ -1,0 +1,109 @@
+name: pica-library-server-preview
+
+services:
+  pica-init:
+    image: ${PICA_LIBRARY_IMAGE:?Set PICA_LIBRARY_IMAGE to the loaded immutable Pica server-preview image}
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        test -s /run/secrets/pica_remote_token
+        mkdir -p /config /secret-out
+        chown 10001:10001 /config /secret-out
+        chmod 0700 /config /secret-out
+        umask 077
+        tmp=/secret-out/token.tmp
+        cat /run/secrets/pica_remote_token > "$$tmp"
+        chown 10001:10001 "$$tmp"
+        chmod 0600 "$$tmp"
+        mv -f "$$tmp" /secret-out/token
+        test "$$(stat -c '%u:%g:%a' /secret-out/token)" = "10001:10001:600"
+    read_only: true
+    network_mode: "none"
+    restart: "no"
+    secrets:
+      - pica_remote_token
+    volumes:
+      - pica_config:/config
+      - pica_secret:/secret-out
+
+  pica:
+    image: ${PICA_LIBRARY_IMAGE:?Set PICA_LIBRARY_IMAGE to the loaded immutable Pica server-preview image}
+    user: "10001:10001"
+    command: ["--remote-api"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    environment:
+      PICA_LIBRARY_REMOTE_TOKEN_FILE: /run/pica-secret/token
+      PICA_LIBRARY_REMOTE_HOST: "0.0.0.0"
+      PICA_LIBRARY_REMOTE_PORT: "8787"
+      PICA_LIBRARY_REMOTE_BEHIND_TLS_PROXY: "true"
+      PICA_LIBRARY_REMOTE_ALLOWED_HOSTS: "${PICA_LIBRARY_DOMAIN:?Set PICA_LIBRARY_DOMAIN},127.0.0.1"
+    depends_on:
+      pica-init:
+        condition: service_completed_successfully
+    expose:
+      - "8787"
+    volumes:
+      - pica_config:/config
+      - pica_secret:/run/pica-secret:ro
+    networks:
+      - pica_backend
+      - pica_egress
+    healthcheck:
+      test:
+        - CMD
+        - /opt/pica/runtime/bin/node
+        - -e
+        - "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    depends_on:
+      pica:
+        condition: service_healthy
+    environment:
+      PICA_LIBRARY_DOMAIN: "${PICA_LIBRARY_DOMAIN:?Set PICA_LIBRARY_DOMAIN}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ${PICA_LIBRARY_CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - pica_backend
+      - caddy_egress
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+secrets:
+  pica_remote_token:
+    file: ${PICA_LIBRARY_REMOTE_TOKEN_FILE_HOST:-./secrets/remote-api-token}
+
+volumes:
+  pica_config:
+  pica_secret:
+  caddy_data:
+  caddy_config:
+
+networks:
+  pica_backend:
+    internal: true
+  pica_egress:
+    driver: bridge
+  caddy_egress:
+    driver: bridge

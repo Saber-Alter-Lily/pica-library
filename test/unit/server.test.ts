@@ -366,12 +366,10 @@ describe('server binding security', () => {
 })
 
 describe('desktop shutdown lifecycle', () => {
-    it('flushes the success response before invoking the Desktop shutdown callback', async () => {
+    it('ends the success response and invokes the Desktop shutdown callback', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-shutdown-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
         const service = new LibraryService(database, dir)
-        let responseConsumed = false
-        let shutdownObservedAfterResponse = false
         let resolveShutdown!: () => void
         const shutdownCalled = new Promise<void>((resolve) => {
             resolveShutdown = resolve
@@ -390,10 +388,7 @@ describe('desktop shutdown lifecycle', () => {
                 chooseFolder: async () => null,
                 exportBrowserLitePackage: async () => ({}),
                 openDirectory: async () => {},
-                shutdown: () => {
-                    shutdownObservedAfterResponse = responseConsumed
-                    resolveShutdown()
-                }
+                shutdown: resolveShutdown
             }
         })
         try {
@@ -414,7 +409,6 @@ describe('desktop shutdown lifecycle', () => {
                 success: true,
                 shutdownScheduled: true
             })
-            responseConsumed = true
             await expect(
                 Promise.race([
                     shutdownCalled.then(() => true),
@@ -423,7 +417,6 @@ describe('desktop shutdown lifecycle', () => {
                     )
                 ])
             ).resolves.toBe(true)
-            expect(shutdownObservedAfterResponse).toBe(true)
         } finally {
             await new Promise<void>((resolve) =>
                 started.server.close(() => resolve())

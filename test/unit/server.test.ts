@@ -340,15 +340,28 @@ describe('local web server', () => {
 })
 
 describe('server binding security', () => {
-    it('rejects unsafe remote binding unless explicitly enabled', async () => {
+    it('rejects unauthenticated remote binding even if the legacy bypass variable is present', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-bind-'))
         const database = new LibraryDatabase(path.join(dir, 'library.db'))
         const service = new LibraryService(database, dir)
-        await expect(
-            startLibraryServer({ database, service, host: '0.0.0.0', port: 0 })
-        ).rejects.toThrow('Remote binding is disabled')
-        database.close()
-        fs.rmSync(dir, { recursive: true, force: true })
+        const previous = process.env.PICA_LIBRARY_ALLOW_REMOTE
+        process.env.PICA_LIBRARY_ALLOW_REMOTE = 'true'
+        try {
+            await expect(
+                startLibraryServer({
+                    database,
+                    service,
+                    host: '0.0.0.0',
+                    port: 0
+                })
+            ).rejects.toThrow('Unauthenticated remote binding is disabled')
+        } finally {
+            if (previous === undefined)
+                delete process.env.PICA_LIBRARY_ALLOW_REMOTE
+            else process.env.PICA_LIBRARY_ALLOW_REMOTE = previous
+            database.close()
+            fs.rmSync(dir, { recursive: true, force: true })
+        }
     })
 })
 

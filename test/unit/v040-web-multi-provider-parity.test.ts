@@ -9,6 +9,7 @@ describe('v0.4 Web/Desktop parity', () => {
   const service = fs.readFileSync('src/library/service.ts', 'utf8')
   const libraryTypes = fs.readFileSync('src/library/types.ts', 'utf8')
   const libraryQuery = fs.readFileSync('src/services/library-query-service.ts', 'utf8')
+  const database = fs.readFileSync('src/library/database.ts', 'utf8')
   const server = fs.readFileSync('src/library/server.ts', 'utf8')
 
   it('loads the parity layer from the normal desktop route', () => {
@@ -18,8 +19,10 @@ describe('v0.4 Web/Desktop parity', () => {
 
   it('keeps library storage scope and provider scope orthogonal', () => {
     expect(libraryTypes).toContain("providerIds?: Array<'pica' | 'eh'>")
-    expect(libraryQuery).toContain('const selectedProviders = new Set(query.providerIds ?? [])')
-    expect(libraryQuery).toContain("selectedProviders.has(comic.providerId ?? 'pica')")
+    expect(libraryQuery).toContain('.listComicsForLibraryQueryBase(query)')
+    expect(database).toContain('const providers = [...new Set(query.providerIds ?? [])]')
+    expect(database).toContain("pm.provider_id")
+    expect(database).toContain("CASE WHEN c.id LIKE 'eh:%' THEN 'eh' ELSE 'pica' END")
     expect(web).toContain("provider.id = 'v040-library-provider'")
     expect(web).toContain('<option value="pica">')
     expect(web).toContain('<option value="eh">')

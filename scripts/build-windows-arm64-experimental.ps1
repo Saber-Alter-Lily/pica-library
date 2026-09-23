@@ -99,6 +99,8 @@ Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $stage
 foreach ($notice in @('NOTICE.md','UPSTREAM.md','DISCLAIMER.md')) {
     Copy-Item -LiteralPath (Join-Path $root $notice) -Destination $stage
 }
+Copy-Item -LiteralPath (Join-Path $root 'scripts\install-windows-arm64-user.ps1') -Destination $stage
+Copy-Item -LiteralPath (Join-Path $root 'scripts\uninstall-windows-arm64-user.ps1') -Destination $stage
 
 $cscCandidates = @(
     'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe',
@@ -119,8 +121,11 @@ Pica Library v$version experimental preview for Windows 11 ARM64
 Source: $sourceSha
 
 1. Extract the entire ZIP.
-2. Double-click Pica Library.exe.
-3. Complete setup in the browser.
+2. For a per-user Start Menu install with no administrator rights, run install-windows-arm64-user.ps1.
+   The application is copied to %LocalAppData%\Programs\Pica Library ARM64 Preview by default.
+3. You can also double-click Pica Library.exe directly without installing.
+4. To remove only application/shortcut files, run the installed uninstall-windows-arm64-user.ps1.
+   User data under the normal Pica Library data root is intentionally preserved.
 
 This package runs the official Node.js $nodeVersion Windows ARM64 runtime.
 The launcher is managed AnyCPU and starts the bundled native ARM64 Node process.
@@ -155,7 +160,9 @@ foreach ($required in @(
     'licenses\THIRD_PARTY_LICENSES.txt',
     'Pica Library.exe',
     'SOURCE_SHA.txt',
-    'PLATFORM_REQUIREMENTS.json'
+    'PLATFORM_REQUIREMENTS.json',
+    'install-windows-arm64-user.ps1',
+    'uninstall-windows-arm64-user.ps1'
 )) {
     $requiredPath = Join-Path $stage $required
     if (-not (Test-Path -LiteralPath $requiredPath) -or (Get-Item -LiteralPath $requiredPath).Length -eq 0) {

@@ -84,6 +84,42 @@ describe('experimental Windows ARM64 package', () => {
         )
     })
 
+    it('ships and validates a fail-closed per-user Windows ARM64 install flow', () => {
+        const build = read('scripts/build-windows-arm64-experimental.ps1')
+        const install = read('scripts/install-windows-arm64-user.ps1')
+        const uninstall = read('scripts/uninstall-windows-arm64-user.ps1')
+        const acceptance = read('scripts/test-windows-arm64-user-install.ps1')
+        const workflow = read('.github/workflows/windows-arm64-experimental.yml')
+
+        expect(build).toContain('install-windows-arm64-user.ps1')
+        expect(build).toContain('uninstall-windows-arm64-user.ps1')
+        expect(install).toContain("Programs\\Pica Library ARM64 Preview")
+        expect(install).toContain('Pica Library ARM64 Preview.lnk')
+        expect(install).toContain('.pica-library-arm64-preview-install.json')
+        expect(install).toContain('Refusing to replace an unrecognized directory')
+        expect(install).toContain(
+            'Close Pica Library before installing or updating the Windows ARM64 preview'
+        )
+        expect(uninstall).toContain('Refusing to remove an unrecognized directory')
+        expect(uninstall).toContain(
+            'Close Pica Library before uninstalling the Windows ARM64 preview'
+        )
+        expect(uninstall).toContain('User data was not removed')
+        expect(uninstall).not.toContain('Remove-Item -Recurse -Force -LiteralPath $dataRoot')
+        expect(acceptance).toContain('stale-application-file.txt')
+        expect(acceptance).toContain('installer did not refuse a running engine')
+        expect(acceptance).toContain('uninstaller did not refuse a running engine')
+        expect(acceptance).toContain('uninstaller accepted an unrecognized directory')
+        expect(acceptance).toContain('uninstaller removed the user database')
+        expect(acceptance).toContain('Windows ARM64 user install/uninstall acceptance: PASS')
+        expect(workflow).toContain(
+            './scripts/test-windows-arm64-user-install.ps1 -Archive $archive.FullName'
+        )
+        expect(workflow).toContain("'scripts/install-windows-arm64-user.ps1'")
+        expect(workflow).toContain("'scripts/uninstall-windows-arm64-user.ps1'")
+        expect(workflow).toContain("'scripts/test-windows-arm64-user-install.ps1'")
+    })
+
     it('runs an end-to-end packaged ARM64 Desktop and DPAPI acceptance', () => {
         const acceptance = read('scripts/test-windows-arm64-experimental.ps1')
         const workflow = read('.github/workflows/windows-arm64-experimental.yml')

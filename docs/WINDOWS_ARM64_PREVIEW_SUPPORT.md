@@ -33,7 +33,8 @@ The Windows ARM64 experimental workflow must:
 11. keep SQLite/user state outside the application package;
 12. build the first accepted Windows ARM64 preview and the current candidate as distinct packages, replace the application tree while reusing one external data root, verify library/shelf/download state survives, then restore the pre-upgrade data snapshot and baseline package and verify candidate-only state disappears;
 13. require the normal pre-migration database backup if a future ARM64 candidate raises the database schema;
-14. keep formal distribution and self-update disabled.
+14. ship a rootless per-user installer that copies the preview under `%LocalAppData%\Programs\Pica Library ARM64 Preview` by default, creates a Start Menu shortcut, replaces only recognized preview application roots, and ships a fail-closed uninstaller that preserves the external Pica Library user-data root;
+15. keep formal distribution and self-update disabled.
 
 No real Provider credentials or manga assets are used by this gate.
 
@@ -43,7 +44,7 @@ Before promotion beyond internal experimental status, retain separate evidence f
 
 - an authorized real Provider login plus ordinary browse/detail/read/download flow on a physical Windows ARM64 device;
 - real browser launch, folder/save picker and managed E-H browser behavior in an interactive ARM64 desktop session;
-- installer/shortcut/uninstall UX appropriate for ordinary Windows ARM users rather than only an extracted ZIP;
+- real interactive validation of the automated per-user installer, Start Menu shortcut and uninstall UX on a physical Windows ARM64 device; CI now validates install/reinstall/uninstall mechanics, fail-closed directory protection and user-data preservation, but does not substitute for ordinary-user desktop review;
 - a schema-changing ARM64 preview migration/rollback when a future candidate raises the database schema; the current automated gate already covers same-schema full-package replacement and external-data snapshot rollback;
 - cold start, long-reader, visual-task and concurrent-download measurements on reference ARM64 hardware;
 - release provenance, signing/reputation policy and support messaging appropriate to a public ARM64 channel.

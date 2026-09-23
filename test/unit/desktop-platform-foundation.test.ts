@@ -34,6 +34,19 @@ describe('Desktop platform foundation', () => {
             managedEhWebLogin: true,
             selfUpdate: true
         })
+        expect(desktopPlatformCapabilities('win32', 'arm64')).toMatchObject({
+            id: 'windows',
+            arch: 'arm64',
+            runtimeFoundation: true,
+            distributionReady: false,
+            browserLaunch: true,
+            directoryLaunch: true,
+            secureCredentialPersistence: true,
+            nativeFolderPicker: true,
+            nativeSavePicker: true,
+            managedEhWebLogin: true,
+            selfUpdate: false
+        })
         for (const platform of ['darwin', 'linux'] as const)
             expect(desktopPlatformCapabilities(platform, 'arm64')).toMatchObject({
                 runtimeFoundation: true,
@@ -183,9 +196,18 @@ describe('Desktop platform foundation', () => {
     })
 
     it('does not advertise Windows update packages on unfinished Desktop targets', () => {
-        expect(appCapabilities(false, 'win32').features.updatePackages).toBe(true)
-        expect(appCapabilities(false, 'darwin').features.updatePackages).toBe(false)
-        expect(appCapabilities(false, 'linux').features.updatePackages).toBe(false)
+        expect(
+            appCapabilities(false, 'win32', 'x64').features.updatePackages
+        ).toBe(true)
+        expect(
+            appCapabilities(false, 'win32', 'arm64').features.updatePackages
+        ).toBe(false)
+        expect(
+            appCapabilities(false, 'darwin', 'arm64').features.updatePackages
+        ).toBe(false)
+        expect(
+            appCapabilities(false, 'linux', 'x64').features.updatePackages
+        ).toBe(false)
     })
 
     it('publishes the runtime capability matrix through Desktop status', () => {

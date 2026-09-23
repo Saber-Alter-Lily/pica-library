@@ -54,6 +54,36 @@ describe('experimental macOS arm64 package P5B', () => {
         expect(build).toContain('"observedNodeMinOS": "$NODE_MIN_MACOS"')
     })
 
+    it('builds a self-contained macOS application bundle without claiming trust', () => {
+        const build = read('scripts/build-macos-experimental.sh')
+        const acceptance = read('scripts/test-macos-app-bundle.sh')
+        const workflow = read('.github/workflows/macos-experimental.yml')
+
+        expect(build).toContain('APP_BUNDLE="$STAGE/Pica Library.app"')
+        expect(build).toContain('<string>org.picalibrary.desktop</string>')
+        expect(build).toContain('<string>APPL</string>')
+        expect(build).toContain('<key>LSMinimumSystemVersion</key>')
+        expect(build).toContain('iconutil -c icns')
+        expect(build).toContain('PicaLibrary.icns')
+        expect(build).toContain(
+            'Pica Library.app/Contents/Resources/$item'
+        )
+        expect(build).toContain('application_bundle:true')
+        expect(build).toContain('signed:false')
+        expect(build).toContain('notarized:false')
+        expect(acceptance).toContain('ditto "$SOURCE_APP" "$STANDALONE_APP"')
+        expect(acceptance).toContain(
+            'open -W -n "$STANDALONE_APP" --args --headless --no-open'
+        )
+        expect(acceptance).toContain(
+            'macOS self-contained app-bundle acceptance: PASS'
+        )
+        expect(workflow).toContain(
+            'bash scripts/test-macos-app-bundle.sh "$archive"'
+        )
+        expect(workflow).toContain("'scripts/test-macos-app-bundle.sh'")
+    })
+
     it('tests preview-to-preview application replacement and data rollback', () => {
         const replacement = read('scripts/test-macos-preview-replacement.sh')
         const workflow = read('.github/workflows/macos-experimental.yml')

@@ -28,7 +28,7 @@ describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
         const source = fs.readFileSync('web/alpha8-star-access.js', 'utf8')
         expect(source).toContain('生成 GitHub 验证码')
         expect(source).toContain('box.hidden=false')
-        expect(source).toContain('code.textContent=flow.userCode')
+        expect(source).toContain('code.textContent = flow.userCode')
         expect(source).toContain('copy.onclick=async()=>')
         expect(source).toContain('open.onclick=async()=>')
         expect(source.match(/window\.open\(flow\.verificationUri/g)?.length).toBe(1)

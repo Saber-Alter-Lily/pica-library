@@ -6,6 +6,7 @@ import type { StoredComic } from '../../src/library/types'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import {
+    buildWorkIdentityAuditAsyncV5,
     buildWorkIdentityAuditV5,
     buildWorkIdentityMaterializationPlanV5,
     buildWorkIdentityMaterializationPreviewV5,
@@ -120,6 +121,49 @@ describe('Canonical Work Identity foundation', () => {
             crossProvider: true,
             relation: 'PROBABLE_SAME_WORK'
         })
+    })
+
+    it('keeps checkpointable background audit results identical to the synchronous baseline', async () => {
+        const catalog = [
+            comic({
+                comicId: 'pica:async-1',
+                providerId: 'pica',
+                title: 'Async Work',
+                author: 'Artist',
+                pagesCount: 30
+            }),
+            comic({
+                comicId: 'eh:async-2',
+                providerId: 'eh',
+                title: '[Digital] Async Work',
+                author: 'Artist',
+                pagesCount: 31
+            }),
+            comic({
+                comicId: 'pica:async-3',
+                providerId: 'pica',
+                title: 'Different Work',
+                author: 'Artist',
+                pagesCount: 80
+            })
+        ]
+        const state = defaultPortablePolicyStateV5()
+        const checkpoints: string[] = []
+        const baseline = buildWorkIdentityAuditV5(catalog, state, 200)
+        const background = await buildWorkIdentityAuditAsyncV5(
+            catalog,
+            state,
+            200,
+            {
+                yieldEvery: 1,
+                checkpoint: async () => {
+                    checkpoints.push('checkpoint')
+                }
+            }
+        )
+
+        expect(background).toEqual(baseline)
+        expect(checkpoints.length).toBeGreaterThan(1)
     })
 
     it('matches the cross-language Pica/E-H example through alternate title and creator aliases', () => {

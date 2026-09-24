@@ -390,7 +390,7 @@ Security:
 - diagnostic data follows existing credential-exclusion rules.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1 local HTTP latency observation implemented; startup/browser/Android measurements remain open**
+**Status: IN_PROGRESS — J1 runtime telemetry + J2 repeatable Desktop scenario harness implemented; startup/browser/Android measurements remain open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -935,7 +935,7 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 - **DONE (PR #118) — H2C / RT-14:** Work Identity evidence refresh is a checkpointable detached service-owned task with pause/resume/cancel and reload-safe Web controls. The async audit is tested for exact result equivalence with the synchronous baseline; evidence remains evidence-only and persists only after the final checkpoint. All main CI plus Linux, macOS arm64, Docker and rerun Windows ARM64 package gates passed before merge.
 
 ## NEXT-4 — P2-C resource-budget design
-**Status: IN_PROGRESS — C1 foundation**
+**Status: IN_PROGRESS — C1 foundation + C2/C2B Desktop observe-only coverage**
 
 - **C1:** add a tested resource coordinator with shared resource-class vocabulary, atomic multi-resource leases, priority/FIFO admission semantics, cancellation and diagnostics. Production mode remains observe-only and does not impose invented capacities.
 - **C2 first batch implemented:** maintenance update, repair, organize, Recommendation V5 Shadow and Work Identity evidence refresh now declare observe-only resource leases; Desktop-only diagnostics expose current/peak overlap.
@@ -946,12 +946,14 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
 ## NEXT-5 — P2-J/P2-K performance baseline
-**Status: IN_PROGRESS — J1 runtime latency instrumentation**
+**Status: IN_PROGRESS — J1 telemetry + J2 repeatable Desktop scenario windows**
 
 - **J1 implemented:** bounded in-memory local HTTP latency telemetry classifies requests into low-cardinality route classes and correlates them with active resource-task types without storing URLs, comic IDs, search terms, bodies, tokens or paths.
 - Desktop-only `/api/v1/desktop/runtime/http-profile` exposes count/p50/p95/max/error summaries for overall, idle, under-load, route class and active task type.
-- No latency threshold or release budget is selected yet; real-device evidence remains required.
-- **Next:** collect repeatable Desktop idle-vs-load scenarios, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
+- **J2 implemented:** `pnpm benchmark:http-latency-scenario` drives repeatable sequential Library/detail/Reader foreground traffic against an already-running loopback Desktop engine, with warm-up, clean telemetry reset and three rounds by default.
+- J2 idle windows are valid only when every foreground sample is idle; load windows are valid only when each requested observed task covers every foreground sample. This validates the measurement window, not the performance result.
+- The J2 harness never starts or controls the measured background workload, never emits discovered comic/chapter IDs, and selects no latency threshold or release budget.
+- **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -965,6 +967,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-J2 repeatable Desktop latency scenarios
+
+State update:
+- J1 measurement infrastructure is now paired with a repeatable Desktop scenario harness rather than relying on ad-hoc manual clicking.
+- The harness connects only to a loopback Desktop engine, obtains the Desktop CSRF token, warms representative foreground paths, resets the J1 window, and records three clean rounds by default.
+- Foreground traffic is sequential and user-interaction-shaped rather than saturation load: status, Library facet query, shelves, downloaded listing, Reader progress, plus an automatically discovered local comic detail/chapter path where available.
+- Optional comic/chapter IDs are discovered before the measured window and are not emitted in the JSON report.
+- Idle windows require zero observed background-task overlap. Load windows require every requested task type to cover every foreground sample; incomplete coverage invalidates the window but does not create a performance pass/fail threshold.
+- The measured workload remains authoritative in its existing scheduler/UI. J2 does not start, pause, cancel or otherwise control downloads, WebDAV, recommendation, maintenance or analysis tasks.
+- Output is machine-readable and includes environment, per-round J1 profiles, task coverage and measurement-window validity. It selects no p50/p95 budget and cannot authorize P2-C3 enforcement.
+- Detailed protocol: docs/HTTP_LATENCY_SCENARIO_P2J2.md.
 
 ## 2026-09-24 — P2-J1 real local HTTP latency observation
 

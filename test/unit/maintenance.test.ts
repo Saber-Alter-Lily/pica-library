@@ -64,7 +64,7 @@ describe('maintenance', () => {
         database.close()
     })
 
-    it('groups missing and empty files into one repair job', () => {
+    it('groups missing and empty files into one repair job without synchronous stat calls', async () => {
         const { dir, database } = setup()
         const empty = path.join(dir, 'empty.jpg')
         fs.writeFileSync(empty, '')
@@ -87,12 +87,17 @@ describe('maintenance', () => {
             fileServer: 'https://example.test'
         })
         database.markPictureDownloaded('p2', empty, 0, '')
-        const issues = scanRepairIssues(database)
+        const progress: Array<{ done: number; total: number }> = []
+        const issues = await scanRepairIssues(database, {
+            yieldEvery: 1,
+            onProgress: (value) => progress.push(value)
+        })
         expect(issues.map((issue) => issue.reason).sort()).toEqual([
             'empty',
             'missing'
         ])
         expect(queueRepairs(database, issues)).toHaveLength(1)
+        expect(progress.at(-1)).toEqual({ done: 2, total: 2 })
         database.close()
     })
 })

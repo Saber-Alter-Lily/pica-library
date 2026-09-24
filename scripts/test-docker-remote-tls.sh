@@ -121,6 +121,7 @@ if [[ ! "$HOST_PORT" =~ ^[0-9]+$ ]]; then
   fail "Could not resolve the Caddy HTTPS host port: $PORT_MAPPING"
 fi
 
+TLS_READY=false
 for _ in $(seq 1 120); do
   if ! docker inspect "$CADDY_NAME" --format '{{.State.Running}}' 2>/dev/null | grep -qx true; then
     fail "Caddy exited during startup"
@@ -128,6 +129,7 @@ for _ in $(seq 1 120); do
   if docker exec "$CADDY_NAME" test -s /data/caddy/pki/authorities/local/root.crt >/dev/null 2>&1; then
     docker cp "$CADDY_NAME:/data/caddy/pki/authorities/local/root.crt" "$ROOT_CA" >/dev/null
     if curl --fail --silent --show-error --noproxy '*'       --cacert "$ROOT_CA"       --resolve "pica.test:$HOST_PORT:127.0.0.1"       "https://pica.test:$HOST_PORT/healthz" >/dev/null 2>&1; then
+      TLS_READY=true
       break
     fi
   fi
@@ -135,6 +137,9 @@ for _ in $(seq 1 120); do
 done
 if [[ ! -s "$ROOT_CA" ]]; then
   fail "Caddy internal root certificate was not produced"
+fi
+if [[ "$TLS_READY" != "true" ]]; then
+  fail "Caddy TLS reverse proxy did not become ready"
 fi
 
 BASE="https://pica.test:$HOST_PORT"
@@ -147,7 +152,22 @@ CURL_TLS=(
 )
 
 HEALTH_FILE="$WORK/health.json"
-curl --fail "${CURL_TLS[@]}" "$BASE/healthz" > "$HEALTH_FILE"
+HEALTH_STATUS=""
+for _ in $(seq 1 80); do
+  HEALTH_STATUS="$(
+    curl "${CURL_TLS[@]}" \
+      --output "$HEALTH_FILE" \
+      --write-out '%{http_code}' \
+      "$BASE/healthz" 2>/dev/null || true
+  )"
+  if [[ "$HEALTH_STATUS" == "200" ]]; then
+    break
+  fi
+  sleep 0.25
+done
+if [[ "$HEALTH_STATUS" != "200" ]]; then
+  fail "Caddy TLS health endpoint did not remain ready: $HEALTH_STATUS"
+fi
 node - "$HEALTH_FILE" <<'NODE'
 const fs=require('fs')
 const value=JSON.parse(fs.readFileSync(process.argv[2],'utf8'))

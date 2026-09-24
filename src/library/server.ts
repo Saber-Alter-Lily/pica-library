@@ -1449,9 +1449,19 @@ export async function startLibraryServer(options: {
                     summary: options.database.summary(),
                     reconciliation: options.database.reconcileLibraryCounts(),
                     favoritesSyncProgress:
-                        options.service.favoritesSyncProgress()
+                        options.service.favoritesSyncProgress(),
+                    runtimeResources: options.service.runtimeResourceStatus()
                 })
             }
+            if (
+                url.pathname === '/api/v1/runtime/resources' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.runtimeResourceStatus()
+                )
             if (
                 url.pathname === '/api/v1/sync/progress' &&
                 request.method === 'GET'

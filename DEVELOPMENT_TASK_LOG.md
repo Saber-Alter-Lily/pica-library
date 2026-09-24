@@ -919,9 +919,9 @@ Produce the checked-in runtime inventory/dependency map and identify:
 Fix the confirmed foreground maintenance hazards before adding a global resource arbiter:
 
 - **DONE (PR #112):** repair scanning no longer performs synchronous per-file `existsSync/statSync` work on the Node event loop; it now uses asynchronous stat calls, progress callbacks and event-loop yielding.
-- **IN_PROGRESS:** maintenance update checks are being moved from one long request-owned full scan to an observable background task with pause/resume/cancel.
-- **IN_PROGRESS:** the correctness-significant 5000-comic default update-scan cap is being removed by querying the complete downloaded-comic ID domain directly.
-- **PLANNED NEXT:** organize/materialize filesystem work must gain explicit background/task semantics rather than foreground synchronous loops.
+- **DONE (PR #113):** full maintenance update checks now run as an observable background task with pause/resume/cancel; explicit narrow comic-ID checks remain synchronous for compatibility.
+- **DONE (PR #113):** the correctness-significant 5000-comic default update-scan cap was removed by querying the complete downloaded-comic ID domain directly.
+- **IN_PROGRESS:** organize/materialize filesystem work is being moved off synchronous foreground filesystem APIs; the Web organize route becomes a controllable background task while explicit CLI organize/portable commands use the same asynchronous checkpointable primitives.
 - preserve the current safety model: scan/review first, then enqueue repair/update jobs.
 
 ## NEXT-3 — P2-C resource-budget design
@@ -946,6 +946,15 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — H1B maintenance update runtime merged
+
+State update:
+- PR #113 passed CI, v0.4 direct-upgrade acceptance, Linux, macOS arm64, Windows ARM64 and Docker package gates and was merged.
+- Full maintenance update scans now detach from the HTTP request lifecycle and expose authoritative progress plus pause/resume/cancel.
+- The scan domain is now the complete set of downloaded comic IDs queried directly from SQLite; the previous 5000-comic list cap is gone.
+- Pause/cancel checkpoints run before and after each bounded Provider request, so an already-active request may finish but no next comic starts after the control action.
+- Full scans remain review-first and do not auto-queue download jobs.
 
 ## 2026-09-24 — H1 maintenance hardening started
 

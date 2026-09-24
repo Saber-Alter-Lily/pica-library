@@ -3041,6 +3041,18 @@ export class LibraryService {
     }
 
     async buildFinalRecommendationCycleV3(cycleId: string) {
+        const resources = this.acquireRuntimeResources(
+            `recommendation-v3:${cycleId}`,
+            'recommendation-v3-generation',
+            'background',
+            ['provider-network', 'cpu-analysis', 'sqlite-write-heavy']
+        )
+        if (!resources.acquired)
+            throw new Error(
+                `Runtime resources are unavailable: ${resources.blockedBy
+                    .map((item) => item.resource)
+                    .join(', ')}`
+            )
         this.beginRecommendationBuild(cycleId)
         try {
         await this.recommendationCheckpoint()
@@ -3477,6 +3489,7 @@ export class LibraryService {
             }
             throw error
         } finally {
+            resources.lease.release()
             this.finishRecommendationBuild()
         }
     }
@@ -3624,6 +3637,18 @@ export class LibraryService {
             this.favoritesTaskState === 'cancelling'
         )
             throw new Error('Favorites sync is already running')
+        const resources = this.acquireRuntimeResources(
+            'favorites-sync',
+            'favorites-sync',
+            'background',
+            ['provider-network', 'sqlite-write-heavy']
+        )
+        if (!resources.acquired)
+            throw new Error(
+                `Runtime resources are unavailable: ${resources.blockedBy
+                    .map((item) => item.resource)
+                    .join(', ')}`
+            )
         this.favoritesPauseRequested = false
         this.favoritesCancelRequested = false
         this.favoritesResumeWaiters.clear()
@@ -3667,6 +3692,7 @@ export class LibraryService {
             }
             throw error
         } finally {
+            resources.lease.release()
             this.finishFavoritesSyncControl()
         }
     }

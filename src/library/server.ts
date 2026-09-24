@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url'
 import type { FavoriteRecord, LibraryFacetQuery, SortMode } from './types'
 import { LibraryDatabase } from './database'
 import { LibraryService } from './service'
-import { queueRepairs, scanRepairIssues } from '../maintenance/repair'
 import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
@@ -2384,15 +2383,51 @@ export async function startLibraryServer(options: {
                 return json(response, 200, { findings, jobs })
             }
             if (
+                url.pathname === '/api/v1/maintenance/repair/status' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.maintenanceRepairStatus()
+                )
+
+            if (
+                url.pathname === '/api/v1/maintenance/repair/control' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const action = String(input.action ?? '')
+                if (
+                    action !== 'pause' &&
+                    action !== 'resume' &&
+                    action !== 'cancel'
+                )
+                    return json(response, 400, {
+                        error: 'Unknown maintenance repair control action'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.maintenanceRepairControl(action)
+                )
+            }
+
+            if (
                 url.pathname === '/api/v1/maintenance/repair' &&
                 request.method === 'POST'
             ) {
                 const input = await body(request)
-                const issues = await scanRepairIssues(options.database)
-                const jobs = input.queue
-                    ? queueRepairs(options.database, issues)
-                    : []
-                return json(response, 200, { issues, jobs })
+                if (input.queue)
+                    return json(response, 400, {
+                        error:
+                            'Run the repair scan first and review its findings before queueing repair downloads'
+                    })
+                return json(
+                    response,
+                    202,
+                    options.service.startMaintenanceRepairScan()
+                )
             }
             if (
                 url.pathname === '/api/v1/organize/status' &&

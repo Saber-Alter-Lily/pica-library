@@ -189,7 +189,16 @@ $settings = @{
     profile = 'balanced'
 }
 Write-Host '[arm64] saving synthetic credentials through DPAPI-backed settings'
-Invoke-RestMethod -Method Post -Uri "$url/api/v1/desktop/settings" -Headers $settingsHeaders -ContentType 'application/json' -Body ($settings | ConvertTo-Json) -TimeoutSec 10 | Out-Null
+$settingsTimer = [System.Diagnostics.Stopwatch]::StartNew()
+try {
+    # Native ARM64 hosted runners occasionally spend more than 10 seconds in
+    # the DPAPI/settings restart path under host load. Keep the acceptance
+    # bounded, but allow the real platform operation enough time to finish.
+    Invoke-RestMethod -Method Post -Uri "$url/api/v1/desktop/settings" -Headers $settingsHeaders -ContentType 'application/json' -Body ($settings | ConvertTo-Json) -TimeoutSec 30 | Out-Null
+} finally {
+    $settingsTimer.Stop()
+    Write-Host ("[arm64] DPAPI settings POST elapsed: {0} ms" -f [math]::Round($settingsTimer.Elapsed.TotalMilliseconds))
+}
 $restarted = Wait-Desktop -OldCsrf $oldCsrf
 $url = $restarted.Url
 $status = $restarted.Status

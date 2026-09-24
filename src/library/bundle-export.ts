@@ -26,7 +26,7 @@ export function serializeBrowserLiteDataPackage(
     database: LibraryDatabase,
     options: BrowserLiteBundleOptions = {}
 ) {
-    const comics = options.comics ?? database.listComics({ limit: 5000 })
+    const comics = options.comics ?? database.listAllComics()
     if (comics.length === 0) throw new EmptyBrowserLiteLibraryError()
     return serializeLibraryBundle({
         schemaVersion: 1,

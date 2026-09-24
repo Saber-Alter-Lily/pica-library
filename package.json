@@ -27,7 +27,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "web:check": "node scripts/check-web-syntax.mjs",
-    "benchmark": "tsx scripts/benchmark/download-harness.ts"
+    "benchmark": "tsx scripts/benchmark/download-harness.ts",
+    "benchmark:visual-analysis": "tsx scripts/benchmark/visual-analysis-harness.ts"
   },
   "engines": {
     "node": ">=22.5"

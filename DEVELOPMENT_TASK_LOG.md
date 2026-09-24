@@ -976,6 +976,7 @@ State update:
 - Profiles separate idle vs under-load samples and summarize p50/p95/max/error count by route class and background task type.
 - Data is process-memory only, bounded to 500 samples in Desktop integration, not persisted and not uploaded.
 - Desktop-only `/api/v1/desktop/runtime/http-profile` exposes the profile; it is not added to Remote Web/browser-session allowlists.
+- Desktop-CSRF-protected `/api/v1/desktop/runtime/http-profile/reset` clears the in-memory window for repeatable scenarios; profile/reset requests themselves are excluded from samples so diagnostics do not contaminate the measurement.
 - No performance threshold is selected. J1 is measurement infrastructure; representative Windows/Android evidence is still required before P2-K budgets or P2-C3 enforcement.
 - Detailed boundary: docs/HTTP_LATENCY_RUNTIME_P2J1.md.
 ## 2026-09-24 — P2-C2B shared Desktop resource graph

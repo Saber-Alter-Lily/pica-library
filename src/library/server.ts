@@ -301,11 +301,16 @@ export async function startLibraryServer(options: {
     }
     const server = http.createServer(async (request, response) => {
         const url = new URL(request.url ?? '/', `http://${host}:${port}`)
-        const recordLatency = httpLatency.start({
-            method: request.method,
-            pathname: url.pathname,
-            activeTaskTypes: options.service.runtimeActiveTaskTypes()
-        })
+        const latencyDiagnostic =
+            url.pathname === '/api/v1/desktop/runtime/http-profile' ||
+            url.pathname === '/api/v1/desktop/runtime/http-profile/reset'
+        const recordLatency = latencyDiagnostic
+            ? (_statusCode: number) => undefined
+            : httpLatency.start({
+                  method: request.method,
+                  pathname: url.pathname,
+                  activeTaskTypes: options.service.runtimeActiveTaskTypes()
+              })
         response.once('finish', () => recordLatency(response.statusCode))
         response.once('close', () =>
             recordLatency(response.writableEnded ? response.statusCode : 499)
@@ -1051,6 +1056,20 @@ export async function startLibraryServer(options: {
                         error: 'Desktop control plane is unavailable'
                     })
                 return json(response, 200, httpLatency.snapshot())
+            }
+            if (
+                url.pathname === '/api/v1/desktop/runtime/http-profile/reset' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                httpLatency.reset()
+                return json(response, 200, {
+                    reset: true,
+                    ...httpLatency.snapshot()
+                })
             }
             if (
                 url.pathname === '/api/v1/visual/representation-qc' &&

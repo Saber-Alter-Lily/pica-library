@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
     LocalHttpLatencyRegistry,
@@ -134,5 +135,19 @@ describe('local HTTP latency registry', () => {
             activeTaskTypes: ['local-download-runner']
         })
         expect(snapshot.recent[0].durationMs).toBeGreaterThanOrEqual(0)
+    })
+
+    it('keeps the runtime profile on the Desktop-only local control plane', () => {
+        const server = fs.readFileSync('src/library/server.ts', 'utf8')
+        const gateway = fs.readFileSync('src/remote-api/gateway.ts', 'utf8')
+
+        expect(server).toContain(
+            "url.pathname === '/api/v1/desktop/runtime/http-profile'"
+        )
+        expect(server).toContain('return json(response, 200, httpLatency.snapshot())')
+        expect(server).toContain(
+            "error: 'Desktop control plane is unavailable'"
+        )
+        expect(gateway).not.toContain('/api/v1/desktop/runtime/http-profile')
     })
 })

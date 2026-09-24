@@ -50,6 +50,55 @@ function stablePair(leftId: string, rightId: string) {
         .join('\u0000')
 }
 
+function auditCandidate(
+    left: StoredComic,
+    right: StoredComic,
+    selected: Map<string, WorkIdentityAuditCandidateV5>,
+    state: PortablePolicyStateV5
+) {
+    if (left.comicId === right.comicId) return null
+    const key = stablePair(left.comicId, right.comicId)
+    if (selected.has(key)) return null
+    const pair = [left.comicId, right.comicId]
+        .map(normalizePreferenceKey)
+        .sort()
+        .join('\u0000')
+    if (state.explicitDistinctPairs.includes(pair)) return null
+    const identity = workIdentityDetailEvidenceV3(left, right)
+    if (identity.relation !== 'HIGH_CONFIDENCE_WORK') return null
+    const a = workIdentityKeys(left)
+    const b = workIdentityKeys(right)
+    const leftProvider = providerId(left)
+    const rightProvider = providerId(right)
+    return {
+        pairKey: key,
+        leftComicId: left.comicId,
+        rightComicId: right.comicId,
+        leftTitle: left.title,
+        rightTitle: right.title,
+        author: left.canonicalAuthor || left.author || '',
+        leftProvider,
+        rightProvider,
+        crossProvider: leftProvider !== rightProvider,
+        relation: 'PROBABLE_SAME_WORK' as const,
+        confidence: identity.confidence,
+        evidence: {
+            titleMatch:
+                identity.titleMatch === 'CORE'
+                    ? ('LOOSE' as const)
+                    : identity.titleMatch,
+            titleAliasMatch: identity.titleMatch !== 'NONE',
+            authorMatch: identity.creatorMatch,
+            authorIdentityMatch: identity.creatorMatchKind,
+            titleSimilarity: identity.titleSimilarity,
+            pageCountCompatible: identity.pageCountCompatible,
+            leftPages: a.pages,
+            rightPages: b.pages
+        },
+        resolverVersion: WORK_IDENTITY_RESOLVER_VERSION
+    }
+}
+
 function addPairs(
     bucket: StoredComic[],
     selected: Map<string, WorkIdentityAuditCandidateV5>,
@@ -63,98 +112,22 @@ function addPairs(
             rightIndex++
         ) {
             if (selected.size >= limit) return
-            const left = bucket[leftIndex]
-            const right = bucket[rightIndex]
-            if (left.comicId === right.comicId) continue
-            const key = stablePair(left.comicId, right.comicId)
-            if (selected.has(key)) continue
-            const pair = [left.comicId, right.comicId]
-                .map(normalizePreferenceKey)
-                .sort()
-                .join('\u0000')
-            if (state.explicitDistinctPairs.includes(pair)) continue
-            const identity = workIdentityDetailEvidenceV3(left, right)
-            if (identity.relation !== 'HIGH_CONFIDENCE_WORK') continue
-            const a = workIdentityKeys(left)
-            const b = workIdentityKeys(right)
-            const leftProvider = providerId(left)
-            const rightProvider = providerId(right)
-            selected.set(key, {
-                pairKey: key,
-                leftComicId: left.comicId,
-                rightComicId: right.comicId,
-                leftTitle: left.title,
-                rightTitle: right.title,
-                author: left.canonicalAuthor || left.author || '',
-                leftProvider,
-                rightProvider,
-                crossProvider: leftProvider !== rightProvider,
-                relation: 'PROBABLE_SAME_WORK',
-                confidence: identity.confidence,
-                evidence: {
-                    titleMatch:
-                        identity.titleMatch === 'CORE'
-                            ? 'LOOSE'
-                            : identity.titleMatch,
-                    titleAliasMatch: identity.titleMatch !== 'NONE',
-                    authorMatch: identity.creatorMatch,
-                    authorIdentityMatch: identity.creatorMatchKind,
-                    titleSimilarity: identity.titleSimilarity,
-                    pageCountCompatible: identity.pageCountCompatible,
-                    leftPages: a.pages,
-                    rightPages: b.pages
-                },
-                resolverVersion: WORK_IDENTITY_RESOLVER_VERSION
-            })
+            const candidate = auditCandidate(
+                bucket[leftIndex],
+                bucket[rightIndex],
+                selected,
+                state
+            )
+            if (candidate) selected.set(candidate.pairKey, candidate)
         }
     }
 }
 
-export function buildWorkIdentityAuditV5(
+function auditResult(
     catalog: StoredComic[],
-    state: PortablePolicyStateV5,
-    requestedLimit = 200
+    selected: Map<string, WorkIdentityAuditCandidateV5>,
+    limit: number
 ) {
-    const limit = Math.max(1, Math.min(1000, Math.floor(requestedLimit)))
-    const creatorBuckets = new Map<string, StoredComic[]>()
-    const titleFallbackBuckets = new Map<string, StoredComic[]>()
-
-    for (const comic of catalog) {
-        const creatorKeys = workIdentityCreatorBucketKeysV3(comic)
-        for (const creator of creatorKeys)
-            creatorBuckets.set(creator, [
-                ...(creatorBuckets.get(creator) || []),
-                comic
-            ])
-
-        // Exact/core title buckets are retained only as the author-uncertain
-        // fallback. Fuzzy title matching never scans the whole catalog.
-        const keys = workIdentityKeys(comic)
-        for (const title of new Set([
-            ...keys.strictTitles,
-            ...keys.looseTitles
-        ])) {
-            const bucketKey = `title:${title}`
-            titleFallbackBuckets.set(bucketKey, [
-                ...(titleFallbackBuckets.get(bucketKey) || []),
-                comic
-            ])
-        }
-    }
-
-    const selected = new Map<string, WorkIdentityAuditCandidateV5>()
-    const candidateBuckets = [
-        ...creatorBuckets.values(),
-        ...titleFallbackBuckets.values()
-    ]
-        .filter((items) => items.length > 1)
-        .sort((a, b) => b.length - a.length)
-
-    for (const bucket of candidateBuckets) {
-        addPairs(bucket, selected, state, limit)
-        if (selected.size >= limit) break
-    }
-
     const candidates = [...selected.values()]
         .sort(
             (a, b) =>
@@ -174,6 +147,174 @@ export function buildWorkIdentityAuditV5(
         ).length,
         candidates
     }
+}
+
+function addToAuditBuckets(
+    comic: StoredComic,
+    creatorBuckets: Map<string, StoredComic[]>,
+    titleFallbackBuckets: Map<string, StoredComic[]>
+) {
+    const creatorKeys = workIdentityCreatorBucketKeysV3(comic)
+    for (const creator of creatorKeys)
+        creatorBuckets.set(creator, [
+            ...(creatorBuckets.get(creator) || []),
+            comic
+        ])
+
+    // Exact/core title buckets are retained only as the author-uncertain
+    // fallback. Fuzzy title matching never scans the whole catalog.
+    const keys = workIdentityKeys(comic)
+    for (const title of new Set([
+        ...keys.strictTitles,
+        ...keys.looseTitles
+    ])) {
+        const bucketKey = `title:${title}`
+        titleFallbackBuckets.set(bucketKey, [
+            ...(titleFallbackBuckets.get(bucketKey) || []),
+            comic
+        ])
+    }
+}
+
+function candidateAuditBuckets(
+    creatorBuckets: Map<string, StoredComic[]>,
+    titleFallbackBuckets: Map<string, StoredComic[]>
+) {
+    return [
+        ...creatorBuckets.values(),
+        ...titleFallbackBuckets.values()
+    ]
+        .filter((items) => items.length > 1)
+        .sort((a, b) => b.length - a.length)
+}
+
+export function buildWorkIdentityAuditV5(
+    catalog: StoredComic[],
+    state: PortablePolicyStateV5,
+    requestedLimit = 200
+) {
+    const limit = Math.max(1, Math.min(1000, Math.floor(requestedLimit)))
+    const creatorBuckets = new Map<string, StoredComic[]>()
+    const titleFallbackBuckets = new Map<string, StoredComic[]>()
+
+    for (const comic of catalog)
+        addToAuditBuckets(comic, creatorBuckets, titleFallbackBuckets)
+
+    const selected = new Map<string, WorkIdentityAuditCandidateV5>()
+    const candidateBuckets = candidateAuditBuckets(
+        creatorBuckets,
+        titleFallbackBuckets
+    )
+
+    for (const bucket of candidateBuckets) {
+        addPairs(bucket, selected, state, limit)
+        if (selected.size >= limit) break
+    }
+
+    return auditResult(catalog, selected, limit)
+}
+
+export interface WorkIdentityAuditProgressV5 {
+    phase: 'bucketing' | 'comparing'
+    done: number
+    total: number
+    candidateCount: number
+    pairChecks: number
+}
+
+export async function buildWorkIdentityAuditAsyncV5(
+    catalog: StoredComic[],
+    state: PortablePolicyStateV5,
+    requestedLimit = 200,
+    options: {
+        checkpoint?: () => Promise<void>
+        onProgress?: (progress: WorkIdentityAuditProgressV5) => void
+        yieldEvery?: number
+    } = {}
+) {
+    const limit = Math.max(1, Math.min(1000, Math.floor(requestedLimit)))
+    const yieldEvery = Math.max(
+        1,
+        Math.min(2000, Math.floor(options.yieldEvery ?? 250))
+    )
+    const creatorBuckets = new Map<string, StoredComic[]>()
+    const titleFallbackBuckets = new Map<string, StoredComic[]>()
+    let pairChecks = 0
+
+    for (let index = 0; index < catalog.length; index++) {
+        addToAuditBuckets(
+            catalog[index],
+            creatorBuckets,
+            titleFallbackBuckets
+        )
+        if ((index + 1) % yieldEvery === 0 || index + 1 === catalog.length) {
+            await options.checkpoint?.()
+            options.onProgress?.({
+                phase: 'bucketing',
+                done: index + 1,
+                total: catalog.length,
+                candidateCount: 0,
+                pairChecks
+            })
+            await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        }
+    }
+
+    const candidateBuckets = candidateAuditBuckets(
+        creatorBuckets,
+        titleFallbackBuckets
+    )
+    const selected = new Map<string, WorkIdentityAuditCandidateV5>()
+
+    for (
+        let bucketIndex = 0;
+        bucketIndex < candidateBuckets.length;
+        bucketIndex++
+    ) {
+        const bucket = candidateBuckets[bucketIndex]
+        for (let leftIndex = 0; leftIndex < bucket.length; leftIndex++) {
+            for (
+                let rightIndex = leftIndex + 1;
+                rightIndex < bucket.length;
+                rightIndex++
+            ) {
+                if (selected.size >= limit) break
+                const candidate = auditCandidate(
+                    bucket[leftIndex],
+                    bucket[rightIndex],
+                    selected,
+                    state
+                )
+                pairChecks++
+                if (candidate) selected.set(candidate.pairKey, candidate)
+                if (pairChecks % yieldEvery === 0) {
+                    await options.checkpoint?.()
+                    options.onProgress?.({
+                        phase: 'comparing',
+                        done: bucketIndex,
+                        total: candidateBuckets.length,
+                        candidateCount: selected.size,
+                        pairChecks
+                    })
+                    await new Promise<void>((resolve) =>
+                        setTimeout(resolve, 0)
+                    )
+                }
+            }
+            if (selected.size >= limit) break
+        }
+        await options.checkpoint?.()
+        options.onProgress?.({
+            phase: 'comparing',
+            done: bucketIndex + 1,
+            total: candidateBuckets.length,
+            candidateCount: selected.size,
+            pairChecks
+        })
+        if (selected.size >= limit) break
+    }
+
+    return auditResult(catalog, selected, limit)
 }
 
 

@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: PARTIAL**
+**Status: IN_PROGRESS — D1 full-domain correctness-cap cleanup implemented; hot-query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -955,6 +955,18 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - The J2 harness never starts or controls the measured background workload, never emits discovered comic/chapter IDs, and selects no latency threshold or release budget.
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
+## NEXT-6 — P2-D SQLite/query discipline
+**Status: IN_PROGRESS — D1 complete-domain cap cleanup candidate**
+
+This is the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
+
+- **D1 implemented:** Browser Lite export and CLI complete-domain export/progress/prepare-library paths no longer reuse the legacy 5000-row presentation cap.
+- `progress <comicId>` now uses direct `getComic(comicId)` instead of listing/filtering a bounded catalog.
+- A 5007-record regression proves Browser Lite export crosses the former boundary and preserves the record beyond row 5000.
+- Fixed limits in recommendation runtime/audit code are **not** mechanically removed in D1; they must first be classified as algorithmic budget, diagnostic sample, presentation bound or correctness domain.
+- **Next:** inventory hot Library/Shelves/History/Work Identity/recommendation support queries, repeated full-catalog materialization, N+1 lookups, relevant indexes and high-frequency writes; then fix measured/high-confidence hotspots in small reviewable batches.
+- Detailed boundary: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`.
+
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
 
@@ -967,6 +979,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D1 full-domain correctness-cap cleanup
+
+State update:
+- The first P2-D cap audit distinguished legitimate bounded presentation/algorithmic queries from operations that claim to cover the complete authoritative library.
+- Browser Lite package export previously defaulted to `listComics({ limit: 5000 })`; libraries above 5000 rows were silently truncated. The default path now uses `listAllComics()`.
+- CLI CSV export and unscoped progress now use the complete catalog. Scoped `progress <comicId>` uses direct `getComic(comicId)`, preserving the P1 direct-object rule.
+- CLI `prepare-library` no longer omits favorites that fall beyond the first 5000 catalog rows.
+- A 5007-record unit regression crosses the legacy boundary and requires the Browser Lite package to contain the complete domain.
+- Recommendation V3/V5 and recommendation-audit 5000/10000 limits are intentionally not changed in D1 because they may be algorithmic/diagnostic budgets rather than accidental SQLite pagination. Their semantics and cost require separate evidence.
+- D1 is a correctness cleanup, not a claim that P2-D is complete. Hot-query/N+1/index/write-frequency audit continues.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D1.md.
 
 ## 2026-09-24 — P2-J2 repeatable Desktop latency scenarios
 

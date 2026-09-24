@@ -207,7 +207,7 @@ async function main() {
             if (!file) throw new Error('An output CSV file path is required')
             const output = path.resolve(file)
             fs.mkdirSync(path.dirname(output), { recursive: true })
-            const comics = database.listComics({ limit: 5000 })
+            const comics = database.listAllComics()
             fs.writeFileSync(output, favoritesToCsv(comics), 'utf8')
             print({ exported: comics.length, file: output })
             return
@@ -234,10 +234,14 @@ async function main() {
         }
         if (command === 'progress') {
             const comicId = positionalsAfter('progress')[0]
-            const comics = database
-                .listComics({ limit: 5000 })
-                .filter((comic) => !comicId || comic.comicId === comicId)
-                .map((comic) => ({
+            const selected = comicId ? database.getComic(comicId) : undefined
+            const comics = (
+                comicId
+                    ? selected
+                        ? [selected]
+                        : []
+                    : database.listAllComics()
+            ).map((comic) => ({
                     comicId: comic.comicId,
                     title: comic.title,
                     expectedEpisodes: comic.epsCount ?? 0,
@@ -367,7 +371,7 @@ async function main() {
                 seedCount: 12
             })
             const favorites = database
-                .listComics({ limit: 5000 })
+                .listAllComics()
                 .filter((comic) => comic.isFavorite)
             fs.mkdirSync(outputDir, { recursive: true })
             fs.writeFileSync(

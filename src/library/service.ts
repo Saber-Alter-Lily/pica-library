@@ -49,7 +49,18 @@ import type {
     DownloadJob,
     DownloadRunner
 } from '../core/downloads/types'
-import { checkComicUpdates } from '../maintenance/updates'
+import {
+    checkComicUpdates,
+    type UpdateFinding
+} from '../maintenance/updates'
+import {
+    scanRepairIssues,
+    type RepairIssue
+} from '../maintenance/repair'
+import {
+    MaintenanceTaskRuntime,
+    type MaintenanceTaskControlAction
+} from '../maintenance/task-runtime'
 import {
     ProviderService,
     type FavoritesSyncMode
@@ -292,6 +303,10 @@ export class LibraryService {
     private localDownloadRunStartedAt: string | null = null
     private localDownloadLastError: string | null = null
     private recoveredLocalDownloadJobs = 0
+    private readonly maintenanceUpdateTask =
+        new MaintenanceTaskRuntime<UpdateFinding[]>('maintenance-update-scan')
+    private readonly maintenanceRepairTask =
+        new MaintenanceTaskRuntime<RepairIssue[]>('maintenance-repair-scan')
     private favoritesProgress: FavoritesSyncProgress = { phase: 'idle' }
     private favoritesTaskState:
         | 'idle'
@@ -4051,33 +4066,107 @@ export class LibraryService {
         return recommendComics(catalog, limit, candidates)
     }
 
-    async checkUpdates(comicIds?: string[]) {
+    maintenanceTaskStatus(kind: 'updates' | 'repair') {
+        return kind === 'updates'
+            ? this.maintenanceUpdateTask.status()
+            : this.maintenanceRepairTask.status()
+    }
+
+    maintenanceTaskControl(
+        kind: 'updates' | 'repair',
+        action: MaintenanceTaskControlAction
+    ) {
+        return kind === 'updates'
+            ? this.maintenanceUpdateTask.control(action)
+            : this.maintenanceRepairTask.control(action)
+    }
+
+    startMaintenanceUpdateScan(comicIds?: string[]) {
+        return this.maintenanceUpdateTask.start(
+            async ({ checkpoint, report }) =>
+                this.checkUpdates(comicIds, {
+                    checkpoint,
+                    onProgress: (progress) =>
+                        report({
+                            phase: 'checking-updates',
+                            done: progress.done,
+                            total: progress.total,
+                            indeterminate: false
+                        })
+                }),
+            {
+                phase: 'preparing',
+                indeterminate: true
+            }
+        )
+    }
+
+    startMaintenanceRepairScan() {
+        return this.maintenanceRepairTask.start(
+            async ({ checkpoint, report }) =>
+                scanRepairIssues(this.database, {
+                    checkpoint,
+                    onProgress: (progress) =>
+                        report({
+                            phase: 'scanning-files',
+                            done: progress.done,
+                            total: progress.total,
+                            indeterminate: false
+                        })
+                }),
+            {
+                phase: 'preparing',
+                indeterminate: true
+            }
+        )
+    }
+
+    async checkUpdates(
+        comicIds?: string[],
+        options: {
+            checkpoint?: () => Promise<void> | void
+            onProgress?: (progress: {
+                done: number
+                total: number
+                comicId?: string
+            }) => void
+        } = {}
+    ) {
         const providerService = this.providerService()
         const ids = comicIds?.length
-            ? comicIds
+            ? [...new Set(comicIds.map(String).filter(Boolean))]
             : this.database
-                  .listComics({ limit: 5000 })
-                  .filter((comic) => comic.downloadedPictures > 0)
+                  .listComicsForLibraryQueryBase({ scope: 'downloaded' })
                   .map((comic) => comic.comicId)
-        const findings = []
-        for (const comicId of ids) {
+
+        const findings: UpdateFinding[] = []
+        options.onProgress?.({ done: 0, total: ids.length })
+
+        for (let index = 0; index < ids.length; index += 1) {
+            await options.checkpoint?.()
+            const comicId = ids[index]
             findings.push(
                 await checkComicUpdates(
                     this.database,
                     {
                         episodes: async (id) =>
-                            (await providerService.getEpisodes(id)).map(
-                                (episode) => ({
+                            (await providerService.getEpisodes(id))
+                                .map((episode) => ({
                                     id: episode.id || episode._id || '',
                                     order: episode.order,
                                     title: episode.title,
                                     updatedAt: episode.updated_at
-                                })
-                            ).filter((episode) => episode.id)
+                                }))
+                                .filter((episode) => episode.id)
                     },
                     comicId
                 )
             )
+            options.onProgress?.({
+                done: index + 1,
+                total: ids.length,
+                comicId
+            })
         }
         return findings
     }

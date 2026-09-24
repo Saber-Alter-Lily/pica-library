@@ -1121,7 +1121,7 @@ export class LibraryService {
         }
 
         const run = (async () => {
-            let releaseResources = () => undefined
+            let releaseResources: () => void = () => undefined
             try {
                 const lease = await this.runtimeResources.acquire({
                     ownerId: 'recommendation-v5-shadow',
@@ -2562,7 +2562,7 @@ export class LibraryService {
         }
 
         const run = (async () => {
-            let releaseResources = () => undefined
+            let releaseResources: () => void = () => undefined
             try {
                 const lease = await this.runtimeResources.acquire({
                     ownerId: 'work-identity-evidence',
@@ -5140,7 +5140,7 @@ export class LibraryService {
         }
 
         const run = (async () => {
-            let releaseResources = () => undefined
+            let releaseResources: () => void = () => undefined
             try {
                 const lease = await this.runtimeResources.acquire({
                     ownerId: 'library-organize',
@@ -5349,7 +5349,7 @@ export class LibraryService {
         }
 
         const run = (async () => {
-            let releaseResources = () => undefined
+            let releaseResources: () => void = () => undefined
             try {
                 const lease = await this.runtimeResources.acquire({
                     ownerId: 'maintenance-repair',
@@ -5599,7 +5599,7 @@ export class LibraryService {
         }
 
         const run = (async () => {
-            let releaseResources = () => undefined
+            let releaseResources: () => void = () => undefined
             try {
                 const lease = await this.runtimeResources.acquire({
                     ownerId: 'maintenance-update',

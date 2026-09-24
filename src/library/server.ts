@@ -673,6 +673,46 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/shadow-retrieval/status' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5ShadowStatus()
+                )
+            }
+
+            if (
+                url.pathname ===
+                    '/api/v1/desktop/recommendation-v5/shadow-retrieval/control' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                const input = await body(request)
+                const action = String(input.action ?? '')
+                if (!['pause', 'resume', 'cancel'].includes(action))
+                    return json(response, 400, {
+                        error: 'Invalid shadow retrieval control action'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5ShadowControl(
+                        action as 'pause' | 'resume' | 'cancel'
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
                     '/api/v1/desktop/recommendation-v5/shadow-retrieval' &&
                 request.method === 'POST'
             ) {
@@ -683,8 +723,8 @@ export async function startLibraryServer(options: {
                 const input = await body(request)
                 return json(
                     response,
-                    200,
-                    await options.service.runRecommendationV5ShadowRetrieval(
+                    202,
+                    options.service.startRecommendationV5ShadowRetrieval(
                         input
                     )
                 )

@@ -914,7 +914,7 @@ Produce the checked-in runtime inventory/dependency map and identify:
 - missing performance instrumentation.
 
 ## NEXT-2 — H1 maintenance runtime hardening
-**Status: IN_PROGRESS**
+**Status: DONE**
 
 Fix the confirmed foreground maintenance hazards before adding a global resource arbiter:
 
@@ -922,15 +922,24 @@ Fix the confirmed foreground maintenance hazards before adding a global resource
 - **DONE (PR #113):** full maintenance update checks now run as an observable background task with pause/resume/cancel; explicit narrow comic-ID checks remain synchronous for compatibility.
 - **DONE (PR #113):** the correctness-significant 5000-comic default update-scan cap was removed by querying the complete downloaded-comic ID domain directly.
 - **DONE (PR #114):** organize/materialize filesystem work now uses asynchronous checkpointable primitives; the Web organize route is a controllable background task, CLI organize/portable use the complete catalog, and final indexes/manifests publish only after the last checkpoint.
-- **IN_PROGRESS:** repair scanning is being promoted from “async but request-owned” to the same background task model with authoritative progress and pause/resume/cancel.
+- **DONE (PR #115):** repair scanning now uses the same background task model with authoritative progress and pause/resume/cancel.
 - preserve the current safety model: scan/review first, then enqueue repair/update jobs.
 
-## NEXT-3 — P2-C resource-budget design
-**Status: PLANNED after NEXT-2**
+## NEXT-3 — H2 background analysis runtime
+**Status: IN_PROGRESS**
 
-Use the runtime inventory and H1 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
+Promote expensive manual/advanced analysis paths to observable background tasks without changing their scientific/product semantics.
 
-## NEXT-4 — P2-J/P2-K performance baseline
+- **IN_PROGRESS — H2A / RT-11:** Recommendation V5 Shadow Retrieval becomes a detached Desktop task with authoritative progress and pause/resume/cancel. Shadow-only, explicit-confirmation and `servingImpact=false` boundaries remain unchanged.
+- **PLANNED — H2B / RT-13:** measure Visual QC / Author Atlas / Style Family latency, then background only the calculations that exceed the approved foreground threshold.
+- **PLANNED — H2C / RT-14:** background Work Identity audit/evidence refresh where full-catalog execution is materially long; preserve evidence-only/manual-review semantics.
+
+## NEXT-4 — P2-C resource-budget design
+**Status: PLANNED after H2**
+
+Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
+
+## NEXT-5 — P2-J/P2-K performance baseline
 **Status: PLANNED after enough instrumentation exists**
 
 Create repeatable local/browser/Android measurements and record the first real baseline.

@@ -63,6 +63,38 @@ async function yieldToEventLoop() {
     await new Promise<void>((resolve) => setImmediate(resolve))
 }
 
+async function replaceFile(temporary: string, file: string) {
+    try {
+        await fs.promises.rename(temporary, file)
+        return
+    } catch (error) {
+        const code =
+            error && typeof error === 'object' && 'code' in error
+                ? String((error as NodeJS.ErrnoException).code ?? '')
+                : ''
+        if (!['EEXIST', 'EPERM', 'ENOTEMPTY'].includes(code)) throw error
+    }
+
+    const previous = `${file}.pica-old-${process.pid}`
+    await fs.promises.rm(previous, { force: true }).catch(() => undefined)
+    let movedPrevious = false
+    try {
+        if (await exists(file)) {
+            await fs.promises.rename(file, previous)
+            movedPrevious = true
+        }
+        await fs.promises.rename(temporary, file)
+        if (movedPrevious)
+            await fs.promises.rm(previous, { force: true }).catch(() => undefined)
+    } catch (error) {
+        if (movedPrevious && !(await exists(file)))
+            await fs.promises.rename(previous, file)
+        throw error
+    } finally {
+        await fs.promises.rm(previous, { force: true }).catch(() => undefined)
+    }
+}
+
 async function writeJsonAtomically(file: string, value: unknown) {
     await fs.promises.mkdir(path.dirname(file), { recursive: true })
     const temporary = `${file}.pica-new-${process.pid}`
@@ -72,7 +104,7 @@ async function writeJsonAtomically(file: string, value: unknown) {
             JSON.stringify(value, null, 2),
             'utf8'
         )
-        await fs.promises.rename(temporary, file)
+        await replaceFile(temporary, file)
     } finally {
         await fs.promises.rm(temporary, { force: true }).catch(() => undefined)
     }

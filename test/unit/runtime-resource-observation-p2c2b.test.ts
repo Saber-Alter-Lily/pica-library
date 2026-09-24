@@ -61,8 +61,9 @@ describe('P2 C2B shared runtime resource observation', () => {
 
         expect(service).toContain("taskType: 'recommendation-v3-build'")
         expect(service).toContain("taskType: 'favorites-sync'")
-        expect(service).toContain("taskType: 'local-download-runner'")
-        expect(service).toContain("taskType: 'github-download-runner'")
+        expect(service).toContain("runner === 'LOCAL'")
+        expect(service).toContain("'local-download-runner'")
+        expect(service).toContain("'github-download-runner'")
         expect(remote).toContain("taskType: 'remote-storage-sync'")
         expect(remote).toContain("'remote-storage-network': 1")
 

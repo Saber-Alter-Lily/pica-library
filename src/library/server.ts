@@ -1018,6 +1018,20 @@ export async function startLibraryServer(options: {
                 )
             }
             if (
+                url.pathname === '/api/v1/desktop/runtime/resources' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.runtimeResourceProfile()
+                )
+            }
+            if (
                 url.pathname === '/api/v1/visual/representation-qc' &&
                 request.method === 'GET'
             )

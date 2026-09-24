@@ -176,6 +176,7 @@ import {
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../recommendation-v5/work-identity-foundation'
 import { AnalysisTimingRegistry } from '../runtime/analysis-timing'
+import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 
 export const WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION =
     'PREPARE_CANONICAL_WORK_BINDING'
@@ -581,6 +582,9 @@ export class LibraryService {
           }
         | null = null
     private readonly visualAnalysisTimings = new AnalysisTimingRegistry()
+    private readonly runtimeResources = new RuntimeResourceCoordinator({
+        mode: 'observe'
+    })
 
     private workIdentityEvidenceRefreshProgress: WorkIdentityEvidenceRefreshTaskProgress =
         {
@@ -608,6 +612,10 @@ export class LibraryService {
               savedCount: number
           }
         | null = null
+
+    runtimeResourceProfile() {
+        return this.runtimeResources.snapshot()
+    }
 
     private allComicsForIdentity(): StoredComic[] {
         return this.database.listComics(
@@ -1113,7 +1121,19 @@ export class LibraryService {
         }
 
         const run = (async () => {
+            let releaseResources: () => void = () => undefined
             try {
+                const lease = await this.runtimeResources.acquire({
+                    ownerId: 'recommendation-v5-shadow',
+                    taskType: 'recommendation-v5-shadow',
+                    priority: 'background',
+                    resources: {
+                        'provider-network': 1,
+                        'cpu-analysis': 1,
+                        'sqlite-write-heavy': 1
+                    }
+                })
+                releaseResources = () => lease.release()
                 const result =
                     await this.runRecommendationV5ShadowRetrieval(
                         input,
@@ -1178,6 +1198,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                releaseResources()
                 this.finishRecommendationV5ShadowControl()
             }
         })()
@@ -2541,7 +2562,19 @@ export class LibraryService {
         }
 
         const run = (async () => {
+            let releaseResources: () => void = () => undefined
             try {
+                const lease = await this.runtimeResources.acquire({
+                    ownerId: 'work-identity-evidence',
+                    taskType: 'work-identity-evidence-refresh',
+                    priority: 'background',
+                    resources: {
+                        'cpu-analysis': 1,
+                        'sqlite-read-heavy': 1,
+                        'sqlite-write-heavy': 1
+                    }
+                })
+                releaseResources = () => lease.release()
                 // Detach the first full-catalog read from the start request.
                 await new Promise<void>((resolve) => setTimeout(resolve, 0))
                 await this.workIdentityEvidenceRefreshCheckpoint()
@@ -2641,6 +2674,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                releaseResources()
                 this.finishWorkIdentityEvidenceRefreshControl()
             }
         })()
@@ -5106,7 +5140,15 @@ export class LibraryService {
         }
 
         const run = (async () => {
+            let releaseResources: () => void = () => undefined
             try {
+                const lease = await this.runtimeResources.acquire({
+                    ownerId: 'library-organize',
+                    taskType: 'library-organize',
+                    priority: 'background',
+                    resources: { 'filesystem-heavy': 1 }
+                })
+                releaseResources = () => lease.release()
                 this.libraryOrganizeResult = await organizeLibraryViews(
                     this.dataDir,
                     comics,
@@ -5162,6 +5204,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                releaseResources()
                 this.finishLibraryOrganizeControl()
             }
         })()
@@ -5306,7 +5349,18 @@ export class LibraryService {
         }
 
         const run = (async () => {
+            let releaseResources: () => void = () => undefined
             try {
+                const lease = await this.runtimeResources.acquire({
+                    ownerId: 'maintenance-repair',
+                    taskType: 'maintenance-repair-scan',
+                    priority: 'background',
+                    resources: {
+                        'filesystem-heavy': 1,
+                        'sqlite-read-heavy': 1
+                    }
+                })
+                releaseResources = () => lease.release()
                 const issues = await scanRepairIssues(this.database, {
                     checkpoint: () => this.maintenanceRepairCheckpoint(),
                     onProgress: ({ done, total }) => {
@@ -5354,6 +5408,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                releaseResources()
                 this.finishMaintenanceRepairControl()
             }
         })()
@@ -5544,7 +5599,18 @@ export class LibraryService {
         }
 
         const run = (async () => {
+            let releaseResources: () => void = () => undefined
             try {
+                const lease = await this.runtimeResources.acquire({
+                    ownerId: 'maintenance-update',
+                    taskType: 'maintenance-update-scan',
+                    priority: 'background',
+                    resources: {
+                        'provider-network': 1,
+                        'sqlite-write-heavy': 1
+                    }
+                })
+                releaseResources = () => lease.release()
                 const findings = await this.checkUpdates(ids, {
                     checkpoint: () => this.maintenanceUpdateCheckpoint(),
                     onProgress: (done, total, current) => {
@@ -5606,6 +5672,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                releaseResources()
                 this.finishMaintenanceUpdateControl()
             }
         })()

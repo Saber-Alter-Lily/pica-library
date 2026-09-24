@@ -9,6 +9,7 @@ const EVAL = {
     candidateVersion: '',
     advancedGate: null,
     advancedDirection: 'LEARNING_TO_RANK',
+    shadowTask: null,
     busy: false,
     runningShadow: false,
     comparing: false,
@@ -118,6 +119,9 @@ function evalEnsurePanel() {
         <div class="v5-eval-actions">
           <button id="v5-eval-refresh" type="button">${evalT('刷新评估','Refresh evaluation','評価を更新')}</button>
           <button id="v5-eval-run-shadow" type="button">${evalT('运行一次影子推荐','Run one shadow recommendation','Shadow おすすめを1回実行')}</button>
+          <button id="v5-eval-shadow-pause" type="button" hidden>${evalT('暂停','Pause','一時停止')}</button>
+          <button id="v5-eval-shadow-resume" type="button" hidden>${evalT('继续','Resume','再開')}</button>
+          <button id="v5-eval-shadow-cancel" type="button" hidden>${evalT('取消','Cancel','キャンセル')}</button>
         </div>
       </div>
       <p id="v5-eval-status" class="status">${evalT('尚未读取评估数据。','Evaluation data has not been loaded yet.','評価データはまだ読み込まれていません。')}</p>
@@ -140,6 +144,16 @@ function evalEnsurePanel() {
     panel.querySelector('#v5-eval-run-shadow').onclick = () => {
         void evalRunShadow()
     }
+    panel.querySelector('#v5-eval-shadow-pause').onclick = () => {
+        void evalShadowControl('pause')
+    }
+    panel.querySelector('#v5-eval-shadow-resume').onclick = () => {
+        void evalShadowControl('resume')
+    }
+    panel.querySelector('#v5-eval-shadow-cancel').onclick = () => {
+        void evalShadowControl('cancel')
+    }
+    evalShadowControls(EVAL.shadowTask)
     return true
 }
 
@@ -681,16 +695,149 @@ async function evalLoad(force = false) {
     }
 }
 
+function evalShadowControls(task = EVAL.shadowTask) {
+    const pause = document.querySelector('#v5-eval-shadow-pause')
+    const resume = document.querySelector('#v5-eval-shadow-resume')
+    const cancel = document.querySelector('#v5-eval-shadow-cancel')
+    const active = Boolean(task?.active)
+    if (pause) {
+        pause.hidden = !active
+        pause.disabled = !task?.canPause
+    }
+    if (resume) {
+        resume.hidden = !active
+        resume.disabled = !task?.canResume
+    }
+    if (cancel) {
+        cancel.hidden = !active
+        cancel.disabled = !task?.canCancel
+    }
+}
+
+function evalShadowPhaseLabel(phase) {
+    const labels = {
+        planning: evalT('准备计划','Planning','計画準備'),
+        retrieving: evalT('召回候选','Retrieving candidates','候補取得'),
+        hygiene: evalT('候选清洗','Cleaning candidates','候補クリーンアップ'),
+        ranking: evalT('排序','Ranking','順位付け'),
+        diversity: evalT('批次多样性','Batch diversity','バッチ多様性'),
+        audit: evalT('安全与覆盖审计','Safety and coverage audit','安全性・カバレッジ監査'),
+        persisting: evalT('保存审计结果','Persisting audit result','監査結果を保存'),
+        paused: evalT('已暂停','Paused','一時停止')
+    }
+    return labels[phase] || String(phase || '—')
+}
+
+function evalShadowProgressStatus(task) {
+    const phase = evalShadowPhaseLabel(task?.phase)
+    const done = Number(task?.done || 0)
+    const total = Number(task?.total || 0)
+    const retrievalDone = Number(task?.retrievalDone || 0)
+    const retrievalTotal = Number(task?.retrievalTotal || 0)
+    const candidates = Number(task?.rawCandidateCount || 0)
+    const retrieval =
+        task?.phase === 'retrieving' && retrievalTotal > 0
+            ? evalT(
+                  `；Provider 请求进度 ${retrievalDone}/${retrievalTotal}，当前候选 ${candidates}`,
+                  `; provider request progress ${retrievalDone}/${retrievalTotal}, current candidates ${candidates}`,
+                  `；Provider リクエスト ${retrievalDone}/${retrievalTotal}、現在候補 ${candidates}`
+              )
+            : ''
+    return evalT(
+        `影子推荐后台任务：${phase} · 阶段 ${done}/${total}${retrieval}。正式推荐未改变。`,
+        `Shadow recommendation background task: ${phase} · phase ${done}/${total}${retrieval}. Formal recommendations are unchanged.`,
+        `Shadow おすすめのバックグラウンドタスク：${phase} · フェーズ ${done}/${total}${retrieval}。正式おすすめは変更されていません。`
+    )
+}
+
+const evalDelay = (milliseconds) =>
+    new Promise((resolve) => setTimeout(resolve, milliseconds))
+
+async function evalShadowControl(action) {
+    try {
+        const task = await evalDesktopPost(
+            '/api/v1/desktop/recommendation-v5/shadow-retrieval/control',
+            { action }
+        )
+        EVAL.shadowTask = task
+        evalShadowControls(task)
+        evalStatus(evalShadowProgressStatus(task))
+    } catch (error) {
+        evalStatus(
+            evalT(
+                `影子推荐控制失败：${error.message}`,
+                `Shadow recommendation control failed: ${error.message}`,
+                `Shadow おすすめの操作に失敗しました：${error.message}`
+            ),
+            true
+        )
+    }
+}
+
+async function evalPollShadowTask() {
+    while (EVAL.runningShadow) {
+        const task = await evalRequest(
+            '/api/v1/desktop/recommendation-v5/shadow-retrieval/status'
+        )
+        EVAL.shadowTask = task
+        evalShadowControls(task)
+
+        if (task.state === 'complete') {
+            const result = task.result || {}
+            evalStatus(
+                evalT(
+                    `影子推荐完成：原始候选 ${Number(result.rawCandidateCount || 0)} → 清洗后 ${Number(result.candidateCount || 0)} → 排序 ${Number(result.rankedCandidateCount || 0)} → 最终测试批次 ${Number(result.selectedCount || 0)}。正式推荐未改变。正在刷新评估…`,
+                    `Shadow recommendation complete: raw candidates ${Number(result.rawCandidateCount || 0)} → cleaned ${Number(result.candidateCount || 0)} → ranked ${Number(result.rankedCandidateCount || 0)} → final test batch ${Number(result.selectedCount || 0)}. Formal recommendations are unchanged. Refreshing evaluation…`,
+                    `Shadow おすすめ完了：元候補 ${Number(result.rawCandidateCount || 0)} → クリーン後 ${Number(result.candidateCount || 0)} → 順位付け ${Number(result.rankedCandidateCount || 0)} → 最終テストバッチ ${Number(result.selectedCount || 0)}。正式おすすめは変更されていません。評価を更新中…`
+                )
+            )
+            EVAL.runningShadow = false
+            await evalLoad(true)
+            return
+        }
+        if (task.state === 'failed') {
+            EVAL.runningShadow = false
+            evalStatus(
+                evalT(
+                    `Shadow run 失败：${task.error || 'unknown error'}`,
+                    `Shadow run failed: ${task.error || 'unknown error'}`,
+                    `Shadow run に失敗しました：${task.error || 'unknown error'}`
+                ),
+                true
+            )
+            return
+        }
+        if (task.state === 'cancelled') {
+            EVAL.runningShadow = false
+            evalStatus(
+                evalT(
+                    '影子推荐已取消；未完成结果不会写入新的审计 run。',
+                    'Shadow recommendation cancelled; incomplete output was not written as a new audit run.',
+                    'Shadow おすすめをキャンセルしました。未完了の結果は新しい監査 run として保存されません。'
+                )
+            )
+            return
+        }
+
+        evalStatus(evalShadowProgressStatus(task))
+        await evalDelay(600)
+    }
+}
+
 async function evalRunShadow() {
     if (EVAL.runningShadow) return
     EVAL.runningShadow = true
     const button = document.querySelector('#v5-eval-run-shadow')
     if (button) button.disabled = true
     evalStatus(
-        evalT('正在后台模拟一次新算法推荐：不会改变当前正式推荐。正在召回候选、排序并生成 12 本测试批次…','Simulating one new-algorithm recommendation in the background. Formal recommendations stay unchanged while candidates are retrieved, ranked and a 12-work test batch is built…','新アルゴリズムのおすすめをバックグラウンドで1回シミュレーションしています。正式おすすめは変更せず、候補取得・順位付け・12作品のテストバッチを生成中です…')
+        evalT(
+            '正在启动影子推荐后台任务；正式推荐不会改变。',
+            'Starting the shadow recommendation background task; formal recommendations will not change.',
+            'Shadow おすすめのバックグラウンドタスクを開始しています。正式おすすめは変更されません。'
+        )
     )
     try {
-        const result = await evalDesktopPost(
+        const task = await evalDesktopPost(
             '/api/v1/desktop/recommendation-v5/shadow-retrieval',
             {
                 confirmation:
@@ -701,16 +848,50 @@ async function evalRunShadow() {
                 visualAnalysisBudget: 24
             }
         )
-        const audit = result.audit || {}
-        evalStatus(
-            evalT(`影子推荐完成：原始候选 ${Number(result.rawCandidateCount || 0)} → 清洗后 ${Number(result.candidateCount || 0)} → 排序 ${Number(result.ranking?.candidateCount || 0)} → 最终测试批次 ${Number(result.diversity?.selectedCount || 0)}。正式推荐未改变。正在刷新评估…`,`Shadow recommendation complete: raw candidates ${Number(result.rawCandidateCount || 0)} → cleaned ${Number(result.candidateCount || 0)} → ranked ${Number(result.ranking?.candidateCount || 0)} → final test batch ${Number(result.diversity?.selectedCount || 0)}. Formal recommendations are unchanged. Refreshing evaluation…`,`Shadow おすすめ完了：元候補 ${Number(result.rawCandidateCount || 0)} → クリーン後 ${Number(result.candidateCount || 0)} → 順位付け ${Number(result.ranking?.candidateCount || 0)} → 最終テストバッチ ${Number(result.diversity?.selectedCount || 0)}。正式おすすめは変更されていません。評価を更新中…`)
-        )
-        await evalLoad(true)
+        EVAL.shadowTask = task
+        evalShadowControls(task)
+        evalStatus(evalShadowProgressStatus(task))
+        await evalPollShadowTask()
     } catch (error) {
-        evalStatus(evalT(`Shadow run 失败：${error.message}`,`Shadow run failed: ${error.message}`,`Shadow run に失敗しました：${error.message}`), true)
-    } finally {
         EVAL.runningShadow = false
-        if (button) button.disabled = false
+        evalStatus(
+            evalT(
+                `Shadow run 失败：${error.message}`,
+                `Shadow run failed: ${error.message}`,
+                `Shadow run に失敗しました：${error.message}`
+            ),
+            true
+        )
+    } finally {
+        const current = document.querySelector('#v5-eval-run-shadow')
+        if (current) current.disabled = false
+        evalShadowControls(EVAL.shadowTask)
+    }
+}
+
+async function evalRestoreShadowTask() {
+    try {
+        const task = await evalRequest(
+            '/api/v1/desktop/recommendation-v5/shadow-retrieval/status'
+        )
+        EVAL.shadowTask = task
+        evalShadowControls(task)
+        if (task.active && !EVAL.runningShadow) {
+            EVAL.runningShadow = true
+            const button = document.querySelector('#v5-eval-run-shadow')
+            if (button) button.disabled = true
+            evalStatus(evalShadowProgressStatus(task))
+            try {
+                await evalPollShadowTask()
+            } finally {
+                const current = document.querySelector('#v5-eval-run-shadow')
+                if (current) current.disabled = false
+                evalShadowControls(EVAL.shadowTask)
+            }
+        }
+    } catch {
+        // Evaluation remains usable when the local Desktop control plane
+        // is unavailable; opening Settings never starts heavy work.
     }
 }
 
@@ -720,9 +901,13 @@ function evalInstall() {
 }
 
 evalInstall()
+void evalRestoreShadowTask()
 document.addEventListener('pica-language-change', () => {
     document.querySelector('#settings-recommendation-v5-evaluation')?.remove()
     evalEnsurePanel()
+    evalShadowControls(EVAL.shadowTask)
+    if (EVAL.shadowTask?.active)
+        evalStatus(evalShadowProgressStatus(EVAL.shadowTask))
     if (EVAL.summary) {
         evalRenderSummary()
         evalRenderCriteria()

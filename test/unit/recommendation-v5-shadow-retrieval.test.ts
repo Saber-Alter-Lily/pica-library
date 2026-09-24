@@ -230,4 +230,59 @@ describe('Recommendation V5 shadow retrieval executor', () => {
             'secret provider detail'
         )
     })
+    it('reports cooperative progress and checks control between retrieval work units', async () => {
+        const { catalog, plan } = compiledPlan()
+        const progress: Array<{
+            done: number
+            total: number
+            candidateCount: number
+        }> = []
+        let checkpoints = 0
+
+        const result = await executeShadowRetrievalV5(
+            plan,
+            {
+                search: async () => [],
+                relatedPica: async () => []
+            },
+            catalog,
+            {
+                checkpoint: () => {
+                    checkpoints += 1
+                },
+                onProgress: (value) => progress.push(value)
+            }
+        )
+
+        expect(result.mode).toBe('SHADOW')
+        expect(checkpoints).toBeGreaterThan(progress.length)
+        expect(progress.length).toBeGreaterThan(0)
+        expect(progress.at(-1)?.done).toBe(progress.at(-1)?.total)
+    })
+
+    it('stops at the next safe checkpoint after cancellation is requested', async () => {
+        const { catalog, plan } = compiledPlan()
+        let cancelled = false
+
+        await expect(
+            executeShadowRetrievalV5(
+                plan,
+                {
+                    search: async () => [],
+                    relatedPica: async () => []
+                },
+                catalog,
+                {
+                    onProgress: () => {
+                        cancelled = true
+                    },
+                    checkpoint: () => {
+                        if (cancelled)
+                            throw new Error('shadow task cancelled')
+                    }
+                }
+            )
+        ).rejects.toThrow('shadow task cancelled')
+    })
+
 })

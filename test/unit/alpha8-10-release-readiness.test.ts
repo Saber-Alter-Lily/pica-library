@@ -59,7 +59,11 @@ describe('Alpha8.10 release readiness baseline', () => {
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
 
         expect(product).toContain("p.starUnlocked === true && Number(p.starUserId || 0) > 0 && p.starAuthMethod === 'github-account-device-flow'")
-        expect(star).toContain("p?.starUnlocked===true&&Number(p?.starUserId||0)>0&&p?.starAuthMethod==='github-account-device-flow'")
+        expect(star).toContain('personalization?.starUnlocked === true')
+        expect(star).toContain('Number(personalization?.starUserId || 0) > 0')
+        expect(star).toContain(
+            "personalization?.starAuthMethod === 'github-account-device-flow'"
+        )
         expect(star).not.toContain('p.starUnlocked||p.supporter')
         expect(service).toContain('return Boolean(this.starProof())')
         expect(service).toContain('const proof = this.starProof()')

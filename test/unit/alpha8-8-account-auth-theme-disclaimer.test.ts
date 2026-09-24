@@ -104,8 +104,8 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
     it('replaces the Desktop username form with GitHub account authorization actions', () => {
         const web = fs.readFileSync('web/alpha8-star-access.js', 'utf8')
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
-        expect(web).toContain("personalizationAction:'github-auth-start'")
-        expect(web).toContain("personalizationAction:'github-auth-poll'")
+        expect(web).toContain("personalizationAction: 'github-auth-start'")
+        expect(web).toContain("personalizationAction: 'github-auth-poll'")
         expect(web).toContain("import './alpha8-disclaimer.js'")
         expect(web).not.toContain('a86-github-user')
         expect(main).toContain("personalizationAction === 'github-auth-start'")

@@ -13,11 +13,22 @@ describe('Alpha8.9 authenticated Star UX and HTTP 204 hotfix', () => {
         expect(applicationFetchInternals.responseBody(200,'GET',new TextEncoder().encode('ok').buffer)).not.toBeNull()
     })
 
+    it('localizes the Desktop Star entry and device-code surface', () => {
+        const source = fs.readFileSync('web/alpha8-star-access.js', 'utf8')
+        expect(source).toContain("import { copy as starT } from './locale-runtime.js'")
+        expect(source).toContain("'⭐ Star this project'")
+        expect(source).toContain("'⭐ プロジェクトに Star'")
+        expect(source).toContain("'Generate GitHub verification code'")
+        expect(source).toContain("'GitHub 認証コードを生成'")
+        expect(source).toContain("'pica-language-change'")
+        expect(source).not.toContain("star.textContent='⭐ 给项目 Star'")
+    })
+
     it('shows the Desktop device code before GitHub can be opened', () => {
         const source = fs.readFileSync('web/alpha8-star-access.js', 'utf8')
         expect(source).toContain('生成 GitHub 验证码')
         expect(source).toContain('box.hidden=false')
-        expect(source).toContain('code.textContent=flow.userCode')
+        expect(source).toContain('code.textContent = flow.userCode')
         expect(source).toContain('copy.onclick=async()=>')
         expect(source).toContain('open.onclick=async()=>')
         expect(source.match(/window\.open\(flow\.verificationUri/g)?.length).toBe(1)

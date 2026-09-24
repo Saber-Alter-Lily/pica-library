@@ -649,6 +649,7 @@ async function startEngine(preferredPort: number) {
                           remoteApiSettings?.allowedOrigins.length ?? 0,
                       webSessions: remoteApiGateway.webSessionsEnabled,
                       webShell: remoteApiGateway.webShellEnabled,
+                      webPwa: remoteApiGateway.webPwaEnabled,
                       activeWebSessions:
                           remoteApiGateway.activeWebSessions()
                   }
@@ -656,6 +657,7 @@ async function startEngine(preferredPort: number) {
                       enabled: false,
                       webSessions: false,
                       webShell: false,
+                      webPwa: false,
                       activeWebSessions: 0
                   },
             remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },

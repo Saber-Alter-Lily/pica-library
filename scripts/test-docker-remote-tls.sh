@@ -180,6 +180,8 @@ if(value.capabilityStates?.remoteWebSessions?.available!==true)fail('Remote Web 
 if(value.features?.remoteWebSessions!==true)fail('Remote Web session compatibility flag missing')
 if(value.capabilityStates?.remoteWebShell?.available!==true)fail('Remote Web shell capability missing')
 if(value.features?.remoteWebShell!==true)fail('Remote Web shell compatibility flag missing')
+if(value.capabilityStates?.remoteWebPwa?.available!==true)fail('Remote Web PWA capability missing')
+if(value.features?.remoteWebPwa!==true)fail('Remote Web PWA compatibility flag missing')
 if(value.features?.updatePackages!==false)fail('Remote Linux runtime must not self-update')
 NODE
 
@@ -195,6 +197,12 @@ fi
 if ! grep -qi "^content-security-policy: .*default-src 'none'" "$REMOTE_SHELL_HEADERS"; then
   fail "Remote Web shell strict CSP header is missing"
 fi
+if ! grep -qi "^content-security-policy: .*manifest-src 'self'" "$REMOTE_SHELL_HEADERS"; then
+  fail "Remote Web PWA manifest CSP allowance is missing"
+fi
+if ! grep -qi "^content-security-policy: .*worker-src 'self'" "$REMOTE_SHELL_HEADERS"; then
+  fail "Remote Web PWA worker CSP allowance is missing"
+fi
 if ! grep -qi '^x-frame-options: DENY' "$REMOTE_SHELL_HEADERS"; then
   fail "Remote Web shell framing protection is missing"
 fi
@@ -209,8 +217,41 @@ curl --fail "${CURL_TLS[@]}" "$BASE/remote/remote.js" > "$REMOTE_JS"
 if ! grep -Fq '/remote/v1/session/bootstrap' "$REMOTE_JS"; then
   fail "Remote Web shell JavaScript bootstrap path is missing"
 fi
-if grep -Eq 'serviceWorker|localStorage|sessionStorage' "$REMOTE_JS"; then
-  fail "Remote Web shell unexpectedly uses offline/browser persistent storage"
+if ! grep -Fq "serviceWorker.register('/remote/sw.js'" "$REMOTE_JS"; then
+  fail "Remote Web PWA service worker registration is missing"
+fi
+if grep -Eq 'localStorage|sessionStorage|indexedDB' "$REMOTE_JS"; then
+  fail "Remote Web shell unexpectedly persists browser session data"
+fi
+
+REMOTE_MANIFEST="$WORK/manifest.webmanifest"
+curl --fail "${CURL_TLS[@]}" "$BASE/remote/manifest.webmanifest" > "$REMOTE_MANIFEST"
+node - "$REMOTE_MANIFEST" <<'NODE'
+const fs=require('fs')
+const value=JSON.parse(fs.readFileSync(process.argv[2],'utf8'))
+if(value.id!=='/remote/')throw new Error('Remote Web manifest id mismatch')
+if(value.start_url!=='/remote/')throw new Error('Remote Web manifest start_url mismatch')
+if(value.scope!=='/remote/')throw new Error('Remote Web manifest scope mismatch')
+if(value.display!=='standalone')throw new Error('Remote Web manifest display mismatch')
+if(!Array.isArray(value.icons)||value.icons[0]?.src!=='/remote/icon.svg')
+  throw new Error('Remote Web manifest icon mismatch')
+NODE
+
+REMOTE_SW="$WORK/sw.js"
+curl --fail "${CURL_TLS[@]}" "$BASE/remote/sw.js" > "$REMOTE_SW"
+if ! grep -Fq 'pica-remote-shell-w5c-v1' "$REMOTE_SW"; then
+  fail "Remote Web PWA cache identity is missing"
+fi
+for forbidden in '/api/' '/remote/v1/' '/covers/' '/reader/' 'Authorization' '__Host-pica_session'; do
+  if grep -Fq "$forbidden" "$REMOTE_SW"; then
+    fail "Remote Web PWA worker contains forbidden sensitive route/token marker: $forbidden"
+  fi
+done
+
+REMOTE_ICON="$WORK/icon.svg"
+curl --fail "${CURL_TLS[@]}" "$BASE/remote/icon.svg" > "$REMOTE_ICON"
+if ! grep -Fq '<svg' "$REMOTE_ICON"; then
+  fail "Remote Web PWA icon is not SVG"
 fi
 
 SESSION_HEADERS="$WORK/session-headers.txt"

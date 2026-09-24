@@ -112,6 +112,11 @@ describe('experimental Docker headless package P5D', () => {
         expect(remote).toContain('Long-lived bearer token leaked into Remote Web session response')
         expect(remote).toContain('Remote Web shell HTML was not served through Caddy TLS')
         expect(remote).toContain('Remote Web shell strict CSP header is missing')
+        expect(remote).toContain('Remote Web PWA manifest CSP allowance is missing')
+        expect(remote).toContain('Remote Web PWA worker CSP allowance is missing')
+        expect(remote).toContain('Remote Web PWA service worker registration is missing')
+        expect(remote).toContain('Remote Web PWA cache identity is missing')
+        expect(remote).toContain('Remote Web PWA worker contains forbidden sensitive route/token marker')
         expect(remote).toContain('Remote Web read-only session escaped into reader-progress mutation')
         expect(remote).toContain('Process-local Remote Web session survived Pica restart')
         expect(remote).toContain(
@@ -199,6 +204,7 @@ describe('experimental Docker headless package P5D', () => {
         expect(caddy).not.toContain('tls internal')
         expect(compose).not.toContain('PICA_LIBRARY_REMOTE_ALLOWED_ORIGINS')
         expect(compose).not.toContain('PICA_LIBRARY_REMOTE_WEB_SESSIONS')
+        expect(compose).not.toContain('PICA_LIBRARY_REMOTE_WEB_PWA')
 
         expect(acceptance).toContain('docker compose')
         expect(acceptance).toContain('config --format json')

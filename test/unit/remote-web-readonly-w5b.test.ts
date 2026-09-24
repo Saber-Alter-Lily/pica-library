@@ -16,14 +16,14 @@ describe('Remote Web read-only shell W5B', () => {
         expect(html).not.toContain('onerror=')
     })
 
-    it('never persists the bearer/session in browser storage or registers offline workers', () => {
+    it('never persists bearer/session data in browser storage', () => {
         const app = read('web/remote/remote.js')
         expect(app).toContain('/remote/v1/session/bootstrap')
         expect(app).toContain('/remote/v1/session/logout')
         expect(app).not.toContain('localStorage')
         expect(app).not.toContain('sessionStorage')
         expect(app).not.toContain('indexedDB')
-        expect(app).not.toContain('serviceWorker')
+        expect(app).toContain("serviceWorker.register('/remote/sw.js'")
         expect(app).not.toContain('caches.')
     })
 

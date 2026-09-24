@@ -4,7 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#101114">
+  <meta name="application-name" content="Pica Library">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="robots" content="noindex,nofollow,noarchive">
   <title>Pica Library Remote</title>
+  <link rel="icon" href="/remote/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/remote/manifest.webmanifest">
   <link rel="stylesheet" href="/remote/remote.css">
   <script type="module" src="/remote/remote.js"></script>
 </head>
@@ -29,7 +37,7 @@
 
   <section id="auth-panel" class="auth-shell">
     <form id="auth-form" class="panel auth-card" autocomplete="off">
-      <p class="eyebrow">W5B · Remote Web</p>
+      <p class="eyebrow">Remote Web</p>
       <h2 data-i18n="signIn">建立浏览器会话</h2>
       <p class="muted" data-i18n="signInHelp">输入服务器管理员提供的 Remote API bearer。它只用于本次换取 HttpOnly 会话，不会写入浏览器存储。</p>
       <label>

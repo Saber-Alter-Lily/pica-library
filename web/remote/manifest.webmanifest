@@ -1,0 +1,29 @@
+{
+  "id": "/remote/",
+  "name": "Pica Library Remote",
+  "short_name": "Pica Library",
+  "description": "Read-only remote access to your Pica Library.",
+  "start_url": "/remote/",
+  "scope": "/remote/",
+  "display": "standalone",
+  "background_color": "#101114",
+  "theme_color": "#101114",
+  "categories": [
+    "books",
+    "entertainment"
+  ],
+  "icons": [
+    {
+      "src": "/remote/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/remote/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

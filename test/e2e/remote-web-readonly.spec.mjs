@@ -284,3 +284,83 @@ test('Remote Web read-only shell supports login, browse, detail and downloaded r
     expect(pageErrors, pageErrors.join('\n\n')).toEqual([])
     expect(consoleErrors, consoleErrors.join('\n\n')).toEqual([])
 })
+
+
+test('Remote Web PWA caches only the shell and boots offline without user content', async ({ page, context }) => {
+    const pageErrors = []
+    page.on('pageerror', (error) =>
+        pageErrors.push(String(error?.stack || error))
+    )
+
+    await page.goto('/remote/', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#auth-panel')).toBeVisible()
+
+    await page.waitForFunction(async () => {
+        if (!('serviceWorker' in navigator)) return false
+        const registration = await navigator.serviceWorker.ready
+        return Boolean(registration.active)
+    })
+
+    await page.waitForFunction(
+        () => Boolean(navigator.serviceWorker.controller),
+        undefined,
+        { timeout: 10_000 }
+    )
+
+    const cacheState = await page.evaluate(async () => {
+        const names = await caches.keys()
+        const entries = []
+        for (const name of names) {
+            const cache = await caches.open(name)
+            const requests = await cache.keys()
+            entries.push({
+                name,
+                paths: requests.map((request) => new URL(request.url).pathname)
+            })
+        }
+        return entries
+    })
+
+    expect(cacheState).toEqual([
+        {
+            name: 'pica-remote-shell-w5c-v1',
+            paths: expect.arrayContaining([
+                '/remote/',
+                '/remote/remote.js',
+                '/remote/remote.css',
+                '/remote/manifest.webmanifest',
+                '/remote/icon.svg'
+            ])
+        }
+    ])
+    const cachedPaths = cacheState.flatMap((entry) => entry.paths)
+    for (const forbidden of [
+        '/api/',
+        '/remote/v1/',
+        '/covers/',
+        '/reader/'
+    ])
+        expect(cachedPaths.some((path) => path.includes(forbidden))).toBe(false)
+
+    await context.setOffline(true)
+    try {
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expect(page.locator('#auth-panel')).toBeVisible()
+        await expect(page.locator('#app-shell')).toBeHidden()
+        await expect(page.locator('#bearer-input')).toBeVisible()
+
+        const offlineApi = await page.evaluate(async () => {
+            try {
+                await fetch('/api/v1/capabilities')
+                return 'unexpected-response'
+            } catch {
+                return 'network-only'
+            }
+        })
+        expect(offlineApi).toBe('network-only')
+    } finally {
+        await context.setOffline(false)
+    }
+
+    expect(pageErrors, pageErrors.join('\n\n')).toEqual([])
+})

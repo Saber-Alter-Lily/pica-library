@@ -47,6 +47,7 @@ export interface AppCapabilities {
         remoteApi: boolean
         remoteWebSessions: boolean
         remoteWebShell: boolean
+        remoteWebPwa: boolean
     }
     runtime: {
         role: 'desktop' | 'server' | 'engine'
@@ -63,6 +64,7 @@ export interface AppCapabilities {
         remoteApi: CapabilityState
         remoteWebSessions: CapabilityState
         remoteWebShell: CapabilityState
+        remoteWebPwa: CapabilityState
     }
 }
 
@@ -249,6 +251,33 @@ export function appCapabilities(
                   execution: 'platform-host',
                   reason: 'DisabledByConfiguration'
               }
+    const remoteWebPwa: CapabilityState = !hostPresent
+        ? {
+              supported: false,
+              available: false,
+              execution: 'platform-host',
+              reason: 'NoPlatformHost'
+          }
+        : mode !== 'headless'
+          ? {
+                supported: false,
+                available: false,
+                execution: 'platform-host',
+                reason: 'UnavailableInRuntime'
+            }
+          : remoteStatus.webPwa === true
+            ? {
+                  supported: true,
+                  available: true,
+                  execution: 'platform-host',
+                  reason: 'Available'
+              }
+            : {
+                  supported: true,
+                  available: false,
+                  execution: 'platform-host',
+                  reason: 'DisabledByConfiguration'
+              }
 
     return {
         appVersion: PRODUCT_VERSION,
@@ -272,7 +301,8 @@ export function appCapabilities(
             adaptiveRecommendationBatches: true,
             remoteApi: remoteApi.available,
             remoteWebSessions: remoteWebSessions.available,
-            remoteWebShell: remoteWebShell.available
+            remoteWebShell: remoteWebShell.available,
+            remoteWebPwa: remoteWebPwa.available
         },
         runtime: {
             role,
@@ -288,7 +318,8 @@ export function appCapabilities(
             managedEhWebLogin,
             remoteApi,
             remoteWebSessions,
-            remoteWebShell
+            remoteWebShell,
+            remoteWebPwa
         }
     }
 }

@@ -522,6 +522,8 @@ export class LibraryService {
     }
     private recommendationV5ShadowPauseRequested = false
     private recommendationV5ShadowCancelRequested = false
+    private recommendationV5ShadowResumePhase: RecommendationV5ShadowTaskProgress['phase'] =
+        'retrieving'
     private readonly recommendationV5ShadowResumeWaiters = new Set<() => void>()
     private recommendationV5ShadowRun: Promise<void> | null = null
     private recommendationV5ShadowResult:
@@ -929,6 +931,16 @@ export class LibraryService {
         }
         if (action === 'resume') {
             this.recommendationV5ShadowPauseRequested = false
+            if (
+                this.recommendationV5ShadowProgress.state === 'paused' ||
+                this.recommendationV5ShadowProgress.state === 'pausing'
+            )
+                this.recommendationV5ShadowProgress = {
+                    ...this.recommendationV5ShadowProgress,
+                    state: 'running',
+                    phase: this.recommendationV5ShadowResumePhase,
+                    updatedAt: new Date().toISOString()
+                }
             for (const resolve of this.recommendationV5ShadowResumeWaiters)
                 resolve()
             this.recommendationV5ShadowResumeWaiters.clear()
@@ -956,9 +968,9 @@ export class LibraryService {
         if (this.recommendationV5ShadowCancelRequested)
             throw new RecommendationV5ShadowCancelledError()
         if (!this.recommendationV5ShadowPauseRequested) return
-        const resumePhase =
+        this.recommendationV5ShadowResumePhase =
             this.recommendationV5ShadowProgress.phase === 'paused'
-                ? 'retrieving'
+                ? this.recommendationV5ShadowResumePhase
                 : this.recommendationV5ShadowProgress.phase
         this.recommendationV5ShadowProgress = {
             ...this.recommendationV5ShadowProgress,
@@ -974,7 +986,7 @@ export class LibraryService {
         this.recommendationV5ShadowProgress = {
             ...this.recommendationV5ShadowProgress,
             state: 'running',
-            phase: resumePhase,
+            phase: this.recommendationV5ShadowResumePhase,
             updatedAt: new Date().toISOString()
         }
     }
@@ -1015,6 +1027,7 @@ export class LibraryService {
         const now = new Date().toISOString()
         this.recommendationV5ShadowPauseRequested = false
         this.recommendationV5ShadowCancelRequested = false
+        this.recommendationV5ShadowResumePhase = 'planning'
         this.recommendationV5ShadowResumeWaiters.clear()
         this.recommendationV5ShadowResult = null
         this.recommendationV5ShadowProgress = {

@@ -73,6 +73,10 @@ The most recent 100 bounded samples are also visible for debugging. They contain
 
 `GET /api/v1/desktop/runtime/http-profile`
 
+Controlled measurement windows can be reset with Desktop-CSRF-protected `POST /api/v1/desktop/runtime/http-profile/reset`.
+
+The profile GET and reset POST are deliberately excluded from the latency sample stream, so repeated diagnostics do not distort the window they are measuring.
+
 The endpoint is Desktop-control-plane only and is not added to W4B/W5 browser-session allowlists.
 
 ## Request lifecycle

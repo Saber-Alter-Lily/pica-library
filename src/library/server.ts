@@ -2324,13 +2324,55 @@ export async function startLibraryServer(options: {
                 )
             }
             if (
+                url.pathname === '/api/v1/maintenance/updates/status' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.maintenanceUpdateStatus()
+                )
+
+            if (
+                url.pathname === '/api/v1/maintenance/updates/control' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const action = String(input.action ?? '')
+                if (
+                    action !== 'pause' &&
+                    action !== 'resume' &&
+                    action !== 'cancel'
+                )
+                    return json(response, 400, {
+                        error: 'Unknown maintenance update control action'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.maintenanceUpdateControl(action)
+                )
+            }
+
+            if (
                 url.pathname === '/api/v1/maintenance/updates' &&
                 request.method === 'POST'
             ) {
                 const input = await body(request)
-                const findings = await options.service.checkUpdates(
-                    stringList(input.comicIds)
-                )
+                const comicIds = stringList(input.comicIds)
+                if (!comicIds.length) {
+                    if (input.queue)
+                        return json(response, 400, {
+                            error:
+                                'Run the full update scan first, review its findings, then queue selected updates'
+                        })
+                    return json(
+                        response,
+                        202,
+                        options.service.startMaintenanceUpdateCheck()
+                    )
+                }
+                const findings = await options.service.checkUpdates(comicIds)
                 const jobs = input.queue
                     ? findings
                           .filter(

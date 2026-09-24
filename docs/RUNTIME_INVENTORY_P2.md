@@ -38,7 +38,7 @@ Risk levels are implementation priorities for P2 only; they are not release seve
 | RT-05 | Local Desktop download queue | detached `LibraryService` runner + `DownloadScheduler` + `MediaRequestGate` | SQLite download job state; verified files/pages; single authoritative backend runner | DB-backed pause/resume/retry/cancel; startup recovers interrupted LOCAL jobs; partial files not trusted | NET-M, FS-W, DB-W | **MATURE** — strongest durable runtime model; current performance profiles govern downloads only, not competing application tasks |
 | RT-06 | Desktop updater | `UpdateManager` + detached updater process | progress JSON + staged update + application backup; health check commits replacement | cancel/re-check/restart; bounded network calls; old install restored on failed health | NET, FS-W | **MATURE / ISOLATED** — synchronous filesystem operations occur mainly in the detached updater where blocking the main app is not the same risk; keep separate from ordinary runtime budget |
 | RT-07 | Maintenance update check | HTTP request directly awaits `LibraryService.checkUpdates()` | each finding written to DB as each comic is checked | **no task progress/pause/cancel/restart contract** | NET-P, DB-R/W | **HIGH** — request-owned long work; provider calls are serial; default discovery currently uses `listComics({limit: 5000})`, which is both a runtime scalability limit and a potential correctness truncation |
-| RT-08 | Maintenance repair scan | HTTP request directly calls `scanRepairIssues()` | scan result returned only at end; queued repair jobs use normal durable download queue | **no progress/pause/cancel** | FS-R, DB-R, UI/API event loop | **HIGH** — loops all picture health rows and performs synchronous `existsSync/statSync` per file on the Node event loop |
+| RT-08 | Maintenance repair scan | HTTP request awaits asynchronous `scanRepairIssues()` | scan result returned at end; queued repair jobs use normal durable download queue | async stat + progress hook + periodic event-loop yield; full task controls remain separate future work | FS-R, DB-R | **IMPROVED / PARTIAL** — PR #112 removed synchronous per-file `existsSync/statSync` from the Node event loop; scan is still request-owned |
 | RT-09 | Organize library views | HTTP request directly calls `organizeLibraryViews()` | filesystem links/manifests are written incrementally; final index JSON written at end | **no progress/pause/cancel/rollback** | FS-R/W, UI/API event loop | **HIGH** — route passes a `listComics({limit:5000})` snapshot and implementation uses synchronous exists/mkdir/symlink/write operations in a loop |
 | RT-10 | Portable library materialization/export | synchronous organizer helper when invoked | output copied incrementally; final manifest written | no common long-task control | FS-R/W | **MEDIUM/HIGH** — recursive `cpSync` can be expensive; must not be hosted by foreground request without explicit detached/task semantics |
 | RT-11 | Recommendation V5 shadow retrieval | manual Desktop POST directly awaits `runRecommendationV5ShadowRetrieval()` | candidate pool/audit telemetry persisted at completion; serving remains unchanged | explicit confirmation but **no pause/cancel/progress task state** | NET-P, CPU, DB-R/W | **HIGH** — deliberately manual, but still request-owned heavy work; loads up to 10k catalog entries and performs provider retrieval + hygiene + ranking + diversity before returning |
@@ -94,23 +94,19 @@ Required direction:
 - keep each finding idempotent/reviewable;
 - use the normal download queue only after the user chooses to queue updates.
 
-### F-03 — Repair scan performs synchronous filesystem stat work on the Node event loop
-**Priority: HIGH**
+### F-03 — Repair scan event-loop blocking
+**Priority: PARTIALLY RESOLVED by PR #112**
 
-`scanRepairIssues()` currently:
+Completed:
+- per-file `existsSync/statSync` calls were replaced with asynchronous `fs.promises.stat`;
+- the scan exposes progress callbacks;
+- the loop periodically yields to the Node event loop;
+- the “scan first, queue repair second” safety model is unchanged.
 
-- enumerates picture-health rows;
-- calls `fs.existsSync()`;
-- calls `fs.statSync()`;
-- does so inside the foreground server request.
-
-Required direction:
-
-- asynchronous/batched stat;
-- periodic event-loop yield;
-- progress and cancel for large scans;
-- bounded scan page/chunk size;
-- no loss of the existing “scan first, queue repair second” safety model.
+Remaining:
+- the HTTP request still owns the scan lifetime;
+- large scans do not yet have the same pause/cancel/background-task contract being introduced for update checking;
+- bounded/chunked status delivery should be considered after real scan measurements.
 
 ### F-04 — Organize/materialize filesystem work is foreground synchronous
 **Priority: HIGH**

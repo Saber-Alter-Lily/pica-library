@@ -47,6 +47,7 @@ describe('P2 H2A Recommendation V5 shadow background runtime', () => {
         })
 
         service.runRecommendationV5ShadowRetrieval = (async (_input, runtime) => {
+            if (!runtime) throw new Error('runtime control is required by this test')
             runtime.onProgress?.({
                 phase: 'retrieving',
                 done: 1,

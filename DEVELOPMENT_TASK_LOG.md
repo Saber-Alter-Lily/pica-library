@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1 full-domain correctness-cap cleanup implemented; hot-query/write audit remains open**
+**Status: IN_PROGRESS — D1 full-domain correctness cleanup + D2 hot-query batching implemented; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -956,16 +956,19 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## NEXT-6 — P2-D SQLite/query discipline
-**Status: IN_PROGRESS — D1 complete-domain cap cleanup candidate**
+**Status: IN_PROGRESS — D1 merged; D2 hot-query batching candidate**
 
-This is the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
+This remains the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
 
-- **D1 implemented:** Browser Lite export and CLI complete-domain export/progress/prepare-library paths no longer reuse the legacy 5000-row presentation cap.
-- `progress <comicId>` now uses direct `getComic(comicId)` instead of listing/filtering a bounded catalog.
-- A 5007-record regression proves Browser Lite export crosses the former boundary and preserves the record beyond row 5000.
-- Fixed limits in recommendation runtime/audit code are **not** mechanically removed in D1; they must first be classified as algorithmic budget, diagnostic sample, presentation bound or correctness domain.
-- **Next:** inventory hot Library/Shelves/History/Work Identity/recommendation support queries, repeated full-catalog materialization, N+1 lookups, relevant indexes and high-frequency writes; then fix measured/high-confidence hotspots in small reviewable batches.
-- Detailed boundary: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`.
+- **D1 merged (PR #124):** Browser Lite export and CLI complete-domain export/progress/prepare-library paths no longer reuse the legacy 5000-row presentation cap.
+- The D1 5007-record regression proves the authoritative export domain crosses the former boundary.
+- **D2 implemented:** `getComicsByIds()` provides chunked exact-ID retrieval; Shelf and recommendation-record restoration no longer materialize an unrelated 5000-comic catalog prefix.
+- **D2 implemented:** `listAuthors()` changes from a 2N+1 alias/circle query pattern to a fixed three-query batch while preserving returned ordering/shape.
+- **D2 migration candidate:** add only the missing reverse author indexes `author_aliases(author_id, alias_display)` and `comic_authors(author_id, circle)`; existing shelf indexes are retained rather than duplicated.
+- D2 extends large-library regression coverage so the >5000 boundary comic must remain visible through Shelf and recommendation-record lookup, and separately validates >800 exact IDs across multiple SQL chunks.
+- Recommendation V3/V5 and recommendation-audit 5000/10000 bounds remain intentionally unchanged until classified as algorithmic budget, diagnostic sample, presentation bound or correctness domain.
+- **Next after D2:** measure Library facet/query cost and inspect repeated full-catalog materialization, Work Identity query shape, and high-frequency write/read-starvation paths before further rewrites/indexes.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -979,6 +982,20 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D2 hot-query batching and reverse author indexes
+
+State update:
+- Shelf reads were still loading the first 5000 comics into a Map after separately reading shelf IDs. This was both an avoidable catalog-scale hot path and a correctness bug for shelf items beyond the legacy boundary.
+- `recommendationRecords(comicIds)` had the same catalog-prefix materialization despite receiving an explicit small ID set.
+- `listAuthors()` executed one base author query plus separate alias and circle queries per author. Because Library facet evaluation calls `listAuthors()`, this formed a 2N+1 query pattern on an ordinary foreground path.
+- D2 adds chunked exact-ID comic retrieval (400 IDs per SQL chunk) that reconstructs the original request order. Shelf and recommendation-record restoration now read only requested IDs.
+- Author aliases and circles are loaded in two batch queries and grouped in memory, reducing `listAuthors()` to a fixed three-query shape.
+- Existing shelf indexes already match shelf membership/order reads, so no duplicate shelf index is added.
+- Migration 14 adds only the missing reverse author indexes: `author_aliases(author_id, alias_display)` and `comic_authors(author_id, circle)`.
+- Regression coverage extends the 5007-record boundary test to Shelf and recommendation record restoration, adds an 805-record multi-chunk exact-ID ordering test, and verifies the new indexes through the migration integration suite.
+- No recommendation ranking/serving logic, latency budget or P2-C3 enforcement changes in D2.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D2.md.
 
 ## 2026-09-24 — P2-D1 full-domain correctness-cap cleanup
 

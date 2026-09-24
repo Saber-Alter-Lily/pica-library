@@ -5,8 +5,8 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-24**  
-Authoritative repository baseline at reconciliation: `main@e52f0ec1788cb40d4f9fcb4cd5117bed6e9acd53` (W5B merged)  
-Open work observed at reconciliation: **PR #109 — W5C installable shell-only Remote Web PWA**
+Authoritative repository baseline after 2026-09-24 reconciliation: `main@e4f83987d78795426f191d6753798c56e39a32ec` (W5C merged)  
+Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
 
@@ -52,12 +52,13 @@ Open work observed at reconciliation: **PR #109 — W5C installable shell-only R
 The current critical path is:
 
 1. **P2 — Architecture & Runtime Hardening**: finish the system-level runtime/performance work that earlier versions addressed only partially.
-2. **P3 — Platform foundation regression lock**: keep the shared platform/runtime layer clean while P2 changes land.
-3. **P4 — Real-platform acceptance**: finish the open Linux/macOS/Windows ARM64/Server gates without weakening capability truth.
-4. **P5 — Remote Web**: W5A/W5B are complete; W5C is currently in PR #109. Continue later Remote Web stages without allowing them to replace the P2 hardening work.
-5. **P6 — Formal distribution/release gates**: only after real-device, signing/trust, performance and rollback evidence exists.
+2. **P2-H1 — Maintenance runtime hardening**: remove the confirmed foreground blocking/truncation paths before introducing broader resource arbitration.
+3. **P3 — Platform foundation regression lock**: keep the shared platform/runtime layer clean while P2 changes land.
+4. **P4 — Real-platform acceptance**: finish the open Linux/macOS/Windows ARM64/Server gates without weakening capability truth.
+5. **P5 — Remote Web**: W5A/W5B/W5C are complete. Continue later Remote Web stages without allowing them to replace the P2 hardening work.
+6. **P6 — Formal distribution/release gates**: only after real-device, signing/trust, performance and rollback evidence exists.
 
-**Parallel-work rule:** isolated W5C work may proceed in its existing branch because it does not require changing the core runtime scheduler. It must not redefine the priority order above or weaken W5A/W5B boundaries.
+**Parallel-work rule:** isolated future Remote Web work may proceed only when it does not redefine the priority order above or weaken the completed W5A/W5B/W5C boundaries.
 
 ---
 
@@ -151,7 +152,7 @@ Overall status: **IN_PROGRESS priority workstream**
 Existing v0.4.1, v0.4.7 and v0.4.8 work solved important concrete problems. P2 is not a request to rewrite those systems. Its purpose is to turn those fixes into a consistent runtime architecture, remove remaining duplicated/hidden heavy work, establish resource budgets, and add real performance evidence.
 
 ## P2-0 — Full runtime inventory and dependency map
-**Status: PLANNED — NEXT**
+**Status: DONE — see [docs/RUNTIME_INVENTORY_P2.md](./docs/RUNTIME_INVENTORY_P2.md)**
 
 Inventory every operation that can materially consume CPU, disk, network, SQLite write bandwidth or UI time.
 
@@ -231,7 +232,7 @@ Target:
 - long work survives page navigation according to its documented semantics.
 
 ## P2-C — Runtime resource classes and concurrency budgets
-**Status: PLANNED**
+**Status: PLANNED — after H1 maintenance runtime hardening**
 
 Create explicit budgets for at least:
 - provider/API requests;
@@ -662,7 +663,7 @@ Completed:
 - reader-progress/favorite/download/shelf/settings/provider/update/restart writes are denied.
 
 ## W5C — Installable shell-only Remote Web PWA
-**Status: IN_PROGRESS — PR #109**
+**Status: DONE — PR #109 merged**
 
 Current PR scope is accepted as the actual W5C label. Do not rename it retroactively.
 
@@ -902,7 +903,7 @@ The task log should be updated against, not replace, these focused documents:
 # 11. Immediate next work
 
 ## NEXT-1 — P2-0 runtime inventory
-**Status: PLANNED**
+**Status: DONE**
 
 Produce the checked-in runtime inventory/dependency map and identify:
 - remaining hidden main-thread work;
@@ -912,18 +913,29 @@ Produce the checked-in runtime inventory/dependency map and identify:
 - repeated DB/full-catalog/JSON work;
 - missing performance instrumentation.
 
-## NEXT-2 — P2-C resource-budget design
-**Status: PLANNED after NEXT-1**
+## NEXT-2 — H1 maintenance runtime hardening
+**Status: NEXT**
 
-Use inventory evidence to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
+Fix the confirmed foreground maintenance hazards before adding a global resource arbiter:
 
-## NEXT-3 — P2-J/P2-K performance baseline
+- maintenance update checks must no longer be one long request-owned serial scan;
+- remove the correctness-significant 5000-comic default-domain cap without replacing it with an unbounded foreground request;
+- repair scanning must move off synchronous per-file `existsSync/statSync` work on the Node event loop;
+- organize/materialize filesystem work must gain explicit background/task semantics rather than foreground synchronous loops;
+- preserve the current safety model: scan/review first, then enqueue repair/update jobs.
+
+## NEXT-3 — P2-C resource-budget design
+**Status: PLANNED after NEXT-2**
+
+Use the runtime inventory and H1 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
+
+## NEXT-4 — P2-J/P2-K performance baseline
 **Status: PLANNED after enough instrumentation exists**
 
 Create repeatable local/browser/Android measurements and record the first real baseline.
 
 ## PARALLEL-1 — W5C PR #109
-**Status: IN_PROGRESS**
+**Status: DONE**
 
 May continue independently if:
 - shell-only cache boundary remains intact;
@@ -934,6 +946,32 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — W5C shell-only PWA merged
+
+State update:
+- PR #109 passed CI plus Linux, macOS arm64, Windows ARM64 and Docker package workflows and was merged.
+- W5C remains intentionally shell-only: no user-content offline cache, remote mutation or multi-user expansion.
+- P2 remains the critical path after this merge.
+
+## 2026-09-24 — P2-0 runtime inventory completed
+
+Finding:
+- Long-task implementations are functionally mature in several areas, but authority is split across LibraryService in-memory state, browser Worker/page state, RemoteStorage manager state, SQLite download jobs, Android WorkManager and Android DownloadManager.
+- This does not justify a single universal scheduler. P2 will standardize the task contract and add cross-task resource governance while preserving platform-native executors.
+- High-priority concrete gaps were confirmed:
+  - maintenance update checking is request-owned, serial and defaults to a 5000-comic domain cap;
+  - repair scanning performs synchronous per-file filesystem stat work on the Node event loop;
+  - organize/materialize flows perform synchronous filesystem work in foreground request paths;
+  - Recommendation V5 shadow retrieval is manual/shadow-only but still request-owned;
+  - Visual indexing is Worker-isolated but its control authority is browser-page-local;
+  - advanced Visual/Work Identity/evaluation calculations require instrumentation before deciding whether each needs background execution;
+  - Android long tasks are individually durable but do not yet share a cross-task resource budget;
+  - current performance documentation is not yet a real hardware/runtime baseline.
+
+Action:
+- Remediation starts with maintenance/runtime hardening (RT-07 through RT-10), then background analysis tasks, resource arbitration and performance instrumentation.
+- Detailed evidence and remediation order are tracked in `docs/RUNTIME_INVENTORY_P2.md`.
 
 ## 2026-09-24 — Reconciled architecture/runtime work with the active multi-platform plan
 

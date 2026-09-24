@@ -52,10 +52,11 @@ Open work observed at reconciliation: **PR #109 — W5C installable shell-only R
 The current critical path is:
 
 1. **P2 — Architecture & Runtime Hardening**: finish the system-level runtime/performance work that earlier versions addressed only partially.
-2. **P3 — Platform foundation regression lock**: keep the shared platform/runtime layer clean while P2 changes land.
-3. **P4 — Real-platform acceptance**: finish the open Linux/macOS/Windows ARM64/Server gates without weakening capability truth.
-4. **P5 — Remote Web**: W5A/W5B are complete; W5C is currently in PR #109. Continue later Remote Web stages without allowing them to replace the P2 hardening work.
-5. **P6 — Formal distribution/release gates**: only after real-device, signing/trust, performance and rollback evidence exists.
+2. **P2-H1 — Maintenance runtime hardening**: remove the confirmed foreground blocking/truncation paths before introducing broader resource arbitration.
+3. **P3 — Platform foundation regression lock**: keep the shared platform/runtime layer clean while P2 changes land.
+4. **P4 — Real-platform acceptance**: finish the open Linux/macOS/Windows ARM64/Server gates without weakening capability truth.
+5. **P5 — Remote Web**: W5A/W5B are complete; W5C is currently in PR #109. Continue later Remote Web stages without allowing them to replace the P2 hardening work.
+6. **P6 — Formal distribution/release gates**: only after real-device, signing/trust, performance and rollback evidence exists.
 
 **Parallel-work rule:** isolated W5C work may proceed in its existing branch because it does not require changing the core runtime scheduler. It must not redefine the priority order above or weaken W5A/W5B boundaries.
 
@@ -231,7 +232,7 @@ Target:
 - long work survives page navigation according to its documented semantics.
 
 ## P2-C — Runtime resource classes and concurrency budgets
-**Status: PLANNED — NEXT after P2-0**
+**Status: PLANNED — after H1 maintenance runtime hardening**
 
 Create explicit budgets for at least:
 - provider/API requests;
@@ -912,12 +913,23 @@ Produce the checked-in runtime inventory/dependency map and identify:
 - repeated DB/full-catalog/JSON work;
 - missing performance instrumentation.
 
-## NEXT-2 — P2-C resource-budget design
+## NEXT-2 — H1 maintenance runtime hardening
 **Status: NEXT**
 
-Use inventory evidence to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
+Fix the confirmed foreground maintenance hazards before adding a global resource arbiter:
 
-## NEXT-3 — P2-J/P2-K performance baseline
+- maintenance update checks must no longer be one long request-owned serial scan;
+- remove the correctness-significant 5000-comic default-domain cap without replacing it with an unbounded foreground request;
+- repair scanning must move off synchronous per-file `existsSync/statSync` work on the Node event loop;
+- organize/materialize filesystem work must gain explicit background/task semantics rather than foreground synchronous loops;
+- preserve the current safety model: scan/review first, then enqueue repair/update jobs.
+
+## NEXT-3 — P2-C resource-budget design
+**Status: PLANNED after NEXT-2**
+
+Use the runtime inventory and H1 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
+
+## NEXT-4 — P2-J/P2-K performance baseline
 **Status: PLANNED after enough instrumentation exists**
 
 Create repeatable local/browser/Android measurements and record the first real baseline.

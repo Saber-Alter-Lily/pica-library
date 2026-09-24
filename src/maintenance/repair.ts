@@ -10,16 +10,67 @@ export interface RepairIssue {
     localPath: string | null
 }
 
-export function scanRepairIssues(database: LibraryDatabase): RepairIssue[] {
+export interface RepairScanProgress {
+    done: number
+    total: number
+}
+
+export interface RepairScanOptions {
+    onProgress?: (progress: RepairScanProgress) => void
+    checkpoint?: () => Promise<void> | void
+    yieldEvery?: number
+}
+
+function missingFile(error: unknown) {
+    return Boolean(
+        error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            (error as NodeJS.ErrnoException).code === 'ENOENT'
+    )
+}
+
+async function yieldToEventLoop() {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+}
+
+export async function scanRepairIssues(
+    database: LibraryDatabase,
+    options: RepairScanOptions = {}
+): Promise<RepairIssue[]> {
+    const pictures = database.listPictureHealth()
     const issues: RepairIssue[] = []
-    for (const picture of database.listPictureHealth()) {
+    const yieldEvery = Math.max(
+        1,
+        Math.floor(Number(options.yieldEvery) || 50)
+    )
+
+    for (let index = 0; index < pictures.length; index += 1) {
+        await options.checkpoint?.()
+        const picture = pictures[index]
         let reason: RepairIssue['reason'] | null = null
+
         if (picture.status === 'failed') reason = 'failed'
-        else if (!picture.localPath || !fs.existsSync(picture.localPath))
-            reason = 'missing'
-        else if (fs.statSync(picture.localPath).size === 0) reason = 'empty'
+        else if (!picture.localPath) reason = 'missing'
+        else {
+            try {
+                const stat = await fs.promises.stat(picture.localPath)
+                if (stat.size === 0) reason = 'empty'
+            } catch (error) {
+                if (missingFile(error)) reason = 'missing'
+                else throw error
+            }
+        }
+
         if (reason) issues.push({ ...picture, reason })
+
+        options.onProgress?.({
+            done: index + 1,
+            total: pictures.length
+        })
+        if ((index + 1) % yieldEvery === 0) await yieldToEventLoop()
     }
+
     return issues
 }
 

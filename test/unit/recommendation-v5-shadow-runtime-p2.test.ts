@@ -88,9 +88,15 @@ describe('P2 H2A Recommendation V5 shadow background runtime', () => {
         ).toMatchObject({
             started: true,
             state: 'running',
-            phase: 'retrieving'
+            phase: 'planning'
         })
         await enteredPromise
+        expect(service.recommendationV5ShadowStatus()).toMatchObject({
+            state: 'running',
+            phase: 'retrieving',
+            retrievalDone: 0,
+            retrievalTotal: 1
+        })
 
         expect(service.recommendationV5ShadowControl('pause')).toMatchObject({
             state: 'pausing'

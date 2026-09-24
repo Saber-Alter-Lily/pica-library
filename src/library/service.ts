@@ -296,6 +296,52 @@ export interface LibraryOrganizeTaskProgress {
     error?: string
 }
 
+class RecommendationV5ShadowCancelledError extends Error {
+    constructor() {
+        super('Recommendation V5 shadow retrieval was cancelled')
+        this.name = 'RecommendationV5ShadowCancelledError'
+    }
+}
+
+export interface RecommendationV5ShadowTaskProgress {
+    state:
+        | 'idle'
+        | 'running'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
+    phase:
+        | 'idle'
+        | 'planning'
+        | 'retrieving'
+        | 'hygiene'
+        | 'ranking'
+        | 'diversity'
+        | 'audit'
+        | 'persisting'
+        | 'paused'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
+    done: number
+    total: number
+    retrievalDone: number
+    retrievalTotal: number
+    rawCandidateCount: number
+    candidateCount: number
+    rankedCandidateCount: number
+    selectedCount: number
+    startedAt?: string
+    updatedAt?: string
+    error?: string
+    poolId?: string
+    cycleId?: string
+    modelVersion?: string
+}
+
 export interface MaintenanceUpdateProgress {
     state:
         | 'idle'
@@ -460,6 +506,38 @@ export class LibraryService {
     private libraryOrganizeRun: Promise<void> | null = null
     private libraryOrganizeResult:
         | Awaited<ReturnType<typeof organizeLibraryViews>>
+        | null = null
+
+    private recommendationV5ShadowProgress: RecommendationV5ShadowTaskProgress = {
+        state: 'idle',
+        phase: 'idle',
+        done: 0,
+        total: 7,
+        retrievalDone: 0,
+        retrievalTotal: 0,
+        rawCandidateCount: 0,
+        candidateCount: 0,
+        rankedCandidateCount: 0,
+        selectedCount: 0
+    }
+    private recommendationV5ShadowPauseRequested = false
+    private recommendationV5ShadowCancelRequested = false
+    private readonly recommendationV5ShadowResumeWaiters = new Set<() => void>()
+    private recommendationV5ShadowRun: Promise<void> | null = null
+    private recommendationV5ShadowResult:
+        | {
+              rawCandidateCount: number
+              candidateCount: number
+              rankedCandidateCount: number
+              selectedCount: number
+              audit: {
+                  poolId: string
+                  cycleId: string
+                  modelVersion: string
+                  generatedAt: string
+                  candidateIdCount: number
+              }
+          }
         | null = null
 
     private allComicsForIdentity(): StoredComic[] {
@@ -810,8 +888,237 @@ export class LibraryService {
         }
     }
 
-    async runRecommendationV5ShadowRetrieval(
+    recommendationV5ShadowStatus() {
+        const active = [
+            'running',
+            'pausing',
+            'paused',
+            'cancelling'
+        ].includes(this.recommendationV5ShadowProgress.state)
+        const terminal = [
+            'complete',
+            'failed',
+            'cancelled'
+        ].includes(this.recommendationV5ShadowProgress.state)
+        return {
+            ...this.recommendationV5ShadowProgress,
+            active,
+            canPause:
+                this.recommendationV5ShadowProgress.state === 'running' ||
+                this.recommendationV5ShadowProgress.state === 'pausing',
+            canResume:
+                this.recommendationV5ShadowProgress.state === 'paused',
+            canCancel: active,
+            result: terminal ? this.recommendationV5ShadowResult : undefined
+        }
+    }
+
+    recommendationV5ShadowControl(
+        action: 'pause' | 'resume' | 'cancel'
+    ) {
+        if (action === 'pause') {
+            if (this.recommendationV5ShadowProgress.state === 'running') {
+                this.recommendationV5ShadowPauseRequested = true
+                this.recommendationV5ShadowProgress = {
+                    ...this.recommendationV5ShadowProgress,
+                    state: 'pausing',
+                    updatedAt: new Date().toISOString()
+                }
+            }
+            return this.recommendationV5ShadowStatus()
+        }
+        if (action === 'resume') {
+            this.recommendationV5ShadowPauseRequested = false
+            for (const resolve of this.recommendationV5ShadowResumeWaiters)
+                resolve()
+            this.recommendationV5ShadowResumeWaiters.clear()
+            return this.recommendationV5ShadowStatus()
+        }
+        this.recommendationV5ShadowCancelRequested = true
+        this.recommendationV5ShadowPauseRequested = false
+        for (const resolve of this.recommendationV5ShadowResumeWaiters)
+            resolve()
+        this.recommendationV5ShadowResumeWaiters.clear()
+        if (
+            this.recommendationV5ShadowProgress.state === 'running' ||
+            this.recommendationV5ShadowProgress.state === 'pausing' ||
+            this.recommendationV5ShadowProgress.state === 'paused'
+        )
+            this.recommendationV5ShadowProgress = {
+                ...this.recommendationV5ShadowProgress,
+                state: 'cancelling',
+                updatedAt: new Date().toISOString()
+            }
+        return this.recommendationV5ShadowStatus()
+    }
+
+    private async recommendationV5ShadowCheckpoint() {
+        if (this.recommendationV5ShadowCancelRequested)
+            throw new RecommendationV5ShadowCancelledError()
+        if (!this.recommendationV5ShadowPauseRequested) return
+        const resumePhase =
+            this.recommendationV5ShadowProgress.phase === 'paused'
+                ? 'retrieving'
+                : this.recommendationV5ShadowProgress.phase
+        this.recommendationV5ShadowProgress = {
+            ...this.recommendationV5ShadowProgress,
+            state: 'paused',
+            phase: 'paused',
+            updatedAt: new Date().toISOString()
+        }
+        await new Promise<void>((resolve) =>
+            this.recommendationV5ShadowResumeWaiters.add(resolve)
+        )
+        if (this.recommendationV5ShadowCancelRequested)
+            throw new RecommendationV5ShadowCancelledError()
+        this.recommendationV5ShadowProgress = {
+            ...this.recommendationV5ShadowProgress,
+            state: 'running',
+            phase: resumePhase,
+            updatedAt: new Date().toISOString()
+        }
+    }
+
+    private finishRecommendationV5ShadowControl() {
+        this.recommendationV5ShadowPauseRequested = false
+        this.recommendationV5ShadowCancelRequested = false
+        for (const resolve of this.recommendationV5ShadowResumeWaiters)
+            resolve()
+        this.recommendationV5ShadowResumeWaiters.clear()
+        this.recommendationV5ShadowRun = null
+    }
+
+    startRecommendationV5ShadowRetrieval(
         input: Record<string, unknown>
+    ) {
+        if (
+            String(input.confirmation ?? '').trim() !==
+            RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION
+        )
+            throw new Error(
+                'Explicit shadow retrieval confirmation is required'
+            )
+        if (
+            this.recommendationV5ShadowRun &&
+            [
+                'running',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(this.recommendationV5ShadowProgress.state)
+        )
+            return {
+                started: false,
+                ...this.recommendationV5ShadowStatus()
+            }
+
+        const now = new Date().toISOString()
+        this.recommendationV5ShadowPauseRequested = false
+        this.recommendationV5ShadowCancelRequested = false
+        this.recommendationV5ShadowResumeWaiters.clear()
+        this.recommendationV5ShadowResult = null
+        this.recommendationV5ShadowProgress = {
+            state: 'running',
+            phase: 'planning',
+            done: 0,
+            total: 7,
+            retrievalDone: 0,
+            retrievalTotal: 0,
+            rawCandidateCount: 0,
+            candidateCount: 0,
+            rankedCandidateCount: 0,
+            selectedCount: 0,
+            startedAt: now,
+            updatedAt: now
+        }
+
+        const run = (async () => {
+            try {
+                const result =
+                    await this.runRecommendationV5ShadowRetrieval(
+                        input,
+                        {
+                            checkpoint: () =>
+                                this.recommendationV5ShadowCheckpoint(),
+                            onProgress: (progress) => {
+                                const controlState =
+                                    this.recommendationV5ShadowProgress.state
+                                this.recommendationV5ShadowProgress = {
+                                    ...this.recommendationV5ShadowProgress,
+                                    ...progress,
+                                    state:
+                                        controlState === 'pausing' ||
+                                        controlState === 'cancelling'
+                                            ? controlState
+                                            : 'running',
+                                    updatedAt: new Date().toISOString()
+                                }
+                            }
+                        }
+                    )
+                this.recommendationV5ShadowResult = {
+                    rawCandidateCount: result.rawCandidateCount,
+                    candidateCount: result.candidateCount,
+                    rankedCandidateCount: result.ranking.candidateCount,
+                    selectedCount: result.diversity.selectedCount,
+                    audit: result.audit
+                }
+                this.recommendationV5ShadowProgress = {
+                    ...this.recommendationV5ShadowProgress,
+                    state: 'complete',
+                    phase: 'complete',
+                    done: 7,
+                    total: 7,
+                    rawCandidateCount: result.rawCandidateCount,
+                    candidateCount: result.candidateCount,
+                    rankedCandidateCount: result.ranking.candidateCount,
+                    selectedCount: result.diversity.selectedCount,
+                    poolId: result.audit.poolId,
+                    cycleId: result.audit.cycleId,
+                    modelVersion: result.audit.modelVersion,
+                    updatedAt: new Date().toISOString()
+                }
+            } catch (error) {
+                if (error instanceof RecommendationV5ShadowCancelledError)
+                    this.recommendationV5ShadowProgress = {
+                        ...this.recommendationV5ShadowProgress,
+                        state: 'cancelled',
+                        phase: 'cancelled',
+                        updatedAt: new Date().toISOString()
+                    }
+                else
+                    this.recommendationV5ShadowProgress = {
+                        ...this.recommendationV5ShadowProgress,
+                        state: 'failed',
+                        phase: 'failed',
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        updatedAt: new Date().toISOString()
+                    }
+            } finally {
+                this.finishRecommendationV5ShadowControl()
+            }
+        })()
+        this.recommendationV5ShadowRun = run
+        void run.catch(() => {
+            // The task records its authoritative terminal state above.
+        })
+        return {
+            started: true,
+            ...this.recommendationV5ShadowStatus()
+        }
+    }
+
+    async runRecommendationV5ShadowRetrieval(
+        input: Record<string, unknown>,
+        runtime: {
+            checkpoint?: () => Promise<void> | void
+            onProgress?: (
+                progress: Partial<RecommendationV5ShadowTaskProgress>
+            ) => void
+        } = {}
     ) {
         if (
             String(input.confirmation ?? '').trim() !==

@@ -989,6 +989,7 @@ State update:
 - C2 will integrate existing tasks in observe-only mode to collect real overlap before C3 selects any enforceable budget.
 - Detailed boundary: docs/RUNTIME_RESOURCE_COORDINATOR_P2C1.md.
 - Windows ARM64 packaged acceptance timeout was hardened after two identical hosted-runner DPAPI/settings POST overruns: that native operation remains bounded at 30 seconds and now logs elapsed time; other platform acceptance bounds remain unchanged.
+- Docker TLS acceptance was hardened after a transient post-readiness 502: Caddy/Pica readiness remains bounded, but the post-TLS health assertion now retries within a finite window and fails with container logs if readiness does not stabilize.
 ## 2026-09-24 — H2C Work Identity background runtime candidate
 
 State update:

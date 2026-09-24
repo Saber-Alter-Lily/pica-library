@@ -56,6 +56,10 @@ import type {
 import { checkComicUpdates, type UpdateFinding } from '../maintenance/updates'
 import { scanRepairIssues, type RepairIssue } from '../maintenance/repair'
 import {
+    RuntimeResourceCoordinator,
+    type RuntimeResourceClass
+} from '../runtime/resource-coordinator'
+import {
     ProviderService,
     type FavoritesSyncMode
 } from '../services/provider-service'
@@ -461,6 +465,26 @@ export class LibraryService {
     private libraryOrganizeResult:
         | Awaited<ReturnType<typeof organizeLibraryViews>>
         | null = null
+
+    private readonly runtimeResources = new RuntimeResourceCoordinator()
+
+    runtimeResourceStatus() {
+        return this.runtimeResources.snapshot()
+    }
+
+    private acquireRuntimeResources(
+        taskId: string,
+        taskType: string,
+        priority: 'interactive' | 'background' | 'maintenance',
+        resources: RuntimeResourceClass[]
+    ) {
+        return this.runtimeResources.tryAcquire({
+            taskId,
+            taskType,
+            priority,
+            resources
+        })
+    }
 
     private allComicsForIdentity(): StoredComic[] {
         return this.database.listComics(
@@ -4298,6 +4322,19 @@ export class LibraryService {
                 ...this.libraryOrganizeStatus()
             }
 
+        const resources = this.acquireRuntimeResources(
+            'library-organize',
+            'library-organize-views',
+            'maintenance',
+            ['filesystem-heavy']
+        )
+        if (!resources.acquired)
+            return {
+                started: false,
+                blockedByResources: resources.blockedBy,
+                ...this.libraryOrganizeStatus()
+            }
+
         const comics = this.database.listAllComics()
         const now = new Date().toISOString()
         this.libraryOrganizePauseRequested = false
@@ -4374,6 +4411,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                resources.lease.release()
                 this.finishLibraryOrganizeControl()
             }
         })()
@@ -4502,6 +4540,19 @@ export class LibraryService {
                 ...this.maintenanceRepairStatus()
             }
 
+        const resources = this.acquireRuntimeResources(
+            'maintenance-repair',
+            'maintenance-repair-scan',
+            'maintenance',
+            ['filesystem-heavy']
+        )
+        if (!resources.acquired)
+            return {
+                started: false,
+                blockedByResources: resources.blockedBy,
+                ...this.maintenanceRepairStatus()
+            }
+
         const now = new Date().toISOString()
         this.maintenanceRepairPauseRequested = false
         this.maintenanceRepairCancelRequested = false
@@ -4566,6 +4617,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                resources.lease.release()
                 this.finishMaintenanceRepairControl()
             }
         })()
@@ -4736,6 +4788,19 @@ export class LibraryService {
                 ...this.maintenanceUpdateStatus()
             }
 
+        const resources = this.acquireRuntimeResources(
+            'maintenance-update',
+            'maintenance-update-scan',
+            'maintenance',
+            ['provider-network', 'sqlite-write-heavy']
+        )
+        if (!resources.acquired)
+            return {
+                started: false,
+                blockedByResources: resources.blockedBy,
+                ...this.maintenanceUpdateStatus()
+            }
+
         const ids = comicIds?.length
             ? [...new Set(comicIds)]
             : this.database.listDownloadedComicIds()
@@ -4818,6 +4883,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                resources.lease.release()
                 this.finishMaintenanceUpdateControl()
             }
         })()
@@ -4907,6 +4973,18 @@ export class LibraryService {
             this.localDownloadRunStartedAt = new Date().toISOString()
             this.localDownloadLastError = null
         }
+        const resources = this.acquireRuntimeResources(
+            `download-${runner.toLowerCase()}`,
+            'download-queue',
+            'background',
+            ['media-network', 'sqlite-write-heavy']
+        )
+        if (!resources.acquired)
+            throw new Error(
+                `Runtime resources are unavailable: ${resources.blockedBy
+                    .map((item) => item.resource)
+                    .join(', ')}`
+            )
         const settings = resolvePerformanceSettings(
             options.profile ?? 'balanced',
             options.custom
@@ -4995,6 +5073,7 @@ export class LibraryService {
                     error instanceof Error ? error.message : String(error)
             throw error
         } finally {
+            resources.lease.release()
             if (runner === 'LOCAL') {
                 this.activeLocalRuns.delete(draining)
                 this.activeLocalSchedulers.delete(scheduler)

@@ -661,6 +661,16 @@ export const migrations: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_work_identity_materialization_digest
                 ON work_identity_materialization_runs(plan_digest);
         `
+    },
+    {
+        version: 14,
+        name: 'p2d2_author_reverse_lookup_indexes',
+        up: `
+            CREATE INDEX IF NOT EXISTS idx_author_aliases_author_display
+                ON author_aliases(author_id, alias_display);
+            CREATE INDEX IF NOT EXISTS idx_comic_authors_author_circle
+                ON comic_authors(author_id, circle);
+        `
     }
 
 ]

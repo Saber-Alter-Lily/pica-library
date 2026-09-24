@@ -615,6 +615,10 @@ export class LibraryService {
         return this.runtimeResources.snapshot()
     }
 
+    runtimeActiveTaskTypes() {
+        return this.runtimeResources.activeTaskTypes()
+    }
+
     private allComicsForIdentity(): StoredComic[] {
         return this.database.listComics(
             {

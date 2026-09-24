@@ -93,6 +93,26 @@ describe('local HTTP latency registry', () => {
         expect(snapshot.recent).toHaveLength(3)
     })
 
+    it('resets an observation window without carrying old samples forward', () => {
+        const registry = new LocalHttpLatencyRegistry()
+        registry.record({
+            at: '2026-09-24T00:00:00.000Z',
+            method: 'GET',
+            routeClass: 'status',
+            statusCode: 200,
+            durationMs: 5,
+            activeTaskTypes: []
+        })
+        expect(registry.snapshot().sampleCount).toBe(1)
+        registry.reset()
+        expect(registry.snapshot()).toMatchObject({
+            sampleCount: 0,
+            overall: { count: 0 },
+            idle: { count: 0 },
+            underLoad: { count: 0 }
+        })
+    })
+
     it('sanitizes task labels and does not expose request paths or query values', () => {
         const registry = new LocalHttpLatencyRegistry()
         registry.record({
@@ -144,7 +164,12 @@ describe('local HTTP latency registry', () => {
         expect(server).toContain(
             "url.pathname === '/api/v1/desktop/runtime/http-profile'"
         )
+        expect(server).toContain(
+            "url.pathname === '/api/v1/desktop/runtime/http-profile/reset'"
+        )
         expect(server).toContain('return json(response, 200, httpLatency.snapshot())')
+        expect(server).toContain('httpLatency.reset()')
+        expect(server).toContain('const latencyDiagnostic =')
         expect(server).toContain(
             "error: 'Desktop control plane is unavailable'"
         )
@@ -155,5 +180,8 @@ describe('local HTTP latency registry', () => {
             '.runtimeResourceProfile()\n                .active.map'
         )
         expect(gateway).not.toContain('/api/v1/desktop/runtime/http-profile')
+        expect(gateway).not.toContain(
+            '/api/v1/desktop/runtime/http-profile/reset'
+        )
     })
 })

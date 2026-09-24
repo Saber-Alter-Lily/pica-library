@@ -79,6 +79,44 @@ export class AnalysisTimingRegistry {
         }
     }
 
+    measureDynamic<T>(
+        kind: AnalysisTimingKind,
+        work: () => {
+            result: T
+            catalogCount: number
+            embeddingCount: number
+            parameters?: AnalysisTimingSample['parameters']
+        }
+    ) {
+        const startedAt = new Date().toISOString()
+        const started = performance.now()
+        try {
+            const measured = work()
+            this.record({
+                kind,
+                startedAt,
+                durationMs: performance.now() - started,
+                outcome: 'complete',
+                catalogCount: measured.catalogCount,
+                embeddingCount: measured.embeddingCount,
+                parameters: measured.parameters ?? {}
+            })
+            return measured.result
+        } catch (error) {
+            this.record({
+                kind,
+                startedAt,
+                durationMs: performance.now() - started,
+                outcome: 'failed',
+                catalogCount: 0,
+                embeddingCount: 0,
+                parameters: {},
+                error: error instanceof Error ? error.message : String(error)
+            })
+            throw error
+        }
+    }
+
     private record(input: AnalysisTimingSample) {
         this.samples.push({
             ...input,

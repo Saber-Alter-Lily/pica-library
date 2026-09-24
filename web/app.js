@@ -4341,12 +4341,56 @@ async function runMaintenanceUpdateScan() {
     return status
 }
 
+let maintenanceRepairPollGeneration = 0
+
+function renderMaintenanceRepairTask(status) {
+    const controls = $('#maintenance-repair-controls')
+    const output = $('#repair-result')
+    if (!controls || !output) return
+    controls.hidden = !status?.active
+    $('#maintenance-repair-pause').disabled = !status?.canPause
+    $('#maintenance-repair-resume').disabled = !status?.canResume
+    $('#maintenance-repair-cancel').disabled = !status?.canCancel
+    output.textContent = JSON.stringify(status, null, 2)
+}
+
+async function controlMaintenanceRepair(action) {
+    const status = await post('/api/v1/maintenance/repair/control', {
+        action
+    })
+    renderMaintenanceRepairTask(status)
+    return status
+}
+
+async function runMaintenanceRepairScan() {
+    const generation = ++maintenanceRepairPollGeneration
+    let status = await post('/api/v1/maintenance/repair', {})
+    renderMaintenanceRepairTask(status)
+    while (
+        generation === maintenanceRepairPollGeneration &&
+        status?.active
+    ) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        status = await api('/api/v1/maintenance/repair/status')
+        renderMaintenanceRepairTask(status)
+    }
+    if (status?.state === 'failed')
+        throw new Error(status.error || 'Maintenance repair scan failed')
+    return status
+}
+
 $('#maintenance-update-pause').onclick = () =>
     void controlMaintenanceUpdate('pause')
 $('#maintenance-update-resume').onclick = () =>
     void controlMaintenanceUpdate('resume')
 $('#maintenance-update-cancel').onclick = () =>
     void controlMaintenanceUpdate('cancel')
+$('#maintenance-repair-pause').onclick = () =>
+    void controlMaintenanceRepair('pause')
+$('#maintenance-repair-resume').onclick = () =>
+    void controlMaintenanceRepair('resume')
+$('#maintenance-repair-cancel').onclick = () =>
+    void controlMaintenanceRepair('cancel')
 
 $('#check-updates').onclick = () =>
     void runMaintenanceAction(
@@ -4358,7 +4402,7 @@ $('#scan-repair').onclick = () =>
     void runMaintenanceAction(
         $('#scan-repair'),
         $('#repair-result'),
-        () => post('/api/v1/maintenance/repair', {})
+        runMaintenanceRepairScan
     )
 $('#run-health').onclick = () =>
     void runMaintenanceAction(

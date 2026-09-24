@@ -5867,35 +5867,40 @@ export class LibraryService {
                 retryBaseMs: settings.retryBaseMs
             }
         )
-        const lease = await this.runtimeResources.acquire({
-            ownerId: `download-${runner.toLowerCase()}`,
-            taskType:
-                runner === 'LOCAL'
-                    ? 'local-download-runner'
-                    : 'github-download-runner',
-            priority: 'user',
-            resources: {
-                'media-network': 1,
-                'filesystem-heavy': 1,
-                'sqlite-write-heavy': 1
+        const execution = (async () => {
+            const lease = await this.runtimeResources.acquire({
+                ownerId: `download-${runner.toLowerCase()}`,
+                taskType:
+                    runner === 'LOCAL'
+                        ? 'local-download-runner'
+                        : 'github-download-runner',
+                priority: 'user',
+                resources: {
+                    'media-network': 1,
+                    'filesystem-heavy': 1,
+                    'sqlite-write-heavy': 1
+                }
+            })
+            try {
+                await scheduler.drain()
+            } finally {
+                lease.release()
             }
-        })
-        const draining = scheduler.drain()
+        })()
         if (runner === 'LOCAL') {
-            this.activeLocalRuns.add(draining)
+            this.activeLocalRuns.add(execution)
             this.activeLocalSchedulers.add(scheduler)
         }
         try {
-            await draining
+            await execution
         } catch (error) {
             if (runner === 'LOCAL')
                 this.localDownloadLastError =
                     error instanceof Error ? error.message : String(error)
             throw error
         } finally {
-            lease.release()
             if (runner === 'LOCAL') {
-                this.activeLocalRuns.delete(draining)
+                this.activeLocalRuns.delete(execution)
                 this.activeLocalSchedulers.delete(scheduler)
                 if (this.activeLocalRuns.size === 0)
                     this.localDownloadRunStartedAt = null

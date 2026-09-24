@@ -582,9 +582,7 @@ export class LibraryService {
           }
         | null = null
     private readonly visualAnalysisTimings = new AnalysisTimingRegistry()
-    private readonly runtimeResources = new RuntimeResourceCoordinator({
-        mode: 'observe'
-    })
+    private readonly runtimeResources: RuntimeResourceCoordinator
 
     private workIdentityEvidenceRefreshProgress: WorkIdentityEvidenceRefreshTaskProgress =
         {
@@ -3583,10 +3581,16 @@ export class LibraryService {
         readonly database: LibraryDatabase,
         readonly dataDir: string,
         provider?: Pica,
-        ehProvider?: EhProvider
+        ehProvider?: EhProvider,
+        runtimeResources?: RuntimeResourceCoordinator
     ) {
         this.pica = provider ?? null
         this.ehProvider = ehProvider ?? new EhProvider()
+        this.runtimeResources =
+            runtimeResources ??
+            new RuntimeResourceCoordinator({
+                mode: 'observe'
+            })
         fs.mkdirSync(dataDir, { recursive: true })
         this.recoveredLocalDownloadJobs =
             this.database.recoverInterruptedDownloadJobs('LOCAL')

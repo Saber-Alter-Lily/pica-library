@@ -2,6 +2,23 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { StoredComic } from './types'
 
+export interface LibraryOrganizeProgress {
+    phase: 'organizing' | 'materializing'
+    done: number
+    total: number
+    linked?: number
+    existing?: number
+    manifests?: number
+    copied?: number
+    skipped: number
+}
+
+export interface LibraryOrganizeOptions {
+    checkpoint?: () => Promise<void> | void
+    onProgress?: (progress: LibraryOrganizeProgress) => void
+    yieldEvery?: number
+}
+
 export function safeSegment(value: string, fallback: string) {
     const normalized = value
         .normalize('NFKC')
@@ -23,27 +40,104 @@ export function portableComicFolder(comic: StoredComic) {
     return `[${author}] ${title} [${shortId}]`
 }
 
-export function materializePortableLibrary(
+function missingFile(error: unknown) {
+    return Boolean(
+        error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            (error as NodeJS.ErrnoException).code === 'ENOENT'
+    )
+}
+
+async function exists(file: string) {
+    try {
+        await fs.promises.access(file)
+        return true
+    } catch (error) {
+        if (missingFile(error)) return false
+        throw error
+    }
+}
+
+async function yieldToEventLoop() {
+    await new Promise<void>((resolve) => setImmediate(resolve))
+}
+
+async function writeJsonAtomically(file: string, value: unknown) {
+    await fs.promises.mkdir(path.dirname(file), { recursive: true })
+    const temporary = `${file}.pica-new-${process.pid}`
+    try {
+        await fs.promises.writeFile(
+            temporary,
+            JSON.stringify(value, null, 2),
+            'utf8'
+        )
+        await fs.promises.rename(temporary, file)
+    } finally {
+        await fs.promises.rm(temporary, { force: true }).catch(() => undefined)
+    }
+}
+
+export async function materializePortableLibrary(
     dataDir: string,
     comics: StoredComic[],
-    outputDir: string
+    outputDir: string,
+    options: LibraryOrganizeOptions = {}
 ) {
     const objectsRoot = path.join(dataDir, 'library', 'objects')
-    fs.mkdirSync(outputDir, { recursive: true })
+    await fs.promises.mkdir(outputDir, { recursive: true })
+    const yieldEvery = Math.max(
+        1,
+        Math.floor(Number(options.yieldEvery) || 10)
+    )
     let copied = 0
     let skipped = 0
-    for (const comic of comics) {
+
+    for (let index = 0; index < comics.length; index += 1) {
+        await options.checkpoint?.()
+        const comic = comics[index]
         const source = path.join(objectsRoot, comic.comicId)
-        if (!fs.existsSync(source)) {
+        if (!(await exists(source))) {
             skipped += 1
-            continue
+        } else {
+            const destination = path.join(
+                outputDir,
+                portableComicFolder(comic)
+            )
+            const temporary = `${destination}.pica-copying-${process.pid}`
+            await fs.promises.rm(temporary, {
+                recursive: true,
+                force: true
+            })
+            try {
+                await fs.promises.cp(source, temporary, {
+                    recursive: true,
+                    force: true
+                })
+                await options.checkpoint?.()
+                await fs.promises.rm(destination, {
+                    recursive: true,
+                    force: true
+                })
+                await fs.promises.rename(temporary, destination)
+                copied += 1
+            } finally {
+                await fs.promises
+                    .rm(temporary, { recursive: true, force: true })
+                    .catch(() => undefined)
+            }
         }
-        fs.cpSync(source, path.join(outputDir, portableComicFolder(comic)), {
-            recursive: true,
-            force: true
+
+        options.onProgress?.({
+            phase: 'materializing',
+            done: index + 1,
+            total: comics.length,
+            copied,
+            skipped
         })
-        copied += 1
+        if ((index + 1) % yieldEvery === 0) await yieldToEventLoop()
     }
+
     const manifest = {
         schemaVersion: 1,
         generatedAt: new Date().toISOString(),
@@ -57,80 +151,100 @@ export function materializePortableLibrary(
             folder: portableComicFolder(comic)
         }))
     }
-    fs.writeFileSync(
+    await options.checkpoint?.()
+    await writeJsonAtomically(
         path.join(outputDir, 'pica-library-manifest.json'),
-        JSON.stringify(manifest, null, 2)
+        manifest
     )
     return { outputDir, copied, skipped }
 }
 
-function createViewLink(source: string, destination: string) {
-    if (fs.existsSync(destination)) return 'existing' as const
-    fs.mkdirSync(path.dirname(destination), { recursive: true })
+async function createViewLink(source: string, destination: string) {
+    if (await exists(destination)) return 'existing' as const
+    await fs.promises.mkdir(path.dirname(destination), { recursive: true })
     try {
         const target =
             process.platform === 'win32'
                 ? path.resolve(source)
                 : path.relative(path.dirname(destination), source)
-        fs.symlinkSync(
+        await fs.promises.symlink(
             target,
             destination,
             process.platform === 'win32' ? 'junction' : 'dir'
         )
         return 'linked' as const
     } catch {
-        fs.mkdirSync(destination, { recursive: true })
-        fs.writeFileSync(
+        await fs.promises.mkdir(destination, { recursive: true })
+        await writeJsonAtomically(
             path.join(destination, '.pica-library-link.json'),
-            JSON.stringify(
-                { schemaVersion: 1, objectPath: path.resolve(source) },
-                null,
-                2
-            )
+            { schemaVersion: 1, objectPath: path.resolve(source) }
         )
         return 'manifest' as const
     }
 }
 
-export function organizeLibraryViews(dataDir: string, comics: StoredComic[]) {
+export async function organizeLibraryViews(
+    dataDir: string,
+    comics: StoredComic[],
+    options: LibraryOrganizeOptions = {}
+) {
     const libraryRoot = path.join(dataDir, 'library')
     const objectsRoot = path.join(libraryRoot, 'objects')
     const viewsRoot = path.join(libraryRoot, 'views')
+    const yieldEvery = Math.max(
+        1,
+        Math.floor(Number(options.yieldEvery) || 25)
+    )
     let linked = 0
     let existing = 0
     let manifests = 0
     let skipped = 0
 
-    const add = (source: string, destination: string) => {
-        const result = createViewLink(source, destination)
+    const add = async (source: string, destination: string) => {
+        const result = await createViewLink(source, destination)
         if (result === 'linked') linked += 1
         else if (result === 'manifest') manifests += 1
         else existing += 1
     }
 
-    for (const comic of comics) {
+    for (let index = 0; index < comics.length; index += 1) {
+        await options.checkpoint?.()
+        const comic = comics[index]
         const source = path.join(objectsRoot, comic.comicId)
-        if (!fs.existsSync(source)) {
+        if (!(await exists(source))) {
             skipped += 1
-            continue
-        }
-        const comicFolder = `${safeSegment(comic.title, 'untitled')} [${comic.comicId}]`
-        const author = safeSegment(
-            comic.canonicalAuthor ?? comic.author,
-            'unknown-author'
-        )
-        add(source, path.join(viewsRoot, 'by-author', author, comicFolder))
-        if (comic.circle) {
-            add(
-                source,
-                path.join(
-                    viewsRoot,
-                    'by-circle',
-                    safeSegment(comic.circle, 'unknown-circle'),
-                    comicFolder
-                )
+        } else {
+            const comicFolder = `${safeSegment(comic.title, 'untitled')} [${comic.comicId}]`
+            const author = safeSegment(
+                comic.canonicalAuthor ?? comic.author,
+                'unknown-author'
             )
+            await add(
+                source,
+                path.join(viewsRoot, 'by-author', author, comicFolder)
+            )
+            if (comic.circle)
+                await add(
+                    source,
+                    path.join(
+                        viewsRoot,
+                        'by-circle',
+                        safeSegment(comic.circle, 'unknown-circle'),
+                        comicFolder
+                    )
+                )
         }
+
+        options.onProgress?.({
+            phase: 'organizing',
+            done: index + 1,
+            total: comics.length,
+            linked,
+            existing,
+            manifests,
+            skipped
+        })
+        if ((index + 1) % yieldEvery === 0) await yieldToEventLoop()
     }
 
     const result = {
@@ -141,10 +255,10 @@ export function organizeLibraryViews(dataDir: string, comics: StoredComic[]) {
         manifests,
         skipped
     }
-    fs.mkdirSync(viewsRoot, { recursive: true })
-    fs.writeFileSync(
+    await options.checkpoint?.()
+    await writeJsonAtomically(
         path.join(viewsRoot, 'index.json'),
-        JSON.stringify({ ...result, comics }, null, 2)
+        { ...result, comics }
     )
     return result
 }

@@ -37,10 +37,10 @@ Risk levels are implementation priorities for P2 only; they are not release seve
 | RT-04 | WebDAV sync | `RemoteStorageDesktopManager` / sync service | manager in-memory state; publication flow is the commit boundary; SHA-matched remote objects reusable | pause/resume/cancel checkpoints; current bounded uploads finish before pause/cancel | NET-R, FS-R, CPU hash, DB/API | **MEDIUM** — local reads are async and checkpointed, but resource use is isolated from downloads/Visual; no process-wide IO/network budget |
 | RT-05 | Local Desktop download queue | detached `LibraryService` runner + `DownloadScheduler` + `MediaRequestGate` | SQLite download job state; verified files/pages; single authoritative backend runner | DB-backed pause/resume/retry/cancel; startup recovers interrupted LOCAL jobs; partial files not trusted | NET-M, FS-W, DB-W | **MATURE** — strongest durable runtime model; current performance profiles govern downloads only, not competing application tasks |
 | RT-06 | Desktop updater | `UpdateManager` + detached updater process | progress JSON + staged update + application backup; health check commits replacement | cancel/re-check/restart; bounded network calls; old install restored on failed health | NET, FS-W | **MATURE / ISOLATED** — synchronous filesystem operations occur mainly in the detached updater where blocking the main app is not the same risk; keep separate from ordinary runtime budget |
-| RT-07 | Maintenance update check | HTTP request directly awaits `LibraryService.checkUpdates()` | each finding written to DB as each comic is checked | **no task progress/pause/cancel/restart contract** | NET-P, DB-R/W | **HIGH** — request-owned long work; provider calls are serial; default discovery currently uses `listComics({limit: 5000})`, which is both a runtime scalability limit and a potential correctness truncation |
+| RT-07 | Maintenance update check | full scan runs as a detached `LibraryService` task; explicit narrow comic-ID checks may remain request-owned | each finding is persisted as checked; task status is authoritative for the full scan | pause/resume/cancel at Provider-request boundaries; full scan status survives page navigation but not process restart | NET-P, DB-R/W | **IMPROVED / PARTIAL** — PR #113 removed the 5000-comic discovery cap and detached the ordinary full scan; restart recovery and cross-task provider budgeting remain later P2 work |
 | RT-08 | Maintenance repair scan | HTTP request awaits asynchronous `scanRepairIssues()` | scan result returned at end; queued repair jobs use normal durable download queue | async stat + progress hook + periodic event-loop yield; full task controls remain separate future work | FS-R, DB-R | **IMPROVED / PARTIAL** — PR #112 removed synchronous per-file `existsSync/statSync` from the Node event loop; scan is still request-owned |
-| RT-09 | Organize library views | HTTP request directly calls `organizeLibraryViews()` | filesystem links/manifests are written incrementally; final index JSON written at end | **no progress/pause/cancel/rollback** | FS-R/W, UI/API event loop | **HIGH** — route passes a `listComics({limit:5000})` snapshot and implementation uses synchronous exists/mkdir/symlink/write operations in a loop |
-| RT-10 | Portable library materialization/export | synchronous organizer helper when invoked | output copied incrementally; final manifest written | no common long-task control | FS-R/W | **MEDIUM/HIGH** — recursive `cpSync` can be expensive; must not be hosted by foreground request without explicit detached/task semantics |
+| RT-09 | Organize library views | Web API starts a detached `LibraryService` task over async organizer primitives | links/fallback manifests are created incrementally; final index is published only after a final checkpoint | pause/resume/cancel at comic boundaries; progress is authoritative in service state | FS-R/W | **IN PROGRESS H1C** — foreground synchronous filesystem APIs and the 5000-comic route cap are being removed; process-restart recovery remains later P2 work |
+| RT-10 | Portable library materialization/export | explicit CLI command over async checkpointable organizer primitives | each comic is copied through a temporary destination before replacement; final manifest is published only after the last checkpoint | CLI process owns cancellation/lifetime; reusable primitive exposes checkpoint/progress hooks | FS-R/W | **IN PROGRESS H1C** — `cpSync`/sync manifest writes and the 5000-comic CLI cap are being removed; no foreground Web route hosts portable materialization |
 | RT-11 | Recommendation V5 shadow retrieval | manual Desktop POST directly awaits `runRecommendationV5ShadowRetrieval()` | candidate pool/audit telemetry persisted at completion; serving remains unchanged | explicit confirmation but **no pause/cancel/progress task state** | NET-P, CPU, DB-R/W | **HIGH** — deliberately manual, but still request-owned heavy work; loads up to 10k catalog entries and performs provider retrieval + hygiene + ranking + diversity before returning |
 | RT-12 | Recommendation V5 evaluation/retrospective/steerability | synchronous `LibraryService` calculations behind explicit/manual endpoints | read-only evaluation outputs; no serving mutation | no task lifecycle; inputs are bounded but several methods materialize up to 10k catalog rows / 5k events / many historical pools | CPU, DB-R | **MEDIUM** — ordinary page open no longer auto-runs these, which is correct; instrumentation is still needed to decide which calculations need background execution or memoization |
 | RT-13 | Visual QC / author atlas / style-family evaluation | synchronous service calculations for QC/gates; indexing itself is RT-02 | read-only output built from stored embeddings/catalog | manual/advanced only; no task lifecycle for QC calculation | CPU, DB-R | **MEDIUM/HIGH** — methods materialize embeddings and up to 10k comics and may perform pair/graph computations; must remain manual and needs latency measurement/background threshold |
@@ -73,26 +73,21 @@ Download concurrency is explicitly governed by `PerformanceSettings`, `DownloadS
 
 This does **not** imply one universal queue. P2-C should define resource classes and a small arbiter/budget policy that existing task systems can consult.
 
-### F-02 — Maintenance update check is still request-owned and truncated at 5000
-**Priority: HIGH — correctness + runtime**
+### F-02 — Maintenance update scan request ownership / 5000-item truncation
+**Priority: RESOLVED for H1 by PR #113**
 
-Current behavior in `LibraryService.checkUpdates()`:
+Completed:
+- ordinary full scans no longer stay attached to one long HTTP request;
+- the full scan exposes authoritative status plus pause/resume/cancel;
+- checkpoints run before and after each bounded Provider request;
+- discovery uses the complete set of downloaded comic IDs queried directly from SQLite;
+- the former `listComics({ limit: 5000 })` correctness truncation is removed;
+- full scans remain review-first and do not auto-queue update jobs.
 
-- when comic IDs are not explicitly supplied, it uses `listComics({ limit: 5000 })`;
-- filters downloaded comics;
-- loops IDs serially;
-- awaits Provider episode lookup one comic at a time;
-- persists each finding;
-- the HTTP request stays open until the complete loop ends.
-
-Required direction:
-
-- remove the correctness-significant 5000-domain truncation;
-- turn full-library scan into an observable background task or explicitly bounded batch task;
-- add progress and cancel;
-- define provider request budget/concurrency conservatively;
-- keep each finding idempotent/reviewable;
-- use the normal download queue only after the user chooses to queue updates.
+Remaining outside H1:
+- task state is process-local rather than restart-durable;
+- Provider traffic still needs the later P2-C cross-task resource budget;
+- result pagination/retention may be revisited after real large-library measurements.
 
 ### F-03 — Repair scan event-loop blocking
 **Priority: PARTIALLY RESOLVED by PR #112**
@@ -108,18 +103,20 @@ Remaining:
 - large scans do not yet have the same pause/cancel/background-task contract being introduced for update checking;
 - bounded/chunked status delivery should be considered after real scan measurements.
 
-### F-04 — Organize/materialize filesystem work is foreground synchronous
-**Priority: HIGH**
+### F-04 — Organize/materialize foreground synchronous filesystem work
+**Priority: IN PROGRESS H1C**
 
-`organizeLibraryViews()` uses synchronous existence checks, directory creation, symlink/junction creation and index writes. `materializePortableLibrary()` can recursively `cpSync` entire comic directories.
+H1C implementation direction:
+- `organizeLibraryViews()` and `materializePortableLibrary()` use asynchronous filesystem operations with explicit checkpoint/progress hooks;
+- the Web `/api/v1/organize` route starts a background service task and exposes status/control endpoints instead of owning the full operation;
+- CLI `organize` and `portable` remain explicit process-owned commands but use the same asynchronous primitives;
+- both CLI paths use the complete catalog rather than a 5000-comic cap;
+- final `views/index.json` and portable manifest are written only after a final checkpoint;
+- portable comic copies use a temporary destination before replacing the final folder so a cancelled copy does not publish a half-copied comic as the new output.
 
-Required direction:
-
-- move heavy materialization out of the foreground request lifecycle;
-- async or isolated worker/process implementation;
-- progress/cancel;
-- explicit partial-output cleanup/re-run semantics;
-- no arbitrary 5000-comic correctness boundary.
+Remaining after H1C:
+- decide whether organize task state needs restart durability based on real usage;
+- measure filesystem-heavy contention before P2-C resource-budget thresholds are set.
 
 ### F-05 — V5 shadow retrieval is manual but still a long HTTP request
 **Priority: HIGH**

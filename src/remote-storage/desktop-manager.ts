@@ -1,4 +1,5 @@
 import type { LibraryDatabase } from '../library/database'
+import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 import { createHash, randomUUID } from 'node:crypto'
 import { removeRemoteCopies, selectedComicIds } from './remove-copies'
 import type { CredentialStore } from '../desktop/credentials'
@@ -60,6 +61,7 @@ export class RemoteStorageDesktopManager {
         phase: 'idle',
         updatedAt: new Date().toISOString()
     }
+    private readonly runtimeResources: RuntimeResourceCoordinator
 
     constructor(
         private readonly configFile: string,
@@ -67,9 +69,15 @@ export class RemoteStorageDesktopManager {
         credentials: StoredCredentials | null,
         private readonly database: LibraryDatabase,
         private readonly dataDir: string,
-        private readonly onCredentialsChanged: (value: StoredCredentials) => void
+        private readonly onCredentialsChanged: (value: StoredCredentials) => void,
+        runtimeResources?: RuntimeResourceCoordinator
     ) {
         this.credentials = credentials
+        this.runtimeResources =
+            runtimeResources ??
+            new RuntimeResourceCoordinator({
+                mode: 'observe'
+            })
         this.registry = loadRemoteStorageRegistry(configFile)
         this.query = new LibraryQueryService(database)
         for (const target of this.registry.targets)
@@ -666,7 +674,20 @@ export class RemoteStorageDesktopManager {
         this.syncPauseRequested = false
         this.syncCancelRequested = false
         this.syncResumeWaiters.clear()
+        let releaseResources: () => void = () => undefined
         try {
+            const lease = await this.runtimeResources.acquire({
+                ownerId: 'remote-storage-sync',
+                taskType: 'remote-storage-sync',
+                priority: 'background',
+                resources: {
+                    'remote-storage-network': 1,
+                    'filesystem-heavy': 1,
+                    'sqlite-read-heavy': 1,
+                    'sqlite-write-heavy': 1
+                }
+            })
+            releaseResources = () => lease.release()
             const result = await this.syncSelected(selected, ids)
             if (input.comicIds !== undefined) {
                 const completed = ids.filter(
@@ -694,6 +715,7 @@ export class RemoteStorageDesktopManager {
                     : 'failed'
             throw error
         } finally {
+            releaseResources()
             this.finishSyncControl()
             this.mutationInFlight = false
         }

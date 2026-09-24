@@ -15,6 +15,7 @@ import { serializeBrowserLiteDataPackage } from '../library/bundle-export'
 import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
+import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 import {
     readRemoteApiToken,
     startRemoteApiGateway,
@@ -574,7 +575,16 @@ async function startEngine(preferredPort: number) {
     const dataDir = config?.libraryDirectory ?? paths.data
     fs.mkdirSync(dataDir, { recursive: true })
     database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-    service = new LibraryService(database, dataDir)
+    const runtimeResources = new RuntimeResourceCoordinator({
+        mode: 'observe'
+    })
+    service = new LibraryService(
+        database,
+        dataDir,
+        undefined,
+        undefined,
+        runtimeResources
+    )
     ehWebLogin = new DesktopEhWebLogin(
         path.join(paths.runtimeState, 'eh-web-login'),
         async (candidate) => {
@@ -598,7 +608,8 @@ async function startEngine(preferredPort: number) {
         credentials,
         database,
         dataDir,
-        (value) => { credentials = value }
+        (value) => { credentials = value },
+        runtimeResources
     )
     const csrfToken = randomBytes(32).toString('base64url')
     const desktop: DesktopServerController = {

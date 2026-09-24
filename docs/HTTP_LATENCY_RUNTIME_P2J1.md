@@ -87,6 +87,8 @@ If a connection closes before the response is fully written, the request is reco
 
 At request start, J1 snapshots the currently active internal task types from the process resource coordinator.
 
+The request path uses a dedicated lightweight `runtimeActiveTaskTypes()` view rather than constructing the full resource diagnostic snapshot on every request. This reduces observer overhead and avoids making the latency instrument materially affect the latency it measures.
+
 Therefore the runtime profile can compare, for example:
 
 - Library query latency when idle;

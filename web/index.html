@@ -756,9 +756,31 @@
                         <div>
                             <div class="help-heading"><h2>更新检测</h2><button type="button" class="info-tip" aria-label="查看更新检测说明" data-info-tip="默认只检查已经建立本地下载状态的漫画。">!</button></div>
                         </div>
-                        <button id="check-updates" class="primary">
-                            检查下载内容更新
-                        </button>
+                        <div class="actions">
+                            <button id="check-updates" class="primary" type="button">
+                                检查下载内容更新
+                            </button>
+                            <button id="maintenance-updates-pause" type="button" hidden>
+                                暂停
+                            </button>
+                            <button id="maintenance-updates-resume" type="button" hidden>
+                                继续
+                            </button>
+                            <button id="maintenance-updates-cancel" type="button" hidden>
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        id="maintenance-updates-progress"
+                        class="operation-progress"
+                        hidden
+                    >
+                        <span id="maintenance-updates-progress-label"></span>
+                        <progress
+                            id="maintenance-updates-progress-bar"
+                            max="1"
+                        ></progress>
                     </div>
                     <pre id="update-result" class="output"></pre>
                 </div>
@@ -831,9 +853,31 @@
                         <div>
                             <div class="help-heading"><h2>文件修复</h2><button type="button" class="info-tip" aria-label="查看文件修复说明" data-info-tip="扫描缺失、空文件和失败记录。">!</button></div>
                         </div>
-                        <button id="scan-repair" class="primary">
-                            扫描问题
-                        </button>
+                        <div class="actions">
+                            <button id="scan-repair" class="primary" type="button">
+                                扫描问题
+                            </button>
+                            <button id="maintenance-repair-pause" type="button" hidden>
+                                暂停
+                            </button>
+                            <button id="maintenance-repair-resume" type="button" hidden>
+                                继续
+                            </button>
+                            <button id="maintenance-repair-cancel" type="button" hidden>
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                    <div
+                        id="maintenance-repair-progress"
+                        class="operation-progress"
+                        hidden
+                    >
+                        <span id="maintenance-repair-progress-label"></span>
+                        <progress
+                            id="maintenance-repair-progress-bar"
+                            max="1"
+                        ></progress>
                     </div>
                     <pre id="repair-result" class="output"></pre>
                 </div>

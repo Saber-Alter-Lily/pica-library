@@ -304,9 +304,7 @@ export async function startLibraryServer(options: {
         const recordLatency = httpLatency.start({
             method: request.method,
             pathname: url.pathname,
-            activeTaskTypes: options.service
-                .runtimeResourceProfile()
-                .active.map((task) => task.taskType)
+            activeTaskTypes: options.service.runtimeActiveTaskTypes()
         })
         response.once('finish', () => recordLatency(response.statusCode))
         response.once('close', () =>

@@ -174,6 +174,7 @@ import {
     buildWorkIdentityMaterializationPreviewV5,
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../recommendation-v5/work-identity-foundation'
+import { AnalysisTimingRegistry } from '../runtime/analysis-timing'
 
 export const WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION =
     'PREPARE_CANONICAL_WORK_BINDING'
@@ -541,6 +542,7 @@ export class LibraryService {
               }
           }
         | null = null
+    private readonly visualAnalysisTimings = new AnalysisTimingRegistry()
 
     private allComicsForIdentity(): StoredComic[] {
         return this.database.listComics(
@@ -2979,25 +2981,46 @@ export class LibraryService {
         })
     }
 
+    visualAnalysisRuntimeProfile() {
+        return this.visualAnalysisTimings.snapshot()
+    }
+
     visualStyleFamilies(
         minWorksPerAuthor = 2,
         maxAuthors = 300,
         mutualK = 2,
         minimumSimilarity = -1
     ) {
-        const atlas = buildVisualAuthorAtlasV5({
-            embeddings: this.database.listVisualEmbeddings(),
-            catalog: this.database.listComics({ limit: 10000 }),
-            minWorksPerAuthor,
-            maxGraphAuthors: Math.max(maxAuthors, 10),
-            neighborLimit: Math.max(mutualK, 2)
-        })
-        return buildVisualStyleFamiliesV5({
-            atlas,
-            maxAuthors,
-            mutualK,
-            minimumSimilarity
-        })
+        const embeddings = this.database.listVisualEmbeddings()
+        const catalog = this.database.listComics({ limit: 10000 })
+        return this.visualAnalysisTimings.measure(
+            'visual-style-families',
+            {
+                catalogCount: catalog.length,
+                embeddingCount: embeddings.length,
+                parameters: {
+                    minWorksPerAuthor,
+                    maxAuthors,
+                    mutualK,
+                    minimumSimilarity
+                }
+            },
+            () => {
+                const atlas = buildVisualAuthorAtlasV5({
+                    embeddings,
+                    catalog,
+                    minWorksPerAuthor,
+                    maxGraphAuthors: Math.max(maxAuthors, 10),
+                    neighborLimit: Math.max(mutualK, 2)
+                })
+                return buildVisualStyleFamiliesV5({
+                    atlas,
+                    maxAuthors,
+                    mutualK,
+                    minimumSimilarity
+                })
+            }
+        )
     }
 
     visualAuthorAtlas(
@@ -3005,13 +3028,28 @@ export class LibraryService {
         maxGraphAuthors = 600,
         neighborLimit = 8
     ) {
-        return buildVisualAuthorAtlasV5({
-            embeddings: this.database.listVisualEmbeddings(),
-            catalog: this.database.listComics({ limit: 10000 }),
-            minWorksPerAuthor,
-            maxGraphAuthors,
-            neighborLimit
-        })
+        const embeddings = this.database.listVisualEmbeddings()
+        const catalog = this.database.listComics({ limit: 10000 })
+        return this.visualAnalysisTimings.measure(
+            'visual-author-atlas',
+            {
+                catalogCount: catalog.length,
+                embeddingCount: embeddings.length,
+                parameters: {
+                    minWorksPerAuthor,
+                    maxGraphAuthors,
+                    neighborLimit
+                }
+            },
+            () =>
+                buildVisualAuthorAtlasV5({
+                    embeddings,
+                    catalog,
+                    minWorksPerAuthor,
+                    maxGraphAuthors,
+                    neighborLimit
+                })
+        )
     }
 
     visualRepresentationQc(
@@ -3019,35 +3057,53 @@ export class LibraryService {
         maxAnchors = 120
     ) {
         const catalog = this.database.listComics({ limit: 10000 })
-        const fandomKeysByComic: Record<string, string[]> = {}
-        try {
-            const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-            for (const comic of catalog) {
-                const keys = new Set<string>()
-                for (const tag of comic.tags) {
-                    const resolved = resolveTagV3(tag, registry)
-                    if (
-                        resolved.resolutionStatus === 'RESOLVED' &&
-                        resolved.resolutionType !== 'SAFETY' &&
-                        resolved.facet === 'FANDOM_IP' &&
-                        resolved.canonicalKey
-                    )
-                        keys.add(resolved.canonicalKey)
+        const embeddings = this.database.listVisualEmbeddings()
+        return this.visualAnalysisTimings.measure(
+            'visual-representation-qc',
+            {
+                catalogCount: catalog.length,
+                embeddingCount: embeddings.length,
+                parameters: {
+                    maxPairSamples,
+                    maxAnchors
                 }
-                if (keys.size)
-                    fandomKeysByComic[comic.comicId] = [...keys].sort()
+            },
+            () => {
+                const fandomKeysByComic: Record<string, string[]> = {}
+                try {
+                    const registry = loadTagRegistryV3(
+                        runtimeRegistryDirectory()
+                    )
+                    for (const comic of catalog) {
+                        const keys = new Set<string>()
+                        for (const tag of comic.tags) {
+                            const resolved = resolveTagV3(tag, registry)
+                            if (
+                                resolved.resolutionStatus === 'RESOLVED' &&
+                                resolved.resolutionType !== 'SAFETY' &&
+                                resolved.facet === 'FANDOM_IP' &&
+                                resolved.canonicalKey
+                            )
+                                keys.add(resolved.canonicalKey)
+                        }
+                        if (keys.size)
+                            fandomKeysByComic[comic.comicId] = [
+                                ...keys
+                            ].sort()
+                    }
+                } catch {
+                    // E-H raw parody tags remain available inside the QC module even
+                    // when the packaged semantic registry cannot be loaded.
+                }
+                return buildVisualRepresentationQcV5({
+                    embeddings,
+                    catalog,
+                    fandomKeysByComic,
+                    maxPairSamples,
+                    maxAnchors
+                })
             }
-        } catch {
-            // E-H raw parody tags remain available inside the QC module even
-            // when the packaged semantic registry cannot be loaded.
-        }
-        return buildVisualRepresentationQcV5({
-            embeddings: this.database.listVisualEmbeddings(),
-            catalog,
-            fandomKeysByComic,
-            maxPairSamples,
-            maxAnchors
-        })
+        )
     }
 
     visualIndexStatus() {

@@ -4,6 +4,8 @@ const IDENTITY = {
     review: null,
     plan: null,
     busy: false,
+    scanTask: null,
+    scanPollGeneration: 0,
     catalog: null,
     catalogById: new Map()
 }
@@ -113,6 +115,9 @@ function ensurePanel() {
             <div class="v5-id-actions">
                 <button id="v5-id-load" type="button">${wiT('读取现有证据','Load existing evidence','既存エビデンスを読み込む')}</button>
                 <button id="v5-id-scan" type="button" class="primary">${wiT('扫描身份证据','Scan identity evidence','作品IDエビデンスをスキャン')}</button>
+                <button id="v5-id-scan-pause" type="button" hidden>${wiT('暂停扫描','Pause scan','スキャンを一時停止')}</button>
+                <button id="v5-id-scan-resume" type="button" hidden>${wiT('继续扫描','Resume scan','スキャンを再開')}</button>
+                <button id="v5-id-scan-cancel" type="button" hidden>${wiT('取消扫描','Cancel scan','スキャンをキャンセル')}</button>
                 <button id="v5-id-plan-btn" type="button">${wiT('生成 Dry-run 绑定计划','Generate dry-run binding plan','Dry-run 紐付け計画を生成')}</button>
             </div>
         </div>
@@ -136,9 +141,19 @@ function ensurePanel() {
     panel.querySelector('#v5-id-scan').addEventListener('click', () => {
         void refreshEvidence()
     })
+    panel.querySelector('#v5-id-scan-pause').addEventListener('click', () => {
+        void controlEvidenceRefresh('pause')
+    })
+    panel.querySelector('#v5-id-scan-resume').addEventListener('click', () => {
+        void controlEvidenceRefresh('resume')
+    })
+    panel.querySelector('#v5-id-scan-cancel').addEventListener('click', () => {
+        void controlEvidenceRefresh('cancel')
+    })
     panel.querySelector('#v5-id-plan-btn').addEventListener('click', () => {
         void loadMaterializationPlan()
     })
+    void reattachEvidenceRefresh()
 }
 
 function status(message, bad = false) {
@@ -405,31 +420,155 @@ async function loadReview() {
     }
 }
 
-async function refreshEvidence() {
-    if (IDENTITY.busy) return
-    IDENTITY.busy = true
-    status(wiT('正在扫描本地目录中的高置信同作品候选；不会自动绑定…','Scanning the local library for high-confidence same-work candidates; nothing is bound automatically…','ローカルライブラリから高信頼度の同一作品候補をスキャン中です。自動で紐付けることはありません…'))
+function renderEvidenceTask(task) {
+    IDENTITY.scanTask = task
+    const scan = document.querySelector('#v5-id-scan')
+    const pause = document.querySelector('#v5-id-scan-pause')
+    const resume = document.querySelector('#v5-id-scan-resume')
+    const cancel = document.querySelector('#v5-id-scan-cancel')
+    if (scan) scan.disabled = Boolean(task?.active)
+    if (pause) pause.hidden = !task?.canPause
+    if (resume) resume.hidden = !task?.canResume
+    if (cancel) cancel.hidden = !task?.canCancel
+    if (!task) return
+
+    const phase = {
+        loading: wiT('读取完整目录','Loading full catalog','全カタログを読み込み中'),
+        bucketing: wiT('建立候选桶','Building candidate buckets','候補バケットを構築中'),
+        comparing: wiT('比较候选','Comparing candidates','候補を比較中'),
+        persisting: wiT('保存证据','Saving evidence','エビデンスを保存中'),
+        paused: wiT('已暂停','Paused','一時停止中')
+    }[task.phase] || task.phase
+
+    if (task.active) {
+        const progress = Number(task.total || 0)
+            ? ` ${Number(task.done || 0)}/${Number(task.total || 0)}`
+            : ''
+        status(
+            `${phase}${progress} · ${wiT('候选','candidates','候補')} ${Number(task.candidateCount || 0)} · pair checks ${Number(task.pairChecks || 0)}`
+        )
+        return
+    }
+    if (task.state === 'failed') {
+        status(
+            wiT(
+                `扫描失败：${task.error || 'unknown error'}`,
+                `Scan failed: ${task.error || 'unknown error'}`,
+                `スキャンに失敗しました：${task.error || 'unknown error'}`
+            ),
+            true
+        )
+        return
+    }
+    if (task.state === 'cancelled') {
+        status(
+            wiT(
+                '扫描已取消；未完成结果没有写入新的证据批次。',
+                'Scan cancelled; incomplete results were not committed as a new evidence batch.',
+                'スキャンをキャンセルしました。未完了の結果は新しいエビデンスとして保存されていません。'
+            )
+        )
+    }
+}
+
+async function reloadReviewAfterEvidenceRefresh() {
+    const [review] = await Promise.all([
+        request('/api/v1/recommendation-v5/work-identity/review?limit=300'),
+        loadCatalog()
+    ])
+    IDENTITY.review = review
+    renderReview()
+}
+
+async function watchEvidenceRefresh() {
+    const generation = ++IDENTITY.scanPollGeneration
+    while (generation === IDENTITY.scanPollGeneration) {
+        let task
+        try {
+            task = await request(
+                '/api/v1/recommendation-v5/work-identity/evidence/refresh/status'
+            )
+        } catch (error) {
+            status(
+                wiT(
+                    `读取扫描状态失败：${error.message}`,
+                    `Failed to read scan status: ${error.message}`,
+                    `スキャン状態の取得に失敗しました：${error.message}`
+                ),
+                true
+            )
+            return
+        }
+        renderEvidenceTask(task)
+        if (!task.active) {
+            if (task.state === 'complete')
+                await reloadReviewAfterEvidenceRefresh()
+            return
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+}
+
+async function reattachEvidenceRefresh() {
     try {
-        const result = await post(
+        const task = await request(
+            '/api/v1/recommendation-v5/work-identity/evidence/refresh/status'
+        )
+        renderEvidenceTask(task)
+        if (task.active) void watchEvidenceRefresh()
+    } catch {
+        // Status probing is read-only and must not make Settings unusable.
+    }
+}
+
+async function controlEvidenceRefresh(action) {
+    try {
+        const task = await post(
+            '/api/v1/recommendation-v5/work-identity/evidence/refresh/control',
+            { action }
+        )
+        renderEvidenceTask(task)
+        if (action === 'resume' && task.active) void watchEvidenceRefresh()
+    } catch (error) {
+        status(
+            wiT(
+                `扫描控制失败：${error.message}`,
+                `Scan control failed: ${error.message}`,
+                `スキャン制御に失敗しました：${error.message}`
+            ),
+            true
+        )
+    }
+}
+
+async function refreshEvidence() {
+    if (IDENTITY.scanTask?.active) {
+        void watchEvidenceRefresh()
+        return
+    }
+    status(
+        wiT(
+            '正在启动身份证据后台扫描；不会自动绑定…',
+            'Starting the identity-evidence background scan; nothing is bound automatically…',
+            '作品IDエビデンスのバックグラウンドスキャンを開始しています。自動で紐付けることはありません…'
+        )
+    )
+    try {
+        const task = await post(
             '/api/v1/recommendation-v5/work-identity/evidence/refresh',
             { limit: 500 }
         )
+        renderEvidenceTask(task)
+        void watchEvidenceRefresh()
+    } catch (error) {
         status(
             wiT(
-                `扫描完成：发现 ${Number(result.candidateCount || 0)} 对候选，其中跨 Provider ${Number(result.crossProviderCandidateCount || 0)} 对；Work binding 仍为 ${Number(result.storage?.counts?.bindings || 0)}。`,
-                `Scan complete: ${Number(result.candidateCount || 0)} candidate pairs found, including ${Number(result.crossProviderCandidateCount || 0)} cross-provider pairs; Work bindings remain ${Number(result.storage?.counts?.bindings || 0)}.`,
-                `スキャン完了：候補ペア ${Number(result.candidateCount || 0)} 件、そのうち Provider 横断 ${Number(result.crossProviderCandidateCount || 0)} 件。Work binding は ${Number(result.storage?.counts?.bindings || 0)} のままです。`
-            )
+                `扫描启动失败：${error.message}`,
+                `Failed to start scan: ${error.message}`,
+                `スキャンの開始に失敗しました：${error.message}`
+            ),
+            true
         )
-        IDENTITY.review = await request(
-            '/api/v1/recommendation-v5/work-identity/review?limit=300'
-        )
-        await loadCatalog()
-        renderReview()
-    } catch (error) {
-        status(wiT(`扫描失败：${error.message}`,`Scan failed: ${error.message}`,`スキャンに失敗しました：${error.message}`), true)
-    } finally {
-        IDENTITY.busy = false
     }
 }
 

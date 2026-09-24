@@ -310,6 +310,10 @@ export class RuntimeResourceCoordinator {
         }
     }
 
+    activeTaskTypes() {
+        return [...new Set([...this.active.values()].map((item) => item.taskType))].sort()
+    }
+
     snapshot() {
         const usage = this.usage()
         return {

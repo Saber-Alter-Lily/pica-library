@@ -31,6 +31,7 @@ import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
 import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
 import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
+import { LocalHttpLatencyRegistry } from '../runtime/http-latency'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -291,6 +292,7 @@ export async function startLibraryServer(options: {
             maxBytes: 256 * 1024 * 1024,
             ttlMs: 24 * 60 * 60 * 1000
         }))
+    const httpLatency = new LocalHttpLatencyRegistry({ maxSamples: 500 })
     const loopbackHosts = new Set(['127.0.0.1', 'localhost', '::1'])
     if (!loopbackHosts.has(host)) {
         throw new Error(
@@ -299,6 +301,20 @@ export async function startLibraryServer(options: {
     }
     const server = http.createServer(async (request, response) => {
         const url = new URL(request.url ?? '/', `http://${host}:${port}`)
+        const latencyDiagnostic =
+            url.pathname === '/api/v1/desktop/runtime/http-profile' ||
+            url.pathname === '/api/v1/desktop/runtime/http-profile/reset'
+        const recordLatency = latencyDiagnostic
+            ? (_statusCode: number) => undefined
+            : httpLatency.start({
+                  method: request.method,
+                  pathname: url.pathname,
+                  activeTaskTypes: options.service.runtimeActiveTaskTypes()
+              })
+        response.once('finish', () => recordLatency(response.statusCode))
+        response.once('close', () =>
+            recordLatency(response.writableEnded ? response.statusCode : 499)
+        )
         try {
             const requestHost = request.headers.host ?? ''
             if (
@@ -1030,6 +1046,30 @@ export async function startLibraryServer(options: {
                     200,
                     options.service.runtimeResourceProfile()
                 )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/runtime/http-profile' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(response, 200, httpLatency.snapshot())
+            }
+            if (
+                url.pathname === '/api/v1/desktop/runtime/http-profile/reset' &&
+                request.method === 'POST'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                httpLatency.reset()
+                return json(response, 200, {
+                    reset: true,
+                    ...httpLatency.snapshot()
+                })
             }
             if (
                 url.pathname === '/api/v1/visual/representation-qc' &&

@@ -198,12 +198,12 @@ describe('runtime resource coordinator', () => {
             })
         ).rejects.toThrow('exceeds capacity')
 
-        expect(() =>
+        await expect(
             coordinator.acquire({
                 ownerId: 'bad-weight',
                 taskType: 'analysis',
                 resources: { 'cpu-analysis': 0 }
             })
-        ).toThrow('positive integer')
+        ).rejects.toThrow('positive integer')
     })
 })

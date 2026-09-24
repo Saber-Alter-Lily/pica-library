@@ -1,4 +1,5 @@
 import type { LibraryDatabase } from '../library/database'
+import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 import { createHash, randomUUID } from 'node:crypto'
 import { removeRemoteCopies, selectedComicIds } from './remove-copies'
 import type { CredentialStore } from '../desktop/credentials'
@@ -60,6 +61,7 @@ export class RemoteStorageDesktopManager {
         phase: 'idle',
         updatedAt: new Date().toISOString()
     }
+    private readonly runtimeResources: RuntimeResourceCoordinator
 
     constructor(
         private readonly configFile: string,
@@ -67,9 +69,15 @@ export class RemoteStorageDesktopManager {
         credentials: StoredCredentials | null,
         private readonly database: LibraryDatabase,
         private readonly dataDir: string,
-        private readonly onCredentialsChanged: (value: StoredCredentials) => void
+        private readonly onCredentialsChanged: (value: StoredCredentials) => void,
+        runtimeResources?: RuntimeResourceCoordinator
     ) {
         this.credentials = credentials
+        this.runtimeResources =
+            runtimeResources ??
+            new RuntimeResourceCoordinator({
+                mode: 'observe'
+            })
         this.registry = loadRemoteStorageRegistry(configFile)
         this.query = new LibraryQueryService(database)
         for (const target of this.registry.targets)

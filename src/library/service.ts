@@ -1127,6 +1127,12 @@ export class LibraryService {
             throw new Error(
                 'Explicit shadow retrieval confirmation is required'
             )
+        runtime.onProgress?.({
+            phase: 'planning',
+            done: 0,
+            total: 7
+        })
+        await runtime.checkpoint?.()
         const appSessionId = input.appSessionId
             ? String(input.appSessionId)
             : null
@@ -1147,6 +1153,12 @@ export class LibraryService {
         )
         const catalog = this.database.listComics({ limit: 10000 })
         const provider = this.providerService()
+        runtime.onProgress?.({
+            phase: 'retrieving',
+            done: 1,
+            total: 7
+        })
+        await runtime.checkpoint?.()
         const result = await executeShadowRetrievalV5(
             plan,
             {
@@ -1165,8 +1177,27 @@ export class LibraryService {
                     )
             },
             catalog,
-            { maxCandidates }
+            {
+                maxCandidates,
+                checkpoint: runtime.checkpoint,
+                onProgress: (progress) =>
+                    runtime.onProgress?.({
+                        phase: 'retrieving',
+                        done: 1,
+                        total: 7,
+                        retrievalDone: progress.done,
+                        retrievalTotal: progress.total,
+                        rawCandidateCount: progress.candidateCount
+                    })
+            }
         )
+        await runtime.checkpoint?.()
+        runtime.onProgress?.({
+            phase: 'hygiene',
+            done: 2,
+            total: 7,
+            rawCandidateCount: result.candidateCount
+        })
         const state = new RecommendationPolicyStoreV5(
             this.database
         ).state()
@@ -1175,6 +1206,14 @@ export class LibraryService {
             catalog,
             state
         )
+        await runtime.checkpoint?.()
+        runtime.onProgress?.({
+            phase: 'ranking',
+            done: 3,
+            total: 7,
+            rawCandidateCount: result.candidateCount,
+            candidateCount: hygiene.outputCandidateCount
+        })
         const timescales =
             this.recommendationV5PreferenceTimescales(
                 appSessionId,
@@ -1186,6 +1225,15 @@ export class LibraryService {
             state,
             catalog
         )
+        await runtime.checkpoint?.()
+        runtime.onProgress?.({
+            phase: 'diversity',
+            done: 4,
+            total: 7,
+            rawCandidateCount: result.candidateCount,
+            candidateCount: hygiene.outputCandidateCount,
+            rankedCandidateCount: ranking.candidateCount
+        })
         const semanticDiversity: Record<
             string,
             CandidateSemanticDiversityV5
@@ -1200,7 +1248,9 @@ export class LibraryService {
         } catch {
             registry = null
         }
-        for (const row of ranking.rows) {
+        for (let rowIndex = 0; rowIndex < ranking.rows.length; rowIndex += 1) {
+            if (rowIndex % 25 === 0) await runtime.checkpoint?.()
+            const row = ranking.rows[rowIndex]
             const fandomKeys = new Set<string>()
             const tagKeys = new Set<string>()
             if (registry)
@@ -1266,6 +1316,16 @@ export class LibraryService {
                 )
             )
         )
+        await runtime.checkpoint?.()
+        runtime.onProgress?.({
+            phase: 'audit',
+            done: 5,
+            total: 7,
+            rawCandidateCount: result.candidateCount,
+            candidateCount: hygiene.outputCandidateCount,
+            rankedCandidateCount: ranking.candidateCount,
+            selectedCount: diversity.selectedCount
+        })
         const correctnessAudit = auditShadowCorrectnessV5({
             candidates: hygiene.candidates,
             diversified: diversity.rows,
@@ -1290,8 +1350,19 @@ export class LibraryService {
                 )
             })()
         })
+        await runtime.checkpoint?.()
+        runtime.onProgress?.({
+            phase: 'persisting',
+            done: 6,
+            total: 7,
+            rawCandidateCount: result.candidateCount,
+            candidateCount: hygiene.outputCandidateCount,
+            rankedCandidateCount: ranking.candidateCount,
+            selectedCount: diversity.selectedCount
+        })
         const cycleId = `v5-shadow:${randomUUID()}`
         const modelVersion = shadowPipelineModelVersionV5()
+        await runtime.checkpoint?.()
         const audit = this.database.saveV3CandidatePool({
             appSessionId,
             cycleId,
@@ -1345,6 +1416,18 @@ export class LibraryService {
                         features: row.features
                     }))
             }
+        })
+        runtime.onProgress?.({
+            phase: 'complete',
+            done: 7,
+            total: 7,
+            rawCandidateCount: result.candidateCount,
+            candidateCount: hygiene.outputCandidateCount,
+            rankedCandidateCount: ranking.candidateCount,
+            selectedCount: diversity.selectedCount,
+            poolId: audit.id,
+            cycleId,
+            modelVersion
         })
         return {
             ...result,

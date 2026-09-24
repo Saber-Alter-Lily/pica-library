@@ -53,6 +53,15 @@ describe('SQLite migrations', () => {
                     )
                 )
         ).toBe(true)
+        const indexNames = (
+            database
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type='index'"
+                )
+                .all() as Array<{ name: string }>
+        ).map((row) => row.name)
+        expect(indexNames).toContain('idx_author_aliases_author_display')
+        expect(indexNames).toContain('idx_comic_authors_author_circle')
         database.close()
     })
 

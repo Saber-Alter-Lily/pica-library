@@ -251,11 +251,11 @@ export class RuntimeResourceCoordinator {
         }
     }
 
-    acquire(input: RuntimeResourceRequest): Promise<RuntimeResourceLease> {
+    async acquire(input: RuntimeResourceRequest): Promise<RuntimeResourceLease> {
         if (!input.ownerId.trim()) throw new Error('Runtime resource ownerId is required')
         if (!input.taskType.trim()) throw new Error('Runtime resource taskType is required')
         if (input.signal?.aborted)
-            return Promise.reject(new RuntimeResourceAcquireCancelledError())
+            throw new RuntimeResourceAcquireCancelledError()
 
         const request: NormalizedRequest = {
             id: randomUUID(),
@@ -267,9 +267,9 @@ export class RuntimeResourceCoordinator {
             sequence: this.sequence++
         }
 
-        if (this.canStart(request)) return Promise.resolve(this.start(request))
+        if (this.canStart(request)) return this.start(request)
 
-        return new Promise<RuntimeResourceLease>((resolve, reject) => {
+        return await new Promise<RuntimeResourceLease>((resolve, reject) => {
             const waiting: WaitingRecord = {
                 request,
                 resolve,

@@ -6,8 +6,6 @@ import type { FavoriteRecord, LibraryFacetQuery, SortMode } from './types'
 import { LibraryDatabase } from './database'
 import { LibraryService } from './service'
 import { organizeLibraryViews } from './organizer'
-import { queueRepairs, scanRepairIssues } from '../maintenance/repair'
-import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
 import { PRODUCT_VERSION } from '../version'
 import { appCapabilities } from '../app-capabilities'
@@ -2323,35 +2321,77 @@ export async function startLibraryServer(options: {
                     )
                 )
             }
+            const maintenanceTask = url.pathname.match(
+                /^\/api\/v1\/maintenance\/tasks\/(updates|repair)$/
+            )
+            if (maintenanceTask && request.method === 'GET')
+                return json(
+                    response,
+                    200,
+                    options.service.maintenanceTaskStatus(
+                        maintenanceTask[1] as 'updates' | 'repair'
+                    )
+                )
+            if (maintenanceTask && request.method === 'POST') {
+                const kind = maintenanceTask[1] as 'updates' | 'repair'
+                const input = await body(request)
+                const action = String(input.action ?? 'start')
+                if (action === 'start')
+                    return json(
+                        response,
+                        202,
+                        kind === 'updates'
+                            ? options.service.startMaintenanceUpdateScan(
+                                  stringList(input.comicIds)
+                              )
+                            : options.service.startMaintenanceRepairScan()
+                    )
+                if (!['pause', 'resume', 'cancel'].includes(action))
+                    return json(response, 400, {
+                        error: 'Invalid maintenance task action'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.maintenanceTaskControl(
+                        kind,
+                        action as 'pause' | 'resume' | 'cancel'
+                    )
+                )
+            }
             if (
                 url.pathname === '/api/v1/maintenance/updates' &&
                 request.method === 'POST'
             ) {
                 const input = await body(request)
-                const findings = await options.service.checkUpdates(
-                    stringList(input.comicIds)
+                if (input.queue)
+                    return json(response, 409, {
+                        error:
+                            'Maintenance scans are review-first. Start the scan, review its result, then queue updates explicitly.'
+                    })
+                return json(
+                    response,
+                    202,
+                    options.service.startMaintenanceUpdateScan(
+                        stringList(input.comicIds)
+                    )
                 )
-                const jobs = input.queue
-                    ? findings
-                          .filter(
-                              (finding) => finding.newEpisodeOrders.length > 0
-                          )
-                          .map((finding) =>
-                              queueUpdate(options.database, finding)
-                          )
-                    : []
-                return json(response, 200, { findings, jobs })
             }
             if (
                 url.pathname === '/api/v1/maintenance/repair' &&
                 request.method === 'POST'
             ) {
                 const input = await body(request)
-                const issues = await scanRepairIssues(options.database)
-                const jobs = input.queue
-                    ? queueRepairs(options.database, issues)
-                    : []
-                return json(response, 200, { issues, jobs })
+                if (input.queue)
+                    return json(response, 409, {
+                        error:
+                            'Maintenance scans are review-first. Start the scan, review its result, then queue repairs explicitly.'
+                    })
+                return json(
+                    response,
+                    202,
+                    options.service.startMaintenanceRepairScan()
+                )
             }
             if (
                 url.pathname === '/api/v1/organize' &&

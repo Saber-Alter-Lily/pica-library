@@ -169,6 +169,7 @@ import {
     workIdentityDetailEvidenceV3
 } from '../recommendation-v5/work-identity-v3'
 import {
+    buildWorkIdentityAuditAsyncV5,
     buildWorkIdentityAuditV5,
     buildWorkIdentityMaterializationPlanV5,
     buildWorkIdentityMaterializationPreviewV5,
@@ -302,6 +303,43 @@ class RecommendationV5ShadowCancelledError extends Error {
         super('Recommendation V5 shadow retrieval was cancelled')
         this.name = 'RecommendationV5ShadowCancelledError'
     }
+}
+
+class WorkIdentityEvidenceRefreshCancelledError extends Error {
+    constructor() {
+        super('Work Identity evidence refresh was cancelled')
+        this.name = 'WorkIdentityEvidenceRefreshCancelledError'
+    }
+}
+
+export interface WorkIdentityEvidenceRefreshTaskProgress {
+    state:
+        | 'idle'
+        | 'running'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
+    phase:
+        | 'idle'
+        | 'loading'
+        | 'bucketing'
+        | 'comparing'
+        | 'persisting'
+        | 'paused'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
+    done: number
+    total: number
+    candidateCount: number
+    pairChecks: number
+    savedCount: number
+    startedAt?: string
+    updatedAt?: string
+    error?: string
 }
 
 export interface RecommendationV5ShadowTaskProgress {
@@ -543,6 +581,33 @@ export class LibraryService {
           }
         | null = null
     private readonly visualAnalysisTimings = new AnalysisTimingRegistry()
+
+    private workIdentityEvidenceRefreshProgress: WorkIdentityEvidenceRefreshTaskProgress =
+        {
+            state: 'idle',
+            phase: 'idle',
+            done: 0,
+            total: 0,
+            candidateCount: 0,
+            pairChecks: 0,
+            savedCount: 0
+        }
+    private workIdentityEvidenceRefreshPauseRequested = false
+    private workIdentityEvidenceRefreshCancelRequested = false
+    private workIdentityEvidenceRefreshResumePhase: WorkIdentityEvidenceRefreshTaskProgress['phase'] =
+        'loading'
+    private readonly workIdentityEvidenceRefreshResumeWaiters = new Set<
+        () => void
+    >()
+    private workIdentityEvidenceRefreshRun: Promise<void> | null = null
+    private workIdentityEvidenceRefreshResult:
+        | {
+              scannedComicCount: number
+              candidateCount: number
+              crossProviderCandidateCount: number
+              savedCount: number
+          }
+        | null = null
 
     private allComicsForIdentity(): StoredComic[] {
         return this.database.listComics(
@@ -2323,6 +2388,269 @@ export class LibraryService {
             workId: currentBinding?.workId ?? null,
             editionId: currentBinding?.editionId ?? null,
             items
+        }
+    }
+
+    recommendationV5WorkIdentityEvidenceRefreshStatus() {
+        const active = [
+            'running',
+            'pausing',
+            'paused',
+            'cancelling'
+        ].includes(this.workIdentityEvidenceRefreshProgress.state)
+        const terminal = [
+            'complete',
+            'failed',
+            'cancelled'
+        ].includes(this.workIdentityEvidenceRefreshProgress.state)
+        return {
+            ...this.workIdentityEvidenceRefreshProgress,
+            active,
+            canPause:
+                this.workIdentityEvidenceRefreshProgress.state === 'running' ||
+                this.workIdentityEvidenceRefreshProgress.state === 'pausing',
+            canResume:
+                this.workIdentityEvidenceRefreshProgress.state === 'paused',
+            canCancel: active,
+            result: terminal
+                ? this.workIdentityEvidenceRefreshResult
+                : undefined
+        }
+    }
+
+    recommendationV5WorkIdentityEvidenceRefreshControl(
+        action: 'pause' | 'resume' | 'cancel'
+    ) {
+        if (action === 'pause') {
+            if (this.workIdentityEvidenceRefreshProgress.state === 'running') {
+                this.workIdentityEvidenceRefreshPauseRequested = true
+                this.workIdentityEvidenceRefreshProgress = {
+                    ...this.workIdentityEvidenceRefreshProgress,
+                    state: 'pausing',
+                    updatedAt: new Date().toISOString()
+                }
+            }
+            return this.recommendationV5WorkIdentityEvidenceRefreshStatus()
+        }
+        if (action === 'resume') {
+            this.workIdentityEvidenceRefreshPauseRequested = false
+            if (
+                this.workIdentityEvidenceRefreshProgress.state === 'paused' ||
+                this.workIdentityEvidenceRefreshProgress.state === 'pausing'
+            )
+                this.workIdentityEvidenceRefreshProgress = {
+                    ...this.workIdentityEvidenceRefreshProgress,
+                    state: 'running',
+                    phase: this.workIdentityEvidenceRefreshResumePhase,
+                    updatedAt: new Date().toISOString()
+                }
+            for (const resolve of this.workIdentityEvidenceRefreshResumeWaiters)
+                resolve()
+            this.workIdentityEvidenceRefreshResumeWaiters.clear()
+            return this.recommendationV5WorkIdentityEvidenceRefreshStatus()
+        }
+        this.workIdentityEvidenceRefreshCancelRequested = true
+        this.workIdentityEvidenceRefreshPauseRequested = false
+        for (const resolve of this.workIdentityEvidenceRefreshResumeWaiters)
+            resolve()
+        this.workIdentityEvidenceRefreshResumeWaiters.clear()
+        if (
+            this.workIdentityEvidenceRefreshProgress.state === 'running' ||
+            this.workIdentityEvidenceRefreshProgress.state === 'pausing' ||
+            this.workIdentityEvidenceRefreshProgress.state === 'paused'
+        )
+            this.workIdentityEvidenceRefreshProgress = {
+                ...this.workIdentityEvidenceRefreshProgress,
+                state: 'cancelling',
+                updatedAt: new Date().toISOString()
+            }
+        return this.recommendationV5WorkIdentityEvidenceRefreshStatus()
+    }
+
+    private async workIdentityEvidenceRefreshCheckpoint() {
+        if (this.workIdentityEvidenceRefreshCancelRequested)
+            throw new WorkIdentityEvidenceRefreshCancelledError()
+        if (!this.workIdentityEvidenceRefreshPauseRequested) return
+        this.workIdentityEvidenceRefreshResumePhase =
+            this.workIdentityEvidenceRefreshProgress.phase === 'paused'
+                ? this.workIdentityEvidenceRefreshResumePhase
+                : this.workIdentityEvidenceRefreshProgress.phase
+        this.workIdentityEvidenceRefreshProgress = {
+            ...this.workIdentityEvidenceRefreshProgress,
+            state: 'paused',
+            phase: 'paused',
+            updatedAt: new Date().toISOString()
+        }
+        await new Promise<void>((resolve) =>
+            this.workIdentityEvidenceRefreshResumeWaiters.add(resolve)
+        )
+        if (this.workIdentityEvidenceRefreshCancelRequested)
+            throw new WorkIdentityEvidenceRefreshCancelledError()
+        this.workIdentityEvidenceRefreshProgress = {
+            ...this.workIdentityEvidenceRefreshProgress,
+            state: 'running',
+            phase: this.workIdentityEvidenceRefreshResumePhase,
+            updatedAt: new Date().toISOString()
+        }
+    }
+
+    private finishWorkIdentityEvidenceRefreshControl() {
+        this.workIdentityEvidenceRefreshPauseRequested = false
+        this.workIdentityEvidenceRefreshCancelRequested = false
+        for (const resolve of this.workIdentityEvidenceRefreshResumeWaiters)
+            resolve()
+        this.workIdentityEvidenceRefreshResumeWaiters.clear()
+        this.workIdentityEvidenceRefreshRun = null
+    }
+
+    startRecommendationV5WorkIdentityEvidenceRefresh(requestedLimit = 500) {
+        if (
+            this.workIdentityEvidenceRefreshRun &&
+            [
+                'running',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(this.workIdentityEvidenceRefreshProgress.state)
+        )
+            return {
+                started: false,
+                ...this.recommendationV5WorkIdentityEvidenceRefreshStatus()
+            }
+
+        const limit = Math.max(
+            1,
+            Math.min(1000, Math.floor(Number(requestedLimit) || 500))
+        )
+        const now = new Date().toISOString()
+        this.workIdentityEvidenceRefreshPauseRequested = false
+        this.workIdentityEvidenceRefreshCancelRequested = false
+        this.workIdentityEvidenceRefreshResumePhase = 'loading'
+        this.workIdentityEvidenceRefreshResumeWaiters.clear()
+        this.workIdentityEvidenceRefreshResult = null
+        this.workIdentityEvidenceRefreshProgress = {
+            state: 'running',
+            phase: 'loading',
+            done: 0,
+            total: 0,
+            candidateCount: 0,
+            pairChecks: 0,
+            savedCount: 0,
+            startedAt: now,
+            updatedAt: now
+        }
+
+        const run = (async () => {
+            try {
+                // Detach the first full-catalog read from the start request.
+                await new Promise<void>((resolve) => setTimeout(resolve, 0))
+                await this.workIdentityEvidenceRefreshCheckpoint()
+                const catalog = this.allComicsForIdentity()
+                const state = new RecommendationPolicyStoreV5(
+                    this.database
+                ).state()
+                await this.workIdentityEvidenceRefreshCheckpoint()
+                const audit = await buildWorkIdentityAuditAsyncV5(
+                    catalog,
+                    state,
+                    limit,
+                    {
+                        checkpoint: () =>
+                            this.workIdentityEvidenceRefreshCheckpoint(),
+                        onProgress: (progress) => {
+                            const controlState =
+                                this.workIdentityEvidenceRefreshProgress.state
+                            this.workIdentityEvidenceRefreshResumePhase =
+                                progress.phase
+                            this.workIdentityEvidenceRefreshProgress = {
+                                ...this.workIdentityEvidenceRefreshProgress,
+                                ...progress,
+                                state:
+                                    controlState === 'pausing' ||
+                                    controlState === 'cancelling'
+                                        ? controlState
+                                        : 'running',
+                                updatedAt: new Date().toISOString()
+                            }
+                        }
+                    }
+                )
+                await this.workIdentityEvidenceRefreshCheckpoint()
+                this.workIdentityEvidenceRefreshResumePhase = 'persisting'
+                this.workIdentityEvidenceRefreshProgress = {
+                    ...this.workIdentityEvidenceRefreshProgress,
+                    state: 'running',
+                    phase: 'persisting',
+                    done: audit.scannedComicCount,
+                    total: audit.scannedComicCount,
+                    candidateCount: audit.candidateCount,
+                    updatedAt: new Date().toISOString()
+                }
+                await this.workIdentityEvidenceRefreshCheckpoint()
+                const saved = this.database.saveWorkIdentityEvidence(
+                    audit.candidates.map((candidate) => ({
+                        leftComicId: candidate.leftComicId,
+                        rightComicId: candidate.rightComicId,
+                        relation: candidate.relation,
+                        confidence: candidate.confidence,
+                        resolverVersion: candidate.resolverVersion,
+                        evidence: {
+                            ...candidate.evidence,
+                            leftProvider: candidate.leftProvider,
+                            rightProvider: candidate.rightProvider,
+                            crossProvider: candidate.crossProvider
+                        }
+                    }))
+                )
+                this.workIdentityEvidenceRefreshResult = {
+                    scannedComicCount: audit.scannedComicCount,
+                    candidateCount: audit.candidateCount,
+                    crossProviderCandidateCount:
+                        audit.crossProviderCandidateCount,
+                    savedCount: saved.length
+                }
+                this.workIdentityEvidenceRefreshProgress = {
+                    ...this.workIdentityEvidenceRefreshProgress,
+                    state: 'complete',
+                    phase: 'complete',
+                    done: audit.scannedComicCount,
+                    total: audit.scannedComicCount,
+                    candidateCount: audit.candidateCount,
+                    savedCount: saved.length,
+                    updatedAt: new Date().toISOString()
+                }
+            } catch (error) {
+                if (
+                    error instanceof WorkIdentityEvidenceRefreshCancelledError
+                )
+                    this.workIdentityEvidenceRefreshProgress = {
+                        ...this.workIdentityEvidenceRefreshProgress,
+                        state: 'cancelled',
+                        phase: 'cancelled',
+                        updatedAt: new Date().toISOString()
+                    }
+                else
+                    this.workIdentityEvidenceRefreshProgress = {
+                        ...this.workIdentityEvidenceRefreshProgress,
+                        state: 'failed',
+                        phase: 'failed',
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        updatedAt: new Date().toISOString()
+                    }
+            } finally {
+                this.finishWorkIdentityEvidenceRefreshControl()
+            }
+        })()
+        this.workIdentityEvidenceRefreshRun = run
+        void run.catch(() => {
+            // The task records its authoritative terminal state above.
+        })
+        return {
+            started: true,
+            ...this.recommendationV5WorkIdentityEvidenceRefreshStatus()
         }
     }
 

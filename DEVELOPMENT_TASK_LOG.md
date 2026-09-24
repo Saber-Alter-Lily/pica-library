@@ -930,8 +930,8 @@ Fix the confirmed foreground maintenance hazards before adding a global resource
 
 Promote expensive manual/advanced analysis paths to observable background tasks without changing their scientific/product semantics.
 
-- **IN_PROGRESS — H2A / RT-11:** Recommendation V5 Shadow Retrieval becomes a detached Desktop task with authoritative progress and pause/resume/cancel. Shadow-only, explicit-confirmation and `servingImpact=false` boundaries remain unchanged.
-- **PLANNED — H2B / RT-13:** measure Visual QC / Author Atlas / Style Family latency, then background only the calculations that exceed the approved foreground threshold.
+- **DONE (PR #116) — H2A / RT-11:** Recommendation V5 Shadow Retrieval is a detached Desktop task with authoritative phase/provider progress, pause/resume/cancel, reload recovery, and compact terminal summary. Shadow-only, explicit-confirmation and `servingImpact=false` boundaries remain unchanged.
+- **NEXT — H2B / RT-13:** instrument Visual QC / Author Atlas / Style Family latency first, then background only calculations that exceed the evidence-based foreground threshold.
 - **PLANNED — H2C / RT-14:** background Work Identity audit/evidence refresh where full-catalog execution is materially long; preserve evidence-only/manual-review semantics.
 
 ## NEXT-4 — P2-C resource-budget design
@@ -956,6 +956,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — H2A V5 Shadow Retrieval runtime completed
+
+State update:
+- PR #116 passed the main CI plus Linux, macOS arm64, Windows ARM64 and Docker package gates on its final implementation head.
+- The Shadow Retrieval POST now starts a detached Desktop task and returns immediately; status and pause/resume/cancel are separate authoritative endpoints.
+- Retrieval checkpoints exist between bounded provider work units and between local analysis phases. Concurrent Pica/E-H/ExH provider pipelines settle at safe checkpoints before a cancellation becomes terminal.
+- The Evaluation UI polls authoritative backend state, exposes real task controls and reattaches to an already-running task after the surface is recreated.
+- Incomplete cancelled output is not persisted as a completed new Shadow audit run.
+- Scientific/product boundaries are unchanged: explicit confirmation remains required, execution remains `MANUAL_DESKTOP_ONLY`, `servingImpact=false`, and there is no serving promotion, Visual rebuild or Canonical Work materialization.
+- H2B is now next and begins with latency instrumentation rather than automatically turning every Visual analysis into a background job.
 
 ## 2026-09-24 — H1C organizer runtime merged
 

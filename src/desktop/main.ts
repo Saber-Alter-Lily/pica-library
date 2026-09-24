@@ -173,7 +173,9 @@ function activeDesktopWorkLeases() {
     if (browserLiteExportProgress.state === 'running')
         leases.push('browser-lite-export')
     if (mobileBridgeHasActiveLease()) leases.push('mobile-bridge-activity')
-    return leases
+    for (const task of service?.runtimeResourceProfile().active ?? [])
+        leases.push(`runtime:${task.taskType}`)
+    return [...new Set(leases)]
 }
 
 function cancelBrowserCloseShutdown() {

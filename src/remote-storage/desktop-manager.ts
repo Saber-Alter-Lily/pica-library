@@ -674,7 +674,20 @@ export class RemoteStorageDesktopManager {
         this.syncPauseRequested = false
         this.syncCancelRequested = false
         this.syncResumeWaiters.clear()
+        let releaseResources: () => void = () => undefined
         try {
+            const lease = await this.runtimeResources.acquire({
+                ownerId: 'remote-storage-sync',
+                taskType: 'remote-storage-sync',
+                priority: 'background',
+                resources: {
+                    'remote-storage-network': 1,
+                    'filesystem-heavy': 1,
+                    'sqlite-read-heavy': 1,
+                    'sqlite-write-heavy': 1
+                }
+            })
+            releaseResources = () => lease.release()
             const result = await this.syncSelected(selected, ids)
             if (input.comicIds !== undefined) {
                 const completed = ids.filter(
@@ -702,6 +715,7 @@ export class RemoteStorageDesktopManager {
                     : 'failed'
             throw error
         } finally {
+            releaseResources()
             this.finishSyncControl()
             this.mutationInFlight = false
         }

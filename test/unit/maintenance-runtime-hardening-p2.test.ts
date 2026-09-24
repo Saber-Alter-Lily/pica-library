@@ -11,14 +11,25 @@ describe('P2 H1 maintenance repair runtime contract', () => {
         expect(repair).not.toContain('fs.statSync(')
     })
 
-    it('awaits the asynchronous repair scan in both API and CLI callers', () => {
+    it('keeps CLI scanning asynchronous and Web scanning detached', () => {
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
         const cli = fs.readFileSync('src/library-cli.ts', 'utf8')
-        expect(server).toContain(
-            'const issues = await scanRepairIssues(options.database)'
-        )
+
         expect(cli).toContain(
             'const issues = await scanRepairIssues(database)'
+        )
+
+        expect(server).toContain(
+            "url.pathname === '/api/v1/maintenance/repair/status'"
+        )
+        expect(server).toContain(
+            "url.pathname === '/api/v1/maintenance/repair/control'"
+        )
+        expect(server).toContain(
+            'options.service.startMaintenanceRepairScan()'
+        )
+        expect(server).not.toContain(
+            'const issues = await scanRepairIssues(options.database)'
         )
     })
 })

@@ -2021,6 +2021,19 @@ export class LibraryDatabase {
         )
     }
 
+    listDownloadedComicIds(): string[] {
+        return (
+            this.db
+                .prepare(
+                    `SELECT DISTINCT comic_id
+                     FROM pictures
+                     WHERE status = 'completed'
+                     ORDER BY comic_id`
+                )
+                .all() as SqlRow[]
+        ).map((row) => String(row.comic_id))
+    }
+
     listComicsForLibraryQueryBase(
         query: Pick<
             LibraryFacetQuery,

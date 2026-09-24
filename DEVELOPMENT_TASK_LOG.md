@@ -232,7 +232,7 @@ Target:
 - long work survives page navigation according to its documented semantics.
 
 ## P2-C — Runtime resource classes and concurrency budgets
-**Status: IN_PROGRESS — C1 coordinator foundation implemented; production enforcement remains disabled**
+**Status: IN_PROGRESS — C1 foundation + C2 first observe-only task batch; production enforcement remains disabled**
 
 Create explicit budgets for at least:
 - provider/API requests;
@@ -938,8 +938,9 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 **Status: IN_PROGRESS — C1 foundation**
 
 - **C1:** add a tested resource coordinator with shared resource-class vocabulary, atomic multi-resource leases, priority/FIFO admission semantics, cancellation and diagnostics. Production mode remains observe-only and does not impose invented capacities.
-- **C2 next:** integrate heavy tasks with observe-only resource declarations so real overlap can be measured.
-- **C3 later:** propose enforceable capacities only after overlap and latency evidence exists.
+- **C2 first batch implemented:** maintenance update, repair, organize, Recommendation V5 Shadow and Work Identity evidence refresh now declare observe-only resource leases; Desktop-only diagnostics expose current/peak overlap.
+- **C2 next batch:** add Recommendation V3, favorites sync, WebDAV, local downloads and suitable Visual analysis observation points without changing their current schedulers.
+- **C3 later:** propose enforceable capacities only after overlap and latency evidence exists; before enforcement, task-lifetime leases must become phase-aware where needed so paused tasks do not reserve enforced capacity.
 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
@@ -961,6 +962,21 @@ May continue independently if:
 
 # 12. Decision / scope-change log
 
+## 2026-09-24 — P2-C2 first observe-only integration batch
+
+State update:
+- The coordinator remains in observe mode: no task waits, no task is rejected for resource pressure, and no production capacity exists yet.
+- First-batch service-owned tasks now declare coarse resource leases:
+  - maintenance update = provider-network + sqlite-write-heavy;
+  - maintenance repair = filesystem-heavy + sqlite-read-heavy;
+  - library organize = filesystem-heavy;
+  - Recommendation V5 Shadow = provider-network + cpu-analysis + sqlite-write-heavy;
+  - Work Identity evidence refresh = cpu-analysis + sqlite-read-heavy + sqlite-write-heavy.
+- Desktop control plane adds read-only `/api/v1/desktop/runtime/resources`; this internal runtime diagnostic is not added to Remote Web/browser-session allowlists.
+- Behavioral coverage holds a real maintenance Provider request open, verifies the active lease/usage snapshot, then verifies release after task completion.
+- First-batch leases describe task-lifetime overlap, not physical utilization. Paused tasks currently retain an observation lease.
+- Therefore C2 data may identify potentially competing task combinations, but C3 enforcement is prohibited until resource ownership is phase-aware where needed and overlap is combined with latency measurements.
+- Detailed boundary: docs/RUNTIME_RESOURCE_OBSERVATION_P2C2.md.
 ## 2026-09-24 — P2-C1 resource coordinator foundation
 
 State update:

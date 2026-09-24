@@ -134,6 +134,10 @@ export class LocalHttpLatencyRegistry {
         }
     }
 
+    reset() {
+        this.samples.length = 0
+    }
+
     record(sample: LocalHttpLatencySample) {
         const normalized: LocalHttpLatencySample = {
             ...sample,

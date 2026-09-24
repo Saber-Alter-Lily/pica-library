@@ -973,6 +973,7 @@ State update:
   - Recommendation V5 Shadow = provider-network + cpu-analysis + sqlite-write-heavy;
   - Work Identity evidence refresh = cpu-analysis + sqlite-read-heavy + sqlite-write-heavy.
 - Desktop control plane adds read-only `/api/v1/desktop/runtime/resources`; this internal runtime diagnostic is not added to Remote Web/browser-session allowlists.
+- Desktop idle-browser shutdown now treats active observed background tasks as work leases, so detached maintenance/analysis work is not killed merely because the last Web UI tab closes.
 - Behavioral coverage holds a real maintenance Provider request open, verifies the active lease/usage snapshot, then verifies release after task completion.
 - First-batch leases describe task-lifetime overlap, not physical utilization. Paused tasks currently retain an observation lease.
 - Therefore C2 data may identify potentially competing task combinations, but C3 enforcement is prohibited until resource ownership is phase-aware where needed and overlap is combined with latency measurements.

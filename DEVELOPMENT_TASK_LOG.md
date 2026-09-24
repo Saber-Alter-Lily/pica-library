@@ -987,6 +987,7 @@ State update:
 - Enforcement semantics are tested in isolation: atomic multi-resource acquisition, foreground/user/background ordering, cancellable waiters, idempotent release and bounded diagnostics.
 - C2 will integrate existing tasks in observe-only mode to collect real overlap before C3 selects any enforceable budget.
 - Detailed boundary: docs/RUNTIME_RESOURCE_COORDINATOR_P2C1.md.
+- Windows ARM64 packaged acceptance timeout was hardened after two identical hosted-runner DPAPI/settings POST overruns: that native operation remains bounded at 30 seconds and now logs elapsed time; other platform acceptance bounds remain unchanged.
 ## 2026-09-24 — H2C Work Identity background runtime candidate
 
 State update:

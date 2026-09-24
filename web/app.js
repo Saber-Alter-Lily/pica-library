@@ -4302,11 +4302,57 @@ async function runMaintenanceAction(button, output, work) {
         button.disabled = false
     }
 }
+
+let maintenanceUpdatePollGeneration = 0
+
+function renderMaintenanceUpdateTask(status) {
+    const controls = $('#maintenance-update-controls')
+    const output = $('#update-result')
+    if (!controls || !output) return
+    controls.hidden = !status?.active
+    $('#maintenance-update-pause').disabled = !status?.canPause
+    $('#maintenance-update-resume').disabled = !status?.canResume
+    $('#maintenance-update-cancel').disabled = !status?.canCancel
+    output.textContent = JSON.stringify(status, null, 2)
+}
+
+async function controlMaintenanceUpdate(action) {
+    const status = await post('/api/v1/maintenance/updates/control', {
+        action
+    })
+    renderMaintenanceUpdateTask(status)
+    return status
+}
+
+async function runMaintenanceUpdateScan() {
+    const generation = ++maintenanceUpdatePollGeneration
+    let status = await post('/api/v1/maintenance/updates', {})
+    renderMaintenanceUpdateTask(status)
+    while (
+        generation === maintenanceUpdatePollGeneration &&
+        status?.active
+    ) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        status = await api('/api/v1/maintenance/updates/status')
+        renderMaintenanceUpdateTask(status)
+    }
+    if (status?.state === 'failed')
+        throw new Error(status.error || 'Maintenance update scan failed')
+    return status
+}
+
+$('#maintenance-update-pause').onclick = () =>
+    void controlMaintenanceUpdate('pause')
+$('#maintenance-update-resume').onclick = () =>
+    void controlMaintenanceUpdate('resume')
+$('#maintenance-update-cancel').onclick = () =>
+    void controlMaintenanceUpdate('cancel')
+
 $('#check-updates').onclick = () =>
     void runMaintenanceAction(
         $('#check-updates'),
         $('#update-result'),
-        () => post('/api/v1/maintenance/updates', {})
+        runMaintenanceUpdateScan
     )
 $('#scan-repair').onclick = () =>
     void runMaintenanceAction(

@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url'
 import type { FavoriteRecord, LibraryFacetQuery, SortMode } from './types'
 import { LibraryDatabase } from './database'
 import { LibraryService } from './service'
-import { organizeLibraryViews } from './organizer'
 import { queueRepairs, scanRepairIssues } from '../maintenance/repair'
 import { queueUpdate } from '../maintenance/updates'
 import type { DownloadSource } from '../core/downloads/types'
@@ -2396,18 +2395,45 @@ export async function startLibraryServer(options: {
                 return json(response, 200, { issues, jobs })
             }
             if (
-                url.pathname === '/api/v1/organize' &&
-                request.method === 'POST'
-            ) {
+                url.pathname === '/api/v1/organize/status' &&
+                request.method === 'GET'
+            )
                 return json(
                     response,
                     200,
-                    organizeLibraryViews(
-                        options.service.dataDir,
-                        options.database.listComics({ limit: 5000 })
-                    )
+                    options.service.libraryOrganizeStatus()
+                )
+
+            if (
+                url.pathname === '/api/v1/organize/control' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const action = String(input.action ?? '')
+                if (
+                    action !== 'pause' &&
+                    action !== 'resume' &&
+                    action !== 'cancel'
+                )
+                    return json(response, 400, {
+                        error: 'Unknown organize control action'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.libraryOrganizeControl(action)
                 )
             }
+
+            if (
+                url.pathname === '/api/v1/organize' &&
+                request.method === 'POST'
+            )
+                return json(
+                    response,
+                    202,
+                    options.service.startLibraryOrganize()
+                )
             if (url.pathname.startsWith('/api/')) {
                 return json(response, 404, { error: 'API route not found' })
             }

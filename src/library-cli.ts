@@ -590,9 +590,9 @@ async function main() {
         }
         if (command === 'organize') {
             print(
-                organizeLibraryViews(
+                await organizeLibraryViews(
                     dataDir,
-                    database.listComics({ limit: 5000 })
+                    database.listAllComics()
                 )
             )
             return
@@ -600,9 +600,9 @@ async function main() {
         if (command === 'portable') {
             const outputDir = path.resolve(flag('output', 'pica-download')!)
             print(
-                materializePortableLibrary(
+                await materializePortableLibrary(
                     dataDir,
-                    database.listComics({ limit: 5000 }),
+                    database.listAllComics(),
                     outputDir
                 )
             )

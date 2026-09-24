@@ -2347,7 +2347,7 @@ export async function startLibraryServer(options: {
                 request.method === 'POST'
             ) {
                 const input = await body(request)
-                const issues = scanRepairIssues(options.database)
+                const issues = await scanRepairIssues(options.database)
                 const jobs = input.queue
                     ? queueRepairs(options.database, issues)
                     : []

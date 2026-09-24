@@ -931,7 +931,7 @@ Fix the confirmed foreground maintenance hazards before adding a global resource
 Promote expensive manual/advanced analysis paths to observable background tasks without changing their scientific/product semantics.
 
 - **DONE (PR #116) — H2A / RT-11:** Recommendation V5 Shadow Retrieval is a detached Desktop task with authoritative phase/provider progress, pause/resume/cancel, reload recovery, and compact terminal summary. Shadow-only, explicit-confirmation and `servingImpact=false` boundaries remain unchanged.
-- **NEXT — H2B / RT-13:** instrument Visual QC / Author Atlas / Style Family latency first, then background only calculations that exceed the evidence-based foreground threshold.
+- **IN_PROGRESS — H2B / RT-13:** Visual QC / Author Atlas / Style Family now record bounded runtime telemetry and have a deterministic synthetic scaling harness. No foreground threshold has been selected yet; background only calculations that exceed the later evidence-based threshold.
 - **PLANNED — H2C / RT-14:** background Work Identity audit/evidence refresh where full-catalog execution is materially long; preserve evidence-only/manual-review semantics.
 
 ## NEXT-4 — P2-C resource-budget design
@@ -956,6 +956,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — H2B Visual analysis measurement started
+
+State update:
+- Representation QC, Author Atlas and Style Families now record bounded in-memory runtime samples with input size, parameters, outcome and duration.
+- `/api/v1/desktop/visual/runtime-profile` exposes those diagnostics without triggering analysis.
+- The timing registry deliberately reports `foregroundThresholdMs=null` and `MEASURE_BEFORE_THRESHOLD`; no synchronous/background decision is being invented before evidence exists.
+- A deterministic `pnpm benchmark:visual-analysis` scaling harness was added for relative regression comparison. CI/shared-runner wall time is explicitly not a user-facing threshold.
+- Scientific/product boundaries remain unchanged: read-only Visual evidence, no embedding rebuild, no serving activation/promotion, and no hidden execution on ordinary page open.
+- H2B remains open until representative real-use timings justify either retaining synchronous execution or promoting one or more calculations to a detached task.
 
 ## 2026-09-24 — H2A V5 Shadow Retrieval runtime completed
 

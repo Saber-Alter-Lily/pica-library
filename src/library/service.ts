@@ -4229,6 +4229,7 @@ export class LibraryService {
                 )
             )
             options.onProgress?.(index + 1, ids.length, findings)
+            await options.checkpoint?.()
         }
         return findings
     }
@@ -4273,9 +4274,15 @@ export class LibraryService {
                     checkpoint: () => this.maintenanceUpdateCheckpoint(),
                     onProgress: (done, total, current) => {
                         this.maintenanceUpdateFindings = [...current]
+                        const controlState =
+                            this.maintenanceUpdateProgress.state
                         this.maintenanceUpdateProgress = {
                             ...this.maintenanceUpdateProgress,
-                            state: 'running',
+                            state:
+                                controlState === 'pausing' ||
+                                controlState === 'cancelling'
+                                    ? controlState
+                                    : 'running',
                             phase: 'checking',
                             done,
                             total,

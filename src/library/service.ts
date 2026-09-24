@@ -49,7 +49,7 @@ import type {
     DownloadJob,
     DownloadRunner
 } from '../core/downloads/types'
-import { checkComicUpdates } from '../maintenance/updates'
+import { checkComicUpdates, type UpdateFinding } from '../maintenance/updates'
 import {
     ProviderService,
     type FavoritesSyncMode
@@ -229,6 +229,33 @@ class FavoritesSyncCancelledError extends Error {
     }
 }
 
+class MaintenanceUpdateCancelledError extends Error {
+    constructor() {
+        super('Maintenance update scan was cancelled')
+        this.name = 'MaintenanceUpdateCancelledError'
+    }
+}
+
+export interface MaintenanceUpdateProgress {
+    state:
+        | 'idle'
+        | 'running'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
+    phase: 'idle' | 'checking' | 'paused' | 'complete' | 'failed' | 'cancelled'
+    done: number
+    total: number
+    findingCount: number
+    updateCount: number
+    startedAt?: string
+    updatedAt?: string
+    error?: string
+}
+
 export interface FavoritesSyncProgress {
     phase:
         | 'idle'
@@ -329,6 +356,20 @@ export class LibraryService {
     private recommendationCancelRequested = false
     private readonly recommendationResumeWaiters = new Set<() => void>()
     private recommendationBuildCycleId: string | null = null
+
+    private maintenanceUpdateProgress: MaintenanceUpdateProgress = {
+        state: 'idle',
+        phase: 'idle',
+        done: 0,
+        total: 0,
+        findingCount: 0,
+        updateCount: 0
+    }
+    private maintenanceUpdatePauseRequested = false
+    private maintenanceUpdateCancelRequested = false
+    private readonly maintenanceUpdateResumeWaiters = new Set<() => void>()
+    private maintenanceUpdateFindings: UpdateFinding[] = []
+    private maintenanceUpdateRun: Promise<void> | null = null
 
     private allComicsForIdentity(): StoredComic[] {
         return this.database.listComics(
@@ -4051,35 +4092,249 @@ export class LibraryService {
         return recommendComics(catalog, limit, candidates)
     }
 
-    async checkUpdates(comicIds?: string[]) {
+    maintenanceUpdateStatus() {
+        const active = [
+            'running',
+            'pausing',
+            'paused',
+            'cancelling'
+        ].includes(this.maintenanceUpdateProgress.state)
+        const terminal = [
+            'complete',
+            'failed',
+            'cancelled'
+        ].includes(this.maintenanceUpdateProgress.state)
+        return {
+            ...this.maintenanceUpdateProgress,
+            active,
+            canPause:
+                this.maintenanceUpdateProgress.state === 'running' ||
+                this.maintenanceUpdateProgress.state === 'pausing',
+            canResume: this.maintenanceUpdateProgress.state === 'paused',
+            canCancel: active,
+            findings: terminal ? this.maintenanceUpdateFindings : undefined
+        }
+    }
+
+    maintenanceUpdateControl(action: 'pause' | 'resume' | 'cancel') {
+        if (action === 'pause') {
+            if (this.maintenanceUpdateProgress.state === 'running') {
+                this.maintenanceUpdatePauseRequested = true
+                this.maintenanceUpdateProgress = {
+                    ...this.maintenanceUpdateProgress,
+                    state: 'pausing',
+                    updatedAt: new Date().toISOString()
+                }
+            }
+            return this.maintenanceUpdateStatus()
+        }
+        if (action === 'resume') {
+            this.maintenanceUpdatePauseRequested = false
+            for (const resolve of this.maintenanceUpdateResumeWaiters) resolve()
+            this.maintenanceUpdateResumeWaiters.clear()
+            if (
+                this.maintenanceUpdateProgress.state === 'paused' ||
+                this.maintenanceUpdateProgress.state === 'pausing'
+            )
+                this.maintenanceUpdateProgress = {
+                    ...this.maintenanceUpdateProgress,
+                    state: 'running',
+                    phase: 'checking',
+                    updatedAt: new Date().toISOString()
+                }
+            return this.maintenanceUpdateStatus()
+        }
+        this.maintenanceUpdateCancelRequested = true
+        this.maintenanceUpdatePauseRequested = false
+        for (const resolve of this.maintenanceUpdateResumeWaiters) resolve()
+        this.maintenanceUpdateResumeWaiters.clear()
+        if (
+            this.maintenanceUpdateProgress.state === 'running' ||
+            this.maintenanceUpdateProgress.state === 'pausing' ||
+            this.maintenanceUpdateProgress.state === 'paused'
+        )
+            this.maintenanceUpdateProgress = {
+                ...this.maintenanceUpdateProgress,
+                state: 'cancelling',
+                updatedAt: new Date().toISOString()
+            }
+        return this.maintenanceUpdateStatus()
+    }
+
+    private async maintenanceUpdateCheckpoint() {
+        if (this.maintenanceUpdateCancelRequested)
+            throw new MaintenanceUpdateCancelledError()
+        if (!this.maintenanceUpdatePauseRequested) return
+        this.maintenanceUpdateProgress = {
+            ...this.maintenanceUpdateProgress,
+            state: 'paused',
+            phase: 'paused',
+            updatedAt: new Date().toISOString()
+        }
+        await new Promise<void>((resolve) =>
+            this.maintenanceUpdateResumeWaiters.add(resolve)
+        )
+        if (this.maintenanceUpdateCancelRequested)
+            throw new MaintenanceUpdateCancelledError()
+        this.maintenanceUpdateProgress = {
+            ...this.maintenanceUpdateProgress,
+            state: 'running',
+            phase: 'checking',
+            updatedAt: new Date().toISOString()
+        }
+    }
+
+    private finishMaintenanceUpdateControl() {
+        this.maintenanceUpdatePauseRequested = false
+        this.maintenanceUpdateCancelRequested = false
+        for (const resolve of this.maintenanceUpdateResumeWaiters) resolve()
+        this.maintenanceUpdateResumeWaiters.clear()
+        this.maintenanceUpdateRun = null
+    }
+
+    async checkUpdates(
+        comicIds?: string[],
+        options: {
+            checkpoint?: () => Promise<void> | void
+            onProgress?: (
+                done: number,
+                total: number,
+                findings: UpdateFinding[]
+            ) => void
+        } = {}
+    ) {
         const providerService = this.providerService()
         const ids = comicIds?.length
-            ? comicIds
-            : this.database
-                  .listComics({ limit: 5000 })
-                  .filter((comic) => comic.downloadedPictures > 0)
-                  .map((comic) => comic.comicId)
-        const findings = []
-        for (const comicId of ids) {
+            ? [...new Set(comicIds)]
+            : this.database.listDownloadedComicIds()
+        const findings: UpdateFinding[] = []
+        for (let index = 0; index < ids.length; index += 1) {
+            await options.checkpoint?.()
+            const comicId = ids[index]
             findings.push(
                 await checkComicUpdates(
                     this.database,
                     {
                         episodes: async (id) =>
-                            (await providerService.getEpisodes(id)).map(
-                                (episode) => ({
+                            (await providerService.getEpisodes(id))
+                                .map((episode) => ({
                                     id: episode.id || episode._id || '',
                                     order: episode.order,
                                     title: episode.title,
                                     updatedAt: episode.updated_at
-                                })
-                            ).filter((episode) => episode.id)
+                                }))
+                                .filter((episode) => episode.id)
                     },
                     comicId
                 )
             )
+            options.onProgress?.(index + 1, ids.length, findings)
         }
         return findings
+    }
+
+    startMaintenanceUpdateCheck(comicIds?: string[]) {
+        if (
+            this.maintenanceUpdateRun &&
+            [
+                'running',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(this.maintenanceUpdateProgress.state)
+        )
+            return {
+                started: false,
+                ...this.maintenanceUpdateStatus()
+            }
+
+        const ids = comicIds?.length
+            ? [...new Set(comicIds)]
+            : this.database.listDownloadedComicIds()
+        const now = new Date().toISOString()
+        this.maintenanceUpdatePauseRequested = false
+        this.maintenanceUpdateCancelRequested = false
+        this.maintenanceUpdateResumeWaiters.clear()
+        this.maintenanceUpdateFindings = []
+        this.maintenanceUpdateProgress = {
+            state: 'running',
+            phase: 'checking',
+            done: 0,
+            total: ids.length,
+            findingCount: 0,
+            updateCount: 0,
+            startedAt: now,
+            updatedAt: now
+        }
+
+        const run = (async () => {
+            try {
+                const findings = await this.checkUpdates(ids, {
+                    checkpoint: () => this.maintenanceUpdateCheckpoint(),
+                    onProgress: (done, total, current) => {
+                        this.maintenanceUpdateFindings = [...current]
+                        this.maintenanceUpdateProgress = {
+                            ...this.maintenanceUpdateProgress,
+                            state: 'running',
+                            phase: 'checking',
+                            done,
+                            total,
+                            findingCount: current.length,
+                            updateCount: current.filter(
+                                (finding) =>
+                                    finding.newEpisodeOrders.length > 0 ||
+                                    finding.metadataChanged
+                            ).length,
+                            updatedAt: new Date().toISOString()
+                        }
+                    }
+                })
+                this.maintenanceUpdateFindings = findings
+                this.maintenanceUpdateProgress = {
+                    ...this.maintenanceUpdateProgress,
+                    state: 'complete',
+                    phase: 'complete',
+                    done: ids.length,
+                    total: ids.length,
+                    findingCount: findings.length,
+                    updateCount: findings.filter(
+                        (finding) =>
+                            finding.newEpisodeOrders.length > 0 ||
+                            finding.metadataChanged
+                    ).length,
+                    updatedAt: new Date().toISOString()
+                }
+            } catch (error) {
+                if (error instanceof MaintenanceUpdateCancelledError)
+                    this.maintenanceUpdateProgress = {
+                        ...this.maintenanceUpdateProgress,
+                        state: 'cancelled',
+                        phase: 'cancelled',
+                        updatedAt: new Date().toISOString()
+                    }
+                else
+                    this.maintenanceUpdateProgress = {
+                        ...this.maintenanceUpdateProgress,
+                        state: 'failed',
+                        phase: 'failed',
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        updatedAt: new Date().toISOString()
+                    }
+            } finally {
+                this.finishMaintenanceUpdateControl()
+            }
+        })()
+        this.maintenanceUpdateRun = run
+        void run.catch(() => {
+            // The task records its authoritative terminal state above.
+        })
+        return {
+            started: true,
+            ...this.maintenanceUpdateStatus()
+        }
     }
 
     enqueueDownload(input: CreateDownloadJob): DownloadJob {

@@ -521,7 +521,7 @@ async function main() {
             return
         }
         if (command === 'maintenance-repair') {
-            const issues = scanRepairIssues(database)
+            const issues = await scanRepairIssues(database)
             const jobs = hasFlag('queue') ? queueRepairs(database, issues) : []
             print({ issues, jobs })
             return

@@ -151,7 +151,7 @@ Overall status: **IN_PROGRESS priority workstream**
 Existing v0.4.1, v0.4.7 and v0.4.8 work solved important concrete problems. P2 is not a request to rewrite those systems. Its purpose is to turn those fixes into a consistent runtime architecture, remove remaining duplicated/hidden heavy work, establish resource budgets, and add real performance evidence.
 
 ## P2-0 — Full runtime inventory and dependency map
-**Status: PLANNED — NEXT**
+**Status: DONE — see [docs/RUNTIME_INVENTORY_P2.md](./docs/RUNTIME_INVENTORY_P2.md)**
 
 Inventory every operation that can materially consume CPU, disk, network, SQLite write bandwidth or UI time.
 
@@ -231,7 +231,7 @@ Target:
 - long work survives page navigation according to its documented semantics.
 
 ## P2-C — Runtime resource classes and concurrency budgets
-**Status: PLANNED**
+**Status: PLANNED — NEXT after P2-0**
 
 Create explicit budgets for at least:
 - provider/API requests;
@@ -902,7 +902,7 @@ The task log should be updated against, not replace, these focused documents:
 # 11. Immediate next work
 
 ## NEXT-1 — P2-0 runtime inventory
-**Status: PLANNED**
+**Status: DONE**
 
 Produce the checked-in runtime inventory/dependency map and identify:
 - remaining hidden main-thread work;
@@ -913,7 +913,7 @@ Produce the checked-in runtime inventory/dependency map and identify:
 - missing performance instrumentation.
 
 ## NEXT-2 — P2-C resource-budget design
-**Status: PLANNED after NEXT-1**
+**Status: NEXT**
 
 Use inventory evidence to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
@@ -934,6 +934,25 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-0 runtime inventory completed
+
+Finding:
+- Long-task implementations are functionally mature in several areas, but authority is split across LibraryService in-memory state, browser Worker/page state, RemoteStorage manager state, SQLite download jobs, Android WorkManager and Android DownloadManager.
+- This does not justify a single universal scheduler. P2 will standardize the task contract and add cross-task resource governance while preserving platform-native executors.
+- High-priority concrete gaps were confirmed:
+  - maintenance update checking is request-owned, serial and defaults to a 5000-comic domain cap;
+  - repair scanning performs synchronous per-file filesystem stat work on the Node event loop;
+  - organize/materialize flows perform synchronous filesystem work in foreground request paths;
+  - Recommendation V5 shadow retrieval is manual/shadow-only but still request-owned;
+  - Visual indexing is Worker-isolated but its control authority is browser-page-local;
+  - advanced Visual/Work Identity/evaluation calculations require instrumentation before deciding whether each needs background execution;
+  - Android long tasks are individually durable but do not yet share a cross-task resource budget;
+  - current performance documentation is not yet a real hardware/runtime baseline.
+
+Action:
+- Remediation starts with maintenance/runtime hardening (RT-07 through RT-10), then background analysis tasks, resource arbitration and performance instrumentation.
+- Detailed evidence and remediation order are tracked in `docs/RUNTIME_INVENTORY_P2.md`.
 
 ## 2026-09-24 — Reconciled architecture/runtime work with the active multi-platform plan
 

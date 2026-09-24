@@ -148,6 +148,12 @@ describe('local HTTP latency registry', () => {
         expect(server).toContain(
             "error: 'Desktop control plane is unavailable'"
         )
+        expect(server).toContain(
+            'activeTaskTypes: options.service.runtimeActiveTaskTypes()'
+        )
+        expect(server).not.toContain(
+            '.runtimeResourceProfile()\n                .active.map'
+        )
         expect(gateway).not.toContain('/api/v1/desktop/runtime/http-profile')
     })
 })

@@ -914,14 +914,14 @@ Produce the checked-in runtime inventory/dependency map and identify:
 - missing performance instrumentation.
 
 ## NEXT-2 — H1 maintenance runtime hardening
-**Status: NEXT**
+**Status: IN_PROGRESS**
 
 Fix the confirmed foreground maintenance hazards before adding a global resource arbiter:
 
-- maintenance update checks must no longer be one long request-owned serial scan;
-- remove the correctness-significant 5000-comic default-domain cap without replacing it with an unbounded foreground request;
-- repair scanning must move off synchronous per-file `existsSync/statSync` work on the Node event loop;
-- organize/materialize filesystem work must gain explicit background/task semantics rather than foreground synchronous loops;
+- **DONE (PR #112):** repair scanning no longer performs synchronous per-file `existsSync/statSync` work on the Node event loop; it now uses asynchronous stat calls, progress callbacks and event-loop yielding.
+- **IN_PROGRESS:** maintenance update checks are being moved from one long request-owned full scan to an observable background task with pause/resume/cancel.
+- **IN_PROGRESS:** the correctness-significant 5000-comic default update-scan cap is being removed by querying the complete downloaded-comic ID domain directly.
+- **PLANNED NEXT:** organize/materialize filesystem work must gain explicit background/task semantics rather than foreground synchronous loops.
 - preserve the current safety model: scan/review first, then enqueue repair/update jobs.
 
 ## NEXT-3 — P2-C resource-budget design
@@ -946,6 +946,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — H1 maintenance hardening started
+
+State update:
+- PR #112 merged the first H1 remediation: repair scanning now performs asynchronous file stats, yields the Node event loop, and exposes scan progress hooks.
+- The next H1 branch changes full maintenance update checking from a request-owned scan into a background task with authoritative status and pause/resume/cancel controls.
+- Full update-scan discovery now uses the database's complete downloaded-comic ID domain rather than `listComics({ limit: 5000 })`.
+- Explicit small `comicIds` update checks remain synchronous for API compatibility; the ordinary full-scan UI uses the background task path.
+- Automatic queueing is intentionally not added to the full scan: findings remain reviewable before update jobs are queued.
+
 
 ## 2026-09-24 — W5C shell-only PWA merged
 

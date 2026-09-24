@@ -3844,7 +3844,20 @@ export class LibraryService {
 
     async buildFinalRecommendationCycleV3(cycleId: string) {
         this.beginRecommendationBuild(cycleId)
+        let releaseResources: () => void = () => undefined
         try {
+        const lease = await this.runtimeResources.acquire({
+            ownerId: 'recommendation-v3',
+            taskType: 'recommendation-v3-build',
+            priority: 'background',
+            resources: {
+                'provider-network': 1,
+                'cpu-analysis': 1,
+                'sqlite-read-heavy': 1,
+                'sqlite-write-heavy': 1
+            }
+        })
+        releaseResources = () => lease.release()
         await this.recommendationCheckpoint()
         const pica = await this.connect()
         const providerService = this.providerService()
@@ -4279,6 +4292,7 @@ export class LibraryService {
             }
             throw error
         } finally {
+            releaseResources()
             this.finishRecommendationBuild()
         }
     }
@@ -4431,7 +4445,18 @@ export class LibraryService {
         this.favoritesResumeWaiters.clear()
         this.favoritesTaskState = 'running'
         this.favoritesProgress = { phase: 'reading' }
+        let releaseResources: () => void = () => undefined
         try {
+            const lease = await this.runtimeResources.acquire({
+                ownerId: 'favorites-sync',
+                taskType: 'favorites-sync',
+                priority: 'background',
+                resources: {
+                    'provider-network': 1,
+                    'sqlite-write-heavy': 1
+                }
+            })
+            releaseResources = () => lease.release()
             const provider = this.providerService()
             const result = await provider.syncFavorites(
                 mode,
@@ -4469,6 +4494,7 @@ export class LibraryService {
             }
             throw error
         } finally {
+            releaseResources()
             this.finishFavoritesSyncControl()
         }
     }
@@ -5841,6 +5867,19 @@ export class LibraryService {
                 retryBaseMs: settings.retryBaseMs
             }
         )
+        const lease = await this.runtimeResources.acquire({
+            ownerId: `download-${runner.toLowerCase()}`,
+            taskType:
+                runner === 'LOCAL'
+                    ? 'local-download-runner'
+                    : 'github-download-runner',
+            priority: 'user',
+            resources: {
+                'media-network': 1,
+                'filesystem-heavy': 1,
+                'sqlite-write-heavy': 1
+            }
+        })
         const draining = scheduler.drain()
         if (runner === 'LOCAL') {
             this.activeLocalRuns.add(draining)
@@ -5854,6 +5893,7 @@ export class LibraryService {
                     error instanceof Error ? error.message : String(error)
             throw error
         } finally {
+            lease.release()
             if (runner === 'LOCAL') {
                 this.activeLocalRuns.delete(draining)
                 this.activeLocalSchedulers.delete(scheduler)

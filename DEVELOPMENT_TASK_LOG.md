@@ -932,7 +932,7 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 
 - **DONE (PR #116) — H2A / RT-11:** Recommendation V5 Shadow Retrieval is a detached Desktop task with authoritative phase/provider progress, pause/resume/cancel, reload recovery, and compact terminal summary. Shadow-only, explicit-confirmation and `servingImpact=false` boundaries remain unchanged.
 - **IN_PROGRESS — H2B / RT-13:** Visual QC / Author Atlas / Style Family now record bounded runtime telemetry and have a deterministic synthetic scaling harness. No foreground threshold has been selected yet; background only calculations that exceed the later evidence-based threshold.
-- **PLANNED — H2C / RT-14:** background Work Identity audit/evidence refresh where full-catalog execution is materially long; preserve evidence-only/manual-review semantics.
+- **IN_PROGRESS — H2C / RT-14:** Work Identity evidence refresh now has a checkpointable async audit core plus a detached service-owned task with pause/resume/cancel and reload-safe Web controls. The async audit is tested for exact result equivalence with the synchronous baseline; evidence remains evidence-only and is persisted only after the final checkpoint.
 
 ## NEXT-4 — P2-C resource-budget design
 **Status: PLANNED after H2**
@@ -956,6 +956,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — H2C Work Identity background runtime candidate
+
+State update:
+- The ordinary Work Identity evidence refresh no longer needs to own one synchronous HTTP request.
+- A checkpointable async audit uses the same pair-evaluation logic as the synchronous baseline and yields during catalog bucketing and candidate-pair comparison.
+- The service-owned task exposes loading/bucketing/comparing/persisting progress plus pause/resume/cancel.
+- The Web review surface polls authoritative backend state and can reattach after the panel is recreated.
+- Evidence persistence occurs only after the final cooperative checkpoint; an incomplete cancelled scan is not committed as a completed new evidence refresh.
+- Tests require the async audit result to equal the synchronous result for identical input.
+- Resolver semantics, confidence rules, KEEP_SEPARATE authority, automatic binding, materialization execution and recommendation serving remain unchanged.
+- Remaining Work Identity runtime measurement for review/materialization-preview and full-catalog SQLite materialization stays under later P2-D/P2-C work.
 
 ## 2026-09-24 — H2B Visual analysis measurement started
 

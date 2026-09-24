@@ -2607,7 +2607,7 @@ export class LibraryService {
                     candidateCount: audit.candidateCount,
                     crossProviderCandidateCount:
                         audit.crossProviderCandidateCount,
-                    savedCount: saved.length
+                    savedCount: saved.upserted
                 }
                 this.workIdentityEvidenceRefreshProgress = {
                     ...this.workIdentityEvidenceRefreshProgress,
@@ -2616,7 +2616,7 @@ export class LibraryService {
                     done: audit.scannedComicCount,
                     total: audit.scannedComicCount,
                     candidateCount: audit.candidateCount,
-                    savedCount: saved.length,
+                    savedCount: saved.upserted,
                     updatedAt: new Date().toISOString()
                 }
             } catch (error) {

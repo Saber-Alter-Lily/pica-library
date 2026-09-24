@@ -133,6 +133,7 @@ describe('P2 C2 observe-only runtime resource integration', () => {
     it('declares the first C2 task batch and keeps the resource endpoint Desktop-only', () => {
         const service = fs.readFileSync('src/library/service.ts', 'utf8')
         const server = fs.readFileSync('src/library/server.ts', 'utf8')
+        const desktop = fs.readFileSync('src/desktop/main.ts', 'utf8')
 
         expect(service).toContain("taskType: 'maintenance-update-scan'")
         expect(service).toContain("taskType: 'maintenance-repair-scan'")
@@ -151,5 +152,9 @@ describe('P2 C2 observe-only runtime resource integration', () => {
         expect(server).toContain(
             "error: 'Desktop control plane is unavailable'"
         )
+        expect(desktop).toContain(
+            'service?.runtimeResourceProfile().active ?? []'
+        )
+        expect(desktop).toContain('runtime:${task.taskType}')
     })
 })

@@ -390,7 +390,7 @@ Security:
 - diagnostic data follows existing credential-exclusion rules.
 
 ## P2-J — Performance instrumentation
-**Status: PLANNED**
+**Status: IN_PROGRESS — J1 local HTTP latency observation implemented; startup/browser/Android measurements remain open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -946,9 +946,12 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
 ## NEXT-5 — P2-J/P2-K performance baseline
-**Status: PLANNED after enough instrumentation exists**
+**Status: IN_PROGRESS — J1 runtime latency instrumentation**
 
-Create repeatable local/browser/Android measurements and record the first real baseline.
+- **J1 implemented:** bounded in-memory local HTTP latency telemetry classifies requests into low-cardinality route classes and correlates them with active resource-task types without storing URLs, comic IDs, search terms, bodies, tokens or paths.
+- Desktop-only `/api/v1/desktop/runtime/http-profile` exposes count/p50/p95/max/error summaries for overall, idle, under-load, route class and active task type.
+- No latency threshold or release budget is selected yet; real-device evidence remains required.
+- **Next:** collect repeatable Desktop idle-vs-load scenarios, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -963,6 +966,18 @@ May continue independently if:
 
 # 12. Decision / scope-change log
 
+## 2026-09-24 — P2-J1 real local HTTP latency observation
+
+State update:
+- Existing performance docs and download/Visual benchmark harnesses are synthetic/implementation-bound evidence and cannot answer whether normal Library/detail/Reader interaction slows down while heavy work runs.
+- J1 adds a bounded in-memory LocalHttpLatencyRegistry at the local HTTP server boundary.
+- Requests are classified only into low-cardinality route classes (`library-query`, `comic`, `reader`, `downloads`, etc.); raw URL/path, comic/episode/page IDs, query strings, bodies and credentials are never retained.
+- Each sample records duration/status plus sanitized active internal task types from the P2-C resource coordinator at request start.
+- Profiles separate idle vs under-load samples and summarize p50/p95/max/error count by route class and background task type.
+- Data is process-memory only, bounded to 500 samples in Desktop integration, not persisted and not uploaded.
+- Desktop-only `/api/v1/desktop/runtime/http-profile` exposes the profile; it is not added to Remote Web/browser-session allowlists.
+- No performance threshold is selected. J1 is measurement infrastructure; representative Windows/Android evidence is still required before P2-K budgets or P2-C3 enforcement.
+- Detailed boundary: docs/HTTP_LATENCY_RUNTIME_P2J1.md.
 ## 2026-09-24 — P2-C2B shared Desktop resource graph
 
 State update:

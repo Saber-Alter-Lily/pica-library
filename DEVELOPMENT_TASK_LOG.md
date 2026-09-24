@@ -5,8 +5,8 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-24**  
-Authoritative repository baseline at reconciliation: `main@e52f0ec1788cb40d4f9fcb4cd5117bed6e9acd53` (W5B merged)  
-Open work observed at reconciliation: **PR #109 — W5C installable shell-only Remote Web PWA**
+Authoritative repository baseline after 2026-09-24 reconciliation: `main@e4f83987d78795426f191d6753798c56e39a32ec` (W5C merged)  
+Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
 
@@ -55,10 +55,10 @@ The current critical path is:
 2. **P2-H1 — Maintenance runtime hardening**: remove the confirmed foreground blocking/truncation paths before introducing broader resource arbitration.
 3. **P3 — Platform foundation regression lock**: keep the shared platform/runtime layer clean while P2 changes land.
 4. **P4 — Real-platform acceptance**: finish the open Linux/macOS/Windows ARM64/Server gates without weakening capability truth.
-5. **P5 — Remote Web**: W5A/W5B are complete; W5C is currently in PR #109. Continue later Remote Web stages without allowing them to replace the P2 hardening work.
+5. **P5 — Remote Web**: W5A/W5B/W5C are complete. Continue later Remote Web stages without allowing them to replace the P2 hardening work.
 6. **P6 — Formal distribution/release gates**: only after real-device, signing/trust, performance and rollback evidence exists.
 
-**Parallel-work rule:** isolated W5C work may proceed in its existing branch because it does not require changing the core runtime scheduler. It must not redefine the priority order above or weaken W5A/W5B boundaries.
+**Parallel-work rule:** isolated future Remote Web work may proceed only when it does not redefine the priority order above or weaken the completed W5A/W5B/W5C boundaries.
 
 ---
 
@@ -663,7 +663,7 @@ Completed:
 - reader-progress/favorite/download/shelf/settings/provider/update/restart writes are denied.
 
 ## W5C — Installable shell-only Remote Web PWA
-**Status: IN_PROGRESS — PR #109**
+**Status: DONE — PR #109 merged**
 
 Current PR scope is accepted as the actual W5C label. Do not rename it retroactively.
 
@@ -935,7 +935,7 @@ Use the runtime inventory and H1 measurements to define resource classes and con
 Create repeatable local/browser/Android measurements and record the first real baseline.
 
 ## PARALLEL-1 — W5C PR #109
-**Status: IN_PROGRESS**
+**Status: DONE**
 
 May continue independently if:
 - shell-only cache boundary remains intact;
@@ -946,6 +946,13 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — W5C shell-only PWA merged
+
+State update:
+- PR #109 passed CI plus Linux, macOS arm64, Windows ARM64 and Docker package workflows and was merged.
+- W5C remains intentionally shell-only: no user-content offline cache, remote mutation or multi-user expansion.
+- P2 remains the critical path after this merge.
 
 ## 2026-09-24 — P2-0 runtime inventory completed
 

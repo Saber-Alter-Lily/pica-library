@@ -2991,21 +2991,11 @@ export class LibraryService {
         mutualK = 2,
         minimumSimilarity = -1
     ) {
-        const embeddings = this.database.listVisualEmbeddings()
-        const catalog = this.database.listComics({ limit: 10000 })
-        return this.visualAnalysisTimings.measure(
+        return this.visualAnalysisTimings.measureDynamic(
             'visual-style-families',
-            {
-                catalogCount: catalog.length,
-                embeddingCount: embeddings.length,
-                parameters: {
-                    minWorksPerAuthor,
-                    maxAuthors,
-                    mutualK,
-                    minimumSimilarity
-                }
-            },
             () => {
+                const embeddings = this.database.listVisualEmbeddings()
+                const catalog = this.database.listComics({ limit: 10000 })
                 const atlas = buildVisualAuthorAtlasV5({
                     embeddings,
                     catalog,
@@ -3013,12 +3003,22 @@ export class LibraryService {
                     maxGraphAuthors: Math.max(maxAuthors, 10),
                     neighborLimit: Math.max(mutualK, 2)
                 })
-                return buildVisualStyleFamiliesV5({
-                    atlas,
-                    maxAuthors,
-                    mutualK,
-                    minimumSimilarity
-                })
+                return {
+                    result: buildVisualStyleFamiliesV5({
+                        atlas,
+                        maxAuthors,
+                        mutualK,
+                        minimumSimilarity
+                    }),
+                    catalogCount: catalog.length,
+                    embeddingCount: embeddings.length,
+                    parameters: {
+                        minWorksPerAuthor,
+                        maxAuthors,
+                        mutualK,
+                        minimumSimilarity
+                    }
+                }
             }
         )
     }
@@ -3028,27 +3028,28 @@ export class LibraryService {
         maxGraphAuthors = 600,
         neighborLimit = 8
     ) {
-        const embeddings = this.database.listVisualEmbeddings()
-        const catalog = this.database.listComics({ limit: 10000 })
-        return this.visualAnalysisTimings.measure(
+        return this.visualAnalysisTimings.measureDynamic(
             'visual-author-atlas',
-            {
-                catalogCount: catalog.length,
-                embeddingCount: embeddings.length,
-                parameters: {
-                    minWorksPerAuthor,
-                    maxGraphAuthors,
-                    neighborLimit
+            () => {
+                const embeddings = this.database.listVisualEmbeddings()
+                const catalog = this.database.listComics({ limit: 10000 })
+                return {
+                    result: buildVisualAuthorAtlasV5({
+                        embeddings,
+                        catalog,
+                        minWorksPerAuthor,
+                        maxGraphAuthors,
+                        neighborLimit
+                    }),
+                    catalogCount: catalog.length,
+                    embeddingCount: embeddings.length,
+                    parameters: {
+                        minWorksPerAuthor,
+                        maxGraphAuthors,
+                        neighborLimit
+                    }
                 }
-            },
-            () =>
-                buildVisualAuthorAtlasV5({
-                    embeddings,
-                    catalog,
-                    minWorksPerAuthor,
-                    maxGraphAuthors,
-                    neighborLimit
-                })
+            }
         )
     }
 
@@ -3056,19 +3057,11 @@ export class LibraryService {
         maxPairSamples = 4000,
         maxAnchors = 120
     ) {
-        const catalog = this.database.listComics({ limit: 10000 })
-        const embeddings = this.database.listVisualEmbeddings()
-        return this.visualAnalysisTimings.measure(
+        return this.visualAnalysisTimings.measureDynamic(
             'visual-representation-qc',
-            {
-                catalogCount: catalog.length,
-                embeddingCount: embeddings.length,
-                parameters: {
-                    maxPairSamples,
-                    maxAnchors
-                }
-            },
             () => {
+                const catalog = this.database.listComics({ limit: 10000 })
+                const embeddings = this.database.listVisualEmbeddings()
                 const fandomKeysByComic: Record<string, string[]> = {}
                 try {
                     const registry = loadTagRegistryV3(
@@ -3095,13 +3088,21 @@ export class LibraryService {
                     // E-H raw parody tags remain available inside the QC module even
                     // when the packaged semantic registry cannot be loaded.
                 }
-                return buildVisualRepresentationQcV5({
-                    embeddings,
-                    catalog,
-                    fandomKeysByComic,
-                    maxPairSamples,
-                    maxAnchors
-                })
+                return {
+                    result: buildVisualRepresentationQcV5({
+                        embeddings,
+                        catalog,
+                        fandomKeysByComic,
+                        maxPairSamples,
+                        maxAnchors
+                    }),
+                    catalogCount: catalog.length,
+                    embeddingCount: embeddings.length,
+                    parameters: {
+                        maxPairSamples,
+                        maxAnchors
+                    }
+                }
             }
         )
     }

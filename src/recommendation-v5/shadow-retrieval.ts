@@ -24,6 +24,14 @@ export interface ShadowRetrievalAdapterV5 {
     ): Promise<FavoriteRecord[]>
 }
 
+export interface ShadowRetrievalProgressV5 {
+    done: number
+    total: number
+    candidateCount: number
+    surface?: string
+    routeId?: string
+}
+
 export interface ShadowCandidateEvidenceV5 {
     routeIds: string[]
     channelIds: string[]
@@ -137,6 +145,8 @@ export async function executeShadowRetrievalV5(
     options: {
         maxCandidates?: number
         now?: () => number
+        checkpoint?: () => Promise<void> | void
+        onProgress?: (progress: ShadowRetrievalProgressV5) => void
     } = {}
 ) {
     const maxCandidates = Math.max(
@@ -149,6 +159,37 @@ export async function executeShadowRetrievalV5(
     const catalogById = new Map(
         catalog.map((comic) => [comic.comicId, comic])
     )
+    const localRoutes = plan.routes.filter(
+        (item) => item.operation === 'LOCAL'
+    )
+    const networkRoutes = plan.routes.filter(
+        (item) => item.operation !== 'LOCAL'
+    )
+    const workTotal = Math.max(
+        1,
+        localRoutes.length +
+            networkRoutes.reduce(
+                (sum, route) =>
+                    sum +
+                    (route.surface === 'pica'
+                        ? Math.max(1, route.requestBudget)
+                        : 1),
+                0
+            )
+    )
+    let workDone = 0
+    const checkpoint = async () => {
+        await options.checkpoint?.()
+    }
+    const reportProgress = (surface?: string, routeId?: string) => {
+        options.onProgress?.({
+            done: workDone,
+            total: workTotal,
+            candidateCount: candidates.size,
+            surface,
+            routeId
+        })
+    }
 
     const addRecords = (
         route: CompiledProviderRouteV5,
@@ -184,9 +225,8 @@ export async function executeShadowRetrievalV5(
     }
 
     // Local rediscovery does not use provider network budget.
-    for (const route of plan.routes.filter(
-        (item) => item.operation === 'LOCAL'
-    )) {
+    for (const route of localRoutes) {
+        await checkpoint()
         const row: ShadowRouteTelemetryV5 = {
             routeId: route.routeId,
             channelId: route.channelId,
@@ -208,6 +248,9 @@ export async function executeShadowRetrievalV5(
             .filter((comic): comic is StoredComic => Boolean(comic))
         addRecords(route, records, row)
         telemetry.set(route.routeId, row)
+        workDone += 1
+        reportProgress('local', route.routeId)
+        await checkpoint()
     }
 
     const runSurface = async (
@@ -219,6 +262,7 @@ export async function executeShadowRetrievalV5(
                 route.operation !== 'LOCAL'
         )
         for (const route of routes) {
+            await checkpoint()
             const startedAt = now()
             const row: ShadowRouteTelemetryV5 = {
                 routeId: route.routeId,
@@ -241,6 +285,7 @@ export async function executeShadowRetrievalV5(
                     ? Math.max(1, route.requestBudget)
                     : 1
             for (let requestIndex = 0; requestIndex < attempts; requestIndex++) {
+                await checkpoint()
                 try {
                     let records: FavoriteRecord[]
                     if (route.operation === 'RELATED') {
@@ -272,6 +317,9 @@ export async function executeShadowRetrievalV5(
                     row.failedRequests++
                     row.errorClasses.push(errorClass(error))
                 }
+                workDone += 1
+                reportProgress(surface, route.routeId)
+                await checkpoint()
             }
             row.errorClasses = [...new Set(row.errorClasses)].sort()
             row.latencyMs = Math.max(0, now() - startedAt)
@@ -288,11 +336,17 @@ export async function executeShadowRetrievalV5(
     // Provider pipelines are isolated from one another. Routes within a
     // provider remain sequential so provider-native pacing/rate limits are
     // respected, while one failed provider cannot abort the other providers.
-    await Promise.all([
+    const providerRuns = await Promise.allSettled([
         runSurface('pica'),
         runSurface('eh'),
         runSurface('exh')
     ])
+    const rejected = providerRuns.find(
+        (result): result is PromiseRejectedResult =>
+            result.status === 'rejected'
+    )
+    if (rejected) throw rejected.reason
+    await checkpoint()
 
     const rows = [...candidates.values()].sort(
         (a, b) =>

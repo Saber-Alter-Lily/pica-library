@@ -232,7 +232,7 @@ Target:
 - long work survives page navigation according to its documented semantics.
 
 ## P2-C — Runtime resource classes and concurrency budgets
-**Status: PLANNED — after H1 maintenance runtime hardening**
+**Status: IN_PROGRESS — C1 coordinator foundation implemented; production enforcement remains disabled**
 
 Create explicit budgets for at least:
 - provider/API requests;
@@ -932,10 +932,14 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 
 - **DONE (PR #116) — H2A / RT-11:** Recommendation V5 Shadow Retrieval is a detached Desktop task with authoritative phase/provider progress, pause/resume/cancel, reload recovery, and compact terminal summary. Shadow-only, explicit-confirmation and `servingImpact=false` boundaries remain unchanged.
 - **IN_PROGRESS — H2B / RT-13:** Visual QC / Author Atlas / Style Family now record bounded runtime telemetry and have a deterministic synthetic scaling harness. No foreground threshold has been selected yet; background only calculations that exceed the later evidence-based threshold.
-- **IN_PROGRESS — H2C / RT-14:** Work Identity evidence refresh now has a checkpointable async audit core plus a detached service-owned task with pause/resume/cancel and reload-safe Web controls. The async audit is tested for exact result equivalence with the synchronous baseline; evidence remains evidence-only and is persisted only after the final checkpoint.
+- **DONE (PR #118) — H2C / RT-14:** Work Identity evidence refresh is a checkpointable detached service-owned task with pause/resume/cancel and reload-safe Web controls. The async audit is tested for exact result equivalence with the synchronous baseline; evidence remains evidence-only and persists only after the final checkpoint. All main CI plus Linux, macOS arm64, Docker and rerun Windows ARM64 package gates passed before merge.
 
 ## NEXT-4 — P2-C resource-budget design
-**Status: PLANNED after H2**
+**Status: IN_PROGRESS — C1 foundation**
+
+- **C1:** add a tested resource coordinator with shared resource-class vocabulary, atomic multi-resource leases, priority/FIFO admission semantics, cancellation and diagnostics. Production mode remains observe-only and does not impose invented capacities.
+- **C2 next:** integrate heavy tasks with observe-only resource declarations so real overlap can be measured.
+- **C3 later:** propose enforceable capacities only after overlap and latency evidence exists.
 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
@@ -957,6 +961,18 @@ May continue independently if:
 
 # 12. Decision / scope-change log
 
+## 2026-09-24 — P2-C1 resource coordinator foundation
+
+State update:
+- H2C PR #118 passed all gates after a transient Windows ARM64 DPAPI settings timeout was reproduced as non-deterministic: the targeted rerun passed packaged acceptance, replacement/rollback and install/uninstall.
+- P2-C may now begin while H2B continues collecting real Visual timing evidence; this does not authorize choosing a Visual foreground threshold.
+- C1 introduces a shared resource-class vocabulary and a coordinator with observe/enforce modes.
+- The application does not enable enforcement in C1. No production resource capacity has been selected.
+- Enforcement semantics are tested in isolation: atomic multi-resource acquisition, foreground/user/background ordering, cancellable waiters, idempotent release and bounded diagnostics.
+- C2 will integrate existing tasks in observe-only mode to collect real overlap before C3 selects any enforceable budget.
+- Detailed boundary: docs/RUNTIME_RESOURCE_COORDINATOR_P2C1.md.
+- Windows ARM64 packaged acceptance timeout was hardened after two identical hosted-runner DPAPI/settings POST overruns: that native operation remains bounded at 30 seconds and now logs elapsed time; other platform acceptance bounds remain unchanged.
+- Docker TLS acceptance was hardened after a transient post-readiness 502: Caddy/Pica readiness remains bounded, but the post-TLS health assertion now retries within a finite window and fails with container logs if readiness does not stabilize.
 ## 2026-09-24 — H2C Work Identity background runtime candidate
 
 State update:

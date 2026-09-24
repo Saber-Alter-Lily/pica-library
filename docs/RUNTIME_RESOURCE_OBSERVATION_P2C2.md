@@ -30,6 +30,8 @@ The endpoint returns the coordinator snapshot: mode, capacities, current/peak us
 
 The endpoint is not part of W4B/W5 browser-session Remote Web allowlists. Remote Web does not receive this internal diagnostic surface.
 
+The same active observation leases are also consulted by the Desktop browser-close lifecycle. An observed background task therefore keeps the local engine alive after the last browser tab closes instead of being terminated by the idle-browser grace timer. This fixes a lifecycle gap introduced as H1/H2 work became detached from request/page ownership.
+
 ## Important measurement limitation
 
 C2 first-batch leases are **task-lifetime observations**.

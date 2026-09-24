@@ -44,6 +44,10 @@ import {
     renderLibraryPath,
     safePathSegment
 } from './path-template'
+import {
+    organizeLibraryViews,
+    type LibraryOrganizeProgress
+} from './organizer'
 import type {
     CreateDownloadJob,
     DownloadJob,
@@ -236,6 +240,35 @@ class MaintenanceUpdateCancelledError extends Error {
     }
 }
 
+class LibraryOrganizeCancelledError extends Error {
+    constructor() {
+        super('Library organize task was cancelled')
+        this.name = 'LibraryOrganizeCancelledError'
+    }
+}
+
+export interface LibraryOrganizeTaskProgress {
+    state:
+        | 'idle'
+        | 'running'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
+    phase: 'idle' | 'organizing' | 'paused' | 'complete' | 'failed' | 'cancelled'
+    done: number
+    total: number
+    linked: number
+    existing: number
+    manifests: number
+    skipped: number
+    startedAt?: string
+    updatedAt?: string
+    error?: string
+}
+
 export interface MaintenanceUpdateProgress {
     state:
         | 'idle'
@@ -370,6 +403,24 @@ export class LibraryService {
     private readonly maintenanceUpdateResumeWaiters = new Set<() => void>()
     private maintenanceUpdateFindings: UpdateFinding[] = []
     private maintenanceUpdateRun: Promise<void> | null = null
+
+    private libraryOrganizeProgress: LibraryOrganizeTaskProgress = {
+        state: 'idle',
+        phase: 'idle',
+        done: 0,
+        total: 0,
+        linked: 0,
+        existing: 0,
+        manifests: 0,
+        skipped: 0
+    }
+    private libraryOrganizePauseRequested = false
+    private libraryOrganizeCancelRequested = false
+    private readonly libraryOrganizeResumeWaiters = new Set<() => void>()
+    private libraryOrganizeRun: Promise<void> | null = null
+    private libraryOrganizeResult:
+        | Awaited<ReturnType<typeof organizeLibraryViews>>
+        | null = null
 
     private allComicsForIdentity(): StoredComic[] {
         return this.database.listComics(
@@ -4090,6 +4141,210 @@ export class LibraryService {
             // profile, ranking, or schema-8 derived artifact is unavailable.
         }
         return recommendComics(catalog, limit, candidates)
+    }
+
+    libraryOrganizeStatus() {
+        const active = [
+            'running',
+            'pausing',
+            'paused',
+            'cancelling'
+        ].includes(this.libraryOrganizeProgress.state)
+        const terminal = [
+            'complete',
+            'failed',
+            'cancelled'
+        ].includes(this.libraryOrganizeProgress.state)
+        return {
+            ...this.libraryOrganizeProgress,
+            active,
+            canPause:
+                this.libraryOrganizeProgress.state === 'running' ||
+                this.libraryOrganizeProgress.state === 'pausing',
+            canResume: this.libraryOrganizeProgress.state === 'paused',
+            canCancel: active,
+            result: terminal ? this.libraryOrganizeResult : undefined
+        }
+    }
+
+    libraryOrganizeControl(action: 'pause' | 'resume' | 'cancel') {
+        if (action === 'pause') {
+            if (this.libraryOrganizeProgress.state === 'running') {
+                this.libraryOrganizePauseRequested = true
+                this.libraryOrganizeProgress = {
+                    ...this.libraryOrganizeProgress,
+                    state: 'pausing',
+                    updatedAt: new Date().toISOString()
+                }
+            }
+            return this.libraryOrganizeStatus()
+        }
+        if (action === 'resume') {
+            this.libraryOrganizePauseRequested = false
+            for (const resolve of this.libraryOrganizeResumeWaiters) resolve()
+            this.libraryOrganizeResumeWaiters.clear()
+            if (
+                this.libraryOrganizeProgress.state === 'paused' ||
+                this.libraryOrganizeProgress.state === 'pausing'
+            )
+                this.libraryOrganizeProgress = {
+                    ...this.libraryOrganizeProgress,
+                    state: 'running',
+                    phase: 'organizing',
+                    updatedAt: new Date().toISOString()
+                }
+            return this.libraryOrganizeStatus()
+        }
+        this.libraryOrganizeCancelRequested = true
+        this.libraryOrganizePauseRequested = false
+        for (const resolve of this.libraryOrganizeResumeWaiters) resolve()
+        this.libraryOrganizeResumeWaiters.clear()
+        if (
+            this.libraryOrganizeProgress.state === 'running' ||
+            this.libraryOrganizeProgress.state === 'pausing' ||
+            this.libraryOrganizeProgress.state === 'paused'
+        )
+            this.libraryOrganizeProgress = {
+                ...this.libraryOrganizeProgress,
+                state: 'cancelling',
+                updatedAt: new Date().toISOString()
+            }
+        return this.libraryOrganizeStatus()
+    }
+
+    private async libraryOrganizeCheckpoint() {
+        if (this.libraryOrganizeCancelRequested)
+            throw new LibraryOrganizeCancelledError()
+        if (!this.libraryOrganizePauseRequested) return
+        this.libraryOrganizeProgress = {
+            ...this.libraryOrganizeProgress,
+            state: 'paused',
+            phase: 'paused',
+            updatedAt: new Date().toISOString()
+        }
+        await new Promise<void>((resolve) =>
+            this.libraryOrganizeResumeWaiters.add(resolve)
+        )
+        if (this.libraryOrganizeCancelRequested)
+            throw new LibraryOrganizeCancelledError()
+        this.libraryOrganizeProgress = {
+            ...this.libraryOrganizeProgress,
+            state: 'running',
+            phase: 'organizing',
+            updatedAt: new Date().toISOString()
+        }
+    }
+
+    private finishLibraryOrganizeControl() {
+        this.libraryOrganizePauseRequested = false
+        this.libraryOrganizeCancelRequested = false
+        for (const resolve of this.libraryOrganizeResumeWaiters) resolve()
+        this.libraryOrganizeResumeWaiters.clear()
+        this.libraryOrganizeRun = null
+    }
+
+    startLibraryOrganize() {
+        if (
+            this.libraryOrganizeRun &&
+            [
+                'running',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(this.libraryOrganizeProgress.state)
+        )
+            return {
+                started: false,
+                ...this.libraryOrganizeStatus()
+            }
+
+        const comics = this.database.listAllComics()
+        const now = new Date().toISOString()
+        this.libraryOrganizePauseRequested = false
+        this.libraryOrganizeCancelRequested = false
+        this.libraryOrganizeResumeWaiters.clear()
+        this.libraryOrganizeResult = null
+        this.libraryOrganizeProgress = {
+            state: 'running',
+            phase: 'organizing',
+            done: 0,
+            total: comics.length,
+            linked: 0,
+            existing: 0,
+            manifests: 0,
+            skipped: 0,
+            startedAt: now,
+            updatedAt: now
+        }
+
+        const run = (async () => {
+            try {
+                this.libraryOrganizeResult = await organizeLibraryViews(
+                    this.dataDir,
+                    comics,
+                    {
+                        checkpoint: () => this.libraryOrganizeCheckpoint(),
+                        onProgress: (progress: LibraryOrganizeProgress) => {
+                            const controlState =
+                                this.libraryOrganizeProgress.state
+                            this.libraryOrganizeProgress = {
+                                ...this.libraryOrganizeProgress,
+                                state:
+                                    controlState === 'pausing' ||
+                                    controlState === 'cancelling'
+                                        ? controlState
+                                        : 'running',
+                                phase: 'organizing',
+                                done: progress.done,
+                                total: progress.total,
+                                linked: progress.linked ?? 0,
+                                existing: progress.existing ?? 0,
+                                manifests: progress.manifests ?? 0,
+                                skipped: progress.skipped,
+                                updatedAt: new Date().toISOString()
+                            }
+                        }
+                    }
+                )
+                this.libraryOrganizeProgress = {
+                    ...this.libraryOrganizeProgress,
+                    state: 'complete',
+                    phase: 'complete',
+                    done: comics.length,
+                    total: comics.length,
+                    updatedAt: new Date().toISOString()
+                }
+            } catch (error) {
+                if (error instanceof LibraryOrganizeCancelledError)
+                    this.libraryOrganizeProgress = {
+                        ...this.libraryOrganizeProgress,
+                        state: 'cancelled',
+                        phase: 'cancelled',
+                        updatedAt: new Date().toISOString()
+                    }
+                else
+                    this.libraryOrganizeProgress = {
+                        ...this.libraryOrganizeProgress,
+                        state: 'failed',
+                        phase: 'failed',
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        updatedAt: new Date().toISOString()
+                    }
+            } finally {
+                this.finishLibraryOrganizeControl()
+            }
+        })()
+        this.libraryOrganizeRun = run
+        void run.catch(() => {
+            // The task records its authoritative terminal state above.
+        })
+        return {
+            started: true,
+            ...this.libraryOrganizeStatus()
+        }
     }
 
     maintenanceUpdateStatus() {

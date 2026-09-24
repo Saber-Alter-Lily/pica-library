@@ -460,14 +460,45 @@ export async function startLibraryServer(options: {
 
             if (
                 url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/evidence/refresh/status' &&
+                request.method === 'GET'
+            )
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityEvidenceRefreshStatus()
+                )
+
+            if (
+                url.pathname ===
+                    '/api/v1/recommendation-v5/work-identity/evidence/refresh/control' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const action = String(input.action ?? '')
+                if (!['pause', 'resume', 'cancel'].includes(action))
+                    return json(response, 400, {
+                        error: 'Invalid Work Identity refresh control action'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.recommendationV5WorkIdentityEvidenceRefreshControl(
+                        action as 'pause' | 'resume' | 'cancel'
+                    )
+                )
+            }
+
+            if (
+                url.pathname ===
                     '/api/v1/recommendation-v5/work-identity/evidence/refresh' &&
                 request.method === 'POST'
             ) {
                 const input = await body(request)
                 return json(
                     response,
-                    200,
-                    options.service.recommendationV5RefreshWorkIdentityEvidence(
+                    202,
+                    options.service.startRecommendationV5WorkIdentityEvidenceRefresh(
                         Number(input.limit ?? 500)
                     )
                 )

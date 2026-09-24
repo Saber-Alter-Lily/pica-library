@@ -4322,6 +4322,7 @@ export class LibraryService {
                 ...this.libraryOrganizeStatus()
             }
 
+        const comics = this.database.listAllComics()
         const resources = this.acquireRuntimeResources(
             'library-organize',
             'library-organize-views',
@@ -4334,8 +4335,6 @@ export class LibraryService {
                 blockedByResources: resources.blockedBy,
                 ...this.libraryOrganizeStatus()
             }
-
-        const comics = this.database.listAllComics()
         const now = new Date().toISOString()
         this.libraryOrganizePauseRequested = false
         this.libraryOrganizeCancelRequested = false
@@ -4788,6 +4787,9 @@ export class LibraryService {
                 ...this.maintenanceUpdateStatus()
             }
 
+        const ids = comicIds?.length
+            ? [...new Set(comicIds)]
+            : this.database.listDownloadedComicIds()
         const resources = this.acquireRuntimeResources(
             'maintenance-update',
             'maintenance-update-scan',
@@ -4800,10 +4802,6 @@ export class LibraryService {
                 blockedByResources: resources.blockedBy,
                 ...this.maintenanceUpdateStatus()
             }
-
-        const ids = comicIds?.length
-            ? [...new Set(comicIds)]
-            : this.database.listDownloadedComicIds()
         const now = new Date().toISOString()
         this.maintenanceUpdatePauseRequested = false
         this.maintenanceUpdateCancelRequested = false
@@ -4973,6 +4971,10 @@ export class LibraryService {
             this.localDownloadRunStartedAt = new Date().toISOString()
             this.localDownloadLastError = null
         }
+        const settings = resolvePerformanceSettings(
+            options.profile ?? 'balanced',
+            options.custom
+        )
         const resources = this.acquireRuntimeResources(
             `download-${runner.toLowerCase()}`,
             'download-queue',
@@ -4985,10 +4987,6 @@ export class LibraryService {
                     .map((item) => item.resource)
                     .join(', ')}`
             )
-        const settings = resolvePerformanceSettings(
-            options.profile ?? 'balanced',
-            options.custom
-        )
         const mediaGate = new MediaRequestGate(
             settings.globalMediaConcurrency,
             settings.requestIntervalMs

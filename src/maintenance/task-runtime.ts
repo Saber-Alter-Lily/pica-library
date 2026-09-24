@@ -125,8 +125,8 @@ export class MaintenanceTaskRuntime<TResult> {
             total: Math.max(0, Math.floor(initial.total ?? 0)),
             indeterminate:
                 initial.indeterminate ??
-                !Number.isFinite(initial.total) ||
-                Number(initial.total) <= 0,
+                (!Number.isFinite(initial.total) ||
+                    Number(initial.total) <= 0),
             startedAt,
             updatedAt: startedAt,
             finishedAt: null,

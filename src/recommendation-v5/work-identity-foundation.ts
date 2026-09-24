@@ -55,7 +55,7 @@ function auditCandidate(
     right: StoredComic,
     selected: Map<string, WorkIdentityAuditCandidateV5>,
     state: PortablePolicyStateV5
-) {
+): WorkIdentityAuditCandidateV5 | null {
     if (left.comicId === right.comicId) return null
     const key = stablePair(left.comicId, right.comicId)
     if (selected.has(key)) return null

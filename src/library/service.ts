@@ -54,6 +54,7 @@ import type {
     DownloadRunner
 } from '../core/downloads/types'
 import { checkComicUpdates, type UpdateFinding } from '../maintenance/updates'
+import { scanRepairIssues, type RepairIssue } from '../maintenance/repair'
 import {
     ProviderService,
     type FavoritesSyncMode
@@ -240,6 +241,32 @@ class MaintenanceUpdateCancelledError extends Error {
     }
 }
 
+class MaintenanceRepairCancelledError extends Error {
+    constructor() {
+        super('Maintenance repair scan was cancelled')
+        this.name = 'MaintenanceRepairCancelledError'
+    }
+}
+
+export interface MaintenanceRepairProgress {
+    state:
+        | 'idle'
+        | 'running'
+        | 'pausing'
+        | 'paused'
+        | 'cancelling'
+        | 'complete'
+        | 'failed'
+        | 'cancelled'
+    phase: 'idle' | 'scanning' | 'paused' | 'complete' | 'failed' | 'cancelled'
+    done: number
+    total: number
+    issueCount: number
+    startedAt?: string
+    updatedAt?: string
+    error?: string
+}
+
 class LibraryOrganizeCancelledError extends Error {
     constructor() {
         super('Library organize task was cancelled')
@@ -403,6 +430,19 @@ export class LibraryService {
     private readonly maintenanceUpdateResumeWaiters = new Set<() => void>()
     private maintenanceUpdateFindings: UpdateFinding[] = []
     private maintenanceUpdateRun: Promise<void> | null = null
+
+    private maintenanceRepairProgress: MaintenanceRepairProgress = {
+        state: 'idle',
+        phase: 'idle',
+        done: 0,
+        total: 0,
+        issueCount: 0
+    }
+    private maintenanceRepairPauseRequested = false
+    private maintenanceRepairCancelRequested = false
+    private readonly maintenanceRepairResumeWaiters = new Set<() => void>()
+    private maintenanceRepairIssues: RepairIssue[] = []
+    private maintenanceRepairRun: Promise<void> | null = null
 
     private libraryOrganizeProgress: LibraryOrganizeTaskProgress = {
         state: 'idle',
@@ -4344,6 +4384,198 @@ export class LibraryService {
         return {
             started: true,
             ...this.libraryOrganizeStatus()
+        }
+    }
+
+    maintenanceRepairStatus() {
+        const active = [
+            'running',
+            'pausing',
+            'paused',
+            'cancelling'
+        ].includes(this.maintenanceRepairProgress.state)
+        const terminal = [
+            'complete',
+            'failed',
+            'cancelled'
+        ].includes(this.maintenanceRepairProgress.state)
+        return {
+            ...this.maintenanceRepairProgress,
+            active,
+            canPause:
+                this.maintenanceRepairProgress.state === 'running' ||
+                this.maintenanceRepairProgress.state === 'pausing',
+            canResume: this.maintenanceRepairProgress.state === 'paused',
+            canCancel: active,
+            issues: terminal ? this.maintenanceRepairIssues : undefined
+        }
+    }
+
+    maintenanceRepairControl(action: 'pause' | 'resume' | 'cancel') {
+        if (action === 'pause') {
+            if (this.maintenanceRepairProgress.state === 'running') {
+                this.maintenanceRepairPauseRequested = true
+                this.maintenanceRepairProgress = {
+                    ...this.maintenanceRepairProgress,
+                    state: 'pausing',
+                    updatedAt: new Date().toISOString()
+                }
+            }
+            return this.maintenanceRepairStatus()
+        }
+        if (action === 'resume') {
+            this.maintenanceRepairPauseRequested = false
+            for (const resolve of this.maintenanceRepairResumeWaiters) resolve()
+            this.maintenanceRepairResumeWaiters.clear()
+            if (
+                this.maintenanceRepairProgress.state === 'paused' ||
+                this.maintenanceRepairProgress.state === 'pausing'
+            )
+                this.maintenanceRepairProgress = {
+                    ...this.maintenanceRepairProgress,
+                    state: 'running',
+                    phase: 'scanning',
+                    updatedAt: new Date().toISOString()
+                }
+            return this.maintenanceRepairStatus()
+        }
+        this.maintenanceRepairCancelRequested = true
+        this.maintenanceRepairPauseRequested = false
+        for (const resolve of this.maintenanceRepairResumeWaiters) resolve()
+        this.maintenanceRepairResumeWaiters.clear()
+        if (
+            this.maintenanceRepairProgress.state === 'running' ||
+            this.maintenanceRepairProgress.state === 'pausing' ||
+            this.maintenanceRepairProgress.state === 'paused'
+        )
+            this.maintenanceRepairProgress = {
+                ...this.maintenanceRepairProgress,
+                state: 'cancelling',
+                updatedAt: new Date().toISOString()
+            }
+        return this.maintenanceRepairStatus()
+    }
+
+    private async maintenanceRepairCheckpoint() {
+        if (this.maintenanceRepairCancelRequested)
+            throw new MaintenanceRepairCancelledError()
+        if (!this.maintenanceRepairPauseRequested) return
+        this.maintenanceRepairProgress = {
+            ...this.maintenanceRepairProgress,
+            state: 'paused',
+            phase: 'paused',
+            updatedAt: new Date().toISOString()
+        }
+        await new Promise<void>((resolve) =>
+            this.maintenanceRepairResumeWaiters.add(resolve)
+        )
+        if (this.maintenanceRepairCancelRequested)
+            throw new MaintenanceRepairCancelledError()
+        this.maintenanceRepairProgress = {
+            ...this.maintenanceRepairProgress,
+            state: 'running',
+            phase: 'scanning',
+            updatedAt: new Date().toISOString()
+        }
+    }
+
+    private finishMaintenanceRepairControl() {
+        this.maintenanceRepairPauseRequested = false
+        this.maintenanceRepairCancelRequested = false
+        for (const resolve of this.maintenanceRepairResumeWaiters) resolve()
+        this.maintenanceRepairResumeWaiters.clear()
+        this.maintenanceRepairRun = null
+    }
+
+    startMaintenanceRepairScan() {
+        if (
+            this.maintenanceRepairRun &&
+            [
+                'running',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(this.maintenanceRepairProgress.state)
+        )
+            return {
+                started: false,
+                ...this.maintenanceRepairStatus()
+            }
+
+        const now = new Date().toISOString()
+        this.maintenanceRepairPauseRequested = false
+        this.maintenanceRepairCancelRequested = false
+        this.maintenanceRepairResumeWaiters.clear()
+        this.maintenanceRepairIssues = []
+        this.maintenanceRepairProgress = {
+            state: 'running',
+            phase: 'scanning',
+            done: 0,
+            total: 0,
+            issueCount: 0,
+            startedAt: now,
+            updatedAt: now
+        }
+
+        const run = (async () => {
+            try {
+                const issues = await scanRepairIssues(this.database, {
+                    checkpoint: () => this.maintenanceRepairCheckpoint(),
+                    onProgress: ({ done, total }) => {
+                        const controlState =
+                            this.maintenanceRepairProgress.state
+                        this.maintenanceRepairProgress = {
+                            ...this.maintenanceRepairProgress,
+                            state:
+                                controlState === 'pausing' ||
+                                controlState === 'cancelling'
+                                    ? controlState
+                                    : 'running',
+                            phase: 'scanning',
+                            done,
+                            total,
+                            updatedAt: new Date().toISOString()
+                        }
+                    }
+                })
+                this.maintenanceRepairIssues = issues
+                this.maintenanceRepairProgress = {
+                    ...this.maintenanceRepairProgress,
+                    state: 'complete',
+                    phase: 'complete',
+                    issueCount: issues.length,
+                    updatedAt: new Date().toISOString()
+                }
+            } catch (error) {
+                if (error instanceof MaintenanceRepairCancelledError)
+                    this.maintenanceRepairProgress = {
+                        ...this.maintenanceRepairProgress,
+                        state: 'cancelled',
+                        phase: 'cancelled',
+                        updatedAt: new Date().toISOString()
+                    }
+                else
+                    this.maintenanceRepairProgress = {
+                        ...this.maintenanceRepairProgress,
+                        state: 'failed',
+                        phase: 'failed',
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                        updatedAt: new Date().toISOString()
+                    }
+            } finally {
+                this.finishMaintenanceRepairControl()
+            }
+        })()
+        this.maintenanceRepairRun = run
+        void run.catch(() => {
+            // The task records its authoritative terminal state above.
+        })
+        return {
+            started: true,
+            ...this.maintenanceRepairStatus()
         }
     }
 

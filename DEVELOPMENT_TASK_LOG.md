@@ -921,7 +921,8 @@ Fix the confirmed foreground maintenance hazards before adding a global resource
 - **DONE (PR #112):** repair scanning no longer performs synchronous per-file `existsSync/statSync` work on the Node event loop; it now uses asynchronous stat calls, progress callbacks and event-loop yielding.
 - **DONE (PR #113):** full maintenance update checks now run as an observable background task with pause/resume/cancel; explicit narrow comic-ID checks remain synchronous for compatibility.
 - **DONE (PR #113):** the correctness-significant 5000-comic default update-scan cap was removed by querying the complete downloaded-comic ID domain directly.
-- **IN_PROGRESS:** organize/materialize filesystem work is being moved off synchronous foreground filesystem APIs; the Web organize route becomes a controllable background task while explicit CLI organize/portable commands use the same asynchronous checkpointable primitives.
+- **DONE (PR #114):** organize/materialize filesystem work now uses asynchronous checkpointable primitives; the Web organize route is a controllable background task, CLI organize/portable use the complete catalog, and final indexes/manifests publish only after the last checkpoint.
+- **IN_PROGRESS:** repair scanning is being promoted from “async but request-owned” to the same background task model with authoritative progress and pause/resume/cancel.
 - preserve the current safety model: scan/review first, then enqueue repair/update jobs.
 
 ## NEXT-3 — P2-C resource-budget design
@@ -946,6 +947,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — H1C organizer runtime merged
+
+State update:
+- PR #114 passed CI plus Linux, macOS arm64, Windows ARM64 and Docker package gates and was merged.
+- `/api/v1/organize` now starts a detached LibraryService task with status and pause/resume/cancel controls.
+- Organizer/materialization filesystem operations use asynchronous APIs and explicit checkpoints instead of synchronous `existsSync/cpSync/symlinkSync/writeFileSync` loops.
+- CLI `organize` and `portable` now use the complete catalog instead of a 5000-comic cap.
+- Portable comic replacement uses a temporary copy before publication; final index/manifest publication occurs only after the final checkpoint.
+- Existing published indexes/manifests are retained until replacement is ready, including a Windows-compatible backup/restore fallback.
 
 ## 2026-09-24 — H1B maintenance update runtime merged
 

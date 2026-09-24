@@ -68,6 +68,7 @@ export async function scanRepairIssues(
             done: index + 1,
             total: pictures.length
         })
+        await options.checkpoint?.()
         if ((index + 1) % yieldEvery === 0) await yieldToEventLoop()
     }
 

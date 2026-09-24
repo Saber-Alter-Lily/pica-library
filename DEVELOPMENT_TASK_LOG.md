@@ -232,15 +232,60 @@ Target:
 - long work survives page navigation according to its documented semantics.
 
 ## P2-C — Runtime resource classes and concurrency budgets
-**Status: PLANNED — after H1 maintenance runtime hardening**
+**Status: IN_PROGRESS**
 
-Create explicit budgets for at least:
-- provider/API requests;
-- media transfers;
-- SQLite write-heavy work;
-- local file hashing/scanning;
-- CPU/model inference;
-- background analysis/evaluation.
+P2-C is split deliberately so observability is not confused with completed throttling.
+
+### P2-C1 — Resource classes, leases and minimal evidence-backed admission control
+**Status: IN_PROGRESS**
+
+Central resource classes:
+- provider-network;
+- media-network;
+- remote-storage-network;
+- cpu-model;
+- cpu-analysis;
+- filesystem-heavy;
+- sqlite-write-heavy.
+
+Current C1 policy:
+- task/resource leases are process-local and exposed through runtime status;
+- **filesystem-heavy has enforced capacity 1** for background/maintenance work because H1 established direct event-loop/disk-contention risk;
+- all other classes remain **observe-only** until P2-J/K establishes a baseline;
+- no Redis/BullMQ/external queue dependency is introduced.
+
+Initial C1 coverage:
+- Recommendation V3 generation;
+- favorites sync;
+- maintenance update scan;
+- maintenance repair scan;
+- library organize task;
+- local download queue.
+
+Still required in C1/C2 coverage:
+- WebDAV sync/hashing;
+- Visual indexing/model work;
+- V5 shadow retrieval and other H2 advanced analysis;
+- import/re-import / other bulk SQLite writers;
+- Android WorkManager task classes through a platform-native equivalent rather than the Node registry.
+
+### P2-C2 — Coverage expansion and foreground/background priority
+**Status: PLANNED**
+
+- connect remaining heavy executors to the same conceptual resource classes;
+- define foreground/user-visible priority versus background/maintenance priority;
+- ensure low-priority work yields or is refused when an evidence-backed conflict exists;
+- do not replace platform-native executors merely to centralize state.
+
+### P2-C3 — Measurement-based budgets
+**Status: PLANNED after P2-J/K baseline**
+
+Only after measurement:
+- set provider/API budgets;
+- set CPU analysis/model budgets;
+- set SQLite write-heavy budget;
+- decide whether media and remote-storage traffic need cross-task coupling;
+- define more conservative Android defaults where device evidence supports them.
 
 Questions the implementation must answer:
 - Which tasks may run together?
@@ -256,8 +301,9 @@ Target behavior:
 - Provider limits are respected; do not optimize by evading upstream restrictions.
 
 **Acceptance**
-- budgets are centralized or otherwise auditable;
-- concurrency is bounded;
+- resource classes and active leases are centralized/auditable;
+- evidence-backed conflict rules are enforced;
+- final budgets are based on repeatable performance evidence rather than copied numbers;
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
@@ -914,23 +960,30 @@ Produce the checked-in runtime inventory/dependency map and identify:
 - missing performance instrumentation.
 
 ## NEXT-2 — H1 maintenance runtime hardening
+**Status: DONE**
+
+Completed:
+- **PR #112:** repair filesystem inspection became asynchronous with progress/checkpoints and event-loop yielding.
+- **PR #113:** full maintenance update scanning became a controllable background task and the 5000-comic discovery cap was removed.
+- **PR #114:** organize/materialize moved to asynchronous checkpointable filesystem primitives; Web organize became a background task; 5000-comic CLI caps were removed; final index/manifest publication preserves last-known-good.
+- **PR #115:** repair scan became a controllable background task; control is checked both before and after each active file inspection.
+- scan/review remains separate from queueing repair/update jobs.
+
+## NEXT-3 — P2-C1 runtime resource lease foundation
 **Status: IN_PROGRESS**
 
-Fix the confirmed foreground maintenance hazards before adding a global resource arbiter:
+- add the shared resource-class registry;
+- expose resource occupancy through local runtime status;
+- register Recommendation V3, favorites sync, downloads and H1 maintenance tasks;
+- enforce only the evidence-backed `filesystem-heavy=1` background capacity;
+- keep provider/media/CPU/SQLite classes observe-only until measurement.
 
-- **DONE (PR #112):** repair scanning no longer performs synchronous per-file `existsSync/statSync` work on the Node event loop; it now uses asynchronous stat calls, progress callbacks and event-loop yielding.
-- **DONE (PR #113):** full maintenance update checks now run as an observable background task with pause/resume/cancel; explicit narrow comic-ID checks remain synchronous for compatibility.
-- **DONE (PR #113):** the correctness-significant 5000-comic default update-scan cap was removed by querying the complete downloaded-comic ID domain directly.
-- **DONE (PR #114):** organize/materialize filesystem work now uses asynchronous checkpointable primitives; the Web organize route is a controllable background task, CLI organize/portable use the complete catalog, and final indexes/manifests publish only after the last checkpoint.
-- **IN_PROGRESS:** repair scanning is being promoted from “async but request-owned” to the same background task model with authoritative progress and pause/resume/cancel.
-- preserve the current safety model: scan/review first, then enqueue repair/update jobs.
+## NEXT-4 — P2-C2 coverage + P2-J instrumentation
+**Status: PLANNED**
 
-## NEXT-3 — P2-C resource-budget design
-**Status: PLANNED after NEXT-2**
+Expand resource coverage while adding the measurements required before hard budgets are introduced.
 
-Use the runtime inventory and H1 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
-
-## NEXT-4 — P2-J/P2-K performance baseline
+## NEXT-5 — P2-J/P2-K real performance baseline
 **Status: PLANNED after enough instrumentation exists**
 
 Create repeatable local/browser/Android measurements and record the first real baseline.
@@ -947,6 +1000,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — H1 completed; P2-C1 started
+
+State update:
+- PR #115 passed CI, real Chromium, Android, Linux, macOS arm64, Windows ARM64 and Docker gates and was merged.
+- All four foreground hazards identified in the initial H1 audit now have first-round remediation: update scan, repair scan, organize and portable materialization.
+- P2-C starts with a local resource lease registry rather than a new universal queue.
+- Mature open-source queue designs were used as architectural references for separating per-task execution from global/resource-class concurrency, but Pica Library will not add Redis/BullMQ or copy another project's numeric limits.
+- The first enforced policy is intentionally narrow: one background/maintenance `filesystem-heavy` lease at a time. Provider/media/CPU/SQLite classes are observed first and budgeted only after P2-J/K measurement.
+
 
 ## 2026-09-24 — H1C organizer runtime merged
 

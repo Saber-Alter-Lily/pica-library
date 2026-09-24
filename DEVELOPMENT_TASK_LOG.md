@@ -232,7 +232,7 @@ Target:
 - long work survives page navigation according to its documented semantics.
 
 ## P2-C — Runtime resource classes and concurrency budgets
-**Status: IN_PROGRESS — C1 foundation + C2 first observe-only task batch; production enforcement remains disabled**
+**Status: IN_PROGRESS — C1 foundation + C2/C2B Desktop observe-only coverage; production enforcement remains disabled**
 
 Create explicit budgets for at least:
 - provider/API requests;
@@ -939,7 +939,8 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 
 - **C1:** add a tested resource coordinator with shared resource-class vocabulary, atomic multi-resource leases, priority/FIFO admission semantics, cancellation and diagnostics. Production mode remains observe-only and does not impose invented capacities.
 - **C2 first batch implemented:** maintenance update, repair, organize, Recommendation V5 Shadow and Work Identity evidence refresh now declare observe-only resource leases; Desktop-only diagnostics expose current/peak overlap.
-- **C2 next batch:** add Recommendation V3, favorites sync, WebDAV, local downloads and suitable Visual analysis observation points without changing their current schedulers.
+- **C2B Desktop batch implemented:** Recommendation V3, favorites sync, local/GitHub download runners and WebDAV now join the same process-wide observe-only resource graph. Desktop injects one coordinator into LibraryService and RemoteStorageDesktopManager; existing task schedulers remain authoritative.
+- **C2 remaining:** collect overlap/latency evidence, keep Visual under its H2B timing path unless phase/resource observation is useful, and design Android-specific cross-task observation rather than copying the Desktop mechanism.
 - **C3 later:** propose enforceable capacities only after overlap and latency evidence exists; before enforcement, task-lifetime leases must become phase-aware where needed so paused tasks do not reserve enforced capacity.
 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
@@ -962,6 +963,20 @@ May continue independently if:
 
 # 12. Decision / scope-change log
 
+## 2026-09-24 — P2-C2B shared Desktop resource graph
+
+State update:
+- Desktop now creates one observe-only RuntimeResourceCoordinator per engine and injects it into LibraryService and RemoteStorageDesktopManager.
+- The resource diagnostics therefore cover both service tasks and WebDAV instead of presenting separate module-local views.
+- Added coarse observation declarations:
+  - Recommendation V3 = provider-network + cpu-analysis + sqlite-read-heavy + sqlite-write-heavy;
+  - favorites sync = provider-network + sqlite-write-heavy;
+  - local/GitHub download runner = media-network + filesystem-heavy + sqlite-write-heavy;
+  - WebDAV sync = remote-storage-network + filesystem-heavy + sqlite-read-heavy + sqlite-write-heavy.
+- Download runners are tagged `user`; the other newly added observations remain `background`. Priority is still diagnostic-only because coordinator enforcement is disabled.
+- Existing DownloadScheduler/MediaRequestGate, recommendation checkpoints, favorites controls and WebDAV controls remain the execution authorities; resource observation does not replace them.
+- C2B leases remain coarse task-lifetime observations. They are not suitable for C3 enforcement until pause/phase ownership and foreground latency are measured.
+- Detailed boundary: docs/RUNTIME_RESOURCE_OBSERVATION_P2C2B.md.
 ## 2026-09-24 — P2-C2 first observe-only integration batch
 
 State update:

@@ -1997,6 +1997,8 @@ function waitForRecommendationStatusSignal(timeoutMs) {
 }
 
 function requestRecommendationStatusWatch() {
+    recommendationStatusSignal.status = null
+    recommendationStatusSignal.observedAt = 0
     document.dispatchEvent(new CustomEvent('pica-recommendation-watch'))
 }
 

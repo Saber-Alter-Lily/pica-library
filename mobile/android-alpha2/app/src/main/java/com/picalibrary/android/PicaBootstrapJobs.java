@@ -13,6 +13,7 @@ final class PicaBootstrapJobs {
     static void enqueue(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);enqueue(context,ExistingWorkPolicy.REPLACE);}
     static void pause(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,true);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
     static void resume(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);enqueue(context,ExistingWorkPolicy.REPLACE);}
-    static void cancel(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
+    static void cancel(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);MobileTaskRegistryStore.clearWorkId(context,"pica-bootstrap",UNIQUE_NAME);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
+    static void complete(Context context){MobileTaskRegistryStore.clearWorkId(context,"pica-bootstrap",UNIQUE_NAME);}
     static boolean paused(Context context){return MobileTaskPauseStore.isPaused(context,"pica-bootstrap",UNIQUE_NAME);}
 }

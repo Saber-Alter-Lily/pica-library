@@ -283,7 +283,7 @@ Remaining:
 - representative large-library query regression tests.
 
 ## P2-E — Snapshot/cache discipline
-**Status: IN_PROGRESS — E1 merged; E2 provider/account-scoped Preview + Online Reader cache candidate; broader cache/frontend audit remains open**
+**Status: IN_PROGRESS — E1/E2 merged; critical cache authority inventory documented; remaining browser/process cache audit moves into P2-F**
 
 Keep and generalize successful patterns:
 - frozen Recommendation serving snapshot for batch switching;
@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: PARTIAL**
+**Status: IN_PROGRESS — F1 redundant Theme decoration polling removed; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -989,19 +989,25 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7C.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8B.md`.
 
 ## NEXT-7 — P2-E snapshot/cache discipline
-**Status: IN_PROGRESS — E1 merged; E2 provider/account cache partition candidate**
+**Status: DONE FOR CURRENT CRITICAL INVENTORY — E1/E2 merged**
 
-P2-D has reached an evidence gate: further aggregate/cadence rewrites require representative D8B/J2 runs rather than more speculative SQL changes. P2-E is the next unblocked architecture lane.
+P2-D remains evidence-gated. The critical cache authority pass is now complete enough to hand the next unblocked architecture lane to P2-F.
 
-- **E1 merged (PR #136):** Desktop cover cache keeps one disk slot per comic but validates it with a source fingerprint over comic/provider/remote identity, trusted cover URL and provider `updatedAt`.
-- **E2 inventory implemented:** critical Desktop/Web/Android caches now have documented owner, key, authoritative invalidation source and scope. TTL/LRU are explicitly treated as eviction, not correctness authority.
-- **E2 provider partition implemented:** Provider Preview and Online Reader metadata/page caches are partitioned by hashed provider/account identity, E-H vs ExH surface and stored provider revision; page data additionally validates the actual page locator through a SHA-256 source fingerprint.
-- Preview routes now serve only pages prepared under the current provider scope, preventing a previously known route from exposing an old-scope disk entry after account/session/revision changes.
-- Online Reader album/chapter Maps include provider scope, page cache validation includes scope + locator, and in-flight image dedupe also includes the source fingerprint.
-- Raw accounts, passwords, E-H session values, provider scope strings and page locators are not persisted in Preview cache metadata.
-- Desktop Settings now clears the cached authenticated Pica SDK instance when saved Pica account/password changes, so live request authority and cache scope cannot diverge.
-- **Next after E2:** validate remaining browser/process-memory cache ownership, then move to P2-F observer/poller discipline if no critical long-lived cache lacks an explicit authority.
+- **E1 merged (PR #136):** Desktop cover cache validates source/version identity instead of trusting comic ID alone.
+- **E2 merged (PR #137):** Provider Preview and Online Reader caches are partitioned by non-secret provider/account/surface/revision identity; page data validates the actual locator by fingerprint; live Pica credential changes reset the cached authenticated SDK session.
+- `docs/CACHE_DISCIPLINE_P2E2.md` records owner, key, authoritative invalidation and scope for the critical Desktop/Web/Android long-lived caches. TTL/LRU are classified as eviction rather than authority.
+- No critical provider-backed cache identified in E1/E2 can silently cross the audited account/source authority boundary.
+- Remaining browser/process-memory lifetime issues are primarily observer/poller/UI lifecycle concerns and continue under P2-F.
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
+
+## NEXT-8 — P2-F frontend observer/poller discipline
+**Status: IN_PROGRESS — F1 event-driven Theme decoration candidate**
+
+- **F1 implemented:** remove the always-on 2.5 second Theme decoration fallback. Theme progress/empty-state decoration remains driven by scoped MutationObservers, theme changes, resize, visibility restoration and explicit theme application, all coalesced through `requestAnimationFrame`.
+- Recommendation build polling at 500 ms is intentionally retained because it reads authoritative backend task state only while a build is being watched.
+- No Theme visuals, scroll restoration or backend poll cadence changes in F1.
+- **Next after F1:** inventory persistent pollers by owner/start/stop/authority, then audit broad `document.body` subtree observers for narrower ownership boundaries.
+- Detailed boundary: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1015,6 +1021,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F1 event-driven Theme decoration
+
+State update:
+- Theme decoration already had scoped MutationObservers on Recommendation/Downloads/Library/Downloaded roots, a theme-attribute observer, resize handling, visibility restoration, explicit theme application and requestAnimationFrame coalescing.
+- Despite those authorities, alpha8-theme-help.js still ran setInterval(scheduleThemeDecoration, 2500) for the full page lifetime.
+- Each visible active-theme tick rescanned progress elements and empty-state targets even when no UI state changed.
+- F1 removes only this redundant interval and its pagehide cleanup branch.
+- Recommendation build polling remains because it observes authoritative backend task state while a build is active and terminates with that task; it is not a DOM-decoration fallback.
+- Existing Web UX regression now forbids the Theme interval while requiring mutation filtering, resize/visibility triggers and Recommendation polling to remain.
+- F1 does not change Theme visuals, task polling cadences for other features, scroll restoration, or performance budgets.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md.
 
 ## 2026-09-24 — P2-E2 provider/account cache partition and inventory
 

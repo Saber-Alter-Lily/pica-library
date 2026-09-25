@@ -31,7 +31,7 @@ public final class PicaDownloadWorker extends Worker {
                 for(PicaClient.Page page:pages){if(isStopped())return Result.failure();String prior=PhoneDownloadStore.indexedUri(getApplicationContext(),comicId,episode.id,page.position);String uri=prior.isEmpty()?download(client,comicId,episode,page):prior;stored.add(new PhoneDownloadStore.Page(page.position,uri));pageDone++;PhoneDownloadStore.putChapter(getApplicationContext(),comicId,online.title,online.author,new PhoneDownloadStore.Chapter(episode.id,episode.title,episode.order,new ArrayList<>(stored)));publish(comicId,online.title,episode.title,episodeDone,episodeTotal,pageDone,pages.size(),prior.isEmpty()?"正在下载":"正在校验已有页面");}
                 episodeDone++;publish(comicId,online.title,episode.title,episodeDone,episodeTotal,pageDone,pages.size(),"章节完成");
             }
-            UnifiedPicaCatalogSync.merge(getApplicationContext(),online);PhoneDownloadStore.reconcileCatalog(getApplicationContext());Data done=progress(episodeTotal,episodeTotal,0,0,online.title,"","下载完成");return Result.success(done);
+            UnifiedPicaCatalogSync.merge(getApplicationContext(),online);PhoneDownloadStore.reconcileCatalog(getApplicationContext());Data done=progress(episodeTotal,episodeTotal,0,0,online.title,"","下载完成");PicaDownloadJobs.complete(getApplicationContext(),comicId,selected);return Result.success(done);
         }catch(Exception e){String message=e.getMessage()==null?"下载失败":e.getMessage();if(isStopped())return failure(PicaDownloadJobs.paused(getApplicationContext(),comicId,selected)?"下载已暂停，可从已完成页面继续":"下载已取消");if(getRunAttemptCount()<3)return Result.retry();return failure(message);}
     }
 

@@ -14,18 +14,107 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** One task surface for lifecycle-independent import, download, Pica bootstrap and recommendation jobs. */
 public final class TaskCenterActivity extends LocaleAwareActivity {
+    private static final class DownloadView {
+        final MobileTaskRegistryStore.DownloadRef ref;
+        final WorkInfo info;
+        DownloadView(MobileTaskRegistryStore.DownloadRef ref,WorkInfo info){this.ref=ref;this.info=info;}
+    }
     private final ExecutorService worker=Executors.newSingleThreadExecutor();private final Handler main=new Handler(Looper.getMainLooper());private final AtomicBoolean refreshInFlight=new AtomicBoolean(false);private LinearLayout content;private boolean destroyed;
     private final Runnable poll=new Runnable(){public void run(){refresh();if(!destroyed)main.postDelayed(this,1200);}};
     @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);render();main.post(poll);}
     private Button button(String label,android.view.View.OnClickListener action){return Ui.button(this,label,action,false);}
     private LinearLayout actions(Button...buttons){LinearLayout row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);for(Button button:buttons){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,-2);p.setMargins(0,Ui.dp(this,8),Ui.dp(this,8),0);row.addView(button,p);}return row;}
     private void render(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"后台任务",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,12),Ui.dp(this,8),Ui.dp(this,12),Ui.dp(this,24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();}
-    private void refresh(){if(destroyed||!refreshInFlight.compareAndSet(false,true))return;worker.submit(()->{try{WorkManager manager=WorkManager.getInstance(this);List<WorkInfo> picaDownloads=manager.getWorkInfosByTag("pica-download").get(5,TimeUnit.SECONDS);List<WorkInfo> ehDownloads=manager.getWorkInfosByTag("eh-download").get(5,TimeUnit.SECONDS);ArrayList<WorkInfo> downloads=new ArrayList<>();downloads.addAll(picaDownloads);downloads.addAll(ehDownloads);List<WorkInfo> favorites=manager.getWorkInfosForUniqueWork(FavoriteImportJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS);List<WorkInfo> bootstrap=manager.getWorkInfosForUniqueWork(PicaBootstrapJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS);List<WorkInfo> recommendation=manager.getWorkInfosForUniqueWork(NativeRecommendationJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS);runOnUiThread(()->show(downloads,favorites,bootstrap,recommendation));}catch(Exception ignored){}finally{refreshInFlight.set(false);}});}
-    private void show(List<WorkInfo> downloads,List<WorkInfo> favorites,List<WorkInfo> bootstrap,List<WorkInfo> recommendation){
+    private void refresh(){if(destroyed||!refreshInFlight.compareAndSet(false,true))return;worker.submit(()->{try{
+        WorkManager manager=WorkManager.getInstance(this);
+        List<WorkInfo> picaDownloads=manager.getWorkInfosByTag("pica-download").get(5,TimeUnit.SECONDS);
+        List<WorkInfo> ehDownloads=manager.getWorkInfosByTag("eh-download").get(5,TimeUnit.SECONDS);
+        ArrayList<WorkInfo> downloadInfos=new ArrayList<>();downloadInfos.addAll(picaDownloads);downloadInfos.addAll(ehDownloads);
+        List<DownloadView> downloads=reconstructDownloads(downloadInfos);
+        WorkInfo favorite=currentWork(manager.getWorkInfosForUniqueWork(FavoriteImportJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"favorite-import",FavoriteImportJobs.UNIQUE_NAME);
+        WorkInfo bootstrap=currentWork(manager.getWorkInfosForUniqueWork(PicaBootstrapJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"pica-bootstrap",PicaBootstrapJobs.UNIQUE_NAME);
+        WorkInfo recommendation=currentWork(manager.getWorkInfosForUniqueWork(NativeRecommendationJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"recommendation",NativeRecommendationJobs.UNIQUE_NAME);
+        runOnUiThread(()->show(downloads,favorite,bootstrap,recommendation));
+    }catch(Exception ignored){}finally{refreshInFlight.set(false);}});}
+
+    private WorkInfo currentWork(List<WorkInfo> values,String scope,String id){
+        String expected=MobileTaskRegistryStore.workId(this,scope,id);
+        if(expected!=null&&!expected.isEmpty())for(WorkInfo value:values)if(value.getId().toString().equals(expected))return value;
+        for(WorkInfo value:values)if(active(value)){
+            MobileTaskRegistryStore.setWorkId(this,scope,id,value.getId());
+            return value;
+        }
+        return null;
+    }
+
+    private List<DownloadView> reconstructDownloads(List<WorkInfo> infos){
+        LinkedHashMap<String,WorkInfo> byId=new LinkedHashMap<>();
+        for(WorkInfo info:infos)byId.put(info.getId().toString(),info);
+
+        LinkedHashMap<String,MobileTaskRegistryStore.DownloadRef> refs=new LinkedHashMap<>();
+        for(MobileTaskRegistryStore.DownloadRef ref:MobileTaskRegistryStore.downloads(this))refs.put(ref.key(),ref);
+
+        LinkedHashMap<String,WorkInfo> legacy=new LinkedHashMap<>();
+        LinkedHashMap<String,MobileTaskRegistryStore.DownloadRef> legacyRefs=new LinkedHashMap<>();
+        for(WorkInfo info:infos){
+            MobileTaskRegistryStore.DownloadRef ref=downloadRef(info);
+            if(ref==null)continue;
+            MobileTaskRegistryStore.DownloadRef registered=refs.get(ref.key());
+            if(registered!=null&&byId.containsKey(registered.workId))continue;
+            WorkInfo prior=legacy.get(ref.key());
+            if(prior==null||(!active(prior)&&active(info))){
+                legacy.put(ref.key(),info);
+                legacyRefs.put(ref.key(),ref);
+            }
+        }
+        for(Map.Entry<String,WorkInfo> row:legacy.entrySet()){
+            MobileTaskRegistryStore.DownloadRef ref=legacyRefs.get(row.getKey());
+            WorkInfo info=row.getValue();
+            if(active(info)||paused(ref)){
+                MobileTaskRegistryStore.registerDownload(this,ref.provider,ref.comicId,ref.episodeId,info.getId());
+                refs.put(ref.key(),new MobileTaskRegistryStore.DownloadRef(ref.provider,ref.comicId,ref.episodeId,info.getId().toString()));
+            }
+        }
+
+        ArrayList<DownloadView> out=new ArrayList<>();
+        for(MobileTaskRegistryStore.DownloadRef ref:refs.values()){
+            WorkInfo info=byId.get(ref.workId);
+            boolean paused=paused(ref);
+            if(info==null&&!paused){
+                MobileTaskRegistryStore.unregisterDownload(this,ref.provider,ref.comicId,ref.episodeId);
+                continue;
+            }
+            if(info!=null&&info.getState()==WorkInfo.State.SUCCEEDED){
+                MobileTaskRegistryStore.unregisterDownload(this,ref.provider,ref.comicId,ref.episodeId);
+                continue;
+            }
+            if(info!=null&&info.getState()==WorkInfo.State.CANCELLED&&!paused){
+                MobileTaskRegistryStore.unregisterDownload(this,ref.provider,ref.comicId,ref.episodeId);
+                continue;
+            }
+            out.add(new DownloadView(ref,info));
+        }
+        return out;
+    }
+
+    private MobileTaskRegistryStore.DownloadRef downloadRef(WorkInfo info){
+        Set<String> tags=info.getTags();
+        boolean eh=tags.contains("eh-download"),pica=tags.contains("pica-download");
+        if(!eh&&!pica)return null;
+        String comic=tag(tags,"comic:"),episode=tag(tags,"episode:");
+        if(comic.isEmpty())return null;
+        if("ALL".equals(episode))episode="";
+        return new MobileTaskRegistryStore.DownloadRef(eh?"eh":"pica",comic,episode,info.getId().toString());
+    }
+
+    private boolean paused(MobileTaskRegistryStore.DownloadRef ref){
+        return "eh".equals(ref.provider)
+            ?EhDownloadJobs.paused(this,ref.comicId)
+            :PicaDownloadJobs.paused(this,ref.comicId,ref.episodeId);
+    }
+    private void show(List<DownloadView> downloads,WorkInfo favorite,WorkInfo picaSync,WorkInfo rec){
         if(destroyed)return;
         content.removeAllViews();
-
-        WorkInfo picaSync=latest(bootstrap);
         LinearLayout picaCard=Ui.card(this);
         picaCard.addView(Ui.text(this,"Pica 收藏同步",18,Ui.TEXT,true));
         boolean picaPaused=PicaBootstrapJobs.paused(this);
@@ -48,7 +137,6 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         }
         content.addView(picaCard);
 
-        WorkInfo rec=latest(recommendation);
         LinearLayout recCard=Ui.card(this);
         recCard.addView(Ui.text(this,"推荐更新",18,Ui.TEXT,true));
         boolean recPaused=NativeRecommendationJobs.paused(this),recWorkerActive=rec!=null&&active(rec),recPauseAck=NativeRecommendationJobs.pauseAcknowledged(this)&&recWorkerActive;
@@ -71,7 +159,6 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         }
         content.addView(recCard);
 
-        WorkInfo favorite=latest(favorites);
         LinearLayout fav=Ui.card(this);
         fav.addView(Ui.text(this,"电脑收藏与封面",18,Ui.TEXT,true));
         boolean favoritePaused=FavoriteImportJobs.paused(this);
@@ -98,26 +185,25 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         head.addView(Ui.button(this,"已下载",v->startActivity(new android.content.Intent(this,DownloadsActivity.class)),true));
         content.addView(head);
         int shown=0;
-        for(WorkInfo info:downloads){
+        for(DownloadView view:downloads){
             if(shown>=30)break;
-            Set<String> tags=info.getTags();
-            String comic=tag(tags,"comic:"),episode=tag(tags,"episode:");
-            if(comic.isEmpty())continue;
-            boolean ehDownload=tags.contains("eh-download");
-            String episodeArg="ALL".equals(episode)?"":episode;
-            boolean paused=ehDownload?EhDownloadJobs.paused(this,comic):PicaDownloadJobs.paused(this,comic,episodeArg);
+            MobileTaskRegistryStore.DownloadRef ref=view.ref;
+            WorkInfo info=view.info;
+            String comic=ref.comicId,episodeArg=ref.episodeId;
+            boolean ehDownload="eh".equals(ref.provider);
+            boolean paused=paused(ref);
             LinearLayout card=Ui.card(this);
-            DataView p=data(info);
+            DataView p=info==null?new DataView("","等待继续"):data(info);
             card.addView(Ui.text(this,p.title.isEmpty()?"漫画 "+shortId(comic):p.title,16,Ui.TEXT,true));
-            String taskLabel=ehDownload?"E-H 画廊":("ALL".equals(episode)?"全部章节":"章节 "+shortId(episode));
-            card.addView(Ui.text(this,taskLabel+" · "+(paused?"已暂停":status(info)),12,Ui.MUTED,false));
+            String taskLabel=ehDownload?"E-H 画廊":(episodeArg.isEmpty()?"全部章节":"章节 "+shortId(episodeArg));
+            card.addView(Ui.text(this,taskLabel+" · "+(paused?"已暂停":info==null?"等待恢复":status(info)),12,Ui.MUTED,false));
             card.addView(Ui.text(this,p.text,12,Ui.PRIMARY,false));
             if(paused){
                 card.addView(Ui.text(this,"继续会从已经完成并校验的页面续传。",12,Ui.MUTED,false));
                 card.addView(ehDownload?actions(button("继续",v->EhDownloadJobs.resume(this,comic)),button("取消下载",v->EhDownloadJobs.cancel(this,comic))):actions(button("继续",v->PicaDownloadJobs.resume(this,comic,episodeArg)),button("取消下载",v->PicaDownloadJobs.cancel(this,comic,episodeArg))));
-            }else if(active(info)){
+            }else if(info!=null&&active(info)){
                 card.addView(ehDownload?actions(button("暂停",v->EhDownloadJobs.pause(this,comic)),button("取消",v->EhDownloadJobs.cancel(this,comic))):actions(button("暂停",v->PicaDownloadJobs.pause(this,comic,episodeArg)),button("取消",v->PicaDownloadJobs.cancel(this,comic,episodeArg))));
-            }else if(info.getState()==WorkInfo.State.FAILED||info.getState()==WorkInfo.State.CANCELLED){
+            }else if(info!=null&&(info.getState()==WorkInfo.State.FAILED||info.getState()==WorkInfo.State.CANCELLED)){
                 card.addView(button("重新下载",v->{if(ehDownload)EhDownloadJobs.enqueue(this,comic);else PicaDownloadJobs.enqueue(this,comic,episodeArg);}));
             }
             content.addView(card);
@@ -125,7 +211,6 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         }
         if(shown==0)content.addView(Ui.text(this,"当前没有下载任务。",13,Ui.MUTED,false));
     }
-    private static WorkInfo latest(List<WorkInfo> values){return values==null||values.isEmpty()?null:values.get(values.size()-1);}
     private static boolean active(WorkInfo i){return i.getState()==WorkInfo.State.RUNNING||i.getState()==WorkInfo.State.ENQUEUED||i.getState()==WorkInfo.State.BLOCKED;}
     private static String status(WorkInfo i){switch(i.getState()){case RUNNING:return "执行中";case ENQUEUED:return "等待网络 / 排队中";case BLOCKED:return "等待前序任务";case SUCCEEDED:return "已完成";case FAILED:return "失败";case CANCELLED:return "已取消";default:return i.getState().name();}}
     private static String tag(Set<String> tags,String prefix){for(String tag:tags)if(tag.startsWith(prefix))return tag.substring(prefix.length());return "";}

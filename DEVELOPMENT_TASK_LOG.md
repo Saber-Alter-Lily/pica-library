@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G11 merged; G12 Reader completion evidence candidate; durable Worker/recovery audit is next**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G12 merged; G13 durable Worker reconstruction candidate**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,17 +1014,21 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G11 merged; G12 Reader completion evidence candidate**
+**Status: RECOVERY_IN_PROGRESS — G1–G12 merged; G13 durable WorkManager reconstruction candidate**
 
-- **G1–G11 merged (PR #153–#163):** the audited scalable Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open local I/O paths are no longer performed synchronously in their UI render/click paths.
-- **G12 finding:** `ReaderActivity.save()` synchronously loaded Unified Catalog and synchronously read/rewrote RecommendationEvidenceStore when a chapter reached its final page for the first time.
-- Reader already owns `completionRecordedChapter` as the per-chapter dedupe authority and an existing `metadata` executor for chapter/source metadata work.
-- **G12 implemented:** `save()` keeps progress persistence and chapter-completion dedupe on the UI thread, then schedules `recordReaderCompleteAsync()`.
-- The helper captures application context/current comic ID, submits to the existing `metadata` executor, loads Catalog metadata and persists the `reader_complete` evidence event off-thread.
-- `completionRecordedChapter` is set before scheduling, preserving one event attempt per completed chapter across repeated page/pause/save callbacks.
-- Reader progress sync cadence, event schema, author/tags/categories enrichment, dirty/sync semantics and navigation are unchanged.
-- **If G12 passes:** move the current P2-G UI-thread I/O remediation lane to implementation-complete and continue with durable Worker process-death/relaunch, Task Center reconstruction, low-memory/background restrictions and Android resource budgets.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G12.md`.
+- **G1–G12 merged (PR #153–#164):** the audited scalable Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion local I/O paths are no longer performed synchronously in their UI render/click/save paths.
+- The UI-thread I/O remediation lane is implementation-complete for the currently audited owners; remaining P2-G work now moves to durable Worker/process-death recovery, low-memory/background restrictions and Android resource budgets.
+- **G13 finding 1:** TaskCenterActivity reconstructed singleton work with `values.get(values.size()-1)` and rendered every historical download WorkInfo returned by tags. REPLACE/resume history can therefore surface stale/duplicate attempts after Activity/process recreation.
+- **G13 finding 2:** dynamic download pause intent is durable in MobileTaskPauseStore, but the provider/comic/episode identity was only enumerable through WorkManager tags. If an old cancelled WorkInfo is pruned, a deliberate PAUSED download can remain marked paused yet disappear from Task Center.
+- **G13 implemented:** add app-private `MobileTaskRegistryStore` containing only recovery identity: current WorkRequest UUID for singleton tasks and provider/comic/episode/current UUID for dynamic downloads.
+- Favorite import, Pica bootstrap and Native Recommendation record their current WorkRequest UUID. Pica/E-H downloads register current UUID on enqueue/resume, preserve registry on pause, clear registry on explicit cancel, and clear it only after successful durable completion.
+- Task Center now selects singleton WorkInfo by exact persisted UUID, falling back only to an actually active WorkInfo for pre-G13/stale-registry migration. It no longer treats list position as recency authority.
+- Download reconstruction emits one logical card per durable registry identity. Active WorkInfo can repair a stale registry UUID; pre-G13 active/paused work migrates from tags once; SUCCEEDED/explicitly cancelled stale registrations are removed; PAUSED cards survive missing/pruned historical WorkInfo.
+- Robolectric coverage verifies registry persistence/replacement/removal and provider separation. Source contracts forbid restoring `values.get(values.size()-1)` / old `latest()` authority.
+- `docs/ANDROID_WORKER_RECOVERY_P2G13.md` records the recovery matrix for Pica/E-H downloads, Favorite import, Pica bootstrap, Native Recommendation, update check and supporter entitlement refresh.
+- **Next after G13:** automated kill/restart tests for critical durable task families, deliberate-PAUSED preservation after process recreation, active Task Center reconstruction, completed/cancelled non-resurrection, then low-memory/background restrictions and Android resource budgets.
+- Representative device timing/jank remains an external evidence gate.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, plus `docs/ANDROID_WORKER_RECOVERY_P2G13.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1038,6 +1042,21 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-G13 durable WorkManager reconstruction authority
+
+State update:
+- G1–G12 are merged and close the currently audited Android UI-thread I/O remediation lane.
+- TaskCenterActivity previously treated WorkInfo list position as current-attempt authority for singleton work and rendered every tag-matched historical download WorkInfo, allowing duplicate/stale cards after REPLACE/resume.
+- Dynamic download PAUSED intent was durable but provider/comic/episode identity was not independently enumerable after old WorkInfo pruning.
+- G13 adds MobileTaskRegistryStore: app-private recovery identity only, with no credentials, URLs or file paths.
+- Favorite import, Pica bootstrap and Native Recommendation persist current WorkRequest UUID. Pica/E-H downloads persist provider/comic/episode/current UUID and keep that identity while paused.
+- Download success unregisters only after page/index/catalog completion; explicit cancel unregisters immediately; retry/failure keep identity for recovery.
+- Task Center reconstructs singleton work by exact UUID and dynamic downloads by registry identity + queried WorkInfo. Missing/stale UUIDs can be repaired only by an actually active same-identity WorkInfo.
+- The old latest(list)=tail assumption is removed. One logical download produces at most one Task Center card.
+- Robolectric MobileTaskRegistryStoreTest verifies persistence, replacement, removal and Pica/E-H identity separation.
+- docs/ANDROID_WORKER_RECOVERY_P2G13.md adds the explicit recovery matrix required by P2-H; true OS kill/restart instrumentation remains the next evidence gate.
+- Detailed boundary: docs/ANDROID_WORKER_RECOVERY_P2G13.md.
 
 ## 2026-09-24 — P2-G12 Reader completion evidence I/O hardening
 

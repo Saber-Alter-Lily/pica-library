@@ -237,6 +237,51 @@ class FavoritesSyncCancelledError extends Error {
     }
 }
 
+type MaintenanceRecoveryTask =
+    | 'maintenance-update'
+    | 'maintenance-repair'
+    | 'library-organize'
+
+type MaintenanceRecoveryActiveState =
+    | 'running'
+    | 'pausing'
+    | 'paused'
+    | 'cancelling'
+
+interface MaintenanceRecoverySnapshot {
+    version: 1
+    task: MaintenanceRecoveryTask
+    state: MaintenanceRecoveryActiveState | 'interrupted'
+    recoveredState?: MaintenanceRecoveryActiveState
+    phase: string
+    done: number
+    total: number
+    startedAt?: string
+    updatedAt: string
+    summary: {
+        findingCount?: number
+        updateCount?: number
+        issueCount?: number
+        linked?: number
+        existing?: number
+        manifests?: number
+        skipped?: number
+    }
+}
+
+const MAINTENANCE_RECOVERY_KEYS: Record<MaintenanceRecoveryTask, string> = {
+    'maintenance-update': 'runtime.maintenance-update.recovery.v1',
+    'maintenance-repair': 'runtime.maintenance-repair.recovery.v1',
+    'library-organize': 'runtime.library-organize.recovery.v1'
+}
+
+const maintenanceRecoveryActiveStates = new Set<string>([
+    'running',
+    'pausing',
+    'paused',
+    'cancelling'
+])
+
 class MaintenanceUpdateCancelledError extends Error {
     constructor() {
         super('Maintenance update scan was cancelled')
@@ -268,6 +313,8 @@ export interface MaintenanceRepairProgress {
     startedAt?: string
     updatedAt?: string
     error?: string
+    recoveryMode?: 'restart_required'
+    recoveredState?: MaintenanceRecoveryActiveState
 }
 
 class LibraryOrganizeCancelledError extends Error {
@@ -297,6 +344,8 @@ export interface LibraryOrganizeTaskProgress {
     startedAt?: string
     updatedAt?: string
     error?: string
+    recoveryMode?: 'restart_required'
+    recoveredState?: MaintenanceRecoveryActiveState
 }
 
 class RecommendationV5ShadowCancelledError extends Error {
@@ -400,6 +449,8 @@ export interface MaintenanceUpdateProgress {
     startedAt?: string
     updatedAt?: string
     error?: string
+    recoveryMode?: 'restart_required'
+    recoveredState?: MaintenanceRecoveryActiveState
 }
 
 export interface FavoritesSyncProgress {

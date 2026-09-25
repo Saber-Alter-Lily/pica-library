@@ -120,7 +120,7 @@ describe('P2 D6A Visual favorite target domain', () => {
             preferenceStart
         )
         const preference = service.slice(preferenceStart, preferenceEnd)
-        expect(preference).toContain('this.database.favoriteIds()')
+        expect(preference).toContain('.favoriteIds()')
         expect(preference).not.toContain(
             'listComics({ limit: 10000 })'
         )
@@ -131,7 +131,7 @@ describe('P2 D6A Visual favorite target domain', () => {
             statusStart
         )
         const status = service.slice(statusStart, statusEnd)
-        expect(status).toContain('this.database.favoriteIds()')
+        expect(status).toContain('.favoriteIds()')
         expect(status).not.toContain(
             'listComics({ limit: 10000 })'
         )

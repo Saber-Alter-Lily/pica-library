@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F12 merged; F13 real-browser cadence evidence candidate; low-end reference trace remains external evidence**
+**Status: IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN — F1–F13 merged; real-browser cadence evidence passed; representative low-end Windows/browser CPU+jank trace remains external evidence**
 
 Already improved:
 - coalesced observers;
@@ -314,13 +314,9 @@ Already improved:
 - settings pages avoid automatic provider probes;
 - experimental tools do not automatically recompute on page open.
 
-Remaining:
-- audit all MutationObservers/timers/pollers;
-- remove duplicate authorities/pollers;
-- ensure large tables/grids use bounded rendering;
-- prevent one status update from rebuilding unrelated page sections;
-- preserve scroll/focus during incremental updates;
-- verify settings/online/recommendation transitions on low-end hardware.
+Remaining evidence only:
+- capture representative low-end Windows/browser CPU + jank trace across Settings, Online, Recommendation and long-running analysis-task transitions;
+- do not add more frontend rewrites unless that trace or a future regression identifies a concrete remaining hotspot.
 
 **Acceptance**
 - no full-page rescan per DOM mutation;
@@ -1001,18 +997,36 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F12 merged; F13 real-browser cadence evidence candidate**
+**Status: IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN**
 
-- **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or processed incrementally/coalesced.
-- **F9 merged (PR #146):** WebDAV progress reattaches after reload and has explicit terminal/start/page lifecycle ownership.
+- **F1–F8 merged (PR #138–#145):** redundant idle polling removed; broad DOM observer work is scoped to its owner or processed incrementally/coalesced.
+- **F9 merged (PR #146):** WebDAV task progress reattaches after reload and self-terminates on backend terminal state.
 - **F10 merged (PR #147):** Recommendation final-cycle status has one normal polling authority with bounded App fallback.
 - **F11 merged (PR #148):** Onboarding readiness is event-driven; the recursive 500 ms retry loop is removed.
-- **F12 merged (PR #149):** Work Identity and V5 shadow status loops retain their 500/600 ms foreground cadence but use 3000 ms hidden-page waits with immediate visibility wake.
-- **F13 implemented:** add focused Playwright Chromium evidence for both analysis pollers. The browser records real status-request timestamps from a hidden start, one hidden interval, visibility restoration, and the next foreground interval.
-- F13 is wired into the existing Web smoke runner; no Playwright dependency, lockfile, or new benchmark framework is added.
-- Structured `[P2-F13]` JSON timing evidence is emitted into CI logs. Assertion windows are control-flow guards only and must not become product latency budgets.
-- **If F13 passes:** move P2-F to `IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN`; retain representative low-end Windows/browser CPU/jank trace as an external evidence gate while allowing P2-G/H to continue.
+- **F12 merged (PR #149):** Work Identity and V5 shadow status loops keep 500/600 ms foreground cadence, use 3000 ms hidden-page waits, and wake immediately when visible.
+- **F13 merged (PR #151):** focused Playwright Chromium evidence passed for both F12 pollers.
+- Observed browser evidence:
+  - Work Identity: hidden 3004 ms → visible wake 2 ms → foreground 504 ms.
+  - V5 shadow: hidden 3004 ms → visible wake 3 ms → foreground 602 ms.
+- Browser evidence confirms the intended control-flow branches but is not promoted into a user-facing latency/CPU budget.
+- **External evidence gate remains:** representative low-end Windows/browser CPU+jank trace across Settings/Online/Recommendation/analysis transitions.
+- No further P2-F code work should be added without a concrete trace/regression showing a remaining problem.
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
+
+## NEXT-9 — P2-G Android runtime hardening
+**Status: IN_PROGRESS — begin Android UI-thread / durable-task recovery inventory**
+
+P2-F code remediation is complete enough to stop speculative frontend tuning. The next unblocked architecture lane is Android runtime hardening.
+
+- Start with a repository-wide Activity/Worker/Store audit for:
+  - synchronous file/JSON/SQLite work on Activity/main-thread paths;
+  - direct network/provider calls reachable from UI callbacks;
+  - durable Worker classes whose UI state is not reconstructible after Activity/process recreation;
+  - duplicate background-task status surfaces outside the Task Center;
+  - process-death semantics that could convert partial/paused work into false completion.
+- Prefer existing Android/Jetpack primitives already used in the project (WorkManager, persistent stores, background executors) before adding new infrastructure.
+- Make changes in small evidence-backed batches; do not introduce Android concurrency budgets until real device evidence exists.
+- Representative mid-range Android performance/low-memory testing remains a hardware evidence gate, not a CI inference.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1026,6 +1040,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F implementation closeout / reference trace open
+
+State update:
+- PR #151 merged the F13 real-browser evidence into main.
+- Chromium browser evidence passed with Work Identity 3004 ms hidden / 2 ms visible wake / 504 ms foreground and V5 shadow 3004 ms hidden / 3 ms visible wake / 602 ms foreground.
+- Across F1–F13, audited frontend observer/poller paths now have explicit ownership, bounded lifecycle, scoped or incremental DOM work, and no known duplicate recurring Recommendation status authority.
+- No known persistent high-frequency idle loop remains in the audited Web paths without a named owner/start/stop condition.
+- CI browser timing proves control-flow behavior only. It does not substitute for a representative low-end Windows/browser CPU, jank or interaction-latency trace.
+- P2-F therefore moves to IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN rather than DONE.
+- Further frontend rewrites are prohibited unless the external reference trace or a future regression identifies a concrete remaining hotspot.
+- Main architecture work proceeds to NEXT-9 / P2-G Android runtime hardening.
 
 ## 2026-09-24 — P2-F13 real-browser cadence evidence
 

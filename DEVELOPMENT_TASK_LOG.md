@@ -304,28 +304,30 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F12 merged; F13 real-browser cadence evidence candidate; low-end reference trace remains external evidence**
+**Status: IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN — F1–F13 complete; representative low-end Windows/browser CPU+jank trace remains an external evidence gate**
 
-Already improved:
-- coalesced observers;
-- duplicate-submission locks;
-- lazy cover rendering;
-- bounded Library/download rendering;
-- settings pages avoid automatic provider probes;
-- experimental tools do not automatically recompute on page open.
+Completed implementation evidence:
+- broad MutationObserver work is scoped to owning roots or processed incrementally/coalesced;
+- redundant idle Theme polling and Onboarding readiness retries are removed;
+- recurring task/status streams have one normal authority with bounded fallback where required;
+- WebDAV task progress reconstructs after reload and terminates its page-local watcher at backend terminal state;
+- analysis-only hidden-tab polling is visibility-aware;
+- selection/status updates no longer rebuild unrelated UI regions;
+- existing scroll/focus preservation and bounded rendering contracts remain intact.
 
-Remaining:
-- audit all MutationObservers/timers/pollers;
-- remove duplicate authorities/pollers;
-- ensure large tables/grids use bounded rendering;
-- prevent one status update from rebuilding unrelated page sections;
-- preserve scroll/focus during incremental updates;
-- verify settings/online/recommendation transitions on low-end hardware.
+Real-browser F13 evidence:
+- Work Identity: hidden 3004 ms → visible wake 2 ms → foreground 504 ms;
+- V5 shadow: hidden 3004 ms → visible wake 3 ms → foreground 602 ms.
 
-**Acceptance**
-- no full-page rescan per DOM mutation;
-- only one authority for each recurring poll/state stream;
-- browser performance trace shows no persistent high-frequency idle work from the app itself.
+Open external evidence only:
+- capture a representative low-end Windows/browser CPU+jank trace under realistic large-library and background-task load;
+- use that trace for future quantitative budgets, not shared CI timing.
+
+**Acceptance status**
+- no audited full-page rescan per DOM mutation: PASS;
+- one normal authority for each audited recurring poll/state stream: PASS;
+- real Chromium hidden/visible cadence control flow: PASS;
+- representative low-end hardware CPU/jank trace: OPEN_EXTERNAL_EVIDENCE.
 
 ## P2-G — Android runtime hardening
 **Status: PARTIAL**
@@ -1001,17 +1003,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F12 merged; F13 real-browser cadence evidence candidate**
+**Status: DONE_FOR_CURRENT_IMPLEMENTATION — reference low-end trace remains open**
 
-- **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or processed incrementally/coalesced.
-- **F9 merged (PR #146):** WebDAV progress reattaches after reload and has explicit terminal/start/page lifecycle ownership.
+- **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or incremental/coalesced.
+- **F9 merged (PR #146):** WebDAV progress reattaches after reload with explicit start/terminal/page lifecycle ownership.
 - **F10 merged (PR #147):** Recommendation final-cycle status has one normal polling authority with bounded App fallback.
-- **F11 merged (PR #148):** Onboarding readiness is event-driven; the recursive 500 ms retry loop is removed.
-- **F12 merged (PR #149):** Work Identity and V5 shadow status loops retain their 500/600 ms foreground cadence but use 3000 ms hidden-page waits with immediate visibility wake.
-- **F13 implemented:** add focused Playwright Chromium evidence for both analysis pollers. The browser records real status-request timestamps from a hidden start, one hidden interval, visibility restoration, and the next foreground interval.
-- F13 is wired into the existing Web smoke runner; no Playwright dependency, lockfile, or new benchmark framework is added.
-- Structured `[P2-F13]` JSON timing evidence is emitted into CI logs. Assertion windows are control-flow guards only and must not become product latency budgets.
-- **If F13 passes:** move P2-F to `IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN`; retain representative low-end Windows/browser CPU/jank trace as an external evidence gate while allowing P2-G/H to continue.
+- **F11 merged (PR #148):** Onboarding readiness is event-driven instead of recursive 500 ms retry.
+- **F12 merged (PR #149):** Work Identity / V5 shadow retain 500/600 ms foreground polling and use 3000 ms hidden-page waits with immediate visibility wake.
+- **F13 browser evidence PASS:** Playwright Chromium measured Work Identity `3004 ms hidden → 2 ms wake → 504 ms foreground` and V5 shadow `3004 ms hidden → 3 ms wake → 602 ms foreground`.
+- F13 runs in the existing Web smoke gate with no new package dependency/lockfile; CI timing remains structural control-flow evidence, not a product performance budget.
+- P2-F now moves to `IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN`.
+- **External evidence gate:** representative low-end Windows/browser CPU+jank trace under realistic large-library/background-task load. This does not block P2-G/H implementation work.
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## PARALLEL-1 — W5C PR #109
@@ -1038,6 +1040,11 @@ State update:
 - The browser smoke runner now includes test/e2e/poller-discipline.spec.mjs and emits structured [P2-F13] timing JSON into CI logs.
 - F13 changes no runtime behavior and introduces no dependency/lockfile change.
 - Detailed boundary: docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md.
+- Observed passing Chromium evidence:
+  - Work Identity: hiddenGapMs=3004, visibleWakeMs=2, foregroundGapMs=504.
+  - V5 shadow: hiddenGapMs=3004, visibleWakeMs=3, foregroundGapMs=602.
+- These measurements close the browser cadence/control-flow evidence for P2-F. They do not close the separate representative low-end Windows/browser CPU+jank evidence gate.
+- P2-F status advances to IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN.
 
 ## 2026-09-24 — P2-F12 visibility-aware analysis task polling
 

@@ -84,7 +84,8 @@ describe('Recommendation V5 portable product contract', () => {
             '/api/v1/recommendation-v5/taste-exclusion'
         )
         expect(service).toContain('tasteExcludedIds')
-        expect(service).toContain('tasteExcluded.has(comic.comicId)')
+        expect(service).toContain('tasteExcluded.has(comicId)')
+        expect(service).toContain('.favoriteIds()')
         expect(portable).toContain('tasteExcludedComicIds')
         expect(web).toContain('保留收藏，但不用于推荐口味')
     })

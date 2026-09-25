@@ -4,8 +4,8 @@
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
-Last reconciled: **2026-09-24**  
-Authoritative repository baseline after 2026-09-24 reconciliation: `main@e4f83987d78795426f191d6753798c56e39a32ec` (W5C merged)  
+Last reconciled: **2026-09-25**  
+Authoritative repository baseline before the current G14 candidate: `main@c9d97e660208f442522ce2701fef67db367b4a1b` (P2-G13 / PR #165 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G12 merged; G13 durable Worker reconstruction candidate**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G13 merged; G14 real force-stop recovery gate candidate**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -337,7 +337,7 @@ Remaining:
 - inventory all Activities/Fragments for main-thread file/JSON/DB/network work;
 - unify background-task status presentation through the task center where appropriate;
 - define Android-specific concurrency/resource budgets;
-- validate process death/relaunch for every durable Worker class;
+- promote the G14 emulator force-stop gate only after its CI evidence passes; then extend recovery evidence to remaining non-user-facing Worker families where useful;
 - validate low-memory/background restrictions;
 - verify large Catalog and long Reader behavior on representative mid-range hardware.
 
@@ -1014,9 +1014,10 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: RECOVERY_IN_PROGRESS — G1–G12 merged; G13 durable WorkManager reconstruction candidate**
+**Status: RECOVERY_IN_PROGRESS — G1–G13 merged; G14 real process-death / force-stop recovery gate candidate**
 
 - **G1–G12 merged (PR #153–#164):** the audited scalable Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion local I/O paths are no longer performed synchronously in their UI render/click/save paths.
+- **G13 merged (PR #165):** durable current WorkRequest/download identity and registry-based Task Center reconstruction are now on main.
 - The UI-thread I/O remediation lane is implementation-complete for the currently audited owners; remaining P2-G work now moves to durable Worker/process-death recovery, low-memory/background restrictions and Android resource budgets.
 - **G13 finding 1:** TaskCenterActivity reconstructed singleton work with `values.get(values.size()-1)` and rendered every historical download WorkInfo returned by tags. REPLACE/resume history can therefore surface stale/duplicate attempts after Activity/process recreation.
 - **G13 finding 2:** dynamic download pause intent is durable in MobileTaskPauseStore, but the provider/comic/episode identity was only enumerable through WorkManager tags. If an old cancelled WorkInfo is pruned, a deliberate PAUSED download can remain marked paused yet disappear from Task Center.
@@ -1026,9 +1027,13 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Download reconstruction emits one logical card per durable registry identity. Active WorkInfo can repair a stale registry UUID; pre-G13 active/paused work migrates from tags once; SUCCEEDED/explicitly cancelled stale registrations are removed; PAUSED cards survive missing/pruned historical WorkInfo.
 - Robolectric coverage verifies registry persistence/replacement/removal and provider separation. Source contracts forbid restoring `values.get(values.size()-1)` / old `latest()` authority.
 - `docs/ANDROID_WORKER_RECOVERY_P2G13.md` records the recovery matrix for Pica/E-H downloads, Favorite import, Pica bootstrap, Native Recommendation, update check and supporter entitlement refresh.
-- **Next after G13:** automated kill/restart tests for critical durable task families, deliberate-PAUSED preservation after process recreation, active Task Center reconstruction, completed/cancelled non-resurrection, then low-memory/background restrictions and Android resource budgets.
+- **G14 finding:** the G13 singleton UUID registry did not retire Favorite import / Pica bootstrap / Native Recommendation current IDs on successful completion or explicit cancel, so historical SUCCEEDED/CANCELLED WorkInfo could remain eligible for current-task reconstruction.
+- **G14 production correction:** explicit cancel now clears singleton current identity; successful Workers clear identity only after their existing durable success boundary. Pause/retry/failure continue retaining recovery identity.
+- **G14 real process-death harness:** a debug-only long-running WorkManager probe is killed by host-side `adb shell am force-stop` while actually RUNNING. A second instrumentation invocation must run in a new PID, observe probe runCount >= 2, preserve paused/current registry state, reconstruct active/paused downloads exactly once in Task Center, and keep explicitly cancelled download history out of Task Center.
+- **G14 CI:** `.github/workflows/android-worker-recovery.yml` uses the open-source ReactiveCircus emulator runner on API 35 and executes `scripts/run-android-worker-recovery.sh`. This is an additive gate; G14 is not promoted until the workflow passes on the PR/head.
+- **Next after G14 acceptance:** low-memory/background restriction audit, foreground-notification reconstruction on representative hardware, Android concurrency/resource budgets, then large-Catalog/long-Reader timing/jank/memory evidence.
 - Representative device timing/jank remains an external evidence gate.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, plus `docs/ANDROID_WORKER_RECOVERY_P2G13.md`.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, and `docs/ANDROID_WORKER_RECOVERY_P2G14.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1042,6 +1047,20 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-G14 real Android process-death recovery gate
+
+State update:
+- G13 is merged as PR #165; current-work identity is no longer inferred from WorkInfo list position.
+- While adding kill/restart evidence, G14 found that Favorite import, Pica bootstrap and Native Recommendation did not clear singleton recovery UUIDs on successful completion or explicit cancel.
+- G14 adds terminal singleton cleanup while deliberately preserving recovery identity for PAUSED/retry/failure states.
+- `WorkerRecoveryProbeWorker` exists only in the Android debug source set and remains RUNNING so the host harness can kill a real WorkManager process at a deterministic boundary.
+- The seed instrumentation writes real WorkManager rows and app-private recovery state, confirms the probe is RUNNING, commits a READY marker and blocks.
+- The host runner confirms the target PID is alive, executes `adb shell am force-stop com.picalibrary.android.dev`, and starts a second instrumentation invocation.
+- Verification requires a fresh PID, probe runCount >= 2, unfinished probe state, durable singleton/download identities, preserved PAUSED states, one-card Task Center reconstruction and non-resurrection of explicitly cancelled download history.
+- CI uses `ReactiveCircus/android-emulator-runner@v2` instead of a custom emulator bootstrap; AndroidX WorkManager remains the only production scheduler.
+- G14 does not claim OEM low-memory/background restriction or physical-device performance acceptance. Those remain the next P2-G gates.
+- Detailed boundary: `docs/ANDROID_WORKER_RECOVERY_P2G14.md`.
 
 ## 2026-09-25 — P2-G13 durable WorkManager reconstruction authority
 

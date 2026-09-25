@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G7 merged; G8 Main Bookshelves snapshot candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G8 merged; G9 Main Recommendation state candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,23 +1014,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G7 merged; G8 Main Bookshelves snapshot candidate**
+**Status: IN_PROGRESS — G1–G8 merged; G9 Main Recommendation state candidate**
 
-- **G1 merged (PR #153):** Author Works local Catalog/Semantic/creator reconstruction is worker-owned.
-- **G2 merged (PR #154):** Comic Detail initial local preparation is worker-owned.
-- **G3 merged (PR #155):** Downloads persistent-index/stat/delete refresh work is worker-owned.
-- **G4 merged (PR #156):** Main Library local-reference reconciliation is worker-owned.
-- **G5 merged (PR #157):** Main Settings heavy summary I/O is worker-owned.
-- **G6 merged (PR #158):** Author Directory creator-concept construction is worker-owned.
-- **G7 merged (PR #159):** PicaBrowse result rendering consumes worker-prepared Catalog/Semantic/Translation snapshots.
-- **G8 finding:** MainActivity Bookshelves synchronously loaded ShelfStore and WebDAV config in page construction, while `renderShelves()` synchronously loaded Unified Catalog. WebDAV failure also reloaded ShelfStore on the UI thread.
-- **G8 implemented:** one worker-owned `ShelfPageState` carries Shelf + Catalog + remote map + source label/config state. Bookshelves renders a shell first and publishes only prepared state through existing `serial/valid(id)`.
-- WebDAV success prepares the reconciled Catalog + remote Catalog map on the worker; failure prepares a complete local fallback state before UI publication.
-- The refresh path no longer calls an explicit second `UnifiedCatalogStore.reconcileLocalReferences()` after `ShelfStore.save()`, because ShelfStore.save already performs that reconciliation.
-- `renderShelves()` contains no Shelf/Catalog/RemoteConfig Store read. Availability priority, active shelf persistence, WebDAV refresh semantics and card navigation are unchanged.
-- **Next after G8:** MainActivity Recommendation tab Portable/Catalog/NativeRecommendation preparation, then direct-open + History/Reader local-state paths.
-- Durable Worker process-death/relaunch, Task Center reconstruction, low-memory/background behavior and Android resource budgets remain later P2-G work.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G8.md`.
+- **G1–G8 merged (PR #153–#160):** Author/Detail/Downloads/Main Library/Main Settings/Author Directory/PicaBrowse/Bookshelves scalable local state preparation is no longer performed synchronously in the audited UI render paths.
+- **G9 finding:** MainActivity Recommendation tab synchronously loaded PortableRecommendationPackage, Unified Catalog and NativeRecommendation cycle, scanned Catalog/feedback for local evidence, checked Pica availability, then when a cycle existed ran `markCurrentSeen()` and loaded NativeRecommendation again before drawing.
+- **G9 implemented:** one worker-owned `RecommendationPageState` prepares Portable state, Catalog evidence/can-run decision and the post-`markCurrentSeen` NativeRecommendation snapshot on MainActivity's existing requests executor.
+- Recommendation renders a shell/loading state first and publishes only the current `serial/valid(id)` generation.
+- `renderRecommendationPage()` is Store-free; existing Generate/Regenerate guidance, Portable candidate messaging, batch controls and card rendering are unchanged.
+- Initial impression persistence remains authoritative but now occurs on the worker before UI publication.
+- **Deliberate non-scope:** Previous/Next batch button persistence remains an explicit user-interaction path for later evidence-based review.
+- **Next after G9:** direct-open + History/Reader local Catalog/store paths, then durable Worker process-death/relaunch, Task Center reconstruction and low-memory/background validation.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G9.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1044,6 +1038,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G9 Main Recommendation initial-state hardening
+
+State update:
+- MainActivity Recommendation previously synchronously loaded PortableRecommendationPackageStore, Unified Catalog and NativeRecommendationStore, scanned Catalog/feedback for local evidence, checked Pica availability, and when a cycle existed executed markCurrentSeen() plus another NativeRecommendation load before rendering.
+- G9 introduces RecommendationPageState(portable, nativeSnapshot, canRun) and worker-owned readRecommendationPageState().
+- The worker owns Portable/Catalog/NativeRecommendation file reads, Catalog evidence scan, Pica/portable availability decision, and initial markCurrentSeen() persistence/reload.
+- recommendations() now renders a lightweight page/loading shell and submits the state read through the existing requests executor; valid(id) guards publication.
+- renderRecommendationPage() performs no Portable/Catalog/NativeRecommendation load and no markCurrentSeen().
+- Generate/Regenerate behavior, input-readiness rules, Portable guidance, recommendation cards, scores/reasons and batch contents are unchanged.
+- Previous/Next batch persistence remains outside G9 as an explicit user-action path.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G9.md.
 
 ## 2026-09-24 — P2-G8 Main Bookshelves local-state hardening
 

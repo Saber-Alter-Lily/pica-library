@@ -3838,21 +3838,39 @@ export class LibraryService {
 
         const cacheDir = path.join(this.dataDir, 'cover-cache')
         const cacheKey = createHash('sha256').update(comicId).digest('hex')
+        const sourceFingerprint = createHash('sha256')
+            .update(
+                [
+                    comic.comicId,
+                    comic.providerId ?? '',
+                    comic.providerRemoteId ?? '',
+                    comic.coverUrl,
+                    comic.updatedAt ?? ''
+                ].join('\n')
+            )
+            .digest('hex')
         const imageFile = path.join(cacheDir, `${cacheKey}.bin`)
         const metadataFile = path.join(cacheDir, `${cacheKey}.json`)
         try {
             const metadata = JSON.parse(
                 await fs.promises.readFile(metadataFile, 'utf8')
-            ) as { contentType?: unknown }
+            ) as {
+                contentType?: unknown
+                sourceFingerprint?: unknown
+            }
             const contentType = safeRasterContentType(metadata.contentType)
-            if (!contentType) throw new Error('invalid')
+            if (
+                !contentType ||
+                String(metadata.sourceFingerprint ?? '') !== sourceFingerprint
+            )
+                throw new Error('invalid')
             return {
                 data: await fs.promises.readFile(imageFile),
                 contentType,
                 cached: true
             }
         } catch {
-            // A partial or stale cache entry is safely replaced below.
+            // A partial, legacy, or source-stale cache entry is replaced below.
         }
 
         const providerService = this.providerService()
@@ -3863,7 +3881,10 @@ export class LibraryService {
         await fs.promises.writeFile(imagePartial, image.data)
         await fs.promises.writeFile(
             metadataPartial,
-            JSON.stringify({ contentType: image.contentType })
+            JSON.stringify({
+                contentType: image.contentType,
+                sourceFingerprint
+            })
         )
         await fs.promises.rename(imagePartial, imageFile)
         await fs.promises.rename(metadataPartial, metadataFile)

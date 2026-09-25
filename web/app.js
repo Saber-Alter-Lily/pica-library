@@ -2014,6 +2014,15 @@ async function waitForFinalCycle(previousCycleId = null) {
     const deadline = Date.now() + 120000
     while (Date.now() < deadline) {
         let status = recommendationStatusSignal.status
+        if (!status) {
+            const startupRemaining = Math.max(0, deadline - Date.now())
+            if (startupRemaining)
+                await waitForRecommendationStatusSignal(
+                    Math.min(750, startupRemaining)
+                )
+            status = recommendationStatusSignal.status
+        }
+
         const signalFresh =
             status &&
             Date.now() - recommendationStatusSignal.observedAt < 1500

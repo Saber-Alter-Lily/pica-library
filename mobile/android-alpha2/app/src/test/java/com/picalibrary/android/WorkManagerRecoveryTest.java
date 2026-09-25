@@ -17,7 +17,6 @@ import androidx.work.WorkerParameters;
 import androidx.work.testing.WorkManagerTestInitHelper;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -244,25 +243,17 @@ public class WorkManagerRecoveryTest {
         return Robolectric.buildActivity(TaskCenterActivity.class).create();
     }
 
-    @SuppressWarnings("unchecked")
     private List<?> reconstructDownloads(
         TaskCenterActivity activity,List<WorkInfo> infos
-    ) throws Exception {
-        Method method = TaskCenterActivity.class
-            .getDeclaredMethod("reconstructDownloads",List.class);
-        method.setAccessible(true);
-        return (List<?>)method.invoke(activity,infos);
+    ){
+        return TaskCenterActivity.reconstructDownloads(activity,infos);
     }
 
     private WorkInfo currentWork(
         TaskCenterActivity activity,
         List<WorkInfo> values,String scope,String id
-    ) throws Exception {
-        Method method = TaskCenterActivity.class.getDeclaredMethod(
-            "currentWork",List.class,String.class,String.class
-        );
-        method.setAccessible(true);
-        return (WorkInfo)method.invoke(activity,values,scope,id);
+    ){
+        return TaskCenterActivity.currentWork(activity,values,scope,id);
     }
 
     private MobileTaskRegistryStore.DownloadRef viewRef(Object view) throws Exception {

@@ -128,14 +128,20 @@ The host script waits for the READY marker and confirms the target process is al
 
 The first instrumentation process is expected to die because of that command. The harness does not treat its abrupt termination as a test failure.
 
+A force-stopped Android package is intentionally not allowed to restart background work by itself. The host therefore verifies the target PID is gone, then performs a normal launcher re-entry:
+
+`adb shell monkey -p com.picalibrary.android.dev -c android.intent.category.LAUNCHER 1`
+
+The debug probe also writes an app-private plain-text run-count marker. After launcher re-entry, the host requires that marker to reach at least 2 and requires a new target PID before starting the verification instrumentation. This proves recovery occurs after legitimate app re-entry/WorkManager initialization rather than by bypassing force-stop semantics.
+
 ### Invocation B — fresh-process verification
 
-`verifyDurableRecoveryStateAfterForceStop()` starts after the force-stop.
+`verifyDurableRecoveryStateAfterForceStop()` starts only after the launcher re-entry has already caused the probe to execute again.
 
 It verifies:
 
 - the current PID differs from the persisted seed PID;
-- the debug probe run counter reaches at least 2, proving a fresh Worker instance was reconstructed after relaunch;
+- the debug probe run counter is at least 2, independently confirmed by the host after normal launcher re-entry, proving a fresh Worker instance was reconstructed after force-stop recovery;
 - the force-stopped probe remains unfinished rather than becoming a false success;
 - singleton current UUIDs persist for active/paused work;
 - paused Favorite import remains paused;
@@ -163,7 +169,7 @@ The workflow:
 - builds the normal debug app + androidTest APK;
 - installs both on an API 35 x86_64 Google APIs emulator;
 - uses KVM hardware acceleration on GitHub's Ubuntu runner;
-- performs the two-invocation force-stop scenario;
+- performs force-stop → confirmed process death → normal launcher re-entry → WorkManager probe recovery → fresh verification instrumentation;
 - uploads the short recovery diagnostics artifact.
 
 This is additive to the normal Android unit/lint/release-build CI gate.

@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1 redundant Theme decoration polling removed; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1 merged; F2 scoped UX polish observers candidate; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,13 +1001,15 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1 event-driven Theme decoration candidate**
+**Status: IN_PROGRESS — F1 merged; F2 scoped UX polish observers candidate**
 
-- **F1 implemented:** remove the always-on 2.5 second Theme decoration fallback. Theme progress/empty-state decoration remains driven by scoped MutationObservers, theme changes, resize, visibility restoration and explicit theme application, all coalesced through `requestAnimationFrame`.
-- Recommendation build polling at 500 ms is intentionally retained because it reads authoritative backend task state only while a build is being watched.
-- No Theme visuals, scroll restoration or backend poll cadence changes in F1.
-- **Next after F1:** inventory persistent pollers by owner/start/stop/authority, then audit broad `document.body` subtree observers for narrower ownership boundaries.
-- Detailed boundary: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`.
+- **F1 merged (PR #138):** the always-on 2.5 second Theme decoration fallback is removed. Theme decoration remains event-driven and coalesced; authoritative Recommendation build polling remains intact.
+- **F2 implemented:** `ui-polish-v5.js` no longer observes the entire `document.body` subtree and reruns the Settings/Downloads installer bundle for unrelated comic/Reader/Recommendation mutations.
+- Settings-owned dynamic polish now observes only `#settings`; Downloads polish observes only `#downloads`; both retain one animation-frame coalescing guard.
+- Dialog backdrop-close behavior is now one delegated `document.body` click handler, so dynamically inserted dialogs no longer require a body-wide rescan or per-dialog listener installation.
+- Existing selection-status, Visual QC, Product, Settings Hub and onboarding observers are unchanged in F2 and remain separate audit targets.
+- **Next after F2:** give selection status streams one matching render authority, then audit the remaining broad body observers and persistent backend pollers one by one.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1021,6 +1023,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F2 scoped UX polish observers
+
+State update:
+- ui-polish-v5.js previously used one document.body childList+subtree MutationObserver to schedule the full dynamic Settings/Downloads polish bundle after any DOM mutation anywhere in the application.
+- requestAnimationFrame coalescing limited callback count but did not fix ownership: unrelated comic cards, Recommendation, Reader and other DOM churn could still trigger all Settings/Downloads installer checks.
+- F2 replaces the global observer with one #settings observer for Settings-owned installers and one #downloads observer for Download-page polish.
+- Each scoped observer keeps its own animation-frame queue guard.
+- Dialog backdrop-close behavior moves from scanning/attaching listeners to every dialog into one delegated body click listener, preserving dynamically inserted dialogs without requiring a global observer.
+- Web UX regression forbids the body-subtree observer and per-dialog click installer while requiring both scoped observers and delegated dialog behavior.
+- F2 changes observer ownership only; Settings/Downloads content, task polling, selection-status observers, Recommendation/Visual observers, scroll/focus behavior and performance budgets are unchanged.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md.
 
 ## 2026-09-24 — P2-F1 event-driven Theme decoration
 

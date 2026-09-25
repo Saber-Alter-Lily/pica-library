@@ -17,8 +17,18 @@ public final class HistoryActivity extends LocaleAwareActivity {
         final String comicId;final List<ReadingHistoryStore.Session> sessions=new ArrayList<>();ReadingHistoryStore.Session latest;
         ComicHistory(String comicId){this.comicId=comicId;}
     }
+    private static final class HistoryData {
+        final ReadingHistoryStore.Snapshot history;
+        final UnifiedCatalogStore.Snapshot catalog;
+        HistoryData(ReadingHistoryStore.Snapshot history,UnifiedCatalogStore.Snapshot catalog){
+            this.history=history;
+            this.catalog=catalog;
+        }
+    }
     private final ExecutorService worker=Executors.newSingleThreadExecutor();private LinearLayout list,filterRow;private TextView status;private ReadingHistoryStore.Range range=ReadingHistoryStore.Range.DAYS_7;private LocalDate exactDate;private boolean destroyed,importing;
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);ReadingHistoryStore.importLocalBookmarksOnce(this);renderShell();renderList();importLegacySources();}
+    private ReadingHistoryStore.Snapshot historySnapshot;
+    private UnifiedCatalogStore.Snapshot catalogSnapshot;
+    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);renderShell();loadLocalHistory(true);importLegacySources();}
     private Button compact(String label,android.view.View.OnClickListener action){return Ui.button(this,label,action,true);}
     private void renderShell(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));bar.addView(compact("‹ 返回",v->finish()));bar.addView(Ui.text(this,"阅读历史",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));bar.addView(compact("📅",v->pickDate()));root.addView(bar);HorizontalScrollView scroller=new HorizontalScrollView(this);filterRow=new LinearLayout(this);filterRow.setPadding(Ui.dp(this,12),0,Ui.dp(this,12),Ui.dp(this,2));scroller.addView(filterRow);root.addView(scroller);status=Ui.text(this,"",12,Ui.MUTED,false);status.setPadding(Ui.dp(this,14),Ui.dp(this,4),Ui.dp(this,14),Ui.dp(this,2));root.addView(status);ScrollView scroll=new ScrollView(this);list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);list.setPadding(Ui.dp(this,10),0,Ui.dp(this,10),Ui.dp(this,24));scroll.addView(list);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();renderFilters();}
     private void renderFilters(){filterRow.removeAllViews();addRange("今天",ReadingHistoryStore.Range.TODAY);addRange("7天",ReadingHistoryStore.Range.DAYS_7);addRange("30天",ReadingHistoryStore.Range.DAYS_30);addRange("全部",ReadingHistoryStore.Range.ALL);if(exactDate!=null){Button exact=compact(exactDate.getMonthValue()+"/"+exactDate.getDayOfMonth()+" ✓",v->{exactDate=null;renderFilters();renderList();});filterRow.addView(exact);}}
@@ -29,14 +39,101 @@ public final class HistoryActivity extends LocaleAwareActivity {
     private List<ReadingHistoryStore.Session> chapterRows(ComicHistory group){LinkedHashMap<String,ReadingHistoryStore.Session> byChapter=new LinkedHashMap<>();for(ReadingHistoryStore.Session row:group.sessions){String key=row.chapterId.isEmpty()?"session:"+row.sessionId:row.chapterId;ReadingHistoryStore.Session prior=byChapter.get(key);if(prior==null){byChapter.put(key,row);continue;}boolean useRow=row.lastReadAt.compareTo(prior.lastReadAt)>0||(row.lastReadAt.equals(prior.lastReadAt)&&prior.chapterOrder==0&&row.chapterOrder>0);ReadingHistoryStore.Session chosen=useRow?row:prior,other=useRow?prior:row;if(chosen.chapterOrder==0&&other.chapterOrder>0)chosen.chapterOrder=other.chapterOrder;if(genericChapterTitle(chosen.chapterTitle)&&!genericChapterTitle(other.chapterTitle))chosen.chapterTitle=other.chapterTitle;byChapter.put(key,chosen);}ArrayList<ReadingHistoryStore.Session> out=new ArrayList<>(byChapter.values());out.sort((a,b)->{if(a.chapterOrder>0&&b.chapterOrder>0){int order=Integer.compare(a.chapterOrder,b.chapterOrder);if(order!=0)return order;}return a.lastReadAt.compareTo(b.lastReadAt);});return out;}
     private ReadingHistoryStore.Session latestDisplay(ComicHistory group,List<ReadingHistoryStore.Session> chapters){for(ReadingHistoryStore.Session row:chapters)if(!group.latest.chapterId.isEmpty()&&group.latest.chapterId.equals(row.chapterId))return row;return group.latest;}
     private String chapterLabel(ReadingHistoryStore.Session row){String title=row.chapterTitle==null?"":row.chapterTitle.trim();if(row.chapterOrder>0){String numbered=LocalizedText.ui(this,"第 "+row.chapterOrder+" 章","Chapter "+row.chapterOrder,"第"+row.chapterOrder+"章");if(title.isEmpty()||"章节".equals(title))return numbered;return numbered+" · "+title;}return title.isEmpty()?LocalizedText.ui(this,"章节","Chapter","チャプター"):title;}
+    private HistoryData readHistoryData(boolean migrateBookmarks){
+        if(migrateBookmarks)ReadingHistoryStore.importLocalBookmarksOnce(this);
+        return new HistoryData(
+            ReadingHistoryStore.load(this),
+            UnifiedCatalogStore.load(this)
+        );
+    }
+    private void loadLocalHistory(boolean migrateBookmarks){
+        worker.submit(()->{
+            HistoryData data=readHistoryData(migrateBookmarks);
+            runOnUiThread(()->{
+                if(destroyed)return;
+                historySnapshot=data.history;
+                catalogSnapshot=data.catalog;
+                renderList();
+            });
+        });
+    }
+
     private UnifiedCatalogStore.Entry coverEntry(ReadingHistoryStore.Session row,UnifiedCatalogStore.Snapshot catalog){UnifiedCatalogStore.Entry entry=catalog.byId.get(row.comicId);if(entry!=null)return entry;entry=new UnifiedCatalogStore.Entry(row.comicId,row.title,row.author);entry.providerId=row.providerId;if("desktop".equals(row.sourceKind))entry.desktopCoverPath="/mobile/v1/covers/"+row.comicId;return entry;}
-    private void renderList(){if(list==null)return;list.removeAllViews();ZoneId zone=ZoneId.systemDefault();List<ReadingHistoryStore.Session> rows=ReadingHistoryStore.filter(ReadingHistoryStore.load(this),range,exactDate,zone);List<ComicHistory> groups=grouped(rows);status.setText((importing?LocalizedText.ui("正在合并旧阅读记录 · "):"")+groups.size()+LocalizedText.ui(" 本漫画 · ")+rows.size()+LocalizedText.ui(" 条会话")+(exactDate==null?"":" · "+exactDate));if(groups.isEmpty()){LinearLayout empty=Ui.card(this);empty.addView(Ui.text(this,exactDate==null?"这个时间段还没有阅读记录":"当天没有阅读记录",16,Ui.TEXT,true));empty.addView(Ui.text(this,"历史会按漫画合并；同一本漫画的章节记录可在卡片内查看。",12,Ui.MUTED,false));list.addView(empty);return;}UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);LocalDate current=null;DateTimeFormatter dayFormat=DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.forLanguageTag(LocaleStore.language(this)));for(ComicHistory group:groups){ReadingHistoryStore.Session row=group.latest;LocalDate day=ReadingHistoryStore.localDay(row.lastReadAt,zone);if(day==null)continue;if(!day.equals(current)){current=day;TextView h=Ui.text(this,dayFormat.format(day),14,Ui.MUTED,true);h.setPadding(Ui.dp(this,8),Ui.dp(this,12),0,Ui.dp(this,2));list.addView(h);}addComic(group,zone,catalog);}}
+    private void renderList(){
+        if(list==null)return;
+        list.removeAllViews();
+        if(historySnapshot==null||catalogSnapshot==null){
+            status.setText(LocalizedText.ui(importing?"正在读取并合并阅读历史…":"正在读取阅读历史…"));
+            ProgressBar progress=new ProgressBar(this);
+            list.addView(progress);
+            return;
+        }
+        ZoneId zone=ZoneId.systemDefault();
+        List<ReadingHistoryStore.Session> rows=ReadingHistoryStore.filter(historySnapshot,range,exactDate,zone);
+        List<ComicHistory> groups=grouped(rows);
+        status.setText((importing?LocalizedText.ui("正在合并旧阅读记录 · "):"")+groups.size()+LocalizedText.ui(" 本漫画 · ")+rows.size()+LocalizedText.ui(" 条会话")+(exactDate==null?"":" · "+exactDate));
+        if(groups.isEmpty()){
+            LinearLayout empty=Ui.card(this);
+            empty.addView(Ui.text(this,exactDate==null?"这个时间段还没有阅读记录":"当天没有阅读记录",16,Ui.TEXT,true));
+            empty.addView(Ui.text(this,"历史会按漫画合并；同一本漫画的章节记录可在卡片内查看。",12,Ui.MUTED,false));
+            list.addView(empty);
+            return;
+        }
+        LocalDate current=null;
+        DateTimeFormatter dayFormat=DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.forLanguageTag(LocaleStore.language(this)));
+        for(ComicHistory group:groups){
+            ReadingHistoryStore.Session row=group.latest;
+            LocalDate day=ReadingHistoryStore.localDay(row.lastReadAt,zone);
+            if(day==null)continue;
+            if(!day.equals(current)){
+                current=day;
+                TextView h=Ui.text(this,dayFormat.format(day),14,Ui.MUTED,true);
+                h.setPadding(Ui.dp(this,8),Ui.dp(this,12),0,Ui.dp(this,2));
+                list.addView(h);
+            }
+            addComic(group,zone,catalogSnapshot);
+        }
+    }
     private void addComic(ComicHistory group,ZoneId zone,UnifiedCatalogStore.Snapshot catalog){List<ReadingHistoryStore.Session> chapters=chapterRows(group);ReadingHistoryStore.Session row=latestDisplay(group,chapters);LinearLayout card=Ui.card(this);LinearLayout body=new LinearLayout(this);body.setGravity(Gravity.TOP);ImageView cover=new ImageView(this);cover.setScaleType(ImageView.ScaleType.CENTER_CROP);LinearLayout.LayoutParams coverLp=new LinearLayout.LayoutParams(Ui.dp(this,78),Ui.dp(this,108));coverLp.setMargins(0,0,Ui.dp(this,12),0);body.addView(cover,coverLp);LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);String time=ReadingHistoryStore.timeLabel(row.lastReadAt,zone);LinearLayout head=new LinearLayout(this);head.setGravity(Gravity.CENTER_VERTICAL);TextView titleView=Ui.text(this,(time.isEmpty()?"":time+"  ")+row.title,16.5f,Ui.TEXT,true);titleView.setMaxLines(2);head.addView(titleView,new LinearLayout.LayoutParams(0,-2,1));if(row.legacySnapshot)head.addView(Ui.pill(this,"旧记录",Ui.ACTION,Ui.MUTED));info.addView(head);String recent=LocalizedText.ui(this,"最近："+chapterLabel(row)+" · 第 "+(row.lastPage+1)+" 页","Latest: "+chapterLabel(row)+" · Page "+(row.lastPage+1),"最近："+chapterLabel(row)+" · "+(row.lastPage+1)+"ページ");info.addView(Ui.rawText(this,recent,12.5f,Ui.PRIMARY,false));if(chapters.size()>1){String recorded=LocalizedText.ui(this,"已记录 "+chapters.size()+" 个章节","Recorded "+chapters.size()+" chapters",chapters.size()+"チャプターを記録");info.addView(Ui.rawText(this,recorded,11.5f,Ui.MUTED,false));}if(!row.author.isEmpty())info.addView(Ui.text(this,row.author,12,Ui.MUTED,false));String source=sourceLabel(row);if(!source.isEmpty())info.addView(Ui.text(this,source,11,Ui.MUTED,false));body.addView(info,new LinearLayout.LayoutParams(0,-2,1));card.addView(body);UnifiedCatalogStore.Entry entry=coverEntry(row,catalog);CoverRepository.load(this,cover,entry,Ui.PLACEHOLDER);LinearLayout actions=new LinearLayout(this);actions.setPadding(0,Ui.dp(this,7),0,0);actions.addView(compact("详情",v->openDetail(row)),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,6);if(chapters.size()>1){actions.addView(compact("章节记录",v->showChapters(group,zone)),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,6);}actions.addView(compact("继续阅读",v->continueReading(row)),new LinearLayout.LayoutParams(0,-2,1));card.addView(actions);list.addView(card);}
     private void showChapters(ComicHistory group,ZoneId zone){List<ReadingHistoryStore.Session> chapters=chapterRows(group);String[] labels=new String[chapters.size()];for(int i=0;i<chapters.size();i++){ReadingHistoryStore.Session row=chapters.get(i);String time=ReadingHistoryStore.timeLabel(row.lastReadAt,zone);labels[i]=LocalizedText.ui(this,chapterLabel(row)+" · 第 "+(row.lastPage+1)+" 页",chapterLabel(row)+" · Page "+(row.lastPage+1),chapterLabel(row)+" · "+(row.lastPage+1)+"ページ")+(time.isEmpty()?"":" · "+time);}new AlertDialog.Builder(this).setTitle(group.latest.title+LocalizedText.ui(" · 章节记录")).setItems(labels,(d,which)->continueReading(chapters.get(which))).setNegativeButton(LocalizedText.ui("关闭"),null).show();}
     private String sourceLabel(ReadingHistoryStore.Session row){String source="phone".equals(row.sourceKind)?LocalizedText.ui(this,"手机","Phone","スマートフォン"):"desktop".equals(row.sourceKind)?LocalizedText.ui(this,"电脑","Desktop","Desktop"):"remote".equals(row.sourceKind)?"WebDAV":"pica".equals(row.sourceKind)?"Pica":"eh".equals(row.sourceKind)?"E-H":"";if(row.legacySnapshot){String legacy=LocalizedText.ui(this,"旧版最后进度快照","Legacy last-progress snapshot","旧版の最終進捗スナップショット");return source.isEmpty()?legacy:source+" · "+legacy;}return source;}
     private void openDetail(ReadingHistoryStore.Session row){Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",row.comicId);i.putExtra("title",row.title);i.putExtra("author",row.author);startActivity(i);}
     private void continueReading(ReadingHistoryStore.Session row){if(!resumeSupported(row)){openDetail(row);return;}ReaderProgress.seedOneShotPosition(this,row.comicId,row.chapterId,row.lastPage);Intent i=new Intent(this,ReaderActivity.class);i.putExtra("comicId",row.comicId);i.putExtra("title",row.title);i.putExtra("author",row.author);i.putExtra("episodeId",row.chapterId);i.putExtra("source",row.sourceKind);startActivity(i);}
     private boolean resumeSupported(ReadingHistoryStore.Session row){if(row.chapterId.isEmpty())return false;if("phone".equals(row.sourceKind))return PhoneDownloadStore.has(this,row.comicId);if("remote".equals(row.sourceKind))return RemoteConfigStore.load(this).configured();if("desktop".equals(row.sourceKind))return BridgeStore.paired(this);if("pica".equals(row.sourceKind))return PicaClient.available(this);if("eh".equals(row.sourceKind))return EhClient.isEhId(row.comicId);return false;}
-    private void importLegacySources(){if(importing)return;importing=true;renderList();worker.submit(()->{ArrayList<ReadingHistoryStore.Legacy> rows=new ArrayList<>();UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);if(RemoteConfigStore.load(this).configured())try{for(RemoteLibraryClient.ReadingEntry e:new RemoteLibraryClient(this).readingEntries()){UnifiedCatalogStore.Entry c=catalog.byId.get(e.comicId);String title=!e.comicTitle.isEmpty()?e.comicTitle:c==null?"漫画":c.title,author=!e.author.isEmpty()?e.author:c==null?"未知作者":c.displayAuthor(),provider=c==null?(EhClient.isEhId(e.comicId)?"eh":""):c.providerId;rows.add(new ReadingHistoryStore.Legacy("webdav",e.comicId,e.episodeId,title,author,e.episodeTitle,e.episodeOrder,provider,"remote",e.pageIndex,e.updatedAt,e.deviceId));}}catch(Exception ignored){}if(BridgeStore.paired(this))try{for(BridgeClient.RecentItem r:BridgeClient.recent(this,200)){UnifiedCatalogStore.Entry c=catalog.byId.get(r.comic.id);String provider=c==null?(EhClient.isEhId(r.comic.id)?"eh":"pica"):c.providerId;rows.add(new ReadingHistoryStore.Legacy("desktop",r.comic.id,r.episodeId,r.comic.title,r.comic.author,r.episodeTitle,r.episodeOrder,provider,"desktop",r.pageIndex,r.updatedAt,"desktop"));CoverRepository.prefetchDesktop(this,r.comic.id,r.comic.coverPath);}}catch(Exception ignored){}ReadingHistoryStore.importLegacy(this,rows);runOnUiThread(()->{if(destroyed)return;importing=false;renderList();});});}
+    private void importLegacySources(){
+        if(importing)return;
+        importing=true;
+        renderList();
+        worker.submit(()->{
+            ArrayList<ReadingHistoryStore.Legacy> rows=new ArrayList<>();
+            UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
+            if(RemoteConfigStore.load(this).configured())try{
+                for(RemoteLibraryClient.ReadingEntry e:new RemoteLibraryClient(this).readingEntries()){
+                    UnifiedCatalogStore.Entry c=catalog.byId.get(e.comicId);
+                    String title=!e.comicTitle.isEmpty()?e.comicTitle:c==null?"漫画":c.title;
+                    String author=!e.author.isEmpty()?e.author:c==null?"未知作者":c.displayAuthor();
+                    String provider=c==null?(EhClient.isEhId(e.comicId)?"eh":""):c.providerId;
+                    rows.add(new ReadingHistoryStore.Legacy("webdav",e.comicId,e.episodeId,title,author,e.episodeTitle,e.episodeOrder,provider,"remote",e.pageIndex,e.updatedAt,e.deviceId));
+                }
+            }catch(Exception ignored){}
+            if(BridgeStore.paired(this))try{
+                for(BridgeClient.RecentItem r:BridgeClient.recent(this,200)){
+                    UnifiedCatalogStore.Entry c=catalog.byId.get(r.comic.id);
+                    String provider=c==null?(EhClient.isEhId(r.comic.id)?"eh":"pica"):c.providerId;
+                    rows.add(new ReadingHistoryStore.Legacy("desktop",r.comic.id,r.episodeId,r.comic.title,r.comic.author,r.episodeTitle,r.episodeOrder,provider,"desktop",r.pageIndex,r.updatedAt,"desktop"));
+                    CoverRepository.prefetchDesktop(this,r.comic.id,r.comic.coverPath);
+                }
+            }catch(Exception ignored){}
+            ReadingHistoryStore.importLegacy(this,rows);
+            HistoryData data=readHistoryData(false);
+            runOnUiThread(()->{
+                if(destroyed)return;
+                historySnapshot=data.history;
+                catalogSnapshot=data.catalog;
+                importing=false;
+                renderList();
+            });
+        });
+    }
     @Override protected void onDestroy(){destroyed=true;worker.shutdownNow();super.onDestroy();}
 }

@@ -113,6 +113,37 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(detail.slice(sourcesStart, sourcesEnd)).not.toContain('PhoneDownloadStore.has(')
   })
 
+  it('keeps Main Library local catalog reconciliation off the UI thread', () => {
+    const main = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MainActivity.java',
+      'utf8'
+    )
+
+    const libraryStart = main.indexOf('private void library(){')
+    const libraryEnd = main.indexOf('private void renderUnifiedLibrary(', libraryStart)
+    const libraryBody = main.slice(libraryStart, libraryEnd)
+
+    expect(libraryBody).toContain('final int id=serial;')
+    expect(libraryBody).toContain('pending=requests.submit(()->{')
+    expect(libraryBody).toContain(
+      'UnifiedCatalogStore.Snapshot local=UnifiedCatalogStore.reconcileLocalReferences(this)'
+    )
+    expect(libraryBody).toContain('runOnUiThread(()->{')
+    expect(libraryBody).toContain('if(!valid(id))return;')
+    expect(libraryBody).toContain(
+      'renderUnifiedLibrary(g,status,local,"本地目录")'
+    )
+
+    const submitIndex = libraryBody.indexOf('pending=requests.submit(()->{')
+    const reconcileIndex = libraryBody.indexOf(
+      'UnifiedCatalogStore.Snapshot local=UnifiedCatalogStore.reconcileLocalReferences(this)'
+    )
+    expect(reconcileIndex).toBeGreaterThan(submitIndex)
+
+    const uiPrefix = libraryBody.slice(0, submitIndex)
+    expect(uiPrefix).not.toContain('UnifiedCatalogStore.reconcileLocalReferences(')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

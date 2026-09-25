@@ -100,8 +100,16 @@ public class MainActivity extends LocaleAwareActivity {
         entries.addView(button("Pica 在线",v->startActivity(new Intent(this,PicaBrowseActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
         entries.addView(button("手机下载",v->startActivity(new Intent(this,DownloadsActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
         TextView status=Ui.text(this,"正在读取本地统一目录…",12,Ui.MUTED,false);p.addView(status);GridView g=grid(p);
-        unifiedSnapshot=UnifiedCatalogStore.reconcileLocalReferences(this);renderUnifiedLibrary(g,status,unifiedSnapshot,"本地目录");
-        if(!libraryRefreshedThisSession){libraryRefreshedThisSession=true;refreshUnifiedCatalog(g,status);}else status.setText(status.getText()+LocalizedText.ui(" · 本次会话已检查来源"));
+        final int id=serial;
+        pending=requests.submit(()->{
+            UnifiedCatalogStore.Snapshot local=UnifiedCatalogStore.reconcileLocalReferences(this);
+            runOnUiThread(()->{
+                if(!valid(id))return;
+                renderUnifiedLibrary(g,status,local,"本地目录");
+                if(!libraryRefreshedThisSession){libraryRefreshedThisSession=true;refreshUnifiedCatalog(g,status);}
+                else status.setText(status.getText()+LocalizedText.ui(" · 本次会话已检查来源"));
+            });
+        });
     }
 
     private void renderUnifiedLibrary(GridView grid,TextView status,UnifiedCatalogStore.Snapshot snapshot,String sourceLabel){

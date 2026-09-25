@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1/G2 merged; G3 Downloads local-state/stat pipeline candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G3 merged; G4 Main Library first-frame reconcile candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,20 +1014,20 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1/G2 merged; G3 Downloads worker pipeline candidate**
+**Status: IN_PROGRESS — G1–G3 merged; G4 Main Library first-frame reconcile candidate**
 
-- **G1 merged (PR #153):** Author Works local Catalog/Semantic/creator reconstruction is worker-owned; UI rendering consumes prepared snapshots.
-- **G2 merged (PR #154):** Comic Detail now shows a lightweight shell and builds one worker-owned `LocalDetailState`; initial Catalog/Semantic/creator/PhoneDownload/E-H favorite work is no longer on the UI thread.
-- **G3 finding:** DownloadsActivity previously parsed the complete PhoneDownloadStore index on the UI thread, then called `estimatedBytes(this)`, which parsed the same index again and stat-ed every stored page URI before rendering.
-- Delete confirmation also called `PhoneDownloadStore.remove()` synchronously from the UI callback even though removal includes page deletion, index save and Catalog reconciliation.
-- **G3 implemented:** DownloadsActivity now renders a loading shell, uses one Activity-local single-thread executor, prepares `DownloadState(snapshot, bytes)` off-thread, and publishes only the current generation to the UI.
-- `PhoneDownloadStore.estimatedBytes(context, snapshot)` reuses the already parsed Snapshot so size calculation does not reopen the index.
-- Delete operations and the subsequent refreshed read run on the same worker. UI callbacks are guarded by `destroyed + loadGeneration`; `onDestroy()` advances generation and shuts down the executor.
-- Render and delete-confirmation paths contain no synchronous PhoneDownloadStore load/stat/remove work.
-- **New audit finding for next batch:** MainActivity's default Library tab still calls `UnifiedCatalogStore.reconcileLocalReferences(this)` synchronously before its first catalog render; the Settings tab separately performs synchronous Favorite/Recommendation/PhoneDownload/storage summary reads.
-- **Next after G3:** move the default MainActivity Library local-reference reconstruction off the UI thread first, then isolate Settings summary I/O, followed by AuthorDirectoryActivity and PicaBrowseActivity in separate batches.
-- Durable Worker process-death/relaunch, low-memory/background behavior, Task Center reconstruction and Android resource budgets remain later P2-G work after first-frame UI-thread I/O is removed.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G2.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G3.md`.
+- **G1 merged (PR #153):** Author Works local Catalog/Semantic/creator reconstruction is worker-owned.
+- **G2 merged (PR #154):** Comic Detail initial Catalog/Semantic/creator/PhoneDownload/E-H favorite preparation is worker-owned behind a lightweight shell.
+- **G3 merged (PR #155):** DownloadsActivity persistent-index parsing, full page-size stat scan and delete refresh run on an Activity-local worker with lifecycle/generation guards.
+- **G4 finding:** MainActivity's default Library tab synchronously executed `UnifiedCatalogStore.reconcileLocalReferences(this)` before its first catalog render.
+- That reconciliation loads/parses Unified Catalog, ShelfStore, E-H/Favorite stores and PhoneDownloadStore, merges local references and writes the Catalog back; cost scales with local library state.
+- **G4 implemented:** Library creates search/filter/shortcut/status/Grid UI first, then submits the local reconciliation to MainActivity's existing `requests` executor.
+- The worker publishes one local Snapshot through `runOnUiThread` only when the existing `serial/valid(id)` page generation is still current.
+- Existing one-source-refresh-per-session behavior starts only after the local Snapshot is published; Desktop/WebDAV refresh remains asynchronous and semantically unchanged.
+- Existing `cancelPageWork()` invalidates/cancels the page-owned Future when the user changes tabs, so stale local reconstruction cannot repaint a newer view.
+- **Next after G4:** isolate MainActivity Settings/source-summary file/stat reads, then AuthorDirectoryActivity and PicaBrowseActivity in separate batches. MainActivity Bookshelves/Recommendation local-store paths remain separately auditable.
+- Durable Worker process-death/relaunch, Task Center reconstruction, low-memory/background behavior and Android resource budgets remain later P2-G work.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G4.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1041,6 +1041,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G4 Main Library first-frame local-reference hardening
+
+State update:
+- MainActivity defaults to the Library tab and onResume immediately enters library().
+- Before G4, library() synchronously called UnifiedCatalogStore.reconcileLocalReferences(this) before the first catalog render.
+- reconcileLocalReferences is a full local-state merge: Unified Catalog load, ShelfStore merge, E-H/Favorite merge, PhoneDownloadStore merge and Catalog save.
+- G4 keeps the Library search/filter/shortcuts/status/Grid shell synchronous, but moves local reconciliation into the existing requests executor.
+- The worker captures the current serial generation and publishes only through runOnUiThread when valid(id) remains true.
+- After the local Snapshot renders, the existing libraryRefreshedThisSession decision starts the normal asynchronous Desktop/WebDAV refresh exactly as before.
+- cancelPageWork() already increments serial and cancels pending, so tab changes invalidate the in-flight local reconstruction without a second lifecycle system.
+- Unified Catalog schema, local-reference authority, filtering/sorting, source labels and remote refresh semantics are unchanged.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G4.md.
 
 ## 2026-09-24 — P2-G3 Downloads persistent-index/stat hardening
 

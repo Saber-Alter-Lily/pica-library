@@ -5333,7 +5333,7 @@ export class LibraryService {
                 }
             }
             this.persistLibraryOrganizeRecovery()
-            return this.libraryOrganizeStatus()
+        return this.libraryOrganizeStatus()
         }
         if (action === 'resume') {
             this.libraryOrganizePauseRequested = false
@@ -5553,7 +5553,7 @@ export class LibraryService {
                 }
             }
             this.persistMaintenanceRepairRecovery()
-            return this.maintenanceRepairStatus()
+        return this.maintenanceRepairStatus()
         }
         if (action === 'resume') {
             this.maintenanceRepairPauseRequested = false
@@ -5764,7 +5764,7 @@ export class LibraryService {
                 }
             }
             this.persistMaintenanceUpdateRecovery()
-            return this.maintenanceUpdateStatus()
+        return this.maintenanceUpdateStatus()
         }
         if (action === 'resume') {
             this.maintenanceUpdatePauseRequested = false

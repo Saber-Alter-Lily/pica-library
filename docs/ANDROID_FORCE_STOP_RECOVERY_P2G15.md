@@ -1,8 +1,20 @@
 # Android Force-Stop Worker Recovery — P2 G15
 
-Status: **implementation + automated emulator force-stop gate added; CI acceptance required before promotion**
+Status: **PASS — merged as PR #169; API 35 emulator force-stop/relaunch recovery accepted**
 
 Parent: `DEVELOPMENT_TASK_LOG.md` → P2-G Android runtime hardening / P2-H crash recovery. G15 builds directly on merged G14 (`docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`) and adds the OS-level emulator force-stop gate that G14 intentionally left open.
+
+Final accepted evidence:
+
+- PR #169 final head: `d0a2e74b6f2fc86ea70233a216f8d35367670ca1`;
+- normal CI: run 36141430122 PASS;
+- v0.4 Direct Upgrade Acceptance: run 36141430431 PASS;
+- Android Worker Force-Stop Recovery: run 36141430171 PASS;
+- probe runCount after normal launcher re-entry: 2;
+- seed PID 3741 → relaunch PID 3872;
+- verification instrumentation: `OK (1 test)`;
+- diagnostic artifact: 10866498681.
+
 
 ## Purpose
 

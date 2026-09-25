@@ -4,16 +4,34 @@ import type { ProviderService } from './provider-service'
 import type { PreviewCacheManager } from './preview-cache-manager'
 
 export class PreviewService {
+    private readonly preparedPages = new Map<
+        string,
+        { scope: string; sourceFingerprint: string }
+    >()
+
     constructor(
         private readonly database: LibraryDatabase,
         private readonly provider: ProviderService,
         private readonly cache: PreviewCacheManager
     ) {}
 
-    private sourceFingerprint(comicId: string, locator: string) {
-        return createHash('sha256')
-            .update(`${this.provider.cacheScope(comicId)}\n${locator}`)
-            .digest('hex')
+    private sourceIdentity(comicId: string, locator: string) {
+        const scope = this.provider.cacheScope(comicId)
+        return {
+            scope,
+            sourceFingerprint: createHash('sha256')
+                .update(`${scope}\n${locator}`)
+                .digest('hex')
+        }
+    }
+
+    private rememberPrepared(
+        key: string,
+        identity: { scope: string; sourceFingerprint: string }
+    ) {
+        if (!this.preparedPages.has(key) && this.preparedPages.size >= 128)
+            this.preparedPages.delete(this.preparedPages.keys().next().value!)
+        this.preparedPages.set(key, identity)
     }
 
     async prepare(comicId: string, offset = 0, count = 3) {
@@ -52,18 +70,17 @@ export class PreviewService {
         for (let index = 0; index < selected.length; index++) {
             const picture = selected[index]
             const key = `${comicId}:${episode.id}:${boundedOffset + index}`
-            const sourceFingerprint = this.sourceFingerprint(
-                comicId,
-                picture.url
-            )
-            if (this.cache.get(key, sourceFingerprint)) continue
-            const image = await this.provider.fetchPage(picture.url)
-            this.cache.put(
-                key,
-                image.data,
-                image.contentType,
-                sourceFingerprint
-            )
+            const identity = this.sourceIdentity(comicId, picture.url)
+            if (!this.cache.get(key, identity.sourceFingerprint)) {
+                const image = await this.provider.fetchPage(picture.url)
+                this.cache.put(
+                    key,
+                    image.data,
+                    image.contentType,
+                    identity.sourceFingerprint
+                )
+            }
+            this.rememberPrepared(key, identity)
         }
         return {
             source: 'provider' as const,
@@ -79,7 +96,14 @@ export class PreviewService {
     }
 
     page(comicId: string, episodeId: string, pageIndex: number) {
-        const value = this.cache.get(`${comicId}:${episodeId}:${pageIndex}`)
+        const key = `${comicId}:${episodeId}:${pageIndex}`
+        const identity = this.preparedPages.get(key)
+        if (
+            !identity ||
+            identity.scope !== this.provider.cacheScope(comicId)
+        )
+            throw new Error('Preview page is not prepared for the current provider scope')
+        const value = this.cache.get(key, identity.sourceFingerprint)
         if (!value) throw new Error('Preview page is not cached')
         return value
     }
@@ -89,6 +113,7 @@ export class PreviewService {
     }
 
     clear() {
+        this.preparedPages.clear()
         return this.cache.clear()
     }
 }

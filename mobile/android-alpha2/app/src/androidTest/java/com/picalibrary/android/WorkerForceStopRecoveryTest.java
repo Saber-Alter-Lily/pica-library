@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * P2-G15 is intentionally split across two instrumentation invocations.
  *
- * The host script runs seedDurableRecoveryState(), force-stops the target package with adb,
+ * The host script runs seedDurableRecoveryStateAndAwaitForceStop(), force-stops the target package with adb,
  * then starts verifyDurableRecoveryStateAfterForceStop() in a fresh process. This exercises the
  * real WorkManager database + app-private SharedPreferences instead of a same-process fake restart.
  */
@@ -137,9 +137,9 @@ public final class WorkerForceStopRecoveryTest {
         // Force both production preference files through a synchronous disk commit before adb
         // force-stop. The extra keys are ignored by production readers.
         assertTrue(app.getSharedPreferences("background-task-registry-v1", Context.MODE_PRIVATE)
-            .edit().putLong("g14-flush", System.nanoTime()).commit());
+            .edit().putLong("g15-flush", System.nanoTime()).commit());
         assertTrue(app.getSharedPreferences("background-task-pauses-v1", Context.MODE_PRIVATE)
-            .edit().putLong("g14-flush", System.nanoTime()).commit());
+            .edit().putLong("g15-flush", System.nanoTime()).commit());
 
         java.io.File ready = new java.io.File(app.getFilesDir(), READY_FILE);
         try (java.io.FileOutputStream out = new java.io.FileOutputStream(ready, false)) {

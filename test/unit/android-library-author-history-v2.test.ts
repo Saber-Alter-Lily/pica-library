@@ -259,6 +259,47 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(history).not.toContain('private void addSession(')
   })
 
+  it('keeps Pica Browse local render snapshots off the UI thread', () => {
+    const browse = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java',
+      'utf8'
+    )
+
+    expect(browse).toContain('private static final class BrowseRenderState')
+    expect(browse).toContain(
+      'private BrowseRenderState prepareRenderState(List<String> ids,String label,int pages)'
+    )
+    expect(browse).toContain('UnifiedCatalogStore.load(this)')
+    expect(browse).toContain('EhSemanticStore.load(this)')
+    expect(browse).toContain('EhTagTranslationStore.load(this)')
+    expect(browse).toContain(
+      'private void showIds(BrowseRenderState state)'
+    )
+    expect(browse).toContain(
+      'EhTagTranslationStore.scheduleUpdate(this,this::refreshLastRenderedIds)'
+    )
+    expect(browse).toContain(
+      'worker.submit(()->publishIds(ids,label,1))'
+    )
+    expect(browse).not.toContain(
+      'private void showIds(List<String> ids,String label,int pages)'
+    )
+
+    const showStart = browse.indexOf(
+      'private void showIds(BrowseRenderState state)'
+    )
+    const showEnd = browse.indexOf(
+      'private void showStatus(',
+      showStart
+    )
+    const showBody = browse.slice(showStart, showEnd)
+    expect(showBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(showBody).not.toContain('EhSemanticStore.load(')
+    expect(showBody).not.toContain('EhTagTranslationStore.load(')
+
+    expect(browse).not.toMatch(/showIds\(\s*ids\s*,/)
+  })
+
   it('keeps E-H browse and filter compact actions in one row', () => {
     const browse = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBrowseActivity.java','utf8')
     expect(browse).toContain('Button browse=button("浏览"')

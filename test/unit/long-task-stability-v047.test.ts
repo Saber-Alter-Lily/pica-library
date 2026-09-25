@@ -196,6 +196,9 @@ describe('v0.4.7 long-task stability contract', () => {
         const recoveryInstrumentation = read(
             'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/WorkerRecoveryProcessTest.java'
         )
+        const recoveryProbe = read(
+            'mobile/android-alpha2/app/src/debug/java/com/picalibrary/android/WorkerRecoveryProbeWorker.java'
+        )
         const recoveryScript = read('scripts/run-android-worker-recovery.sh')
         const recoveryWorkflow = read('.github/workflows/android-worker-recovery.yml')
         const picaWorker = read(
@@ -280,7 +283,7 @@ describe('v0.4.7 long-task stability contract', () => {
         )
 
         expect(recoveryInstrumentation).toContain(
-            'seedDurableRecoveryState()'
+            'seedDurableRecoveryStateAndAwaitForceStop()'
         )
         expect(recoveryInstrumentation).toContain(
             'verifyDurableRecoveryStateAfterForceStop()'
@@ -293,6 +296,15 @@ describe('v0.4.7 long-task stability contract', () => {
         )
         expect(recoveryInstrumentation).toContain(
             'explicitly cancelled download history must not resurrect'
+        )
+        expect(recoveryInstrumentation).toContain(
+            'awaitProbeRuns(app, 2)'
+        )
+        expect(recoveryProbe).toContain(
+            'while (!isStopped()) Thread.sleep(200L)'
+        )
+        expect(recoveryScript).toContain(
+            'seedDurableRecoveryStateAndAwaitForceStop'
         )
         expect(recoveryScript).toContain(
             'adb shell am force-stop "$TARGET_PACKAGE"'

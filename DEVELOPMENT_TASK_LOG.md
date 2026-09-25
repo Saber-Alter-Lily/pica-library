@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G8 merged; G9 Main Recommendation state candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G9 merged; G10 History local snapshot candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,17 +1014,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G8 merged; G9 Main Recommendation state candidate**
+**Status: IN_PROGRESS — G1–G9 merged; G10 History local snapshot candidate**
 
-- **G1–G8 merged (PR #153–#160):** Author/Detail/Downloads/Main Library/Main Settings/Author Directory/PicaBrowse/Bookshelves scalable local state preparation is no longer performed synchronously in the audited UI render paths.
-- **G9 finding:** MainActivity Recommendation tab synchronously loaded PortableRecommendationPackage, Unified Catalog and NativeRecommendation cycle, scanned Catalog/feedback for local evidence, checked Pica availability, then when a cycle existed ran `markCurrentSeen()` and loaded NativeRecommendation again before drawing.
-- **G9 implemented:** one worker-owned `RecommendationPageState` prepares Portable state, Catalog evidence/can-run decision and the post-`markCurrentSeen` NativeRecommendation snapshot on MainActivity's existing requests executor.
-- Recommendation renders a shell/loading state first and publishes only the current `serial/valid(id)` generation.
-- `renderRecommendationPage()` is Store-free; existing Generate/Regenerate guidance, Portable candidate messaging, batch controls and card rendering are unchanged.
-- Initial impression persistence remains authoritative but now occurs on the worker before UI publication.
-- **Deliberate non-scope:** Previous/Next batch button persistence remains an explicit user-interaction path for later evidence-based review.
-- **Next after G9:** direct-open + History/Reader local Catalog/store paths, then durable Worker process-death/relaunch, Task Center reconstruction and low-memory/background validation.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G9.md`.
+- **G1–G9 merged (PR #153–#161):** scalable local Catalog/Semantic/download/settings/browse/shelf/recommendation preparation has been removed from the audited first-frame/render paths.
+- **G10 finding:** HistoryActivity ran `ReadingHistoryStore.importLocalBookmarksOnce(this)` before rendering its shell, and every `renderList()` reparsed both ReadingHistoryStore and Unified Catalog. Range/date filter changes therefore repeated file/JSON work on the UI thread.
+- **G10 implemented:** `HistoryData(history, catalog)` is prepared on the existing single-thread worker. `onCreate()` now renders the shell first, then schedules local bookmark migration + History/Catalog loading.
+- Activity fields cache the latest History/Catalog snapshots. Date/range filters call the existing in-memory `ReadingHistoryStore.filter(historySnapshot,...)` and reuse the prepared Catalog for cover metadata.
+- Legacy WebDAV/Desktop import remains on the same serialized worker; after `importLegacy` it reloads one HistoryData on that worker before publishing the refreshed snapshot to UI.
+- `renderList()` contains no History/Catalog Store load. Existing grouping, chapter metadata, date headings, covers and resume/open-detail controls are unchanged.
+- **Deliberate non-scope:** explicit Continue Reading source checks, MainActivity direct-open Catalog lookup and Reader chapter-completion evidence metadata remain separate lower-frequency interaction paths.
+- **Next after G10:** audit those explicit direct-open/Reader evidence paths, then move into durable Worker process-death/relaunch, Task Center reconstruction and low-memory/background validation.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G10.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1038,6 +1038,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G10 History local snapshot hardening
+
+State update:
+- HistoryActivity previously executed ReadingHistoryStore.importLocalBookmarksOnce(this) before renderShell(), and renderList() synchronously reloaded ReadingHistoryStore + Unified Catalog on every page/filter/date render.
+- G10 introduces HistoryData(history, catalog), Activity-held historySnapshot/catalogSnapshot, and worker-owned readHistoryData().
+- onCreate() renders the shell first, schedules loadLocalHistory(true), and then schedules legacy-source import on the same single-thread worker.
+- Initial bookmark migration, History JSON load and Catalog load are worker-owned; renderList() shows loading until snapshots exist, then filters only in memory and reuses catalogSnapshot for covers.
+- Range/date changes no longer perform file/JSON reads.
+- After WebDAV/Desktop legacy import persists rows, the same worker calls readHistoryData(false) and publishes refreshed snapshots before rerendering.
+- Existing history grouping, chapter metadata, legacy labels, cover behavior and resume/open-detail controls are unchanged.
+- Explicit resumeSupported() source checks and Reader/Main direct-open evidence reads remain outside G10.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G10.md.
 
 ## 2026-09-24 — P2-G9 Main Recommendation initial-state hardening
 

@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F4 merged; F5 incremental Product source cleanup candidate; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1–F5 merged; F6 scoped Settings Hub observer candidate; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,16 +1001,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F4 merged; F5 incremental Product cleanup candidate**
+**Status: IN_PROGRESS — F1–F5 merged; F6 scoped Settings Hub observer candidate**
 
 - **F1 merged (PR #138):** remove redundant Theme idle polling.
 - **F2 merged (PR #139):** scope UX polish observers to Settings/Downloads and delegate dialog backdrop handling.
 - **F3 merged (PR #140):** give each selection-status stream one matching render authority.
-- **F4 merged (PR #141):** make v0.4 parity tag/detail mutation processing incremental and animation-frame coalesced instead of full-document per mutation.
-- **F5 implemented:** Product source-entry cleanup retains one initial full-page pass, but subsequent body mutations collect only added/changed subtrees and scan links/buttons only within those roots.
-- F5 keeps the body observer as the broad insertion event source because dynamic source entry points can originate from multiple modules, while removed-only/self-cleanup mutations no longer schedule another scan.
-- **Next after F5:** scope Settings Hub observer ownership, then audit onboarding and Visual QC broad observers and persistent backend pollers.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`.
+- **F4 merged (PR #141):** make v0.4 parity tag/detail mutation processing incremental and animation-frame coalesced.
+- **F5 merged (PR #142):** keep Product's one-time source-entry cleanup, but make dynamic cleanup process only mutation-added subtrees instead of rescanning all links/buttons.
+- **F6 implemented:** Settings Hub no longer watches the entire document body. Its coalesced observer now watches only the hidden `#settings` source root where Product Appearance/Support/Personalization panels are dynamically created before Hub relocation.
+- The static top-header language control is still moved explicitly during Hub construction; it does not require a permanent body observer.
+- **Next after F6:** audit onboarding's full-body target scan and Visual QC's body observer, then inventory persistent backend pollers by owner/start/stop lifecycle.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F6.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1024,6 +1025,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F6 scoped Settings Hub observer
+
+State update:
+- alpha8-7-desktop-hub.js previously observed the complete document.body subtree and ran Settings-panel relocation checks after unrelated Library/Recommendation/Reader/Download DOM changes.
+- Ownership audit shows dynamic Product Appearance, Support and Personalization surfaces are created under the legacy #settings root before the Hub moves them into its panels.
+- The top-header language control is static and is already moved explicitly during buildSettingsHub(), so it does not justify permanent body observation.
+- F6 keeps the existing requestAnimationFrame coalescing but changes the observer target from document.body to #settings.
+- Later settings-owned panels still trigger relocation while unrelated app views no longer schedule Hub work.
+- Hub layout, tabs, keyboard navigation, language placement, Product panels, Personalization and Maintenance behavior are unchanged.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F6.md.
 
 ## 2026-09-24 — P2-F5 incremental Product source-entry cleanup
 

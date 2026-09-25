@@ -4,5 +4,12 @@
         <activity
             android:name=".WorkerForceStopSeedActivity"
             android:exported="true" />
+        <!-- Debug-only P2-G16 probes for trim-memory and Doze/background behavior. -->
+        <activity
+            android:name=".MemoryPressureProbeActivity"
+            android:exported="true" />
+        <activity
+            android:name=".BackgroundRestrictionSeedActivity"
+            android:exported="true" />
     </application>
 </manifest>

@@ -52,6 +52,8 @@ final class ImageRepository {
     }
 
     static void prefetch(Activity activity, String path) { if (path == null || path.isEmpty() || cached(path) != null || disk(activity,path).isFile()) return; POOL.submit(() -> cacheNow(activity,path)); }
+    static int memoryBytes(){synchronized(CACHE){return CACHE.size();}}
+    static void trimMemory(){synchronized(CACHE){CACHE.evictAll();}}
     static long diskBytes(Context context){File[] files=dir(context).listFiles();long total=0;if(files!=null)for(File f:files)total+=f.length();return total;}
-    static void clearDisk(Context context){File[] files=dir(context).listFiles();if(files!=null)for(File f:files)f.delete();synchronized(CACHE){CACHE.evictAll();}}
+    static void clearDisk(Context context){File[] files=dir(context).listFiles();if(files!=null)for(File f:files)f.delete();trimMemory();}
 }

@@ -256,7 +256,10 @@ describe('v0.4.7 long-task stability contract', () => {
         )
 
         expect(gradle).toContain(
-            "testImplementation 'androidx.work:work-testing:2.9.1'"
+            "implementation 'androidx.work:work-runtime:2.12.0'"
+        )
+        expect(gradle).toContain(
+            "testImplementation 'androidx.work:work-testing:2.12.0'"
         )
         expect(recovery).toContain('WorkManagerTestInitHelper.initializeTestWorkManager')
         expect(recovery).toContain(

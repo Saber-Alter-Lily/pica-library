@@ -273,8 +273,19 @@ describe('V5 Web UX audit contract', () => {
         const visual = read('web/visual-qc.js')
         const hub = read('web/alpha8-7-desktop-hub.js')
         expect(visual).toContain('let queued = false')
-        expect(visual).toContain('const observer = new MutationObserver(schedule)')
+        expect(visual).toContain('const pendingRoots = new Set()')
+        expect(visual).toContain(
+            'const observer = new MutationObserver((mutations) =>'
+        )
+        expect(visual).toContain('for (const node of mutation.addedNodes)')
         expect(visual).toContain('requestAnimationFrame(() => {')
+        expect(visual).toContain(
+            'for (const root of roots) a88InstallDetailButtons(root)'
+        )
+        expect(visual).toContain('if (settingsDirty) {')
+        expect(visual).not.toContain(
+            'const observer = new MutationObserver(schedule)'
+        )
         expect(hub).toContain('let queued = false')
         expect(hub).toContain('const observer = new MutationObserver(schedule)')
         expect(hub).toContain('requestAnimationFrame(() => {')

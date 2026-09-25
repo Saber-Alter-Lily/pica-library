@@ -463,11 +463,20 @@ async function a88RunDetailSimilar(comicId, button) {
 function a88ComicIdFromCard(card) {
     return card?.querySelector('input[data-comic-id]')?.dataset.comicId || card?.querySelector('[data-read-comic]')?.dataset.readComic || card?.querySelector('[data-online-comic]')?.dataset.onlineComic || ''
 }
-function a88InstallDetailButtons() {
-    for (const root of ['#library', '#downloaded', '#shelves']) {
-        const section = a88$(root)
-        if (!section) continue
-        for (const card of a88$$('article.comic-card, tr', section)) {
+function a88SectionsWithin(root = document) {
+    const sections = []
+    for (const selector of ['#library', '#downloaded', '#shelves']) {
+        if (root instanceof Element && root.matches(selector))
+            sections.push(root)
+        if (root?.querySelectorAll)
+            sections.push(...root.querySelectorAll(selector))
+    }
+    return sections
+}
+
+function a88InstallDetailButtons(root = document) {
+    for (const section of a88SectionsWithin(root)) {
+        for (const card of a88$('article.comic-card, tr', section)) {
             if (card.querySelector('.a88-detail-trigger, [data-library-detail]')) continue
             const comicId = a88ComicIdFromCard(card)
             if (!comicId) continue
@@ -539,17 +548,42 @@ function a88InstallIndexFailureCapture() {
 
 function a88InstallObservers() {
     let queued = false
+    let settingsDirty = false
+    const pendingRoots = new Set()
+    const settingsSelector =
+        '#settings-recommendation-v4, #a87-recommendations-panel, #visual-index-build, #visual-index-message'
+
     const schedule = () => {
         if (queued) return
         queued = true
         requestAnimationFrame(() => {
             queued = false
-            a88EnsurePanel()
-            a88InstallDetailButtons()
-            a88InstallIndexFailureCapture()
+            const roots = [...pendingRoots]
+            pendingRoots.clear()
+            for (const root of roots) a88InstallDetailButtons(root)
+            if (settingsDirty) {
+                settingsDirty = false
+                a88EnsurePanel()
+                a88InstallIndexFailureCapture()
+            }
         })
     }
-    const observer = new MutationObserver(schedule)
+
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations)
+            for (const node of mutation.addedNodes) {
+                const root =
+                    node instanceof Element ? node : node.parentElement
+                if (!root) continue
+                pendingRoots.add(root)
+                if (
+                    root.matches?.(settingsSelector) ||
+                    root.querySelector?.(settingsSelector)
+                )
+                    settingsDirty = true
+            }
+        if (pendingRoots.size || settingsDirty) schedule()
+    })
     observer.observe(document.body, { childList: true, subtree: true })
 }
 

@@ -43,7 +43,7 @@ describe('P2 D7C recommendation impression batching', () => {
             contextId: 'context-d7c',
             recommendationCycleId: cycle,
             recommendationBatchIndex: 2,
-            rankPosition: index + 1,
+            rankPosition: index,
             dedupeKey: `context-d7c:2:comic-${index}`
         }
     }
@@ -77,7 +77,7 @@ describe('P2 D7C recommendation impression batching', () => {
                 (event) => event.recommendationCycleId === 'cycle-d7c'
             )
         expect(stored).toHaveLength(3)
-        expect(stored.map((event) => event.rankPosition)).toEqual([1, 2, 3])
+        expect(stored.map((event) => event.rankPosition)).toEqual([0, 1, 2])
     })
 
     it('rolls back the whole impression batch when one event fails storage validation', async () => {
@@ -155,7 +155,7 @@ describe('P2 D7C recommendation impression batching', () => {
                     events: Array.from({ length: 25 }, (_, index) => ({
                         ...impression(index + 10, 'cycle-d7c-too-large'),
                         comicId: `too-large-${index}`,
-                        rankPosition: index + 1,
+                        rankPosition: index,
                         dedupeKey: `too-large:${index}`
                     }))
                 })

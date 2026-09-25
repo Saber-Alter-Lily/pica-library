@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G4 merged; G5 Main Settings summary candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G5 merged; G6 Author Directory creator snapshot candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,21 +1014,21 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G4 merged; G5 Main Settings summary candidate**
+**Status: IN_PROGRESS — G1–G5 merged; G6 Author Directory creator snapshot candidate**
 
 - **G1 merged (PR #153):** Author Works local Catalog/Semantic/creator reconstruction is worker-owned.
-- **G2 merged (PR #154):** Comic Detail initial Catalog/Semantic/creator/PhoneDownload/E-H favorite preparation is worker-owned behind a lightweight shell.
-- **G3 merged (PR #155):** DownloadsActivity persistent-index parsing, page-size stat scan and delete refresh are worker-owned with lifecycle/generation guards.
-- **G4 merged (PR #156):** MainActivity's default Library shell renders before `UnifiedCatalogStore.reconcileLocalReferences()`, which now runs on the existing requests executor with `serial/valid(id)` publication.
-- **G5 finding:** MainActivity Settings/source summary synchronously mixed UI construction with Favorite JSON parsing, cover directory scan, encrypted Remote/Pica state reads, NativeRecommendation JSON parsing, PhoneDownload index + page-size stats, and recursive StoragePolicy usage scans.
-- **G5 implemented:** Settings renders all cards/actions immediately with loading placeholders, while one worker-owned `SettingsSummary` prepares the file/stat-heavy state.
-- `readSettingsSummary()` loads Favorite/Remote/Pica/Recommendation/PhoneDownload/Storage/Cover state off-thread and reuses `PhoneDownloadStore.estimatedBytes(this, downloads)` to avoid reparsing the phone index.
-- Desktop reachability keeps the existing `pending` Future; Settings summary uses a separate `settingsSummaryTask` so the two authorities cannot cancel/overwrite each other.
-- Summary publication uses the existing `serial/valid(id)` page-generation guard. `settingsSummaryTask` is cancelled on tab change, pause and destroy.
-- Favorite-import action messages are protected from stale summary overwrite by updating the Favorite summary only while its original loading placeholder is still present.
-- **Next after G5:** AuthorDirectoryActivity creator-concept construction, then PicaBrowseActivity local Catalog/Semantic/translation work. MainActivity Bookshelves/Recommendation and direct-open Catalog reads remain separate owner-level batches.
+- **G2 merged (PR #154):** Comic Detail initial Catalog/Semantic/creator/PhoneDownload/E-H favorite preparation is worker-owned.
+- **G3 merged (PR #155):** Downloads persistent-index parsing, page-size stats and delete refresh are worker-owned.
+- **G4 merged (PR #156):** Main Library local-reference reconciliation is worker-owned behind the Library shell.
+- **G5 merged (PR #157):** Main Settings cards render immediately while one `SettingsSummary` prepares Favorite/Remote/Pica/Recommendation/PhoneDownload/Storage/Cover state off-thread.
+- **G6 finding:** AuthorDirectoryActivity previously called `AuthorConceptStore.build(this)` directly in `onCreate()`, synchronously loading full Unified Catalog + E-H semantics and rebuilding creator concepts before the first author-directory frame.
+- **G6 implemented:** Author Directory now renders navigation/search/list shell first, then a single-thread worker loads Catalog + Semantic snapshots and builds `AuthorConceptStore.build(catalog, semantics)`.
+- While loading, the list shows a lightweight progress state; search input remains usable and does not trigger file/JSON reads. Snapshot publication reruns filtering against the current search text.
+- UI publication is guarded by `destroyed + loadGeneration`; `onDestroy()` advances generation and shuts down the executor.
+- Creator identity, aliases/circles, focused-author grouping, search semantics, display cap and Author Works navigation are unchanged.
+- **Next after G6:** PicaBrowseActivity local Catalog/Semantic/translation preparation, then MainActivity Bookshelves/Recommendation and History/Reader local-state paths as separate owners.
 - Durable Worker process-death/relaunch, Task Center reconstruction, low-memory/background behavior and Android resource budgets remain later P2-G work.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G5.md`.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G6.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1042,6 +1042,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G6 Author Directory creator-concept hardening
+
+State update:
+- AuthorDirectoryActivity previously called AuthorConceptStore.build(this) in onCreate(), which synchronously loaded Unified Catalog, loaded E-H semantics and rebuilt creator concepts across the local catalog before the first directory frame.
+- G6 renders the Author Directory shell/search immediately and schedules one Activity-local single-thread loadSnapshot() pipeline.
+- The worker explicitly loads UnifiedCatalogStore + EhSemanticStore and calls AuthorConceptStore.build(catalog, semantics); AuthorConceptStore.build(this) is removed from the Activity.
+- renderList() shows a lightweight loading state until the snapshot arrives. Search text changes remain local/UI-only while loading, and the published snapshot renders using the current search text.
+- destroyed + loadGeneration guard snapshot publication; onDestroy() advances generation and shuts down the executor.
+- Creator identity, aliases, circles/groups, focused-author grouping, 120-result cap and Author Works navigation are unchanged.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G6.md.
 
 ## 2026-09-24 — P2-G5 Main Settings summary I/O hardening
 

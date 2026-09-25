@@ -45,21 +45,19 @@ adb shell am start -W \
 
 ready=0
 for _ in $(seq 1 120); do
-    if adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-ready" 2>/dev/null | grep -q '^READY pid='; then
+    ready_text="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-ready" 2>/dev/null || true)"
+    if [[ "$ready_text" == READY\ pid=* ]]; then
         ready=1
         break
-    fi
-    if adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-seed-failure" 2>/dev/null | grep -q '.'; then
-        adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-seed-failure" >&2 || true
-        adb logcat -d >"$RESULT_DIR/logcat-seed-failure.txt" || true
-        echo "Debug seed Activity reported failure" >&2
-        exit 1
     fi
     sleep 0.25
 done
 
 if [[ "$ready" != "1" ]]; then
+    adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-seed-failure" \
+        >"$RESULT_DIR/seed-failure.txt" 2>&1 || true
     adb logcat -d >"$RESULT_DIR/logcat-before-force-stop.txt" || true
+    cat "$RESULT_DIR/seed-failure.txt" >&2 || true
     echo "Timed out waiting for P2-G15 READY marker from debug seed Activity" >&2
     exit 1
 fi

@@ -879,6 +879,86 @@ export async function startLibraryServer(options: {
             }
 
             if (
+                url.pathname === '/api/v1/recommendation-events/batch' &&
+                request.method === 'POST'
+            ) {
+                const input = await body(request)
+                const rawEvents = Array.isArray(input.events)
+                    ? input.events
+                    : []
+                if (rawEvents.length < 1 || rawEvents.length > 24)
+                    return json(response, 400, {
+                        error: 'Recommendation impression batch must contain 1 to 24 events'
+                    })
+
+                const events: UserEventInput[] = []
+                for (const raw of rawEvents) {
+                    if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+                        return json(response, 400, {
+                            error: 'Recommendation impression batch contains an invalid event'
+                        })
+                    const item = raw as Record<string, unknown>
+                    if (String(item.eventType ?? '') !== 'recommend_impression')
+                        return json(response, 400, {
+                            error: 'Only recommendation impressions may use the batch endpoint'
+                        })
+                    const cycleId = String(
+                        item.recommendationCycleId ?? ''
+                    ).trim()
+                    const comicId = String(item.comicId ?? '').trim()
+                    const batchIndex = Number(
+                        item.recommendationBatchIndex
+                    )
+                    const rankPosition = Number(item.rankPosition)
+                    const dedupeKey = String(item.dedupeKey ?? '').trim()
+                    if (
+                        !cycleId ||
+                        !comicId ||
+                        !Number.isInteger(batchIndex) ||
+                        batchIndex < 0 ||
+                        !Number.isInteger(rankPosition) ||
+                        rankPosition < 0 ||
+                        !dedupeKey
+                    )
+                        return json(response, 400, {
+                            error: 'Recommendation impression requires cycle, batch, comic, rank, and dedupe context'
+                        })
+                    events.push({
+                        eventType: 'recommend_impression',
+                        occurredAt: item.occurredAt
+                            ? String(item.occurredAt)
+                            : undefined,
+                        comicId,
+                        source: item.source ? String(item.source) : null,
+                        appSessionId: item.appSessionId
+                            ? String(item.appSessionId)
+                            : null,
+                        contextId: item.contextId
+                            ? String(item.contextId)
+                            : null,
+                        recommendationCycleId: cycleId,
+                        recommendationSessionId:
+                            item.recommendationSessionId
+                                ? String(item.recommendationSessionId)
+                                : null,
+                        recommendationBatchIndex: batchIndex,
+                        rankPosition,
+                        metadata:
+                            item.metadata &&
+                            typeof item.metadata === 'object' &&
+                            !Array.isArray(item.metadata)
+                                ? (item.metadata as Record<string, unknown>)
+                                : {},
+                        dedupeKey
+                    })
+                }
+
+                return json(response, 200, {
+                    events: options.service.recordRecommendationEvents(events)
+                })
+            }
+
+            if (
                 url.pathname === '/api/v1/recommendation-events' &&
                 request.method === 'POST'
             ) {

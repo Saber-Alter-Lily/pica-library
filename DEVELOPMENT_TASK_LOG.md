@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1–D7B merged; D8A picture-count index candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1–D8A merged; D7C recommendation-impression batching candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -956,7 +956,7 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## NEXT-6 — P2-D SQLite/query discipline
-**Status: IN_PROGRESS — D1–D4 merged; D5A authoritative Work Identity domain candidate**
+**Status: IN_PROGRESS — D1–D8A merged; D7C recommendation-impression batching candidate; broader query/write audit remains open**
 
 This remains the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
 
@@ -976,11 +976,14 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - D7A regression preserves partial-patch semantics, explicit zero writes, unknown-job failure behavior and the existing 250 ms service throttle.
 - **D7B merged (PR #132):** Shelf add/remove still records one behavior event per comic, but the route sends the event array through `recordUserEvents()`, which wraps the existing single-event recorder in one short `BEGIN IMMEDIATE / COMMIT / ROLLBACK` transaction.
 - D7B preserves event IDs, metadata safety, dedupe behavior and per-comic evidence granularity; invalid input rolls back the event batch rather than leaving a partially recorded shelf action.
-- **D8A implemented:** migration 16 adds `idx_pictures_comic_status(comic_id, status)`, filling the missing comic-first access path used by the correlated `comicSelect` picture-count subquery.
+- **D8A merged (PR #133):** migration 16 adds `idx_pictures_comic_status(comic_id, status)`, filling the missing comic-first access path used by the correlated `comicSelect` picture-count subquery.
 - D8A planner regression requires `COUNT(*) WHERE comic_id = ?` to use the new index; completed-picture counts may validly use either the new comic-first index or the existing status-first downloaded index.
 - D8A does not rewrite `comicSelect`; aggregate joins/CTEs remain deferred until representative scaling evidence justifies a broader semantic-preserving query change.
-- **Next after D8A:** compare Library/detail scaling with the new index, inspect recommendation event bursts for short-transaction batching, and use J1/J2 real foreground latency before any cadence or global resource-budget change.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`.
+- **D7C implemented:** Web recommendation impressions that pass the existing 50% / 800 ms visibility rule are queued into a 25 ms micro-batch and sent through a dedicated impression-only endpoint capped at 24 events.
+- D7C reuses D7B `recordUserEvents()` so one natural impression burst becomes one short SQLite transaction while every impression retains its own event ID, client-observed time, cycle/batch/comic/rank context and dedupe key.
+- The batch route preserves the existing zero-based rank contract, rejects non-impression event types, and rolls back the whole batch if one event fails storage validation. `recommend_batch_presented`, feedback and detail-open events stay on the existing single-event path because they are separate user/authority actions rather than one natural burst.
+- **Next after D7C:** compare Library/detail scaling after D8A, use J1/J2 real foreground latency under download/WebDAV/recommendation load, and only then consider further write-cadence or aggregate-query changes.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7C.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -994,6 +997,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D7C transactional recommendation impression batching
+
+State update:
+- Recommendation event audit found that `recommend_batch_presented` is one event per render and feedback/detail events are independent user actions, so they are not transaction-batching targets.
+- The real write burst is Web `recommend_impression`: several cards in the same recommendation batch can cross the existing 50% visibility / 800 ms dwell threshold nearly simultaneously and previously produced multiple independent POSTs and autocommit SQLite writes.
+- D7C adds a 25 ms Web micro-batch queue, capped at 24 events. Each event freezes its own client-observed time, app/context/cycle/batch/comic fields, zero-based rank and dedupe key before entering the queue.
+- `POST /api/v1/recommendation-events/batch` accepts only `recommend_impression` events and delegates to `recordRecommendationEvents()` / D7B `recordUserEvents()`, producing one short transaction per natural burst.
+- The existing single-event endpoint is unchanged. Batch-presented, like/dislike, feedback-reason and detail actions continue through their existing independent event paths.
+- Batch validation preserves rank 0, caps the batch at 24, and transaction rollback prevents a metadata-invalid event from leaving a partial impression burst.
+- Web batching uses `keepalive: true` and flushes pending impressions when the document becomes hidden. This reduces avoidable loss but does not create a durable offline telemetry queue.
+- D7C changes write/request fan-out only; visibility/dwell thresholds, evidence granularity, dedupe semantics, ranking/serving, SQLite journal mode, performance budgets and P2-C3 enforcement remain unchanged.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D7C.md.
 
 ## 2026-09-24 — P2-D8A picture count planner index
 

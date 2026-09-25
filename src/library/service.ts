@@ -3656,6 +3656,164 @@ export class LibraryService {
         return record
     }
 
+    private persistMaintenanceRecovery(
+        task: MaintenanceRecoveryTask,
+        progress: {
+            state: string
+            phase: string
+            done: number
+            total: number
+            startedAt?: string
+            updatedAt?: string
+        },
+        summary: MaintenanceRecoverySnapshot['summary']
+    ) {
+        if (!maintenanceRecoveryActiveStates.has(progress.state)) return
+        this.database.setAppState(MAINTENANCE_RECOVERY_KEYS[task], {
+            version: 1,
+            task,
+            state: progress.state as MaintenanceRecoveryActiveState,
+            phase: progress.phase,
+            done: progress.done,
+            total: progress.total,
+            startedAt: progress.startedAt,
+            updatedAt: progress.updatedAt ?? new Date().toISOString(),
+            summary
+        } satisfies MaintenanceRecoverySnapshot)
+    }
+
+    private clearMaintenanceRecovery(task: MaintenanceRecoveryTask) {
+        this.database.deleteAppState(MAINTENANCE_RECOVERY_KEYS[task])
+    }
+
+    private interruptedMaintenanceSnapshot(task: MaintenanceRecoveryTask) {
+        const key = MAINTENANCE_RECOVERY_KEYS[task]
+        const snapshot =
+            this.database.getAppState<MaintenanceRecoverySnapshot>(key)
+        if (
+            !snapshot ||
+            snapshot.version !== 1 ||
+            snapshot.task !== task
+        )
+            return null
+
+        if (snapshot.state === 'interrupted') return snapshot
+
+        if (!maintenanceRecoveryActiveStates.has(snapshot.state)) {
+            this.database.deleteAppState(key)
+            return null
+        }
+
+        const tombstone: MaintenanceRecoverySnapshot = {
+            ...snapshot,
+            state: 'interrupted',
+            recoveredState:
+                snapshot.state as MaintenanceRecoveryActiveState,
+            updatedAt: new Date().toISOString()
+        }
+        this.database.setAppState(key, tombstone)
+        return tombstone
+    }
+
+    private persistMaintenanceUpdateRecovery() {
+        this.persistMaintenanceRecovery(
+            'maintenance-update',
+            this.maintenanceUpdateProgress,
+            {
+                findingCount:
+                    this.maintenanceUpdateProgress.findingCount,
+                updateCount:
+                    this.maintenanceUpdateProgress.updateCount
+            }
+        )
+    }
+
+    private persistMaintenanceRepairRecovery() {
+        this.persistMaintenanceRecovery(
+            'maintenance-repair',
+            this.maintenanceRepairProgress,
+            {
+                issueCount: this.maintenanceRepairProgress.issueCount
+            }
+        )
+    }
+
+    private persistLibraryOrganizeRecovery() {
+        this.persistMaintenanceRecovery(
+            'library-organize',
+            this.libraryOrganizeProgress,
+            {
+                linked: this.libraryOrganizeProgress.linked,
+                existing: this.libraryOrganizeProgress.existing,
+                manifests: this.libraryOrganizeProgress.manifests,
+                skipped: this.libraryOrganizeProgress.skipped
+            }
+        )
+    }
+
+    private recoverInterruptedMaintenanceTasks() {
+        const error =
+            'Interrupted by the previous Desktop process; restart required.'
+
+        const update =
+            this.interruptedMaintenanceSnapshot('maintenance-update')
+        if (update) {
+            this.maintenanceUpdateFindings = []
+            this.maintenanceUpdateProgress = {
+                state: 'failed',
+                phase: 'failed',
+                done: update.done,
+                total: update.total,
+                findingCount: Number(update.summary.findingCount || 0),
+                updateCount: Number(update.summary.updateCount || 0),
+                startedAt: update.startedAt,
+                updatedAt: update.updatedAt,
+                error,
+                recoveryMode: 'restart_required',
+                recoveredState: update.recoveredState
+            }
+        }
+
+        const repair =
+            this.interruptedMaintenanceSnapshot('maintenance-repair')
+        if (repair) {
+            this.maintenanceRepairIssues = []
+            this.maintenanceRepairProgress = {
+                state: 'failed',
+                phase: 'failed',
+                done: repair.done,
+                total: repair.total,
+                issueCount: Number(repair.summary.issueCount || 0),
+                startedAt: repair.startedAt,
+                updatedAt: repair.updatedAt,
+                error,
+                recoveryMode: 'restart_required',
+                recoveredState: repair.recoveredState
+            }
+        }
+
+        const organize =
+            this.interruptedMaintenanceSnapshot('library-organize')
+        if (organize) {
+            this.libraryOrganizeResult = null
+            this.libraryOrganizeProgress = {
+                state: 'failed',
+                phase: 'failed',
+                done: organize.done,
+                total: organize.total,
+                linked: Number(organize.summary.linked || 0),
+                existing: Number(organize.summary.existing || 0),
+                manifests: Number(organize.summary.manifests || 0),
+                skipped: Number(organize.summary.skipped || 0),
+                startedAt: organize.startedAt,
+                updatedAt: organize.updatedAt,
+                error,
+                recoveryMode: 'restart_required',
+                recoveredState: organize.recoveredState
+            }
+        }
+    }
+
     constructor(
         readonly database: LibraryDatabase,
         readonly dataDir: string,
@@ -3674,6 +3832,7 @@ export class LibraryService {
         this.recoveredLocalDownloadJobs =
             this.database.recoverInterruptedDownloadJobs('LOCAL')
         this.recoverInterruptedRecommendationBuild()
+        this.recoverInterruptedMaintenanceTasks()
     }
 
     async connect() {

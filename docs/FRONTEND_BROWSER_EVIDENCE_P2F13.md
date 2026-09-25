@@ -190,3 +190,28 @@ After F13:
 3. mark P2-F implementation complete if no regression appears;
 4. leave the low-end reference trace as a named external evidence gate;
 5. continue the next unblocked architecture lane rather than inventing further frontend rewrites.
+
+
+## Observed passing Chromium run
+
+PR #151 / Web browser smoke recorded:
+
+| Stream | Hidden interval | Visibility wake | Foreground interval |
+| --- | ---: | ---: | ---: |
+| Work Identity evidence refresh | 3004 ms | 2 ms | 504 ms |
+| V5 shadow evaluation | 3004 ms | 3 ms | 602 ms |
+
+Interpretation:
+
+- the real browser selected the intended 3000 ms hidden-page branch;
+- visibility restoration interrupted the pending hidden wait immediately;
+- the next interval returned to the existing foreground cadence;
+- no separate foreground-rate hidden poller was observed in these focused task streams.
+
+These values are CI control-flow evidence only. They are not a user-facing latency, CPU, jank, battery, or network performance budget.
+
+With this evidence, P2-F implementation status is:
+
+`IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN`
+
+The remaining named evidence gate is a representative low-end Windows/browser CPU+jank trace under realistic large-library and background-task load.

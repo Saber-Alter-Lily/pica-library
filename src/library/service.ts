@@ -856,11 +856,18 @@ export class LibraryService {
         const rawItems = Array.isArray(batch.evidence?.items)
             ? (batch.evidence.items as Array<Record<string, unknown>>)
             : []
-        const catalog = this.database.listComics({ limit: 10000 })
         const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const ownership = this.database.recommendationOwnershipState()
+        const filterCatalog = this.database.getComicsByIds([
+            ...new Set([
+                ...ownership.ownedComicIds,
+                ...policy.ownedComicIds,
+                ...batch.itemIds
+            ])
+        ])
         const servingRows = filterCandidatesAgainstOwnedV5(
             this.database.recommendationRecords(batch.itemIds),
-            catalog,
+            filterCatalog,
             policy
         ).rows
         const servingIds = new Set(

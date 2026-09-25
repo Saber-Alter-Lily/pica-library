@@ -86,5 +86,7 @@ final class CoverRepository {
     private static void save(Context context,String cacheKey,Bitmap bitmap){File target=disk(context,cacheKey),tmp=null;try{tmp=File.createTempFile("cover-",".tmp",target.getParentFile());try(OutputStream out=new FileOutputStream(tmp)){if(!bitmap.compress(Bitmap.CompressFormat.JPEG,88,out))throw new IOException("compress failed");}if(target.exists()&&!target.delete())throw new IOException("replace failed");if(!tmp.renameTo(target))throw new IOException("rename failed");trim(context,target);}catch(Exception ignored){if(tmp!=null)tmp.delete();}}
     private static synchronized void trim(Context context,File active){File[] files=dir(context).listFiles();if(files==null)return;Arrays.sort(files,Comparator.comparingLong(File::lastModified));long total=0;for(File f:files)if(f.isFile())total+=f.length();long limit=StorageSettings.coverLimitBytes(context);if(limit==Long.MAX_VALUE)return;for(File f:files)if(total>limit&&f.isFile()&&!f.equals(active)){long n=f.length();if(f.delete())total-=n;}}
     static long diskBytes(Context context){File[] files=dir(context).listFiles();long total=0;if(files!=null)for(File f:files)if(f.isFile())total+=f.length();return total;}
-    static void clear(Context context){File[] files=dir(context).listFiles();if(files!=null)for(File f:files)f.delete();synchronized(MEMORY){MEMORY.evictAll();}}
+    static int memoryBytes(){synchronized(MEMORY){return MEMORY.size();}}
+    static void trimMemory(){synchronized(MEMORY){MEMORY.evictAll();}}
+    static void clear(Context context){File[] files=dir(context).listFiles();if(files!=null)for(File f:files)f.delete();trimMemory();}
 }

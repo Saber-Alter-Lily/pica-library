@@ -1024,8 +1024,8 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - `PhoneDownloadStore.estimatedBytes(context, snapshot)` reuses the already parsed Snapshot so size calculation does not reopen the index.
 - Delete operations and the subsequent refreshed read run on the same worker. UI callbacks are guarded by `destroyed + loadGeneration`; `onDestroy()` advances generation and shuts down the executor.
 - Render and delete-confirmation paths contain no synchronous PhoneDownloadStore load/stat/remove work.
-- **New audit finding for next batch:** MainActivity home summary still loads PhoneDownloadStore and estimates persistent-download bytes synchronously on the landing screen; treat this as higher priority than lower-frequency AuthorDirectory/PicaBrowse work.
-- **Next after G3:** MainActivity home-summary local-state/stat pipeline, then AuthorDirectoryActivity and PicaBrowseActivity in separate batches.
+- **New audit finding for next batch:** MainActivity's default Library tab still calls `UnifiedCatalogStore.reconcileLocalReferences(this)` synchronously before its first catalog render; the Settings tab separately performs synchronous Favorite/Recommendation/PhoneDownload/storage summary reads.
+- **Next after G3:** move the default MainActivity Library local-reference reconstruction off the UI thread first, then isolate Settings summary I/O, followed by AuthorDirectoryActivity and PicaBrowseActivity in separate batches.
 - Durable Worker process-death/relaunch, low-memory/background behavior, Task Center reconstruction and Android resource budgets remain later P2-G work after first-frame UI-thread I/O is removed.
 - Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G2.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G3.md`.
 
@@ -1054,7 +1054,7 @@ State update:
 - Delete confirmation dispatches deleteDownload(); remove + refreshed index/stat read run on the worker before one guarded UI publication.
 - destroyed + loadGeneration prevent stale/out-of-order/destroyed Activity publications, and onDestroy() advances the generation and shuts down the executor.
 - Persistent-download format, deletion semantics, Catalog reconciliation, displayed list/card behavior and navigation are unchanged.
-- Audit also confirms MainActivity still performs PhoneDownloadStore load + estimated byte work synchronously on the landing screen; this becomes the next high-priority Android runtime batch.
+- Audit correction: PhoneDownloadStore byte summary is in MainActivity Settings, not the default landing tab. The higher-priority default Library path synchronously runs UnifiedCatalogStore.reconcileLocalReferences(this), while Settings retains separate PhoneDownloadStore/storage summary I/O.
 - Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G3.md.
 
 ## 2026-09-24 — P2-G2 Comic Detail first-frame local-state hardening

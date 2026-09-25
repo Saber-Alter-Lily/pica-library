@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { LibraryDatabase } from '../library/database'
 import type { ProviderService } from './provider-service'
 import type { PreviewCacheManager } from './preview-cache-manager'
@@ -8,6 +9,12 @@ export class PreviewService {
         private readonly provider: ProviderService,
         private readonly cache: PreviewCacheManager
     ) {}
+
+    private sourceFingerprint(comicId: string, locator: string) {
+        return createHash('sha256')
+            .update(`${this.provider.cacheScope(comicId)}\n${locator}`)
+            .digest('hex')
+    }
 
     async prepare(comicId: string, offset = 0, count = 3) {
         const boundedCount = Math.max(1, Math.min(count, 3))
@@ -45,9 +52,18 @@ export class PreviewService {
         for (let index = 0; index < selected.length; index++) {
             const picture = selected[index]
             const key = `${comicId}:${episode.id}:${boundedOffset + index}`
-            if (this.cache.get(key)) continue
+            const sourceFingerprint = this.sourceFingerprint(
+                comicId,
+                picture.url
+            )
+            if (this.cache.get(key, sourceFingerprint)) continue
             const image = await this.provider.fetchPage(picture.url)
-            this.cache.put(key, image.data, image.contentType)
+            this.cache.put(
+                key,
+                image.data,
+                image.contentType,
+                sourceFingerprint
+            )
         }
         return {
             source: 'provider' as const,

@@ -671,6 +671,11 @@ function startRecommendationWatch() {
     void pollRecommendationProgress()
 }
 
+document.addEventListener(
+    'pica-recommendation-watch',
+    startRecommendationWatch
+)
+
 async function pollRecommendationProgress() {
     const card = $('#a85-recommend-progress')
     if (!card) return false

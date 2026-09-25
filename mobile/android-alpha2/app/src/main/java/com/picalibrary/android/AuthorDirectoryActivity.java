@@ -7,17 +7,81 @@ import android.text.*;
 import android.view.Gravity;
 import android.widget.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 /** Auditable creator directory between comic detail and provider-specific works. */
 public final class AuthorDirectoryActivity extends LocaleAwareActivity {
-    private LinearLayout list;private EditText search;private AuthorConceptStore.Snapshot snapshot;private String focusComicId="";
-    @Override public void onCreate(Bundle saved){super.onCreate(saved);Ui.applyWindow(this);focusComicId=safe(getIntent().getStringExtra("comicId"));snapshot=AuthorConceptStore.build(this);render();}
+    private LinearLayout list;
+    private EditText search;
+    private AuthorConceptStore.Snapshot snapshot;
+    private String focusComicId="";
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private boolean destroyed;
+    private int loadGeneration;
+
+    @Override public void onCreate(Bundle saved){
+        super.onCreate(saved);
+        Ui.applyWindow(this);
+        focusComicId=safe(getIntent().getStringExtra("comicId"));
+        render();
+        loadSnapshot();
+    }
     private void render(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"作者",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);search=new EditText(this);search.setSingleLine(true);search.setHint(LocalizedText.ui("搜索作者 / 别名 / 社团"));Ui.styleField(search,this);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.setMargins(Ui.dp(this,14),Ui.dp(this,4),Ui.dp(this,14),Ui.dp(this,4));root.addView(search,sp);ScrollView scroll=new ScrollView(this);list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);list.setPadding(Ui.dp(this,10),Ui.dp(this,2),Ui.dp(this,10),Ui.dp(this,24));scroll.addView(list);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);search.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){renderList();}public void afterTextChanged(Editable e){}});renderList();}
-    private void renderList(){if(list==null)return;list.removeAllViews();String q=norm(search==null?"":search.getText().toString());List<AuthorConceptStore.Concept> focused=focusComicId.isEmpty()?Collections.emptyList():snapshot.forComic(focusComicId);LinkedHashSet<String> used=new LinkedHashSet<>();if(!focused.isEmpty()){heading("本作作者");for(AuthorConceptStore.Concept c:focused)if(matches(c,q)){addConcept(c,true);used.add(c.id);}}
-        List<AuthorConceptStore.Concept> all=snapshot.all();ArrayList<AuthorConceptStore.Concept> visible=new ArrayList<>();for(AuthorConceptStore.Concept c:all){if(used.contains(c.id)||!matches(c,q))continue;visible.add(c);if(visible.size()>=120)break;}if(!visible.isEmpty()){heading(q.isEmpty()?"作者目录":"匹配作者");for(AuthorConceptStore.Concept c:visible)addConcept(c,false);}if(list.getChildCount()==0)list.addView(Ui.text(this,"没有匹配作者",14,Ui.MUTED,false));}
+    private void loadSnapshot(){
+        final int generation=++loadGeneration;
+        worker.submit(()->{
+            UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
+            EhSemanticStore.Snapshot semantics=EhSemanticStore.load(this);
+            AuthorConceptStore.Snapshot next=AuthorConceptStore.build(catalog,semantics);
+            runOnUiThread(()->{
+                if(destroyed||generation!=loadGeneration)return;
+                snapshot=next;
+                renderList();
+            });
+        });
+    }
+
+    private void renderList(){
+        if(list==null)return;
+        list.removeAllViews();
+        if(snapshot==null){
+            ProgressBar progress=new ProgressBar(this);
+            list.addView(progress);
+            TextView loading=Ui.text(this,LocalizedText.ui("正在读取作者目录…"),13,Ui.MUTED,false);
+            loading.setPadding(0,Ui.dp(this,8),0,0);
+            list.addView(loading);
+            return;
+        }
+        String q=norm(search==null?"":search.getText().toString());
+        List<AuthorConceptStore.Concept> focused=focusComicId.isEmpty()?Collections.emptyList():snapshot.forComic(focusComicId);
+        LinkedHashSet<String> used=new LinkedHashSet<>();
+        if(!focused.isEmpty()){
+            heading("本作作者");
+            for(AuthorConceptStore.Concept c:focused)if(matches(c,q)){addConcept(c,true);used.add(c.id);}
+        }
+        List<AuthorConceptStore.Concept> all=snapshot.all();
+        ArrayList<AuthorConceptStore.Concept> visible=new ArrayList<>();
+        for(AuthorConceptStore.Concept c:all){
+            if(used.contains(c.id)||!matches(c,q))continue;
+            visible.add(c);
+            if(visible.size()>=120)break;
+        }
+        if(!visible.isEmpty()){
+            heading(q.isEmpty()?"作者目录":"匹配作者");
+            for(AuthorConceptStore.Concept c:visible)addConcept(c,false);
+        }
+        if(list.getChildCount()==0)list.addView(Ui.text(this,"没有匹配作者",14,Ui.MUTED,false));
+    }
     private boolean matches(AuthorConceptStore.Concept c,String q){if(q.isEmpty())return true;if(norm(c.canonicalName).contains(q))return true;for(String a:c.aliases)if(norm(a).contains(q))return true;for(String circle:c.circles)if(norm(circle).contains(q))return true;return false;}
     private void heading(String value){TextView h=Ui.text(this,value,14,Ui.MUTED,true);h.setPadding(Ui.dp(this,8),Ui.dp(this,10),0,Ui.dp(this,2));list.addView(h);}
     private void addConcept(AuthorConceptStore.Concept c,boolean focused){LinearLayout card=Ui.card(this);LinearLayout titleRow=new LinearLayout(this);titleRow.setGravity(Gravity.CENTER_VERTICAL);titleRow.addView(Ui.text(this,c.canonicalName,17,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));if(focused)titleRow.addView(Ui.pill(this,"本作",Ui.PRIMARY_SOFT,Ui.PRIMARY));card.addView(titleRow);ArrayList<String> meta=new ArrayList<>();meta.add(AuthorConceptStore.sourceLabel(c));meta.add(c.works()+" 部已知作品");if(c.roles.contains("group")&&!c.roles.contains("artist")&&!c.roles.contains("author"))meta.add("社团");card.addView(Ui.text(this,String.join(" · ",meta),12,Ui.MUTED,false));ArrayList<String> aliases=new ArrayList<>();for(String a:c.aliases)if(!a.equalsIgnoreCase(c.canonicalName)&&aliases.size()<3)aliases.add(a);if(!aliases.isEmpty())card.addView(Ui.text(this,"别名 · "+String.join(" / ",aliases),11.5f,Ui.MUTED,false));if(!c.circles.isEmpty())card.addView(Ui.text(this,"社团 · "+String.join(" / ",new ArrayList<>(c.circles)),11.5f,Ui.MUTED,false));card.setOnClickListener(v->{Intent i=new Intent(this,AuthorWorksActivity.class);i.putExtra("authorConceptId",c.id);startActivity(i);});list.addView(card);}
     private static String norm(String value){return safe(value).trim().toLowerCase(Locale.ROOT);}
     private static String safe(String value){return value==null?"":value;}
+
+    @Override protected void onDestroy(){
+        destroyed=true;
+        loadGeneration++;
+        worker.shutdownNow();
+        super.onDestroy();
+    }
 }

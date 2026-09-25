@@ -48,6 +48,42 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(works).toMatch(/EhCapabilityStore\.refresh\(\s*this,\s*false\s*\)/)
   })
 
+  it('keeps Author Directory creator-concept construction off the UI thread', () => {
+    const directory = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AuthorDirectoryActivity.java',
+      'utf8'
+    )
+
+    expect(directory).toContain('Executors.newSingleThreadExecutor()')
+    expect(directory).toContain('private void loadSnapshot()')
+    expect(directory).toContain(
+      'UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this)'
+    )
+    expect(directory).toContain(
+      'EhSemanticStore.Snapshot semantics=EhSemanticStore.load(this)'
+    )
+    expect(directory).toContain(
+      'AuthorConceptStore.Snapshot next=AuthorConceptStore.build(catalog,semantics)'
+    )
+    expect(directory).toContain('worker.submit(()->{')
+    expect(directory).toContain('if(destroyed||generation!=loadGeneration)return')
+    expect(directory).toContain('LocalizedText.ui("正在读取作者目录…")')
+    expect(directory).not.toContain('AuthorConceptStore.build(this)')
+
+    const onCreateStart = directory.indexOf('@Override public void onCreate')
+    const onCreateEnd = directory.indexOf('private void render()', onCreateStart)
+    const onCreateBody = directory.slice(onCreateStart, onCreateEnd)
+    expect(onCreateBody).toContain('render();')
+    expect(onCreateBody).toContain('loadSnapshot();')
+    expect(onCreateBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(onCreateBody).not.toContain('EhSemanticStore.load(')
+    expect(onCreateBody).not.toContain('AuthorConceptStore.build(')
+
+    expect(directory).toContain(
+      '@Override protected void onDestroy(){\n        destroyed=true;\n        loadGeneration++;\n        worker.shutdownNow();'
+    )
+  })
+
   it('keeps Author Works catalog and creator rebuilds off the UI render path', () => {
     const works = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AuthorWorksActivity.java','utf8')
     expect(works).toContain('private static final class LocalState')

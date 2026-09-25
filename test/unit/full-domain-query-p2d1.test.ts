@@ -45,11 +45,23 @@ describe('P2 D1 full-domain query discipline', () => {
             JSON.parse(serializeBrowserLiteDataPackage(store))
         )
         expect(bundle.library.comics).toHaveLength(count)
+        const boundaryComicId = `full-domain-${count - 1}`
         expect(
             bundle.library.comics.some(
-                (comic) => comic.comicId === `full-domain-${count - 1}`
+                (comic) => comic.comicId === boundaryComicId
             )
         ).toBe(true)
+
+        const shelf = store.createShelf('Beyond 5000')
+        store.addShelfItems(shelf.id, [boundaryComicId])
+        expect(
+            store.listShelfComics(shelf.id).map((comic) => comic.comicId)
+        ).toEqual([boundaryComicId])
+        expect(
+            store
+                .recommendationRecords([boundaryComicId])
+                .map((item) => item.comic.comicId)
+        ).toEqual([boundaryComicId])
         store.close()
     })
 

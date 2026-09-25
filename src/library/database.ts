@@ -2113,6 +2113,33 @@ export class LibraryDatabase {
         return row ? storedComicFromRow(row) : undefined
     }
 
+    getComicsByIds(comicIds: string[]): StoredComic[] {
+        const requested = comicIds
+            .map((comicId) => String(comicId ?? '').trim())
+            .filter(Boolean)
+        if (!requested.length) return []
+
+        const unique = [...new Set(requested)]
+        const byId = new Map<string, StoredComic>()
+        const chunkSize = 400
+        for (let offset = 0; offset < unique.length; offset += chunkSize) {
+            const chunk = unique.slice(offset, offset + chunkSize)
+            const placeholders = chunk.map(() => '?').join(', ')
+            const rows = this.db
+                .prepare(`${comicSelect} WHERE c.id IN (${placeholders})`)
+                .all(...chunk) as SqlRow[]
+            for (const row of rows) {
+                const comic = storedComicFromRow(row)
+                byId.set(comic.comicId, comic)
+            }
+        }
+
+        return requested.flatMap((comicId) => {
+            const comic = byId.get(comicId)
+            return comic ? [comic] : []
+        })
+    }
+
     private recomputeFavoriteState(comicId?: string) {
         const favoriteReasons = "'pica-favorite','eh-favorite','local-favorite'"
         if (comicId)
@@ -2482,16 +2509,7 @@ export class LibraryDatabase {
                 )
                 .all(shelfId) as SqlRow[]
         ).map((row) => String(row.comic_id))
-        const comics = new Map(
-            this.listComics({ limit: 5000 }).map((comic) => [
-                comic.comicId,
-                comic
-            ])
-        )
-        return ids.flatMap((id) => {
-            const comic = comics.get(id)
-            return comic ? [comic] : []
-        })
+        return this.getComicsByIds(ids)
     }
 
     listReaderEpisodes(comicId: string): ReaderEpisode[] {
@@ -2649,27 +2667,14 @@ export class LibraryDatabase {
     }
 
     recommendationRecords(comicIds: string[]) {
-        const byId = new Map(
-            this.listComics({ limit: 5000 }).map((comic) => [
-                comic.comicId,
-                comic
-            ])
-        )
-        return comicIds.flatMap((id) => {
-            const comic = byId.get(id)
-            return comic
-                ? [
-                      {
-                          comic,
-                          score: 0,
-                          reasons: [] as string[],
-                          recallSources: [] as string[],
-                          matchedSignals: [] as string[],
-                          exploration: false
-                      }
-                  ]
-                : []
-        })
+        return this.getComicsByIds(comicIds).map((comic) => ({
+            comic,
+            score: 0,
+            reasons: [] as string[],
+            recallSources: [] as string[],
+            matchedSignals: [] as string[],
+            exploration: false
+        }))
     }
 
     saveRecommendationSession(
@@ -2746,30 +2751,51 @@ export class LibraryDatabase {
                  ORDER BY works DESC, a.canonical_name ASC`
             )
             .all() as SqlRow[]
-        const aliases = this.db.prepare(
-            `SELECT alias_display FROM author_aliases
-             WHERE author_id = ? ORDER BY alias_display`
-        )
-        const circles = this.db.prepare(
-            `SELECT DISTINCT circle FROM comic_authors
-             WHERE author_id = ? AND circle IS NOT NULL AND circle <> ''
-             ORDER BY circle`
-        )
-        return rows.map((row) => ({
-            id: String(row.id),
-            canonicalName: String(row.canonical_name),
-            normalizedKey: String(row.normalized_key),
-            aliases: (aliases.all(String(row.id)) as SqlRow[]).map((item) =>
-                String(item.alias_display)
-            ),
-            circles: (circles.all(String(row.id)) as SqlRow[]).map((item) =>
-                String(item.circle)
-            ),
-            works: numberValue(row.works),
-            confidence: numberValue(row.confidence),
-            evidence: String(row.evidence),
-            reviewStatus: String(row.review_status)
-        }))
+        const aliasRows = this.db
+            .prepare(
+                `SELECT author_id, alias_display
+                 FROM author_aliases
+                 ORDER BY author_id, alias_display`
+            )
+            .all() as SqlRow[]
+        const circleRows = this.db
+            .prepare(
+                `SELECT DISTINCT author_id, circle
+                 FROM comic_authors
+                 WHERE circle IS NOT NULL AND circle <> ''
+                 ORDER BY author_id, circle`
+            )
+            .all() as SqlRow[]
+
+        const aliasesByAuthor = new Map<string, string[]>()
+        for (const row of aliasRows) {
+            const authorId = String(row.author_id)
+            const values = aliasesByAuthor.get(authorId) ?? []
+            values.push(String(row.alias_display))
+            aliasesByAuthor.set(authorId, values)
+        }
+        const circlesByAuthor = new Map<string, string[]>()
+        for (const row of circleRows) {
+            const authorId = String(row.author_id)
+            const values = circlesByAuthor.get(authorId) ?? []
+            values.push(String(row.circle))
+            circlesByAuthor.set(authorId, values)
+        }
+
+        return rows.map((row) => {
+            const authorId = String(row.id)
+            return {
+                id: authorId,
+                canonicalName: String(row.canonical_name),
+                normalizedKey: String(row.normalized_key),
+                aliases: aliasesByAuthor.get(authorId) ?? [],
+                circles: circlesByAuthor.get(authorId) ?? [],
+                works: numberValue(row.works),
+                confidence: numberValue(row.confidence),
+                evidence: String(row.evidence),
+                reviewStatus: String(row.review_status)
+            }
+        })
     }
 
     setAuthorDecision(

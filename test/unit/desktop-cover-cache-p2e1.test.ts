@@ -84,6 +84,20 @@ describe('P2 E1 Desktop cover cache source identity', () => {
         expect(cachedV2.data.toString()).toBe('cover-v2')
         expect(fetchImage).toHaveBeenCalledTimes(2)
 
+        database.importCatalog(
+            [record(v2, '2026-09-24T03:00:00.000Z')],
+            'p2-e1-cover-v2-revision'
+        )
+        const sameLocatorNewRevision =
+            await service.cover('cover-cache-comic')
+        expect(sameLocatorNewRevision.cached).toBe(false)
+        expect(sameLocatorNewRevision.data.toString()).toBe('cover-v2')
+        expect(fetchImage).toHaveBeenCalledTimes(3)
+
+        const stableRevision = await service.cover('cover-cache-comic')
+        expect(stableRevision.cached).toBe(true)
+        expect(fetchImage).toHaveBeenCalledTimes(3)
+
         const cacheKey = createHash('sha256')
             .update('cover-cache-comic')
             .digest('hex')

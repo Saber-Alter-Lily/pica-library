@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: PARTIAL**
+**Status: IN_PROGRESS — G1 Author Works main-thread catalog/creator rebuild candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,19 +1014,20 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — begin Android UI-thread / durable-task recovery inventory**
+**Status: IN_PROGRESS — G1 Author Works local-state pipeline candidate**
 
-P2-F code remediation is complete enough to stop speculative frontend tuning. The next unblocked architecture lane is Android runtime hardening.
+P2-F code remediation is closed for now. Android runtime hardening is the active architecture lane.
 
-- Start with a repository-wide Activity/Worker/Store audit for:
-  - synchronous file/JSON/SQLite work on Activity/main-thread paths;
-  - direct network/provider calls reachable from UI callbacks;
-  - durable Worker classes whose UI state is not reconstructible after Activity/process recreation;
-  - duplicate background-task status surfaces outside the Task Center;
-  - process-death semantics that could convert partial/paused work into false completion.
-- Prefer existing Android/Jetpack primitives already used in the project (WorkManager, persistent stores, background executors) before adding new infrastructure.
-- Make changes in small evidence-backed batches; do not introduce Android concurrency budgets until real device evidence exists.
-- Representative mid-range Android performance/low-memory testing remains a hardware evidence gate, not a CI inference.
+- **G1 audit finding:** `UnifiedCatalogStore.load()` reads/parses the complete unified Catalog JSON; `EhSemanticStore.load()` reads/parses the complete E-H semantic JSON; `AuthorConceptStore.build(Context)` calls both and then rebuilds creator concepts across the catalog.
+- **G1 AuthorWorks issue:** the Activity previously ran `AuthorConceptStore.build(this)` in `onCreate()`, rebuilt again in `renderWorks()`, separately reloaded Unified Catalog, and rebuilt again from the UI callback after online refresh.
+- **G1 implemented:** reuse the Activity's existing single-thread executor. One worker-owned `LocalState` loads Unified Catalog once, loads E-H semantics once, builds Author concepts from those snapshots, and publishes only the resolved concept + catalog snapshot back to the UI.
+- `renderWorks()` is now in-memory only; `onCreate()` renders the shell before scheduling local data; online provider refresh rebuilds local state on the worker before one UI publication.
+- No creator identity, source filter, provider search, merge, ordering or navigation semantics change.
+- **Confirmed later hotspots:** UnifiedComicDetailActivity Catalog/creator/download-index reads; DownloadsActivity PhoneDownloadStore load + byte-stat scan; AuthorDirectoryActivity creator build; lower-frequency Theme/About/Recommendation settings file reads.
+- **Next after G1:** fix Comic Detail startup, then Downloads/Author Directory in separate evidence-backed batches.
+- Durable Worker process-death/relaunch audit and Task Center reconstruction remain separate P2-G work after UI-thread file/JSON hotspots are removed.
+- Android concurrency/resource budgets remain hardware-evidence gated.
+- Detailed boundary: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1040,6 +1041,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G1 Author Works main-thread local-state hardening
+
+State update:
+- Android runtime audit classified Store.load/build calls by actual cost rather than moving every preference read off-thread.
+- UnifiedCatalogStore.load reads/parses the complete unified-catalog JSON; EhSemanticStore.load reads/parses the complete semantic JSON; AuthorConceptStore.build(Context) invokes both and builds creator identities across the catalog.
+- AuthorWorksActivity previously executed those operations repeatedly on the UI thread during onCreate(), renderWorks(), filter refreshes and the post-provider-refresh UI callback.
+- G1 introduces a worker-owned LocalState. readLocalState() loads Unified Catalog once, loads E-H semantics once, builds Author concepts from the already-loaded snapshots, and selects the requested concept.
+- onCreate() now renders a lightweight shell first and schedules local-state loading on the existing single-thread executor.
+- renderWorks() performs no Store load or AuthorConcept build and consumes only the committed in-memory snapshots.
+- Provider refresh remains on the same worker; after merges it rebuilds local state off-thread and publishes it once to the UI.
+- Source-contract regression forbids AuthorConceptStore.build(this) in AuthorWorks and forbids Catalog/Semantic/AuthorConcept load/build calls inside renderWorks().
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G1.md.
 
 ## 2026-09-24 — P2-F implementation closeout / reference trace open
 

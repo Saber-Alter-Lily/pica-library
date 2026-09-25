@@ -2,6 +2,7 @@ package com.picalibrary.android;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -92,7 +93,23 @@ public class ReaderActivity extends LocaleAwareActivity {
     private void updateChapterAdvance(){if(chapterAdvance==null||nextPageButton==null)return;if(!atChapterEnd()){chapterAdvance.setVisibility(View.GONE);nextPageButton.setText(LocalizedText.ui("下一页"));nextPageButton.setEnabled(true);return;}int current=currentChapterIndex(),next=current+1;if(current>=0&&next<chapters.size()){BridgeClient.ChapterItem target=chapters.get(next);chapterAdvance.setVisibility(View.VISIBLE);chapterAdvance.setEnabled(true);chapterAdvance.setText(LocalizedText.ui("下一章 · ")+target.title);nextPageButton.setText(LocalizedText.ui("下一章"));nextPageButton.setEnabled(true);}else{chapterAdvance.setVisibility(View.VISIBLE);chapterAdvance.setEnabled(false);chapterAdvance.setText(LocalizedText.ui("已读完 · 最后一章"));nextPageButton.setText(LocalizedText.ui("已结束"));nextPageButton.setEnabled(false);}}
     private void advanceChapter(){int current=currentChapterIndex(),target=current+1;if(current>=0&&target<chapters.size())loadChapter(chapters.get(target).id,0);else Toast.makeText(this,LocalizedText.ui("已经到最后一章"),Toast.LENGTH_SHORT).show();}
     private void updateCounter() { if (!dragging) { seek.setProgress(index); counter.setText((pages.isEmpty() ? 0 : index + 1) + " / " + pages.size() + " · "+sourceLabel()+LocalizedText.ui(" · 预载 ")+StorageSettings.prefetchPages(this)); } updateChapterAdvance(); }
-    private void save(boolean flush) {if (!chapterReady || pages.isEmpty()) return;boolean displayed = false; for (Holder h : holders) if (h.position == index && h.loaded) displayed = true;if (!displayed) return;progress.save(comic, chapter, index, flush);if(index>=pages.size()-1&&!chapter.equals(completionRecordedChapter)){completionRecordedChapter=chapter;UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(this).byId.get(comic);RecommendationEvidenceStore.recordReaderComplete(this,comic,entry==null?"":entry.displayAuthor(),entry==null?Collections.emptyList():entry.tags,entry==null?Collections.emptyList():entry.categories);} main.removeCallbacks(syncProgress);if (flush) progress.sync(); else main.postDelayed(syncProgress, 1200);}
+    private void recordReaderCompleteAsync(){
+        Context app=getApplicationContext();
+        String comicId=comic;
+        metadata.submit(()->{
+            UnifiedCatalogStore.Entry entry=
+                UnifiedCatalogStore.load(app).byId.get(comicId);
+            RecommendationEvidenceStore.recordReaderComplete(
+                app,
+                comicId,
+                entry==null?"":entry.displayAuthor(),
+                entry==null?Collections.emptyList():entry.tags,
+                entry==null?Collections.emptyList():entry.categories
+            );
+        });
+    }
+
+    private void save(boolean flush) {if (!chapterReady || pages.isEmpty()) return;boolean displayed = false; for (Holder h : holders) if (h.position == index && h.loaded) displayed = true;if (!displayed) return;progress.save(comic, chapter, index, flush);if(index>=pages.size()-1&&!chapter.equals(completionRecordedChapter)){completionRecordedChapter=chapter;recordReaderCompleteAsync();} main.removeCallbacks(syncProgress);if (flush) progress.sync(); else main.postDelayed(syncProgress, 1200);}
     private void go(int p, boolean smooth) {if (!chapterReady || pages.isEmpty()) return; p = ReaderPolicy.clampPage(p, pages.size());if (pager != null) pager.setCurrentItem(p, smooth);else if (continuous != null) { ((LinearLayoutManager)continuous.getLayoutManager()).scrollToPositionWithOffset(p, 0); selected(p); }}
     private void flip(int direction) {if (!chapterReady || pages.isEmpty()) return;if(direction>0&&atChapterEnd()){advanceChapter();return;}if (mode == 2 && continuous != null && continuous.canScrollVertically(direction)) { continuous.smoothScrollBy(0, direction * (int)(continuous.getHeight() * .85f)); return; }int next = index + direction;if (next >= 0 && next < pages.size()) { go(next, true); return; }int current=currentChapterIndex(),target=current+direction;if (target >= 0 && target < chapters.size()) loadChapter(chapters.get(target).id, direction > 0 ? 0 : -2);else Toast.makeText(this, direction > 0 ? LocalizedText.ui("已经到最后一章") : LocalizedText.ui("已经到第一章"), Toast.LENGTH_SHORT).show();}
     private void chooseChapter() {main.removeCallbacks(hideChrome);setChrome(true);String[] titles = new String[chapters.size()]; for (int i = 0; i < titles.length; i++) titles[i] = chapters.get(i).title;new AlertDialog.Builder(this).setTitle(LocalizedText.ui("章节")).setItems(titles, (d, i) -> loadChapter(chapters.get(i).id, -1)).setOnDismissListener(d->scheduleHide()).show();}

@@ -54,5 +54,5 @@ jobs:
         with:
           name: android-worker-recovery-${{ github.run_id }}
           path: test-results/android-worker-recovery/
-          retention-days: 2
+          retention-days: 1
           if-no-files-found: ignore

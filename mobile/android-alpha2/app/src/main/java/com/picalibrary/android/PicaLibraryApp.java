@@ -3,8 +3,10 @@ package com.picalibrary.android;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.content.ComponentCallbacks2;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.os.Bundle;
 
 /** Application entrypoint for appearance, update checks and lightweight maintenance jobs. */
@@ -35,4 +37,13 @@ public final class PicaLibraryApp extends Application {
         StoragePolicy.maintain(this);
     }
     @Override public void onConfigurationChanged(Configuration next){super.onConfigurationChanged(next);Ui.applyTheme(this);}
+    @Override public void onTrimMemory(int level){
+        super.onTrimMemory(level);
+        boolean backgroundOrHidden=level>=ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN;
+        boolean legacyRunningPressure=Build.VERSION.SDK_INT<34&&level>=ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW;
+        if(backgroundOrHidden||legacyRunningPressure){
+            CoverRepository.trimMemory();
+            ImageRepository.trimMemory();
+        }
+    }
 }

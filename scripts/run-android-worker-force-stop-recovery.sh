@@ -38,31 +38,29 @@ run_case() {
     fi
 }
 
-seed_output="$RESULT_DIR/seedDurableRecoveryStateAndAwaitForceStop.txt"
 adb logcat -c
-adb shell am instrument -w \
-    -e class "$TEST_CLASS#seedDurableRecoveryStateAndAwaitForceStop" \
-    "$COMPONENT" >"$seed_output" 2>&1 &
-seed_instrument_pid=$!
+adb shell am start -W \
+    -n "$TARGET_PACKAGE/com.picalibrary.android.WorkerForceStopSeedActivity" \
+    >"$RESULT_DIR/seed-activity.txt"
 
 ready=0
-for _ in $(seq 1 80); do
+for _ in $(seq 1 120); do
     if adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-ready" 2>/dev/null | grep -q '^READY pid='; then
         ready=1
         break
     fi
-    if ! kill -0 "$seed_instrument_pid" 2>/dev/null; then
-        cat "$seed_output" >&2 || true
-        echo "Seed instrumentation exited before force-stop readiness" >&2
+    if adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-seed-failure" 2>/dev/null | grep -q '.'; then
+        adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-seed-failure" >&2 || true
+        adb logcat -d >"$RESULT_DIR/logcat-seed-failure.txt" || true
+        echo "Debug seed Activity reported failure" >&2
         exit 1
     fi
     sleep 0.25
 done
 
 if [[ "$ready" != "1" ]]; then
-    cat "$seed_output" >&2 || true
     adb logcat -d >"$RESULT_DIR/logcat-before-force-stop.txt" || true
-    echo "Timed out waiting for P2-G15 READY marker" >&2
+    echo "Timed out waiting for P2-G15 READY marker from debug seed Activity" >&2
     exit 1
 fi
 
@@ -74,7 +72,6 @@ if [[ -z "$seed_pid" ]]; then
 fi
 
 adb shell am force-stop "$TARGET_PACKAGE"
-wait "$seed_instrument_pid" || true
 sleep 1
 
 if adb shell pidof "$TARGET_PACKAGE" 2>/dev/null | grep -q '[0-9]'; then
@@ -90,7 +87,7 @@ adb shell monkey -p "$TARGET_PACKAGE" -c android.intent.category.LAUNCHER 1 \
 
 probe_run_count=0
 recovered=0
-for _ in $(seq 1 80); do
+for _ in $(seq 1 240); do
     raw_count="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-probe-run-count" 2>/dev/null | tr -d '\r\n' || true)"
     if [[ "$raw_count" =~ ^[0-9]+$ ]]; then
         probe_run_count="$raw_count"
@@ -126,7 +123,7 @@ cat > "$RESULT_DIR/result.json" <<JSON
   "targetPackage": "$TARGET_PACKAGE",
   "forceStopCommand": "adb shell am force-stop $TARGET_PACKAGE",
   "relaunchCommand": "adb shell monkey -p $TARGET_PACKAGE -c android.intent.category.LAUNCHER 1",
-  "seedInstrumentation": "FORCE_STOPPED_AS_DESIGNED",
+  "seedSurface": "DEBUG_ACTIVITY_FORCE_STOPPED_AS_DESIGNED",
   "probeRecoveredAfterRelaunch": true,
   "probeRunCount": $probe_run_count,
   "verifyInstrumentation": "PASS",

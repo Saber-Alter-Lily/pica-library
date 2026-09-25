@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1–D8A + D7C merged; D8B comicSelect A/B scaling evidence candidate; broader query/write audit remains open**
+**Status: PARTIAL — D1–D8B + D7C merged; further query/write rewrites require representative performance evidence**
 
 Already improved:
 - direct comic lookup;
@@ -283,7 +283,7 @@ Remaining:
 - representative large-library query regression tests.
 
 ## P2-E — Snapshot/cache discipline
-**Status: PARTIAL**
+**Status: IN_PROGRESS — E1 Desktop cover source invalidation candidate; broader cache inventory remains open**
 
 Keep and generalize successful patterns:
 - frozen Recommendation serving snapshot for batch switching;
@@ -956,7 +956,7 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## NEXT-6 — P2-D SQLite/query discipline
-**Status: IN_PROGRESS — D1–D8A merged; D7C recommendation-impression batching candidate; broader query/write audit remains open**
+**Status: PARTIAL — D1–D8B + D7C merged; evidence collection blocks further production query rewrites**
 
 This remains the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
 
@@ -982,11 +982,24 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - **D7C merged (PR #134):** Web recommendation impressions that pass the existing 50% / 800 ms visibility rule are queued into a 25 ms micro-batch and sent through a dedicated impression-only endpoint capped at 24 events.
 - D7C reuses D7B `recordUserEvents()` so one natural impression burst becomes one short SQLite transaction while every impression retains its own event ID, client-observed time, cycle/batch/comic/rank context and dedupe key.
 - The batch route preserves the existing zero-based rank contract, rejects non-impression event types, and rolls back the whole batch if one event fails storage validation. `recommend_batch_presented`, feedback and detail-open events stay on the existing single-event path because they are separate user/authority actions rather than one natural burst.
-- **D8B implemented:** `pnpm benchmark:comic-select-picture-count` builds identical real SQLite fixtures with and without migration 16's `idx_pictures_comic_status`, then compares single-comic `getComic()` and broad catalog projection p50/p95/max.
+- **D8B merged (PR #135):** `pnpm benchmark:comic-select-picture-count` builds identical real SQLite fixtures with and without migration 16's `idx_pictures_comic_status`, then compares single-comic `getComic()` and broad catalog projection p50/p95/max.
 - D8B reports descriptive without-index/indexed ratios but defines no timing pass/fail threshold. A semantic regression requires count outputs to remain identical with and without the planner index.
 - D8B changes no production SQL. Aggregate join/CTE or denormalized-count work remains prohibited until repeated D8B plus J1/J2 foreground evidence demonstrates a remaining bottleneck.
 - **Next after D8B:** collect representative A/B runs, combine them with real Windows x64 J2 idle/load profiles, then decide whether P2-D should prototype an aggregate alternative or move on to the remaining runtime/cache/frontend workstreams.
 - Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7C.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8B.md`.
+
+## NEXT-7 — P2-E snapshot/cache discipline
+**Status: IN_PROGRESS — E1 Desktop cover source invalidation candidate**
+
+P2-D has reached an evidence gate: further aggregate/cadence rewrites require representative D8B/J2 runs rather than more speculative SQL changes. P2-E is the next unblocked architecture lane.
+
+- Existing Android `CoverRepository` already versions cover cache identity by comic/source locators plus stable catalog revision, preventing a changed cover from reusing an old bitmap forever.
+- **E1 implemented:** Desktop keeps one disk slot per comic but validates it with a SHA-256 source fingerprint over comic/provider/remote identity, current trusted cover URL and provider `updatedAt`.
+- Legacy Desktop cache metadata without a fingerprint becomes stale once and is refreshed through the existing atomic `.part` → rename publication path.
+- The raw cover URL is not persisted in cache metadata; only MIME type + source fingerprint are stored.
+- A real SQLite + injected Pica-provider regression requires unchanged sources to remain cache hits, changed URL/revision to refetch, same URL + newer provider revision to refetch, and legacy metadata to migrate with one refresh.
+- **Next after E1:** inventory remaining long-lived Desktop/Web caches by owner/key/invalidation authority, then address only caches whose stale identity can become authoritative or leak across user/device generations.
+- Detailed boundary: `docs/CACHE_DISCIPLINE_P2E1.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1000,6 +1013,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-E1 Desktop cover cache source identity
+
+State update:
+- Desktop cover cache filenames were keyed only by `comicId`, and metadata stored only MIME type. A changed provider cover locator/revision could therefore reuse an old image indefinitely.
+- The existing Android `CoverRepository` already solves the same class of problem with source/version-aware cache identity; E1 adopts that established principle for Desktop rather than introducing a different cache model.
+- Desktop still owns one image/metadata slot per comic. The filename remains `SHA-256(comicId)`, while cache validity now requires a source fingerprint derived from comic/provider/remote identity, trusted `coverUrl` and provider `updatedAt`.
+- Source changes atomically replace the existing slot, so cache correctness improves without accumulating historical cover versions.
+- Legacy metadata without `sourceFingerprint` refreshes once. Raw cover URLs are not written to the metadata file.
+- Regression coverage uses a real Library SQLite database plus injected Pica image provider and requires unchanged cache hits, URL/revision invalidation, same-URL newer-revision invalidation, and one-time legacy refresh.
+- E1 does not add TTLs, memory LRU, cache-size policy, provider probes or Android changes.
+- Detailed boundary: docs/CACHE_DISCIPLINE_P2E1.md.
 
 ## 2026-09-24 — P2-D8B comicSelect picture-count A/B scaling evidence
 

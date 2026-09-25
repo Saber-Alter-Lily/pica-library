@@ -69,6 +69,7 @@ describe('SQLite migrations', () => {
         expect(indexNames).toContain(
             'idx_work_identity_evidence_right_probable'
         )
+        expect(indexNames).toContain('idx_pictures_comic_status')
         database.close()
     })
 

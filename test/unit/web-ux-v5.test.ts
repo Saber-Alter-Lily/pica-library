@@ -354,6 +354,38 @@ describe('V5 Web UX audit contract', () => {
         )
     })
 
+    it('uses one recommendation status poll authority with app fallback', () => {
+        const app = read('web/app.js')
+        const theme = read('web/alpha8-theme-help.js')
+
+        expect(theme).toContain('function publishRecommendationStatus(status)')
+        expect(theme).toContain(
+            "new CustomEvent('pica-recommendation-status'"
+        )
+        expect(theme).toContain('publishRecommendationStatus(current)')
+        expect(theme).toContain(
+            "'pica-recommendation-watch',\n    startRecommendationWatch"
+        )
+
+        expect(app).toContain('const recommendationStatusSignal = {')
+        expect(app).toContain(
+            "document.addEventListener('pica-recommendation-status'"
+        )
+        expect(app).toContain('function waitForRecommendationStatusSignal(')
+        expect(app).toContain('Date.now() - recommendationStatusSignal.observedAt < 1500')
+        expect(app).toContain(
+            "status = await api(\n                '/api/v1/recommendation-sessions/status?mode=final'"
+        )
+        expect(app).toContain('const deadline = Date.now() + 120000')
+        expect(app).toContain('recommendationStatusSignal.status = null')
+        expect(app).toContain(
+            "document.dispatchEvent(new CustomEvent('pica-recommendation-watch'))"
+        )
+        expect(app).not.toContain(
+            'for (let attempt = 0; attempt < 120; attempt++)'
+        )
+    })
+
     it('uses one-step import and guards long Desktop operations', () => {
         const index = read('web/index.html')
         const i18n = read('web/i18n.js')

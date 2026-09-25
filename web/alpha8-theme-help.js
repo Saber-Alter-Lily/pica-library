@@ -641,6 +641,14 @@ function buildPhaseLabel(phase) {
     })[phase] || ''
 }
 
+function publishRecommendationStatus(status) {
+    document.dispatchEvent(
+        new CustomEvent('pica-recommendation-status', {
+            detail: { status, observedAt: Date.now() }
+        })
+    )
+}
+
 function startRecommendationWatch() {
     ensureRecommendationProgress()
     updateRecommendationArtwork()
@@ -663,6 +671,11 @@ function startRecommendationWatch() {
     void pollRecommendationProgress()
 }
 
+document.addEventListener(
+    'pica-recommendation-watch',
+    startRecommendationWatch
+)
+
 async function pollRecommendationProgress() {
     const card = $('#a85-recommend-progress')
     if (!card) return false
@@ -670,6 +683,7 @@ async function pollRecommendationProgress() {
         const current = await api(
             '/api/v1/recommendation-sessions/status?mode=final'
         )
+        publishRecommendationStatus(current)
         const progress = current.buildProgress || {}
         updateRecommendationTaskControls(progress)
         if (

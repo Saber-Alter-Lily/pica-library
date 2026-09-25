@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F8 merged; F9 WebDAV poller recovery candidate; hidden-tab/remaining poller audit remains open**
+**Status: IN_PROGRESS — F1–F9 merged; F10 single recommendation status authority candidate; hidden-tab/remaining poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,16 +1001,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F8 merged; F9 WebDAV poller recovery candidate**
+**Status: IN_PROGRESS — F1–F9 merged; F10 single Recommendation status authority candidate**
 
-- **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is either scoped to an owning root or processed incrementally/coalesced.
-- **F9 poller inventory completed:** Downloads, Favorites sync, Browser Lite export, WebDAV, updater, Recommendation build, E-H login, Work Identity evidence refresh, V5 shadow evaluation and onboarding readiness now have documented owner/start/stop/terminal contracts.
-- Most existing pollers are already request-, view-, or task-scoped and are not changed merely to lower frequency.
-- **F9 WebDAV gap fixed:** after page/script reload, `load()` now reattaches polling when `remoteStorage.syncProgress` is still active/recoverable instead of rendering one frozen snapshot.
-- Restored WebDAV polling now self-terminates when backend progress becomes terminal; a local `remoteSyncRequestPending` guard prevents the initiating request's first still-idle status snapshot from prematurely stopping its timer.
-- Pause/resume/cancel responses ensure polling is active while the returned task is still active, and `pagehide` clears the page-local timer without affecting backend durability.
-- **Next after F9:** audit hidden-tab/background behavior, onboarding readiness retry lifetime, and duplicate watcher prevention. Make changes only where a poller can outlive its UI/task authority.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F8.md`, plus `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md`.
+- **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or processed incrementally/coalesced.
+- **F9 merged (PR #146):** persistent pollers were inventoried and WebDAV progress now reattaches after page reload, self-terminates at backend terminal state, and protects the local start race.
+- **F10 duplicate authority identified:** during explicit Recommendation build/rebuild, Theme Help polls final-cycle status every 500 ms for progress/control UI while `app.js::waitForFinalCycle()` independently polled the same endpoint every second only to detect completion.
+- **F10 implemented:** Theme Help remains the normal recurring poll authority and publishes each already-fetched final-cycle status through the internal `pica-recommendation-status` document event.
+- App consumes that signal for failure/completion detection, resets stale snapshots before each build handoff, waits up to 750 ms for the first Theme status, treats signals as fresh for 1500 ms, and performs a direct status request only when the Theme signal is absent/stale.
+- App explicitly dispatches `pica-recommendation-watch` only after the backend has accepted a build that requires waiting, closing the existing capture-click startup race while preserving immediate Theme feedback.
+- The existing 120-second build timeout, force-new cycle identity check, progress UI, pause/resume/cancel controls and managed batch switch remain unchanged.
+- **Next after F10:** audit hidden/background-tab behavior and onboarding readiness retry lifetime; change only pollers that outlive their UI/task authority.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md`, and `docs/FRONTEND_POLLER_DISCIPLINE_P2F10.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1024,6 +1025,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F10 single Recommendation status poll authority
+
+State update:
+- Explicit Recommendation generation previously created two concurrent recurring readers of /api/v1/recommendation-sessions/status?mode=final: Theme Help at 500 ms for progress/control UI and app.js::waitForFinalCycle() at 1 s for completion detection.
+- F10 keeps Theme Help as the normal recurring authority and publishes each successful status read through the local pica-recommendation-status CustomEvent.
+- App stores the latest signal and waits on status events instead of running a fixed one-second polling loop.
+- Before each explicit build wait, App clears any prior snapshot and dispatches pica-recommendation-watch after the backend has accepted the build, so Theme restarts from authoritative post-start state rather than relying on its earlier capture-click poll.
+- App gives Theme 750 ms for the first status and treats signals as fresh for 1500 ms; direct status API reads remain only as bounded fallback when the signal is missing/stale.
+- Failure detection, final-cycle identity rules, force-new previous-cycle guard and the 120-second timeout are unchanged.
+- F10 adds no persistent bus, WebSocket/SSE, new backend endpoint or new stored data.
+- Detailed boundary: docs/FRONTEND_POLLER_DISCIPLINE_P2F10.md.
 
 ## 2026-09-24 — P2-F9 persistent poller lifecycle audit and WebDAV reattach
 

@@ -3,6 +3,7 @@ import { copy as t } from './locale-runtime.js'
 const $ = (selector) => document.querySelector(selector)
 let desktop = null
 let progressTimer = null
+let remoteSyncRequestPending = false
 let selectedTargetId = ''
 let creatingTarget = false
 let remoteState = { targets: [], presets: [] }
@@ -289,15 +290,42 @@ function renderProgress(progress) {
     $('#remote-progress-phase').textContent = `${progress.message || progress.phase || ''}${target}`
 }
 
+function remoteProgressActive(progress) {
+    if (!progress) return false
+    return Boolean(
+        progress.canPause ||
+            progress.canResume ||
+            progress.canCancel ||
+            [
+                'scanning',
+                'uploading',
+                'publishing',
+                'pausing',
+                'paused',
+                'cancelling'
+            ].includes(progress.phase)
+    )
+}
+
 async function pollProgress() {
     try {
         const status = await api('/api/v1/desktop/status')
         desktop = status
-        renderProgress(status.remoteStorage?.syncProgress)
+        const progress = status.remoteStorage?.syncProgress
+        renderProgress(progress)
+        if (!remoteSyncRequestPending && !remoteProgressActive(progress))
+            stopProgressPolling()
     } catch {}
 }
-function startProgressPolling() { stopProgressPolling(); pollProgress(); progressTimer = setInterval(pollProgress, 700) }
-function stopProgressPolling() { if (progressTimer) clearInterval(progressTimer); progressTimer = null }
+function startProgressPolling() {
+    stopProgressPolling()
+    progressTimer = setInterval(() => void pollProgress(), 700)
+    void pollProgress()
+}
+function stopProgressPolling() {
+    if (progressTimer) clearInterval(progressTimer)
+    progressTimer = null
+}
 
 async function controlRemoteSync(action) {
     const buttons = [
@@ -316,6 +344,8 @@ async function controlRemoteSync(action) {
                       : 'cancel-sync'
         })
         renderProgress(result.syncProgress)
+        if (remoteProgressActive(result.syncProgress))
+            startProgressPolling()
         if (action === 'pause')
             message(t('已请求暂停，当前正在上传的页面完成后会暂停。','Pause requested. The currently uploading pages will finish before the task pauses.','一時停止を要求しました。現在アップロード中のページが完了してから停止します。'))
         else if (action === 'resume')
@@ -379,6 +409,10 @@ async function load(preferredTargetId = '') {
         if (remoteState.targets.length > 1 && !selectedTargetId)
             message(t('已配置多个网盘，请先选择本次扫描/上传使用的目标网盘。','Multiple storage targets are configured. Choose the one to use for this scan/upload.','複数の保存先が設定されています。今回のスキャン/アップロード先を選択してください。'))
         renderProgress(remoteState.syncProgress)
+        if (remoteProgressActive(remoteState.syncProgress))
+            startProgressPolling()
+        else
+            stopProgressPolling()
     } catch (error) { message(t(`无法读取远程存储状态：${error.message}`,`Could not read remote storage status: ${error.message}`,`リモートストレージの状態を読み込めませんでした：${error.message}`), true) }
 }
 
@@ -448,7 +482,10 @@ $('#remote-sync')?.addEventListener('click', async () => {
           )
     if (!confirmed) return
     message(t(`正在同步到「${target}」。页面会实时显示整库和当前漫画进度。`,`Syncing to “${target}”. Whole-library and current-work progress will update live.`,`「${target}」へ同期中です。ライブラリ全体と現在の作品の進捗をリアルタイムで表示します。`))
-    const button = $('#remote-sync'); button.disabled = true; startProgressPolling()
+    const button = $('#remote-sync')
+    button.disabled = true
+    remoteSyncRequestPending = true
+    startProgressPolling()
     try {
         const result = await post('/api/v1/desktop/settings', request)
         await pollProgress()
@@ -464,8 +501,14 @@ $('#remote-sync')?.addEventListener('click', async () => {
         else
             message(t(`同步失败：${reason}`,`Sync failed: ${reason}`,`同期に失敗しました：${reason}`), true)
     }
-    finally { stopProgressPolling(); button.disabled = false }
+    finally {
+        remoteSyncRequestPending = false
+        stopProgressPolling()
+        button.disabled = false
+    }
 })
+
+window.addEventListener('pagehide', stopProgressPolling)
 
 load()
 

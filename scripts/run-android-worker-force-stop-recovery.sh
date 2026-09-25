@@ -40,7 +40,7 @@ run_case() {
 
 seed_output="$RESULT_DIR/seedDurableRecoveryStateAndAwaitForceStop.txt"
 adb logcat -c
-adb shell am instrument -w -r \
+adb shell am instrument -w \
     -e class "$TEST_CLASS#seedDurableRecoveryStateAndAwaitForceStop" \
     "$COMPONENT" >"$seed_output" 2>&1 &
 seed_instrument_pid=$!

@@ -1683,19 +1683,35 @@ export async function startLibraryServer(options: {
                 if (shelfItemsRoute[2] === 'remove') {
                     const comicIds = stringList(input.comicIds)
                     const result = shelfService.remove(shelfId, comicIds)
-                    for (const comicId of comicIds)
-                        options.database.recordUserEvent({
-                            eventType: 'shelf_remove',
-                            comicId,
-                            source: 'shelf',
-                            appSessionId: request.headers['x-pica-app-session']
-                                ? String(request.headers['x-pica-app-session'])
-                                : null,
-                            contextId: request.headers['x-pica-context-id']
-                                ? String(request.headers['x-pica-context-id'])
-                                : null,
-                            metadata: { shelfId }
-                        })
+                    options.database.recordUserEvents(
+                        comicIds.map(
+                            (comicId) =>
+                                ({
+                                    eventType: 'shelf_remove',
+                                    comicId,
+                                    source: 'shelf',
+                                    appSessionId: request.headers[
+                                        'x-pica-app-session'
+                                    ]
+                                        ? String(
+                                              request.headers[
+                                                  'x-pica-app-session'
+                                              ]
+                                          )
+                                        : null,
+                                    contextId: request.headers[
+                                        'x-pica-context-id'
+                                    ]
+                                        ? String(
+                                              request.headers[
+                                                  'x-pica-context-id'
+                                              ]
+                                          )
+                                        : null,
+                                    metadata: { shelfId }
+                                }) satisfies UserEventInput
+                        )
+                    )
                     return json(response, 200, result)
                 }
                 const comicIds = stringList(input.comicIds)
@@ -1706,19 +1722,33 @@ export async function startLibraryServer(options: {
                         ? (input.records as FavoriteRecord[])
                         : []
                 )
-                for (const comicId of comicIds)
-                    options.database.recordUserEvent({
-                        eventType: 'shelf_add',
-                        comicId,
-                        source: 'shelf',
-                        appSessionId: request.headers['x-pica-app-session']
-                            ? String(request.headers['x-pica-app-session'])
-                            : null,
-                        contextId: request.headers['x-pica-context-id']
-                            ? String(request.headers['x-pica-context-id'])
-                            : null,
-                        metadata: { shelfId }
-                    })
+                options.database.recordUserEvents(
+                    comicIds.map(
+                        (comicId) =>
+                            ({
+                                eventType: 'shelf_add',
+                                comicId,
+                                source: 'shelf',
+                                appSessionId: request.headers[
+                                    'x-pica-app-session'
+                                ]
+                                    ? String(
+                                          request.headers[
+                                              'x-pica-app-session'
+                                          ]
+                                      )
+                                    : null,
+                                contextId: request.headers['x-pica-context-id']
+                                    ? String(
+                                          request.headers[
+                                              'x-pica-context-id'
+                                          ]
+                                      )
+                                    : null,
+                                metadata: { shelfId }
+                            }) satisfies UserEventInput
+                    )
+                )
                 return json(response, 200, result)
             }
             if (

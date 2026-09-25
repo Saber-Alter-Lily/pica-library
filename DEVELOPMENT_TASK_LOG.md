@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current G16 candidate: `main@d60ee3207bc2f1d7a02a77634a748eaf6a08d2ac` (P2-G15 / PR #169 merged)  
+Authoritative repository baseline before the current G17 candidate: `main@bf0e5e8853e715909aa63cff5ef31934cd2f2c5f` (P2-G16 / PR #170 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G15 merged; G16 low-memory / background-restriction candidate**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RESOURCE_OBSERVATION_IN_PROGRESS — G1–G16 merged; G17 Android cross-task resource observation candidate**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -336,8 +336,8 @@ Already improved:
 Remaining:
 - inventory all Activities/Fragments for main-thread file/JSON/DB/network work;
 - unify background-task status presentation through the task center where appropriate;
-- define Android-specific concurrency/resource budgets;
-- promote the G16 trim-memory + Doze gate after CI evidence;
+- collect Android cross-task resource overlap + foreground latency evidence before choosing concurrency budgets;
+- define Android-specific concurrency/resource budgets only if measured contention justifies enforcement;
 - validate remaining OEM/physical-device background restrictions where generic emulator evidence is insufficient;
 - verify large Catalog and long Reader behavior on representative mid-range hardware.
 
@@ -347,7 +347,7 @@ Remaining:
 - background task UI is reconstructible after Activity recreation.
 
 ## P2-H — Startup, shutdown and crash recovery
-**Status: IN_PROGRESS — G13–G15 recovery evidence merged; G16 low-memory/Doze candidate; OEM/device evidence open**
+**Status: IN_PROGRESS — G13–G16 generic recovery/memory/Doze evidence merged; OEM/device evidence open**
 
 Required:
 - stale recommendation building state cleanup;
@@ -1014,7 +1014,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: RECOVERY_IN_PROGRESS — G1–G15 merged; G16 low-memory / Doze restriction candidate**
+**Status: RESOURCE_OBSERVATION_IN_PROGRESS — G1–G16 merged; G17 observe-only Android resource instrumentation candidate**
 
 - **G1–G12 merged (PR #153–#164):** audited Android UI-thread Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion I/O owners are worker-owned.
 - **G13 merged (PR #165):** durable task identity is persisted independently of Activity memory; Task Center reconstructs singleton/dynamic work from exact WorkRequest UUID + WorkManager state instead of WorkInfo list order/history.
@@ -1036,9 +1036,13 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - **G16 finding 1:** PicaLibraryApp had no trim-memory handling while CoverRepository and ImageRepository could each retain up to 72 MiB of decoded Bitmaps.
 - **G16 memory correction:** Application.onTrimMemory now evicts only reconstructible in-memory Bitmap LRUs at UI_HIDDEN/background pressure; encoded disk caches and durable work are untouched. Robolectric + real `am send-trim-memory ... HIDDEN` evidence cover this boundary.
 - **G16 finding 2:** Android durable work still used WorkManager 2.9.1, predating Android 15 SDK/network/foreground-timeout fixes. G16 upgrades both runtime and work-testing to stable 2.12.0 while preserving the G14/G15 recovery suite.
-- **G16 Doze gate:** a delayed, network-constrained debug WorkManager probe must remain unexecuted while the API-35 emulator is forced into Doze and must execute after `deviceidle unforce`.
-- **Next after G16 acceptance:** representative-hardware foreground-notification/OEM restriction evidence, Android resource/concurrency budgets, then large-Catalog/long-Reader timing/jank/memory evidence.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, and `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`.
+- **G16 merged (PR #170):** normal CI, direct-upgrade, G15 force-stop regression and the API-35 HIDDEN/Doze gate all passed. Generic trim-memory and Doze defer/resume evidence is accepted.
+- **G17 observe-only candidate:** AndroidTaskResources adds coarse WorkManager resource tags and de-duplicated RUNNING/ENQUEUED-BLOCKED snapshots for RT-17–RT-20 without changing scheduling, concurrency or task controls.
+- Current classes: provider-network, media-network, bridge-network, cpu-analysis, filesystem-heavy.
+- A debug-only ADB collector writes an app-private JSON snapshot for representative-device overlap sampling; it is absent from release UI/manifest.
+- **Next after G17 source acceptance:** collect representative resource-overlap + foreground Library/detail/Reader latency evidence; only then decide whether G18/P2-C3 enforcement is justified.
+- OEM battery-manager / foreground-notification evidence and large-Catalog/long-Reader timing/jank/memory remain physical-device gates.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`, and `docs/ANDROID_RESOURCE_OBSERVATION_P2G17.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1052,6 +1056,22 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-G17 Android cross-task resource observation
+
+State update:
+- G16 is merged as PR #170 after CI `36147604842`, direct-upgrade `36147604826`, G15 force-stop regression `36147604861`, and G16 memory/background gate `36147604843` all passed.
+- P2-C and the runtime inventory already prohibit arbitrary concurrency limits before representative overlap/latency evidence.
+- G17 therefore remains observe-only: AndroidTaskResources adds resource tags and current WorkManager snapshots, but does not cancel, delay, reprioritize or serialize jobs.
+- RT-17 Native Recommendation = provider-network + cpu-analysis.
+- RT-18 Pica/E-H downloads = media-network + filesystem-heavy.
+- RT-19 Desktop favorites/covers import = bridge-network + filesystem-heavy.
+- RT-20 Pica bootstrap = provider-network + filesystem-heavy.
+- Snapshot totals de-duplicate one multi-resource WorkRequest while preserving per-resource counts.
+- AndroidTaskResourcesTest uses the official WorkManager harness to verify this de-duplication.
+- Debug-only AndroidResourceObservationActivity writes `p2-g17-resource-snapshot.json` for ADB collection on representative hardware and is absent from the release manifest.
+- No G18/P2-C3 capacity will be chosen until resource-overlap samples are paired with foreground latency/memory evidence.
+- Detailed boundary: `docs/ANDROID_RESOURCE_OBSERVATION_P2G17.md`.
 
 ## 2026-09-25 — P2-G16 Android low-memory and background restriction gate
 

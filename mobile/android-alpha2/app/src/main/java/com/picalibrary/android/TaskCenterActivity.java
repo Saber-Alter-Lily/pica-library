@@ -58,7 +58,9 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         LinkedHashMap<String,MobileTaskRegistryStore.DownloadRef> legacyRefs=new LinkedHashMap<>();
         for(WorkInfo info:infos){
             MobileTaskRegistryStore.DownloadRef ref=downloadRef(info);
-            if(ref==null||refs.containsKey(ref.key()))continue;
+            if(ref==null)continue;
+            MobileTaskRegistryStore.DownloadRef registered=refs.get(ref.key());
+            if(registered!=null&&byId.containsKey(registered.workId))continue;
             WorkInfo prior=legacy.get(ref.key());
             if(prior==null||(!active(prior)&&active(info))){
                 legacy.put(ref.key(),info);

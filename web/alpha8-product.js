@@ -194,11 +194,19 @@ function refreshProductCopy() {
     applyTheme(storedTheme())
 }
 
-function removeSourceEntryPoints() {
-    document.querySelectorAll('a,button').forEach((node) => {
+function sourceEntryNodes(root = document) {
+    const nodes = []
+    if (root instanceof Element && root.matches('a,button')) nodes.push(root)
+    if (root?.querySelectorAll)
+        nodes.push(...root.querySelectorAll('a,button'))
+    return nodes
+}
+
+function removeSourceEntryPoints(root = document) {
+    for (const node of sourceEntryNodes(root)) {
         const text = (node.textContent || '').trim()
         if (/查看源码|source code|open source/i.test(text)) node.remove()
-    })
+    }
 }
 
 async function init() {
@@ -222,15 +230,26 @@ async function init() {
         void personalizationPanel()
     })
     let cleanupQueued = false
+    const pendingSourceRoots = new Set()
     const scheduleSourceCleanup = () => {
         if (cleanupQueued) return
         cleanupQueued = true
         requestAnimationFrame(() => {
             cleanupQueued = false
-            removeSourceEntryPoints()
+            const roots = [...pendingSourceRoots]
+            pendingSourceRoots.clear()
+            for (const root of roots) removeSourceEntryPoints(root)
         })
     }
-    const observer = new MutationObserver(scheduleSourceCleanup)
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations)
+            for (const node of mutation.addedNodes) {
+                const root =
+                    node instanceof Element ? node : node.parentElement
+                if (root) pendingSourceRoots.add(root)
+            }
+        if (pendingSourceRoots.size) scheduleSourceCleanup()
+    })
     observer.observe(document.body, { childList: true, subtree: true })
 }
 

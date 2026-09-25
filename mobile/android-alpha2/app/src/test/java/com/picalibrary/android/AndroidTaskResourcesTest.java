@@ -60,6 +60,16 @@ public final class AndroidTaskResourcesTest {
 
         manager.enqueue(request).getResult().get(5,TimeUnit.SECONDS);
 
+        assertEquals(
+            java.util.Set.of(
+                AndroidTaskResources.PROVIDER_NETWORK,
+                AndroidTaskResources.CPU_ANALYSIS
+            ),
+            AndroidTaskResources.resources(
+                manager.getWorkInfoById(request.getId()).get(5,TimeUnit.SECONDS)
+            )
+        );
+
         AndroidTaskResources.Snapshot snapshot=AndroidTaskResources.snapshot(app);
         assertEquals(0,snapshot.runningTotal());
         assertEquals(1,snapshot.waitingTotal());
@@ -76,22 +86,4 @@ public final class AndroidTaskResourcesTest {
         manager.cancelWorkById(request.getId()).getResult().get(5,TimeUnit.SECONDS);
     }
 
-    @Test public void unknownTagsDoNotBecomeResourceClasses() {
-        OneTimeWorkRequest request=new OneTimeWorkRequest.Builder(ProbeWorker.class)
-            .addTag("unrelated-tag").build();
-        assertTrue(AndroidTaskResources.resources(
-            new androidx.work.WorkInfo(
-                request.getId(),
-                androidx.work.WorkInfo.State.ENQUEUED,
-                androidx.work.Data.EMPTY,
-                java.util.List.of("unrelated-tag"),
-                androidx.work.Data.EMPTY,
-                0,
-                0,
-                androidx.work.Constraints.NONE,
-                0,
-                0
-            )
-        ).isEmpty());
-    }
 }

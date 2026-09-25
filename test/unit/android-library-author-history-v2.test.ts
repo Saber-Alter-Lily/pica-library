@@ -75,6 +75,44 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(onCreateBody).not.toContain('AuthorConceptStore.build(')
   })
 
+  it('keeps Comic Detail startup local-state IO off the UI thread', () => {
+    const detail = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicDetailActivity.java','utf8')
+    expect(detail).toContain('private static final class LocalDetailState')
+    expect(detail).toContain('private LocalDetailState readLocalDetailState(')
+    expect(detail).toContain('UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this)')
+    expect(detail).toContain('EhSemanticStore.Snapshot semantics=EhSemanticStore.load(this)')
+    expect(detail).toContain('AuthorConceptStore.build(catalog,semantics)')
+    expect(detail).toContain('boolean phoneDownloaded=PhoneDownloadStore.has(this,local.id)')
+    expect(detail).toContain('worker.submit(()->{')
+    expect(detail).toContain('LocalDetailState state=readLocalDetailState(')
+    expect(detail).toContain('renderLoadingShell(entry.title)')
+    expect(detail).toContain('resolveSources(state.phoneDownloaded)')
+
+    const onCreateStart = detail.indexOf('@Override public void onCreate')
+    const onCreateEnd = detail.indexOf('private void renderLoadingShell', onCreateStart)
+    const onCreateBody = detail.slice(onCreateStart, onCreateEnd)
+    expect(onCreateBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(onCreateBody).not.toContain('AuthorConceptStore.build(')
+    expect(onCreateBody).not.toContain('PhoneDownloadStore.has(')
+
+    const authorStart = detail.indexOf('private String authorSummary()')
+    const authorEnd = detail.indexOf('private void openAuthors()', authorStart)
+    expect(detail.slice(authorStart, authorEnd)).not.toContain('AuthorConceptStore.build(')
+
+    const tagStart = detail.indexOf('private String tagLine()')
+    const tagEnd = detail.indexOf('private String workVariantRelation(', tagStart)
+    expect(detail.slice(tagStart, tagEnd)).not.toContain('EhSemanticStore.')
+    expect(detail.slice(tagStart, tagEnd)).not.toContain('EhTagTranslationStore.')
+
+    const variantStart = detail.indexOf('private UnifiedCatalogStore.Entry workVariantEntry(')
+    const variantEnd = detail.indexOf('private void openWorkVariant(', variantStart)
+    expect(detail.slice(variantStart, variantEnd)).not.toContain('UnifiedCatalogStore.load(')
+
+    const sourcesStart = detail.indexOf('private void resolveSources(')
+    const sourcesEnd = detail.indexOf('private ProbeResult probe(', sourcesStart)
+    expect(detail.slice(sourcesStart, sourcesEnd)).not.toContain('PhoneDownloadStore.has(')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

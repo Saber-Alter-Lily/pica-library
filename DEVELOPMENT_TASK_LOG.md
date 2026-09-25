@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1–D7A merged; D7B transactional shelf-event candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1–D7B merged; D8A picture-count index candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -974,10 +974,13 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - A 10001-favorite SQLite regression places the only embedded favorite outside the legacy effective 5000-row catalog prefix and requires both Visual preference evidence and index target counts to include it.
 - **D7A merged (PR #131):** the existing 250 ms download-progress persistence cadence remains unchanged, but each persisted patch no longer performs a pre-read solely to recover unspecified fields. SQLite `COALESCE` preserves omitted fields, reducing the hot write shape from SELECT → UPDATE → SELECT to UPDATE → SELECT.
 - D7A regression preserves partial-patch semantics, explicit zero writes, unknown-job failure behavior and the existing 250 ms service throttle.
-- **D7B implemented:** Shelf add/remove still records one behavior event per comic, but the route now sends the event array through `recordUserEvents()`, which wraps the existing single-event recorder in one short `BEGIN IMMEDIATE / COMMIT / ROLLBACK` transaction.
+- **D7B merged (PR #132):** Shelf add/remove still records one behavior event per comic, but the route sends the event array through `recordUserEvents()`, which wraps the existing single-event recorder in one short `BEGIN IMMEDIATE / COMMIT / ROLLBACK` transaction.
 - D7B preserves event IDs, metadata safety, dedupe behavior and per-comic evidence granularity; invalid input rolls back the event batch rather than leaving a partially recorded shelf action.
-- **Next after D7B:** inspect recommendation impression/batch event bursts for equivalent short-transaction batching, measure real foreground latency before changing any write cadence, and separately investigate `comicSelect` correlated aggregate cost.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`.
+- **D8A implemented:** migration 16 adds `idx_pictures_comic_status(comic_id, status)`, filling the missing comic-first access path used by the correlated `comicSelect` picture-count subquery.
+- D8A planner regression requires `COUNT(*) WHERE comic_id = ?` to use the new index; completed-picture counts may validly use either the new comic-first index or the existing status-first downloaded index.
+- D8A does not rewrite `comicSelect`; aggregate joins/CTEs remain deferred until representative scaling evidence justifies a broader semantic-preserving query change.
+- **Next after D8A:** compare Library/detail scaling with the new index, inspect recommendation event bursts for short-transaction batching, and use J1/J2 real foreground latency before any cadence or global resource-budget change.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -991,6 +994,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D8A picture count planner index
+
+State update:
+- `comicSelect` computes known/downloaded picture counts through correlated predicates on `pictures.comic_id`.
+- Existing indexes covered episode-order reads and status-first downloaded-picture scans, but there was no index whose leading column is `comic_id` for `COUNT(*) WHERE comic_id = ?`.
+- Migration 16 adds `idx_pictures_comic_status(comic_id, status)` without changing `comicSelect` output or removing existing indexes.
+- A real SQLite `EXPLAIN QUERY PLAN` regression requires the total-picture count to use the new index. The completed-picture count may use either the new index or the existing `idx_pictures_downloaded(status, comic_id)`, both of which cover its equality predicates.
+- The migration suite separately requires the new index to exist in a fresh latest database.
+- D8A intentionally avoids a larger correlated-subquery-to-aggregate-join rewrite until query scaling evidence shows it is justified across single-comic and broad Library reads.
+- No count semantics, Library ordering/filtering, write paths, performance budgets or P2-C3 enforcement change.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md.
 
 ## 2026-09-24 — P2-D7B transactional shelf event batching
 

@@ -12,16 +12,18 @@ Dependencies:
 
 ## Finding
 
-Two Visual paths used a 10,000-row catalog read only to recover favorite comic IDs:
+Two Visual paths used a nominal 10,000-row catalog read only to recover favorite comic IDs:
 
 1. `visualPreferenceProfile()`;
 2. `visualIndexStatus()`.
+
+Although these call sites request `limit: 10000`, `listComics()` still applies its default internal cap of 5,000 unless a caller explicitly overrides that internal cap. The effective favorite domain was therefore only the first 5,000 rows.
 
 The database already has a dedicated complete-domain query:
 
 `favoriteIds()`
 
-Using a catalog prefix for this purpose created both unnecessary row materialization and a correctness boundary: a favorite outside the first 10,000 catalog rows could be omitted from Visual profile evidence or indexing targets.
+Using a catalog prefix for this purpose created both unnecessary row materialization and a correctness boundary: a favorite outside the effective 5,000-row catalog prefix could be omitted from Visual profile evidence or indexing targets.
 
 ## D6A change
 
@@ -48,7 +50,7 @@ Embedding/model/sampling-policy checks, indexed/pending counts and profile gener
 
 ## Why Author Atlas / Representation QC are not compacted here
 
-D6A deliberately leaves the 10,000-row catalog reads in:
+D6A deliberately leaves the nominal 10,000-row catalog reads in:
 
 - `visualAuthorAtlas()`;
 - `visualStyleFamilies()` through its Author Atlas input;
@@ -88,7 +90,7 @@ Only that tail favorite receives a current Visual embedding.
 The regression requires:
 
 - `favoriteIds()` = 10,001;
-- the legacy 10,000-row catalog prefix does not contain the tail favorite;
+- the legacy effective 5,000-row catalog prefix does not contain the tail favorite;
 - `visualPreferenceProfile()` still sees its embedding as favorite evidence;
 - `visualIndexStatus().targetCount` = 10,001;
 - one indexed target and 10,000 pending targets.

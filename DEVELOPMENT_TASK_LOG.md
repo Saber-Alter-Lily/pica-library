@@ -4,8 +4,8 @@
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
-Last reconciled: **2026-09-24**  
-Authoritative repository baseline after 2026-09-24 reconciliation: `main@e4f83987d78795426f191d6753798c56e39a32ec` (W5C merged)  
+Last reconciled: **2026-09-25**  
+Authoritative repository baseline before the current G15 candidate: `main@ac0d1fb9222503ca778802b73691fb59705827ca` (P2-G14 / PR #166 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G13 merged; G14 WorkManager recovery integration candidate**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G14 merged; G15 real ADB force-stop recovery candidate**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -337,7 +337,7 @@ Remaining:
 - inventory all Activities/Fragments for main-thread file/JSON/DB/network work;
 - unify background-task status presentation through the task center where appropriate;
 - define Android-specific concurrency/resource budgets;
-- validate process death/relaunch for every durable Worker class;
+- promote the G15 emulator/ADB force-stop gate after CI evidence, then extend process-death evidence to remaining Worker families where it adds value;
 - validate low-memory/background restrictions;
 - verify large Catalog and long Reader behavior on representative mid-range hardware.
 
@@ -347,7 +347,7 @@ Remaining:
 - background task UI is reconstructible after Activity recreation.
 
 ## P2-H — Startup, shutdown and crash recovery
-**Status: IN_PROGRESS — Android recovery matrix + durable reconstruction merged; WorkManager integration candidate; OS force-stop evidence open**
+**Status: IN_PROGRESS — G13/G14 recovery reconstruction evidence merged; G15 OS force-stop candidate; low-memory/device evidence open**
 
 Required:
 - stale recommendation building state cleanup;
@@ -1014,12 +1014,12 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: RECOVERY_IN_PROGRESS — G1–G13 merged; G14 official WorkManager recovery integration candidate**
+**Status: RECOVERY_IN_PROGRESS — G1–G14 merged; G15 real emulator/ADB force-stop recovery candidate**
 
 - **G1–G12 merged (PR #153–#164):** audited Android UI-thread Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion I/O owners are worker-owned.
 - **G13 merged (PR #165):** durable task identity is persisted independently of Activity memory; Task Center reconstructs singleton/dynamic work from exact WorkRequest UUID + WorkManager state instead of WorkInfo list order/history.
 - G13 also adds the explicit Android recovery matrix required by P2-H and preserves PAUSED download identity even when an old CANCELLED WorkInfo is unavailable.
-- **G14 implemented with the official WorkManager test harness:** add `androidx.work:work-testing:2.9.1` matching the production WorkManager runtime.
+- **G14 merged (PR #166) with the official WorkManager test harness:** `androidx.work:work-testing:2.9.1` matches the production WorkManager runtime.
 - `WorkManagerRecoveryTest` creates real delayed WorkRequests and queries real WorkInfo/unique-work history under Robolectric rather than using a hand-built scheduler fake.
 - G14 covers:
   - REPLACE history reconstructs exactly one current download;
@@ -1029,8 +1029,12 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
   - singleton unique-work recovery selects the exact persisted current request and repairs stale UUIDs.
 - All G14 requests use a long initial delay, so provider/network Worker bodies do not execute; the test targets WorkManager DB/query + app recovery authority.
 - **Evidence boundary:** G14 is Activity/process-state reconstruction evidence, not a claim of Android OS force-stop/reboot coverage.
-- **Next after G14:** emulator/adb force-stop + relaunch smoke for one active download and one deliberate PAUSED task, then low-memory/background restrictions and Android resource budgets.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, and `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`.
+- **G15 finding:** Favorite import, Pica bootstrap and Native Recommendation persisted current singleton WorkRequest UUIDs but did not retire those UUIDs on successful completion or explicit cancel. A later restart could therefore bind Task Center to historical SUCCEEDED/CANCELLED WorkInfo.
+- **G15 production correction:** explicit cancel clears singleton recovery identity immediately; successful Workers clear it only after their existing durable success boundary. PAUSED/retry/failure states retain recovery identity.
+- **G15 real process-death gate:** a debug-only normal app Activity seeds real WorkManager state and keeps a debug-only probe RUNNING; the seed deliberately does not use instrumentation because Android instrumentation itself adds target-package force-stop lifecycle events. The host executes `adb shell am force-stop com.picalibrary.android.dev`, confirms process death, re-enters through the normal launcher and requires probe runCount >= 2 in a fresh app process before verification-only instrumentation checks active/PAUSED recovery state, one-card Task Center reconstruction and cancelled-history non-resurrection.
+- **G15 CI:** `.github/workflows/android-worker-force-stop-recovery.yml` uses the open-source ReactiveCircus emulator runner on API 35 and executes `scripts/run-android-worker-force-stop-recovery.sh`. Promotion requires this gate to pass.
+- **Next after G15 acceptance:** low-memory/background restriction audit, foreground-notification reconstruction on representative hardware, Android resource/concurrency budgets, then large-Catalog/long-Reader timing/jank/memory evidence.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, and `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1044,6 +1048,20 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-G15 real Android force-stop recovery gate
+
+State update:
+- G14 is merged as PR #166 and validates WorkManager DB/WorkInfo reconstruction through the official test harness; it intentionally leaves real OS force-stop evidence open.
+- G15 closes that named evidence gap by seeding from a debug-only **normal app Activity**, keeping a debug-only WorkManager probe actually RUNNING, then applying host-side `adb shell am force-stop`. Seed instrumentation was rejected after emulator evidence showed Android instrumentation itself force-stops the target at start/finish and would contaminate the measured boundary.
+- Force-stop is treated as a real stopped-state boundary: the app is not expected to resurrect background work while stopped. After explicit launcher re-entry, the host requires a new target PID and probe runCount >= 2 before starting verification-only instrumentation, proving WorkManager reconstructed unfinished work rather than merely reading the old database row.
+- G15 also fixes a recovery-identity terminal leak found during this work: Favorite import, Pica bootstrap and Native Recommendation now clear current UUIDs on explicit cancel and only after durable success, while pause/retry/failure retain them.
+- The emulator scenario also preserves a deliberate PAUSED Favorite import and E-H download, retains an active Pica download, and verifies Task Center renders active/paused logical downloads exactly once.
+- An explicitly cancelled Pica download remains historical CANCELLED WorkInfo but has no registry identity and must not reappear in Task Center.
+- The test-only probe lives under the Android debug source set; release behavior receives only the singleton terminal-identity correction.
+- CI uses `ReactiveCircus/android-emulator-runner@v2` with API 35 / x86_64 / KVM instead of a custom emulator bootstrap.
+- G15 does not claim OEM low-memory/background restriction, vendor foreground-service, or physical-device performance acceptance; those remain the next P2-G gates.
+- Detailed boundary: `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`.
 
 ## 2026-09-25 — P2-G14 official WorkManager recovery integration
 

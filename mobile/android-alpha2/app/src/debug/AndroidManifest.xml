@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Debug-only host entry used by P2-G15. Release manifests never contain this Activity. -->
+        <activity
+            android:name=".WorkerForceStopSeedActivity"
+            android:exported="true" />
+    </application>
+</manifest>

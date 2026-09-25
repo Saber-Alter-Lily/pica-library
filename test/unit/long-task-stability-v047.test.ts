@@ -276,6 +276,88 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(recovery).toContain('@LooperMode(LooperMode.Mode.PAUSED)')
     })
 
+    it('forces a live Android WorkManager process through adb restart for G15', () => {
+        const favoriteJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/FavoriteImportJobs.java'
+        )
+        const favoriteWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/FavoriteImportWorker.java'
+        )
+        const bootstrapJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBootstrapJobs.java'
+        )
+        const bootstrapWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBootstrapWorker.java'
+        )
+        const recommendationJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationJobs.java'
+        )
+        const recommendationWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationWorker.java'
+        )
+        const recovery = read(
+            'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/WorkerForceStopRecoveryTest.java'
+        )
+        const seedActivity = read(
+            'mobile/android-alpha2/app/src/debug/java/com/picalibrary/android/WorkerForceStopSeedActivity.java'
+        )
+        const debugManifest = read(
+            'mobile/android-alpha2/app/src/debug/AndroidManifest.xml'
+        )
+        const probe = read(
+            'mobile/android-alpha2/app/src/debug/java/com/picalibrary/android/WorkerRecoveryProbeWorker.java'
+        )
+        const runner = read('scripts/run-android-worker-force-stop-recovery.sh')
+        const workflow = read('.github/workflows/android-worker-force-stop-recovery.yml')
+
+        expect(favoriteJobs).toContain(
+            'MobileTaskRegistryStore.clearWorkId(context,"favorite-import",UNIQUE_NAME)'
+        )
+        expect(bootstrapJobs).toContain(
+            'MobileTaskRegistryStore.clearWorkId(context,"pica-bootstrap",UNIQUE_NAME)'
+        )
+        expect(recommendationJobs).toContain(
+            'MobileTaskRegistryStore.clearWorkId(context,"recommendation",UNIQUE_NAME)'
+        )
+        expect(favoriteWorker).toContain('FavoriteImportJobs.complete(getApplicationContext())')
+        expect(bootstrapWorker).toContain('PicaBootstrapJobs.complete(app)')
+        expect(recommendationWorker).toContain(
+            'NativeRecommendationJobs.complete(getApplicationContext())'
+        )
+
+        expect(seedActivity).toContain('public final class WorkerForceStopSeedActivity')
+        expect(seedActivity).toContain('awaitState(manager, probe.getId(), WorkInfo.State.RUNNING)')
+        expect(seedActivity).toContain('writeFile(READY_FILE')
+        expect(debugManifest).toContain('android:name=".WorkerForceStopSeedActivity"')
+        expect(debugManifest).toContain('android:exported="true"')
+        expect(recovery).not.toContain('seedDurableRecoveryStateAndAwaitForceStop()')
+        expect(recovery).toContain('verifyDurableRecoveryStateAfterForceStop()')
+        expect(recovery).toContain('assertNotEquals(')
+        expect(recovery).toContain('"verification must run in a fresh process"')
+        expect(recovery).toContain('awaitProbeRuns(app, 2)')
+        expect(recovery).toContain('ActivityScenario<TaskCenterActivity>')
+        expect(recovery).toContain(
+            'explicitly cancelled download history must not resurrect'
+        )
+        expect(probe).toContain('while (!isStopped()) Thread.sleep(200L)')
+        expect(probe).toContain('RUN_COUNT_FILE = "p2-g15-probe-run-count"')
+        expect(runner).toContain(
+            '$TARGET_PACKAGE/com.picalibrary.android.WorkerForceStopSeedActivity'
+        )
+        expect(runner).toContain('files/p2-g15-ready')
+        expect(runner).toContain('adb shell am force-stop "$TARGET_PACKAGE"')
+        expect(runner).toContain('for _ in $(seq 1 40)')
+        expect(runner).toContain('post-force-process.txt')
+        expect(runner).toContain(
+            'Target process survived adb force-stop after 10s'
+        )
+        expect(runner).toContain(
+            'adb shell monkey -p "$TARGET_PACKAGE" -c android.intent.category.LAUNCHER 1'
+        )
+        expect(runner).toContain('probe_run_count >= 2')
+        expect(workflow).toContain('ReactiveCircus/android-emulator-runner@v2')
+    })
+
     it('retains mature Desktop download and Android updater controls', () => {
         const web = read('web/app.js')
         const server = read('src/library/server.ts')

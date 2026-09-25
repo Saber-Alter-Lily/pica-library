@@ -54,7 +54,12 @@ final class FavoriteImportJobs {
 
     static void cancel(Context context) {
         MobileTaskPauseStore.setPaused(context,"favorite-import",UNIQUE_NAME,false);
+        MobileTaskRegistryStore.clearWorkId(context,"favorite-import",UNIQUE_NAME);
         WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);
+    }
+
+    static void complete(Context context) {
+        MobileTaskRegistryStore.clearWorkId(context,"favorite-import",UNIQUE_NAME);
     }
 
     static boolean paused(Context context) {

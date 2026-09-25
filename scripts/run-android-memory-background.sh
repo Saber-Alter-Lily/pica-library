@@ -51,6 +51,17 @@ if [[ -z "$before_pid" || -z "$before_cover" || -z "$before_image" ]] ||
     exit 1
 fi
 
+# Move the probe UI definitively out of the foreground before sending a background trim.
+# The PID must remain the same so a process restart cannot masquerade as successful eviction.
+adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.HOME \
+    >"$RESULT_DIR/memory-home.txt"
+sleep 1
+background_pid="$(adb shell pidof "$TARGET_PACKAGE" 2>/dev/null | tr -d '\r' || true)"
+if [[ -z "$background_pid" || "$background_pid" != "$before_pid" ]]; then
+    echo "Memory probe process changed before HIDDEN trim: before=$before_pid background=$background_pid" >&2
+    exit 1
+fi
+
 # ActivityManager's shell API calls TRIM_MEMORY_UI_HIDDEN "HIDDEN".
 adb shell am send-trim-memory "$TARGET_PACKAGE" HIDDEN
 

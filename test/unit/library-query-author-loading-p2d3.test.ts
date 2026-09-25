@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import type { LibraryDatabase } from '../../src/library/database'
 import type { StoredComic } from '../../src/library/types'
@@ -87,12 +88,12 @@ describe('P2 D3 Library query author metadata discipline', () => {
     })
 
     it('exposes the synthetic scaling harness without promoting a latency budget', () => {
-        const script = require('node:fs').readFileSync(
+        const script = fs.readFileSync(
             'scripts/benchmark/library-query-harness.ts',
             'utf8'
         )
         const pkg = JSON.parse(
-            require('node:fs').readFileSync('package.json', 'utf8')
+            fs.readFileSync('package.json', 'utf8')
         ) as { scripts: Record<string, string> }
 
         expect(pkg.scripts['benchmark:library-query']).toBe(

@@ -3346,19 +3346,14 @@ export class LibraryService {
     }
 
     visualPreferenceProfile() {
-        const catalog = this.database.listComics({ limit: 10000 })
         const tasteExcluded = new Set(
             new RecommendationPolicyStoreV5(this.database).state()
                 .tasteExcludedComicIds
         )
         const favorites = new Set(
-            catalog
-                .filter(
-                    (comic) =>
-                        comic.isFavorite &&
-                        !tasteExcluded.has(comic.comicId)
-                )
-                .map((comic) => comic.comicId)
+            this.database
+                .favoriteIds()
+                .filter((comicId) => !tasteExcluded.has(comicId))
         )
         const feedback = this.database.recommendationFeedback()
         return buildVisualPreferenceProfile({
@@ -3501,12 +3496,9 @@ export class LibraryService {
 
     visualIndexStatus() {
         const settings = this.visualSettings()
-        const catalog = this.database.listComics({ limit: 10000 })
         const feedback = this.database.recommendationFeedback()
         const targetIds = new Set([
-            ...catalog
-                .filter((comic) => comic.isFavorite)
-                .map((comic) => comic.comicId),
+            ...this.database.favoriteIds(),
             ...feedback.map((item) => item.comicId)
         ])
         const embeddings = this.database.listVisualEmbeddings()

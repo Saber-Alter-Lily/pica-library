@@ -558,13 +558,14 @@ function normalizeDangerAndStatus() {
 }
 
 function installDialogBehavior() {
-    for (const dialog of uxAll('dialog')) {
-        if (dialog.dataset.uxBackdropClose) continue
-        dialog.dataset.uxBackdropClose = '1'
-        dialog.addEventListener('click', (event) => {
-            if (event.target === dialog) dialog.close()
-        })
-    }
+    const body = document.body
+    if (!body || body.dataset.uxDialogBackdropDelegation) return
+    body.dataset.uxDialogBackdropDelegation = '1'
+    body.addEventListener('click', (event) => {
+        const dialog =
+            event.target instanceof HTMLDialogElement ? event.target : null
+        if (dialog?.open) dialog.close()
+    })
 }
 
 function refreshUxCopy() {
@@ -592,26 +593,42 @@ function installObservers() {
         }).observe(node, { childList: true, characterData: true, subtree: true })
     }
 
-    let polishQueued = false
-    const scheduleDynamicPolish = () => {
-        if (polishQueued) return
-        polishQueued = true
+    let settingsPolishQueued = false
+    const scheduleSettingsPolish = () => {
+        if (settingsPolishQueued) return
+        settingsPolishQueued = true
         requestAnimationFrame(() => {
-            polishQueued = false
+            settingsPolishQueued = false
             installExperimentHub()
-            installDownloadsPage()
             installVisualSettingsDisclosure()
             installSettingsUtilities()
             installUpdatePanel()
             installEhAccountFlow()
             installRemoteStorageFlow()
-            installDialogBehavior()
         })
     }
-    const bodyObserver = new MutationObserver(() => {
-        scheduleDynamicPolish()
-    })
-    bodyObserver.observe(document.body, { childList: true, subtree: true })
+    const settings = ux$('#settings')
+    if (settings)
+        new MutationObserver(scheduleSettingsPolish).observe(settings, {
+            childList: true,
+            subtree: true
+        })
+
+    let downloadsPolishQueued = false
+    const scheduleDownloadsPolish = () => {
+        if (downloadsPolishQueued) return
+        downloadsPolishQueued = true
+        requestAnimationFrame(() => {
+            downloadsPolishQueued = false
+            installDownloadsPage()
+        })
+    }
+    const downloads = ux$('#downloads')
+    if (downloads)
+        new MutationObserver(scheduleDownloadsPolish).observe(downloads, {
+            childList: true,
+            subtree: true
+        })
 }
 
 function installUxPolish() {

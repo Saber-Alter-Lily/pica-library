@@ -956,7 +956,7 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## NEXT-6 — P2-D SQLite/query discipline
-**Status: IN_PROGRESS — D1–D4 merged; D5A authoritative Work Identity domain candidate**
+**Status: IN_PROGRESS — D1–D8A merged; D7C recommendation-impression batching candidate; broader query/write audit remains open**
 
 This remains the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
 

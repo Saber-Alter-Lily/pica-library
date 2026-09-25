@@ -494,8 +494,10 @@ function installObservers() {
             if (settingsNav) settingsNav.style.display = 'none'
         })
     }
+    const settings = hub$('#settings')
+    if (!settings) return
     const observer = new MutationObserver(schedule)
-    observer.observe(document.body, { childList: true, subtree: true })
+    observer.observe(settings, { childList: true, subtree: true })
 }
 
 function bootstrap() {

@@ -49,7 +49,7 @@ jobs:
           script: bash scripts/run-android-worker-recovery.sh
 
       - name: Upload recovery diagnostics
-        if: failure()
+        if: failure() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
           name: android-worker-recovery-${{ github.run_id }}

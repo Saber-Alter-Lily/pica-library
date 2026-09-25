@@ -78,7 +78,7 @@ adb shell am start -W     -n "$TARGET_PACKAGE/com.picalibrary.android.Background
 ready=""
 for _ in $(seq 1 80); do
     ready="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-ready" 2>/dev/null || true)"
-    [[ "$ready" == READY workId=* ]] && break
+    [[ "$ready" == "READY workId="* ]] && break
     failure="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-failure" 2>/dev/null || true)"
     if [[ "$failure" == *:* ]]; then
         printf '%s\n' "$failure" >&2
@@ -87,7 +87,7 @@ for _ in $(seq 1 80); do
     sleep 0.25
 done
 printf '%s\n' "$ready" >"$RESULT_DIR/background-ready.txt"
-if [[ "$ready" != READY workId=* ]]; then
+if [[ "$ready" != "READY workId="* ]]; then
     echo "Timed out waiting for G16 background seed" >&2
     exit 1
 fi

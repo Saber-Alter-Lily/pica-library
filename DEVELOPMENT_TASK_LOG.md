@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1 merged; G2 Comic Detail first-frame local-state candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1/G2 merged; G3 Downloads local-state/stat pipeline candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,18 +1014,20 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1 merged; G2 Comic Detail local-state pipeline candidate**
+**Status: IN_PROGRESS — G1/G2 merged; G3 Downloads worker pipeline candidate**
 
-- **G1 merged (PR #153):** Author Works no longer reads/rebuilds Unified Catalog + E-H semantics + Author concepts on the UI thread. Its render path consumes worker-prepared snapshots.
-- **G2 finding:** UnifiedComicDetailActivity previously loaded Unified Catalog in `onCreate()`, rebuilt Author concepts in `authorSummary()`, reloaded semantic/translation data in `tagLine()`, checked PhoneDownloadStore synchronously in `resolveSources()`, and reloaded Unified Catalog per same-work variant card.
-- **G2 implemented:** `onCreate()` now renders a lightweight loading shell and schedules one worker-owned `LocalDetailState` pipeline.
-- LocalDetailState loads Unified Catalog once, E-H semantics once, builds creator concepts from those snapshots, derives creator/tag presentation, checks phone-download availability, and prepares E-H favorite metadata before one UI publication.
-- Full detail render consumes only the prepared creator/tag/favorite/catalog snapshots; source probing remains asynchronous.
-- Same-work variant cards reuse the loaded catalog snapshot instead of reopening the catalog file per row.
-- Creator identity, tag translation, source priority, chapter ordering, same-work semantics, favorites/shelves/recommendation controls are unchanged.
-- **Next after G2:** DownloadsActivity PhoneDownloadStore/size-stat work, then AuthorDirectory/PicaBrowse local snapshot construction in separate batches.
-- Durable Worker/process-death/relaunch and Task Center reconstruction remain later P2-G work after first-frame UI-thread I/O is removed.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G2.md`.
+- **G1 merged (PR #153):** Author Works local Catalog/Semantic/creator reconstruction is worker-owned; UI rendering consumes prepared snapshots.
+- **G2 merged (PR #154):** Comic Detail now shows a lightweight shell and builds one worker-owned `LocalDetailState`; initial Catalog/Semantic/creator/PhoneDownload/E-H favorite work is no longer on the UI thread.
+- **G3 finding:** DownloadsActivity previously parsed the complete PhoneDownloadStore index on the UI thread, then called `estimatedBytes(this)`, which parsed the same index again and stat-ed every stored page URI before rendering.
+- Delete confirmation also called `PhoneDownloadStore.remove()` synchronously from the UI callback even though removal includes page deletion, index save and Catalog reconciliation.
+- **G3 implemented:** DownloadsActivity now renders a loading shell, uses one Activity-local single-thread executor, prepares `DownloadState(snapshot, bytes)` off-thread, and publishes only the current generation to the UI.
+- `PhoneDownloadStore.estimatedBytes(context, snapshot)` reuses the already parsed Snapshot so size calculation does not reopen the index.
+- Delete operations and the subsequent refreshed read run on the same worker. UI callbacks are guarded by `destroyed + loadGeneration`; `onDestroy()` advances generation and shuts down the executor.
+- Render and delete-confirmation paths contain no synchronous PhoneDownloadStore load/stat/remove work.
+- **New audit finding for next batch:** MainActivity home summary still loads PhoneDownloadStore and estimates persistent-download bytes synchronously on the landing screen; treat this as higher priority than lower-frequency AuthorDirectory/PicaBrowse work.
+- **Next after G3:** MainActivity home-summary local-state/stat pipeline, then AuthorDirectoryActivity and PicaBrowseActivity in separate batches.
+- Durable Worker process-death/relaunch, low-memory/background behavior, Task Center reconstruction and Android resource budgets remain later P2-G work after first-frame UI-thread I/O is removed.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G2.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G3.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1039,6 +1041,21 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G3 Downloads persistent-index/stat hardening
+
+State update:
+- DownloadsActivity previously called PhoneDownloadStore.load(this) and PhoneDownloadStore.estimatedBytes(this) directly from renderList() on the UI thread.
+- estimatedBytes(context) reloaded the complete download index and then stat-ed every page URI, so one render could parse the index twice before drawing the persistent-download list.
+- Delete confirmation also executed PhoneDownloadStore.remove() synchronously on the UI thread; removal may delete many page URIs, rewrite the index and reconcile Unified Catalog.
+- G3 adds one Activity-local single-thread executor and one immutable DownloadState(snapshot, bytes).
+- onResume shows a loading state and schedules readDownloads(); the worker loads the index once and computes size from the same Snapshot through the new estimatedBytes(context, snapshot) overload.
+- renderList() is now UI-only and performs no PhoneDownloadStore load/stat call.
+- Delete confirmation dispatches deleteDownload(); remove + refreshed index/stat read run on the worker before one guarded UI publication.
+- destroyed + loadGeneration prevent stale/out-of-order/destroyed Activity publications, and onDestroy() advances the generation and shuts down the executor.
+- Persistent-download format, deletion semantics, Catalog reconciliation, displayed list/card behavior and navigation are unchanged.
+- Audit also confirms MainActivity still performs PhoneDownloadStore load + estimated byte work synchronously on the landing screen; this becomes the next high-priority Android runtime batch.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G3.md.
 
 ## 2026-09-24 — P2-G2 Comic Detail first-frame local-state hardening
 

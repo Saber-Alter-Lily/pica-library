@@ -205,16 +205,26 @@ function translateValue(raw) {
     if (currentLanguage() !== 'zh-CN') return raw
     return parityState.valueTranslations.get(norm(raw)) || raw
 }
-function translateVisibleTags() {
-    for (const tag of $$('.tag')) {
+function elementsWithin(root, selector) {
+    const matches = []
+    if (root instanceof Element && root.matches(selector)) matches.push(root)
+    if (root?.querySelectorAll) matches.push(...root.querySelectorAll(selector))
+    return matches
+}
+function translateVisibleTags(root = document) {
+    for (const tag of elementsWithin(root, '.tag')) {
         const raw = tag.dataset.rawValue || tag.textContent.trim()
         tag.dataset.rawValue = raw
         const translated = translateValue(raw)
-        if (translated !== raw) { tag.textContent = translated; tag.title = raw }
+        if (translated !== raw) {
+            if (tag.textContent !== translated) tag.textContent = translated
+            if (tag.title !== raw) tag.title = raw
+        }
     }
-    for (const node of $$('[data-eh-category]')) {
+    for (const node of elementsWithin(root, '[data-eh-category]')) {
         const raw = node.dataset.ehCategory
-        node.textContent = categoryLabel(raw)
+        const translated = categoryLabel(raw)
+        if (node.textContent !== translated) node.textContent = translated
     }
 }
 function installTagSuggestions() {
@@ -420,8 +430,51 @@ async function resumeHistory(row) {
 }
 
 function observeUi() {
-    const observer=new MutationObserver(()=>{translateVisibleTags();enhanceDetailAuthor()})
-    observer.observe(document.body,{childList:true,subtree:true})
+    let queued = false
+    let detailDirty = false
+    const pendingRoots = new Set()
+    const schedule = () => {
+        if (queued) return
+        queued = true
+        requestAnimationFrame(() => {
+            queued = false
+            const roots = [...pendingRoots]
+            pendingRoots.clear()
+            for (const root of roots) translateVisibleTags(root)
+            if (detailDirty) {
+                detailDirty = false
+                enhanceDetailAuthor()
+            }
+        })
+    }
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            const target =
+                mutation.target instanceof Element
+                    ? mutation.target
+                    : mutation.target.parentElement
+            if (
+                target &&
+                (target.id === 'recommend-detail-content' ||
+                    target.closest?.('#recommend-detail-content'))
+            )
+                detailDirty = true
+            for (const node of mutation.addedNodes) {
+                const root =
+                    node instanceof Element ? node : node.parentElement
+                if (!root) continue
+                pendingRoots.add(root)
+                if (
+                    root.id === 'recommend-detail-content' ||
+                    root.closest?.('#recommend-detail-content') ||
+                    root.querySelector?.('#recommend-detail-content')
+                )
+                    detailDirty = true
+            }
+        }
+        if (pendingRoots.size || detailDirty) schedule()
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
 }
 function installCss() {
     if(document.querySelector('link[href="./v040-parity.css"]'))return

@@ -72,6 +72,21 @@ describe('v0.4 Web/Desktop parity', () => {
     expect(web).toContain("recordHistory({comicId:row.comicId")
   })
 
+  it('coalesces parity mutations and translates only changed subtrees', () => {
+    expect(web).toContain('function elementsWithin(root, selector)')
+    expect(web).toContain('function translateVisibleTags(root = document)')
+    expect(web).toContain('const pendingRoots = new Set()')
+    expect(web).toContain('for (const node of mutation.addedNodes)')
+    expect(web).toContain('requestAnimationFrame(() => {')
+    expect(web).toContain('for (const root of roots) translateVisibleTags(root)')
+    expect(web).toContain("target.closest?.('#recommend-detail-content')")
+    expect(web).toContain('if (tag.textContent !== translated)')
+    expect(web).toContain('if (node.textContent !== translated)')
+    expect(web).not.toContain(
+      'new MutationObserver(()=>{translateVisibleTags();enhanceDetailAuthor()})'
+    )
+  })
+
   it('keeps ExH an optional E-H capability rather than a core dependency', () => {
     expect(web).toContain("['eh','exh'].includes")
     expect(account).toContain("if (value === 'UNAVAILABLE') return ehT('当前不可访问','Unavailable','現在アクセス不可')")

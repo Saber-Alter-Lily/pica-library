@@ -672,7 +672,23 @@ export const migrations: Migration[] = [
                 ON comic_authors(author_id, circle);
         `
     }
-
+,
+    {
+        version: 15,
+        name: 'p2d5b_work_identity_detail_indexes',
+        up: `
+            CREATE INDEX IF NOT EXISTS idx_work_identity_decisions_right
+                ON work_identity_decisions(right_comic_id, left_comic_id);
+            CREATE INDEX IF NOT EXISTS idx_work_identity_evidence_left_probable
+                ON work_identity_evidence(
+                    left_comic_id, relation, confidence DESC, right_comic_id
+                );
+            CREATE INDEX IF NOT EXISTS idx_work_identity_evidence_right_probable
+                ON work_identity_evidence(
+                    right_comic_id, relation, confidence DESC, left_comic_id
+                );
+        `
+    }
 ]
 
 export const latestMigrationVersion = Math.max(

@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1–D4 merged; D5A authoritative Work Identity domain candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1–D5A merged; D5B targeted Work Identity detail candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -964,11 +964,15 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - **D2 merged (PR #125):** Shelf/recommendation exact-ID reads use chunked `getComicsByIds()`; author metadata changed from 2N+1 to fixed batched queries with the required reverse indexes.
 - **D3 merged (PR #126):** ordinary no-text Library queries avoid complete author metadata; `pnpm benchmark:library-query` records SQLite scaling evidence without defining a release budget.
 - **D4 merged (PR #127):** Final V3 frozen serving, portable readback and serving-composition diagnostics use complete owned+candidate exact-ID domains instead of unrelated 10000-row catalog materialization; Canonical Work ownership semantics remain unchanged.
-- **D5A implemented:** Work Identity bounded review reads and authoritative correctness reads are now separate contracts. Materialization plan uses all decisions + all bindings; review preview switches to the full decision domain when the bounded review list is incomplete; Final V3 Canonical Work ownership uses all bindings.
+- **D5A merged (PR #128):** Work Identity bounded review reads and authoritative correctness reads are separate contracts. Materialization plan uses all decisions + all bindings; review preview switches to the full decision domain when the bounded review list is incomplete; Final V3 Canonical Work ownership uses all bindings.
 - D5A regression constructs 10001 bindings and 5001 decisions in real SQLite, requiring bounded APIs to remain capped while authoritative APIs cross both former boundaries.
-- Materialization execution remains disabled; plan digest/confirmation/blocker gates are unchanged.
-- **Next after D5A:** D5B should replace `workVariantsForComic()` global relationship prefixes with targeted current-comic/work binding, decision and probable-evidence queries while preserving its intentional full-catalog metadata heuristic funnel.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`.
+- **D5B implemented:** `workVariantsForComic()` now uses targeted current binding, same-work bindings, current-comic decisions and current-comic probable evidence rather than global 10000/5000 relationship prefixes.
+- D5B preserves binding metadata for decision/evidence variants through a batched exact-ID binding lookup and keeps the intentional full-catalog creator/title/cover heuristic funnel unchanged.
+- Migration 15 adds only the missing right-side decision and left/right probable-evidence indexes needed by symmetric current-comic relationship reads.
+- D5B regression requires targeted binding/decision/evidence APIs to recover rows outside the bounded global review prefixes; source contracts prohibit the old global relationship readers inside `workVariantsForComic()`.
+- Materialization execution remains disabled; Work Identity relation precedence, KEEP_SEPARATE authority, resolver confidence and Final V3 ranking are unchanged.
+- **Next after D5B:** continue repeated full-catalog materialization audit in Visual/remaining Work Identity/recommendation analysis paths, then inspect download-progress/user-event write cadence versus foreground read latency before any further rewrite.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -982,6 +986,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D5B targeted Work Identity detail relationships
+
+State update:
+- `workVariantsForComic()` previously loaded global prefixes of 10000 bindings, 5000 decisions and 5000 evidence rows and then filtered them to the current comic.
+- D5B adds targeted database APIs for the current binding, all bindings of the current Canonical Work, all decisions involving the current comic, and high-confidence probable evidence involving the current comic.
+- Relationship candidate binding metadata is resolved in one chunked exact-ID batch rather than per-candidate N+1 lookups.
+- The existing full-catalog Work Identity V3 creator/title/cover heuristic funnel remains unchanged because it is a separate discovery semantic, not relationship-state lookup.
+- Migration 15 adds `idx_work_identity_decisions_right` plus symmetric left/right probable-evidence indexes. Existing binding primary/work indexes are reused.
+- Boundary regressions extend the 10001/5001 D5A fixture and add a 5001-row evidence case where the target pair is outside the global review prefix but must be returned by the current-comic targeted API.
+- Source-contract tests forbid `workVariantsForComic()` from using the legacy global relationship-prefix APIs.
+- D5B changes query scope only; relation precedence, KEEP_SEPARATE authority, resolver confidence, materialization execution, recommendation ranking, performance budgets and P2-C3 enforcement remain unchanged.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md.
 
 ## 2026-09-24 — P2-D5A authoritative Work Identity domains
 

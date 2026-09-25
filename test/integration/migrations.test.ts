@@ -62,6 +62,13 @@ describe('SQLite migrations', () => {
         ).map((row) => row.name)
         expect(indexNames).toContain('idx_author_aliases_author_display')
         expect(indexNames).toContain('idx_comic_authors_author_circle')
+        expect(indexNames).toContain('idx_work_identity_decisions_right')
+        expect(indexNames).toContain(
+            'idx_work_identity_evidence_left_probable'
+        )
+        expect(indexNames).toContain(
+            'idx_work_identity_evidence_right_probable'
+        )
         database.close()
     })
 

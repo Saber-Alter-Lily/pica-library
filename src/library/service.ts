@@ -2055,12 +2055,37 @@ export class LibraryService {
                 items: []
             }
 
-        const bindings = this.database.listWorkIdentityBindings(10000)
+        const currentBinding = this.database.getWorkIdentityBinding(id)
+        const workBindings = currentBinding
+            ? this.database.listWorkIdentityBindingsForWork(
+                  currentBinding.workId
+              )
+            : []
+        const decisions =
+            this.database.listWorkIdentityDecisionsForComic(id)
+        const probableEvidence =
+            this.database.listWorkIdentityProbableEvidenceForComic(id, 0.94)
+        const relationshipComicIds = new Set<string>([
+            id,
+            ...workBindings.map((binding) => binding.comicId),
+            ...decisions.flatMap((item) => [
+                item.leftComicId,
+                item.rightComicId
+            ]),
+            ...probableEvidence.flatMap((item) => [
+                item.leftComicId,
+                item.rightComicId
+            ])
+        ])
+        const relatedBindings =
+            this.database.listWorkIdentityBindingsByComicIds([
+                ...relationshipComicIds
+            ])
         const bindingByComic = new Map(
-            bindings.map((binding) => [binding.comicId, binding] as const)
+            relatedBindings.map(
+                (binding) => [binding.comicId, binding] as const
+            )
         )
-        const currentBinding = bindingByComic.get(id) ?? null
-        const decisions = this.database.listWorkIdentityDecisions(5000)
         const decisionByPair = new Map(
             decisions.map((item) => [
                 [item.leftComicId, item.rightComicId].sort().join('\u0000'),
@@ -2135,12 +2160,8 @@ export class LibraryService {
         }
 
         if (currentBinding) {
-            for (const binding of bindings) {
-                if (
-                    binding.comicId === id ||
-                    binding.workId !== currentBinding.workId
-                )
-                    continue
+            for (const binding of workBindings) {
+                if (binding.comicId === id) continue
                 add(
                     binding.comicId,
                     binding.editionId &&
@@ -2158,11 +2179,7 @@ export class LibraryService {
         }
 
         for (const decision of decisions) {
-            if (
-                decision.decision === 'KEEP_SEPARATE' ||
-                (decision.leftComicId !== id && decision.rightComicId !== id)
-            )
-                continue
+            if (decision.decision === 'KEEP_SEPARATE') continue
             const otherId =
                 decision.leftComicId === id
                     ? decision.rightComicId
@@ -2176,18 +2193,16 @@ export class LibraryService {
             )
         }
 
-        for (const evidence of this.database.listWorkIdentityEvidence(5000)) {
-            if (
-                evidence.relation !== 'PROBABLE_SAME_WORK' ||
-                Number(evidence.confidence || 0) < 0.94 ||
-                (evidence.leftComicId !== id && evidence.rightComicId !== id)
-            )
-                continue
+        for (const evidence of probableEvidence) {
             const otherId =
                 evidence.leftComicId === id
                     ? evidence.rightComicId
                     : evidence.leftComicId
-            add(otherId, 'PROBABLE_SAME_WORK', Number(evidence.confidence || 0))
+            add(
+                otherId,
+                'PROBABLE_SAME_WORK',
+                Number(evidence.confidence || 0)
+            )
         }
 
         // Work Identity V3 detail funnel:

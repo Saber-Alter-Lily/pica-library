@@ -329,7 +329,11 @@ export class LibraryDatabase {
         }
     }
 
-    private workIdentityBindings(limit: number | null) {
+    private workIdentityBindingRows(
+        whereSql = '',
+        args: Array<string | number> = [],
+        limit: number | null = null
+    ) {
         const sql = `SELECT b.*, c.title AS comic_title,
                             w.preferred_title AS work_title,
                             e.label AS edition_label,
@@ -339,13 +343,14 @@ export class LibraryDatabase {
                      JOIN comics c ON c.id = b.comic_id
                      JOIN canonical_works w ON w.id = b.work_id
                      LEFT JOIN work_editions e ON e.id = b.edition_id
+                     ${whereSql}
                      ORDER BY b.updated_at DESC, b.comic_id`
         const rows =
             limit === null
-                ? (this.db.prepare(sql).all() as SqlRow[])
+                ? (this.db.prepare(sql).all(...args) as SqlRow[])
                 : (this.db
                       .prepare(`${sql} LIMIT ?`)
-                      .all(limit) as SqlRow[])
+                      .all(...args, limit) as SqlRow[])
         return rows.map((row) => ({
             comicId: String(row.comic_id),
             comicTitle: String(row.comic_title ?? ''),
@@ -370,6 +375,10 @@ export class LibraryDatabase {
         }))
     }
 
+    private workIdentityBindings(limit: number | null) {
+        return this.workIdentityBindingRows('', [], limit)
+    }
+
     listWorkIdentityBindings(limit = 5000) {
         const bounded = Math.max(1, Math.min(10000, Math.floor(limit)))
         return this.workIdentityBindings(bounded)
@@ -377,6 +386,56 @@ export class LibraryDatabase {
 
     listAllWorkIdentityBindings() {
         return this.workIdentityBindings(null)
+    }
+
+    getWorkIdentityBinding(comicId: string) {
+        const id = String(comicId ?? '').trim()
+        if (!id) return null
+        return (
+            this.workIdentityBindingRows(
+                'WHERE b.comic_id = ?',
+                [id],
+                1
+            )[0] ?? null
+        )
+    }
+
+    listWorkIdentityBindingsForWork(workId: string) {
+        const id = String(workId ?? '').trim()
+        if (!id) return []
+        return this.workIdentityBindingRows(
+            'WHERE b.work_id = ?',
+            [id],
+            null
+        )
+    }
+
+    listWorkIdentityBindingsByComicIds(comicIds: string[]) {
+        const requested = comicIds
+            .map((comicId) => String(comicId ?? '').trim())
+            .filter(Boolean)
+        if (!requested.length) return []
+
+        const unique = [...new Set(requested)]
+        const byComic = new Map<
+            string,
+            ReturnType<LibraryDatabase['getWorkIdentityBinding']>
+        >()
+        const chunkSize = 400
+        for (let offset = 0; offset < unique.length; offset += chunkSize) {
+            const chunk = unique.slice(offset, offset + chunkSize)
+            const placeholders = chunk.map(() => '?').join(', ')
+            for (const binding of this.workIdentityBindingRows(
+                `WHERE b.comic_id IN (${placeholders})`,
+                chunk,
+                null
+            ))
+                byComic.set(binding.comicId, binding)
+        }
+        return requested.flatMap((comicId) => {
+            const binding = byComic.get(comicId)
+            return binding ? [binding] : []
+        })
     }
 
     private workIdentityMaterializationRun(row: SqlRow) {
@@ -566,20 +625,25 @@ export class LibraryDatabase {
         }
     }
 
-    listWorkIdentityEvidence(limit = 500) {
-        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
-        const rows = this.db
-            .prepare(
-                `SELECT e.*, lc.title AS left_title,
-                        rc.title AS right_title
-                 FROM work_identity_evidence e
-                 JOIN comics lc ON lc.id = e.left_comic_id
-                 JOIN comics rc ON rc.id = e.right_comic_id
-                 ORDER BY e.confidence DESC, e.created_at DESC,
-                          e.left_comic_id, e.right_comic_id
-                 LIMIT ?`
-            )
-            .all(bounded) as SqlRow[]
+    private workIdentityEvidenceRows(
+        whereSql = '',
+        args: Array<string | number> = [],
+        limit: number | null = null
+    ) {
+        const sql = `SELECT e.*, lc.title AS left_title,
+                            rc.title AS right_title
+                     FROM work_identity_evidence e
+                     JOIN comics lc ON lc.id = e.left_comic_id
+                     JOIN comics rc ON rc.id = e.right_comic_id
+                     ${whereSql}
+                     ORDER BY e.confidence DESC, e.created_at DESC,
+                              e.left_comic_id, e.right_comic_id`
+        const rows =
+            limit === null
+                ? (this.db.prepare(sql).all(...args) as SqlRow[])
+                : (this.db
+                      .prepare(`${sql} LIMIT ?`)
+                      .all(...args, limit) as SqlRow[])
         return rows.map((row) => ({
             id: String(row.id),
             leftComicId: String(row.left_comic_id),
@@ -592,6 +656,30 @@ export class LibraryDatabase {
             evidence: jsonObject(row.evidence_json),
             createdAt: String(row.created_at)
         }))
+    }
+
+    listWorkIdentityEvidence(limit = 500) {
+        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
+        return this.workIdentityEvidenceRows('', [], bounded)
+    }
+
+    listWorkIdentityProbableEvidenceForComic(
+        comicId: string,
+        minimumConfidence = 0.94
+    ) {
+        const id = String(comicId ?? '').trim()
+        if (!id) return []
+        const confidence = Math.max(
+            0,
+            Math.min(1, Number(minimumConfidence) || 0)
+        )
+        return this.workIdentityEvidenceRows(
+            `WHERE e.relation = 'PROBABLE_SAME_WORK'
+               AND e.confidence >= ?
+               AND (e.left_comic_id = ? OR e.right_comic_id = ?)`,
+            [confidence, id, id],
+            null
+        )
     }
 
 
@@ -670,19 +758,24 @@ export class LibraryDatabase {
         }
     }
 
-    private workIdentityDecisions(limit: number | null) {
+    private workIdentityDecisionRows(
+        whereSql = '',
+        args: Array<string | number> = [],
+        limit: number | null = null
+    ) {
         const sql = `SELECT d.*, lc.title AS left_title,
                             rc.title AS right_title
                      FROM work_identity_decisions d
                      JOIN comics lc ON lc.id = d.left_comic_id
                      JOIN comics rc ON rc.id = d.right_comic_id
+                     ${whereSql}
                      ORDER BY d.updated_at DESC, d.left_comic_id, d.right_comic_id`
         const rows =
             limit === null
-                ? (this.db.prepare(sql).all() as SqlRow[])
+                ? (this.db.prepare(sql).all(...args) as SqlRow[])
                 : (this.db
                       .prepare(`${sql} LIMIT ?`)
-                      .all(limit) as SqlRow[])
+                      .all(...args, limit) as SqlRow[])
         return rows.map((row) => ({
             id: String(row.id),
             leftComicId: String(row.left_comic_id),
@@ -700,6 +793,10 @@ export class LibraryDatabase {
         }))
     }
 
+    private workIdentityDecisions(limit: number | null) {
+        return this.workIdentityDecisionRows('', [], limit)
+    }
+
     listWorkIdentityDecisions(limit = 500) {
         const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
         return this.workIdentityDecisions(bounded)
@@ -707,6 +804,16 @@ export class LibraryDatabase {
 
     listAllWorkIdentityDecisions() {
         return this.workIdentityDecisions(null)
+    }
+
+    listWorkIdentityDecisionsForComic(comicId: string) {
+        const id = String(comicId ?? '').trim()
+        if (!id) return []
+        return this.workIdentityDecisionRows(
+            'WHERE d.left_comic_id = ? OR d.right_comic_id = ?',
+            [id, id],
+            null
+        )
     }
 
     recordUserEvent(input: UserEventInput): UserEvent {

@@ -71,7 +71,7 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         for(Map.Entry<String,WorkInfo> row:legacy.entrySet()){
             MobileTaskRegistryStore.DownloadRef ref=legacyRefs.get(row.getKey());
             WorkInfo info=row.getValue();
-            if(active(info)||paused(ref)){
+            if(active(info)||paused(context,ref)){
                 MobileTaskRegistryStore.registerDownload(context,ref.provider,ref.comicId,ref.episodeId,info.getId());
                 refs.put(ref.key(),new MobileTaskRegistryStore.DownloadRef(ref.provider,ref.comicId,ref.episodeId,info.getId().toString()));
             }

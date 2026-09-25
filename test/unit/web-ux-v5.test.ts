@@ -124,17 +124,15 @@ describe('V5 Web UX audit contract', () => {
         )
     })
 
-    it('coalesces dynamic DOM polish instead of rerunning on every mutation', () => {
+    it('coalesces dynamic DOM polish inside its owning views', () => {
         const polish = read('web/ui-polish-v5.js')
-        expect(polish).toContain('let polishQueued = false')
+        expect(polish).toContain('let settingsPolishQueued = false')
+        expect(polish).toContain('let downloadsPolishQueued = false')
         expect(polish).toContain('requestAnimationFrame(() => {')
-        expect(polish).toContain('scheduleDynamicPolish()')
-        const observerBody =
-            /const bodyObserver = new MutationObserver\(\(\) => \{([\s\S]*?)\n    \}\)/.exec(
-                polish
-            )?.[1] ?? ''
-        expect(observerBody).toContain('scheduleDynamicPolish()')
-        expect(observerBody).not.toContain('installExperimentHub()')
+        expect(polish).toContain('scheduleSettingsPolish')
+        expect(polish).toContain('scheduleDownloadsPolish')
+        expect(polish).not.toContain('const bodyObserver = new MutationObserver')
+        expect(polish).not.toContain('scheduleDynamicPolish()')
     })
 
     it('keeps connection probes explicit and avoids duplicate update polling', () => {
@@ -204,8 +202,9 @@ describe('V5 Web UX audit contract', () => {
         expect(product).toContain(
             'const observer = new MutationObserver(scheduleSourceCleanup)'
         )
-        expect(polish).toContain('let polishQueued = false')
-        expect(polish).toContain('scheduleDynamicPolish()')
+        expect(polish).toContain('let settingsPolishQueued = false')
+        expect(polish).toContain('let downloadsPolishQueued = false')
+        expect(polish).not.toContain('scheduleDynamicPolish()')
     })
 
     it('uses app-native confirmation and prompt dialogs for ordinary web flows', () => {
@@ -271,6 +270,27 @@ describe('V5 Web UX audit contract', () => {
         expect(hub).toContain('let queued = false')
         expect(hub).toContain('const observer = new MutationObserver(schedule)')
         expect(hub).toContain('requestAnimationFrame(() => {')
+    })
+
+    it('scopes UX polish observers to their owning views', () => {
+        const polish = read('web/ui-polish-v5.js')
+        expect(polish).not.toContain('bodyObserver.observe(document.body')
+        expect(polish).not.toContain(
+            'document.body, { childList: true, subtree: true }'
+        )
+        expect(polish).toContain(
+            'new MutationObserver(scheduleSettingsPolish).observe(settings'
+        )
+        expect(polish).toContain(
+            'new MutationObserver(scheduleDownloadsPolish).observe(downloads'
+        )
+        expect(polish).toContain("const settings = ux$('#settings')")
+        expect(polish).toContain("const downloads = ux$('#downloads')")
+        expect(polish).toContain(
+            "body.dataset.uxDialogBackdropDelegation = '1'"
+        )
+        expect(polish).toContain("body.addEventListener('click'")
+        expect(polish).not.toContain("dialog.addEventListener('click'")
     })
 
     it('uses one-step import and guards long Desktop operations', () => {

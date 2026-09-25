@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F5 merged; F6 scoped Settings Hub observer candidate; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1–F6 merged; F7 incremental onboarding observer candidate; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,17 +1001,19 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F5 merged; F6 scoped Settings Hub observer candidate**
+**Status: IN_PROGRESS — F1–F6 merged; F7 incremental onboarding observer candidate**
 
 - **F1 merged (PR #138):** remove redundant Theme idle polling.
 - **F2 merged (PR #139):** scope UX polish observers to Settings/Downloads and delegate dialog backdrop handling.
 - **F3 merged (PR #140):** give each selection-status stream one matching render authority.
 - **F4 merged (PR #141):** make v0.4 parity tag/detail mutation processing incremental and animation-frame coalesced.
 - **F5 merged (PR #142):** keep Product's one-time source-entry cleanup, but make dynamic cleanup process only mutation-added subtrees instead of rescanning all links/buttons.
-- **F6 implemented:** Settings Hub no longer watches the entire document body. Its coalesced observer now watches only the hidden `#settings` source root where Product Appearance/Support/Personalization panels are dynamically created before Hub relocation.
-- The static top-header language control is still moved explicitly during Hub construction; it does not require a permanent body observer.
-- **Next after F6:** audit onboarding's full-body target scan and Visual QC's body observer, then inventory persistent backend pollers by owner/start/stop lifecycle.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F6.md`.
+- **F6 merged (PR #143):** scope the Settings Hub observer to the legacy `#settings` source root instead of the full body.
+- **F7 implemented:** onboarding keeps one bootstrap/full-tour target scan, but dynamic body mutations now collect only added subtrees, coalesce one animation-frame pass, and mark tour targets only within those roots.
+- The Help & Onboarding Settings panel is rechecked only when an added subtree is/contains `#a87-general-panel`, not after every application mutation.
+- Onboarding step order, prompt policy, dismissal/completion state and driver.js behavior are unchanged.
+- **Next after F7:** audit Visual QC's body observer, then inventory persistent backend pollers and onboarding welcome retry lifecycle by explicit owner/start/stop conditions.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F6.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F7.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1025,6 +1027,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F7 incremental onboarding mutation processing
+
+State update:
+- onboarding-v1.js previously observed the complete body subtree and, after any child mutation, reran all 12 tour-target document queries plus the Settings-panel existence check.
+- F7 promotes the tour selectors into one TOUR_TARGETS registry and makes markTourTargets(root = document) root-aware.
+- The body observer now consumes mutation.addedNodes, accumulates unique roots in a Set and performs one requestAnimationFrame pass over those roots.
+- The Help & Onboarding Settings panel is marked dirty only when an added subtree is/contains #a87-general-panel.
+- Full-document target marking remains for bootstrap and explicit tour start/replay authority.
+- Onboarding steps, target selectors, prompt/dismiss/completion semantics, driver.js integration and language behavior are unchanged.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F7.md.
 
 ## 2026-09-24 — P2-F6 scoped Settings Hub observer
 

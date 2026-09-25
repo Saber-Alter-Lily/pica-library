@@ -42,23 +42,32 @@ function openSettingsPanel(id = 'general') {
     const tab = document.querySelector(`#a87-${id}-tab`)
     tab?.click()
 }
-function markTourTargets() {
-    const targets = [
-        ['nav [data-view="library"]','library-nav'],
-        ['#filter-text','library-filter'],
-        ['nav [data-view="discover"]','discover-nav'],
-        ['#recommend-button','recommend-run'],
-        ['nav [data-view="maintenance"]','settings-nav'],
-        ['#a87-recommendations-tab','recommend-settings-tab'],
-        ['#settings-recommendation-v5, #settings-recommendation-v4','recommend-settings'],
-        ['#a87-connections-tab','connections-tab'],
-        ['#settings-mobile-bridge','mobile-bridge'],
-        ['#a87-general-tab','general-tab'],
-        ['#a87-language-panel','language-panel'],
-        ['#a87-software-tab','software-tab']
-    ]
-    for (const [selector,name] of targets)
-        document.querySelector(selector)?.setAttribute('data-tour', name)
+const TOUR_TARGETS = [
+    ['nav [data-view="library"]', 'library-nav'],
+    ['#filter-text', 'library-filter'],
+    ['nav [data-view="discover"]', 'discover-nav'],
+    ['#recommend-button', 'recommend-run'],
+    ['nav [data-view="maintenance"]', 'settings-nav'],
+    ['#a87-recommendations-tab', 'recommend-settings-tab'],
+    [
+        '#settings-recommendation-v5, #settings-recommendation-v4',
+        'recommend-settings'
+    ],
+    ['#a87-connections-tab', 'connections-tab'],
+    ['#settings-mobile-bridge', 'mobile-bridge'],
+    ['#a87-general-tab', 'general-tab'],
+    ['#a87-language-panel', 'language-panel'],
+    ['#a87-software-tab', 'software-tab']
+]
+
+function targetWithin(root, selector) {
+    if (root instanceof Element && root.matches(selector)) return root
+    return root?.querySelector?.(selector) || null
+}
+
+function markTourTargets(root = document) {
+    for (const [selector, name] of TOUR_TARGETS)
+        targetWithin(root, selector)?.setAttribute('data-tour', name)
 }
 
 function welcomeCopy() {
@@ -315,14 +324,38 @@ function renderSettingsPanel() {
 
 function installObserver() {
     let queued = false
-    const observer = new MutationObserver(() => {
+    let settingsPanelDirty = false
+    const pendingRoots = new Set()
+    const schedule = () => {
         if (queued) return
         queued = true
         requestAnimationFrame(() => {
             queued = false
-            markTourTargets()
-            if (!document.querySelector('#a89-onboarding-panel')) ensureSettingsPanel()
+            const roots = [...pendingRoots]
+            pendingRoots.clear()
+            for (const root of roots) markTourTargets(root)
+            if (
+                settingsPanelDirty &&
+                !document.querySelector('#a89-onboarding-panel')
+            )
+                ensureSettingsPanel()
+            settingsPanelDirty = false
         })
+    }
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations)
+            for (const node of mutation.addedNodes) {
+                const root =
+                    node instanceof Element ? node : node.parentElement
+                if (!root) continue
+                pendingRoots.add(root)
+                if (
+                    root.id === 'a87-general-panel' ||
+                    root.querySelector?.('#a87-general-panel')
+                )
+                    settingsPanelDirty = true
+            }
+        if (pendingRoots.size || settingsPanelDirty) schedule()
     })
     observer.observe(document.body, { childList: true, subtree: true })
 }

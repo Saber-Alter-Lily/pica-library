@@ -196,21 +196,21 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(registry).toContain('static synchronized void registerDownload(')
         expect(registry).toContain('static synchronized List<DownloadRef> downloads(')
 
-        expect(taskCenter).toContain('private WorkInfo currentWork(')
+        expect(taskCenter).toContain('static WorkInfo currentWork(Context context,')
         expect(taskCenter).toContain(
-            'MobileTaskRegistryStore.workId(this,scope,id)'
+            'MobileTaskRegistryStore.workId(context,scope,id)'
         )
         expect(taskCenter).toContain(
             'value.getId().toString().equals(expected)'
         )
         expect(taskCenter).toContain(
-            'private List<DownloadView> reconstructDownloads('
+            'static List<DownloadView> reconstructDownloads(Context context,'
         )
         expect(taskCenter).toContain(
-            'MobileTaskRegistryStore.downloads(this)'
+            'MobileTaskRegistryStore.downloads(context)'
         )
         expect(taskCenter).toContain(
-            'MobileTaskRegistryStore.registerDownload(this'
+            'MobileTaskRegistryStore.registerDownload(context'
         )
         expect(taskCenter).not.toContain(
             'values.get(values.size()-1)'
@@ -274,6 +274,33 @@ describe('v0.4.7 long-task stability contract', () => {
         )
         expect(recovery).toContain('.setInitialDelay(1,TimeUnit.DAYS)')
         expect(recovery).toContain('@LooperMode(LooperMode.Mode.PAUSED)')
+    })
+
+    it('keeps an emulator force-stop recovery gate for G15', () => {
+        const gradle = read('mobile/android-alpha2/app/build.gradle')
+        const recovery = read(
+            'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/WorkManagerProcessRecoveryInstrumentedTest.java'
+        )
+        const runner = read('scripts/run-android-worker-recovery.sh')
+        const workflow = read('.github/workflows/android-worker-recovery.yml')
+
+        expect(gradle).toContain(
+            "testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'"
+        )
+        expect(recovery).toContain('a_seedRecoveryState')
+        expect(recovery).toContain('b_verifyRecoveryAfterForceStop')
+        expect(recovery).toContain(
+            'TaskCenterActivity.reconstructDownloads(app,visibleHistory)'
+        )
+        expect(recovery).toContain(
+            'TaskCenterActivity.currentWork(app,singletonHistory'
+        )
+        expect(runner).toContain('am force-stop')
+        expect(runner).toContain('a_seedRecoveryState')
+        expect(runner).toContain('b_verifyRecoveryAfterForceStop')
+        expect(workflow).toContain(
+            'ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d'
+        )
     })
 
     it('retains mature Desktop download and Android updater controls', () => {

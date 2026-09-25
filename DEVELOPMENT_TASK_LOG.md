@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F9 merged; F10 single recommendation status authority candidate; hidden-tab/remaining poller audit remains open**
+**Status: IN_PROGRESS — F1–F10 merged; F11 event-driven onboarding readiness candidate; hidden-tab/browser evidence remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,17 +1001,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F9 merged; F10 single Recommendation status authority candidate**
+**Status: IN_PROGRESS — F1–F10 merged; F11 event-driven Onboarding readiness candidate**
 
 - **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or processed incrementally/coalesced.
-- **F9 merged (PR #146):** persistent pollers were inventoried and WebDAV progress now reattaches after page reload, self-terminates at backend terminal state, and protects the local start race.
-- **F10 duplicate authority identified:** during explicit Recommendation build/rebuild, Theme Help polls final-cycle status every 500 ms for progress/control UI while `app.js::waitForFinalCycle()` independently polled the same endpoint every second only to detect completion.
-- **F10 implemented:** Theme Help remains the normal recurring poll authority and publishes each already-fetched final-cycle status through the internal `pica-recommendation-status` document event.
-- App consumes that signal for failure/completion detection, resets stale snapshots before each build handoff, waits up to 750 ms for the first Theme status, treats signals as fresh for 1500 ms, and performs a direct status request only when the Theme signal is absent/stale.
-- App explicitly dispatches `pica-recommendation-watch` only after the backend has accepted a build that requires waiting, closing the existing capture-click startup race while preserving immediate Theme feedback.
-- The existing 120-second build timeout, force-new cycle identity check, progress UI, pause/resume/cancel controls and managed batch switch remain unchanged.
-- **Next after F10:** audit hidden/background-tab behavior and onboarding readiness retry lifetime; change only pollers that outlive their UI/task authority.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md`, and `docs/FRONTEND_POLLER_DISCIPLINE_P2F10.md`.
+- **F9 merged (PR #146):** WebDAV progress reattaches after reload and has explicit terminal/start/page lifecycle ownership.
+- **F10 merged (PR #147):** Theme Help is the normal Recommendation final-cycle poll authority; App consumes its local status signal with bounded fallback instead of running a parallel fixed poll loop.
+- **F11 implemented:** remove Onboarding's recursive 500 ms readiness retry while preserving the existing 650 ms initial check.
+- Setup readiness is now observed only on `#setup` class/hidden/style changes; disclaimer mount/unmount reuses the existing incremental Onboarding body observer; visibility restoration performs one readiness check.
+- Once the welcome is shown or `shouldPrompt()` becomes false, F11 clears the pending timeout, disconnects the Setup observer and removes the visibility listener.
+- First-run conditions, disclaimer gating, Setup gating, onboarding state/version rules, step order and driver.js behavior are unchanged.
+- **Next after F11:** audit hidden/background-tab behavior for task-owned pollers and collect browser traces. Only pause/defer purely presentational work where visibility loss does not weaken task control or recovery.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, plus `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md`, `P2F10.md`, and `P2F11.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1025,6 +1025,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F11 event-driven Onboarding readiness
+
+State update:
+- onboarding-v1.js previously waited 650 ms once and then retried promptWelcomeIfNeeded() every 500 ms until the App became ready or onboarding was no longer needed.
+- A user remaining on Setup or leaving the disclaimer open could therefore keep a page-local readiness timer running indefinitely without any readiness change.
+- F11 removes the recursive retry loop. It keeps one 650 ms initial check, observes only #setup class/hidden/style readiness changes, reuses the existing Onboarding body observer for disclaimer gate mount/unmount, and checks once when the document becomes visible again.
+- At most one readiness timeout is pending. Showing the welcome or making shouldPrompt() false clears the timeout, disconnects the Setup observer and removes the visibility listener.
+- writeState() also stops readiness watching immediately when a user choice makes auto-prompting unnecessary.
+- Onboarding prompt criteria, state/version semantics, disclaimer/Setup gates, target steps, copy and driver.js integration are unchanged.
+- Detailed boundary: docs/FRONTEND_POLLER_DISCIPLINE_P2F11.md.
 
 ## 2026-09-24 — P2-F10 single Recommendation status poll authority
 

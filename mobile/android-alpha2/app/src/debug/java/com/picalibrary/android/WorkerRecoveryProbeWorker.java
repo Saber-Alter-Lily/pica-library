@@ -17,6 +17,7 @@ public final class WorkerRecoveryProbeWorker extends Worker {
     static final String UNIQUE_NAME = "p2-g15-running-probe";
     static final String PREFS = "p2-g15-worker-recovery";
     static final String KEY_RUN_COUNT = "probeRunCount";
+    static final String RUN_COUNT_FILE = "p2-g15-probe-run-count";
 
     public WorkerRecoveryProbeWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -28,6 +29,17 @@ public final class WorkerRecoveryProbeWorker extends Worker {
             .getInt(KEY_RUN_COUNT, 0) + 1;
         app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putInt(KEY_RUN_COUNT, runCount).commit();
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(
+            new java.io.File(app.getFilesDir(), RUN_COUNT_FILE), false
+        )) {
+            out.write((Integer.toString(runCount) + "\n")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.getFD().sync();
+        } catch (java.io.IOException e) {
+            return Result.failure(new Data.Builder()
+                .putString("phase", "P2-G15 probe marker write failed")
+                .build());
+        }
         setProgressAsync(new Data.Builder()
             .putString("phase", "P2-G15 RUNNING")
             .putInt("runCount", runCount)

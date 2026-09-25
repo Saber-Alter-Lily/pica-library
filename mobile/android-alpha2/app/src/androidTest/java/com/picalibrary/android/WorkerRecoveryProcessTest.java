@@ -42,6 +42,8 @@ public final class WorkerRecoveryProcessTest {
     private static final String KEY_PICA_ACTIVE = "picaActiveWorkId";
     private static final String KEY_EH_PAUSED = "ehPausedWorkId";
     private static final String KEY_PICA_CANCELLED = "picaCancelledWorkId";
+    private static final String KEY_PROBE = "probeWorkId";
+    private static final String READY_FILE = "p2-g14-ready";
 
     private static final String PICA_ACTIVE_COMIC = "g14pactive";
     private static final String PICA_CANCELLED_COMIC = "g14pcancel";
@@ -51,7 +53,7 @@ public final class WorkerRecoveryProcessTest {
         return InstrumentationRegistry.getInstrumentation().getTargetContext().getApplicationContext();
     }
 
-    @Test public void seedDurableRecoveryState() throws Exception {
+    @Test public void seedDurableRecoveryStateAndAwaitForceStop() throws Exception {
         Context app = app();
         WorkManager manager = WorkManager.getInstance(app);
         manager.cancelAllWork().getResult().get(10, TimeUnit.SECONDS);
@@ -115,6 +117,11 @@ public final class WorkerRecoveryProcessTest {
         assertTrue(EhDownloadJobs.paused(app, EH_PAUSED_COMIC));
         assertNotNull(downloadRef(app, "eh", EH_PAUSED_COMIC, ""));
 
+        OneTimeWorkRequest probe = new OneTimeWorkRequest.Builder(WorkerRecoveryProbeWorker.class).build();
+        enqueueUnique(manager, WorkerRecoveryProbeWorker.UNIQUE_NAME, probe);
+        awaitState(manager, probe.getId(), WorkInfo.State.RUNNING);
+        awaitProbeRuns(app, 1);
+
         boolean committed = app.getSharedPreferences(HARNESS_PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_SEED_PID, Process.myPid())
             .putString(KEY_FAVORITE, favorite.getId().toString())
@@ -123,6 +130,7 @@ public final class WorkerRecoveryProcessTest {
             .putString(KEY_PICA_ACTIVE, picaActive.getId().toString())
             .putString(KEY_EH_PAUSED, ehPaused.getId().toString())
             .putString(KEY_PICA_CANCELLED, picaCancelled.getId().toString())
+            .putString(KEY_PROBE, probe.getId().toString())
             .commit();
         assertTrue(committed);
 
@@ -132,6 +140,17 @@ public final class WorkerRecoveryProcessTest {
             .edit().putLong("g14-flush", System.nanoTime()).commit());
         assertTrue(app.getSharedPreferences("background-task-pauses-v1", Context.MODE_PRIVATE)
             .edit().putLong("g14-flush", System.nanoTime()).commit());
+
+        java.io.File ready = new java.io.File(app.getFilesDir(), READY_FILE);
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(ready, false)) {
+            out.write(("READY pid=" + Process.myPid() + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.getFD().sync();
+        }
+
+        // The host-side harness force-stops the target package while this instrumentation process
+        // and WorkerRecoveryProbeWorker are both alive. Reaching this latch normally is a failure:
+        // the process is expected to disappear underneath the test.
+        new java.util.concurrent.CountDownLatch(1).await();
     }
 
     @Test public void verifyDurableRecoveryStateAfterForceStop() throws Exception {
@@ -148,6 +167,7 @@ public final class WorkerRecoveryProcessTest {
         UUID picaActiveId = storedUuid(app, KEY_PICA_ACTIVE);
         UUID ehPausedId = storedUuid(app, KEY_EH_PAUSED);
         UUID picaCancelledId = storedUuid(app, KEY_PICA_CANCELLED);
+        UUID probeId = storedUuid(app, KEY_PROBE);
 
         assertEquals(favoriteId.toString(), MobileTaskRegistryStore.workId(app, "favorite-import", FavoriteImportJobs.UNIQUE_NAME));
         assertTrue(FavoriteImportJobs.paused(app));
@@ -174,10 +194,18 @@ public final class WorkerRecoveryProcessTest {
         assertFalse(PicaDownloadJobs.paused(app, PICA_CANCELLED_COMIC, ""));
         assertEquals(WorkInfo.State.CANCELLED, workInfo(manager, picaCancelledId).getState());
 
+        awaitProbeRuns(app, 2);
+        WorkInfo probeInfo = workInfo(manager, probeId);
+        assertFalse("force-stopped RUNNING work must be reconstructed as unfinished work", probeInfo.getState().isFinished());
+
         String taskCenterText = awaitTaskCenterText();
         assertEquals("active Pica download must reconstruct exactly once", 1, occurrences(taskCenterText, PICA_ACTIVE_COMIC));
         assertEquals("paused E-H download must reconstruct exactly once", 1, occurrences(taskCenterText, EH_PAUSED_COMIC));
         assertEquals("explicitly cancelled download history must not resurrect", 0, occurrences(taskCenterText, PICA_CANCELLED_COMIC));
+
+        manager.cancelUniqueWork(WorkerRecoveryProbeWorker.UNIQUE_NAME)
+            .getResult().get(10, TimeUnit.SECONDS);
+        awaitState(manager, probeId, WorkInfo.State.CANCELLED);
     }
 
     private static void verifyTerminalIdentityCleanup(Context app) {
@@ -254,6 +282,18 @@ public final class WorkerRecoveryProcessTest {
             Thread.sleep(100L);
         }
         fail("WorkInfo " + id + " expected " + expected + " but was " + (value == null ? "null" : value.getState()));
+    }
+
+    private static void awaitProbeRuns(Context app, int expected) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        int observed = 0;
+        while (System.nanoTime() < deadline) {
+            observed = app.getSharedPreferences(WorkerRecoveryProbeWorker.PREFS, Context.MODE_PRIVATE)
+                .getInt(WorkerRecoveryProbeWorker.KEY_RUN_COUNT, 0);
+            if (observed >= expected) return;
+            Thread.sleep(100L);
+        }
+        fail("probe expected runCount >= " + expected + " but was " + observed);
     }
 
     private static UUID storedUuid(Context app, String key) {

@@ -4,7 +4,7 @@ import android.content.Context;
 
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
-import androidx.work.WorkRequest;
+import androidx.work.OneTimeWorkRequest;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +41,9 @@ final class AndroidTaskResources {
 
     private AndroidTaskResources(){}
 
-    static <B extends WorkRequest.Builder<?,?>> B tag(B builder,String...resources){
+    static OneTimeWorkRequest.Builder tag(
+        OneTimeWorkRequest.Builder builder,String...resources
+    ){
         if(builder==null)return null;
         if(resources!=null)for(String resource:resources){
             if(resource==null||resource.trim().isEmpty())continue;

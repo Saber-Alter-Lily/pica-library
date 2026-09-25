@@ -11,5 +11,9 @@
         <activity
             android:name=".BackgroundRestrictionSeedActivity"
             android:exported="true" />
+        <!-- Debug-only P2-G17 ADB resource-overlap snapshot collector. -->
+        <activity
+            android:name=".AndroidResourceObservationActivity"
+            android:exported="true" />
     </application>
 </manifest>

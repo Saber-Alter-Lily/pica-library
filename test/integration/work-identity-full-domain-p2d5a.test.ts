@@ -83,9 +83,28 @@ describe('P2 D5A authoritative Work Identity domains', () => {
 
         expect(database.listWorkIdentityBindings(10000)).toHaveLength(10000)
         expect(database.listAllWorkIdentityBindings()).toHaveLength(10001)
+        expect(database.getWorkIdentityBinding('comic-10000')).toMatchObject({
+            comicId: 'comic-10000',
+            workId: 'work-all'
+        })
+        expect(database.listWorkIdentityBindingsForWork('work-all')).toHaveLength(
+            10001
+        )
+        expect(
+            database
+                .listWorkIdentityBindingsByComicIds([
+                    'comic-10000',
+                    'missing',
+                    'comic-0'
+                ])
+                .map((item) => item.comicId)
+        ).toEqual(['comic-10000', 'comic-0'])
 
         expect(database.listWorkIdentityDecisions(5000)).toHaveLength(5000)
         expect(database.listAllWorkIdentityDecisions()).toHaveLength(5001)
+        expect(
+            database.listWorkIdentityDecisionsForComic('comic-0')
+        ).toHaveLength(5001)
         database.close()
     })
 

@@ -452,6 +452,59 @@ function recordRecommendationEvent(eventType, payload = {}) {
     }).catch(() => undefined)
 }
 
+const recommendationImpressionQueue = []
+let recommendationImpressionFlushTimer = null
+
+function flushRecommendationImpressions() {
+    if (recommendationImpressionFlushTimer) {
+        window.clearTimeout(recommendationImpressionFlushTimer)
+        recommendationImpressionFlushTimer = null
+    }
+    if (!recommendationImpressionQueue.length) return
+    const events = recommendationImpressionQueue.splice(0, 24)
+    if (state.mode === 'connected') {
+        void api('/api/v1/recommendation-events/batch', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ events }),
+            keepalive: true
+        }).catch(() => undefined)
+    }
+    if (recommendationImpressionQueue.length)
+        recommendationImpressionFlushTimer = window.setTimeout(
+            flushRecommendationImpressions,
+            25
+        )
+}
+
+function queueRecommendationImpression(payload = {}) {
+    if (state.mode !== 'connected') return
+    const value = {
+        eventType: 'recommend_impression',
+        occurredAt: new Date().toISOString(),
+        appSessionId: state.appSessionId,
+        recommendationCycleId: state.recommendationCycleId,
+        ...payload
+    }
+    recommendationImpressionQueue.push({
+        ...value,
+        contextId:
+            payload.contextId || state.recommendationContextId || null
+    })
+    if (recommendationImpressionQueue.length >= 24)
+        return flushRecommendationImpressions()
+    if (!recommendationImpressionFlushTimer)
+        recommendationImpressionFlushTimer = window.setTimeout(
+            flushRecommendationImpressions,
+            25
+        )
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden')
+        flushRecommendationImpressions()
+})
+
 const mutate = (path, method, value = {}) =>
     api(path, {
         method,
@@ -1868,7 +1921,7 @@ function observeRecommendationImpressions() {
                 if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
                     const timer = window.setTimeout(() => {
                         const rank = Number(card.dataset.resultRank || 0)
-                        recordRecommendationEvent('recommend_impression', {
+                        queueRecommendationImpression({
                             comicId: card.dataset.comicId,
                             contextId: state.recommendationContextId,
                             recommendationCycleId: state.recommendationCycleId,

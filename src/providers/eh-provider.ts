@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { Episode, Picture } from '../types'
 import { safeRasterContentType, trustedCoverUrl } from '../library/cover-url'
@@ -358,6 +359,18 @@ export class EhProvider implements ComicProvider {
 
     setSession(session?: EhSession | null) {
         this.session = session ? normalizeEhSession(session) : null
+    }
+
+    cachePartitionKey() {
+        const identity = this.session
+            ? [
+                  this.session.memberId,
+                  this.session.passHash,
+                  this.session.igneous ?? '',
+                  this.session.cfClearance ?? ''
+              ].join('\n')
+            : 'anonymous'
+        return createHash('sha256').update(identity).digest('hex')
     }
 
     hasSession() {

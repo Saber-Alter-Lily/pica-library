@@ -330,8 +330,13 @@ describe('v0.4.7 long-task stability contract', () => {
             'explicitly cancelled download history must not resurrect'
         )
         expect(probe).toContain('while (!isStopped()) Thread.sleep(200L)')
+        expect(probe).toContain('RUN_COUNT_FILE = "p2-g15-probe-run-count"')
         expect(runner).toContain('files/p2-g15-ready')
         expect(runner).toContain('adb shell am force-stop "$TARGET_PACKAGE"')
+        expect(runner).toContain(
+            'adb shell monkey -p "$TARGET_PACKAGE" -c android.intent.category.LAUNCHER 1'
+        )
+        expect(runner).toContain('probe_run_count >= 2')
         expect(workflow).toContain('ReactiveCircus/android-emulator-runner@v2')
     })
 

@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** One task surface for lifecycle-independent import, download, Pica bootstrap and recommendation jobs. */
 public final class TaskCenterActivity extends LocaleAwareActivity {
-    private static final class DownloadView {
+    static final class DownloadView {
         final MobileTaskRegistryStore.DownloadRef ref;
         final WorkInfo info;
         DownloadView(MobileTaskRegistryStore.DownloadRef ref,WorkInfo info){this.ref=ref;this.info=info;}
@@ -30,29 +31,29 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         List<WorkInfo> picaDownloads=manager.getWorkInfosByTag("pica-download").get(5,TimeUnit.SECONDS);
         List<WorkInfo> ehDownloads=manager.getWorkInfosByTag("eh-download").get(5,TimeUnit.SECONDS);
         ArrayList<WorkInfo> downloadInfos=new ArrayList<>();downloadInfos.addAll(picaDownloads);downloadInfos.addAll(ehDownloads);
-        List<DownloadView> downloads=reconstructDownloads(downloadInfos);
-        WorkInfo favorite=currentWork(manager.getWorkInfosForUniqueWork(FavoriteImportJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"favorite-import",FavoriteImportJobs.UNIQUE_NAME);
-        WorkInfo bootstrap=currentWork(manager.getWorkInfosForUniqueWork(PicaBootstrapJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"pica-bootstrap",PicaBootstrapJobs.UNIQUE_NAME);
-        WorkInfo recommendation=currentWork(manager.getWorkInfosForUniqueWork(NativeRecommendationJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"recommendation",NativeRecommendationJobs.UNIQUE_NAME);
+        List<DownloadView> downloads=reconstructDownloads(this,downloadInfos);
+        WorkInfo favorite=currentWork(this,manager.getWorkInfosForUniqueWork(FavoriteImportJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"favorite-import",FavoriteImportJobs.UNIQUE_NAME);
+        WorkInfo bootstrap=currentWork(this,manager.getWorkInfosForUniqueWork(PicaBootstrapJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"pica-bootstrap",PicaBootstrapJobs.UNIQUE_NAME);
+        WorkInfo recommendation=currentWork(this,manager.getWorkInfosForUniqueWork(NativeRecommendationJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"recommendation",NativeRecommendationJobs.UNIQUE_NAME);
         runOnUiThread(()->show(downloads,favorite,bootstrap,recommendation));
     }catch(Exception ignored){}finally{refreshInFlight.set(false);}});}
 
-    private WorkInfo currentWork(List<WorkInfo> values,String scope,String id){
-        String expected=MobileTaskRegistryStore.workId(this,scope,id);
+    static WorkInfo currentWork(Context context,List<WorkInfo> values,String scope,String id){
+        String expected=MobileTaskRegistryStore.workId(context,scope,id);
         if(expected!=null&&!expected.isEmpty())for(WorkInfo value:values)if(value.getId().toString().equals(expected))return value;
         for(WorkInfo value:values)if(active(value)){
-            MobileTaskRegistryStore.setWorkId(this,scope,id,value.getId());
+            MobileTaskRegistryStore.setWorkId(context,scope,id,value.getId());
             return value;
         }
         return null;
     }
 
-    private List<DownloadView> reconstructDownloads(List<WorkInfo> infos){
+    static List<DownloadView> reconstructDownloads(Context context,List<WorkInfo> infos){
         LinkedHashMap<String,WorkInfo> byId=new LinkedHashMap<>();
         for(WorkInfo info:infos)byId.put(info.getId().toString(),info);
 
         LinkedHashMap<String,MobileTaskRegistryStore.DownloadRef> refs=new LinkedHashMap<>();
-        for(MobileTaskRegistryStore.DownloadRef ref:MobileTaskRegistryStore.downloads(this))refs.put(ref.key(),ref);
+        for(MobileTaskRegistryStore.DownloadRef ref:MobileTaskRegistryStore.downloads(context))refs.put(ref.key(),ref);
 
         LinkedHashMap<String,WorkInfo> legacy=new LinkedHashMap<>();
         LinkedHashMap<String,MobileTaskRegistryStore.DownloadRef> legacyRefs=new LinkedHashMap<>();
@@ -71,7 +72,7 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
             MobileTaskRegistryStore.DownloadRef ref=legacyRefs.get(row.getKey());
             WorkInfo info=row.getValue();
             if(active(info)||paused(ref)){
-                MobileTaskRegistryStore.registerDownload(this,ref.provider,ref.comicId,ref.episodeId,info.getId());
+                MobileTaskRegistryStore.registerDownload(context,ref.provider,ref.comicId,ref.episodeId,info.getId());
                 refs.put(ref.key(),new MobileTaskRegistryStore.DownloadRef(ref.provider,ref.comicId,ref.episodeId,info.getId().toString()));
             }
         }
@@ -79,17 +80,17 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         ArrayList<DownloadView> out=new ArrayList<>();
         for(MobileTaskRegistryStore.DownloadRef ref:refs.values()){
             WorkInfo info=byId.get(ref.workId);
-            boolean paused=paused(ref);
+            boolean paused=paused(context,ref);
             if(info==null&&!paused){
-                MobileTaskRegistryStore.unregisterDownload(this,ref.provider,ref.comicId,ref.episodeId);
+                MobileTaskRegistryStore.unregisterDownload(context,ref.provider,ref.comicId,ref.episodeId);
                 continue;
             }
             if(info!=null&&info.getState()==WorkInfo.State.SUCCEEDED){
-                MobileTaskRegistryStore.unregisterDownload(this,ref.provider,ref.comicId,ref.episodeId);
+                MobileTaskRegistryStore.unregisterDownload(context,ref.provider,ref.comicId,ref.episodeId);
                 continue;
             }
             if(info!=null&&info.getState()==WorkInfo.State.CANCELLED&&!paused){
-                MobileTaskRegistryStore.unregisterDownload(this,ref.provider,ref.comicId,ref.episodeId);
+                MobileTaskRegistryStore.unregisterDownload(context,ref.provider,ref.comicId,ref.episodeId);
                 continue;
             }
             out.add(new DownloadView(ref,info));
@@ -97,7 +98,7 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         return out;
     }
 
-    private MobileTaskRegistryStore.DownloadRef downloadRef(WorkInfo info){
+    private static MobileTaskRegistryStore.DownloadRef downloadRef(WorkInfo info){
         Set<String> tags=info.getTags();
         boolean eh=tags.contains("eh-download"),pica=tags.contains("pica-download");
         if(!eh&&!pica)return null;
@@ -107,10 +108,10 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         return new MobileTaskRegistryStore.DownloadRef(eh?"eh":"pica",comic,episode,info.getId().toString());
     }
 
-    private boolean paused(MobileTaskRegistryStore.DownloadRef ref){
+    private static boolean paused(Context context,MobileTaskRegistryStore.DownloadRef ref){
         return "eh".equals(ref.provider)
-            ?EhDownloadJobs.paused(this,ref.comicId)
-            :PicaDownloadJobs.paused(this,ref.comicId,ref.episodeId);
+            ?EhDownloadJobs.paused(context,ref.comicId)
+            :PicaDownloadJobs.paused(context,ref.comicId,ref.episodeId);
     }
     private void show(List<DownloadView> downloads,WorkInfo favorite,WorkInfo picaSync,WorkInfo rec){
         if(destroyed)return;

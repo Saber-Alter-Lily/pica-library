@@ -74,6 +74,21 @@ public class MainActivity extends LocaleAwareActivity {
         }
     }
 
+    private static final class RecommendationPageState {
+        final PortableRecommendationPackageStore.Snapshot portable;
+        final NativeRecommendationStore.Snapshot nativeSnapshot;
+        final boolean canRun;
+        RecommendationPageState(
+            PortableRecommendationPackageStore.Snapshot portable,
+            NativeRecommendationStore.Snapshot nativeSnapshot,
+            boolean canRun
+        ){
+            this.portable=portable;
+            this.nativeSnapshot=nativeSnapshot;
+            this.canRun=canRun;
+        }
+    }
+
     private FrameLayout body;
     private LinearLayout nav;
     private LinearLayout recommendationBatchList;
@@ -328,47 +343,154 @@ public class MainActivity extends LocaleAwareActivity {
         }
     }
 
-    private void recommendations(){
-        LinearLayout p=page("为你推荐","手机独立运行自己的推荐周期；Desktop 只同步可复用画像、候选与 Visual/Canonical 基础",true);
-        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.load(this);
+    private RecommendationPageState readRecommendationPageState(){
+        PortableRecommendationPackageStore.Snapshot portable=
+            PortableRecommendationPackageStore.load(this);
         UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
         boolean hasLocalEvidence=false;
-        for(UnifiedCatalogStore.Entry entry:catalog.byId.values())if(entry.favorite||entry.inShelf||entry.phoneDownloaded||entry.desktopDownloaded||entry.remoteAvailable||RecommendationFeedbackStore.isLiked(this,entry.id)){hasLocalEvidence=true;break;}
-        boolean canRun=hasLocalEvidence&&(PicaClient.available(this)||portable.available());
+        for(UnifiedCatalogStore.Entry entry:catalog.byId.values()){
+            if(
+                entry.favorite ||
+                entry.inShelf ||
+                entry.phoneDownloaded ||
+                entry.desktopDownloaded ||
+                entry.remoteAvailable ||
+                RecommendationFeedbackStore.isLiked(this,entry.id)
+            ){
+                hasLocalEvidence=true;
+                break;
+            }
+        }
+        boolean canRun=
+            hasLocalEvidence &&
+            (PicaClient.available(this)||portable.available());
 
-        NativeRecommendationStore.Snapshot snapshot=NativeRecommendationStore.load(this);
-        LinearLayout actions=new LinearLayout(this);p.addView(actions);
-        actions.addView(button(snapshot.available()?"重新生成手机推荐":"生成手机推荐",v->{NativeRecommendationJobs.refresh(this);Toast.makeText(this,LocalizedText.ui("手机将独立生成新的推荐周期，可离开本页继续使用 App"),Toast.LENGTH_LONG).show();}),new LinearLayout.LayoutParams(0,-2,1));
-        actions.addView(button("画像 / 调整",v->startActivity(new Intent(this,RecommendationStyleActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
+        NativeRecommendationStore.Snapshot snapshot=
+            NativeRecommendationStore.load(this);
+        if(snapshot.available()){
+            NativeRecommendationStore.markCurrentSeen(this);
+            snapshot=NativeRecommendationStore.load(this);
+        }
+        return new RecommendationPageState(portable,snapshot,canRun);
+    }
 
-        if(!canRun&&!snapshot.available()){
-            note(p,"手机推荐输入还不完整","需要本地收藏/行为画像，并至少具备在线 Provider 或已同步的 Portable Candidate Reservoir。同步的是候选和知识，不会复制电脑当前推荐列表。");
-            LinearLayout setup=new LinearLayout(this);p.addView(setup);
-            setup.addView(button("推荐同步",v->startActivity(new Intent(this,RecommendationSyncActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
-            setup.addView(button("在线来源",v->startActivity(new Intent(this,PicaBrowseActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
+    private void recommendations(){
+        LinearLayout page=page(
+            "为你推荐",
+            "手机独立运行自己的推荐周期；Desktop 只同步可复用画像、候选与 Visual/Canonical 基础",
+            true
+        );
+        TextView loadingState=Ui.text(
+            this,
+            LocalizedText.ui("正在读取手机推荐…"),
+            13,
+            Ui.MUTED,
+            false
+        );
+        page.addView(loadingState);
+        LinearLayout recommendationContent=new LinearLayout(this);
+        recommendationContent.setOrientation(LinearLayout.VERTICAL);
+        page.addView(recommendationContent);
+
+        final int id=serial;
+        pending=requests.submit(()->{
+            RecommendationPageState state=readRecommendationPageState();
+            runOnUiThread(()->{
+                if(!valid(id))return;
+                loadingState.setVisibility(View.GONE);
+                renderRecommendationPage(recommendationContent,state);
+            });
+        });
+    }
+
+    private void renderRecommendationPage(
+        LinearLayout target,
+        RecommendationPageState state
+    ){
+        target.removeAllViews();
+        NativeRecommendationStore.Snapshot snapshot=state.nativeSnapshot;
+
+        LinearLayout actions=new LinearLayout(this);
+        target.addView(actions);
+        actions.addView(
+            button(
+                snapshot.available()?"重新生成手机推荐":"生成手机推荐",
+                v->{
+                    NativeRecommendationJobs.refresh(this);
+                    Toast.makeText(
+                        this,
+                        LocalizedText.ui("手机将独立生成新的推荐周期，可离开本页继续使用 App"),
+                        Toast.LENGTH_LONG
+                    ).show();
+                }
+            ),
+            new LinearLayout.LayoutParams(0,-2,1)
+        );
+        actions.addView(
+            button(
+                "画像 / 调整",
+                v->startActivity(new Intent(this,RecommendationStyleActivity.class))
+            ),
+            new LinearLayout.LayoutParams(0,-2,1)
+        );
+
+        if(!state.canRun&&!snapshot.available()){
+            note(
+                target,
+                "手机推荐输入还不完整",
+                "需要本地收藏/行为画像，并至少具备在线 Provider 或已同步的 Portable Candidate Reservoir。同步的是候选和知识，不会复制电脑当前推荐列表。"
+            );
+            LinearLayout setup=new LinearLayout(this);
+            target.addView(setup);
+            setup.addView(
+                button(
+                    "推荐同步",
+                    v->startActivity(new Intent(this,RecommendationSyncActivity.class))
+                ),
+                new LinearLayout.LayoutParams(0,-2,1)
+            );
+            setup.addView(
+                button(
+                    "在线来源",
+                    v->startActivity(new Intent(this,PicaBrowseActivity.class))
+                ),
+                new LinearLayout.LayoutParams(0,-2,1)
+            );
             return;
         }
 
         if(!snapshot.available()){
-            String detail=portable.available()?"已同步 "+portable.candidates.size()+" 个候选，可由手机结合本机 Recent / Session / 人工调整重新排序。":"首次生成会使用手机本地收藏和可用 Provider 建立自己的候选池。";
-            note(p,"尚未生成手机推荐周期",detail);
+            String detail=state.portable.available()
+                ?"已同步 "+state.portable.candidates.size()+" 个候选，可由手机结合本机 Recent / Session / 人工调整重新排序。"
+                :"首次生成会使用手机本地收藏和可用 Provider 建立自己的候选池。";
+            note(target,"尚未生成手机推荐周期",detail);
             return;
         }
 
-        NativeRecommendationStore.markCurrentSeen(this);
-        snapshot=NativeRecommendationStore.load(this);
-        recommendationBatchStatus=Ui.text(this,"",13,Ui.MUTED,false);p.addView(recommendationBatchStatus);
-        LinearLayout batchControls=new LinearLayout(this);p.addView(batchControls);
-        batchControls.addView(button("上一批",v->switchNativeRecommendationBatch(-1)),new LinearLayout.LayoutParams(0,-2,1));
-        batchControls.addView(button("下一批",v->switchNativeRecommendationBatch(1)),new LinearLayout.LayoutParams(0,-2,1));
-        recommendationBatchList=new LinearLayout(this);recommendationBatchList.setOrientation(LinearLayout.VERTICAL);p.addView(recommendationBatchList);
+        recommendationBatchStatus=Ui.text(this,"",13,Ui.MUTED,false);
+        target.addView(recommendationBatchStatus);
+        LinearLayout batchControls=new LinearLayout(this);
+        target.addView(batchControls);
+        batchControls.addView(
+            button("上一批",v->switchNativeRecommendationBatch(-1)),
+            new LinearLayout.LayoutParams(0,-2,1)
+        );
+        batchControls.addView(
+            button("下一批",v->switchNativeRecommendationBatch(1)),
+            new LinearLayout.LayoutParams(0,-2,1)
+        );
+        recommendationBatchList=new LinearLayout(this);
+        recommendationBatchList.setOrientation(LinearLayout.VERTICAL);
+        target.addView(recommendationBatchList);
         renderNativeRecommendationBatch(snapshot);
     }
 
-
     private void switchNativeRecommendationBatch(int direction){
         if(recommendationBatchList==null||recommendationBatchStatus==null)return;
-        NativeRecommendationStore.Snapshot snapshot=direction<0?NativeRecommendationStore.previousBatch(this):NativeRecommendationStore.nextBatch(this);
+        NativeRecommendationStore.Snapshot snapshot=
+            direction<0
+                ?NativeRecommendationStore.previousBatch(this)
+                :NativeRecommendationStore.nextBatch(this);
         renderNativeRecommendationBatch(snapshot);
     }
 

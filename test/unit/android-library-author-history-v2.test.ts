@@ -252,10 +252,16 @@ describe('Android Library / Author / History V2 contracts', () => {
       'private void renderShelves(',
       refreshStart
     )
+    const nextAfterShelves = main.indexOf(
+      'private RecommendationPageState readRecommendationPageState()',
+      renderStart
+    )
     const recommendationsStart = main.indexOf(
       'private void recommendations(){',
       renderStart
     )
+    const renderEnd =
+      nextAfterShelves >= 0 ? nextAfterShelves : recommendationsStart
 
     const booksBody = main.slice(booksStart, refreshStart)
     expect(booksBody).toContain('pending=requests.submit(()->{')
@@ -276,11 +282,59 @@ describe('Android Library / Author / History V2 contracts', () => {
     )
     expect(refreshBody).toContain('ShelfPageState fallback=readLocalShelfState()')
 
-    const renderBody = main.slice(renderStart, recommendationsStart)
+    const renderBody = main.slice(renderStart, renderEnd)
     expect(renderBody).not.toContain('ShelfStore.load(')
     expect(renderBody).not.toContain('UnifiedCatalogStore.load(')
     expect(renderBody).not.toContain('RemoteConfigStore.load(')
     expect(renderBody).toContain('state.catalog.byId.get(item.comicId)')
+  })
+
+  it('keeps Main Recommendation initial local state off the UI thread', () => {
+    const main = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MainActivity.java',
+      'utf8'
+    )
+
+    expect(main).toContain('private static final class RecommendationPageState')
+    expect(main).toContain('private RecommendationPageState readRecommendationPageState()')
+    expect(main).toContain('PortableRecommendationPackageStore.load(this)')
+    expect(main).toContain('UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this)')
+    expect(main).toContain('NativeRecommendationStore.Snapshot snapshot=')
+    expect(main).toContain('NativeRecommendationStore.markCurrentSeen(this)')
+    expect(main).toContain('PicaClient.available(this)||portable.available()')
+
+    const recommendationsStart = main.indexOf('private void recommendations(){')
+    const renderStart = main.indexOf(
+      'private void renderRecommendationPage(',
+      recommendationsStart
+    )
+    const switchStart = main.indexOf(
+      'private void switchNativeRecommendationBatch(',
+      renderStart
+    )
+
+    const recommendationsBody = main.slice(recommendationsStart, renderStart)
+    expect(recommendationsBody).toContain('pending=requests.submit(()->{')
+    expect(recommendationsBody).toContain(
+      'RecommendationPageState state=readRecommendationPageState()'
+    )
+    expect(recommendationsBody).toContain('if(!valid(id))return;')
+
+    const submitIndex = recommendationsBody.indexOf(
+      'pending=requests.submit(()->{'
+    )
+    const syncPrefix = recommendationsBody.slice(0, submitIndex)
+    expect(syncPrefix).not.toContain('PortableRecommendationPackageStore.load(')
+    expect(syncPrefix).not.toContain('UnifiedCatalogStore.load(')
+    expect(syncPrefix).not.toContain('NativeRecommendationStore.load(')
+    expect(syncPrefix).not.toContain('NativeRecommendationStore.markCurrentSeen(')
+
+    const renderBody = main.slice(renderStart, switchStart)
+    expect(renderBody).not.toContain('PortableRecommendationPackageStore.load(')
+    expect(renderBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(renderBody).not.toContain('NativeRecommendationStore.load(')
+    expect(renderBody).not.toContain('NativeRecommendationStore.markCurrentSeen(')
+    expect(renderBody).toContain('NativeRecommendationStore.Snapshot snapshot=state.nativeSnapshot')
   })
 
   it('records session history separately from bookmarks and supports exact-date resume', () => {

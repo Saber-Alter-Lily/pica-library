@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current G17 candidate: `main@bf0e5e8853e715909aa63cff5ef31934cd2f2c5f` (P2-G16 / PR #170 merged)  
+Authoritative repository baseline before the current G18 candidate: `main@def4e391aa7c1783707cdb71adfd426428d2e371` (P2-G17 / PR #171 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RESOURCE_OBSERVATION_IN_PROGRESS — G1–G16 merged; G17 Android cross-task resource observation candidate**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / PERFORMANCE_MEASUREMENT_IN_PROGRESS — G1–G17 merged; G18 Android Macrobenchmark candidate**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -336,7 +336,8 @@ Already improved:
 Remaining:
 - inventory all Activities/Fragments for main-thread file/JSON/DB/network work;
 - unify background-task status presentation through the task center where appropriate;
-- collect Android cross-task resource overlap + foreground latency evidence before choosing concurrency budgets;
+- compile and validate the G18 Android Macrobenchmark harness;
+- collect physical-device startup/frame timing plus G17 resource-overlap evidence before choosing concurrency budgets;
 - define Android-specific concurrency/resource budgets only if measured contention justifies enforcement;
 - validate remaining OEM/physical-device background restrictions where generic emulator evidence is insufficient;
 - verify large Catalog and long Reader behavior on representative mid-range hardware.
@@ -1014,7 +1015,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: RESOURCE_OBSERVATION_IN_PROGRESS — G1–G16 merged; G17 observe-only Android resource instrumentation candidate**
+**Status: PERFORMANCE_MEASUREMENT_IN_PROGRESS — G1–G17 merged; G18 Android foreground Macrobenchmark candidate**
 
 - **G1–G12 merged (PR #153–#164):** audited Android UI-thread Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion I/O owners are worker-owned.
 - **G13 merged (PR #165):** durable task identity is persisted independently of Activity memory; Task Center reconstructs singleton/dynamic work from exact WorkRequest UUID + WorkManager state instead of WorkInfo list order/history.
@@ -1037,12 +1038,16 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - **G16 memory correction:** Application.onTrimMemory now evicts only reconstructible in-memory Bitmap LRUs at UI_HIDDEN/background pressure; encoded disk caches and durable work are untouched. Robolectric + real `am send-trim-memory ... HIDDEN` evidence cover this boundary.
 - **G16 finding 2:** Android durable work still used WorkManager 2.9.1, predating Android 15 SDK/network/foreground-timeout fixes. G16 upgrades both runtime and work-testing to stable 2.12.0 while preserving the G14/G15 recovery suite.
 - **G16 merged (PR #170):** normal CI, direct-upgrade, G15 force-stop regression and the API-35 HIDDEN/Doze gate all passed. Generic trim-memory and Doze defer/resume evidence is accepted.
-- **G17 observe-only candidate:** AndroidTaskResources adds coarse WorkManager resource tags and de-duplicated RUNNING/ENQUEUED-BLOCKED snapshots for RT-17–RT-20 without changing scheduling, concurrency or task controls.
+- **G17 merged (PR #171):** AndroidTaskResources provides observe-only resource tags and de-duplicated RUNNING/ENQUEUED-BLOCKED snapshots for RT-17–RT-20 without changing scheduling, concurrency or task controls.
 - Current classes: provider-network, media-network, bridge-network, cpu-analysis, filesystem-heavy.
 - A debug-only ADB collector writes an app-private JSON snapshot for representative-device overlap sampling; it is absent from release UI/manifest.
-- **Next after G17 source acceptance:** collect representative resource-overlap + foreground Library/detail/Reader latency evidence; only then decide whether G18/P2-C3 enforcement is justified.
+- **G18 Macrobenchmark candidate:** add a release-like benchmark variant plus AndroidX Macrobenchmark 1.5.0 / UiAutomator 2.4.0; measure cold startup to usable local Library and top-level navigation FrameTiming without setting thresholds.
+- HomeActivity reports fully drawn only after the local Library list is usable, giving StartupTimingMetric a meaningful full-display boundary.
+- CI compiles the benchmark target/test APK only; emulator timing is not accepted as representative performance evidence.
+- A physical-device runner archives device metadata, benchmarkData JSON and Perfetto traces.
+- **Next after G18 source/build acceptance:** run representative physical-device idle baseline, then G19 loaded scenarios pairing G17 resource overlap with foreground startup/navigation/detail/Reader measurements. Only after that may G20/P2-C3 enforcement be proposed.
 - OEM battery-manager / foreground-notification evidence and large-Catalog/long-Reader timing/jank/memory remain physical-device gates.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`, and `docs/ANDROID_RESOURCE_OBSERVATION_P2G17.md`.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`, `docs/ANDROID_RESOURCE_OBSERVATION_P2G17.md`, and `docs/ANDROID_FOREGROUND_PERFORMANCE_P2G18.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1056,6 +1061,21 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-G18 Android foreground Macrobenchmark measurement
+
+State update:
+- G17 is merged as PR #171 after CI `36149248370`, G15 force-stop regression `36149248427`, and G16 memory/background regression `36149248367` passed.
+- G18 explicitly remains measurement-only. It does not replace G17 observation with concurrency enforcement.
+- AndroidX Macrobenchmark is used instead of a custom jank timer.
+- A release-like `benchmark` app variant is added with benchmark-only profileable/setup components; formal release/debug manifests remain unchanged.
+- `coldStartupToUsableLibrary` uses StartupTimingMetric + COLD + Partial compilation for five iterations.
+- HomeActivity calls `reportFullyDrawn()` once after the local Library adapter is attached, defining usable-local-Library full display without waiting for optional provider refreshes.
+- `topLevelTabSwitchFrameTiming` uses FrameTimingMetric while switching Library → Recommendation → Online → Settings → Library through UiAutomator.
+- CI only compiles `:app:assembleBenchmark` and `:macrobenchmark:assembleBenchmark`; GitHub emulator timings are not promoted as real performance evidence.
+- `scripts/run-android-macrobenchmark.sh` is the physical-device collection entry and archives device metadata, benchmarkData JSON and Perfetto traces.
+- G19 should add loaded overlap scenarios on representative hardware using G17 resource observation; G20/P2-C3 enforcement remains evidence-gated.
+- Detailed boundary: `docs/ANDROID_FOREGROUND_PERFORMANCE_P2G18.md`.
 
 ## 2026-09-25 — P2-G17 Android cross-task resource observation
 

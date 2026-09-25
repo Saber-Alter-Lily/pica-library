@@ -995,7 +995,7 @@ May continue independently if:
 State update:
 - Download progress persistence was already throttled to 250 ms per active job, but every persisted update still executed a leading `getDownloadJob()` only to fill omitted patch fields, followed by UPDATE and a second `getDownloadJob()` for the return value.
 - D7A moves omitted-field preservation into SQLite with `COALESCE`, reducing each persisted progress patch from SELECT → UPDATE → SELECT to UPDATE → SELECT.
-- Partial patch behavior is preserved: unspecified fields retain stored values, explicit numeric zero and empty chapter titles remain writable, and unknown job IDs still fail through the authoritative return lookup.
+- Partial patch behavior is preserved: unspecified fields retain stored values, explicit numeric zero remains writable, and unknown job IDs still fail through the authoritative return lookup.
 - The 250 ms persistence interval, UI callback frequency, forced final persistence, download concurrency, media pacing and pause/resume/cancel semantics are unchanged.
 - D7A is a read-amplification cleanup, not evidence to tighten or relax the persistence cadence; that requires J1/J2 foreground-latency evidence under real active downloads.
 - Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md.

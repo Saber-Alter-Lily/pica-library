@@ -39,11 +39,13 @@ public final class BackgroundRestrictionSeedActivity extends Activity {
                     finish();
                 });
             } catch (Throwable error) {
-                writeFile(
-                    FAILURE_FILE,
-                    error.getClass().getName() + ": " +
-                        (error.getMessage() == null ? "" : error.getMessage()) + "\n"
-                );
+                try {
+                    writeFile(
+                        FAILURE_FILE,
+                        error.getClass().getName() + ": " +
+                            (error.getMessage() == null ? "" : error.getMessage()) + "\n"
+                    );
+                } catch (Exception ignored) {}
                 runOnUiThread(() ->
                     status.setText("P2-G16 background restriction seed: FAILED")
                 );

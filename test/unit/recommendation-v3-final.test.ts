@@ -520,6 +520,7 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
             coordinator.resumeOrCreate('build-1')
             await coordinator.waitForBuild()
             const listComicsSpy = vi.spyOn(database, 'listComics')
+            const exactIdsSpy = vi.spyOn(database, 'getComicsByIds')
             const current = coordinator.current() as {
                 batchId: string
                 recommendations: unknown[]
@@ -538,15 +539,19 @@ describe('Recommender V3 allocator and Schema 8 cycle', () => {
             }
             expect(repeated.batchId).toBe(next.batchId)
             expect(next.recommendations).toHaveLength(12)
-            const readsAfterFirstBatch = listComicsSpy.mock.calls.length
-            expect(readsAfterFirstBatch).toBe(1)
+            expect(listComicsSpy).not.toHaveBeenCalled()
+            const exactReadsAfterFirstBatch = exactIdsSpy.mock.calls.length
+            expect(exactReadsAfterFirstBatch).toBe(1)
             const currentAfterNext = coordinator.current() as {
                 batchId: string
                 batchIndex: number
             }
             expect(currentAfterNext.batchId).toBe(next.batchId)
             expect(currentAfterNext.batchIndex).toBe(next.batchIndex)
-            expect(listComicsSpy.mock.calls.length).toBe(readsAfterFirstBatch)
+            expect(listComicsSpy).not.toHaveBeenCalled()
+            expect(exactIdsSpy.mock.calls.length).toBe(
+                exactReadsAfterFirstBatch
+            )
             expect(
                 new Set(
                     database.recommendationSeen(

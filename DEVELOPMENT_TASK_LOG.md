@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1/D2 query correctness and batching merged; D3 Library-query cost evidence candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1/D2/D3 merged; D4 compact recommendation-serving catalog candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -956,21 +956,19 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## NEXT-6 — P2-D SQLite/query discipline
-**Status: IN_PROGRESS — D1/D2 merged; D3 Library-query cost evidence candidate**
+**Status: IN_PROGRESS — D1/D2/D3 merged; D4 compact recommendation-serving catalog candidate**
 
 This remains the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
 
-- **D1 merged (PR #124):** Browser Lite export and CLI complete-domain export/progress/prepare-library paths no longer reuse the legacy 5000-row presentation cap.
-- The D1 5007-record regression proves the authoritative export domain crosses the former boundary.
-- **D2 implemented:** `getComicsByIds()` provides chunked exact-ID retrieval; Shelf and recommendation-record restoration no longer materialize an unrelated 5000-comic catalog prefix.
-- **D2 implemented:** `listAuthors()` changes from a 2N+1 alias/circle query pattern to a fixed three-query batch while preserving returned ordering/shape.
-- **D2 merged (PR #125):** reverse author indexes `author_aliases(author_id, alias_display)` and `comic_authors(author_id, circle)` were added; existing shelf indexes were retained rather than duplicated.
-- D2 extends large-library regression coverage so the >5000 boundary comic must remain visible through Shelf and recommendation-record lookup, and separately validates >800 exact IDs across multiple SQL chunks.
-- Recommendation V3/V5 and recommendation-audit 5000/10000 bounds remain intentionally unchanged until classified as algorithmic budget, diagnostic sample, presentation bound or correctness domain.
-- **D3 implemented:** ordinary no-text Library queries no longer load the complete author/alias/circle group set; author facet labels reuse each StoredComic canonical author. Alias-aware author metadata is loaded only when free-text matching needs it.
-- **D3 evidence harness:** `pnpm benchmark:library-query` runs real temporary SQLite datasets at 500/2000/5000 rows and emits machine-readable p50/p95/max scaling evidence for ordinary, structural, tag and text/author queries. CI/shared-runner timing is explicitly not a release budget.
-- **Next after D3:** use the scaling evidence and J1/J2 runtime telemetry to decide whether text-search author metadata should be scoped by candidate IDs, whether `comicSelect` aggregate subqueries need query-plan work, and then continue Work Identity/recommendation/Visual materialization plus high-frequency write/read-starvation audits.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`.
+- **D1 merged (PR #124):** complete-domain Browser Lite/CLI paths no longer reuse the legacy 5000-row presentation cap.
+- **D2 merged (PR #125):** Shelf/recommendation exact-ID reads use chunked `getComicsByIds()`; author metadata changed from 2N+1 to fixed batched queries with the required reverse indexes.
+- **D3 merged (PR #126):** ordinary no-text Library queries no longer load the complete author/alias/circle set; `pnpm benchmark:library-query` records 500/2000/5000-row SQLite scaling evidence without defining a release budget.
+- **D4 implemented:** Final V3 frozen serving, portable readback and serving-composition diagnostics replace unrelated 10000-row catalog materialization with the exact union of physical ownership, policy ownership and current candidate/batch IDs. Final V3 Canonical Work ownership expansion remains intact.
+- D4 uses the existing dedicated `favoriteIds()` query for allocator favorites and removes unused full-catalog fields from the frozen serving snapshot.
+- A semantic equivalence regression requires compact owned+candidate filtering to equal full-catalog filtering, including ownership/work-duplicate telemetry. Existing Final V3 owned-upload/same-work and frozen-snapshot regressions remain authoritative.
+- Recommendation generation/profile/Shadow/Portable Policy snapshot and recommendation-audit bounds remain unchanged because they may be algorithmic or diagnostic budgets rather than serving-query waste.
+- **Next after D4:** classify Work Identity 10000-row review/binding limits, inspect Visual/Work Identity full-catalog materialization and use D3/J1/J2 evidence before any `comicSelect` aggregate or write-cadence rewrite.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -984,6 +982,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D4 compact Final V3 serving catalog
+
+State update:
+- Final V3 frozen serving, portable readback and serving-composition diagnostics still materialized up to 10000 comics even though each path already had explicit ranked/batch IDs.
+- The ownership filter only depends on records that are physically owned, explicitly policy-owned, or current candidates; unrelated unowned catalog rows cannot affect the decision.
+- D4 replaces those broad reads with exact-ID `getComicsByIds()` sets built from `recommendationOwnershipState().ownedComicIds`, policy-owned IDs and current candidate/batch IDs.
+- Frozen Final V3 serving preserves its existing Canonical Work expansion: uploads belonging to an already owned canonical work are still added to the serving policy and exact-ID filter catalog.
+- Batch allocator favorites now come from the dedicated `favoriteIds()` query instead of filtering a broad serving catalog.
+- Recommendation generation/profile, V5 Shadow, Portable Policy inferred-signal construction and recommendation-audit bounds are explicitly unchanged.
+- Regression coverage requires compact ownership filtering to equal the previous full-catalog semantics and locks serving/portable/composition paths away from the 10000-row materialization.
+- D4 changes query scope only; it does not change ranking, candidate generation, ownership authority, Work Identity confidence, performance budgets or P2-C3 enforcement.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D4.md.
 
 ## 2026-09-24 — P2-D3 Library-query cost evidence and lazy author metadata
 

@@ -1,11 +1,17 @@
 # Android Cross-task Resource Observation — P2 G17
 
-Status: **observe-only implementation candidate / no production throttling**
+Status: **PASS / merged as PR #171 / no production throttling**
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-C Runtime resource classes and concurrency budgets;
 - P2-G Android runtime hardening;
 - `docs/RUNTIME_INVENTORY_P2.md` finding F-08 / H5.
+
+Accepted evidence before merge:
+- normal CI run `36149248370`: PASS;
+- G15 force-stop regression run `36149248427`: PASS;
+- G16 memory/background regression run `36149248367`: PASS;
+- merged commit: `def4e391aa7c1783707cdb71adfd426428d2e371`.
 
 Baseline:
 - G16 is merged as PR #170.

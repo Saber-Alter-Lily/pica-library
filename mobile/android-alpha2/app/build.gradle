@@ -72,6 +72,17 @@ android {
                 signingConfig signingConfigs.preview
             }
         }
+        benchmark {
+            initWith release
+            // Release-like code path, signed locally so Macrobenchmark can install it on QA devices.
+            signingConfig signingConfigs.debug
+            debuggable false
+            matchingFallbacks = ['release']
+            manifestPlaceholders = [
+                    appLabel  : 'Pica Library Benchmark',
+                    pairScheme: 'picalibrary'
+            ]
+        }
     }
 }
 

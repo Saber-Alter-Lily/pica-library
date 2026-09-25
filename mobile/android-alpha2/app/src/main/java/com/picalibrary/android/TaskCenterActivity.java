@@ -192,7 +192,7 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
             WorkInfo info=view.info;
             String comic=ref.comicId,episodeArg=ref.episodeId;
             boolean ehDownload="eh".equals(ref.provider);
-            boolean paused=paused(ref);
+            boolean paused=paused(this,ref);
             LinearLayout card=Ui.card(this);
             DataView p=info==null?new DataView("","等待继续"):data(info);
             card.addView(Ui.text(this,p.title.isEmpty()?"漫画 "+shortId(comic):p.title,16,Ui.TEXT,true));

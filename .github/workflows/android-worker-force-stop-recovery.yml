@@ -54,7 +54,7 @@ jobs:
           disable-animations: true
           script: bash scripts/run-android-worker-force-stop-recovery.sh
       - name: Upload recovery diagnostics
-        if: always()
+        if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
           name: android-worker-force-stop-recovery-${{ github.run_id }}-${{ github.job }}

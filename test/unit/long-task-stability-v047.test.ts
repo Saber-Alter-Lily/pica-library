@@ -104,6 +104,40 @@ describe('v0.4.7 long-task stability contract', () => {
         )
     })
 
+    it('keeps the persistent Downloads screen file and URI scans off the UI render path', () => {
+        const activity = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/DownloadsActivity.java')
+        const store = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PhoneDownloadStore.java')
+
+        expect(activity).toContain('Executors.newSingleThreadExecutor()')
+        expect(activity).toContain('private DownloadState readDownloads()')
+        expect(activity).toContain('PhoneDownloadStore.Snapshot snapshot=PhoneDownloadStore.load(this)')
+        expect(activity).toContain('PhoneDownloadStore.estimatedBytes(this,snapshot)')
+        expect(activity).toContain('worker.submit(()->{')
+        expect(activity).toContain('private void renderList(DownloadState state)')
+        expect(activity).toContain('private void deleteDownload(String comicId)')
+        expect(activity).toContain('PhoneDownloadStore.remove(this,comicId)')
+        expect(activity).toContain('private boolean destroyed')
+        expect(activity).toContain('private int loadGeneration')
+        expect(activity).toContain('if(destroyed||generation!=loadGeneration)return')
+        expect(activity).toContain(
+            '@Override protected void onDestroy(){destroyed=true;loadGeneration++;worker.shutdownNow();super.onDestroy();}'
+        )
+
+        const renderStart = activity.indexOf('private void renderList(DownloadState state)')
+        const renderEnd = activity.indexOf('private void open(', renderStart)
+        const renderBody = activity.slice(renderStart, renderEnd)
+        expect(renderBody).not.toContain('PhoneDownloadStore.load(')
+        expect(renderBody).not.toContain('PhoneDownloadStore.estimatedBytes(')
+
+        const confirmStart = activity.indexOf('private void confirmDelete(')
+        const confirmEnd = activity.indexOf('private void deleteDownload(', confirmStart)
+        const confirmBody = activity.slice(confirmStart, confirmEnd)
+        expect(confirmBody).not.toContain('PhoneDownloadStore.remove(')
+
+        expect(store).toContain('static long estimatedBytes(Context context,Snapshot snapshot)')
+        expect(store).toContain('return estimatedBytes(context,load(context))')
+    })
+
     it('gives Android recommendation, downloads and imports durable pause/resume semantics', () => {
         const taskCenter = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TaskCenterActivity.java')
         const recJobs = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationJobs.java')

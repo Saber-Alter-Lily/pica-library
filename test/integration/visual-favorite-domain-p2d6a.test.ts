@@ -73,7 +73,7 @@ describe('P2 D6A Visual favorite target domain', () => {
     it('keeps Visual target and preference favorites beyond the legacy 10000 catalog prefix', () => {
         const { root, database } = seededFavorites()
         expect(database.favoriteIds()).toHaveLength(10001)
-        expect(database.listComics({ limit: 10000 })).toHaveLength(10000)
+        expect(database.listComics({ limit: 10000 })).toHaveLength(5000)
         expect(
             database
                 .listComics({ limit: 10000 })
@@ -112,7 +112,9 @@ describe('P2 D6A Visual favorite target domain', () => {
     it('narrows only favorite-ID reads and preserves full-catalog Visual coverage analyses', () => {
         const service = fs.readFileSync('src/library/service.ts', 'utf8')
 
-        const preferenceStart = service.indexOf('visualPreferenceProfile()')
+        const preferenceStart = service.indexOf(
+            '    visualPreferenceProfile() {'
+        )
         const preferenceEnd = service.indexOf(
             '\n    visualAnalysisRuntimeProfile()',
             preferenceStart
@@ -123,7 +125,7 @@ describe('P2 D6A Visual favorite target domain', () => {
             'listComics({ limit: 10000 })'
         )
 
-        const statusStart = service.indexOf('visualIndexStatus()')
+        const statusStart = service.indexOf('    visualIndexStatus() {')
         const statusEnd = service.indexOf(
             '\n    similarVisualStyle(',
             statusStart

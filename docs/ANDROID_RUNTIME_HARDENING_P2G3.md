@@ -198,22 +198,23 @@ Android compile/test/lint/build remains the authoritative API/lifecycle gate.
 
 G3 does not claim PhoneDownloadStore is globally removed from UI-thread paths.
 
-The audit still finds other potential first-frame/local-state consumers, notably:
+The audit still finds other potential MainActivity local-state consumers, notably:
 
-- `MainActivity` home summary currently loads PhoneDownloadStore and estimates total bytes synchronously;
-- `UnifiedCatalogStore.applyLocalReferences()` consumes PhoneDownloadStore as part of full Catalog reconstruction;
-- other stores displayed on the Home screen may also perform scalable file/stat work.
+- the default Library tab calls `UnifiedCatalogStore.reconcileLocalReferences(this)` synchronously before its first catalog render; that reconstruction itself consumes several file-backed stores, including PhoneDownloadStore;
+- the Settings tab synchronously loads Favorite/Remote/Pica/Recommendation/PhoneDownload summaries, calculates persistent-download bytes and calls `StoragePolicy.usage(this)`;
+- `UnifiedCatalogStore.applyLocalReferences()` consumes PhoneDownloadStore as part of full Catalog reconstruction.
 
-Those require separate owner-level pipelines rather than being folded into DownloadsActivity.
+Those require separate page-owner pipelines rather than being folded into DownloadsActivity.
 
 ## Next P2-G work
 
 Evidence-based priority after G3:
 
-1. audit/fix `MainActivity` home-summary file/stat work because it affects the app landing surface;
-2. audit/fix `AuthorDirectoryActivity` creator-concept construction;
-3. audit `PicaBrowseActivity` result/local snapshot construction;
-4. lower-frequency Theme/About/Recommendation settings file reads;
-5. then durable Worker process-death/relaunch and Task Center reconstruction.
+1. audit/fix the default MainActivity Library first-frame `reconcileLocalReferences()` path because it affects the app's primary landing tab;
+2. then isolate the MainActivity Settings summary file/stat reads;
+3. audit/fix `AuthorDirectoryActivity` creator-concept construction;
+4. audit `PicaBrowseActivity` result/local snapshot construction;
+5. lower-frequency Theme/About/Recommendation settings file reads;
+6. then durable Worker process-death/relaunch and Task Center reconstruction.
 
 Representative Android device performance and concurrency budgets remain external evidence gates.

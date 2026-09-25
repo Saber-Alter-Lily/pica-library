@@ -1,0 +1,58 @@
+name: Android Worker Recovery
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/android-alpha2/**'
+      - 'scripts/run-android-worker-recovery.sh'
+      - 'test/unit/long-task-stability-v047.test.ts'
+      - '.github/workflows/android-worker-recovery.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/android-alpha2/**'
+      - 'scripts/run-android-worker-recovery.sh'
+      - 'test/unit/long-task-stability-v047.test.ts'
+      - '.github/workflows/android-worker-recovery.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  force-stop-relaunch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      # Pinned v2.38.0. This is the same open-source emulator runner used by
+      # mature Android projects such as AnkiDroid and NativeScript.
+      - name: Force-stop and relaunch recovery gate
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/run-android-worker-recovery.sh
+
+      - name: Upload recovery diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-worker-recovery-${{ github.run_id }}
+          path: test-results/android-worker-recovery/
+          retention-days: 2
+          if-no-files-found: ignore

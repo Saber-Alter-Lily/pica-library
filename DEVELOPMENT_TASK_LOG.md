@@ -283,7 +283,7 @@ Remaining:
 - representative large-library query regression tests.
 
 ## P2-E — Snapshot/cache discipline
-**Status: IN_PROGRESS — E1 Desktop cover source invalidation candidate; broader cache inventory remains open**
+**Status: IN_PROGRESS — E1 merged; E2 provider/account-scoped Preview + Online Reader cache candidate; broader cache/frontend audit remains open**
 
 Keep and generalize successful patterns:
 - frozen Recommendation serving snapshot for batch switching;
@@ -989,17 +989,19 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7C.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8B.md`.
 
 ## NEXT-7 — P2-E snapshot/cache discipline
-**Status: IN_PROGRESS — E1 Desktop cover source invalidation candidate**
+**Status: IN_PROGRESS — E1 merged; E2 provider/account cache partition candidate**
 
 P2-D has reached an evidence gate: further aggregate/cadence rewrites require representative D8B/J2 runs rather than more speculative SQL changes. P2-E is the next unblocked architecture lane.
 
-- Existing Android `CoverRepository` already versions cover cache identity by comic/source locators plus stable catalog revision, preventing a changed cover from reusing an old bitmap forever.
-- **E1 implemented:** Desktop keeps one disk slot per comic but validates it with a SHA-256 source fingerprint over comic/provider/remote identity, current trusted cover URL and provider `updatedAt`.
-- Legacy Desktop cache metadata without a fingerprint becomes stale once and is refreshed through the existing atomic `.part` → rename publication path.
-- The raw cover URL is not persisted in cache metadata; only MIME type + source fingerprint are stored.
-- A real SQLite + injected Pica-provider regression requires unchanged sources to remain cache hits, changed URL/revision to refetch, same URL + newer provider revision to refetch, and legacy metadata to migrate with one refresh.
-- **Next after E1:** inventory remaining long-lived Desktop/Web caches by owner/key/invalidation authority, then address only caches whose stale identity can become authoritative or leak across user/device generations.
-- Detailed boundary: `docs/CACHE_DISCIPLINE_P2E1.md`.
+- **E1 merged (PR #136):** Desktop cover cache keeps one disk slot per comic but validates it with a source fingerprint over comic/provider/remote identity, trusted cover URL and provider `updatedAt`.
+- **E2 inventory implemented:** critical Desktop/Web/Android caches now have documented owner, key, authoritative invalidation source and scope. TTL/LRU are explicitly treated as eviction, not correctness authority.
+- **E2 provider partition implemented:** Provider Preview and Online Reader metadata/page caches are partitioned by hashed provider/account identity, E-H vs ExH surface and stored provider revision; page data additionally validates the actual page locator through a SHA-256 source fingerprint.
+- Preview routes now serve only pages prepared under the current provider scope, preventing a previously known route from exposing an old-scope disk entry after account/session/revision changes.
+- Online Reader album/chapter Maps include provider scope, page cache validation includes scope + locator, and in-flight image dedupe also includes the source fingerprint.
+- Raw accounts, passwords, E-H session values, provider scope strings and page locators are not persisted in Preview cache metadata.
+- Desktop Settings now clears the cached authenticated Pica SDK instance when saved Pica account/password changes, so live request authority and cache scope cannot diverge.
+- **Next after E2:** validate remaining browser/process-memory cache ownership, then move to P2-F observer/poller discipline if no critical long-lived cache lacks an explicit authority.
+- Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1013,6 +1015,20 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-E2 provider/account cache partition and inventory
+
+State update:
+- Critical long-lived caches/snapshots now have an explicit owner/key/invalidation/scope inventory in docs/CACHE_DISCIPLINE_P2E2.md. TTL and LRU are classified as eviction policies, not authoritative invalidation.
+- Provider Preview and Online Reader caches previously keyed provider-backed state only by comic/episode/page identity, so a live Pica account change, E-H session/surface change, provider revision change or page-locator change could reuse data created under a different authority.
+- ProviderService now exposes a non-secret cache scope. Pica uses a hashed configured account identity + comic revision; E-H uses selected surface + a SHA-256 session partition + comic revision. Raw credentials are not exposed.
+- Preview/Online Reader page validation adds a SHA-256 fingerprint over current provider scope + actual page locator. Only the digest is persisted.
+- Preview routes additionally require the page to have been prepared under the current provider scope; an old route cannot directly retrieve a previous account/session entry after an authority switch.
+- Online Reader album/chapter metadata and in-flight image dedupe are provider-scope partitioned.
+- Desktop Pica credential changes now clear LibraryService's cached authenticated Pica SDK instance before subsequent requests.
+- Regression coverage checks Pica/E-H scope changes without secret leakage, Preview direct-route invalidation, locator invalidation, Online Reader metadata/page reload after scope change and the Pica session-reset source contract.
+- E2 does not change TTL/size budgets, create an offline reader cache contract, add generic provider probes, or change Android cache formats.
+- Detailed boundary: docs/CACHE_DISCIPLINE_P2E2.md.
 
 ## 2026-09-24 — P2-E1 Desktop cover cache source identity
 

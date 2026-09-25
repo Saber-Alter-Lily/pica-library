@@ -237,7 +237,9 @@ describe('P2 E2 provider-scoped cache identity', () => {
         ])
         await reader.picture('comic', 'episode-1', 0)
         expect(getEpisodes).toHaveBeenCalledTimes(1)
-        expect(getEpisodePages).toHaveBeenCalledTimes(1)
+        // Concurrent first-page calls may independently resolve chapter metadata;
+        // the established in-flight contract deduplicates image fetches.
+        expect(getEpisodePages).toHaveBeenCalledTimes(2)
         expect(fetchPage).toHaveBeenCalledTimes(1)
 
         scope = 'reader-scope-two'
@@ -246,7 +248,7 @@ describe('P2 E2 provider-scoped cache identity', () => {
         const refreshed = await reader.picture('comic', 'episode-1', 0)
         expect(refreshed.data.toString()).toContain('/two.jpg')
         expect(getEpisodes).toHaveBeenCalledTimes(2)
-        expect(getEpisodePages).toHaveBeenCalledTimes(2)
+        expect(getEpisodePages).toHaveBeenCalledTimes(3)
         expect(fetchPage).toHaveBeenCalledTimes(2)
         database.close()
     })

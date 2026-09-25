@@ -30,7 +30,8 @@
     "benchmark": "tsx scripts/benchmark/download-harness.ts",
     "benchmark:visual-analysis": "tsx scripts/benchmark/visual-analysis-harness.ts",
     "benchmark:http-latency-scenario": "tsx scripts/benchmark/http-latency-scenario.ts",
-    "benchmark:library-query": "tsx scripts/benchmark/library-query-harness.ts"
+    "benchmark:library-query": "tsx scripts/benchmark/library-query-harness.ts",
+    "benchmark:comic-select-picture-count": "tsx scripts/benchmark/comic-select-picture-count-harness.ts"
   },
   "engines": {
     "node": ">=22.5"

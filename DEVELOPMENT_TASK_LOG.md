@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1–D8A merged; D7C recommendation-impression batching candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1–D8A + D7C merged; D8B comicSelect A/B scaling evidence candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -979,11 +979,14 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - **D8A merged (PR #133):** migration 16 adds `idx_pictures_comic_status(comic_id, status)`, filling the missing comic-first access path used by the correlated `comicSelect` picture-count subquery.
 - D8A planner regression requires `COUNT(*) WHERE comic_id = ?` to use the new index; completed-picture counts may validly use either the new comic-first index or the existing status-first downloaded index.
 - D8A does not rewrite `comicSelect`; aggregate joins/CTEs remain deferred until representative scaling evidence justifies a broader semantic-preserving query change.
-- **D7C implemented:** Web recommendation impressions that pass the existing 50% / 800 ms visibility rule are queued into a 25 ms micro-batch and sent through a dedicated impression-only endpoint capped at 24 events.
+- **D7C merged (PR #134):** Web recommendation impressions that pass the existing 50% / 800 ms visibility rule are queued into a 25 ms micro-batch and sent through a dedicated impression-only endpoint capped at 24 events.
 - D7C reuses D7B `recordUserEvents()` so one natural impression burst becomes one short SQLite transaction while every impression retains its own event ID, client-observed time, cycle/batch/comic/rank context and dedupe key.
 - The batch route preserves the existing zero-based rank contract, rejects non-impression event types, and rolls back the whole batch if one event fails storage validation. `recommend_batch_presented`, feedback and detail-open events stay on the existing single-event path because they are separate user/authority actions rather than one natural burst.
-- **Next after D7C:** compare Library/detail scaling after D8A, use J1/J2 real foreground latency under download/WebDAV/recommendation load, and only then consider further write-cadence or aggregate-query changes.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7C.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`.
+- **D8B implemented:** `pnpm benchmark:comic-select-picture-count` builds identical real SQLite fixtures with and without migration 16's `idx_pictures_comic_status`, then compares single-comic `getComic()` and broad catalog projection p50/p95/max.
+- D8B reports descriptive without-index/indexed ratios but defines no timing pass/fail threshold. A semantic regression requires count outputs to remain identical with and without the planner index.
+- D8B changes no production SQL. Aggregate join/CTE or denormalized-count work remains prohibited until repeated D8B plus J1/J2 foreground evidence demonstrates a remaining bottleneck.
+- **Next after D8B:** collect representative A/B runs, combine them with real Windows x64 J2 idle/load profiles, then decide whether P2-D should prototype an aggregate alternative or move on to the remaining runtime/cache/frontend workstreams.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7C.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D8B.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -997,6 +1000,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D8B comicSelect picture-count A/B scaling evidence
+
+State update:
+- D8A fixed the missing comic-first picture-count index, but query-plan selection alone does not justify replacing correlated counters with aggregate joins/CTEs.
+- D8B adds `pnpm benchmark:comic-select-picture-count`, which creates a deterministic latest-schema SQLite fixture, copies it, removes only `idx_pictures_comic_status` from the comparison copy, and measures both variants.
+- The harness measures spread single-comic `getComic()` calls plus repeated broad `listComicsForLibraryQueryBase({ scope: 'catalog' })` projections at default 500/2000/5000 comic sizes and configurable picture density.
+- Output includes p50/p95/max plus descriptive without-index/indexed ratios. These values are synthetic local scaling evidence and are explicitly not release thresholds or Windows reference-machine budgets.
+- A real SQLite semantic regression compares detail and broad count projections with versus without the D8A index and requires identical comic/count results.
+- D8B changes no production query, count semantics, picture write path or index set. Aggregate rewrites remain evidence-gated.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D8B.md.
 
 ## 2026-09-24 — P2-D7C transactional recommendation impression batching
 

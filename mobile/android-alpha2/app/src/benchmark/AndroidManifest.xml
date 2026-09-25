@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Benchmark-only profiling surface; never merged into release/debug variants. -->
+        <profileable android:shell="true" />
+        <activity
+            android:name=".BenchmarkSetupActivity"
+            android:exported="true" />
+    </application>
+</manifest>

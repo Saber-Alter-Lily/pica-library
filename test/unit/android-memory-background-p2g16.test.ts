@@ -41,6 +41,18 @@ describe('P2-G16 Android memory and background restrictions', () => {
         expect(test).toContain('modernNonTrimHintDoesNotPurgeCaches')
     })
 
+    it('uses a WorkManager release with Android 15 background fixes', () => {
+        const gradle = read('mobile/android-alpha2/app/build.gradle')
+        expect(gradle).toContain(
+            "implementation 'androidx.work:work-runtime:2.12.0'"
+        )
+        expect(gradle).toContain(
+            "testImplementation 'androidx.work:work-testing:2.12.0'"
+        )
+        expect(gradle).not.toContain('androidx.work:work-runtime:2.9.1')
+        expect(gradle).not.toContain('androidx.work:work-testing:2.9.1')
+    })
+
     it('keeps durable network work on WorkManager constraints instead of raw services', () => {
         const names = [
             'FavoriteImportJobs.java',

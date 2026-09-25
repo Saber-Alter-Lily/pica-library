@@ -254,7 +254,7 @@ describe('Round 2 progress and download observability contracts', () => {
     })
     it('download_pause_progress_retained', () => {
         const database = source('src/library/database.ts')
-        expect(database).toContain('progress_completed = ?')
+        expect(database).toContain('progress_completed = COALESCE(?')
         expect(app).toContain('data-job-action="resume"')
     })
     it('download_cancel_progress_visible', () => {

@@ -917,7 +917,7 @@ export async function startLibraryServer(options: {
                         !Number.isInteger(batchIndex) ||
                         batchIndex < 0 ||
                         !Number.isInteger(rankPosition) ||
-                        rankPosition < 1 ||
+                        rankPosition < 0 ||
                         !dedupeKey
                     )
                         return json(response, 400, {

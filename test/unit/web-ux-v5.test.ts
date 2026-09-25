@@ -269,7 +269,7 @@ describe('V5 Web UX audit contract', () => {
         )
     })
 
-    it('coalesces Visual QC and Settings Hub global DOM observers', () => {
+    it('coalesces Visual QC and Settings Hub DOM observers', () => {
         const visual = read('web/visual-qc.js')
         const hub = read('web/alpha8-7-desktop-hub.js')
         expect(visual).toContain('let queued = false')
@@ -278,6 +278,13 @@ describe('V5 Web UX audit contract', () => {
         expect(hub).toContain('let queued = false')
         expect(hub).toContain('const observer = new MutationObserver(schedule)')
         expect(hub).toContain('requestAnimationFrame(() => {')
+        expect(hub).toContain("const settings = hub$('#settings')")
+        expect(hub).toContain(
+            'observer.observe(settings, { childList: true, subtree: true })'
+        )
+        expect(hub).not.toContain(
+            'observer.observe(document.body, { childList: true, subtree: true })'
+        )
     })
 
     it('scopes UX polish observers to their owning views', () => {

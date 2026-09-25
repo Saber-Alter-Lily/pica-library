@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F6 merged; F7 incremental onboarding observer candidate; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1–F7 merged; F8 incremental Visual QC observer candidate; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,19 +1001,20 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F6 merged; F7 incremental onboarding observer candidate**
+**Status: IN_PROGRESS — F1–F7 merged; F8 incremental Visual QC observer candidate**
 
 - **F1 merged (PR #138):** remove redundant Theme idle polling.
 - **F2 merged (PR #139):** scope UX polish observers to Settings/Downloads and delegate dialog backdrop handling.
 - **F3 merged (PR #140):** give each selection-status stream one matching render authority.
 - **F4 merged (PR #141):** make v0.4 parity tag/detail mutation processing incremental and animation-frame coalesced.
-- **F5 merged (PR #142):** keep Product's one-time source-entry cleanup, but make dynamic cleanup process only mutation-added subtrees instead of rescanning all links/buttons.
-- **F6 merged (PR #143):** scope the Settings Hub observer to the legacy `#settings` source root instead of the full body.
-- **F7 implemented:** onboarding keeps one bootstrap/full-tour target scan, but dynamic body mutations now collect only added subtrees, coalesce one animation-frame pass, and mark tour targets only within those roots.
-- The Help & Onboarding Settings panel is rechecked only when an added subtree is/contains `#a87-general-panel`, not after every application mutation.
-- Onboarding step order, prompt policy, dismissal/completion state and driver.js behavior are unchanged.
-- **Next after F7:** audit Visual QC's body observer, then inventory persistent backend pollers and onboarding welcome retry lifecycle by explicit owner/start/stop conditions.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F6.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F7.md`.
+- **F5 merged (PR #142):** make Product dynamic source-entry cleanup process only mutation-added subtrees.
+- **F6 merged (PR #143):** scope Settings Hub observation to the legacy `#settings` source root.
+- **F7 merged (PR #144):** make onboarding target discovery incremental while preserving full bootstrap/tour scans.
+- **F8 implemented:** Visual QC keeps one body mutation event source, but dynamic work is split by ownership: detail-button installation runs only inside added/changed roots; QC panel/failure-capture installers run only when Visual/Settings controls are added.
+- F8 uses `pendingRoots` + one animation-frame pass and ignores removed-only mutations.
+- Visual data, similarity retrieval, manual QC scoring, index failure semantics and existing native detail actions are unchanged.
+- **Next after F8:** inventory every persistent backend poller by owner/start/stop/terminal condition, audit onboarding welcome retry timing, and remove only duplicate or overlong authorities.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F6.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F7.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F8.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1027,6 +1028,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F8 incremental Visual QC mutation processing
+
+State update:
+- visual-qc.js previously observed the full body subtree and, after any child mutation, reran a88EnsurePanel(), a88InstallDetailButtons() and a88InstallIndexFailureCapture() globally.
+- F8 keeps one broad mutation event source because Visual detail buttons span Library/Downloaded/Shelves while QC controls live in Settings, but it removes global work from each callback.
+- Added/changed element roots are accumulated in pendingRoots and processed once per animation frame.
+- a88InstallDetailButtons(root) now scopes card traversal to Library/Downloaded/Shelves sections inside that root.
+- QC panel and failure-capture installers run only when an added subtree is/contains the Visual Settings panel, recommendation Settings host, Visual build button or Visual status message.
+- Removed-only mutations do not schedule installer work.
+- Visual embedding/QC data, similarity retrieval, scoring, failure semantics, lazy-load policy and existing native detail actions are unchanged.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F8.md.
 
 ## 2026-09-24 — P2-F7 incremental onboarding mutation processing
 

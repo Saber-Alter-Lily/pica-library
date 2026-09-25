@@ -249,6 +249,33 @@ describe('v0.4.7 long-task stability contract', () => {
         )
     })
 
+    it('uses the official WorkManager recovery test harness for G14', () => {
+        const gradle = read('mobile/android-alpha2/app/build.gradle')
+        const recovery = read(
+            'mobile/android-alpha2/app/src/test/java/com/picalibrary/android/WorkManagerRecoveryTest.java'
+        )
+
+        expect(gradle).toContain(
+            "testImplementation 'androidx.work:work-testing:2.9.1'"
+        )
+        expect(recovery).toContain('WorkManagerTestInitHelper.initializeTestWorkManager')
+        expect(recovery).toContain(
+            'replaceHistoryReconstructsOnlyPersistedCurrentDownload'
+        )
+        expect(recovery).toContain('activeWorkRepairsStaleRegistryUuid')
+        expect(recovery).toContain(
+            'pausedDownloadSurvivesWhenHistoricalWorkInfoIsUnavailable'
+        )
+        expect(recovery).toContain(
+            'nonPausedMissingDownloadDoesNotResurrect'
+        )
+        expect(recovery).toContain(
+            'singletonRecoveryUsesExactPersistedRequestAndRepairsStaleUuid'
+        )
+        expect(recovery).toContain('.setInitialDelay(1,TimeUnit.DAYS)')
+        expect(recovery).toContain('@LooperMode(LooperMode.Mode.PAUSED)')
+    })
+
     it('retains mature Desktop download and Android updater controls', () => {
         const web = read('web/app.js')
         const server = read('src/library/server.ts')

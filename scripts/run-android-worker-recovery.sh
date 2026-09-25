@@ -28,7 +28,7 @@ adb shell pm clear "$TARGET_PACKAGE" >/dev/null
 run_case() {
     local method="$1"
     local output="$RESULT_DIR/${method}.txt"
-    adb shell am instrument -w -r \
+    adb shell am instrument -w \
         -e class "$TEST_CLASS#$method" \
         "$COMPONENT" | tee "$output"
     grep -q "OK (1 test)" "$output"

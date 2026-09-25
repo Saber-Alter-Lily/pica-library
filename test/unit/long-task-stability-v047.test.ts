@@ -184,6 +184,20 @@ describe('v0.4.7 long-task stability contract', () => {
         const recommendationJobs = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationJobs.java'
         )
+        const favoriteWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/FavoriteImportWorker.java'
+        )
+        const bootstrapWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBootstrapWorker.java'
+        )
+        const recommendationWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationWorker.java'
+        )
+        const recoveryInstrumentation = read(
+            'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/WorkerRecoveryProcessTest.java'
+        )
+        const recoveryScript = read('scripts/run-android-worker-recovery.sh')
+        const recoveryWorkflow = read('.github/workflows/android-worker-recovery.yml')
         const picaWorker = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaDownloadWorker.java'
         )
@@ -246,6 +260,45 @@ describe('v0.4.7 long-task stability contract', () => {
         )
         expect(recommendationJobs).toContain(
             'MobileTaskRegistryStore.setWorkId(context,"recommendation"'
+        )
+
+        expect(favoriteJobs).toContain(
+            'MobileTaskRegistryStore.clearWorkId(context,"favorite-import",UNIQUE_NAME)'
+        )
+        expect(bootstrapJobs).toContain(
+            'MobileTaskRegistryStore.clearWorkId(context,"pica-bootstrap",UNIQUE_NAME)'
+        )
+        expect(recommendationJobs).toContain(
+            'MobileTaskRegistryStore.clearWorkId(context,"recommendation",UNIQUE_NAME)'
+        )
+        expect(favoriteWorker).toContain(
+            'FavoriteImportJobs.complete(getApplicationContext())'
+        )
+        expect(bootstrapWorker).toContain('PicaBootstrapJobs.complete(app)')
+        expect(recommendationWorker).toContain(
+            'NativeRecommendationJobs.complete(getApplicationContext())'
+        )
+
+        expect(recoveryInstrumentation).toContain(
+            'seedDurableRecoveryState()'
+        )
+        expect(recoveryInstrumentation).toContain(
+            'verifyDurableRecoveryStateAfterForceStop()'
+        )
+        expect(recoveryInstrumentation).toContain(
+            'assertNotEquals("verification must run in a fresh process"'
+        )
+        expect(recoveryInstrumentation).toContain(
+            'ActivityScenario<TaskCenterActivity>'
+        )
+        expect(recoveryInstrumentation).toContain(
+            'explicitly cancelled download history must not resurrect'
+        )
+        expect(recoveryScript).toContain(
+            'adb shell am force-stop "$TARGET_PACKAGE"'
+        )
+        expect(recoveryWorkflow).toContain(
+            'ReactiveCircus/android-emulator-runner@v2'
         )
     })
 

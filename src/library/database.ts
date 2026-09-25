@@ -906,6 +906,19 @@ export class LibraryDatabase {
         }
     }
 
+    recordUserEvents(inputs: UserEventInput[]): UserEvent[] {
+        if (!inputs.length) return []
+        this.db.exec('BEGIN IMMEDIATE')
+        try {
+            const events = inputs.map((input) => this.recordUserEvent(input))
+            this.db.exec('COMMIT')
+            return events
+        } catch (error) {
+            this.db.exec('ROLLBACK')
+            throw error
+        }
+    }
+
     listUserEvents(
         options: { eventType?: string; comicId?: string; limit?: number } = {}
     ): UserEvent[] {

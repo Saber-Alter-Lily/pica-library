@@ -2878,6 +2878,13 @@ export class LibraryDatabase {
         return { key, updatedAt: now }
     }
 
+    deleteAppState(key: string) {
+        const result = this.db
+            .prepare('DELETE FROM app_state WHERE key = ?')
+            .run(key)
+        return Number(result.changes || 0)
+    }
+
     listAuthors(): AuthorGroup[] {
         const rows = this.db
             .prepare(

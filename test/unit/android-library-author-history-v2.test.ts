@@ -227,6 +227,62 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(main).toContain('settingsSummaryTask=null')
   })
 
+  it('keeps Main Bookshelves Shelf/Catalog preparation off the UI thread', () => {
+    const main = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MainActivity.java',
+      'utf8'
+    )
+
+    expect(main).toContain('private static final class ShelfPageState')
+    expect(main).toContain('private ShelfPageState readLocalShelfState()')
+    expect(main).toContain('ShelfStore.Snapshot shelves=ShelfStore.load(this)')
+    expect(main).toContain(
+      'UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this)'
+    )
+    expect(main).toContain(
+      'boolean remoteConfigured=RemoteConfigStore.load(this).configured()'
+    )
+
+    const booksStart = main.indexOf('private void bookshelves(){')
+    const refreshStart = main.indexOf(
+      'private void refreshShelvesInto(',
+      booksStart
+    )
+    const renderStart = main.indexOf(
+      'private void renderShelves(',
+      refreshStart
+    )
+    const recommendationsStart = main.indexOf(
+      'private void recommendations(){',
+      renderStart
+    )
+
+    const booksBody = main.slice(booksStart, refreshStart)
+    expect(booksBody).toContain('pending=requests.submit(()->{')
+    expect(booksBody).toContain('ShelfPageState state=readLocalShelfState()')
+    const submitIndex = booksBody.indexOf('pending=requests.submit(()->{')
+    const syncPrefix = booksBody.slice(0, submitIndex)
+    expect(syncPrefix).not.toContain('ShelfStore.load(')
+    expect(syncPrefix).not.toContain('UnifiedCatalogStore.load(')
+    expect(syncPrefix).not.toContain('RemoteConfigStore.load(')
+
+    const refreshBody = main.slice(refreshStart, renderStart)
+    expect(refreshBody).toContain('ShelfStore.save(this,shelves)')
+    expect(refreshBody).toContain(
+      'UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this)'
+    )
+    expect(refreshBody).not.toContain(
+      'UnifiedCatalogStore.reconcileLocalReferences(this)'
+    )
+    expect(refreshBody).toContain('ShelfPageState fallback=readLocalShelfState()')
+
+    const renderBody = main.slice(renderStart, recommendationsStart)
+    expect(renderBody).not.toContain('ShelfStore.load(')
+    expect(renderBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(renderBody).not.toContain('RemoteConfigStore.load(')
+    expect(renderBody).toContain('state.catalog.byId.get(item.comicId)')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

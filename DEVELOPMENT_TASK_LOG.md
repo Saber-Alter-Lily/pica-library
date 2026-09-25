@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G10 merged; G11 direct-open evidence persistence candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G11 merged; G12 Reader completion evidence candidate; durable Worker/recovery audit is next**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,17 +1014,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G10 merged; G11 direct-open evidence persistence candidate**
+**Status: IN_PROGRESS — G1–G11 merged; G12 Reader completion evidence candidate**
 
-- **G1–G10 merged (PR #153–#162):** scalable Catalog/Semantic/download/settings/browse/shelf/recommendation/history preparation has been removed from the audited first-frame/render paths.
-- **G11 finding:** `MainActivity.openUnified()` synchronously loaded the entire Unified Catalog and then synchronously read/rewrote RecommendationEvidenceStore before launching comic detail.
-- The Catalog load was used only to enrich one `recommend_detail_open` event with tags/categories; the evidence recorder itself also performs persistent JSON I/O.
-- **G11 implemented:** `recordDetailOpenAsync(comicId, author)` captures application context and submits Catalog enrichment + evidence persistence to MainActivity's existing `requests` executor.
-- `openUnified()` now only schedules that task, builds the existing detail Intent and starts the detail Activity immediately.
-- The evidence task deliberately does not use page-level `pending`, so normal tab/page cancellation does not cancel an already-observed user detail-open action.
-- Event schema, dirty/sync semantics, author/tags/categories enrichment and detail navigation are unchanged.
-- **Next after G11:** ReaderActivity chapter-completion evidence enrichment/persistence on Reader's existing metadata executor, then transition from UI-thread I/O remediation into durable Worker process-death/relaunch, Task Center reconstruction and low-memory/background validation.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G11.md`.
+- **G1–G11 merged (PR #153–#163):** the audited scalable Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open local I/O paths are no longer performed synchronously in their UI render/click paths.
+- **G12 finding:** `ReaderActivity.save()` synchronously loaded Unified Catalog and synchronously read/rewrote RecommendationEvidenceStore when a chapter reached its final page for the first time.
+- Reader already owns `completionRecordedChapter` as the per-chapter dedupe authority and an existing `metadata` executor for chapter/source metadata work.
+- **G12 implemented:** `save()` keeps progress persistence and chapter-completion dedupe on the UI thread, then schedules `recordReaderCompleteAsync()`.
+- The helper captures application context/current comic ID, submits to the existing `metadata` executor, loads Catalog metadata and persists the `reader_complete` evidence event off-thread.
+- `completionRecordedChapter` is set before scheduling, preserving one event attempt per completed chapter across repeated page/pause/save callbacks.
+- Reader progress sync cadence, event schema, author/tags/categories enrichment, dirty/sync semantics and navigation are unchanged.
+- **If G12 passes:** move the current P2-G UI-thread I/O remediation lane to implementation-complete and continue with durable Worker process-death/relaunch, Task Center reconstruction, low-memory/background restrictions and Android resource budgets.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G12.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1038,6 +1038,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G12 Reader completion evidence I/O hardening
+
+State update:
+- ReaderActivity.save() previously performed UnifiedCatalogStore.load(this) and RecommendationEvidenceStore.recordReaderComplete(...) synchronously when the current chapter first reached its final page.
+- That completion branch could add a full Catalog parse plus recommendation-evidence JSON read/write to the UI-thread progress-save path.
+- G12 adds recordReaderCompleteAsync(), capturing application context/current comic ID and submitting Catalog enrichment + evidence persistence to Reader's existing metadata executor.
+- save() retains progress.save(), completionRecordedChapter dedupe and progress-sync scheduling, but contains no Catalog load and no direct evidence Store write.
+- completionRecordedChapter is set before the background task is scheduled, preserving one completion evidence attempt per chapter across repeated save callbacks.
+- Reader progress schema/cadence, chapter detection, reader_complete event schema, metadata enrichment and dirty/sync behavior are unchanged.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G12.md.
 
 ## 2026-09-24 — P2-G11 direct-open evidence I/O hardening
 

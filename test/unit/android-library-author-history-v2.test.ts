@@ -415,6 +415,31 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(open).not.toContain('RecommendationEvidenceStore.recordDetailOpen(')
   })
 
+  it('keeps Reader completion evidence persistence off the UI thread', () => {
+    const reader = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderActivity.java',
+      'utf8'
+    )
+
+    const helperStart = reader.indexOf('private void recordReaderCompleteAsync()')
+    const helperEnd = reader.indexOf('private void save(boolean flush)', helperStart)
+    const helper = reader.slice(helperStart, helperEnd)
+    const saveStart = helperEnd
+    const saveEnd = reader.indexOf('private void go(', saveStart)
+    const save = reader.slice(saveStart, saveEnd)
+
+    expect(helper).toContain('Context app=getApplicationContext();')
+    expect(helper).toContain('String comicId=comic;')
+    expect(helper).toContain('metadata.submit(()->{')
+    expect(helper).toContain('UnifiedCatalogStore.load(app).byId.get(comicId)')
+    expect(helper).toContain('RecommendationEvidenceStore.recordReaderComplete(')
+
+    expect(save).toContain('completionRecordedChapter=chapter;')
+    expect(save).toContain('recordReaderCompleteAsync();')
+    expect(save).not.toContain('UnifiedCatalogStore.load(')
+    expect(save).not.toContain('RecommendationEvidenceStore.recordReaderComplete(')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

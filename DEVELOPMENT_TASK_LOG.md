@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1 full-domain correctness cleanup + D2 hot-query batching implemented; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1/D2 query correctness and batching merged; D3 Library-query cost evidence candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -956,7 +956,7 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## NEXT-6 — P2-D SQLite/query discipline
-**Status: IN_PROGRESS — D1 merged; D2 hot-query batching candidate**
+**Status: IN_PROGRESS — D1/D2 merged; D3 Library-query cost evidence candidate**
 
 This remains the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
 
@@ -964,11 +964,13 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - The D1 5007-record regression proves the authoritative export domain crosses the former boundary.
 - **D2 implemented:** `getComicsByIds()` provides chunked exact-ID retrieval; Shelf and recommendation-record restoration no longer materialize an unrelated 5000-comic catalog prefix.
 - **D2 implemented:** `listAuthors()` changes from a 2N+1 alias/circle query pattern to a fixed three-query batch while preserving returned ordering/shape.
-- **D2 migration candidate:** add only the missing reverse author indexes `author_aliases(author_id, alias_display)` and `comic_authors(author_id, circle)`; existing shelf indexes are retained rather than duplicated.
+- **D2 merged (PR #125):** reverse author indexes `author_aliases(author_id, alias_display)` and `comic_authors(author_id, circle)` were added; existing shelf indexes were retained rather than duplicated.
 - D2 extends large-library regression coverage so the >5000 boundary comic must remain visible through Shelf and recommendation-record lookup, and separately validates >800 exact IDs across multiple SQL chunks.
 - Recommendation V3/V5 and recommendation-audit 5000/10000 bounds remain intentionally unchanged until classified as algorithmic budget, diagnostic sample, presentation bound or correctness domain.
-- **Next after D2:** measure Library facet/query cost and inspect repeated full-catalog materialization, Work Identity query shape, and high-frequency write/read-starvation paths before further rewrites/indexes.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`.
+- **D3 implemented:** ordinary no-text Library queries no longer load the complete author/alias/circle group set; author facet labels reuse each StoredComic canonical author. Alias-aware author metadata is loaded only when free-text matching needs it.
+- **D3 evidence harness:** `pnpm benchmark:library-query` runs real temporary SQLite datasets at 500/2000/5000 rows and emits machine-readable p50/p95/max scaling evidence for ordinary, structural, tag and text/author queries. CI/shared-runner timing is explicitly not a release budget.
+- **Next after D3:** use the scaling evidence and J1/J2 runtime telemetry to decide whether text-search author metadata should be scoped by candidate IDs, whether `comicSelect` aggregate subqueries need query-plan work, and then continue Work Identity/recommendation/Visual materialization plus high-frequency write/read-starvation audits.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -982,6 +984,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D3 Library-query cost evidence and lazy author metadata
+
+State update:
+- After D2 removed the author 2N+1 query shape, ordinary Library queries still eagerly loaded the complete author-group metadata set before determining whether aliases were needed.
+- D3 makes author-group loading conditional on non-empty free-text search. Normal Library render, structural filters and tag filters no longer issue the full author/alias/circle batch.
+- Author facet labels on no-text paths reuse the canonical author already projected on each StoredComic; text search keeps the previous alias-aware matching semantics.
+- Unit coverage requires no-text queries to avoid `listAuthors()`, while a text query that matches only an alias must still load author groups and return the comic.
+- D3 adds `pnpm benchmark:library-query`, which builds real temporary SQLite libraries at 500/2000/5000 rows and records repeated ordinary/structural/tag/text query p50/p95/max scaling evidence.
+- The D3 harness is synthetic local scaling evidence only. It does not set a user-facing latency threshold, Windows reference result, P2-K budget or P2-C3 capacity.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D3.md.
 
 ## 2026-09-24 — P2-D2 hot-query batching and reverse author indexes
 

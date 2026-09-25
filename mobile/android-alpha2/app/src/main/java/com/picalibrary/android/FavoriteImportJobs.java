@@ -26,6 +26,9 @@ final class FavoriteImportJobs {
             .build();
         WorkManager.getInstance(context.getApplicationContext())
             .enqueueUniqueWork(UNIQUE_NAME, policy, request);
+        MobileTaskRegistryStore.setWorkId(
+            context,"favorite-import",UNIQUE_NAME,request.getId()
+        );
     }
 
     static void enqueue(Context context, boolean covers) {

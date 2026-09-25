@@ -346,6 +346,11 @@ describe('v0.4.7 long-task stability contract', () => {
         )
         expect(runner).toContain('files/p2-g15-ready')
         expect(runner).toContain('adb shell am force-stop "$TARGET_PACKAGE"')
+        expect(runner).toContain('for _ in $(seq 1 40)')
+        expect(runner).toContain('post-force-process.txt')
+        expect(runner).toContain(
+            'Target process survived adb force-stop after 10s'
+        )
         expect(runner).toContain(
             'adb shell monkey -p "$TARGET_PACKAGE" -c android.intent.category.LAUNCHER 1'
         )

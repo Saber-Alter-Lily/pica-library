@@ -292,8 +292,9 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(recovery).toContain(
             'TaskCenterActivity.reconstructDownloads(app,visibleHistory)'
         )
+        expect(recovery).toContain('TaskCenterActivity.currentWork(')
         expect(recovery).toContain(
-            'TaskCenterActivity.currentWork(app,singletonHistory'
+            'app,singletonHistory,"recommendation"'
         )
         expect(runner).toContain('am force-stop')
         expect(runner).toContain('a_seedRecoveryState')

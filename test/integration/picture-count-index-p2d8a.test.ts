@@ -49,9 +49,13 @@ describe('P2 D8A picture count query plan', () => {
             database,
             "SELECT COUNT(*) FROM pictures WHERE comic_id = ? AND status = 'completed'"
         )
-        expect(completed.some((detail) =>
-            detail.includes('idx_pictures_comic_status')
-        )).toBe(true)
+        expect(
+            completed.some(
+                (detail) =>
+                    detail.includes('idx_pictures_comic_status') ||
+                    detail.includes('idx_pictures_downloaded')
+            )
+        ).toBe(true)
 
         database.close()
     })

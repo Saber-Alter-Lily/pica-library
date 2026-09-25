@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1–D6A merged; D7A download-progress write candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1–D7A merged; D7B transactional shelf-event candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -972,10 +972,12 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - **D6A merged (PR #130):** `visualPreferenceProfile()` and `visualIndexStatus()` use the complete dedicated `favoriteIds()` query instead of materializing a nominal 10000-row / effective 5000-row catalog prefix merely to recover favorite IDs.
 - D6A deliberately leaves Author Atlas / Style Families / Representation QC full-catalog inputs unchanged because those analyses use catalog/provider/favorite coverage denominators; blindly narrowing to embedding IDs would alter diagnostic meaning.
 - A 10001-favorite SQLite regression places the only embedded favorite outside the legacy effective 5000-row catalog prefix and requires both Visual preference evidence and index target counts to include it.
-- **D7A implemented:** the existing 250 ms download-progress persistence cadence remains unchanged, but each persisted patch no longer performs a pre-read solely to recover unspecified fields. SQLite `COALESCE` preserves omitted fields, reducing the hot write shape from SELECT → UPDATE → SELECT to UPDATE → SELECT.
-- D7A regression preserves partial-patch semantics, explicit zero/empty-string writes, unknown-job failure behavior and the existing 250 ms service throttle.
-- **Next after D7A:** measure foreground latency under active downloads before changing persistence cadence, inspect bulk shelf/recommendation event writes for transactional batching, and separately investigate `comicSelect` correlated aggregate cost.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`.
+- **D7A merged (PR #131):** the existing 250 ms download-progress persistence cadence remains unchanged, but each persisted patch no longer performs a pre-read solely to recover unspecified fields. SQLite `COALESCE` preserves omitted fields, reducing the hot write shape from SELECT → UPDATE → SELECT to UPDATE → SELECT.
+- D7A regression preserves partial-patch semantics, explicit zero writes, unknown-job failure behavior and the existing 250 ms service throttle.
+- **D7B implemented:** Shelf add/remove still records one behavior event per comic, but the route now sends the event array through `recordUserEvents()`, which wraps the existing single-event recorder in one short `BEGIN IMMEDIATE / COMMIT / ROLLBACK` transaction.
+- D7B preserves event IDs, metadata safety, dedupe behavior and per-comic evidence granularity; invalid input rolls back the event batch rather than leaving a partially recorded shelf action.
+- **Next after D7B:** inspect recommendation impression/batch event bursts for equivalent short-transaction batching, measure real foreground latency before changing any write cadence, and separately investigate `comicSelect` correlated aggregate cost.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -989,6 +991,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D7B transactional shelf event batching
+
+State update:
+- Shelf add/remove routes preserved correct per-comic behavior evidence but wrote each event through an independent autocommit `recordUserEvent()` call.
+- D7B adds `recordUserEvents()`, which wraps the existing single-event recorder in one synchronous `BEGIN IMMEDIATE / COMMIT / ROLLBACK` transaction.
+- Shelf routes now map the same one-event-per-comic payloads into the batch API; event granularity, IDs, app/context fields, metadata safety and dedupe behavior remain unchanged.
+- If one event fails validation, the event batch rolls back rather than leaving a partially recorded route action. The shelf mutation itself remains outside this event transaction exactly as before.
+- No network/async work occurs inside the transaction and no unrelated requests are combined.
+- D7B does not change recommendation evidence semantics, download cadence, SQLite journal mode, performance budgets or P2-C3 enforcement.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D7B.md.
 
 ## 2026-09-24 — P2-D7A download progress write read-amplification
 

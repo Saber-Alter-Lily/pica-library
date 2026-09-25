@@ -79,8 +79,8 @@ ready=""
 for _ in $(seq 1 80); do
     ready="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-ready" 2>/dev/null || true)"
     [[ "$ready" == "READY workId="* ]] && break
-    failure="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-failure" 2>/dev/null || true)"
-    if [[ "$failure" == *:* ]]; then
+    if adb shell run-as "$TARGET_PACKAGE" test -s "files/p2-g16-background-failure" >/dev/null 2>&1; then
+        failure="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-failure" 2>/dev/null || true)"
         printf '%s\n' "$failure" >&2
         exit 1
     fi

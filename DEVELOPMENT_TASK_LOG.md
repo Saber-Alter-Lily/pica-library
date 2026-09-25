@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G12 merged; G13 durable Worker reconstruction candidate**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G13 merged; G14 WorkManager recovery integration candidate**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -347,7 +347,7 @@ Remaining:
 - background task UI is reconstructible after Activity recreation.
 
 ## P2-H — Startup, shutdown and crash recovery
-**Status: PARTIAL**
+**Status: IN_PROGRESS — Android recovery matrix + durable reconstruction merged; WorkManager integration candidate; OS force-stop evidence open**
 
 Required:
 - stale recommendation building state cleanup;
@@ -1014,21 +1014,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: RECOVERY_IN_PROGRESS — G1–G12 merged; G13 durable WorkManager reconstruction candidate**
+**Status: RECOVERY_IN_PROGRESS — G1–G13 merged; G14 official WorkManager recovery integration candidate**
 
-- **G1–G12 merged (PR #153–#164):** the audited scalable Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion local I/O paths are no longer performed synchronously in their UI render/click/save paths.
-- The UI-thread I/O remediation lane is implementation-complete for the currently audited owners; remaining P2-G work now moves to durable Worker/process-death recovery, low-memory/background restrictions and Android resource budgets.
-- **G13 finding 1:** TaskCenterActivity reconstructed singleton work with `values.get(values.size()-1)` and rendered every historical download WorkInfo returned by tags. REPLACE/resume history can therefore surface stale/duplicate attempts after Activity/process recreation.
-- **G13 finding 2:** dynamic download pause intent is durable in MobileTaskPauseStore, but the provider/comic/episode identity was only enumerable through WorkManager tags. If an old cancelled WorkInfo is pruned, a deliberate PAUSED download can remain marked paused yet disappear from Task Center.
-- **G13 implemented:** add app-private `MobileTaskRegistryStore` containing only recovery identity: current WorkRequest UUID for singleton tasks and provider/comic/episode/current UUID for dynamic downloads.
-- Favorite import, Pica bootstrap and Native Recommendation record their current WorkRequest UUID. Pica/E-H downloads register current UUID on enqueue/resume, preserve registry on pause, clear registry on explicit cancel, and clear it only after successful durable completion.
-- Task Center now selects singleton WorkInfo by exact persisted UUID, falling back only to an actually active WorkInfo for pre-G13/stale-registry migration. It no longer treats list position as recency authority.
-- Download reconstruction emits one logical card per durable registry identity. Active WorkInfo can repair a stale registry UUID; pre-G13 active/paused work migrates from tags once; SUCCEEDED/explicitly cancelled stale registrations are removed; PAUSED cards survive missing/pruned historical WorkInfo.
-- Robolectric coverage verifies registry persistence/replacement/removal and provider separation. Source contracts forbid restoring `values.get(values.size()-1)` / old `latest()` authority.
-- `docs/ANDROID_WORKER_RECOVERY_P2G13.md` records the recovery matrix for Pica/E-H downloads, Favorite import, Pica bootstrap, Native Recommendation, update check and supporter entitlement refresh.
-- **Next after G13:** automated kill/restart tests for critical durable task families, deliberate-PAUSED preservation after process recreation, active Task Center reconstruction, completed/cancelled non-resurrection, then low-memory/background restrictions and Android resource budgets.
-- Representative device timing/jank remains an external evidence gate.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, plus `docs/ANDROID_WORKER_RECOVERY_P2G13.md`.
+- **G1–G12 merged (PR #153–#164):** audited Android UI-thread Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion I/O owners are worker-owned.
+- **G13 merged (PR #165):** durable task identity is persisted independently of Activity memory; Task Center reconstructs singleton/dynamic work from exact WorkRequest UUID + WorkManager state instead of WorkInfo list order/history.
+- G13 also adds the explicit Android recovery matrix required by P2-H and preserves PAUSED download identity even when an old CANCELLED WorkInfo is unavailable.
+- **G14 implemented with the official WorkManager test harness:** add `androidx.work:work-testing:2.9.1` matching the production WorkManager runtime.
+- `WorkManagerRecoveryTest` creates real delayed WorkRequests and queries real WorkInfo/unique-work history under Robolectric rather than using a hand-built scheduler fake.
+- G14 covers:
+  - REPLACE history reconstructs exactly one current download;
+  - stale registry UUID repairs from the actual active WorkInfo;
+  - deliberate PAUSED download remains reconstructible when historical WorkInfo is unavailable;
+  - missing non-paused download registration does not resurrect;
+  - singleton unique-work recovery selects the exact persisted current request and repairs stale UUIDs.
+- All G14 requests use a long initial delay, so provider/network Worker bodies do not execute; the test targets WorkManager DB/query + app recovery authority.
+- **Evidence boundary:** G14 is Activity/process-state reconstruction evidence, not a claim of Android OS force-stop/reboot coverage.
+- **Next after G14:** emulator/adb force-stop + relaunch smoke for one active download and one deliberate PAUSED task, then low-memory/background restrictions and Android resource budgets.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, and `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1042,6 +1044,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-G14 official WorkManager recovery integration
+
+State update:
+- G13 is merged as PR #165 and provides durable task identity + Task Center reconstruction authority.
+- G14 adds the official androidx.work:work-testing:2.9.1 artifact, matching the production WorkManager 2.9.1 runtime rather than introducing a custom scheduler fake.
+- Robolectric WorkManagerRecoveryTest creates real delayed unique/tagged WorkRequests and exercises the real WorkManager database/WorkInfo query layer.
+- Scenarios cover REPLACE-history de-duplication, stale registry self-repair, PAUSED recovery with missing historical WorkInfo, non-paused orphan non-resurrection, and singleton exact-current selection/repair.
+- The test runs Task Center recovery methods against actual WorkInfo rows while keeping the normal Task Center poll loop paused.
+- G14 does not claim to emulate am force-stop, process SIGKILL, reboot or OEM background restrictions; those remain a named device/emulator evidence gate.
+- Detailed boundary: docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md.
 
 ## 2026-09-25 — P2-G13 durable WorkManager reconstruction authority
 

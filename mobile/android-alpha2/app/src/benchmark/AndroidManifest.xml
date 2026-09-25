@@ -5,5 +5,8 @@
         <activity
             android:name=".BenchmarkSetupActivity"
             android:exported="true" />
+        <receiver
+            android:name=".BenchmarkResourceSnapshotReceiver"
+            android:exported="true" />
     </application>
 </manifest>

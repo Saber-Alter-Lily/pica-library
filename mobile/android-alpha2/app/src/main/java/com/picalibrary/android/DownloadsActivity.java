@@ -83,12 +83,20 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         final int generation=++loadGeneration;
         renderLoading();
         worker.submit(()->{
-            PhoneDownloadStore.remove(this,comicId);
-            DownloadState state=readDownloads();
-            runOnUiThread(()->{
-                if(destroyed||generation!=loadGeneration)return;
-                renderList(state);
-            });
+            try{
+                PhoneDownloadStore.remove(this,comicId);
+                DownloadState state=readDownloads();
+                runOnUiThread(()->{
+                    if(destroyed||generation!=loadGeneration)return;
+                    renderList(state);
+                });
+            }catch(Exception error){
+                runOnUiThread(()->{
+                    if(destroyed||generation!=loadGeneration)return;
+                    Toast.makeText(this,error.getMessage()==null?LocalizedText.ui("删除失败"):error.getMessage(),Toast.LENGTH_LONG).show();
+                    loadDownloads();
+                });
+            }
         });
     }
 

@@ -33,9 +33,14 @@ export class LibraryQueryService {
 
     private evaluate(input: LibraryFacetQuery = {}) {
         const query = this.normalize(input)
-        const authors = this.database.listAuthors()
-        const authorById = new Map(authors.map((author) => [author.id, author]))
         const text = normalizeAuthorKey(query.text ?? '')
+        const authorById = text
+            ? new Map(
+                  this.database
+                      .listAuthors()
+                      .map((author) => [author.id, author] as const)
+              )
+            : new Map()
         const tags = (query.tags ?? []).map(normalizeAuthorKey)
         const items = this.database
             .listComicsForLibraryQueryBase(query)
@@ -84,13 +89,20 @@ export class LibraryQueryService {
         })
 
         const authorCounts = new Map<string, number>()
+        const authorLabels = new Map<string, string>()
         const tagCounts = new Map<string, { label: string; count: number }>()
         for (const comic of items) {
-            if (comic.authorId)
+            if (comic.authorId) {
                 authorCounts.set(
                     comic.authorId,
                     (authorCounts.get(comic.authorId) ?? 0) + 1
                 )
+                if (!authorLabels.has(comic.authorId))
+                    authorLabels.set(
+                        comic.authorId,
+                        comic.canonicalAuthor ?? comic.author ?? comic.authorId
+                    )
+            }
             for (const tag of comic.tags) {
                 const key = normalizeAuthorKey(tag)
                 const current = tagCounts.get(key)
@@ -103,7 +115,10 @@ export class LibraryQueryService {
         const authorFacets: FacetOption[] = [...authorCounts.entries()]
             .map(([value, count]) => ({
                 value,
-                label: authorById.get(value)?.canonicalName ?? value,
+                label:
+                    authorById.get(value)?.canonicalName ??
+                    authorLabels.get(value) ??
+                    value,
                 count
             }))
             .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))

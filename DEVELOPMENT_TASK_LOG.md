@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F10 merged; F11 event-driven onboarding readiness candidate; hidden-tab/browser evidence remains open**
+**Status: CODE_COMPLETE / EVIDENCE_GATED — F1–F12 merged; representative browser traces / low-end hardware verification remain open**
 
 Already improved:
 - coalesced observers;
@@ -314,13 +314,12 @@ Already improved:
 - settings pages avoid automatic provider probes;
 - experimental tools do not automatically recompute on page open.
 
-Remaining:
-- audit all MutationObservers/timers/pollers;
-- remove duplicate authorities/pollers;
-- ensure large tables/grids use bounded rendering;
-- prevent one status update from rebuilding unrelated page sections;
-- preserve scroll/focus during incremental updates;
-- verify settings/online/recommendation transitions on low-end hardware.
+Remaining evidence:
+- collect representative browser traces for visible and hidden analysis-task scenarios;
+- verify settings/online/recommendation transitions on low-end hardware;
+- confirm traces show no persistent high-frequency idle work from the app itself.
+
+Code-side F1–F12 audits have already removed the confirmed redundant poll/observer authorities; do not reopen them without new trace evidence.
 
 **Acceptance**
 - no full-page rescan per DOM mutation;
@@ -351,9 +350,15 @@ Remaining:
 - background task UI is reconstructible after Activity recreation.
 
 ## P2-H — Startup, shutdown and crash recovery
-**Status: PARTIAL**
+**Status: IN_PROGRESS — H3A maintenance interruption tombstones candidate; broader shutdown/recovery matrix remains open**
 
-Required:
+Current H3A:
+- persist active maintenance update / repair / organize task boundaries in SQLite app_state;
+- convert process-interrupted active/paused/cancelling snapshots to failed + restart_required tombstones on startup;
+- never auto-resume paused maintenance work and never promote partial findings/issues/result as completed output;
+- explicit clean rerun clears the tombstone.
+
+Required / follow-up:
 - stale recommendation building state cleanup;
 - active download recovery without reviving deliberate PAUSED tasks;
 - WebDAV publication safety;
@@ -1001,18 +1006,31 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F11 merged; F12 visibility-aware analysis pollers candidate**
+**Status: CODE_COMPLETE / EVIDENCE_GATED — F1–F12 merged**
 
-- **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or processed incrementally/coalesced.
-- **F9 merged (PR #146):** WebDAV progress reattaches after reload and has explicit terminal/start/page lifecycle ownership.
-- **F10 merged (PR #147):** Recommendation final-cycle status has one normal polling authority with App fallback only when the shared signal is absent/stale.
-- **F11 merged (PR #148):** Onboarding readiness is event-driven; the recursive 500 ms retry loop is removed.
-- **F12 implemented:** Work Identity evidence refresh and Recommendation V5 shadow evaluation retain their existing 500/600 ms foreground status cadence, but hidden-page waits extend to 3000 ms.
-- Both visibility-aware waits resolve immediately when the document becomes visible, so progress refresh is not delayed after the user returns.
-- F12 is deliberately limited to analysis/development status surfaces. E-H login, updater, Recommendation build, WebDAV and Downloads keep their existing lifecycle/cadence because their control/recovery semantics differ.
-- Backend task execution, pause/resume/cancel, task recovery and output semantics are unchanged.
-- **Next after F12:** collect representative browser traces for foreground/hidden analysis tasks and verify no remaining high-frequency poller lacks clear task/view authority before closing P2-F.
+- **F1–F8 merged (PR #138–#145):** redundant idle polling removed; broad DOM observers are scoped or incremental/coalesced.
+- **F9 merged (PR #146):** WebDAV progress reattaches after reload with explicit terminal/start/page lifecycle ownership.
+- **F10 merged (PR #147):** Recommendation final-cycle status has one normal polling authority with bounded App fallback.
+- **F11 merged (PR #148):** Onboarding readiness is event-driven; no recursive 500 ms readiness loop.
+- **F12 merged (PR #149):** Work Identity / V5 shadow status polling is visibility-aware (500/600 ms foreground, 3000 ms hidden, immediate refresh on visible).
+- Code-side observer/poller audit is complete for the confirmed issues. Reopen only if browser traces identify a specific remaining high-frequency authority.
+- **Evidence gate:** representative browser traces and low-end settings/online/recommendation transition QA.
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, plus `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`.
+
+## NEXT-9 — P2-H startup / shutdown / crash recovery
+**Status: IN_PROGRESS — H3A maintenance interruption tombstones candidate**
+
+- Existing mature startup recovery already covers interrupted LOCAL downloads and stale Recommendation building state.
+- **H3A implemented:** Maintenance update, repair and organize persist only low-frequency active/control/checkpoint boundaries to existing SQLite `app_state`; no new sidecar file or migration.
+- Startup converts any persisted running/pausing/paused/cancelling state into a durable `interrupted` tombstone and exposes task status as `failed + recoveryMode=restart_required`.
+- A deliberate paused task is never auto-resumed after process death.
+- Partial update findings / repair issues / organizer result are discarded as non-authoritative; only numeric diagnostics remain.
+- A second Desktop restart preserves the tombstone instead of reverting to `idle`; an explicit clean rerun overwrites and clears it at terminal completion/failure/cancel.
+- Recovery metadata is written only at start/control/checkpoint boundaries, not every progress item.
+- Real SQLite tests cover running/paused/cancelling snapshots, two consecutive restarts and clean rerun cleanup.
+- **Next after H3A:** explicit graceful shutdown ordering and automated kill/restart coverage for the remaining critical recovery matrix.
+- Detailed boundary: `docs/STARTUP_CRASH_RECOVERY_P2H3A.md`.
+
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1026,6 +1044,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-H3A maintenance interruption tombstones
+
+State update:
+- Maintenance update / repair / organize already run as detached, controllable LibraryService tasks, but their authoritative status was process-memory only and reset to idle after Desktop restart.
+- H3A reuses the existing SQLite app_state authority; no recovery sidecar or schema migration is added.
+- Active task snapshots are persisted only at start, pause/resume/cancel transitions and actual paused/running checkpoints; progress hot loops do not write recovery metadata.
+- On startup, persisted running/pausing/paused/cancelling snapshots are first rewritten to durable interrupted tombstones, then exposed as failed + recoveryMode=restart_required with recoveredState.
+- Partial findings/issues/organizer result are not promoted. Paused work is not automatically resumed.
+- Tombstones survive repeated restarts until an explicit rerun starts; normal terminal task paths delete the recovery key.
+- A real SQLite restart regression covers update=running, repair=paused, organize=cancelling, a second restart and clean-rerun cleanup.
+- Recovery matrix: docs/STARTUP_CRASH_RECOVERY_P2H3A.md.
 
 ## 2026-09-24 — P2-F12 visibility-aware analysis task polling
 

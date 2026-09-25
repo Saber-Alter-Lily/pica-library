@@ -38,6 +38,30 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(service).toContain('favoriteCount')
         expect(service).toContain('downloadedCount')
         expect(service).toContain('count: rankedItems.length')
+        const variantsStart = service.indexOf('workVariantsForComic(')
+        const variantsEnd = service.indexOf(
+            '\n    recommendationV5WorkIdentityEvidenceRefreshStatus()',
+            variantsStart
+        )
+        const variants = service.slice(variantsStart, variantsEnd)
+        expect(variants).toContain('getWorkIdentityBinding(id)')
+        expect(variants).toContain('listWorkIdentityBindingsForWork(')
+        expect(variants).toContain('listWorkIdentityDecisionsForComic(id)')
+        expect(variants).toContain(
+            'listWorkIdentityProbableEvidenceForComic(id, 0.94)'
+        )
+        expect(variants).toContain(
+            'listWorkIdentityBindingsByComicIds(['
+        )
+        expect(variants).not.toContain(
+            'listWorkIdentityBindings(10000)'
+        )
+        expect(variants).not.toContain(
+            'listWorkIdentityDecisions(5000)'
+        )
+        expect(variants).not.toContain(
+            'listWorkIdentityEvidence(5000)'
+        )
         expect(service).not.toMatch(
             /workVariantsForComic[\s\S]{0,800}saveWorkIdentityEvidence/
         )

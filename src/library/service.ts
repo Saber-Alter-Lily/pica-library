@@ -3640,6 +3640,10 @@ export class LibraryService {
         return pica
     }
 
+    resetPicaSession() {
+        this.pica = null
+    }
+
     providerService() {
         return new ProviderService(
             () => this.connect(),

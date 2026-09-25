@@ -894,11 +894,15 @@ async function startEngine(preferredPort: number) {
             built.credentials.ehPassHash = previousCredentials?.ehPassHash
             built.credentials.ehIgneous = previousCredentials?.ehIgneous
             built.credentials.ehCfClearance = previousCredentials?.ehCfClearance
+            const picaCredentialsChanged =
+                previousCredentials?.account !== built.credentials.account ||
+                previousCredentials?.password !== built.credentials.password
             credentialsStore.save(built.credentials)
             saveConfig(paths.config, built.config)
             config = built.config
             credentials = built.credentials
             applyCredentials(credentials, config)
+            if (picaCredentialsChanged) service?.resetPicaSession()
             if (!wasConfigured)
                 desktop.csrfToken = randomBytes(32).toString('base64url')
             if (dataChanged) void restartEngine()

@@ -14,6 +14,7 @@ interface PreviewMetadata {
     size: number
     createdAt: number
     accessedAt: number
+    sourceFingerprint?: string
 }
 
 export class PreviewCacheManager {
@@ -69,10 +70,15 @@ export class PreviewCacheManager {
         }
     }
 
-    get(key: string) {
+    get(key: string, sourceFingerprint?: string) {
         const files = this.files(key)
         const metadata = this.readMetadata(files.metadata)
         if (!metadata || !fs.existsSync(files.data)) return null
+        if (
+            sourceFingerprint !== undefined &&
+            metadata.sourceFingerprint !== sourceFingerprint
+        )
+            return null
         if (this.now() - metadata.accessedAt > this.ttlMs) {
             fs.rmSync(files.data, { force: true })
             fs.rmSync(files.metadata, { force: true })
@@ -87,7 +93,12 @@ export class PreviewCacheManager {
         }
     }
 
-    put(key: string, data: Buffer, contentType: string) {
+    put(
+        key: string,
+        data: Buffer,
+        contentType: string,
+        sourceFingerprint?: string
+    ) {
         if (!contentType.startsWith('image/'))
             throw new Error('Preview cache accepts image content only')
         if (data.byteLength > this.maxBytes)
@@ -99,7 +110,8 @@ export class PreviewCacheManager {
             contentType,
             size: data.byteLength,
             createdAt: timestamp,
-            accessedAt: timestamp
+            accessedAt: timestamp,
+            ...(sourceFingerprint ? { sourceFingerprint } : {})
         }
         fs.writeFileSync(`${files.data}.part`, data)
         fs.writeFileSync(

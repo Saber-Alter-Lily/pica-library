@@ -59,6 +59,7 @@ describe('Preview cache and bounded preview fetching', () => {
             contentType: 'image/jpeg'
         }))
         const provider = {
+            cacheScope: vi.fn(() => 'pica:test-scope'),
             getEpisodes: vi.fn(async () => [
                 { id: 'episode', title: 'Chapter 1', order: 1, updated_at: '' }
             ]),

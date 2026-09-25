@@ -84,6 +84,19 @@ export class ProviderService {
             : 'eh'
     }
 
+    cacheScope(comicId: string) {
+        const revision = this.database.getComic(comicId)?.updatedAt ?? ''
+        if (comicId.startsWith('eh:')) {
+            const surface = this.ehSurfaceForComic(comicId)
+            return `eh:${surface}:${this.ehProvider.cachePartitionKey()}:${revision}`
+        }
+        const account = String(process.env.PICA_ACCOUNT ?? '').trim()
+        const accountFingerprint = createHash('sha256')
+            .update(account || 'anonymous')
+            .digest('hex')
+        return `pica:${accountFingerprint}:${revision}`
+    }
+
     private recordForOnlineSource(comic: Parameters<typeof providerComicToRecord>[0], source: OnlineSource) {
         const record = providerComicToRecord(comic)
         if (source === 'pica') return record

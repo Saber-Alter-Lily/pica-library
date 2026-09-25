@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G9 merged; G10 History local snapshot candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G10 merged; G11 direct-open evidence persistence candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,17 +1014,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G9 merged; G10 History local snapshot candidate**
+**Status: IN_PROGRESS — G1–G10 merged; G11 direct-open evidence persistence candidate**
 
-- **G1–G9 merged (PR #153–#161):** scalable local Catalog/Semantic/download/settings/browse/shelf/recommendation preparation has been removed from the audited first-frame/render paths.
-- **G10 finding:** HistoryActivity ran `ReadingHistoryStore.importLocalBookmarksOnce(this)` before rendering its shell, and every `renderList()` reparsed both ReadingHistoryStore and Unified Catalog. Range/date filter changes therefore repeated file/JSON work on the UI thread.
-- **G10 implemented:** `HistoryData(history, catalog)` is prepared on the existing single-thread worker. `onCreate()` now renders the shell first, then schedules local bookmark migration + History/Catalog loading.
-- Activity fields cache the latest History/Catalog snapshots. Date/range filters call the existing in-memory `ReadingHistoryStore.filter(historySnapshot,...)` and reuse the prepared Catalog for cover metadata.
-- Legacy WebDAV/Desktop import remains on the same serialized worker; after `importLegacy` it reloads one HistoryData on that worker before publishing the refreshed snapshot to UI.
-- `renderList()` contains no History/Catalog Store load. Existing grouping, chapter metadata, date headings, covers and resume/open-detail controls are unchanged.
-- **Deliberate non-scope:** explicit Continue Reading source checks, MainActivity direct-open Catalog lookup and Reader chapter-completion evidence metadata remain separate lower-frequency interaction paths.
-- **Next after G10:** audit those explicit direct-open/Reader evidence paths, then move into durable Worker process-death/relaunch, Task Center reconstruction and low-memory/background validation.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G10.md`.
+- **G1–G10 merged (PR #153–#162):** scalable Catalog/Semantic/download/settings/browse/shelf/recommendation/history preparation has been removed from the audited first-frame/render paths.
+- **G11 finding:** `MainActivity.openUnified()` synchronously loaded the entire Unified Catalog and then synchronously read/rewrote RecommendationEvidenceStore before launching comic detail.
+- The Catalog load was used only to enrich one `recommend_detail_open` event with tags/categories; the evidence recorder itself also performs persistent JSON I/O.
+- **G11 implemented:** `recordDetailOpenAsync(comicId, author)` captures application context and submits Catalog enrichment + evidence persistence to MainActivity's existing `requests` executor.
+- `openUnified()` now only schedules that task, builds the existing detail Intent and starts the detail Activity immediately.
+- The evidence task deliberately does not use page-level `pending`, so normal tab/page cancellation does not cancel an already-observed user detail-open action.
+- Event schema, dirty/sync semantics, author/tags/categories enrichment and detail navigation are unchanged.
+- **Next after G11:** ReaderActivity chapter-completion evidence enrichment/persistence on Reader's existing metadata executor, then transition from UI-thread I/O remediation into durable Worker process-death/relaunch, Task Center reconstruction and low-memory/background validation.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G11.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1038,6 +1038,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G11 direct-open evidence I/O hardening
+
+State update:
+- MainActivity.openUnified() previously synchronously loaded UnifiedCatalogStore, looked up one comic's tags/categories, synchronously loaded/rewrote RecommendationEvidenceStore through recordDetailOpen(), and only then launched detail.
+- G11 adds recordDetailOpenAsync(), using application context and MainActivity's existing requests executor for Catalog enrichment and evidence persistence.
+- openUnified() now contains no Catalog Store load and no direct evidence Store write; detail Activity launch is immediate after scheduling the evidence task.
+- The evidence task is not assigned to page-level pending, so ordinary tab/page cancellation does not cancel an already-recorded user interaction.
+- Recommendation evidence event type/schema, author/tags/categories semantics, bounded evidence retention, dirty/sync behavior and detail Intent extras are unchanged.
+- ReaderActivity reader_complete evidence remains outside G11 and is the explicit next owner-level batch.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G11.md.
 
 ## 2026-09-24 — P2-G10 History local snapshot hardening
 

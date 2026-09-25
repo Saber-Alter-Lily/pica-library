@@ -1,6 +1,7 @@
 package com.picalibrary.android;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -153,7 +154,29 @@ public class MainActivity extends LocaleAwareActivity {
     private ProgressBar loading(LinearLayout p){ProgressBar b=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);b.setIndeterminate(true);p.addView(b,new LinearLayout.LayoutParams(-1,Ui.dp(this,3)));return b;}
     private GridView grid(LinearLayout p){GridView g=new GridView(this);g.setNumColumns(columns);g.setHorizontalSpacing(Ui.dp(this,8));g.setVerticalSpacing(Ui.dp(this,8));g.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,12));g.setClipToPadding(false);p.addView(g,new LinearLayout.LayoutParams(-1,0,1));return g;}
 
-    private void openUnified(String comicId,String title,String author){UnifiedCatalogStore.Entry entry=UnifiedCatalogStore.load(this).byId.get(comicId);RecommendationEvidenceStore.recordDetailOpen(this,comicId,author,entry==null?Collections.emptyList():entry.tags,entry==null?Collections.emptyList():entry.categories);Intent i=new Intent(this,UnifiedComicDetailActivity.class);i.putExtra("comicId",comicId);i.putExtra("title",title);i.putExtra("author",author);startActivity(i);}
+    private void recordDetailOpenAsync(String comicId,String author){
+        Context app=getApplicationContext();
+        requests.submit(()->{
+            UnifiedCatalogStore.Entry entry=
+                UnifiedCatalogStore.load(app).byId.get(comicId);
+            RecommendationEvidenceStore.recordDetailOpen(
+                app,
+                comicId,
+                author,
+                entry==null?Collections.emptyList():entry.tags,
+                entry==null?Collections.emptyList():entry.categories
+            );
+        });
+    }
+
+    private void openUnified(String comicId,String title,String author){
+        recordDetailOpenAsync(comicId,author);
+        Intent i=new Intent(this,UnifiedComicDetailActivity.class);
+        i.putExtra("comicId",comicId);
+        i.putExtra("title",title);
+        i.putExtra("author",author);
+        startActivity(i);
+    }
 
     private void library(){
         LinearLayout p=page("我的书库","一个漫画只显示一次；手机、电脑、WebDAV、Pica、收藏和书架作为同一条目的属性",false);

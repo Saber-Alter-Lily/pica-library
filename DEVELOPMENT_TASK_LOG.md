@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1–D5B merged; D6A Visual favorite-domain candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1–D6A merged; D7A download-progress write candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -969,11 +969,13 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - **D5B merged (PR #129):** `workVariantsForComic()` uses targeted current binding, same-work bindings, current-comic decisions and current-comic probable evidence rather than global 10000/5000 relationship prefixes.
 - D5B preserves binding metadata for decision/evidence variants through a batched exact-ID binding lookup and keeps the intentional full-catalog creator/title/cover heuristic funnel unchanged.
 - Migration 15 adds only the missing right-side decision and left/right probable-evidence indexes needed by symmetric current-comic relationship reads.
-- **D6A implemented:** `visualPreferenceProfile()` and `visualIndexStatus()` use the complete dedicated `favoriteIds()` query instead of materializing a nominal 10000-row / effective 5000-row catalog prefix merely to recover favorite IDs.
+- **D6A merged (PR #130):** `visualPreferenceProfile()` and `visualIndexStatus()` use the complete dedicated `favoriteIds()` query instead of materializing a nominal 10000-row / effective 5000-row catalog prefix merely to recover favorite IDs.
 - D6A deliberately leaves Author Atlas / Style Families / Representation QC full-catalog inputs unchanged because those analyses use catalog/provider/favorite coverage denominators; blindly narrowing to embedding IDs would alter diagnostic meaning.
 - A 10001-favorite SQLite regression places the only embedded favorite outside the legacy effective 5000-row catalog prefix and requires both Visual preference evidence and index target counts to include it.
-- **Next after D6A:** inspect `comicSelect` correlated episode/picture aggregate cost and high-frequency download-progress/user-event writes versus foreground read latency; optimize remaining Visual/Work Identity full-domain analysis only with semantics-preserving aggregate/query evidence.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`.
+- **D7A implemented:** the existing 250 ms download-progress persistence cadence remains unchanged, but each persisted patch no longer performs a pre-read solely to recover unspecified fields. SQLite `COALESCE` preserves omitted fields, reducing the hot write shape from SELECT → UPDATE → SELECT to UPDATE → SELECT.
+- D7A regression preserves partial-patch semantics, explicit zero/empty-string writes, unknown-job failure behavior and the existing 250 ms service throttle.
+- **Next after D7A:** measure foreground latency under active downloads before changing persistence cadence, inspect bulk shelf/recommendation event writes for transactional batching, and separately investigate `comicSelect` correlated aggregate cost.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -987,6 +989,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D7A download progress write read-amplification
+
+State update:
+- Download progress persistence was already throttled to 250 ms per active job, but every persisted update still executed a leading `getDownloadJob()` only to fill omitted patch fields, followed by UPDATE and a second `getDownloadJob()` for the return value.
+- D7A moves omitted-field preservation into SQLite with `COALESCE`, reducing each persisted progress patch from SELECT → UPDATE → SELECT to UPDATE → SELECT.
+- Partial patch behavior is preserved: unspecified fields retain stored values, explicit numeric zero and empty chapter titles remain writable, and unknown job IDs still fail through the authoritative return lookup.
+- The 250 ms persistence interval, UI callback frequency, forced final persistence, download concurrency, media pacing and pause/resume/cancel semantics are unchanged.
+- D7A is a read-amplification cleanup, not evidence to tighten or relax the persistence cadence; that requires J1/J2 foreground-latency evidence under real active downloads.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D7A.md.
 
 ## 2026-09-24 — P2-D6A complete Visual favorite target domain
 

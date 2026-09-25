@@ -1996,6 +1996,10 @@ function waitForRecommendationStatusSignal(timeoutMs) {
     })
 }
 
+function requestRecommendationStatusWatch() {
+    document.dispatchEvent(new CustomEvent('pica-recommendation-watch'))
+}
+
 function finalCycleReady(status, previousCycleId) {
     return Boolean(
         status?.activeCycleId &&
@@ -3907,6 +3911,7 @@ $('#recommend-button').onclick = async () => {
             })
             if (!started.activeCycleId) {
                 $('#recommend-message').textContent = t('recommend.preparing')
+                requestRecommendationStatusWatch()
                 await waitForFinalCycle()
             }
             const value = await post('/api/v1/recommendations', {
@@ -3943,6 +3948,7 @@ $('#recommend-restart').onclick = async () => {
             appSessionId: state.appSessionId
         })
         $('#recommend-message').textContent = t('recommend.rebuilding')
+        requestRecommendationStatusWatch()
         await waitForFinalCycle(previousCycleId)
         const value = await post('/api/v1/recommendations', {
             action: 'current',

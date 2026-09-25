@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1 Author Works main-thread catalog/creator rebuild candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1 merged; G2 Comic Detail first-frame local-state candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,20 +1014,18 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1 Author Works local-state pipeline candidate**
+**Status: IN_PROGRESS — G1 merged; G2 Comic Detail local-state pipeline candidate**
 
-P2-F code remediation is closed for now. Android runtime hardening is the active architecture lane.
-
-- **G1 audit finding:** `UnifiedCatalogStore.load()` reads/parses the complete unified Catalog JSON; `EhSemanticStore.load()` reads/parses the complete E-H semantic JSON; `AuthorConceptStore.build(Context)` calls both and then rebuilds creator concepts across the catalog.
-- **G1 AuthorWorks issue:** the Activity previously ran `AuthorConceptStore.build(this)` in `onCreate()`, rebuilt again in `renderWorks()`, separately reloaded Unified Catalog, and rebuilt again from the UI callback after online refresh.
-- **G1 implemented:** reuse the Activity's existing single-thread executor. One worker-owned `LocalState` loads Unified Catalog once, loads E-H semantics once, builds Author concepts from those snapshots, and publishes only the resolved concept + catalog snapshot back to the UI.
-- `renderWorks()` is now in-memory only; `onCreate()` renders the shell before scheduling local data; online provider refresh rebuilds local state on the worker before one UI publication.
-- No creator identity, source filter, provider search, merge, ordering or navigation semantics change.
-- **Confirmed later hotspots:** UnifiedComicDetailActivity Catalog/creator/download-index reads; DownloadsActivity PhoneDownloadStore load + byte-stat scan; AuthorDirectoryActivity creator build; lower-frequency Theme/About/Recommendation settings file reads.
-- **Next after G1:** fix Comic Detail startup, then Downloads/Author Directory in separate evidence-backed batches.
-- Durable Worker process-death/relaunch audit and Task Center reconstruction remain separate P2-G work after UI-thread file/JSON hotspots are removed.
-- Android concurrency/resource budgets remain hardware-evidence gated.
-- Detailed boundary: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md`.
+- **G1 merged (PR #153):** Author Works no longer reads/rebuilds Unified Catalog + E-H semantics + Author concepts on the UI thread. Its render path consumes worker-prepared snapshots.
+- **G2 finding:** UnifiedComicDetailActivity previously loaded Unified Catalog in `onCreate()`, rebuilt Author concepts in `authorSummary()`, reloaded semantic/translation data in `tagLine()`, checked PhoneDownloadStore synchronously in `resolveSources()`, and reloaded Unified Catalog per same-work variant card.
+- **G2 implemented:** `onCreate()` now renders a lightweight loading shell and schedules one worker-owned `LocalDetailState` pipeline.
+- LocalDetailState loads Unified Catalog once, E-H semantics once, builds creator concepts from those snapshots, derives creator/tag presentation, checks phone-download availability, and prepares E-H favorite metadata before one UI publication.
+- Full detail render consumes only the prepared creator/tag/favorite/catalog snapshots; source probing remains asynchronous.
+- Same-work variant cards reuse the loaded catalog snapshot instead of reopening the catalog file per row.
+- Creator identity, tag translation, source priority, chapter ordering, same-work semantics, favorites/shelves/recommendation controls are unchanged.
+- **Next after G2:** DownloadsActivity PhoneDownloadStore/size-stat work, then AuthorDirectory/PicaBrowse local snapshot construction in separate batches.
+- Durable Worker/process-death/relaunch and Task Center reconstruction remain later P2-G work after first-frame UI-thread I/O is removed.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md`, `docs/ANDROID_RUNTIME_HARDENING_P2G2.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1041,6 +1039,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G2 Comic Detail first-frame local-state hardening
+
+State update:
+- UnifiedComicDetailActivity is a high-frequency destination from Library, Recommendation, Download, History, Author and Browse surfaces.
+- Its previous first-frame path synchronously parsed Unified Catalog in onCreate(), rebuilt Author concepts from Catalog+Semantic data, reloaded E-H semantic/translation data for tags, checked the phone-download index, and reopened Unified Catalog for each expanded same-work variant.
+- G2 adds a worker-owned LocalDetailState and shows a lightweight detail loading shell immediately.
+- The worker loads Catalog/Semantic snapshots once, builds Author concepts from those snapshots, derives creator/tag display, checks phone download state and loads initial E-H favorite metadata.
+- Full render then consumes only prepared state; resolveSources receives the precomputed phone-download flag and existing provider probes remain asynchronous.
+- workVariantEntry() now uses the already-loaded catalog snapshot rather than reopening the file per card.
+- Initial E-H action rendering uses the worker-prepared favorite snapshot; remote favorite mutation refreshes that snapshot off-thread before returning to UI.
+- No creator/tag/source/chapter/work-variant/favorite/shelf/recommendation semantics are intentionally changed.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G2.md.
 
 ## 2026-09-24 — P2-G1 Author Works main-thread local-state hardening
 

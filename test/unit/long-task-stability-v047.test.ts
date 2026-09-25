@@ -116,6 +116,12 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(activity).toContain('private void renderList(DownloadState state)')
         expect(activity).toContain('private void deleteDownload(String comicId)')
         expect(activity).toContain('PhoneDownloadStore.remove(this,comicId)')
+        expect(activity).toContain('private boolean destroyed')
+        expect(activity).toContain('private int loadGeneration')
+        expect(activity).toContain('if(destroyed||generation!=loadGeneration)return')
+        expect(activity).toContain(
+            '@Override protected void onDestroy(){destroyed=true;loadGeneration++;worker.shutdownNow();super.onDestroy();}'
+        )
 
         const renderStart = activity.indexOf('private void renderList(DownloadState state)')
         const renderEnd = activity.indexOf('private void open(', renderStart)

@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G6 merged; G7 Pica Browse render snapshot candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G7 merged; G8 Main Bookshelves snapshot candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,22 +1014,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G6 merged; G7 Pica Browse render snapshot candidate**
+**Status: IN_PROGRESS — G1–G7 merged; G8 Main Bookshelves snapshot candidate**
 
 - **G1 merged (PR #153):** Author Works local Catalog/Semantic/creator reconstruction is worker-owned.
-- **G2 merged (PR #154):** Comic Detail initial Catalog/Semantic/creator/PhoneDownload/E-H favorite preparation is worker-owned.
-- **G3 merged (PR #155):** Downloads persistent-index parsing, size stats and delete refresh are worker-owned.
-- **G4 merged (PR #156):** Main Library local-reference reconciliation is worker-owned behind the Library shell.
-- **G5 merged (PR #157):** Main Settings heavy summary Store/stat work is prepared in one worker-owned SettingsSummary.
-- **G6 merged (PR #158):** Author Directory renders its shell first; Catalog/Semantic/creator concept construction runs on an Activity-local worker.
-- **G7 finding:** PicaBrowse provider/network work was already worker-owned, but `showIds()` synchronously reloaded Unified Catalog + E-H Semantic + Tag Translation on the UI thread for every result set.
-- **G7 implemented:** one worker-owned `BrowseRenderState` now carries IDs/label/pages plus Catalog/Semantic/Translation snapshots. `showIds(BrowseRenderState)` is UI-only.
-- Provider search/browse/favorites/leaderboard/category and combined-source paths prepare render state before UI publication.
-- E-H favorite-slot selection and Tag Translation update callbacks also route through worker preparation, eliminating their former UI-thread Store loads.
-- Pica favorites write/merge behavior, provider semantics, ordering, tag translation, pagination and cover loading remain unchanged.
-- **Next after G7:** MainActivity Bookshelves local Shelf/Catalog preparation, then MainActivity Recommendation Portable/Catalog/NativeRecommendation preparation, followed by History/Reader local-state paths.
+- **G2 merged (PR #154):** Comic Detail initial local preparation is worker-owned.
+- **G3 merged (PR #155):** Downloads persistent-index/stat/delete refresh work is worker-owned.
+- **G4 merged (PR #156):** Main Library local-reference reconciliation is worker-owned.
+- **G5 merged (PR #157):** Main Settings heavy summary I/O is worker-owned.
+- **G6 merged (PR #158):** Author Directory creator-concept construction is worker-owned.
+- **G7 merged (PR #159):** PicaBrowse result rendering consumes worker-prepared Catalog/Semantic/Translation snapshots.
+- **G8 finding:** MainActivity Bookshelves synchronously loaded ShelfStore and WebDAV config in page construction, while `renderShelves()` synchronously loaded Unified Catalog. WebDAV failure also reloaded ShelfStore on the UI thread.
+- **G8 implemented:** one worker-owned `ShelfPageState` carries Shelf + Catalog + remote map + source label/config state. Bookshelves renders a shell first and publishes only prepared state through existing `serial/valid(id)`.
+- WebDAV success prepares the reconciled Catalog + remote Catalog map on the worker; failure prepares a complete local fallback state before UI publication.
+- The refresh path no longer calls an explicit second `UnifiedCatalogStore.reconcileLocalReferences()` after `ShelfStore.save()`, because ShelfStore.save already performs that reconciliation.
+- `renderShelves()` contains no Shelf/Catalog/RemoteConfig Store read. Availability priority, active shelf persistence, WebDAV refresh semantics and card navigation are unchanged.
+- **Next after G8:** MainActivity Recommendation tab Portable/Catalog/NativeRecommendation preparation, then direct-open + History/Reader local-state paths.
 - Durable Worker process-death/relaunch, Task Center reconstruction, low-memory/background behavior and Android resource budgets remain later P2-G work.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G7.md`.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G8.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1043,6 +1044,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G8 Main Bookshelves local-state hardening
+
+State update:
+- MainActivity Bookshelves previously loaded ShelfStore and RemoteConfig synchronously during page construction; renderShelves then loaded Unified Catalog synchronously for availability labels.
+- WebDAV refresh failure returned to UI and loaded ShelfStore again; the success path also called an explicit UnifiedCatalogStore.reconcileLocalReferences() immediately after ShelfStore.save(), even though ShelfStore.save already performs reconciliation.
+- G8 adds ShelfPageState(shelves, catalog, remote, sourceLabel, remoteConfigured) and worker-owned readLocalShelfState().
+- Initial Bookshelves page renders its shell/status immediately, then loads Shelf/Catalog/config on the existing requests executor before one valid(id)-guarded publication.
+- WebDAV success publishes a worker-prepared state using the Catalog already reconciled by ShelfStore.save; the redundant explicit reconcile is removed.
+- WebDAV failure prepares its local fallback Shelf+Catalog state on the worker before UI publication.
+- renderShelves() is Store-free and preserves shelf ordering, active shelf persistence, availability priority, refresh semantics and navigation.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G8.md.
 
 ## 2026-09-24 — P2-G7 Pica Browse render snapshot hardening
 

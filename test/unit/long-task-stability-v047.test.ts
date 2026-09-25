@@ -298,6 +298,12 @@ describe('v0.4.7 long-task stability contract', () => {
         const recovery = read(
             'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/WorkerForceStopRecoveryTest.java'
         )
+        const seedActivity = read(
+            'mobile/android-alpha2/app/src/debug/java/com/picalibrary/android/WorkerForceStopSeedActivity.java'
+        )
+        const debugManifest = read(
+            'mobile/android-alpha2/app/src/debug/AndroidManifest.xml'
+        )
         const probe = read(
             'mobile/android-alpha2/app/src/debug/java/com/picalibrary/android/WorkerRecoveryProbeWorker.java'
         )
@@ -319,7 +325,12 @@ describe('v0.4.7 long-task stability contract', () => {
             'NativeRecommendationJobs.complete(getApplicationContext())'
         )
 
-        expect(recovery).toContain('seedDurableRecoveryStateAndAwaitForceStop()')
+        expect(seedActivity).toContain('public final class WorkerForceStopSeedActivity')
+        expect(seedActivity).toContain('awaitState(manager, probe.getId(), WorkInfo.State.RUNNING)')
+        expect(seedActivity).toContain('writeFile(READY_FILE')
+        expect(debugManifest).toContain('android:name=".WorkerForceStopSeedActivity"')
+        expect(debugManifest).toContain('android:exported="true"')
+        expect(recovery).not.toContain('seedDurableRecoveryStateAndAwaitForceStop()')
         expect(recovery).toContain('verifyDurableRecoveryStateAfterForceStop()')
         expect(recovery).toContain(
             'assertNotEquals("verification must run in a fresh process"'
@@ -331,6 +342,9 @@ describe('v0.4.7 long-task stability contract', () => {
         )
         expect(probe).toContain('while (!isStopped()) Thread.sleep(200L)')
         expect(probe).toContain('RUN_COUNT_FILE = "p2-g15-probe-run-count"')
+        expect(runner).toContain(
+            '$TARGET_PACKAGE/com.picalibrary.android.WorkerForceStopSeedActivity'
+        )
         expect(runner).toContain('files/p2-g15-ready')
         expect(runner).toContain('adb shell am force-stop "$TARGET_PACKAGE"')
         expect(runner).toContain(

@@ -82,6 +82,39 @@ if adb shell pidof "$TARGET_PACKAGE" 2>/dev/null | grep -q '[0-9]'; then
     exit 1
 fi
 
+# A force-stopped package is intentionally prevented from running background work.
+# Re-enter the app through its normal launcher, then require WorkManager to reconstruct
+# the unfinished RUNNING probe in the newly started process.
+adb shell monkey -p "$TARGET_PACKAGE" -c android.intent.category.LAUNCHER 1 \
+    >"$RESULT_DIR/relaunch.txt" 2>&1
+
+probe_run_count=0
+recovered=0
+for _ in $(seq 1 80); do
+    raw_count="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g15-probe-run-count" 2>/dev/null | tr -d '\r\n' || true)"
+    if [[ "$raw_count" =~ ^[0-9]+$ ]]; then
+        probe_run_count="$raw_count"
+        if (( probe_run_count >= 2 )); then
+            recovered=1
+            break
+        fi
+    fi
+    sleep 0.25
+done
+
+if [[ "$recovered" != "1" ]]; then
+    adb logcat -d >"$RESULT_DIR/logcat-after-relaunch.txt" || true
+    echo "WorkManager probe did not execute again after explicit app relaunch; runCount=$probe_run_count" >&2
+    exit 1
+fi
+
+relaunch_pid="$(adb shell pidof "$TARGET_PACKAGE" 2>/dev/null | tr -d '\r' || true)"
+printf '%s\n' "$relaunch_pid" > "$RESULT_DIR/relaunch-process.txt"
+if [[ -z "$relaunch_pid" || "$relaunch_pid" == "$seed_pid" ]]; then
+    echo "App relaunch did not produce a fresh target process" >&2
+    exit 1
+fi
+
 run_case verifyDurableRecoveryStateAfterForceStop
 
 verify_pid="$(adb shell pidof "$TARGET_PACKAGE" 2>/dev/null | tr -d '\r' || true)"
@@ -92,10 +125,14 @@ cat > "$RESULT_DIR/result.json" <<JSON
   "task": "P2-G15",
   "targetPackage": "$TARGET_PACKAGE",
   "forceStopCommand": "adb shell am force-stop $TARGET_PACKAGE",
-  "seedInstrumentation": "PASS",
+  "relaunchCommand": "adb shell monkey -p $TARGET_PACKAGE -c android.intent.category.LAUNCHER 1",
+  "seedInstrumentation": "FORCE_STOPPED_AS_DESIGNED",
+  "probeRecoveredAfterRelaunch": true,
+  "probeRunCount": $probe_run_count,
   "verifyInstrumentation": "PASS",
-  "seedProcessObservedAfterInvocation": "$seed_pid",
-  "verifyProcessObservedAfterInvocation": "$verify_pid"
+  "seedProcess": "$seed_pid",
+  "relaunchProcess": "$relaunch_pid",
+  "verifyProcess": "$verify_pid"
 }
 JSON
 

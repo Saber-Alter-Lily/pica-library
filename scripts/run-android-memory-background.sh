@@ -14,6 +14,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+read_app_file_if_exists() {
+    local path="$1"
+    if adb shell run-as "$TARGET_PACKAGE" test -f "$path" >/dev/null 2>&1; then
+        adb exec-out run-as "$TARGET_PACKAGE" cat "$path" 2>/dev/null || true
+    fi
+}
+
 cd "$ANDROID_DIR"
 gradle :app:assembleDebug --stacktrace
 
@@ -29,7 +36,7 @@ adb shell am start -W     -n "$TARGET_PACKAGE/com.picalibrary.android.MemoryPres
 
 before=""
 for _ in $(seq 1 40); do
-    before="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-memory-before" 2>/dev/null || true)"
+    before="$(read_app_file_if_exists "files/p2-g16-memory-before")"
     [[ "$before" == pid=* ]] && break
     sleep 0.25
 done
@@ -51,7 +58,7 @@ adb shell am start -W     -n "$TARGET_PACKAGE/com.picalibrary.android.MemoryPres
 
 after=""
 for _ in $(seq 1 40); do
-    after="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-memory-after" 2>/dev/null || true)"
+    after="$(read_app_file_if_exists "files/p2-g16-memory-after")"
     [[ "$after" == pid=* ]] && break
     sleep 0.25
 done
@@ -77,10 +84,10 @@ adb shell am start -W     -n "$TARGET_PACKAGE/com.picalibrary.android.Background
 
 ready=""
 for _ in $(seq 1 80); do
-    ready="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-ready" 2>/dev/null || true)"
+    ready="$(read_app_file_if_exists "files/p2-g16-background-ready")"
     [[ "$ready" == "READY workId="* ]] && break
     if adb shell run-as "$TARGET_PACKAGE" test -s "files/p2-g16-background-failure" >/dev/null 2>&1; then
-        failure="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-failure" 2>/dev/null || true)"
+        failure="$(read_app_file_if_exists "files/p2-g16-background-failure")"
         printf '%s\n' "$failure" >&2
         exit 1
     fi
@@ -92,7 +99,7 @@ if [[ "$ready" != "READY workId="* ]]; then
     exit 1
 fi
 
-initial_count="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-run-count" 2>/dev/null | tr -d '\r\n' || true)"
+initial_count="$(read_app_file_if_exists "files/p2-g16-background-run-count" | tr -d '\r\n')"
 if [[ -n "$initial_count" && "$initial_count" != "0" ]]; then
     echo "Background probe executed before Doze was applied: $initial_count" >&2
     exit 1
@@ -105,7 +112,7 @@ adb shell dumpsys deviceidle >"$RESULT_DIR/deviceidle-forced-state.txt"
 # The WorkRequest has a 15 s initial delay. Stay in forced Doze beyond that boundary.
 sleep 22
 
-doze_count="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-run-count" 2>/dev/null | tr -d '\r\n' || true)"
+doze_count="$(read_app_file_if_exists "files/p2-g16-background-run-count" | tr -d '\r\n')"
 if [[ -n "$doze_count" && "$doze_count" != "0" ]]; then
     echo "WorkManager probe executed while device was forced into Doze: $doze_count" >&2
     exit 1
@@ -118,7 +125,7 @@ adb shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1 || true
 recovered=0
 run_count=0
 for _ in $(seq 1 240); do
-    raw="$(adb exec-out run-as "$TARGET_PACKAGE" cat "files/p2-g16-background-run-count" 2>/dev/null | tr -d '\r\n' || true)"
+    raw="$(read_app_file_if_exists "files/p2-g16-background-run-count" | tr -d '\r\n')"
     if [[ "$raw" =~ ^[0-9]+$ ]]; then
         run_count="$raw"
         if (( run_count >= 1 )); then

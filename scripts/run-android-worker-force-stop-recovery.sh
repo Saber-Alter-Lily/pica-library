@@ -70,10 +70,25 @@ if [[ -z "$seed_pid" ]]; then
 fi
 
 adb shell am force-stop "$TARGET_PACKAGE"
-sleep 1
 
-if adb shell pidof "$TARGET_PACKAGE" 2>/dev/null | grep -q '[0-9]'; then
-    echo "Target process survived adb force-stop" >&2
+# am force-stop is asynchronous with respect to process teardown on some emulator builds.
+# Require eventual process death, but do not fail on a short-lived PID during teardown.
+stopped=0
+post_force_pid=""
+for _ in $(seq 1 40); do
+    post_force_pid="$(adb shell pidof "$TARGET_PACKAGE" 2>/dev/null | tr -d '\r' || true)"
+    if [[ -z "$post_force_pid" ]]; then
+        stopped=1
+        break
+    fi
+    sleep 0.25
+done
+printf '%s\n' "$post_force_pid" > "$RESULT_DIR/post-force-process.txt"
+
+if [[ "$stopped" != "1" ]]; then
+    adb shell ps -A >"$RESULT_DIR/post-force-ps.txt" 2>&1 || true
+    adb shell dumpsys activity processes >"$RESULT_DIR/post-force-activity-processes.txt" 2>&1 || true
+    echo "Target process survived adb force-stop after 10s; pid=$post_force_pid" >&2
     exit 1
 fi
 

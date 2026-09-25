@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1 merged; F2 scoped UX polish observers candidate; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1/F2 merged; F3 selection-status render authority candidate; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,15 +1001,14 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1 merged; F2 scoped UX polish observers candidate**
+**Status: IN_PROGRESS — F1/F2 merged; F3 one-render-authority selection streams candidate**
 
-- **F1 merged (PR #138):** the always-on 2.5 second Theme decoration fallback is removed. Theme decoration remains event-driven and coalesced; authoritative Recommendation build polling remains intact.
-- **F2 implemented:** `ui-polish-v5.js` no longer observes the entire `document.body` subtree and reruns the Settings/Downloads installer bundle for unrelated comic/Reader/Recommendation mutations.
-- Settings-owned dynamic polish now observes only `#settings`; Downloads polish observes only `#downloads`; both retain one animation-frame coalescing guard.
-- Dialog backdrop-close behavior is now one delegated `document.body` click handler, so dynamically inserted dialogs no longer require a body-wide rescan or per-dialog listener installation.
-- Existing selection-status, Visual QC, Product, Settings Hub and onboarding observers are unchanged in F2 and remain separate audit targets.
-- **Next after F2:** give selection status streams one matching render authority, then audit the remaining broad body observers and persistent backend pollers one by one.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`.
+- **F1 merged (PR #138):** remove the always-on Theme decoration fallback while preserving event-driven decoration and active Recommendation task polling.
+- **F2 merged (PR #139):** replace the body-wide UX polish observer with scoped `#settings` and `#downloads` observers; dynamically inserted dialog backdrop behavior is owned by one delegated body click handler.
+- **F3 implemented:** each selection-status source now owns exactly one matching render function: Library → Library bar, Recommendation → Recommendation bar, Search → Search bar.
+- F3 preserves the existing selection state, mutation types and bulk-action semantics; it removes only unrelated cross-view recalculation.
+- **Next after F3:** make the uncoalesced body-wide `v040-parity.js` tag/detail observer incremental and coalesced, then continue through the remaining broad Product/Hub/Onboarding/Visual observers and persistent backend pollers.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1023,6 +1022,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F3 one render authority per selection stream
+
+State update:
+- Library, Recommendation and Search already expose three separate selection-status DOM nodes and three separate selection-bar render functions.
+- Previously every one of those three MutationObservers invoked all three render functions, so a Library selection change also recalculated Recommendation and Search selection bars, and vice versa.
+- F3 registers each status selector with exactly one matching render authority.
+- The observed mutation types remain childList + characterData + subtree, and selection parsing/bulk-action semantics are unchanged.
+- Web UX regression requires the three selector/render pairs and forbids the former three-render callback sequence.
+- F3 changes only render ownership; it does not alter selection state, result cards, bulk actions, scroll/focus behavior, task polling or the F2 scoped Settings/Downloads observers.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md.
 
 ## 2026-09-24 — P2-F2 scoped UX polish observers
 

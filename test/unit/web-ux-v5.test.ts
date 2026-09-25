@@ -293,6 +293,23 @@ describe('V5 Web UX audit contract', () => {
         expect(polish).not.toContain("dialog.addEventListener('click'")
     })
 
+    it('gives each selection status stream one render authority', () => {
+        const polish = read('web/ui-polish-v5.js')
+        expect(polish).toContain(
+            "['#library-selection-status', updateLibrarySelectionBar]"
+        )
+        expect(polish).toContain(
+            "['#recommend-selection-status', updateRecommendationSelectionBar]"
+        )
+        expect(polish).toContain(
+            "['#search-selection-status', updateSearchSelectionBar]"
+        )
+        expect(polish).toContain('new MutationObserver(() => render())')
+        expect(polish).not.toContain(
+            'updateLibrarySelectionBar()\n            updateRecommendationSelectionBar()\n            updateSearchSelectionBar()'
+        )
+    })
+
     it('uses one-step import and guards long Desktop operations', () => {
         const index = read('web/index.html')
         const i18n = read('web/i18n.js')

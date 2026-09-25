@@ -579,18 +579,18 @@ function refreshUxCopy() {
 }
 
 function installObservers() {
-    for (const selector of [
-        '#library-selection-status',
-        '#recommend-selection-status',
-        '#search-selection-status'
+    for (const [selector, render] of [
+        ['#library-selection-status', updateLibrarySelectionBar],
+        ['#recommend-selection-status', updateRecommendationSelectionBar],
+        ['#search-selection-status', updateSearchSelectionBar]
     ]) {
         const node = ux$(selector)
         if (!node) continue
-        new MutationObserver(() => {
-            updateLibrarySelectionBar()
-            updateRecommendationSelectionBar()
-            updateSearchSelectionBar()
-        }).observe(node, { childList: true, characterData: true, subtree: true })
+        new MutationObserver(() => render()).observe(node, {
+            childList: true,
+            characterData: true,
+            subtree: true
+        })
     }
 
     let settingsPolishQueued = false

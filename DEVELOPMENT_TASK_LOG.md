@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F3 merged; F4 incremental parity mutation processing candidate; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1–F4 merged; F5 incremental Product source cleanup candidate; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,17 +1001,16 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F3 merged; F4 incremental parity observer candidate**
+**Status: IN_PROGRESS — F1–F4 merged; F5 incremental Product cleanup candidate**
 
-- **F1 merged (PR #138):** remove the always-on Theme decoration fallback while preserving event-driven decoration and active Recommendation task polling.
-- **F2 merged (PR #139):** replace the body-wide UX polish observer with scoped Settings/Downloads owners and delegated dialog backdrop handling.
-- **F3 merged (PR #140):** Library, Recommendation and Search selection-status streams each update only their matching selection bar.
-- **F4 implemented:** `v040-parity.js` still uses one body MutationObserver as a compatibility-layer entry point, but it no longer runs full-document tag/category translation plus detail-author checks after every child mutation.
-- F4 collects only mutation-added/changed subtrees, coalesces them into one animation frame, translates only those roots, and runs detail-author enhancement only when `#recommend-detail-content` was touched.
-- Translation writes now check whether text actually changed, preventing parity translation from feeding unnecessary child mutations back into its own observer.
-- Full-document translation remains only for explicit translation-database load and language-change authority.
-- **Next after F4:** audit Product source-entry cleanup, Settings Hub, onboarding and Visual QC broad observers, then inventory persistent backend pollers by owner/start/stop lifecycle.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`.
+- **F1 merged (PR #138):** remove redundant Theme idle polling.
+- **F2 merged (PR #139):** scope UX polish observers to Settings/Downloads and delegate dialog backdrop handling.
+- **F3 merged (PR #140):** give each selection-status stream one matching render authority.
+- **F4 merged (PR #141):** make v0.4 parity tag/detail mutation processing incremental and animation-frame coalesced instead of full-document per mutation.
+- **F5 implemented:** Product source-entry cleanup retains one initial full-page pass, but subsequent body mutations collect only added/changed subtrees and scan links/buttons only within those roots.
+- F5 keeps the body observer as the broad insertion event source because dynamic source entry points can originate from multiple modules, while removed-only/self-cleanup mutations no longer schedule another scan.
+- **Next after F5:** scope Settings Hub observer ownership, then audit onboarding and Visual QC broad observers and persistent backend pollers.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1025,6 +1024,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F5 incremental Product source-entry cleanup
+
+State update:
+- alpha8-product.js performs an intentional initial scan to remove ordinary-product source-code entry points, but its dynamic body observer previously rescanned every a/button in the document after any child mutation.
+- F5 keeps the initial full cleanup but changes dynamic processing to MutationObserver records + pendingSourceRoots + one requestAnimationFrame pass.
+- Only mutation.addedNodes (or their parent elements for text insertions) become cleanup roots; each root is scanned only for a/button descendants.
+- Source-link removal itself produces removed-only mutations, which no longer schedule another cleanup pass.
+- The body observer remains the insertion event source because source entry points may be inserted by several modules; the work is now incremental rather than a full-document rescan.
+- The existing source/open-source text policy, Product appearance/support behavior, personalization, update ownership and language behavior are unchanged.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md.
 
 ## 2026-09-24 — P2-F4 incremental v0.4 parity mutation processing
 

@@ -480,6 +480,25 @@ async function reloadReviewAfterEvidenceRefresh() {
     renderReview()
 }
 
+function waitForTaskPollDelay(visibleMs, hiddenMs = 3000) {
+    return new Promise((resolve) => {
+        let timer = null
+        const finish = () => {
+            if (timer) window.clearTimeout(timer)
+            document.removeEventListener('visibilitychange', onVisibility)
+            resolve()
+        }
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') finish()
+        }
+        document.addEventListener('visibilitychange', onVisibility)
+        timer = window.setTimeout(
+            finish,
+            document.visibilityState === 'hidden' ? hiddenMs : visibleMs
+        )
+    })
+}
+
 async function watchEvidenceRefresh() {
     const generation = ++IDENTITY.scanPollGeneration
     while (generation === IDENTITY.scanPollGeneration) {
@@ -505,7 +524,7 @@ async function watchEvidenceRefresh() {
                 await reloadReviewAfterEvidenceRefresh()
             return
         }
-        await new Promise((resolve) => setTimeout(resolve, 500))
+        await waitForTaskPollDelay(500)
     }
 }
 

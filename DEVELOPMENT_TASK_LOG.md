@@ -1001,17 +1001,18 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F10 merged; F11 event-driven Onboarding readiness candidate**
+**Status: IN_PROGRESS — F1–F11 merged; F12 visibility-aware analysis pollers candidate**
 
 - **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or processed incrementally/coalesced.
 - **F9 merged (PR #146):** WebDAV progress reattaches after reload and has explicit terminal/start/page lifecycle ownership.
-- **F10 merged (PR #147):** Theme Help is the normal Recommendation final-cycle poll authority; App consumes its local status signal with bounded fallback instead of running a parallel fixed poll loop.
-- **F11 implemented:** remove Onboarding's recursive 500 ms readiness retry while preserving the existing 650 ms initial check.
-- Setup readiness is now observed only on `#setup` class/hidden/style changes; disclaimer mount/unmount reuses the existing incremental Onboarding body observer; visibility restoration performs one readiness check.
-- Once the welcome is shown or `shouldPrompt()` becomes false, F11 clears the pending timeout, disconnects the Setup observer and removes the visibility listener.
-- First-run conditions, disclaimer gating, Setup gating, onboarding state/version rules, step order and driver.js behavior are unchanged.
-- **Next after F11:** audit hidden/background-tab behavior for task-owned pollers and collect browser traces. Only pause/defer purely presentational work where visibility loss does not weaken task control or recovery.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, plus `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md`, `P2F10.md`, and `P2F11.md`.
+- **F10 merged (PR #147):** Recommendation final-cycle status has one normal polling authority with App fallback only when the shared signal is absent/stale.
+- **F11 merged (PR #148):** Onboarding readiness is event-driven; the recursive 500 ms retry loop is removed.
+- **F12 implemented:** Work Identity evidence refresh and Recommendation V5 shadow evaluation retain their existing 500/600 ms foreground status cadence, but hidden-page waits extend to 3000 ms.
+- Both visibility-aware waits resolve immediately when the document becomes visible, so progress refresh is not delayed after the user returns.
+- F12 is deliberately limited to analysis/development status surfaces. E-H login, updater, Recommendation build, WebDAV and Downloads keep their existing lifecycle/cadence because their control/recovery semantics differ.
+- Backend task execution, pause/resume/cancel, task recovery and output semantics are unchanged.
+- **Next after F12:** collect representative browser traces for foreground/hidden analysis tasks and verify no remaining high-frequency poller lacks clear task/view authority before closing P2-F.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, plus `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1025,6 +1026,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F12 visibility-aware analysis task polling
+
+State update:
+- Hidden-tab audit found two long-running analysis/development status loops that continued foreground-rate polling while the page was hidden: Work Identity evidence refresh (500 ms) and Recommendation V5 shadow evaluation (600 ms).
+- F12 keeps those foreground cadences unchanged but extends hidden-page waits to 3000 ms.
+- Each visibility-aware delay registers one temporary visibilitychange listener and resolves immediately when the document becomes visible, so returning to the page triggers the next status request without waiting for the full hidden delay.
+- Existing duplicate-watcher authorities remain unchanged: scanPollGeneration for Work Identity and EVAL.runningShadow for V5 shadow evaluation.
+- E-H login, updater, Recommendation build, WebDAV and Downloads are intentionally excluded because their user-control/recovery ownership differs and the audit found no safe generic throttle to apply.
+- Backend task execution, task outputs, pause/resume/cancel and recovery semantics are unchanged.
+- Detailed boundary: docs/FRONTEND_POLLER_DISCIPLINE_P2F12.md.
 
 ## 2026-09-24 — P2-F11 event-driven Onboarding readiness
 

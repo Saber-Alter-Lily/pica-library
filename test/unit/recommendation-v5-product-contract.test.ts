@@ -1010,6 +1010,38 @@ describe('Recommendation V5 portable product contract', () => {
         expect(app).toContain("'pica-open-reader'")
     })
 
+    it('throttles analysis-only task polling while the page is hidden', () => {
+        const workIdentity = read('web/work-identity-review.js')
+        const evaluation = read('web/recommendation-v5-evaluation.js')
+
+        expect(workIdentity).toContain(
+            'function waitForTaskPollDelay(visibleMs, hiddenMs = 3000)'
+        )
+        expect(workIdentity).toContain(
+            "document.visibilityState === 'hidden' ? hiddenMs : visibleMs"
+        )
+        expect(workIdentity).toContain(
+            "if (document.visibilityState === 'visible') finish()"
+        )
+        expect(workIdentity).toContain(
+            'await waitForTaskPollDelay(500)'
+        )
+        expect(workIdentity).not.toContain(
+            'await new Promise((resolve) => setTimeout(resolve, 500))'
+        )
+
+        expect(evaluation).toContain(
+            'function evalDelay(milliseconds, hiddenMilliseconds = 3000)'
+        )
+        expect(evaluation).toContain(
+            "document.visibilityState === 'hidden'"
+        )
+        expect(evaluation).toContain(
+            "if (document.visibilityState === 'visible') finish()"
+        )
+        expect(evaluation).toContain('await evalDelay(600)')
+    })
+
     it('makes Visual QC detail reading independent of the current page DOM', () => {
         const qc = read('web/visual-qc.js')
         expect(qc).toContain("'pica-open-reader'")

@@ -750,8 +750,26 @@ function evalShadowProgressStatus(task) {
     )
 }
 
-const evalDelay = (milliseconds) =>
-    new Promise((resolve) => setTimeout(resolve, milliseconds))
+function evalDelay(milliseconds, hiddenMilliseconds = 3000) {
+    return new Promise((resolve) => {
+        let timer = null
+        const finish = () => {
+            if (timer) window.clearTimeout(timer)
+            document.removeEventListener('visibilitychange', onVisibility)
+            resolve()
+        }
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') finish()
+        }
+        document.addEventListener('visibilitychange', onVisibility)
+        timer = window.setTimeout(
+            finish,
+            document.visibilityState === 'hidden'
+                ? hiddenMilliseconds
+                : milliseconds
+        )
+    })
+}
 
 async function evalShadowControl(action) {
     try {

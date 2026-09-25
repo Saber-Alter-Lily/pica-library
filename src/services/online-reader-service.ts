@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import pLimit from 'p-limit'
 import type { LibraryDatabase } from '../library/database'
 import type { Episode, Picture } from '../types'
@@ -21,7 +22,7 @@ export class OnlineReaderService {
         private readonly database: LibraryDatabase,
         private readonly provider: Pick<
             ProviderService,
-            'getEpisodes' | 'getEpisodePages' | 'fetchPage'
+            'getEpisodes' | 'getEpisodePages' | 'fetchPage' | 'cacheScope'
         >,
         private readonly cache: PreviewCacheManager
     ) {}
@@ -43,7 +44,9 @@ export class OnlineReaderService {
 
     async chapters(comicId: string) {
         this.comicId(comicId)
-        let episodes = this.albums.get(comicId)
+        const scope = this.provider.cacheScope(comicId)
+        const albumKey = `${scope}\n${comicId}`
+        let episodes = this.albums.get(albumKey)
         if (!episodes) {
             episodes = await this.provider.getEpisodes(comicId)
             episodes = episodes.map((episode) => ({
@@ -52,7 +55,7 @@ export class OnlineReaderService {
             }))
             if (this.albums.size >= 20)
                 this.albums.delete(this.albums.keys().next().value!)
-            this.albums.set(comicId, episodes)
+            this.albums.set(albumKey, episodes)
         }
         return episodes.map(({ id, title, order }) => ({
             id,
@@ -65,12 +68,14 @@ export class OnlineReaderService {
     private async metadata(comicId: string, episodeId: string) {
         this.comicId(comicId)
         this.episodeId(episodeId)
-        const key = `${comicId}:${episodeId}`
+        const scope = this.provider.cacheScope(comicId)
+        const albumKey = `${scope}\n${comicId}`
+        const key = `${scope}\n${comicId}\n${episodeId}`
         let value = this.chaptersCache.get(key)
         if (!value) {
             await this.chapters(comicId)
             const episode = this.albums
-                .get(comicId)
+                .get(albumKey)
                 ?.find((entry) => entry.id === episodeId)
             if (!episode) throw new Error('此漫画中不存在该章节')
             const pictures = await this.provider.getEpisodePages(
@@ -114,20 +119,31 @@ export class OnlineReaderService {
         )
             throw new Error('阅读页码无效')
         const key = `${comicId}:${episodeId}:${index}`
-        const cached = this.cache.get(key)
+        const sourceFingerprint = createHash('sha256')
+            .update(
+                `${this.provider.cacheScope(comicId)}\n${pictures[index].url}`
+            )
+            .digest('hex')
+        const cached = this.cache.get(key, sourceFingerprint)
         if (cached) return cached
-        const pending = this.pendingImages.get(key)
+        const pendingKey = `${key}:${sourceFingerprint}`
+        const pending = this.pendingImages.get(pendingKey)
         if (pending) return pending
         const request = this.imageLimit(async () => {
             const image = await this.provider.fetchPage(pictures[index].url)
-            this.cache.put(key, image.data, image.contentType)
+            this.cache.put(
+                key,
+                image.data,
+                image.contentType,
+                sourceFingerprint
+            )
             return image
         })
-        this.pendingImages.set(key, request)
+        this.pendingImages.set(pendingKey, request)
         try {
             return await request
         } finally {
-            this.pendingImages.delete(key)
+            this.pendingImages.delete(pendingKey)
         }
     }
 

@@ -12,7 +12,6 @@ import {
 } from './batch-allocator-v3'
 import { RecommendationPolicyStoreV5 } from '../recommendation-v5/policy-store'
 import { filterCandidatesAgainstOwnedV5 } from '../recommendation-v5/portable-policy'
-import type { StoredComic } from '../library/types'
 
 export const CYCLE_COORDINATOR_VERSION = '3.2.0-schema8-visible-cap'
 export const MAX_VISIBLE_BATCHES_PER_CYCLE = 6
@@ -39,8 +38,6 @@ export interface BuiltRecommendationCycleV3 {
 interface FrozenCycleServingSnapshotV3 {
     poolId: string
     ownershipKey: string
-    catalog: StoredComic[]
-    catalogById: Map<string, StoredComic>
     eligibleRanked: RankedCandidateWithEvidenceV3[]
     eligibleById: Map<string, RankedCandidateWithEvidenceV3>
     intents: RecommendationIntentV3[]
@@ -151,10 +148,6 @@ export class CycleCoordinatorV3 {
         )
             return existing
 
-        const catalog = this.database.listComics({ limit: 10000 })
-        const catalogById = new Map(
-            catalog.map((comic) => [comic.comicId, comic])
-        )
         const bindings = this.database.listWorkIdentityBindings(10000)
         const ownedWorkIds = new Set(
             bindings
@@ -173,31 +166,38 @@ export class CycleCoordinatorV3 {
                 ])
             ]
         }
+        const rankedCandidateIds = (telemetry.rankedCandidates ?? []).map(
+            (item) => item.comicId
+        )
+        const filterCatalog = this.database.getComicsByIds([
+            ...new Set([
+                ...ownership.ownedComicIds,
+                ...servingPolicy.ownedComicIds,
+                ...rankedCandidateIds
+            ])
+        ])
+        const filterCatalogById = new Map(
+            filterCatalog.map((comic) => [comic.comicId, comic])
+        )
         const ranked = (telemetry.rankedCandidates ?? []).flatMap((item) => {
-            const comic = catalogById.get(item.comicId)
+            const comic = filterCatalogById.get(item.comicId)
             return comic ? [{ ...item, comic }] : []
         })
         const serving = filterCandidatesAgainstOwnedV5(
             ranked,
-            catalog,
+            filterCatalog,
             servingPolicy
         )
         const eligibleRanked = serving.rows
         const snapshot: FrozenCycleServingSnapshotV3 = {
             poolId: pool.id,
             ownershipKey,
-            catalog,
-            catalogById,
             eligibleRanked,
             eligibleById: new Map(
                 eligibleRanked.map((item) => [item.comicId, item])
             ),
             intents: telemetry.intentPlan ?? [],
-            favoriteIds: new Set(
-                catalog
-                    .filter((comic) => comic.isFavorite)
-                    .map((comic) => comic.comicId)
-            ),
+            favoriteIds: new Set(this.database.favoriteIds()),
             recentlyDisplayedComicIds:
                 this.recentlyDisplayedComicIds(cycleId),
             servingFilterTelemetry: {
@@ -478,14 +478,30 @@ export class CycleCoordinatorV3 {
         if (!pool)
             return { ...this.status(), items: [], source: 'final-v3-portable-cache', cached: true }
         const telemetry = pool.telemetry as { rankedCandidates?: Array<Omit<RankedCandidateWithEvidenceV3, 'comic'>> }
-        const catalog = this.database.listComics({ limit: 10000 })
-        const byId = new Map(catalog.map((comic) => [comic.comicId, comic]))
+        const policy = new RecommendationPolicyStoreV5(this.database).state()
+        const ownership = this.database.recommendationOwnershipState()
+        const rankedCandidateIds = (telemetry.rankedCandidates ?? []).map(
+            (item) => item.comicId
+        )
+        const filterCatalog = this.database.getComicsByIds([
+            ...new Set([
+                ...ownership.ownedComicIds,
+                ...policy.ownedComicIds,
+                ...rankedCandidateIds
+            ])
+        ])
+        const byId = new Map(
+            filterCatalog.map((comic) => [comic.comicId, comic])
+        )
         const ranked = (telemetry.rankedCandidates ?? []).flatMap((item) => {
             const comic = byId.get(item.comicId)
             return comic ? [{ ...item, comic }] : []
         })
-        const policy = new RecommendationPolicyStoreV5(this.database).state()
-        const serving = filterCandidatesAgainstOwnedV5(ranked, catalog, policy)
+        const serving = filterCandidatesAgainstOwnedV5(
+            ranked,
+            filterCatalog,
+            policy
+        )
         const bounded = Math.max(1, Math.min(120, Math.floor(limit)))
         const buildTelemetry = pool.telemetry.telemetry as
             | {

@@ -325,6 +325,24 @@ describe('V5 Web UX audit contract', () => {
         )
     })
 
+    it('processes onboarding mutations incrementally', () => {
+        const onboarding = read('web/onboarding-v1.js')
+        expect(onboarding).toContain('const TOUR_TARGETS = [')
+        expect(onboarding).toContain('function targetWithin(root, selector)')
+        expect(onboarding).toContain('function markTourTargets(root = document)')
+        expect(onboarding).toContain('const pendingRoots = new Set()')
+        expect(onboarding).toContain('for (const node of mutation.addedNodes)')
+        expect(onboarding).toContain('requestAnimationFrame(() => {')
+        expect(onboarding).toContain('for (const root of roots) markTourTargets(root)')
+        expect(onboarding).toContain("root.id === 'a87-general-panel'")
+        expect(onboarding).not.toContain(
+            'new MutationObserver(() => {\n        if (queued) return'
+        )
+        expect(onboarding).not.toContain(
+            'markTourTargets()\n            if (!document.querySelector'
+        )
+    })
+
     it('uses one-step import and guards long Desktop operations', () => {
         const index = read('web/index.html')
         const i18n = read('web/i18n.js')

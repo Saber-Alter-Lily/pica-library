@@ -28,6 +28,7 @@ public final class NativeRecommendationWorker extends Worker {
             if(!snapshot.available()&&NativeRecommendationPolicy.readinessRank(snapshot.candidateCount)==0){
                 return Result.failure(new Data.Builder().putString(KEY_PHASE,"候选池不足："+snapshot.candidateCount+" 本").putInt(KEY_DONE,snapshot.candidateCount).putInt(KEY_TOTAL,NativeRecommendationPolicy.TARGET_POOL).build());
             }
+            NativeRecommendationJobs.complete(getApplicationContext());
             return Result.success(new Data.Builder().putString(KEY_PHASE,"手机原生 Recommendation V3 已更新").putInt(KEY_DONE,snapshot.batches.size()).putInt(KEY_TOTAL,NativeRecommendationPolicy.MAX_BATCHES).build());
         }catch(Exception e){
             String message=e.getMessage()==null?"手机推荐生成失败":e.getMessage();

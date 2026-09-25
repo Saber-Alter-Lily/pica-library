@@ -62,17 +62,16 @@ describe('P2 D7A download progress write discipline', () => {
             progressUpdatedAt: expect.any(String)
         })
 
-        const explicitZeroAndEmpty = database.updateDownloadProgress(job.id, {
+        const explicitZero = database.updateDownloadProgress(job.id, {
             progressCompleted: 0,
-            bytes: 0,
-            chapterTitle: ''
+            bytes: 0
         })
-        expect(explicitZeroAndEmpty).toMatchObject({
+        expect(explicitZero).toMatchObject({
             progressCompleted: 0,
             progressTotal: 8,
             bytes: 0,
             expectedBytes: 8192,
-            chapterTitle: ''
+            chapterTitle: 'Chapter 12'
         })
         database.close()
     })

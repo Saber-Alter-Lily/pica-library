@@ -148,7 +148,7 @@ export class CycleCoordinatorV3 {
         )
             return existing
 
-        const bindings = this.database.listWorkIdentityBindings(10000)
+        const bindings = this.database.listAllWorkIdentityBindings()
         const ownedWorkIds = new Set(
             bindings
                 .filter((binding) => ownedComicIds.has(binding.comicId))

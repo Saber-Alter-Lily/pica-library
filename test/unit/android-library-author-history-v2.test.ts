@@ -390,6 +390,31 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(importBody).toContain('catalogSnapshot=data.catalog')
   })
 
+  it('keeps Main direct-open evidence persistence off the UI thread', () => {
+    const main = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MainActivity.java',
+      'utf8'
+    )
+
+    const helperStart = main.indexOf('private void recordDetailOpenAsync(')
+    const helperEnd = main.indexOf('private void openUnified(', helperStart)
+    const helper = main.slice(helperStart, helperEnd)
+    const openStart = helperEnd
+    const openEnd = main.indexOf('private void library(){', openStart)
+    const open = main.slice(openStart, openEnd)
+
+    expect(helper).toContain('Context app=getApplicationContext();')
+    expect(helper).toContain('requests.submit(()->{')
+    expect(helper).toContain('UnifiedCatalogStore.load(app).byId.get(comicId)')
+    expect(helper).toContain('RecommendationEvidenceStore.recordDetailOpen(')
+    expect(helper).not.toContain('pending=')
+
+    expect(open).toContain('recordDetailOpenAsync(comicId,author);')
+    expect(open).toContain('startActivity(i);')
+    expect(open).not.toContain('UnifiedCatalogStore.load(')
+    expect(open).not.toContain('RecommendationEvidenceStore.recordDetailOpen(')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

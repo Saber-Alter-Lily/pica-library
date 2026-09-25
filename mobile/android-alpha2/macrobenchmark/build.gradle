@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.test'
+}
+
+android {
+    namespace 'com.picalibrary.android.macrobenchmark'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 28
+        targetSdk 35
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+
+    targetProjectPath = ':app'
+    experimentalProperties['android.experimental.self-instrumenting'] = true
+
+    buildTypes {
+        benchmark {
+            debuggable true
+        }
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().all()) { variantBuilder ->
+        variantBuilder.enable = variantBuilder.buildType == 'benchmark'
+    }
+}
+
+dependencies {
+    implementation 'androidx.benchmark:benchmark-macro-junit4:1.5.0'
+    implementation 'androidx.test.ext:junit:1.3.0'
+    implementation 'androidx.test:runner:1.7.0'
+    implementation 'androidx.test.uiautomator:uiautomator:2.4.0'
+}

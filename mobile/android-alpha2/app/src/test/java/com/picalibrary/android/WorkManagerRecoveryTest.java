@@ -90,20 +90,26 @@ public class WorkManagerRecoveryTest {
         OneTimeWorkRequest first = delayedDownload("pica",comic,episode);
         manager.enqueueUniqueWork(unique,ExistingWorkPolicy.REPLACE,first)
             .getResult().get(5,TimeUnit.SECONDS);
-        MobileTaskRegistryStore.registerDownload(app,"pica",comic,episode,first.getId());
+        ActivityController<TaskCenterActivity> controller = taskCenter();
+        TaskCenterActivity activity = controller.get();
+        try{
+            MobileTaskRegistryStore.registerDownload(activity,"pica",comic,episode,first.getId());
 
-        OneTimeWorkRequest second = delayedDownload("pica",comic,episode);
-        manager.enqueueUniqueWork(unique,ExistingWorkPolicy.REPLACE,second)
-            .getResult().get(5,TimeUnit.SECONDS);
-        MobileTaskRegistryStore.registerDownload(app,"pica",comic,episode,second.getId());
+            OneTimeWorkRequest second = delayedDownload("pica",comic,episode);
+            manager.enqueueUniqueWork(unique,ExistingWorkPolicy.REPLACE,second)
+                .getResult().get(5,TimeUnit.SECONDS);
+            MobileTaskRegistryStore.registerDownload(activity,"pica",comic,episode,second.getId());
 
-        List<WorkInfo> history = manager.getWorkInfosByTag("pica-download")
-            .get(5,TimeUnit.SECONDS);
-        List<?> views = reconstructDownloads(history);
+            List<WorkInfo> history = manager.getWorkInfosByTag("pica-download")
+                .get(5,TimeUnit.SECONDS);
+            List<?> views = reconstructDownloads(activity,history);
 
-        assertEquals(1,views.size());
-        assertEquals(second.getId(),viewInfo(views.get(0)).getId());
-        assertEquals(second.getId().toString(),onlyRegisteredDownload().workId);
+            assertEquals(1,views.size());
+            assertEquals(second.getId(),viewInfo(views.get(0)).getId());
+            assertEquals(second.getId().toString(),onlyRegisteredDownload(activity).workId);
+        }finally{
+            controller.destroy();
+        }
     }
 
     @Test public void activeWorkRepairsStaleRegistryUuid() throws Exception {
@@ -115,17 +121,24 @@ public class WorkManagerRecoveryTest {
         manager.enqueueUniqueWork(unique,ExistingWorkPolicy.REPLACE,current)
             .getResult().get(5,TimeUnit.SECONDS);
 
-        MobileTaskRegistryStore.registerDownload(
-            app,"pica",comic,episode,UUID.randomUUID()
-        );
+        ActivityController<TaskCenterActivity> controller = taskCenter();
+        TaskCenterActivity activity = controller.get();
+        try{
+            MobileTaskRegistryStore.registerDownload(
+                activity,"pica",comic,episode,UUID.randomUUID()
+            );
 
-        List<?> views = reconstructDownloads(
-            manager.getWorkInfosByTag("pica-download").get(5,TimeUnit.SECONDS)
-        );
+            List<?> views = reconstructDownloads(
+                activity,
+                manager.getWorkInfosByTag("pica-download").get(5,TimeUnit.SECONDS)
+            );
 
-        assertEquals(1,views.size());
-        assertEquals(current.getId(),viewInfo(views.get(0)).getId());
-        assertEquals(current.getId().toString(),onlyRegisteredDownload().workId);
+            assertEquals(1,views.size());
+            assertEquals(current.getId(),viewInfo(views.get(0)).getId());
+            assertEquals(current.getId().toString(),onlyRegisteredDownload(activity).workId);
+        }finally{
+            controller.destroy();
+        }
     }
 
     @Test public void pausedDownloadSurvivesWhenHistoricalWorkInfoIsUnavailable() throws Exception {
@@ -133,32 +146,44 @@ public class WorkManagerRecoveryTest {
         String episode = "episode-3";
         UUID prior = UUID.randomUUID();
 
-        MobileTaskRegistryStore.registerDownload(app,"pica",comic,episode,prior);
-        MobileTaskPauseStore.setPaused(
-            app,"download",PicaDownloadJobs.name(comic,episode),true
-        );
+        ActivityController<TaskCenterActivity> controller = taskCenter();
+        TaskCenterActivity activity = controller.get();
+        try{
+            MobileTaskRegistryStore.registerDownload(activity,"pica",comic,episode,prior);
+            MobileTaskPauseStore.setPaused(
+                activity,"download",PicaDownloadJobs.name(comic,episode),true
+            );
 
-        List<?> views = reconstructDownloads(Collections.emptyList());
+            List<?> views = reconstructDownloads(activity,Collections.emptyList());
 
-        assertEquals(1,views.size());
-        MobileTaskRegistryStore.DownloadRef ref = viewRef(views.get(0));
-        assertEquals(comic,ref.comicId);
-        assertEquals(episode,ref.episodeId);
-        assertNull(viewInfo(views.get(0)));
-        assertEquals(prior.toString(),onlyRegisteredDownload().workId);
+            assertEquals(1,views.size());
+            MobileTaskRegistryStore.DownloadRef ref = viewRef(views.get(0));
+            assertEquals(comic,ref.comicId);
+            assertEquals(episode,ref.episodeId);
+            assertNull(viewInfo(views.get(0)));
+            assertEquals(prior.toString(),onlyRegisteredDownload(activity).workId);
+        }finally{
+            controller.destroy();
+        }
     }
 
     @Test public void nonPausedMissingDownloadDoesNotResurrect() throws Exception {
         String comic = "cancelled-" + UUID.randomUUID();
         String episode = "episode-4";
-        MobileTaskRegistryStore.registerDownload(
-            app,"pica",comic,episode,UUID.randomUUID()
-        );
+        ActivityController<TaskCenterActivity> controller = taskCenter();
+        TaskCenterActivity activity = controller.get();
+        try{
+            MobileTaskRegistryStore.registerDownload(
+                activity,"pica",comic,episode,UUID.randomUUID()
+            );
 
-        List<?> views = reconstructDownloads(Collections.emptyList());
+            List<?> views = reconstructDownloads(activity,Collections.emptyList());
 
-        assertTrue(views.isEmpty());
-        assertTrue(MobileTaskRegistryStore.downloads(app).isEmpty());
+            assertTrue(views.isEmpty());
+            assertTrue(MobileTaskRegistryStore.downloads(activity).isEmpty());
+        }finally{
+            controller.destroy();
+        }
     }
 
     @Test public void singletonRecoveryUsesExactPersistedRequestAndRepairsStaleUuid() throws Exception {
@@ -172,22 +197,28 @@ public class WorkManagerRecoveryTest {
         OneTimeWorkRequest second = delayedSingleton("g14-singleton-tag");
         manager.enqueueUniqueWork(unique,ExistingWorkPolicy.REPLACE,second)
             .getResult().get(5,TimeUnit.SECONDS);
-        MobileTaskRegistryStore.setWorkId(app,scope,unique,second.getId());
+        ActivityController<TaskCenterActivity> controller = taskCenter();
+        TaskCenterActivity activity = controller.get();
+        try{
+            MobileTaskRegistryStore.setWorkId(activity,scope,unique,second.getId());
 
-        List<WorkInfo> history = manager.getWorkInfosForUniqueWork(unique)
-            .get(5,TimeUnit.SECONDS);
-        WorkInfo selected = currentWork(history,scope,unique);
-        assertNotNull(selected);
-        assertEquals(second.getId(),selected.getId());
+            List<WorkInfo> history = manager.getWorkInfosForUniqueWork(unique)
+                .get(5,TimeUnit.SECONDS);
+            WorkInfo selected = currentWork(activity,history,scope,unique);
+            assertNotNull(selected);
+            assertEquals(second.getId(),selected.getId());
 
-        MobileTaskRegistryStore.setWorkId(app,scope,unique,UUID.randomUUID());
-        WorkInfo repaired = currentWork(history,scope,unique);
-        assertNotNull(repaired);
-        assertEquals(second.getId(),repaired.getId());
-        assertEquals(
-            second.getId().toString(),
-            MobileTaskRegistryStore.workId(app,scope,unique)
-        );
+            MobileTaskRegistryStore.setWorkId(activity,scope,unique,UUID.randomUUID());
+            WorkInfo repaired = currentWork(activity,history,scope,unique);
+            assertNotNull(repaired);
+            assertEquals(second.getId(),repaired.getId());
+            assertEquals(
+                second.getId().toString(),
+                MobileTaskRegistryStore.workId(activity,scope,unique)
+            );
+        }finally{
+            controller.destroy();
+        }
     }
 
     private OneTimeWorkRequest delayedDownload(
@@ -209,40 +240,29 @@ public class WorkManagerRecoveryTest {
             .build();
     }
 
-    private TaskCenterActivity activity(){
-        ActivityController<TaskCenterActivity> controller =
-            Robolectric.buildActivity(TaskCenterActivity.class).create();
-        return controller.get();
+    private ActivityController<TaskCenterActivity> taskCenter(){
+        return Robolectric.buildActivity(TaskCenterActivity.class).create();
     }
 
     @SuppressWarnings("unchecked")
-    private List<?> reconstructDownloads(List<WorkInfo> infos) throws Exception {
-        TaskCenterActivity activity = activity();
-        try{
-            Method method = TaskCenterActivity.class
-                .getDeclaredMethod("reconstructDownloads",List.class);
-            method.setAccessible(true);
-            return (List<?>)method.invoke(activity,infos);
-        }finally{
-            activity.finish();
-            activity.onDestroy();
-        }
+    private List<?> reconstructDownloads(
+        TaskCenterActivity activity,List<WorkInfo> infos
+    ) throws Exception {
+        Method method = TaskCenterActivity.class
+            .getDeclaredMethod("reconstructDownloads",List.class);
+        method.setAccessible(true);
+        return (List<?>)method.invoke(activity,infos);
     }
 
     private WorkInfo currentWork(
+        TaskCenterActivity activity,
         List<WorkInfo> values,String scope,String id
     ) throws Exception {
-        TaskCenterActivity activity = activity();
-        try{
-            Method method = TaskCenterActivity.class.getDeclaredMethod(
-                "currentWork",List.class,String.class,String.class
-            );
-            method.setAccessible(true);
-            return (WorkInfo)method.invoke(activity,values,scope,id);
-        }finally{
-            activity.finish();
-            activity.onDestroy();
-        }
+        Method method = TaskCenterActivity.class.getDeclaredMethod(
+            "currentWork",List.class,String.class,String.class
+        );
+        method.setAccessible(true);
+        return (WorkInfo)method.invoke(activity,values,scope,id);
     }
 
     private MobileTaskRegistryStore.DownloadRef viewRef(Object view) throws Exception {
@@ -257,9 +277,9 @@ public class WorkManagerRecoveryTest {
         return (WorkInfo)field.get(view);
     }
 
-    private MobileTaskRegistryStore.DownloadRef onlyRegisteredDownload(){
+    private MobileTaskRegistryStore.DownloadRef onlyRegisteredDownload(Context context){
         List<MobileTaskRegistryStore.DownloadRef> refs =
-            MobileTaskRegistryStore.downloads(app);
+            MobileTaskRegistryStore.downloads(context);
         assertEquals(1,refs.size());
         return refs.get(0);
     }

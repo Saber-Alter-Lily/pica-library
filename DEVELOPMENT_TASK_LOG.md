@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current G19 candidate: `main@55f5be7c450f4f9bae38f38a4795b4d2deaa0739` (P2-G18 / PR #172 merged)  
+Authoritative repository baseline after G19 source/build completion: `main@529638cd1ff3ebe8c16e6ba54e8f43ea85c9a116` (P2-G19 / PR #173 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / LOADED_PERFORMANCE_MEASUREMENT_IN_PROGRESS — G1–G18 merged; G19 real recommendation-overlap candidate**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / PHYSICAL_DEVICE_EVIDENCE_REQUIRED — G1–G19 merged; G20 enforcement blocked pending representative Android evidence**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -336,10 +336,11 @@ Already improved:
 Remaining:
 - inventory all Activities/Fragments for main-thread file/JSON/DB/network work;
 - unify background-task status presentation through the task center where appropriate;
-- collect physical-device G18 idle startup/frame timing;
-- validate G19 real recommendation-overlap measurement and collect representative loaded evidence;
+- collect representative physical-device G18 idle startup/frame timing;
+- collect representative physical-device G19 real recommendation-overlap timing with provider-network + cpu-analysis actually RUNNING;
+- add/collect explicit real download and Reader loaded scenarios using user-selected real comic/chapter inputs rather than synthetic media work;
 - pair G17 resource-overlap evidence with G18/G19 foreground metrics before choosing concurrency budgets;
-- define Android-specific concurrency/resource budgets only if measured contention justifies enforcement;
+- keep G20/P2-C3 Android concurrency enforcement blocked unless measured contention justifies it;
 - validate remaining OEM/physical-device background restrictions where generic emulator evidence is insufficient;
 - verify large Catalog and long Reader behavior on representative mid-range hardware.
 
@@ -1016,7 +1017,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: LOADED_PERFORMANCE_MEASUREMENT_IN_PROGRESS — G1–G18 merged; G19 real recommendation-overlap Macrobenchmark candidate**
+**Status: PHYSICAL_DEVICE_EVIDENCE_REQUIRED — G1–G19 merged; source/build work complete, G20/P2-C3 enforcement blocked**
 
 - **G1–G12 merged (PR #153–#164):** audited Android UI-thread Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion I/O owners are worker-owned.
 - **G13 merged (PR #165):** durable task identity is persisted independently of Activity memory; Task Center reconstructs singleton/dynamic work from exact WorkRequest UUID + WorkManager state instead of WorkInfo list order/history.
@@ -1045,10 +1046,11 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - **G18 merged (PR #172):** release-like benchmark target + AndroidX Macrobenchmark 1.5.0 / UiAutomator 2.4.0 compile successfully. Cold startup-to-usable-Library and idle top-level FrameTiming scenarios are checked in without thresholds.
 - HomeActivity reports fully drawn only after the local Library list is usable, giving StartupTimingMetric a meaningful full-display boundary.
 - CI remains build-only; GitHub emulator timing is not accepted as representative performance evidence. The physical-device runner archives device metadata, benchmarkData JSON and Perfetto traces.
-- **G19 real-loaded candidate:** an opt-in Macrobenchmark triggers the real `重新生成手机推荐` action, requires G17 provider-network + cpu-analysis to be RUNNING before and after measured foreground navigation, and uses `startupMode=null` so the background WorkManager task is preserved.
+- **G19 merged (PR #173):** the opt-in loaded Macrobenchmark triggers the real `重新生成手机推荐` action, requires G17 provider-network + cpu-analysis RUNNING before and after measured foreground navigation, and uses `startupMode=null` so the background WorkManager task is preserved.
+- G19 source/build acceptance passed Macrobenchmark Build `36160396121`, CI `36160396044`, G15 regression `36160396042`, and G16 regression `36160396108`.
 - G19 adds a benchmark-only exported resource snapshot receiver; release/debug builds do not expose it. It returns only coarse resource counts, never credentials or Provider payload.
-- A prepare/run script leaves Provider/candidate configuration manual and explicit. No synthetic Worker is substituted when real recommendation load is unavailable.
-- **Next after G19 source/build acceptance:** collect representative physical idle + recommendation-loaded evidence, then add explicit real download/Reader loaded scenarios. Only after that may G20/P2-C3 enforcement be proposed.
+- The prepare/run script leaves Provider/candidate configuration manual and explicit. No synthetic Worker is substituted when real recommendation load is unavailable.
+- **Current hard gate:** source/build work through G19 is complete, but no valid G20/P2-C3 Android resource budget may be proposed until representative physical-device G18 idle + G19 recommendation-loaded evidence exists. Real download/Reader loaded scenarios also require explicit user-selected real inputs.
 - OEM battery-manager / foreground-notification evidence and large-Catalog/long-Reader timing/jank/memory remain physical-device gates.
 - Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`, `docs/ANDROID_RESOURCE_OBSERVATION_P2G17.md`, `docs/ANDROID_FOREGROUND_PERFORMANCE_P2G18.md`, and `docs/ANDROID_LOADED_PERFORMANCE_P2G19.md`.
 
@@ -1064,6 +1066,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — G19 source/build accepted; Android enforcement enters physical-evidence gate
+
+State update:
+- G19 is merged as PR #173 at `529638cd1ff3ebe8c16e6ba54e8f43ea85c9a116`.
+- Source/build acceptance passed Macrobenchmark Build `36160396121`, normal CI `36160396044`, G15 force-stop regression `36160396042`, and G16 memory/background regression `36160396108`.
+- G17–G19 now provide the complete pre-enforcement toolchain: WorkManager resource observation, idle foreground Macrobenchmark, and an opt-in real Native Recommendation overlap Macrobenchmark.
+- CI/emulator success is not promoted into a performance conclusion. The next accepted evidence must come from representative physical Android hardware.
+- Required first evidence pair: G18 idle baseline + G19 real recommendation-loaded run on the same device/build context.
+- Download/Reader loaded evidence must use explicit real comic/chapter inputs; synthetic media traffic remains prohibited for the promotion decision.
+- G20/P2-C3 Android concurrency/resource enforcement is BLOCKED until those measurements show concrete contention and justify a policy.
+- Detailed boundaries: `docs/ANDROID_FOREGROUND_PERFORMANCE_P2G18.md` and `docs/ANDROID_LOADED_PERFORMANCE_P2G19.md`.
 
 ## 2026-09-25 — P2-G19 real recommendation-loaded Android performance scenario
 

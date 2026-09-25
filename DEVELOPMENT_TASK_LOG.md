@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1/F2 merged; F3 selection-status render authority candidate; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1–F3 merged; F4 incremental parity mutation processing candidate; broader observer/poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,14 +1001,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1/F2 merged; F3 one-render-authority selection streams candidate**
+**Status: IN_PROGRESS — F1–F3 merged; F4 incremental parity observer candidate**
 
 - **F1 merged (PR #138):** remove the always-on Theme decoration fallback while preserving event-driven decoration and active Recommendation task polling.
-- **F2 merged (PR #139):** replace the body-wide UX polish observer with scoped `#settings` and `#downloads` observers; dynamically inserted dialog backdrop behavior is owned by one delegated body click handler.
-- **F3 implemented:** each selection-status source now owns exactly one matching render function: Library → Library bar, Recommendation → Recommendation bar, Search → Search bar.
-- F3 preserves the existing selection state, mutation types and bulk-action semantics; it removes only unrelated cross-view recalculation.
-- **Next after F3:** make the uncoalesced body-wide `v040-parity.js` tag/detail observer incremental and coalesced, then continue through the remaining broad Product/Hub/Onboarding/Visual observers and persistent backend pollers.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`.
+- **F2 merged (PR #139):** replace the body-wide UX polish observer with scoped Settings/Downloads owners and delegated dialog backdrop handling.
+- **F3 merged (PR #140):** Library, Recommendation and Search selection-status streams each update only their matching selection bar.
+- **F4 implemented:** `v040-parity.js` still uses one body MutationObserver as a compatibility-layer entry point, but it no longer runs full-document tag/category translation plus detail-author checks after every child mutation.
+- F4 collects only mutation-added/changed subtrees, coalesces them into one animation frame, translates only those roots, and runs detail-author enhancement only when `#recommend-detail-content` was touched.
+- Translation writes now check whether text actually changed, preventing parity translation from feeding unnecessary child mutations back into its own observer.
+- Full-document translation remains only for explicit translation-database load and language-change authority.
+- **Next after F4:** audit Product source-entry cleanup, Settings Hub, onboarding and Visual QC broad observers, then inventory persistent backend pollers by owner/start/stop lifecycle.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1022,6 +1025,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F4 incremental v0.4 parity mutation processing
+
+State update:
+- v040-parity.js previously observed the entire body subtree and synchronously called full-document translateVisibleTags() plus enhanceDetailAuthor() after every child mutation.
+- That path queried all .tag and [data-eh-category] elements for unrelated Library/Recommendation/Reader/Settings/status mutations and was not coalesced.
+- F4 changes translateVisibleTags(root = document) into a scoped-capable primitive while preserving full-document calls for explicit translation load/language changes.
+- The body observer now consumes MutationObserver records, collects only added/changed roots in a Set, and performs one requestAnimationFrame pass over those roots.
+- Detail-author enhancement is marked dirty only for mutations touching #recommend-detail-content.
+- Tag/category text writes are guarded by current-value equality so translation-generated DOM changes do not keep feeding unnecessary writes into the observer.
+- Translation sources, canonical tag/search semantics, author identity, history and provider behavior are unchanged.
+- Detailed boundary: docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md.
 
 ## 2026-09-24 — P2-F3 one render authority per selection stream
 

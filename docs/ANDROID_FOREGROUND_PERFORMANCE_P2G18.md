@@ -1,11 +1,19 @@
 # Android Foreground Performance Macrobenchmark — P2 G18
 
-Status: **measurement harness candidate / no performance budget selected**
+Status: **PASS / merged as PR #172 / no performance budget selected**
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-G Android runtime hardening;
 - P2-J Android startup / foreground latency / jank instrumentation;
 - P2-C precondition for Android resource-budget enforcement.
+
+Accepted source/build evidence before merge:
+- Android Macrobenchmark Build run `36159189196`: PASS;
+- normal CI run `36159189211`: PASS;
+- v0.4 Direct Upgrade Acceptance run `36159189201`: PASS;
+- G16 memory/background regression run `36159189220`: PASS;
+- G15 force-stop regression run `36159189234`: PASS;
+- merged commit: `55f5be7c450f4f9bae38f38a4795b4d2deaa0739`.
 
 Baseline:
 - G17 resource observation is merged as PR #171.

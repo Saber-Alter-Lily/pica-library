@@ -753,6 +753,10 @@ export class LibraryService {
         return this.database.recordUserEvent(input)
     }
 
+    recordRecommendationEvents(inputs: UserEventInput[]) {
+        return this.database.recordUserEvents(inputs)
+    }
+
     recommendationV5Snapshot() {
         const snapshot = new RecommendationPolicyStoreV5(
             this.database

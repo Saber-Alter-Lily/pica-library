@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F10 merged; F11 event-driven onboarding readiness candidate; hidden-tab/browser evidence remains open**
+**Status: IN_PROGRESS — F1–F12 merged; F13 real-browser cadence evidence candidate; low-end reference trace remains external evidence**
 
 Already improved:
 - coalesced observers;
@@ -1001,18 +1001,18 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F11 merged; F12 visibility-aware analysis pollers candidate**
+**Status: IN_PROGRESS — F1–F12 merged; F13 real-browser cadence evidence candidate**
 
 - **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is scoped or processed incrementally/coalesced.
 - **F9 merged (PR #146):** WebDAV progress reattaches after reload and has explicit terminal/start/page lifecycle ownership.
-- **F10 merged (PR #147):** Recommendation final-cycle status has one normal polling authority with App fallback only when the shared signal is absent/stale.
+- **F10 merged (PR #147):** Recommendation final-cycle status has one normal polling authority with bounded App fallback.
 - **F11 merged (PR #148):** Onboarding readiness is event-driven; the recursive 500 ms retry loop is removed.
-- **F12 implemented:** Work Identity evidence refresh and Recommendation V5 shadow evaluation retain their existing 500/600 ms foreground status cadence, but hidden-page waits extend to 3000 ms.
-- Both visibility-aware waits resolve immediately when the document becomes visible, so progress refresh is not delayed after the user returns.
-- F12 is deliberately limited to analysis/development status surfaces. E-H login, updater, Recommendation build, WebDAV and Downloads keep their existing lifecycle/cadence because their control/recovery semantics differ.
-- Backend task execution, pause/resume/cancel, task recovery and output semantics are unchanged.
-- **Next after F12:** collect representative browser traces for foreground/hidden analysis tasks and verify no remaining high-frequency poller lacks clear task/view authority before closing P2-F.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, plus `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`.
+- **F12 merged (PR #149):** Work Identity and V5 shadow status loops retain their 500/600 ms foreground cadence but use 3000 ms hidden-page waits with immediate visibility wake.
+- **F13 implemented:** add focused Playwright Chromium evidence for both analysis pollers. The browser records real status-request timestamps from a hidden start, one hidden interval, visibility restoration, and the next foreground interval.
+- F13 is wired into the existing Web smoke runner; no Playwright dependency, lockfile, or new benchmark framework is added.
+- Structured `[P2-F13]` JSON timing evidence is emitted into CI logs. Assertion windows are control-flow guards only and must not become product latency budgets.
+- **If F13 passes:** move P2-F to `IMPLEMENTATION_COMPLETE_REFERENCE_TRACE_OPEN`; retain representative low-end Windows/browser CPU/jank trace as an external evidence gate while allowing P2-G/H to continue.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1026,6 +1026,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F13 real-browser cadence evidence
+
+State update:
+- F12 visibility-aware polling is now covered by focused Playwright Chromium timing evidence rather than source contracts alone.
+- A minimal same-origin shell loads the real Work Identity or V5 evaluation module without the rest of the App, while only the target status endpoint is stubbed as an active task.
+- Each test begins with a test-only hidden visibility state, records actual browser request timestamps, observes one hidden-delay interval, restores visibility, and then observes the next foreground interval.
+- The test expects the hidden interval to reflect the F12 3000 ms branch, visibility restoration to wake promptly, and the subsequent interval to return to the existing 500/600 ms foreground cadence.
+- Timing bounds are deliberately wide scheduler/control-flow assertions. CI runner timing is not a user-facing performance budget or low-end-hardware claim.
+- The browser smoke runner now includes test/e2e/poller-discipline.spec.mjs and emits structured [P2-F13] timing JSON into CI logs.
+- F13 changes no runtime behavior and introduces no dependency/lockfile change.
+- Detailed boundary: docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md.
 
 ## 2026-09-24 — P2-F12 visibility-aware analysis task polling
 

@@ -5332,6 +5332,7 @@ export class LibraryService {
                     updatedAt: new Date().toISOString()
                 }
             }
+            this.persistLibraryOrganizeRecovery()
             return this.libraryOrganizeStatus()
         }
         if (action === 'resume') {
@@ -5348,6 +5349,7 @@ export class LibraryService {
                     phase: 'organizing',
                     updatedAt: new Date().toISOString()
                 }
+            this.persistLibraryOrganizeRecovery()
             return this.libraryOrganizeStatus()
         }
         this.libraryOrganizeCancelRequested = true
@@ -5364,7 +5366,8 @@ export class LibraryService {
                 state: 'cancelling',
                 updatedAt: new Date().toISOString()
             }
-        return this.libraryOrganizeStatus()
+        this.persistLibraryOrganizeRecovery()
+            return this.libraryOrganizeStatus()
     }
 
     private async libraryOrganizeCheckpoint() {
@@ -5377,6 +5380,7 @@ export class LibraryService {
             phase: 'paused',
             updatedAt: new Date().toISOString()
         }
+        this.persistLibraryOrganizeRecovery()
         await new Promise<void>((resolve) =>
             this.libraryOrganizeResumeWaiters.add(resolve)
         )
@@ -5388,6 +5392,7 @@ export class LibraryService {
             phase: 'organizing',
             updatedAt: new Date().toISOString()
         }
+        this.persistLibraryOrganizeRecovery()
     }
 
     private finishLibraryOrganizeControl() {
@@ -5431,6 +5436,7 @@ export class LibraryService {
             startedAt: now,
             updatedAt: now
         }
+        this.persistLibraryOrganizeRecovery()
 
         const run = (async () => {
             let releaseResources: () => void = () => undefined
@@ -5497,6 +5503,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                this.clearMaintenanceRecovery('library-organize')
                 releaseResources()
                 this.finishLibraryOrganizeControl()
             }
@@ -5545,6 +5552,7 @@ export class LibraryService {
                     updatedAt: new Date().toISOString()
                 }
             }
+            this.persistMaintenanceRepairRecovery()
             return this.maintenanceRepairStatus()
         }
         if (action === 'resume') {
@@ -5561,6 +5569,7 @@ export class LibraryService {
                     phase: 'scanning',
                     updatedAt: new Date().toISOString()
                 }
+            this.persistMaintenanceRepairRecovery()
             return this.maintenanceRepairStatus()
         }
         this.maintenanceRepairCancelRequested = true
@@ -5577,7 +5586,8 @@ export class LibraryService {
                 state: 'cancelling',
                 updatedAt: new Date().toISOString()
             }
-        return this.maintenanceRepairStatus()
+        this.persistMaintenanceRepairRecovery()
+            return this.maintenanceRepairStatus()
     }
 
     private async maintenanceRepairCheckpoint() {
@@ -5590,6 +5600,7 @@ export class LibraryService {
             phase: 'paused',
             updatedAt: new Date().toISOString()
         }
+        this.persistMaintenanceRepairRecovery()
         await new Promise<void>((resolve) =>
             this.maintenanceRepairResumeWaiters.add(resolve)
         )
@@ -5601,6 +5612,7 @@ export class LibraryService {
             phase: 'scanning',
             updatedAt: new Date().toISOString()
         }
+        this.persistMaintenanceRepairRecovery()
     }
 
     private finishMaintenanceRepairControl() {
@@ -5640,6 +5652,7 @@ export class LibraryService {
             startedAt: now,
             updatedAt: now
         }
+        this.persistMaintenanceRepairRecovery()
 
         const run = (async () => {
             let releaseResources: () => void = () => undefined
@@ -5701,6 +5714,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                this.clearMaintenanceRecovery('maintenance-repair')
                 releaseResources()
                 this.finishMaintenanceRepairControl()
             }
@@ -5749,6 +5763,7 @@ export class LibraryService {
                     updatedAt: new Date().toISOString()
                 }
             }
+            this.persistMaintenanceUpdateRecovery()
             return this.maintenanceUpdateStatus()
         }
         if (action === 'resume') {
@@ -5765,6 +5780,7 @@ export class LibraryService {
                     phase: 'checking',
                     updatedAt: new Date().toISOString()
                 }
+            this.persistMaintenanceUpdateRecovery()
             return this.maintenanceUpdateStatus()
         }
         this.maintenanceUpdateCancelRequested = true
@@ -5781,7 +5797,8 @@ export class LibraryService {
                 state: 'cancelling',
                 updatedAt: new Date().toISOString()
             }
-        return this.maintenanceUpdateStatus()
+        this.persistMaintenanceUpdateRecovery()
+            return this.maintenanceUpdateStatus()
     }
 
     private async maintenanceUpdateCheckpoint() {
@@ -5794,6 +5811,7 @@ export class LibraryService {
             phase: 'paused',
             updatedAt: new Date().toISOString()
         }
+        this.persistMaintenanceUpdateRecovery()
         await new Promise<void>((resolve) =>
             this.maintenanceUpdateResumeWaiters.add(resolve)
         )
@@ -5805,6 +5823,7 @@ export class LibraryService {
             phase: 'checking',
             updatedAt: new Date().toISOString()
         }
+        this.persistMaintenanceUpdateRecovery()
     }
 
     private finishMaintenanceUpdateControl() {
@@ -5890,6 +5909,7 @@ export class LibraryService {
             startedAt: now,
             updatedAt: now
         }
+        this.persistMaintenanceUpdateRecovery()
 
         const run = (async () => {
             let releaseResources: () => void = () => undefined
@@ -5965,6 +5985,7 @@ export class LibraryService {
                         updatedAt: new Date().toISOString()
                     }
             } finally {
+                this.clearMaintenanceRecovery('maintenance-update')
                 releaseResources()
                 this.finishMaintenanceUpdateControl()
             }

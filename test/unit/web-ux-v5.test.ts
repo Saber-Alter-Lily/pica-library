@@ -273,6 +273,27 @@ describe('V5 Web UX audit contract', () => {
         expect(hub).toContain('requestAnimationFrame(() => {')
     })
 
+    it('scopes UX polish observers to their owning views', () => {
+        const polish = read('web/ui-polish-v5.js')
+        expect(polish).not.toContain('bodyObserver.observe(document.body')
+        expect(polish).not.toContain(
+            'document.body, { childList: true, subtree: true }'
+        )
+        expect(polish).toContain(
+            'new MutationObserver(scheduleSettingsPolish).observe(settings'
+        )
+        expect(polish).toContain(
+            'new MutationObserver(scheduleDownloadsPolish).observe(downloads'
+        )
+        expect(polish).toContain("const settings = ux$('#settings')")
+        expect(polish).toContain("const downloads = ux$('#downloads')")
+        expect(polish).toContain(
+            "body.dataset.uxDialogBackdropDelegation = '1'"
+        )
+        expect(polish).toContain("body.addEventListener('click'")
+        expect(polish).not.toContain("dialog.addEventListener('click'")
+    })
+
     it('uses one-step import and guards long Desktop operations', () => {
         const index = read('web/index.html')
         const i18n = read('web/i18n.js')

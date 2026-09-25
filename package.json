@@ -29,7 +29,8 @@
     "web:check": "node scripts/check-web-syntax.mjs",
     "benchmark": "tsx scripts/benchmark/download-harness.ts",
     "benchmark:visual-analysis": "tsx scripts/benchmark/visual-analysis-harness.ts",
-    "benchmark:http-latency-scenario": "tsx scripts/benchmark/http-latency-scenario.ts"
+    "benchmark:http-latency-scenario": "tsx scripts/benchmark/http-latency-scenario.ts",
+    "benchmark:library-query": "tsx scripts/benchmark/library-query-harness.ts"
   },
   "engines": {
     "node": ">=22.5"

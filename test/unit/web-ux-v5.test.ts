@@ -244,11 +244,21 @@ describe('V5 Web UX audit contract', () => {
         expect(theme).not.toContain('const viewScroll = new Map()')
         expect(theme).not.toContain('lastActiveView')
         expect(theme).toContain('function scheduleThemeDecoration()')
-        expect(theme).toContain(
-            'progressTimer = setInterval(scheduleThemeDecoration, 2500)'
+        expect(theme).not.toContain(
+            'setInterval(scheduleThemeDecoration'
         )
+        expect(theme).not.toContain('let progressTimer = null')
         expect(theme).toContain(
             "attributeFilter: ['class', 'hidden', 'style', 'value']"
+        )
+        expect(theme).toContain(
+            "window.addEventListener('resize', scheduleThemeDecoration"
+        )
+        expect(theme).toContain(
+            "document.addEventListener('visibilitychange'"
+        )
+        expect(theme).toContain(
+            'recommendationTimer = setInterval(pollRecommendationProgress, 500)'
         )
     })
 

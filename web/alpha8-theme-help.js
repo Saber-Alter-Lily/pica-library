@@ -11,7 +11,6 @@ const referenceFiles = []
 const progressHeads = new WeakMap()
 let desktopStatus = null
 let activeDescriptor = null
-let progressTimer = null
 let recommendationTimer = null
 let recommendationCompletionTimer = null
 let recommendationWatchBaselineCycleId = null
@@ -991,9 +990,9 @@ function setupRuntimeObservers() {
             scheduleThemeDecoration()
     })
 
-    // Low-frequency fallback only. Normal updates are driven by the observer
-    // above, so themed pages no longer rescan the DOM every 650 ms.
-    progressTimer = setInterval(scheduleThemeDecoration, 2500)
+    // Decoration is event-driven: relevant DOM mutations, theme changes,
+    // viewport resize, visibility restoration, and explicit theme application
+    // all schedule one coalesced animation-frame pass.
     scheduleThemeDecoration()
 }
 
@@ -1020,7 +1019,6 @@ if (document.readyState === 'loading')
 else void bootstrap()
 
 window.addEventListener('pagehide', () => {
-    if (progressTimer) clearInterval(progressTimer)
     if (recommendationTimer) clearInterval(recommendationTimer)
 })
 

@@ -3463,21 +3463,23 @@ export class LibraryDatabase {
     }
 
     updateDownloadProgress(id: string, patch: DownloadJobPatch): DownloadJob {
-        const current = this.getDownloadJob(id)
         this.db
             .prepare(
                 `UPDATE download_jobs SET
-                    progress_completed = ?, progress_total = ?, bytes = ?,
-                    expected_bytes = ?, current_episode_title = ?,
+                    progress_completed = COALESCE(?, progress_completed),
+                    progress_total = COALESCE(?, progress_total),
+                    bytes = COALESCE(?, bytes),
+                    expected_bytes = COALESCE(?, expected_bytes),
+                    current_episode_title = COALESCE(?, current_episode_title),
                     progress_updated_at = ?
                  WHERE id = ?`
             )
             .run(
-                patch.progressCompleted ?? current.progressCompleted,
-                patch.progressTotal ?? current.progressTotal,
-                patch.bytes ?? current.bytes,
-                patch.expectedBytes ?? current.expectedBytes ?? null,
-                patch.chapterTitle ?? current.chapterTitle ?? null,
+                patch.progressCompleted ?? null,
+                patch.progressTotal ?? null,
+                patch.bytes ?? null,
+                patch.expectedBytes ?? null,
+                patch.chapterTitle ?? null,
                 new Date().toISOString(),
                 id
             )

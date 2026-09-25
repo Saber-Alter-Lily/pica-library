@@ -144,6 +144,53 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(uiPrefix).not.toContain('UnifiedCatalogStore.reconcileLocalReferences(')
   })
 
+  it('prepares Main Settings file and stat summaries off the UI thread', () => {
+    const main = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MainActivity.java',
+      'utf8'
+    )
+
+    expect(main).toContain('private static final class SettingsSummary')
+    expect(main).toContain('private Future<?> settingsSummaryTask;')
+    expect(main).toContain('private SettingsSummary readSettingsSummary(){')
+    expect(main).toContain('FavoriteCacheStore.Snapshot favorites=FavoriteCacheStore.load(this)')
+    expect(main).toContain('long coverBytes=CoverRepository.diskBytes(this)')
+    expect(main).toContain('RemoteConfigStore.Config remote=RemoteConfigStore.load(this)')
+    expect(main).toContain('PicaAccountStore.Session pica=PicaAccountStore.load(this)')
+    expect(main).toContain('NativeRecommendationStore.Snapshot recommendation=NativeRecommendationStore.load(this)')
+    expect(main).toContain('PhoneDownloadStore.Snapshot downloads=PhoneDownloadStore.load(this)')
+    expect(main).toContain('PhoneDownloadStore.estimatedBytes(this,downloads)')
+    expect(main).toContain('StoragePolicy.Usage storage=StoragePolicy.usage(this)')
+    expect(main).toContain('settingsSummaryTask=requests.submit(()->{')
+    expect(main).toContain('SettingsSummary summary=readSettingsSummary();')
+    expect(main).toContain('if(!valid(id))return;')
+
+    const sourcesStart = main.indexOf('private void sources(){')
+    const summarySubmit = main.indexOf(
+      'settingsSummaryTask=requests.submit(()->{',
+      sourcesStart
+    )
+    const sourcesEnd = main.indexOf('private String formatBytes', sourcesStart)
+    const syncPrefix = main.slice(sourcesStart, summarySubmit)
+    const sourcesBody = main.slice(sourcesStart, sourcesEnd)
+
+    expect(syncPrefix).not.toContain('FavoriteCacheStore.load(')
+    expect(syncPrefix).not.toContain('CoverRepository.diskBytes(')
+    expect(syncPrefix).not.toContain('RemoteConfigStore.load(')
+    expect(syncPrefix).not.toContain('PicaAccountStore.load(')
+    expect(syncPrefix).not.toContain('NativeRecommendationStore.load(')
+    expect(syncPrefix).not.toContain('PhoneDownloadStore.load(')
+    expect(syncPrefix).not.toContain('PhoneDownloadStore.estimatedBytes(')
+    expect(syncPrefix).not.toContain('StoragePolicy.usage(')
+    expect(sourcesBody).toContain('pending=requests.submit(()->{')
+    expect(sourcesBody).toContain('settingsSummaryTask=requests.submit(()->{')
+
+    expect(main).toContain(
+      'if(settingsSummaryTask!=null)settingsSummaryTask.cancel(true)'
+    )
+    expect(main).toContain('settingsSummaryTask=null')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

@@ -329,23 +329,23 @@ export class LibraryDatabase {
         }
     }
 
-    listWorkIdentityBindings(limit = 5000) {
-        const bounded = Math.max(1, Math.min(10000, Math.floor(limit)))
-        const rows = this.db
-            .prepare(
-                `SELECT b.*, c.title AS comic_title,
-                        w.preferred_title AS work_title,
-                        e.label AS edition_label,
-                        e.language AS edition_language,
-                        e.edition_kind AS edition_kind
-                 FROM work_upload_bindings b
-                 JOIN comics c ON c.id = b.comic_id
-                 JOIN canonical_works w ON w.id = b.work_id
-                 LEFT JOIN work_editions e ON e.id = b.edition_id
-                 ORDER BY b.updated_at DESC, b.comic_id
-                 LIMIT ?`
-            )
-            .all(bounded) as SqlRow[]
+    private workIdentityBindings(limit: number | null) {
+        const sql = `SELECT b.*, c.title AS comic_title,
+                            w.preferred_title AS work_title,
+                            e.label AS edition_label,
+                            e.language AS edition_language,
+                            e.edition_kind AS edition_kind
+                     FROM work_upload_bindings b
+                     JOIN comics c ON c.id = b.comic_id
+                     JOIN canonical_works w ON w.id = b.work_id
+                     LEFT JOIN work_editions e ON e.id = b.edition_id
+                     ORDER BY b.updated_at DESC, b.comic_id`
+        const rows =
+            limit === null
+                ? (this.db.prepare(sql).all() as SqlRow[])
+                : (this.db
+                      .prepare(`${sql} LIMIT ?`)
+                      .all(limit) as SqlRow[])
         return rows.map((row) => ({
             comicId: String(row.comic_id),
             comicTitle: String(row.comic_title ?? ''),
@@ -368,6 +368,15 @@ export class LibraryDatabase {
             createdAt: String(row.created_at),
             updatedAt: String(row.updated_at)
         }))
+    }
+
+    listWorkIdentityBindings(limit = 5000) {
+        const bounded = Math.max(1, Math.min(10000, Math.floor(limit)))
+        return this.workIdentityBindings(bounded)
+    }
+
+    listAllWorkIdentityBindings() {
+        return this.workIdentityBindings(null)
     }
 
     private workIdentityMaterializationRun(row: SqlRow) {
@@ -661,19 +670,19 @@ export class LibraryDatabase {
         }
     }
 
-    listWorkIdentityDecisions(limit = 500) {
-        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
-        const rows = this.db
-            .prepare(
-                `SELECT d.*, lc.title AS left_title,
-                        rc.title AS right_title
-                 FROM work_identity_decisions d
-                 JOIN comics lc ON lc.id = d.left_comic_id
-                 JOIN comics rc ON rc.id = d.right_comic_id
-                 ORDER BY d.updated_at DESC, d.left_comic_id, d.right_comic_id
-                 LIMIT ?`
-            )
-            .all(bounded) as SqlRow[]
+    private workIdentityDecisions(limit: number | null) {
+        const sql = `SELECT d.*, lc.title AS left_title,
+                            rc.title AS right_title
+                     FROM work_identity_decisions d
+                     JOIN comics lc ON lc.id = d.left_comic_id
+                     JOIN comics rc ON rc.id = d.right_comic_id
+                     ORDER BY d.updated_at DESC, d.left_comic_id, d.right_comic_id`
+        const rows =
+            limit === null
+                ? (this.db.prepare(sql).all() as SqlRow[])
+                : (this.db
+                      .prepare(`${sql} LIMIT ?`)
+                      .all(limit) as SqlRow[])
         return rows.map((row) => ({
             id: String(row.id),
             leftComicId: String(row.left_comic_id),
@@ -689,6 +698,15 @@ export class LibraryDatabase {
             createdAt: String(row.created_at),
             updatedAt: String(row.updated_at)
         }))
+    }
+
+    listWorkIdentityDecisions(limit = 500) {
+        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
+        return this.workIdentityDecisions(bounded)
+    }
+
+    listAllWorkIdentityDecisions() {
+        return this.workIdentityDecisions(null)
     }
 
     recordUserEvent(input: UserEventInput): UserEvent {

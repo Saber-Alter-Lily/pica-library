@@ -2750,8 +2750,14 @@ export class LibraryService {
     recommendationV5WorkIdentityReview(limit = 200) {
         const evidence = this.database.listWorkIdentityEvidence(limit)
         const decisions = this.database.listWorkIdentityDecisions(5000)
+        const decisionCount =
+            this.database.workIdentityStorageStatus().counts.decisions
+        const authoritativeDecisions =
+            decisionCount > decisions.length
+                ? this.database.listAllWorkIdentityDecisions()
+                : decisions
         const decisionByPair = new Map(
-            decisions.map((item) => [
+            authoritativeDecisions.map((item) => [
                 [item.leftComicId, item.rightComicId].sort().join('\u0000'),
                 item
             ])
@@ -2768,7 +2774,7 @@ export class LibraryService {
         const materializationPreview =
             buildWorkIdentityMaterializationPreviewV5(
                 this.allComicsForIdentity(),
-                decisions
+                authoritativeDecisions
             )
         return {
             mode: 'HUMAN_REVIEW' as const,
@@ -2783,8 +2789,8 @@ export class LibraryService {
 
     recommendationV5WorkIdentityMaterializationPlan() {
         const catalog = this.allComicsForIdentity()
-        const decisions = this.database.listWorkIdentityDecisions(5000)
-        const existingBindings = this.database.listWorkIdentityBindings(10000)
+        const decisions = this.database.listAllWorkIdentityDecisions()
+        const existingBindings = this.database.listAllWorkIdentityBindings()
         const plan = buildWorkIdentityMaterializationPlanV5(
             catalog,
             decisions,

@@ -14,7 +14,7 @@ describe('owned-work exclusion and work-variant detail UX', () => {
         expect(coordinator).toContain('recommendationOwnershipState()')
         expect(database).toContain('recommendationOwnershipState()')
         expect(database).toContain("p.status = 'completed'")
-        expect(coordinator).toContain('listWorkIdentityBindings(10000)')
+        expect(coordinator).toContain('listAllWorkIdentityBindings()')
         expect(coordinator).toContain('canonicalOwnedComicIds')
         expect(coordinator).toContain('canonicalOwnedWorkCount')
         expect(coordinator).toContain('filterCandidatesAgainstOwnedV5')

@@ -261,7 +261,7 @@ Target behavior:
 - stress tests cover representative competing workloads.
 
 ## P2-D — SQLite/query/write discipline
-**Status: IN_PROGRESS — D1/D2/D3 merged; D4 compact recommendation-serving catalog candidate; broader query/write audit remains open**
+**Status: IN_PROGRESS — D1–D4 merged; D5A authoritative Work Identity domain candidate; broader query/write audit remains open**
 
 Already improved:
 - direct comic lookup;
@@ -956,19 +956,19 @@ Use the runtime inventory plus H1/H2 measurements to define resource classes and
 - **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
 
 ## NEXT-6 — P2-D SQLite/query discipline
-**Status: IN_PROGRESS — D1/D2/D3 merged; D4 compact recommendation-serving catalog candidate**
+**Status: IN_PROGRESS — D1–D4 merged; D5A authoritative Work Identity domain candidate**
 
 This remains the next unblocked P2 lane while J2 real Windows x64 measurement evidence requires a representative running Desktop environment.
 
 - **D1 merged (PR #124):** complete-domain Browser Lite/CLI paths no longer reuse the legacy 5000-row presentation cap.
 - **D2 merged (PR #125):** Shelf/recommendation exact-ID reads use chunked `getComicsByIds()`; author metadata changed from 2N+1 to fixed batched queries with the required reverse indexes.
-- **D3 merged (PR #126):** ordinary no-text Library queries no longer load the complete author/alias/circle set; `pnpm benchmark:library-query` records 500/2000/5000-row SQLite scaling evidence without defining a release budget.
-- **D4 implemented:** Final V3 frozen serving, portable readback and serving-composition diagnostics replace unrelated 10000-row catalog materialization with the exact union of physical ownership, policy ownership and current candidate/batch IDs. Final V3 Canonical Work ownership expansion remains intact.
-- D4 uses the existing dedicated `favoriteIds()` query for allocator favorites and removes unused full-catalog fields from the frozen serving snapshot.
-- A semantic equivalence regression requires compact owned+candidate filtering to equal full-catalog filtering, including ownership/work-duplicate telemetry. Existing Final V3 owned-upload/same-work and frozen-snapshot regressions remain authoritative.
-- Recommendation generation/profile/Shadow/Portable Policy snapshot and recommendation-audit bounds remain unchanged because they may be algorithmic or diagnostic budgets rather than serving-query waste.
-- **Next after D4:** classify Work Identity 10000-row review/binding limits, inspect Visual/Work Identity full-catalog materialization and use D3/J1/J2 evidence before any `comicSelect` aggregate or write-cadence rewrite.
-- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`.
+- **D3 merged (PR #126):** ordinary no-text Library queries avoid complete author metadata; `pnpm benchmark:library-query` records SQLite scaling evidence without defining a release budget.
+- **D4 merged (PR #127):** Final V3 frozen serving, portable readback and serving-composition diagnostics use complete owned+candidate exact-ID domains instead of unrelated 10000-row catalog materialization; Canonical Work ownership semantics remain unchanged.
+- **D5A implemented:** Work Identity bounded review reads and authoritative correctness reads are now separate contracts. Materialization plan uses all decisions + all bindings; review preview switches to the full decision domain when the bounded review list is incomplete; Final V3 Canonical Work ownership uses all bindings.
+- D5A regression constructs 10001 bindings and 5001 decisions in real SQLite, requiring bounded APIs to remain capped while authoritative APIs cross both former boundaries.
+- Materialization execution remains disabled; plan digest/confirmation/blocker gates are unchanged.
+- **Next after D5A:** D5B should replace `workVariantsForComic()` global relationship prefixes with targeted current-comic/work binding, decision and probable-evidence queries while preserving its intentional full-catalog metadata heuristic funnel.
+- Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -982,6 +982,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-D5A authoritative Work Identity domains
+
+State update:
+- Work Identity review/presentation and authoritative materialization previously shared bounded decision/binding APIs: 5000 decisions and 10000 bindings.
+- D5A preserves those bounded APIs for ordinary review surfaces but adds explicit `listAllWorkIdentityDecisions()` and `listAllWorkIdentityBindings()` for correctness domains.
+- Materialization preview uses the complete decision domain whenever storage exceeds the bounded review list. The materialization plan always uses complete decisions and existing bindings, so its digest represents the full stored state.
+- Final V3 Canonical Work ownership expansion now uses complete bindings rather than the legacy 10000-row prefix.
+- A real SQLite boundary regression stores 10001 bindings and 5001 decisions and requires bounded versus authoritative reads to return 10000/10001 and 5000/5001 respectively.
+- D5A intentionally does not change `workVariantsForComic()`; that detail UX needs targeted per-comic/work relationship queries rather than replacing bounded prefixes with global full-domain reads.
+- Materialization execution remains disabled; resolver confidence, human authority, KEEP_SEPARATE semantics, recommendation ranking and P2-C3 enforcement are unchanged.
+- Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md.
 
 ## 2026-09-24 — P2-D4 compact Final V3 serving catalog
 

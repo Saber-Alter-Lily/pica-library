@@ -11,7 +11,13 @@ final class NativeRecommendationJobs {
 
     private static OneTimeWorkRequest request(){
         Constraints constraints=new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
-        return new OneTimeWorkRequest.Builder(NativeRecommendationWorker.class).setConstraints(constraints).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).addTag(TAG).build();
+        return AndroidTaskResources.tag(
+            new OneTimeWorkRequest.Builder(NativeRecommendationWorker.class),
+            AndroidTaskResources.PROVIDER_NETWORK,
+            AndroidTaskResources.CPU_ANALYSIS
+        ).setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS)
+            .addTag(TAG).build();
     }
     private static void enqueue(Context context,ExistingWorkPolicy policy){OneTimeWorkRequest request=request();WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,policy,request);MobileTaskRegistryStore.setWorkId(context,"recommendation",UNIQUE_NAME,request.getId());}
     static void enqueue(Context context){acknowledgePause(context,false);MobileTaskPauseStore.setPaused(context,"recommendation",UNIQUE_NAME,false);enqueue(context,ExistingWorkPolicy.KEEP);}

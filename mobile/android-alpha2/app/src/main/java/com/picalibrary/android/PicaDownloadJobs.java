@@ -9,7 +9,14 @@ final class PicaDownloadJobs {
     static String name(String comicId,String episodeId){return "pica-download-"+ReaderPolicy.hash(comicId+"\n"+(episodeId==null?"":episodeId));}
     private static void enqueue(Context context,String comicId,String episodeId,ExistingWorkPolicy policy){
         String ep=episodeId==null?"":episodeId;Data input=new Data.Builder().putString(PicaDownloadWorker.KEY_COMIC,comicId).putString(PicaDownloadWorker.KEY_EPISODE,ep).build();NetworkType network=StorageSettings.downloadWifiOnly(context)?NetworkType.UNMETERED:NetworkType.CONNECTED;Constraints constraints=new Constraints.Builder().setRequiredNetworkType(network).build();
-        OneTimeWorkRequest request=new OneTimeWorkRequest.Builder(PicaDownloadWorker.class).setInputData(input).setConstraints(constraints).setBackoffCriteria(BackoffPolicy.EXPONENTIAL,15,TimeUnit.SECONDS).addTag("pica-download").addTag("comic:"+comicId).addTag(ep.isEmpty()?"episode:ALL":"episode:"+ep).build();
+        OneTimeWorkRequest request=AndroidTaskResources.tag(
+            new OneTimeWorkRequest.Builder(PicaDownloadWorker.class),
+            AndroidTaskResources.MEDIA_NETWORK,
+            AndroidTaskResources.FILESYSTEM_HEAVY
+        ).setInputData(input).setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,15,TimeUnit.SECONDS)
+            .addTag("pica-download").addTag("comic:"+comicId)
+            .addTag(ep.isEmpty()?"episode:ALL":"episode:"+ep).build();
         WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(name(comicId,ep),policy,request);
         MobileTaskRegistryStore.registerDownload(context,"pica",comicId,ep,request.getId());
     }

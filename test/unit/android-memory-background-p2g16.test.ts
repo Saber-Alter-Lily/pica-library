@@ -110,6 +110,12 @@ describe('P2-G16 Android memory and background restrictions', () => {
         expect(backgroundWorker).toContain('RUN_COUNT_FILE')
 
         expect(script).toContain(
+            'android.intent.category.HOME'
+        )
+        expect(script).toContain(
+            'background_pid" != "$before_pid'
+        )
+        expect(script).toContain(
             'adb shell am send-trim-memory "$TARGET_PACKAGE" HIDDEN'
         )
         expect(script).toContain('before_pid')

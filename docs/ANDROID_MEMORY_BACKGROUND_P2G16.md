@@ -1,8 +1,15 @@
 # Android Memory Pressure and Background Restrictions — P2 G16
 
-Status: **implementation candidate / CI and emulator evidence required before promotion**
+Status: **PASS / merged as PR #170**
 
 Parent: `DEVELOPMENT_TASK_LOG.md` → P2-G Android runtime hardening.
+
+Accepted evidence before merge:
+- normal CI run `36147604842`: PASS;
+- v0.4 Direct Upgrade Acceptance run `36147604826`: PASS;
+- G15 force-stop regression run `36147604861`: PASS on WorkManager 2.12.0;
+- Android Memory and Background Restrictions run `36147604843`: PASS;
+- merged commit: `bf0e5e8853e715909aa63cff5ef31934cd2f2c5f`.
 
 Baseline:
 

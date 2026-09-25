@@ -252,10 +252,16 @@ describe('Android Library / Author / History V2 contracts', () => {
       'private void renderShelves(',
       refreshStart
     )
+    const nextAfterShelves = main.indexOf(
+      'private RecommendationPageState readRecommendationPageState()',
+      renderStart
+    )
     const recommendationsStart = main.indexOf(
       'private void recommendations(){',
       renderStart
     )
+    const renderEnd =
+      nextAfterShelves >= 0 ? nextAfterShelves : recommendationsStart
 
     const booksBody = main.slice(booksStart, refreshStart)
     expect(booksBody).toContain('pending=requests.submit(()->{')
@@ -276,7 +282,7 @@ describe('Android Library / Author / History V2 contracts', () => {
     )
     expect(refreshBody).toContain('ShelfPageState fallback=readLocalShelfState()')
 
-    const renderBody = main.slice(renderStart, recommendationsStart)
+    const renderBody = main.slice(renderStart, renderEnd)
     expect(renderBody).not.toContain('ShelfStore.load(')
     expect(renderBody).not.toContain('UnifiedCatalogStore.load(')
     expect(renderBody).not.toContain('RemoteConfigStore.load(')

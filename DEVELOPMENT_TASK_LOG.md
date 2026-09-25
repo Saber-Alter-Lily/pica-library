@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current G15 candidate: `main@ac0d1fb9222503ca778802b73691fb59705827ca` (P2-G14 / PR #166 merged)  
+Authoritative repository baseline before the current G16 candidate: `main@d60ee3207bc2f1d7a02a77634a748eaf6a08d2ac` (P2-G15 / PR #169 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G14 merged; G15 real ADB force-stop recovery candidate**
+**Status: IMPLEMENTATION_COMPLETE_UI_THREAD_IO / RECOVERY_IN_PROGRESS — G1–G15 merged; G16 low-memory / background-restriction candidate**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -337,8 +337,8 @@ Remaining:
 - inventory all Activities/Fragments for main-thread file/JSON/DB/network work;
 - unify background-task status presentation through the task center where appropriate;
 - define Android-specific concurrency/resource budgets;
-- promote the G15 emulator/ADB force-stop gate after CI evidence, then extend process-death evidence to remaining Worker families where it adds value;
-- validate low-memory/background restrictions;
+- promote the G16 trim-memory + Doze gate after CI evidence;
+- validate remaining OEM/physical-device background restrictions where generic emulator evidence is insufficient;
 - verify large Catalog and long Reader behavior on representative mid-range hardware.
 
 **Acceptance**
@@ -347,7 +347,7 @@ Remaining:
 - background task UI is reconstructible after Activity recreation.
 
 ## P2-H — Startup, shutdown and crash recovery
-**Status: IN_PROGRESS — G13/G14 recovery reconstruction evidence merged; G15 OS force-stop candidate; low-memory/device evidence open**
+**Status: IN_PROGRESS — G13–G15 recovery evidence merged; G16 low-memory/Doze candidate; OEM/device evidence open**
 
 Required:
 - stale recommendation building state cleanup;
@@ -1014,12 +1014,12 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: RECOVERY_IN_PROGRESS — G1–G14 merged; G15 real emulator/ADB force-stop recovery candidate**
+**Status: RECOVERY_IN_PROGRESS — G1–G15 merged; G16 low-memory / Doze restriction candidate**
 
 - **G1–G12 merged (PR #153–#164):** audited Android UI-thread Catalog/Semantic/download/settings/browse/shelf/recommendation/history/direct-open/Reader-completion I/O owners are worker-owned.
 - **G13 merged (PR #165):** durable task identity is persisted independently of Activity memory; Task Center reconstructs singleton/dynamic work from exact WorkRequest UUID + WorkManager state instead of WorkInfo list order/history.
 - G13 also adds the explicit Android recovery matrix required by P2-H and preserves PAUSED download identity even when an old CANCELLED WorkInfo is unavailable.
-- **G14 merged (PR #166) with the official WorkManager test harness:** `androidx.work:work-testing:2.9.1` matches the production WorkManager runtime.
+- **G14 merged (PR #166) with the official WorkManager test harness:** recovery semantics remain covered by the official AndroidX test harness; G16 updates runtime + harness from historical 2.9.1 to current WorkManager 2.12.0.
 - `WorkManagerRecoveryTest` creates real delayed WorkRequests and queries real WorkInfo/unique-work history under Robolectric rather than using a hand-built scheduler fake.
 - G14 covers:
   - REPLACE history reconstructs exactly one current download;
@@ -1032,9 +1032,13 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - **G15 finding:** Favorite import, Pica bootstrap and Native Recommendation persisted current singleton WorkRequest UUIDs but did not retire those UUIDs on successful completion or explicit cancel. A later restart could therefore bind Task Center to historical SUCCEEDED/CANCELLED WorkInfo.
 - **G15 production correction:** explicit cancel clears singleton recovery identity immediately; successful Workers clear it only after their existing durable success boundary. PAUSED/retry/failure states retain recovery identity.
 - **G15 real process-death gate:** a debug-only normal app Activity seeds real WorkManager state and keeps a debug-only probe RUNNING; the seed deliberately does not use instrumentation because Android instrumentation itself adds target-package force-stop lifecycle events. The host executes `adb shell am force-stop com.picalibrary.android.dev`, confirms process death, re-enters through the normal launcher and requires probe runCount >= 2 in a fresh app process before verification-only instrumentation checks active/PAUSED recovery state, one-card Task Center reconstruction and cancelled-history non-resurrection.
-- **G15 CI:** `.github/workflows/android-worker-force-stop-recovery.yml` uses the open-source ReactiveCircus emulator runner on API 35 and executes `scripts/run-android-worker-force-stop-recovery.sh`. Promotion requires this gate to pass.
-- **Next after G15 acceptance:** low-memory/background restriction audit, foreground-notification reconstruction on representative hardware, Android resource/concurrency budgets, then large-Catalog/long-Reader timing/jank/memory evidence.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, and `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`.
+- **G15 merged (PR #169):** normal CI, direct-upgrade acceptance and the real API-35 force-stop/relaunch emulator gate all passed before merge. The OS process-death recovery gate is now accepted.
+- **G16 finding 1:** PicaLibraryApp had no trim-memory handling while CoverRepository and ImageRepository could each retain up to 72 MiB of decoded Bitmaps.
+- **G16 memory correction:** Application.onTrimMemory now evicts only reconstructible in-memory Bitmap LRUs at UI_HIDDEN/background pressure; encoded disk caches and durable work are untouched. Robolectric + real `am send-trim-memory ... HIDDEN` evidence cover this boundary.
+- **G16 finding 2:** Android durable work still used WorkManager 2.9.1, predating Android 15 SDK/network/foreground-timeout fixes. G16 upgrades both runtime and work-testing to stable 2.12.0 while preserving the G14/G15 recovery suite.
+- **G16 Doze gate:** a delayed, network-constrained debug WorkManager probe must remain unexecuted while the API-35 emulator is forced into Doze and must execute after `deviceidle unforce`.
+- **Next after G16 acceptance:** representative-hardware foreground-notification/OEM restriction evidence, Android resource/concurrency budgets, then large-Catalog/long-Reader timing/jank/memory evidence.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, and `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1048,6 +1052,21 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-G16 Android low-memory and background restriction gate
+
+State update:
+- G15 is merged as PR #169 after the normal CI, v0.4 direct-upgrade gate and the real API-35 force-stop/relaunch emulator gate passed.
+- Android memory audit found no process-wide onTrimMemory handler while CoverRepository and ImageRepository each allowed a 72 MiB decoded-Bitmap LRU.
+- G16 adds Application.onTrimMemory handling that evicts only those reconstructible memory LRUs at UI_HIDDEN/background pressure; disk caches, active view references and durable WorkManager state are not deleted.
+- AndroidMemoryPressureTest covers UI_HIDDEN/BACKGROUND eviction and protects against purging on a non-trim hint.
+- G16 also upgrades WorkManager runtime/testing from 2.9.1 to stable 2.12.0. This crosses the Android 15 compatibility fixes for dataSync foreground timeout handling, blocked-network constraint tracking and background network execution.
+- Existing durable network families remain WorkManager-owned with CONNECTED/UNMETERED constraints; no new raw service scheduler is introduced.
+- The real emulator gate primes both Bitmap LRUs, sends ActivityManager HIDDEN trim in the same PID and requires both memory sizes to reach zero.
+- The same API-35 emulator then enqueues a delayed network-constrained debug Worker, forces Doze past the eligibility boundary, requires zero execution while idle, exits Doze and requires the Worker to execute.
+- Debug probes remain outside the release manifest.
+- OEM battery managers, Android 16+ long-running Worker quota behavior, foreground-notification reconstruction on representative devices and enforceable concurrency budgets remain later evidence gates.
+- Detailed boundary: `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`.
 
 ## 2026-09-25 — P2-G15 real Android force-stop recovery gate
 

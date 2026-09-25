@@ -48,6 +48,33 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(works).toContain('EhCapabilityStore.refresh(this,false)')
   })
 
+  it('keeps Author Works catalog and creator rebuilds off the UI render path', () => {
+    const works = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AuthorWorksActivity.java','utf8')
+    expect(works).toContain('private static final class LocalState')
+    expect(works).toContain('private LocalState readLocalState()')
+    expect(works).toContain('UnifiedCatalogStore.Snapshot nextCatalog =')
+    expect(works).toContain('EhSemanticStore.Snapshot semantics = EhSemanticStore.load(this)')
+    expect(works).toContain('AuthorConceptStore.build(nextCatalog, semantics)')
+    expect(works).toContain('worker.submit(() -> {')
+    expect(works).toContain('LocalState next = readLocalState();')
+    expect(works).not.toContain('AuthorConceptStore.build(this)')
+
+    const renderStart = works.indexOf('private void renderWorks()')
+    const renderEnd = works.indexOf('private boolean bindingMatches(', renderStart)
+    const renderBody = works.slice(renderStart, renderEnd)
+    expect(renderBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(renderBody).not.toContain('EhSemanticStore.load(')
+    expect(renderBody).not.toContain('AuthorConceptStore.build(')
+
+    const onCreateStart = works.indexOf('@Override public void onCreate')
+    const onCreateEnd = works.indexOf('private Button compact(', onCreateStart)
+    const onCreateBody = works.slice(onCreateStart, onCreateEnd)
+    expect(onCreateBody).toContain('renderShell();')
+    expect(onCreateBody).toContain('loadLocalState(true);')
+    expect(onCreateBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(onCreateBody).not.toContain('AuthorConceptStore.build(')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

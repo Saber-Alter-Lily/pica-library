@@ -35,7 +35,6 @@ On an active download queue this turns every persisted progress update into two 
 - provided numeric/string values replace the stored value;
 - `undefined` / `null` parameters retain the current stored value;
 - explicit zero values remain writable;
-- an explicit empty chapter title remains writable;
 - `progress_updated_at` is refreshed exactly as before.
 
 The method then performs one `getDownloadJob(id)` to return the authoritative updated job.

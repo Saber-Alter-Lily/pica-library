@@ -324,7 +324,7 @@ Remaining evidence only:
 - browser performance trace shows no persistent high-frequency idle work from the app itself.
 
 ## P2-G — Android runtime hardening
-**Status: IN_PROGRESS — G1–G3 merged; G4 Main Library first-frame reconcile candidate; broader Activity/Worker audit remains open**
+**Status: IN_PROGRESS — G1–G4 merged; G5 Main Settings summary candidate; broader Activity/Worker audit remains open**
 
 Already improved:
 - heavy recommendation profile work moved off Activity first frame;
@@ -1014,20 +1014,21 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `P2F8.md`, `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md` through `P2F12.md`, and `docs/FRONTEND_BROWSER_EVIDENCE_P2F13.md`.
 
 ## NEXT-9 — P2-G Android runtime hardening
-**Status: IN_PROGRESS — G1–G3 merged; G4 Main Library first-frame reconcile candidate**
+**Status: IN_PROGRESS — G1–G4 merged; G5 Main Settings summary candidate**
 
 - **G1 merged (PR #153):** Author Works local Catalog/Semantic/creator reconstruction is worker-owned.
 - **G2 merged (PR #154):** Comic Detail initial Catalog/Semantic/creator/PhoneDownload/E-H favorite preparation is worker-owned behind a lightweight shell.
-- **G3 merged (PR #155):** DownloadsActivity persistent-index parsing, full page-size stat scan and delete refresh run on an Activity-local worker with lifecycle/generation guards.
-- **G4 finding:** MainActivity's default Library tab synchronously executed `UnifiedCatalogStore.reconcileLocalReferences(this)` before its first catalog render.
-- That reconciliation loads/parses Unified Catalog, ShelfStore, E-H/Favorite stores and PhoneDownloadStore, merges local references and writes the Catalog back; cost scales with local library state.
-- **G4 implemented:** Library creates search/filter/shortcut/status/Grid UI first, then submits the local reconciliation to MainActivity's existing `requests` executor.
-- The worker publishes one local Snapshot through `runOnUiThread` only when the existing `serial/valid(id)` page generation is still current.
-- Existing one-source-refresh-per-session behavior starts only after the local Snapshot is published; Desktop/WebDAV refresh remains asynchronous and semantically unchanged.
-- Existing `cancelPageWork()` invalidates/cancels the page-owned Future when the user changes tabs, so stale local reconstruction cannot repaint a newer view.
-- **Next after G4:** isolate MainActivity Settings/source-summary file/stat reads, then AuthorDirectoryActivity and PicaBrowseActivity in separate batches. MainActivity Bookshelves/Recommendation local-store paths remain separately auditable.
+- **G3 merged (PR #155):** DownloadsActivity persistent-index parsing, page-size stat scan and delete refresh are worker-owned with lifecycle/generation guards.
+- **G4 merged (PR #156):** MainActivity's default Library shell renders before `UnifiedCatalogStore.reconcileLocalReferences()`, which now runs on the existing requests executor with `serial/valid(id)` publication.
+- **G5 finding:** MainActivity Settings/source summary synchronously mixed UI construction with Favorite JSON parsing, cover directory scan, encrypted Remote/Pica state reads, NativeRecommendation JSON parsing, PhoneDownload index + page-size stats, and recursive StoragePolicy usage scans.
+- **G5 implemented:** Settings renders all cards/actions immediately with loading placeholders, while one worker-owned `SettingsSummary` prepares the file/stat-heavy state.
+- `readSettingsSummary()` loads Favorite/Remote/Pica/Recommendation/PhoneDownload/Storage/Cover state off-thread and reuses `PhoneDownloadStore.estimatedBytes(this, downloads)` to avoid reparsing the phone index.
+- Desktop reachability keeps the existing `pending` Future; Settings summary uses a separate `settingsSummaryTask` so the two authorities cannot cancel/overwrite each other.
+- Summary publication uses the existing `serial/valid(id)` page-generation guard. `settingsSummaryTask` is cancelled on tab change, pause and destroy.
+- Favorite-import action messages are protected from stale summary overwrite by updating the Favorite summary only while its original loading placeholder is still present.
+- **Next after G5:** AuthorDirectoryActivity creator-concept construction, then PicaBrowseActivity local Catalog/Semantic/translation work. MainActivity Bookshelves/Recommendation and direct-open Catalog reads remain separate owner-level batches.
 - Durable Worker process-death/relaunch, Task Center reconstruction, low-memory/background behavior and Android resource budgets remain later P2-G work.
-- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G4.md`.
+- Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `docs/ANDROID_RUNTIME_HARDENING_P2G5.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1041,6 +1042,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-G5 Main Settings summary I/O hardening
+
+State update:
+- MainActivity Settings previously built the page while synchronously loading FavoriteCacheStore, RemoteConfigStore, PicaAccountStore, NativeRecommendationStore and PhoneDownloadStore, scanning cover bytes, stat-ing every phone-download page through estimatedBytes(this), and recursively calculating StoragePolicy.usage().
+- G5 introduces one worker-prepared SettingsSummary and leaves the Settings cards/buttons synchronous with lightweight loading placeholders.
+- readSettingsSummary() owns the persistent JSON/Keystore/directory/stat work and reuses the already loaded PhoneDownload Snapshot for byte estimation.
+- Desktop online probing remains on the existing pending Future; settingsSummaryTask is a separate page-owned Future so these state streams do not replace/cancel one another.
+- Summary UI publication is guarded by serial/valid(id). settingsSummaryTask is cancelled on page switch, pause and destroy.
+- Favorite action messages are not overwritten by an older summary completion.
+- Settings actions, WorkManager jobs, Pica/WebDAV configuration, Task Center, Downloads, Storage and Update navigation are unchanged.
+- Detailed boundary: docs/ANDROID_RUNTIME_HARDENING_P2G5.md.
 
 ## 2026-09-24 — P2-G4 Main Library first-frame local-reference hardening
 

@@ -85,6 +85,25 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(cloud).toContain("controlRemoteSync('cancel')")
     })
 
+    it('reattaches WebDAV progress polling after reload and stops at terminal state', () => {
+        const cloud = read('web/alpha7-cloud.js')
+        expect(cloud).toContain('let remoteSyncRequestPending = false')
+        expect(cloud).toContain('function remoteProgressActive(progress)')
+        expect(cloud).toContain(
+            'if (!remoteSyncRequestPending && !remoteProgressActive(progress))'
+        )
+        expect(cloud).toContain('stopProgressPolling()')
+        expect(cloud).toContain(
+            'if (remoteProgressActive(remoteState.syncProgress))'
+        )
+        expect(cloud).toContain('startProgressPolling()')
+        expect(cloud).toContain('remoteSyncRequestPending = true')
+        expect(cloud).toContain('remoteSyncRequestPending = false')
+        expect(cloud).toContain(
+            "window.addEventListener('pagehide', stopProgressPolling)"
+        )
+    })
+
     it('gives Android recommendation, downloads and imports durable pause/resume semantics', () => {
         const taskCenter = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TaskCenterActivity.java')
         const recJobs = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationJobs.java')

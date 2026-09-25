@@ -16,6 +16,7 @@ function fixture() {
         fs.rmSync(dir, { recursive: true, force: true })
     })
     const provider = {
+        cacheScope: vi.fn(() => 'pica:test-scope'),
         getEpisodes: vi.fn(
             async () =>
                 [

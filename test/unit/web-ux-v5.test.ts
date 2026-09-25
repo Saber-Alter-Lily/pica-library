@@ -198,8 +198,16 @@ describe('V5 Web UX audit contract', () => {
         const product = read('web/alpha8-product.js')
         const polish = read('web/ui-polish-v5.js')
         expect(product).toContain('let cleanupQueued = false')
+        expect(product).toContain('const pendingSourceRoots = new Set()')
         expect(product).toContain('requestAnimationFrame(() => {')
         expect(product).toContain(
+            'const observer = new MutationObserver((mutations) =>'
+        )
+        expect(product).toContain('for (const node of mutation.addedNodes)')
+        expect(product).toContain(
+            'for (const root of roots) removeSourceEntryPoints(root)'
+        )
+        expect(product).not.toContain(
             'const observer = new MutationObserver(scheduleSourceCleanup)'
         )
         expect(polish).toContain('let settingsPolishQueued = false')

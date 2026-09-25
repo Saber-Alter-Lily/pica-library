@@ -337,6 +337,59 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(renderBody).toContain('NativeRecommendationStore.Snapshot snapshot=state.nativeSnapshot')
   })
 
+  it('keeps History local JSON and catalog reads off the UI render path', () => {
+    const history = fs.readFileSync(
+      'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HistoryActivity.java',
+      'utf8'
+    )
+
+    expect(history).toContain('private static final class HistoryData')
+    expect(history).toContain('private ReadingHistoryStore.Snapshot historySnapshot')
+    expect(history).toContain('private UnifiedCatalogStore.Snapshot catalogSnapshot')
+    expect(history).toContain('private HistoryData readHistoryData(boolean migrateBookmarks)')
+    expect(history).toContain(
+      'if(migrateBookmarks)ReadingHistoryStore.importLocalBookmarksOnce(this)'
+    )
+    expect(history).toContain('ReadingHistoryStore.load(this)')
+    expect(history).toContain('UnifiedCatalogStore.load(this)')
+    expect(history).toContain('private void loadLocalHistory(boolean migrateBookmarks)')
+    expect(history).toContain('worker.submit(()->{')
+    expect(history).toContain('HistoryData data=readHistoryData(migrateBookmarks)')
+    expect(history).toContain('historySnapshot=data.history')
+    expect(history).toContain('catalogSnapshot=data.catalog')
+
+    const onCreateStart = history.indexOf('@Override public void onCreate')
+    const onCreateEnd = history.indexOf('private Button compact(', onCreateStart)
+    const onCreateBody = history.slice(onCreateStart, onCreateEnd)
+    expect(onCreateBody).toContain('renderShell();')
+    expect(onCreateBody).toContain('loadLocalHistory(true);')
+    expect(onCreateBody).toContain('importLegacySources();')
+    expect(onCreateBody).not.toContain('ReadingHistoryStore.importLocalBookmarksOnce(')
+    expect(onCreateBody).not.toContain('ReadingHistoryStore.load(')
+    expect(onCreateBody).not.toContain('UnifiedCatalogStore.load(')
+
+    const renderStart = history.indexOf('private void renderList()')
+    const renderEnd = history.indexOf('private void addComic(', renderStart)
+    const renderBody = history.slice(renderStart, renderEnd)
+    expect(renderBody).not.toContain('ReadingHistoryStore.load(')
+    expect(renderBody).not.toContain('UnifiedCatalogStore.load(')
+    expect(renderBody).toContain(
+      'ReadingHistoryStore.filter(historySnapshot,range,exactDate,zone)'
+    )
+    expect(renderBody).toContain('addComic(group,zone,catalogSnapshot)')
+
+    const importStart = history.indexOf('private void importLegacySources()')
+    const importEnd = history.indexOf(
+      '@Override protected void onDestroy()',
+      importStart
+    )
+    const importBody = history.slice(importStart, importEnd)
+    expect(importBody).toContain('ReadingHistoryStore.importLegacy(this,rows)')
+    expect(importBody).toContain('HistoryData data=readHistoryData(false)')
+    expect(importBody).toContain('historySnapshot=data.history')
+    expect(importBody).toContain('catalogSnapshot=data.catalog')
+  })
+
   it('records session history separately from bookmarks and supports exact-date resume', () => {
     const progress = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReaderProgress.java','utf8')
     const store = fs.readFileSync('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ReadingHistoryStore.java','utf8')

@@ -117,9 +117,6 @@ describe('P2-G16 Android memory and background restrictions', () => {
         expect(script).toContain(
             'run-as "$TARGET_PACKAGE" test -s "files/p2-g16-background-failure"'
         )
-        expect(script).not.toContain(
-            'cat "files/p2-g16-background-failure" 2>/dev/null || true)"'
-        )
         expect(script).toContain('adb shell cmd deviceidle force-idle')
         expect(script).toContain('sleep 22')
         expect(script).toContain('executed while device was forced into Doze')

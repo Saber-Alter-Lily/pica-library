@@ -1965,20 +1965,70 @@ function applyManagedRecommendationBatch(value) {
     clearSelection('recommendation')
 }
 
-async function waitForFinalCycle(previousCycleId = null) {
-    for (let attempt = 0; attempt < 120; attempt++) {
-        const status = await api(
-            '/api/v1/recommendation-sessions/status?mode=final'
-        )
-        if (status.buildProgress?.state === 'failed')
-            throw new Error(t('recommend.buildFailed'))
-        if (
-            status.activeCycleId &&
+const recommendationStatusSignal = {
+    status: null,
+    observedAt: 0
+}
+
+document.addEventListener('pica-recommendation-status', (event) => {
+    const status = event.detail?.status
+    if (!status || typeof status !== 'object') return
+    recommendationStatusSignal.status = status
+    recommendationStatusSignal.observedAt = Number(
+        event.detail?.observedAt || Date.now()
+    )
+})
+
+function waitForRecommendationStatusSignal(timeoutMs) {
+    return new Promise((resolve) => {
+        let timer = null
+        const finish = () => {
+            document.removeEventListener(
+                'pica-recommendation-status',
+                onStatus
+            )
+            if (timer) window.clearTimeout(timer)
+            resolve()
+        }
+        const onStatus = () => finish()
+        document.addEventListener('pica-recommendation-status', onStatus)
+        timer = window.setTimeout(finish, timeoutMs)
+    })
+}
+
+function finalCycleReady(status, previousCycleId) {
+    return Boolean(
+        status?.activeCycleId &&
             !status.buildingCycleId &&
             (!previousCycleId || status.activeCycleId !== previousCycleId)
+    )
+}
+
+async function waitForFinalCycle(previousCycleId = null) {
+    const deadline = Date.now() + 120000
+    while (Date.now() < deadline) {
+        let status = recommendationStatusSignal.status
+        const signalFresh =
+            status &&
+            Date.now() - recommendationStatusSignal.observedAt < 1500
+
+        if (!signalFresh) {
+            status = await api(
+                '/api/v1/recommendation-sessions/status?mode=final'
+            )
+            recommendationStatusSignal.status = status
+            recommendationStatusSignal.observedAt = Date.now()
+        }
+
+        if (status.buildProgress?.state === 'failed')
+            throw new Error(t('recommend.buildFailed'))
+        if (finalCycleReady(status, previousCycleId)) return status
+
+        const remaining = Math.max(0, deadline - Date.now())
+        if (!remaining) break
+        await waitForRecommendationStatusSignal(
+            Math.min(1500, remaining)
         )
-            return status
-        await new Promise((resolve) => window.setTimeout(resolve, 1000))
     }
     throw new Error(t('recommend.buildTimeout'))
 }

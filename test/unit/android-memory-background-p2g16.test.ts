@@ -114,8 +114,15 @@ describe('P2-G16 Android memory and background restrictions', () => {
         )
         expect(script).toContain('before_pid')
         expect(script).toContain('before_pid" != "$after_pid')
+        expect(script).toContain('read_app_file_if_exists()')
+        expect(script).toContain(
+            'run-as "$TARGET_PACKAGE" test -f "$path"'
+        )
         expect(script).toContain(
             'run-as "$TARGET_PACKAGE" test -s "files/p2-g16-background-failure"'
+        )
+        expect(script).toContain(
+            'read_app_file_if_exists "files/p2-g16-background-run-count"'
         )
         expect(script).toContain('adb shell cmd deviceidle force-idle')
         expect(script).toContain('sleep 22')

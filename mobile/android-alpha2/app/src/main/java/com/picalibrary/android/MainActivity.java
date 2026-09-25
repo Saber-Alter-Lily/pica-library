@@ -53,6 +53,27 @@ public class MainActivity extends LocaleAwareActivity {
         }
     }
 
+    private static final class ShelfPageState {
+        final ShelfStore.Snapshot shelves;
+        final UnifiedCatalogStore.Snapshot catalog;
+        final Map<String,RemoteLibraryClient.Comic> remote;
+        final String sourceLabel;
+        final boolean remoteConfigured;
+        ShelfPageState(
+            ShelfStore.Snapshot shelves,
+            UnifiedCatalogStore.Snapshot catalog,
+            Map<String,RemoteLibraryClient.Comic> remote,
+            String sourceLabel,
+            boolean remoteConfigured
+        ){
+            this.shelves=shelves;
+            this.catalog=catalog;
+            this.remote=remote;
+            this.sourceLabel=sourceLabel;
+            this.remoteConfigured=remoteConfigured;
+        }
+    }
+
     private FrameLayout body;
     private LinearLayout nav;
     private LinearLayout recommendationBatchList;
@@ -163,22 +184,148 @@ public class MainActivity extends LocaleAwareActivity {
     }
     private String join(List<String> values,String separator){StringBuilder out=new StringBuilder();for(String value:values){if(out.length()>0)out.append(separator);out.append(value);}return out.toString();}
 
-    private void bookshelves(){
-        LinearLayout p=page("书架","书架属于统一书库的组织方式，不占用底部主导航",true);LinearLayout toolbar=new LinearLayout(this);p.addView(toolbar);
-        toolbar.addView(button("返回书库",v->{current=0;showTab();}),new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(button("刷新书架",v->{shelvesRefreshedThisSession=false;showBookshelvesPage();}),new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(button("连接设置",v->{current=3;showTab();}),new LinearLayout.LayoutParams(0,-2,1));
-        TextView status=Ui.text(this,"",12,Ui.MUTED,false);p.addView(status);LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);p.addView(content);ShelfStore.Snapshot cached=ShelfStore.load(this);renderShelves(content,status,cached,Collections.emptyMap(),"本地缓存");
-        if(!shelvesRefreshedThisSession&&RemoteConfigStore.load(this).configured()){shelvesRefreshedThisSession=true;refreshShelvesInto(content,status);}else if(cached.shelves.isEmpty())status.setText(RemoteConfigStore.load(this).configured()?LocalizedText.ui("暂无书架缓存；点击刷新书架重试"):LocalizedText.ui("暂无本地书架。配置 WebDAV 并完成一次电脑云同步后即可导入。"));
-    }
-
-    private void refreshShelvesInto(LinearLayout content,TextView status){
-        final int id=serial;status.setText(LocalizedText.ui("正在从 WebDAV 更新书架元数据…"));pending=requests.submit(()->{try{RemoteLibraryClient client=new RemoteLibraryClient(this);ShelfStore.Snapshot snapshot=ShelfStore.fromRemote(client.shelves());ShelfStore.save(this,snapshot);UnifiedCatalogStore.reconcileLocalReferences(this);Map<String,RemoteLibraryClient.Comic> remote=new HashMap<>();try{for(RemoteLibraryClient.Comic c:client.catalog().comics)remote.put(c.id,c);}catch(Exception ignored){}runOnUiThread(()->{if(valid(id))renderShelves(content,status,snapshot,remote,"WebDAV 已同步");});}catch(Exception e){runOnUiThread(()->{if(!valid(id))return;ShelfStore.Snapshot fallback=ShelfStore.load(this);renderShelves(content,status,fallback,Collections.emptyMap(),fallback.shelves.isEmpty()?"书架尚未同步到云端":"云端暂不可用 · 正在使用本地书架缓存");});}});
-    }
-
-    private void renderShelves(LinearLayout target,TextView status,ShelfStore.Snapshot snapshot,Map<String,RemoteLibraryClient.Comic> remote,String sourceLabel){
-        target.removeAllViews();if(snapshot.shelves.isEmpty()){status.setText(sourceLabel+LocalizedText.ui(" · 暂无书架"));return;}ShelfStore.Shelf active=null;for(ShelfStore.Shelf s:snapshot.shelves)if(s.id.equals(activeShelfId)){active=s;break;}if(active==null)active=snapshot.shelves.get(0);activeShelfId=active.id;preferences.edit().putString("activeShelfId",activeShelfId).apply();status.setText(sourceLabel+" · "+snapshot.shelves.size()+LocalizedText.ui(" 个书架 · ")+active.items.size()+LocalizedText.ui(" 本"));
-        LinearLayout tabs=new LinearLayout(this);target.addView(tabs);for(ShelfStore.Shelf shelf:snapshot.shelves){Button b=button(shelf.name+(shelf.id.equals(active.id)?" ✓":""),v->{activeShelfId=shelf.id;preferences.edit().putString("activeShelfId",activeShelfId).apply();showBookshelvesPage();});tabs.addView(b,new LinearLayout.LayoutParams(0,-2,1));}Ui.gap(target,this,8);
+    private ShelfPageState readLocalShelfState(){
+        ShelfStore.Snapshot shelves=ShelfStore.load(this);
         UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
-        for(ShelfStore.Item item:active.items){LinearLayout card=Ui.card(this);card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));RemoteLibraryClient.Comic cloud=remote.get(item.comicId);UnifiedCatalogStore.Entry local=catalog.byId.get(item.comicId);String availability=cloud!=null?"云端可读 · "+cloud.pageCount+" 页":local!=null&&local.phoneDownloaded?"手机已下载":item.downloadedPictures>0?"电脑已下载 · "+item.downloadedPictures+" 页":local!=null&&local.picaAvailable?"Pica 在线可读":"仅书架元数据";card.addView(Ui.text(this,availability,12,cloud!=null||local!=null&&(local.phoneDownloaded||local.picaAvailable)?Ui.PRIMARY:Ui.MUTED,false));card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));target.addView(card);}
+        boolean remoteConfigured=RemoteConfigStore.load(this).configured();
+        return new ShelfPageState(
+            shelves,
+            catalog,
+            Collections.emptyMap(),
+            "本地缓存",
+            remoteConfigured
+        );
+    }
+
+    private void bookshelves(){
+        LinearLayout p=page("书架","书架属于统一书库的组织方式，不占用底部主导航",true);
+        LinearLayout toolbar=new LinearLayout(this);
+        p.addView(toolbar);
+        toolbar.addView(button("返回书库",v->{current=0;showTab();}),new LinearLayout.LayoutParams(0,-2,1));
+        toolbar.addView(button("刷新书架",v->{shelvesRefreshedThisSession=false;showBookshelvesPage();}),new LinearLayout.LayoutParams(0,-2,1));
+        toolbar.addView(button("连接设置",v->{current=3;showTab();}),new LinearLayout.LayoutParams(0,-2,1));
+        TextView status=Ui.text(this,LocalizedText.ui("正在读取本地书架…"),12,Ui.MUTED,false);
+        p.addView(status);
+        LinearLayout shelfContent=new LinearLayout(this);
+        shelfContent.setOrientation(LinearLayout.VERTICAL);
+        p.addView(shelfContent);
+
+        final int id=serial;
+        pending=requests.submit(()->{
+            ShelfPageState state=readLocalShelfState();
+            runOnUiThread(()->{
+                if(!valid(id))return;
+                renderShelves(shelfContent,status,state);
+                if(!shelvesRefreshedThisSession&&state.remoteConfigured){
+                    shelvesRefreshedThisSession=true;
+                    refreshShelvesInto(shelfContent,status);
+                }else if(state.shelves.shelves.isEmpty()){
+                    status.setText(state.remoteConfigured
+                        ?LocalizedText.ui("暂无书架缓存；点击刷新书架重试")
+                        :LocalizedText.ui("暂无本地书架。配置 WebDAV 并完成一次电脑云同步后即可导入。"));
+                }
+            });
+        });
+    }
+
+    private void refreshShelvesInto(LinearLayout target,TextView status){
+        final int id=serial;
+        status.setText(LocalizedText.ui("正在从 WebDAV 更新书架元数据…"));
+        pending=requests.submit(()->{
+            try{
+                RemoteLibraryClient client=new RemoteLibraryClient(this);
+                ShelfStore.Snapshot shelves=ShelfStore.fromRemote(client.shelves());
+                ShelfStore.save(this,shelves);
+                UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(this);
+                Map<String,RemoteLibraryClient.Comic> remote=new HashMap<>();
+                try{
+                    for(RemoteLibraryClient.Comic comic:client.catalog().comics)
+                        remote.put(comic.id,comic);
+                }catch(Exception ignored){}
+                ShelfPageState state=new ShelfPageState(
+                    shelves,
+                    catalog,
+                    remote,
+                    "WebDAV 已同步",
+                    true
+                );
+                runOnUiThread(()->{
+                    if(valid(id))renderShelves(target,status,state);
+                });
+            }catch(Exception error){
+                ShelfPageState fallback=readLocalShelfState();
+                String label=fallback.shelves.shelves.isEmpty()
+                    ?"书架尚未同步到云端"
+                    :"云端暂不可用 · 正在使用本地书架缓存";
+                ShelfPageState state=new ShelfPageState(
+                    fallback.shelves,
+                    fallback.catalog,
+                    Collections.emptyMap(),
+                    label,
+                    fallback.remoteConfigured
+                );
+                runOnUiThread(()->{
+                    if(valid(id))renderShelves(target,status,state);
+                });
+            }
+        });
+    }
+
+    private void renderShelves(LinearLayout target,TextView status,ShelfPageState state){
+        ShelfStore.Snapshot snapshot=state.shelves;
+        target.removeAllViews();
+        if(snapshot.shelves.isEmpty()){
+            status.setText(state.sourceLabel+LocalizedText.ui(" · 暂无书架"));
+            return;
+        }
+        ShelfStore.Shelf active=null;
+        for(ShelfStore.Shelf shelf:snapshot.shelves)
+            if(shelf.id.equals(activeShelfId)){active=shelf;break;}
+        if(active==null)active=snapshot.shelves.get(0);
+        activeShelfId=active.id;
+        preferences.edit().putString("activeShelfId",activeShelfId).apply();
+        status.setText(state.sourceLabel+" · "+snapshot.shelves.size()+LocalizedText.ui(" 个书架 · ")+active.items.size()+LocalizedText.ui(" 本"));
+        LinearLayout tabs=new LinearLayout(this);
+        target.addView(tabs);
+        for(ShelfStore.Shelf shelf:snapshot.shelves){
+            Button button=button(
+                shelf.name+(shelf.id.equals(active.id)?" ✓":""),
+                v->{
+                    activeShelfId=shelf.id;
+                    preferences.edit().putString("activeShelfId",activeShelfId).apply();
+                    showBookshelvesPage();
+                }
+            );
+            tabs.addView(button,new LinearLayout.LayoutParams(0,-2,1));
+        }
+        Ui.gap(target,this,8);
+        for(ShelfStore.Item item:active.items){
+            LinearLayout card=Ui.card(this);
+            card.addView(Ui.text(this,item.title,17,Ui.TEXT,true));
+            card.addView(Ui.text(this,item.author,12,Ui.MUTED,false));
+            RemoteLibraryClient.Comic cloud=state.remote.get(item.comicId);
+            UnifiedCatalogStore.Entry local=state.catalog.byId.get(item.comicId);
+            String availability=cloud!=null
+                ?"云端可读 · "+cloud.pageCount+" 页"
+                :local!=null&&local.phoneDownloaded
+                    ?"手机已下载"
+                    :item.downloadedPictures>0
+                        ?"电脑已下载 · "+item.downloadedPictures+" 页"
+                        :local!=null&&local.picaAvailable
+                            ?"Pica 在线可读"
+                            :"仅书架元数据";
+            card.addView(Ui.text(
+                this,
+                availability,
+                12,
+                cloud!=null||local!=null&&(local.phoneDownloaded||local.picaAvailable)
+                    ?Ui.PRIMARY
+                    :Ui.MUTED,
+                false
+            ));
+            card.setOnClickListener(v->openUnified(item.comicId,item.title,item.author));
+            target.addView(card);
+        }
     }
 
     private void recommendations(){

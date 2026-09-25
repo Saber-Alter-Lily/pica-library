@@ -688,6 +688,14 @@ export const migrations: Migration[] = [
                     right_comic_id, relation, confidence DESC, left_comic_id
                 );
         `
+    },
+    {
+        version: 16,
+        name: 'p2d8a_picture_comic_status_index',
+        up: `
+            CREATE INDEX IF NOT EXISTS idx_pictures_comic_status
+                ON pictures(comic_id, status);
+        `
     }
 ]
 

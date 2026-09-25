@@ -162,6 +162,93 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(taskCenter).toContain('继续会从当前检查点继续本轮生成；上一轮可用推荐不会被覆盖。')
     })
 
+    it('reconstructs current Android WorkManager tasks by durable identity', () => {
+        const taskCenter = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/TaskCenterActivity.java'
+        )
+        const registry = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/MobileTaskRegistryStore.java'
+        )
+        const picaJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaDownloadJobs.java'
+        )
+        const ehJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhDownloadJobs.java'
+        )
+        const favoriteJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/FavoriteImportJobs.java'
+        )
+        const bootstrapJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaBootstrapJobs.java'
+        )
+        const recommendationJobs = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationJobs.java'
+        )
+        const picaWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/PicaDownloadWorker.java'
+        )
+        const ehWorker = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/EhDownloadWorker.java'
+        )
+
+        expect(registry).toContain('background-task-registry-v1')
+        expect(registry).toContain('static synchronized void setWorkId(')
+        expect(registry).toContain('static synchronized void registerDownload(')
+        expect(registry).toContain('static synchronized List<DownloadRef> downloads(')
+
+        expect(taskCenter).toContain('private WorkInfo currentWork(')
+        expect(taskCenter).toContain(
+            'MobileTaskRegistryStore.workId(this,scope,id)'
+        )
+        expect(taskCenter).toContain(
+            'value.getId().toString().equals(expected)'
+        )
+        expect(taskCenter).toContain(
+            'private List<DownloadView> reconstructDownloads('
+        )
+        expect(taskCenter).toContain(
+            'MobileTaskRegistryStore.downloads(this)'
+        )
+        expect(taskCenter).toContain(
+            'MobileTaskRegistryStore.registerDownload(this'
+        )
+        expect(taskCenter).not.toContain(
+            'values.get(values.size()-1)'
+        )
+        expect(taskCenter).not.toContain(
+            'private static WorkInfo latest('
+        )
+
+        expect(picaJobs).toContain(
+            'MobileTaskRegistryStore.registerDownload(context,"pica"'
+        )
+        expect(picaJobs).toContain(
+            'MobileTaskRegistryStore.unregisterDownload(context,"pica"'
+        )
+        expect(ehJobs).toContain(
+            'MobileTaskRegistryStore.registerDownload(context,"eh"'
+        )
+        expect(ehJobs).toContain(
+            'MobileTaskRegistryStore.unregisterDownload(context,"eh"'
+        )
+        expect(picaWorker).toContain(
+            'PicaDownloadJobs.complete(getApplicationContext(),comicId,selected)'
+        )
+        expect(ehWorker).toContain(
+            'EhDownloadJobs.complete(getApplicationContext(),comicId)'
+        )
+
+        expect(favoriteJobs).toContain(
+            'MobileTaskRegistryStore.setWorkId('
+        )
+        expect(bootstrapJobs).toContain(
+            'MobileTaskRegistryStore.setWorkId(context,"pica-bootstrap"'
+        )
+        expect(recommendationJobs).toContain(
+            'MobileTaskRegistryStore.setWorkId(context,"recommendation"'
+        )
+    })
+
     it('retains mature Desktop download and Android updater controls', () => {
         const web = read('web/app.js')
         const server = read('src/library/server.ts')

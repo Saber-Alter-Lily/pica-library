@@ -304,7 +304,7 @@ Target:
 - stale cache cannot silently become authoritative.
 
 ## P2-F — Frontend responsiveness and observer discipline
-**Status: IN_PROGRESS — F1–F7 merged; F8 incremental Visual QC observer candidate; broader observer/poller audit remains open**
+**Status: IN_PROGRESS — F1–F8 merged; F9 WebDAV poller recovery candidate; hidden-tab/remaining poller audit remains open**
 
 Already improved:
 - coalesced observers;
@@ -1001,20 +1001,16 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/CACHE_DISCIPLINE_P2E1.md`, `docs/CACHE_DISCIPLINE_P2E2.md`.
 
 ## NEXT-8 — P2-F frontend observer/poller discipline
-**Status: IN_PROGRESS — F1–F7 merged; F8 incremental Visual QC observer candidate**
+**Status: IN_PROGRESS — F1–F8 merged; F9 WebDAV poller recovery candidate**
 
-- **F1 merged (PR #138):** remove redundant Theme idle polling.
-- **F2 merged (PR #139):** scope UX polish observers to Settings/Downloads and delegate dialog backdrop handling.
-- **F3 merged (PR #140):** give each selection-status stream one matching render authority.
-- **F4 merged (PR #141):** make v0.4 parity tag/detail mutation processing incremental and animation-frame coalesced.
-- **F5 merged (PR #142):** make Product dynamic source-entry cleanup process only mutation-added subtrees.
-- **F6 merged (PR #143):** scope Settings Hub observation to the legacy `#settings` source root.
-- **F7 merged (PR #144):** make onboarding target discovery incremental while preserving full bootstrap/tour scans.
-- **F8 implemented:** Visual QC keeps one body mutation event source, but dynamic work is split by ownership: detail-button installation runs only inside added/changed roots; QC panel/failure-capture installers run only when Visual/Settings controls are added.
-- F8 uses `pendingRoots` + one animation-frame pass and ignores removed-only mutations.
-- Visual data, similarity retrieval, manual QC scoring, index failure semantics and existing native detail actions are unchanged.
-- **Next after F8:** inventory every persistent backend poller by owner/start/stop/terminal condition, audit onboarding welcome retry timing, and remove only duplicate or overlong authorities.
-- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F2.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F3.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F4.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F5.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F6.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F7.md`, `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F8.md`.
+- **F1–F8 merged (PR #138–#145):** idle Theme polling removed; broad DOM observer work is either scoped to an owning root or processed incrementally/coalesced.
+- **F9 poller inventory completed:** Downloads, Favorites sync, Browser Lite export, WebDAV, updater, Recommendation build, E-H login, Work Identity evidence refresh, V5 shadow evaluation and onboarding readiness now have documented owner/start/stop/terminal contracts.
+- Most existing pollers are already request-, view-, or task-scoped and are not changed merely to lower frequency.
+- **F9 WebDAV gap fixed:** after page/script reload, `load()` now reattaches polling when `remoteStorage.syncProgress` is still active/recoverable instead of rendering one frozen snapshot.
+- Restored WebDAV polling now self-terminates when backend progress becomes terminal; a local `remoteSyncRequestPending` guard prevents the initiating request's first still-idle status snapshot from prematurely stopping its timer.
+- Pause/resume/cancel responses ensure polling is active while the returned task is still active, and `pagehide` clears the page-local timer without affecting backend durability.
+- **Next after F9:** audit hidden-tab/background behavior, onboarding readiness retry lifetime, and duplicate watcher prevention. Make changes only where a poller can outlive its UI/task authority.
+- Detailed boundaries: `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F1.md` through `docs/FRONTEND_OBSERVER_DISCIPLINE_P2F8.md`, plus `docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1028,6 +1024,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-24 — P2-F9 persistent poller lifecycle audit and WebDAV reattach
+
+State update:
+- Persistent Web pollers were inventoried by owner, start condition, stop/terminal condition and state authority.
+- Downloads, Favorites sync, Browser Lite export, updater, Recommendation build, E-H login, Work Identity evidence refresh and V5 shadow evaluation already have bounded request/view/task ownership and are not changed in F9.
+- WebDAV sync had a recovery gap: load() rendered one remoteStorage.syncProgress snapshot after page/script reload but did not reattach polling to a still-running durable backend sync.
+- F9 adds remoteProgressActive(progress), reload reattachment, terminal auto-stop and a remoteSyncRequestPending startup-race guard.
+- Pause/resume/cancel responses restart/retain polling when the returned progress is still active, and pagehide stops only the page-local timer.
+- Backend sync/checkpoint semantics, polling cadence, WebDAV configuration and progress fields are unchanged.
+- Detailed boundary: docs/FRONTEND_POLLER_DISCIPLINE_P2F9.md.
 
 ## 2026-09-24 — P2-F8 incremental Visual QC mutation processing
 

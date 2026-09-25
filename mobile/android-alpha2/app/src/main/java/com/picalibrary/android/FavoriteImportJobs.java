@@ -19,7 +19,11 @@ final class FavoriteImportJobs {
         Data input = new Data.Builder()
             .putBoolean(FavoriteImportWorker.KEY_COVERS, covers)
             .build();
-        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(FavoriteImportWorker.class)
+        OneTimeWorkRequest request = AndroidTaskResources.tag(
+            new OneTimeWorkRequest.Builder(FavoriteImportWorker.class),
+            AndroidTaskResources.BRIDGE_NETWORK,
+            AndroidTaskResources.FILESYSTEM_HEAVY
+        )
             .setConstraints(constraints)
             .setInputData(input)
             .addTag(UNIQUE_NAME)

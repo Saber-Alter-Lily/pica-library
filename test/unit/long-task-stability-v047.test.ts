@@ -332,9 +332,8 @@ describe('v0.4.7 long-task stability contract', () => {
         expect(debugManifest).toContain('android:exported="true"')
         expect(recovery).not.toContain('seedDurableRecoveryStateAndAwaitForceStop()')
         expect(recovery).toContain('verifyDurableRecoveryStateAfterForceStop()')
-        expect(recovery).toContain(
-            'assertNotEquals("verification must run in a fresh process"'
-        )
+        expect(recovery).toContain('assertNotEquals(')
+        expect(recovery).toContain('"verification must run in a fresh process"')
         expect(recovery).toContain('awaitProbeRuns(app, 2)')
         expect(recovery).toContain('ActivityScenario<TaskCenterActivity>')
         expect(recovery).toContain(

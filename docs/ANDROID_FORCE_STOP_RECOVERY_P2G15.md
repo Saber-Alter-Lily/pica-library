@@ -100,13 +100,15 @@ The probe:
 
 This avoids modifying real provider/network Workers purely to create a deterministic kill point.
 
-## Two-invocation force-stop harness
+## Normal-process seed + force-stop + verification harness
 
-The test is intentionally not one instrumentation method pretending to restart itself.
+The seed phase deliberately does **not** run under instrumentation. Android itself force-stops the target package when an instrumentation session starts/finishes, which would add unrelated process-death events to the evidence window.
 
-### Invocation A — seed + remain alive
+Instead, `WorkerForceStopSeedActivity` exists only in the debug source set and is started as a normal app Activity through an explicit ADB component launch.
 
-`seedDurableRecoveryStateAndAwaitForceStop()`:
+### Normal app seed Activity
+
+`WorkerForceStopSeedActivity`:
 
 - clears prior harness state;
 - creates real WorkManager rows using the actual production Worker classes;
@@ -118,7 +120,9 @@ The test is intentionally not one instrumentation method pretending to restart i
 - starts the debug-only recovery probe and waits for `RUNNING`;
 - commits the seed PID, UUIDs and preference state to disk;
 - writes an app-private READY marker;
-- blocks indefinitely.
+- stays alive as the ordinary foreground app process until the host force-stops it.
+
+The debug manifest alone exposes this seed Activity to ADB. The release manifest never contains it.
 
 ### Host boundary — real ADB force-stop
 
@@ -134,9 +138,11 @@ A force-stopped Android package is intentionally not allowed to restart backgrou
 
 The debug probe also writes an app-private plain-text run-count marker. After launcher re-entry, the host requires that marker to reach at least 2 and requires a new target PID before starting the verification instrumentation. This proves recovery occurs after legitimate app re-entry/WorkManager initialization rather than by bypassing force-stop semantics.
 
-### Invocation B — fresh-process verification
+### Verification instrumentation
 
-`verifyDurableRecoveryStateAfterForceStop()` starts only after the launcher re-entry has already caused the probe to execute again.
+Only after the host has independently observed the probe execute again does it start `verifyDurableRecoveryStateAfterForceStop()`.
+
+Instrumentation is verification-only. Any force-stop lifecycle that Android applies while starting the verifier occurs **after** the OS-level recovery evidence has already been captured.
 
 It verifies:
 
@@ -169,7 +175,9 @@ The workflow:
 - builds the normal debug app + androidTest APK;
 - installs both on an API 35 x86_64 Google APIs emulator;
 - uses KVM hardware acceleration on GitHub's Ubuntu runner;
-- performs force-stop → confirmed process death → normal launcher re-entry → WorkManager probe recovery → fresh verification instrumentation;
+- starts the debug seed Activity in a normal app process;
+- performs force-stop → confirmed process death → normal launcher re-entry → WorkManager probe recovery;
+- only then starts fresh verification instrumentation;
 - uploads the short recovery diagnostics artifact.
 
 This is additive to the normal Android unit/lint/release-build CI gate.

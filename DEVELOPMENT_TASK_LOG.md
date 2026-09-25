@@ -969,9 +969,9 @@ This remains the next unblocked P2 lane while J2 real Windows x64 measurement ev
 - **D5B merged (PR #129):** `workVariantsForComic()` uses targeted current binding, same-work bindings, current-comic decisions and current-comic probable evidence rather than global 10000/5000 relationship prefixes.
 - D5B preserves binding metadata for decision/evidence variants through a batched exact-ID binding lookup and keeps the intentional full-catalog creator/title/cover heuristic funnel unchanged.
 - Migration 15 adds only the missing right-side decision and left/right probable-evidence indexes needed by symmetric current-comic relationship reads.
-- **D6A implemented:** `visualPreferenceProfile()` and `visualIndexStatus()` use the complete dedicated `favoriteIds()` query instead of materializing a 10000-row catalog prefix merely to recover favorite IDs.
+- **D6A implemented:** `visualPreferenceProfile()` and `visualIndexStatus()` use the complete dedicated `favoriteIds()` query instead of materializing a nominal 10000-row / effective 5000-row catalog prefix merely to recover favorite IDs.
 - D6A deliberately leaves Author Atlas / Style Families / Representation QC full-catalog inputs unchanged because those analyses use catalog/provider/favorite coverage denominators; blindly narrowing to embedding IDs would alter diagnostic meaning.
-- A 10001-favorite SQLite regression places the only embedded favorite outside the legacy 10000-row catalog prefix and requires both Visual preference evidence and index target counts to include it.
+- A 10001-favorite SQLite regression places the only embedded favorite outside the legacy effective 5000-row catalog prefix and requires both Visual preference evidence and index target counts to include it.
 - **Next after D6A:** inspect `comicSelect` correlated episode/picture aggregate cost and high-frequency download-progress/user-event writes versus foreground read latency; optimize remaining Visual/Work Identity full-domain analysis only with semantics-preserving aggregate/query evidence.
 - Detailed boundaries: `docs/SQLITE_QUERY_DISCIPLINE_P2D1.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D2.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D3.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D4.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5A.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D5B.md`, `docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md`.
 
@@ -991,9 +991,9 @@ May continue independently if:
 ## 2026-09-24 — P2-D6A complete Visual favorite target domain
 
 State update:
-- `visualPreferenceProfile()` and `visualIndexStatus()` were still materializing up to 10000 comics only to derive favorite IDs.
+- `visualPreferenceProfile()` and `visualIndexStatus()` were still requesting up to 10000 comics (but effectively capped at 5000) only to derive favorite IDs.
 - D6A replaces those reads with the existing complete-domain `favoriteIds()` query. Taste-exclusion filtering in the preference profile and feedback-derived targets in index status remain unchanged.
-- A real SQLite regression stores 10001 favorites, deliberately places the only embedded favorite outside the legacy 10000-row catalog prefix, and requires Visual preference evidence plus `targetCount=10001` to include it.
+- A real SQLite regression stores 10001 favorites, deliberately places the only embedded favorite outside the legacy effective 5000-row catalog prefix, and requires Visual preference evidence plus `targetCount=10001` to include it.
 - Author Atlas, Style Families and Representation QC retain their wider catalog inputs because they explicitly report total-catalog, provider and favorite coverage metrics. Narrowing those inputs to embedding-bearing rows would change diagnostic/scientific semantics.
 - D6A changes only favorite-ID acquisition; it does not rebuild embeddings, change Visual serving/reranking, alter coverage denominators, choose a foreground threshold or enable P2-C3 enforcement.
 - Detailed boundary: docs/SQLITE_QUERY_DISCIPLINE_P2D6A.md.

@@ -5,6 +5,8 @@ const STATE_KEY = 'pica-onboarding-state-v1'
 const SESSION_DISMISSED_KEY = 'pica-onboarding-session-dismissed-v1'
 let activeDriver = null
 let promptScheduled = false
+let welcomeCheckTimer = null
+let welcomeReadinessObserver = null
 
 function readState() {
     try {
@@ -21,6 +23,7 @@ function readState() {
 function writeState(next) {
     localStorage.setItem(STATE_KEY, JSON.stringify({ ...readState(), ...next }))
     renderSettingsPanel()
+    if (!shouldPrompt()) stopWelcomeReadinessWatch()
 }
 function shouldPrompt() {
     const state = readState()
@@ -129,15 +132,62 @@ function promptWelcomeIfNeeded() {
     if (!dialog.open) dialog.showModal()
     return true
 }
+function stopWelcomeReadinessWatch() {
+    if (welcomeCheckTimer) window.clearTimeout(welcomeCheckTimer)
+    welcomeCheckTimer = null
+    welcomeReadinessObserver?.disconnect()
+    welcomeReadinessObserver = null
+    document.removeEventListener(
+        'visibilitychange',
+        onWelcomeVisibilityChange
+    )
+}
+
+function runWelcomeReadinessCheck() {
+    if (!shouldPrompt()) {
+        stopWelcomeReadinessWatch()
+        return
+    }
+    if (promptWelcomeIfNeeded()) stopWelcomeReadinessWatch()
+}
+
+function queueWelcomeReadinessCheck(delay = 0) {
+    if (!shouldPrompt()) {
+        stopWelcomeReadinessWatch()
+        return
+    }
+    if (welcomeCheckTimer) window.clearTimeout(welcomeCheckTimer)
+    welcomeCheckTimer = window.setTimeout(() => {
+        welcomeCheckTimer = null
+        runWelcomeReadinessCheck()
+    }, delay)
+}
+
+function onWelcomeVisibilityChange() {
+    if (document.visibilityState === 'visible')
+        queueWelcomeReadinessCheck()
+}
+
 function scheduleWelcome() {
     if (promptScheduled) return
     promptScheduled = true
-    const tryPrompt = () => {
-        if (promptWelcomeIfNeeded()) return
-        if (!shouldPrompt()) return
-        window.setTimeout(tryPrompt, 500)
+
+    const setup = document.querySelector('#setup')
+    if (setup) {
+        welcomeReadinessObserver = new MutationObserver(() =>
+            queueWelcomeReadinessCheck()
+        )
+        welcomeReadinessObserver.observe(setup, {
+            attributes: true,
+            attributeFilter: ['class', 'hidden', 'style']
+        })
     }
-    window.setTimeout(tryPrompt, 650)
+
+    document.addEventListener(
+        'visibilitychange',
+        onWelcomeVisibilityChange
+    )
+    queueWelcomeReadinessCheck(650)
 }
 
 function stepText() {
@@ -325,6 +375,7 @@ function renderSettingsPanel() {
 function installObserver() {
     let queued = false
     let settingsPanelDirty = false
+    let welcomeReadinessDirty = false
     const pendingRoots = new Set()
     const schedule = () => {
         if (queued) return
@@ -339,11 +390,14 @@ function installObserver() {
                 !document.querySelector('#a89-onboarding-panel')
             )
                 ensureSettingsPanel()
+            if (welcomeReadinessDirty)
+                queueWelcomeReadinessCheck()
             settingsPanelDirty = false
+            welcomeReadinessDirty = false
         })
     }
     const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations)
+        for (const mutation of mutations) {
             for (const node of mutation.addedNodes) {
                 const root =
                     node instanceof Element ? node : node.parentElement
@@ -354,8 +408,27 @@ function installObserver() {
                     root.querySelector?.('#a87-general-panel')
                 )
                     settingsPanelDirty = true
+                if (
+                    root.id === 'pica-disclaimer-gate' ||
+                    root.querySelector?.('#pica-disclaimer-gate')
+                )
+                    welcomeReadinessDirty = true
             }
-        if (pendingRoots.size || settingsPanelDirty) schedule()
+            for (const node of mutation.removedNodes) {
+                if (
+                    node instanceof Element &&
+                    (node.id === 'pica-disclaimer-gate' ||
+                        node.querySelector?.('#pica-disclaimer-gate'))
+                )
+                    welcomeReadinessDirty = true
+            }
+        }
+        if (
+            pendingRoots.size ||
+            settingsPanelDirty ||
+            welcomeReadinessDirty
+        )
+            schedule()
     })
     observer.observe(document.body, { childList: true, subtree: true })
 }

@@ -352,6 +352,24 @@ describe('V5 Web UX audit contract', () => {
         expect(onboarding).not.toContain(
             'markTourTargets()\n            if (!document.querySelector'
         )
+        expect(onboarding).toContain('let welcomeCheckTimer = null')
+        expect(onboarding).toContain('let welcomeReadinessObserver = null')
+        expect(onboarding).toContain('function queueWelcomeReadinessCheck(')
+        expect(onboarding).toContain(
+            "attributeFilter: ['class', 'hidden', 'style']"
+        )
+        expect(onboarding).toContain(
+            "root.id === 'pica-disclaimer-gate'"
+        )
+        expect(onboarding).toContain(
+            'for (const node of mutation.removedNodes)'
+        )
+        expect(onboarding).toContain(
+            "document.addEventListener(\n        'visibilitychange',"
+        )
+        expect(onboarding).toContain('queueWelcomeReadinessCheck(650)')
+        expect(onboarding).toContain('stopWelcomeReadinessWatch()')
+        expect(onboarding).not.toContain('window.setTimeout(tryPrompt, 500)')
     })
 
     it('uses one recommendation status poll authority with app fallback', () => {

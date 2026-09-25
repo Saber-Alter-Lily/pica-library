@@ -45,7 +45,7 @@ describe('Android Library / Author / History V2 contracts', () => {
     expect(directory).toContain('"本作作者"')
     expect(works).toContain('AuthorConceptStore.queryForPica(concept)')
     expect(works).toContain('AuthorConceptStore.queryForEh(concept)')
-    expect(works).toContain('EhCapabilityStore.refresh(this,false)')
+    expect(works).toMatch(/EhCapabilityStore\.refresh\(\s*this,\s*false\s*\)/)
   })
 
   it('keeps Author Works catalog and creator rebuilds off the UI render path', () => {

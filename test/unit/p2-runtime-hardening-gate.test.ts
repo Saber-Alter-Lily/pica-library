@@ -34,6 +34,12 @@ describe('P2-L runtime hardening promotion gate', () => {
         ])
             expect(workflow).toContain(contract)
 
+        expect(workflow).toContain('Prepare previous accepted Windows package')
+        expect(workflow).toContain(
+            'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'
+        )
+        expect(workflow).toContain("'artifacts\\release-base'")
+        expect(workflow).toContain('Previous accepted Windows asset missing')
         expect(workflow).toContain('pnpm build:windows')
         expect(workflow).toContain('scripts/test-windows-artifact.ps1')
         expect(workflow).toContain(':app:testDebugUnitTest')

@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current I2 candidate: `main@e4d508dea0d342f4f9b173a20520e69e8262b1b5` (P2-I1 / PR #176 merged)  
+Authoritative repository baseline before the current P2-L candidate: `main@c7eab55f0b54d6a520aa524e50a9ab6c93258404` (P2-I2 / PR #177 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -380,7 +380,7 @@ Current reconciliation:
 - Detailed recovery matrix: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## P2-I — Observability without exposing internals to ordinary users
-**Status: IN_PROGRESS — I1 merged; I2 external Desktop owner adapters candidate**
+**Status: IMPLEMENTATION_COMPLETE_CORE_DESKTOP — I1/I2 merged; Visual remains browser-owned with H2B diagnostics unless a concrete trace proves a gap**
 
 Internal diagnostics should expose:
 - task ID/type/state/phase;
@@ -410,14 +410,21 @@ I1 merged (PR #176):
 - bounded error text redacts URLs, absolute paths, Bearer/token/password/cookie/authorization shapes;
 - endpoint is excluded from Remote API and from J1 HTTP latency samples.
 
-I2 candidate:
+I2 merged (PR #177):
 - extends the same schema/endpoint to WebDAV, Browser Lite export, managed E-H login and software update;
 - external owners remain authoritative; Desktop main only aggregates snapshots;
 - WebDAV reuses the existing shared `remote-storage-sync` resource lease;
 - Browser Lite/E-H/updater do not receive invented resource leases/timestamps/IDs;
 - adds safe `providerRoute` labels only for `webdav`, `eh-managed-browser`, and `github-release`;
 - failed external-owner messages pass through the same I1 sanitizer;
-- Remote API/browser-session boundaries remain unchanged.
+- Remote API/browser-session boundaries remain unchanged;
+- full CI/platform/Android regression matrix passed before merge.
+
+Visual decision:
+- do not add an I3 adapter merely for uniformity;
+- Visual indexing task authority remains browser page/Worker-owned;
+- H2B already exposes bounded Desktop Visual runtime timing/profile diagnostics;
+- revisit only if representative traces show that current Visual diagnostics cannot distinguish slow/stuck/failed behavior.
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
@@ -1096,15 +1103,14 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## NEXT-11 — P2-I unified structured task diagnostics
-**Status: I1_DONE / I2_CANDIDATE**
+**Status: DONE — I1/I2 merged**
 
 - **I1 merged (PR #176):** safe read-only schema + LibraryService-owned batch + Desktop-only endpoint.
-- I1 full CI/platform/Android regression matrix passed before merge.
-- **I2 candidate:** aggregate WebDAV, Browser Lite export, managed E-H login and software update without moving task authority.
+- **I2 merged (PR #177):** WebDAV, Browser Lite export, managed E-H login and software update adapters.
+- Both batches passed full CI/platform/Android regression matrices.
 - Additive `providerRoute` is fixed/low-cardinality only; no configured URL/host/account/path values.
-- WebDAV correlates against the shared C2 resource coordinator; owners without a real lease remain resourceState=none.
-- Keep absent IDs/timestamps/control metadata null/false according to the actual owner rather than synthesizing them.
-- External failed messages reuse the I1 sanitizer.
+- Owners without real IDs/timestamps/resource leases remain null/none rather than synthesized.
+- Visual remains browser-owned with H2B runtime diagnostics; no I3 adapter is planned without a concrete diagnostic regression.
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## PARALLEL-1 — W5C PR #109
@@ -1119,6 +1125,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-I2 accepted; core Desktop structured task observability complete
+
+State update:
+- I2 is merged as PR #177 at `c7eab55f0b54d6a520aa524e50a9ab6c93258404`.
+- Accepted runs: CI `36212602733`, Linux `36212602711`, macOS `36212602662`, Windows ARM64 `36212602709`, Docker `36212602678`, Macrobenchmark build `36212602738`, Android force-stop `36212602671`, Android memory/background `36212602704`.
+- Core Desktop long-task diagnostics now cover both LibraryService-owned and external Desktop-owned task families through the same read-only schema/endpoint.
+- Visual is intentionally not copied into Desktop task authority: browser Worker/page remains authoritative and H2B already supplies timing/profile diagnostics.
+- P2-I code work is considered complete unless a concrete trace/regression demonstrates a remaining observability gap.
+- Next unblocked architecture task is P2-L automated runtime-hardening gate; P2-K performance budgets remain blocked on real-hardware evidence.
 
 ## 2026-09-25 — G16 post-Doze gate corrected for OS-controlled JobScheduler timing
 

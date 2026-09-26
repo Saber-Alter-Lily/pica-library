@@ -44,6 +44,7 @@ export interface RuntimeTaskDiagnostic {
     runDurationMs: number | null
     retryCount: number | null
     lastError: string | null
+    providerRoute: string | null
     recoveryMode: string | null
     commitBoundary: string | null
 }
@@ -83,6 +84,7 @@ export interface RuntimeTaskDiagnosticInput {
     resourceClasses?: string[]
     retryCount?: unknown
     lastError?: unknown
+    providerRoute?: string | null
     recoveryMode?: string | null
     commitBoundary?: string | null
 }
@@ -220,16 +222,23 @@ export function runtimeTaskDiagnostic(
         ...observation,
         retryCount: numberOrNull(input.retryCount),
         lastError: sanitizeRuntimeDiagnosticError(input.lastError),
+        providerRoute: input.providerRoute ?? null,
         recoveryMode: input.recoveryMode ?? null,
         commitBoundary: input.commitBoundary ?? null
     }
+}
+
+export interface RuntimeTaskDiagnosticSnapshot {
+    schemaVersion: 1
+    capturedAt: string
+    tasks: RuntimeTaskDiagnostic[]
 }
 
 export function runtimeTaskDiagnosticSnapshot(
     inputs: RuntimeTaskDiagnosticInput[],
     resources: RuntimeTaskResourceSnapshotLike,
     now = new Date()
-) {
+): RuntimeTaskDiagnosticSnapshot {
     const capturedAt = now.toISOString()
     const nowMs = now.getTime()
     return {

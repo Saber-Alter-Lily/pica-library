@@ -174,14 +174,19 @@ The emulator host:
 4. remains in forced Doze past the 15-second eligibility boundary;
 5. requires run count to remain zero;
 6. exits Doze and restores battery state;
-7. requires the Worker to execute.
+7. briefly observes natural background JobScheduler dispatch;
+8. if the OS has not dispatched the job yet, performs a normal launcher re-entry;
+9. requires the same durable WorkRequest to execute after that legitimate app re-entry.
 
 This tests the intended contract:
 
 - system restriction delays WorkManager;
 - the app does not bypass Doze with a private service;
 - delayed work remains durable;
-- work resumes after restriction removal.
+- leaving Doze does not lose the WorkRequest;
+- recovery occurs either through OS-controlled background dispatch or through normal app re-entry/WorkManager initialization.
+
+G16 deliberately does **not** define a fixed post-Doze background dispatch SLA. JobScheduler timing after restriction removal is OS-controlled and can vary across emulator/system-image releases. The acceptance gate therefore distinguishes durable recovery from scheduler latency rather than treating “must run within N seconds in the background” as an application guarantee.
 
 ## CI gate
 
@@ -208,7 +213,7 @@ Diagnostics are uploaded only for public-repository runs under the repository's 
 - no raw `startForegroundService` / `startService` in those job owners;
 - debug-only probe isolation from the release manifest;
 - real `am send-trim-memory ... HIDDEN` acceptance;
-- real forced-Doze defer/resume acceptance;
+- real forced-Doze defer + durable post-restriction recovery acceptance;
 - emulator workflow presence.
 
 The older G14 source contract is updated to verify the recovery harness against WorkManager 2.12.0 rather than freezing 2.9.1 forever.

@@ -134,7 +134,16 @@ describe('P2-G16 Android memory and background restrictions', () => {
         expect(script).toContain('sleep 22')
         expect(script).toContain('executed while device was forced into Doze')
         expect(script).toContain('adb shell cmd deviceidle unforce')
-        expect(script).toContain('WorkManager probe did not resume after leaving Doze')
+        expect(script).toContain('recovery_path="background-auto"')
+        expect(script).toContain('recovery_path="launcher-reentry"')
+        expect(script).toContain(
+            'adb shell monkey -p "$TARGET_PACKAGE" -c android.intent.category.LAUNCHER 1'
+        )
+        expect(script).toContain('jobscheduler-before-reentry.txt')
+        expect(script).toContain(
+            'WorkManager probe did not recover after Doze exit and normal app re-entry'
+        )
+        expect(script).not.toContain('for _ in $(seq 1 240)')
 
         expect(workflow).toContain('ReactiveCircus/android-emulator-runner@v2')
         expect(workflow).toContain('github.event.repository.private')

@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current I1 candidate: `main@60abf3a17516e98ab6f4bda0e63af2908e926338` (P2-H3 / PR #175 merged)  
+Authoritative repository baseline before the current I2 candidate: `main@e4d508dea0d342f4f9b173a20520e69e8262b1b5` (P2-I1 / PR #176 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -380,7 +380,7 @@ Current reconciliation:
 - Detailed recovery matrix: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## P2-I — Observability without exposing internals to ordinary users
-**Status: IN_PROGRESS — I1 unified LibraryService task diagnostics candidate**
+**Status: IN_PROGRESS — I1 merged; I2 external Desktop owner adapters candidate**
 
 Internal diagnostics should expose:
 - task ID/type/state/phase;
@@ -394,22 +394,31 @@ Internal diagnostics should expose:
 Ordinary UI should expose only useful status, progress and actionable errors.
 
 Security:
-- no provider credentials, cookies, bearer tokens or sensitive local paths in normal diagnostic exports.
+- no provider credentials, cookies, bearer tokens or sensitive local paths in normal diagnostic exports;
+- providerRoute, when present, must be a fixed low-cardinality label and must never contain URL/host/account/path values.
 
 **Acceptance**
 - enough structured telemetry to diagnose “stuck” vs “slow” vs “waiting” vs “failed”;
 - diagnostic data follows existing credential-exclusion rules.
 
-I1 candidate:
-- adds a read-only adapter over existing task authorities; it does not create a second scheduler/registry;
+I1 merged (PR #176):
+- read-only adapter over existing task authorities; no second scheduler/registry;
 - Desktop-only `GET /api/v1/desktop/runtime/tasks`;
 - first batch covers Recommendation V3, Favorites, Maintenance Update/Repair/Organize, V5 Shadow, Work Identity evidence and aggregate LOCAL downloads;
 - unavailable task IDs/timestamps/control flags remain `null` instead of being synthesized;
 - current resource wait/run state is correlated from the existing RuntimeResourceCoordinator;
 - bounded error text redacts URLs, absolute paths, Bearer/token/password/cookie/authorization shapes;
-- endpoint is excluded from Remote API and from J1 HTTP latency samples;
-- external owners such as WebDAV/update/Browser Lite remain later owner-specific adapters.
-- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`.
+- endpoint is excluded from Remote API and from J1 HTTP latency samples.
+
+I2 candidate:
+- extends the same schema/endpoint to WebDAV, Browser Lite export, managed E-H login and software update;
+- external owners remain authoritative; Desktop main only aggregates snapshots;
+- WebDAV reuses the existing shared `remote-storage-sync` resource lease;
+- Browser Lite/E-H/updater do not receive invented resource leases/timestamps/IDs;
+- adds safe `providerRoute` labels only for `webdav`, `eh-managed-browser`, and `github-release`;
+- failed external-owner messages pass through the same I1 sanitizer;
+- Remote API/browser-session boundaries remain unchanged.
+- Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
 **Status: IN_PROGRESS — J1 runtime telemetry + J2 repeatable Desktop scenario harness implemented; startup/browser/Android measurements remain open**
@@ -1062,7 +1071,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - **G16 finding 1:** PicaLibraryApp had no trim-memory handling while CoverRepository and ImageRepository could each retain up to 72 MiB of decoded Bitmaps.
 - **G16 memory correction:** Application.onTrimMemory now evicts only reconstructible in-memory Bitmap LRUs at UI_HIDDEN/background pressure; encoded disk caches and durable work are untouched. Robolectric + real `am send-trim-memory ... HIDDEN` evidence cover this boundary.
 - **G16 finding 2:** Android durable work still used WorkManager 2.9.1, predating Android 15 SDK/network/foreground-timeout fixes. G16 upgrades both runtime and work-testing to stable 2.12.0 while preserving the G14/G15 recovery suite.
-- **G16 merged (PR #170):** normal CI, direct-upgrade, G15 force-stop regression and the API-35 HIDDEN/Doze gate all passed. Generic trim-memory and Doze defer/resume evidence is accepted.
+- **G16 merged (PR #170):** normal CI, direct-upgrade, G15 force-stop regression and the API-35 HIDDEN/Doze gate all passed. Generic trim-memory and Doze defer/durable-recovery evidence is accepted; no fixed post-Doze JobScheduler dispatch SLA is claimed.
 - **G17 merged (PR #171):** AndroidTaskResources provides observe-only resource tags and de-duplicated RUNNING/ENQUEUED-BLOCKED snapshots for RT-17–RT-20 without changing scheduling, concurrency or task controls.
 - Current classes: provider-network, media-network, bridge-network, cpu-analysis, filesystem-heavy.
 - A debug-only ADB collector writes an app-private JSON snapshot for representative-device overlap sampling; it is absent from release UI/manifest.
@@ -1087,16 +1096,16 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## NEXT-11 — P2-I unified structured task diagnostics
-**Status: I1_CANDIDATE**
+**Status: I1_DONE / I2_CANDIDATE**
 
-- Add one safe read-only schema over existing task-owned status surfaces; do not create a second task authority.
-- First LibraryService batch covers eight logical task families.
-- Correlate resource waiting/running durations through the existing shared RuntimeResourceCoordinator.
-- Keep unavailable metadata null instead of guessing.
-- Redact secret/path-bearing error text.
-- Expose only through the local Desktop control plane and keep Remote API/browser-session boundaries unchanged.
-- Exclude the diagnostic endpoint from J1 latency samples.
-- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`.
+- **I1 merged (PR #176):** safe read-only schema + LibraryService-owned batch + Desktop-only endpoint.
+- I1 full CI/platform/Android regression matrix passed before merge.
+- **I2 candidate:** aggregate WebDAV, Browser Lite export, managed E-H login and software update without moving task authority.
+- Additive `providerRoute` is fixed/low-cardinality only; no configured URL/host/account/path values.
+- WebDAV correlates against the shared C2 resource coordinator; owners without a real lease remain resourceState=none.
+- Keep absent IDs/timestamps/control metadata null/false according to the actual owner rather than synthesizing them.
+- External failed messages reuse the I1 sanitizer.
+- Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1110,6 +1119,32 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — G16 post-Doze gate corrected for OS-controlled JobScheduler timing
+
+State update:
+- I2 PR #177 exposed a G16 test-harness assumption after GitHub runners began using Android Emulator 37.1.11: the probe stayed durable through forced Doze, but the OS did not dispatch it within the old fixed 60 s post-unforce window.
+- The failure was isolated to the existing G16 emulator gate; I2 Desktop code passed the other seven CI/platform gates.
+- Android does not guarantee a fixed background JobScheduler dispatch latency immediately after leaving Doze, so the old 60 s requirement was stronger than the application contract.
+- G16 now continues to require zero probe execution while forced idle.
+- After unforce, the gate briefly observes natural background dispatch; if no dispatch occurs, it performs a normal launcher re-entry and requires the same already-seeded WorkRequest to execute.
+- No `jobscheduler run -f` or equivalent forced scheduler execution is used.
+- The result artifact records whether recovery was `background-auto` or `launcher-reentry`.
+- Product WorkManager code and G16 resource/Doze semantics are unchanged; only the evidence harness is corrected.
+
+## 2026-09-25 — P2-I2 external Desktop task diagnostics
+
+State update:
+- I1 is merged as PR #176 at `e4d508dea0d342f4f9b173a20520e69e8262b1b5` after the full CI/platform/Android regression matrix passed.
+- I2 keeps the I1 endpoint/schema authority model and extends it through a Desktop-controller aggregation layer rather than moving external owners into LibraryService.
+- External batch: WebDAV remote sync, Browser Lite export, managed E-H web login, software update.
+- WebDAV maps its authoritative `syncProgress` and the existing shared `remote-storage-sync` RuntimeResourceCoordinator lease.
+- Browser Lite only exposes the state/phase/completion timestamp it actually owns; missing start/update/resource metadata remains null/empty.
+- E-H `opening/verifying` normalize to running and `waiting` remains waiting; only failed message is treated as sanitized lastError.
+- Updater `staged` normalizes to waiting; apply/stage phases normalize to running; complete/failed stay terminal.
+- I2 adds additive `providerRoute` with fixed safe labels only: `webdav`, `eh-managed-browser`, `github-release`.
+- Remote API remains excluded; the existing Desktop-only endpoint is still excluded from J1 latency samples.
+- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## 2026-09-25 — P2-I1 unified LibraryService runtime task diagnostics
 
@@ -1205,7 +1240,7 @@ State update:
 - G16 also upgrades WorkManager runtime/testing from 2.9.1 to stable 2.12.0. This crosses the Android 15 compatibility fixes for dataSync foreground timeout handling, blocked-network constraint tracking and background network execution.
 - Existing durable network families remain WorkManager-owned with CONNECTED/UNMETERED constraints; no new raw service scheduler is introduced.
 - The real emulator gate primes both Bitmap LRUs, sends ActivityManager HIDDEN trim in the same PID and requires both memory sizes to reach zero.
-- The same API-35 emulator then enqueues a delayed network-constrained debug Worker, forces Doze past the eligibility boundary, requires zero execution while idle, exits Doze and requires the Worker to execute.
+- The same API-35 emulator then enqueues a delayed network-constrained debug Worker, forces Doze past the eligibility boundary and requires zero execution while idle. After unforce, the gate first observes natural background dispatch and, if the OS has not scheduled it yet, performs a normal launcher re-entry and requires the same durable WorkRequest to execute. This validates durability/recovery without inventing a fixed JobScheduler latency SLA.
 - Debug probes remain outside the release manifest.
 - OEM battery managers, Android 16+ long-running Worker quota behavior, foreground-notification reconstruction on representative devices and enforceable concurrency budgets remain later evidence gates.
 - Detailed boundary: `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`.

@@ -16,6 +16,7 @@ import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
 import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
+import { desktopRuntimeTaskDiagnostics } from '../runtime/desktop-task-diagnostics'
 import {
     readRemoteApiToken,
     startRemoteApiGateway,
@@ -1204,6 +1205,29 @@ async function startEngine(preferredPort: number) {
             return result
         },
         updateProgress: () => updateManager.progress(),
+        runtimeTasks: () => {
+            if (!service)
+                return {
+                    schemaVersion: 1,
+                    capturedAt: new Date().toISOString(),
+                    tasks: []
+                }
+            const remoteStatus = remoteStorageManager?.status()
+            return desktopRuntimeTaskDiagnostics({
+                base: service.runtimeTaskDiagnostics(),
+                resources: runtimeResources.snapshot(),
+                remoteStorageProgress:
+                    remoteStatus &&
+                    typeof remoteStatus === 'object' &&
+                    'syncProgress' in remoteStatus
+                        ? (remoteStatus.syncProgress as Record<string, unknown>)
+                        : null,
+                browserLiteExportProgress,
+                lastBrowserLiteExportAt,
+                ehWebLogin: ehWebLogin?.status() ?? null,
+                updateProgress: updateManager.progress()
+            })
+        },
         browserSessionOpened,
         browserSessionClosed,
         shutdown: () => {

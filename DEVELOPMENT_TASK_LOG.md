@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1/K2 merged; K3 Android real download/Reader physical evidence tooling candidate; representative execution still required; no budgets selected**
+**Status: IN_PROGRESS — K1/K2 merged; K3 source/contract accepted and merge-ready; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -577,7 +577,8 @@ K2 merged (PR #191):
 - explicit real download/Reader loaded scenarios remain external and may not be replaced with synthetic media.
 - Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
 
-K3 candidate:
+K3 source/contract accepted (PR #192 merge-ready):
+- final automated validation head `3792d8775d45c645d75a989cdee333283f3ea125` passed all 17 triggered workflows, including dedicated K3, K1/K2 evidence contracts, P2-L, CI and Android runtime gates;
 - adds physical-device-only real download-loaded and Reader-under-download Macrobenchmark scenarios using AndroidX Macrobenchmark/UiAutomator already adopted by G18/G19;
 - synthetic media is explicitly prohibited;
 - download-loaded acceptance requires `media-network` + `filesystem-heavy` RUNNING before and after measured navigation;
@@ -1352,7 +1353,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
 
 ## NEXT-24 — P2-K K3 Android real download / Reader physical evidence tooling
-**Status: K3_CANDIDATE**
+**Status: SOURCE/CONTRACT_ACCEPTED — PR #192 / MERGE_READY**
 
 - Reuse AndroidX Macrobenchmark + UiAutomator; do not create a new benchmark framework.
 - Require a user-selected real download and verify `media-network` + `filesystem-heavy` remain RUNNING through measured navigation.

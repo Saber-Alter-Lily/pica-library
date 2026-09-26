@@ -28,6 +28,36 @@ const EXTERNAL_CATEGORY = Object.freeze({
   'p2-k-windows-low-end-trace': 'WINDOWS_LOW_END_TRACE'
 })
 
+const REQUIRED_RUN_IDS = Object.freeze({
+  'p2-k-windows-x64-reference': [
+    'J3_DESKTOP_STARTUP',
+    'J4_BROWSER_HOME_LIBRARY',
+    'J5_DETAIL_SHELF_READER',
+    'J6_READER_LONG_SESSION',
+    'J7A_RECOMMENDATION_BATCH',
+    'J8_ACTIVE_DOWNLOAD',
+    'J9_WEBDAV',
+    'J11_OVERLAP'
+  ],
+  'p2-k-android-physical-reference': [
+    'G18_IDLE',
+    'G19_RECOMMENDATION_LOADED'
+  ],
+  'p2-k-windows-manual-acceptance': [
+    'WINDOWS_LONG_TASK_VISIBLE',
+    'WINDOWS_PAUSE_RESUME',
+    'WINDOWS_CANCEL',
+    'WINDOWS_FOREGROUND_USABILITY'
+  ],
+  'p2-k-android-manual-acceptance': [
+    'ANDROID_TASK_CENTER_VISIBILITY',
+    'ANDROID_FOREGROUND_NOTIFICATION',
+    'ANDROID_PAUSE_RESUME_CANCEL',
+    'ANDROID_BACKGROUND_OEM',
+    'ANDROID_FOREGROUND_USABILITY'
+  ]
+})
+
 function parseArgs(args = process.argv.slice(2)) {
   const values = new Map()
   const repeated = new Map()
@@ -234,8 +264,18 @@ function validateManifestRoot(root) {
       errors.push(`indexed evidence SHA-256 mismatch: ${relative}`)
   }
 
+  const runRows = Array.isArray(manifest.runStatus?.runs)
+    ? manifest.runStatus.runs
+    : []
+  const requiredRunIds = REQUIRED_RUN_IDS[type] ?? []
+  for (const id of requiredRunIds) {
+    const run = runRows.find((row) => row?.id === id)
+    if (!runSuccessful(run))
+      errors.push(`required evidence run is missing or unsuccessful: ${id}`)
+  }
+
   const categories = baseCategory ? [baseCategory] : []
-  const visual = (manifest.runStatus?.runs ?? []).find(
+  const visual = runRows.find(
     (row) => row?.id === 'J10_VISUAL_REAL_MODEL'
   )
   if (type === 'p2-k-windows-x64-reference' && runSuccessful(visual))
@@ -257,7 +297,7 @@ function validateManifestRoot(root) {
     categories,
     bundleDigestSha256: rows.length ? digestRows(rows) : null,
     environment: platformSummary(manifest.environment),
-    runIds: (manifest.runStatus?.runs ?? []).map((row) => row?.id).filter(Boolean)
+    runIds: runRows.map((row) => row?.id).filter(Boolean)
   }
 }
 

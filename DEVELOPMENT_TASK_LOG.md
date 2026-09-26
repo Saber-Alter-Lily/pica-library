@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J10 merged; J11 controlled multi-task overlap candidate; real-model/representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J10 merged; J11 source/harness accepted and merge-ready; real-model/representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -524,7 +524,9 @@ J10 merged (PR #188):
 - hosted CI does not silently download the model and no Visual performance budget is selected.
 - Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
 
-J11 candidate:
+J11 source/harness accepted (PR #189 merge-ready):
+- first full validation head `55d62f6edce2fb8780fc8ab4e12968cb1201ab87` passed all 18 triggered workflows;
+- hosted smoke confirmed both task types covered 24/24 foreground samples, with 7 real LOCAL writes and 6 real WebDAV requests inside the measured window;
 - combines the accepted J8 LOCAL download and J9 WebDAV workload patterns in one Desktop process;
 - both production owners share one observe-only `RuntimeResourceCoordinator`;
 - J2 accepts a foreground window only when `local-download-runner` and `remote-storage-sync` both cover every recorded sample;
@@ -1297,7 +1299,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
 
 ## NEXT-21 — P2-J11 Desktop overlapping-task foreground latency
-**Status: J11_CANDIDATE**
+**Status: SOURCE/HARNESS_ACCEPTED — PR #189 / MERGE_READY**
 
 - Reuse J2 as the only foreground latency/window authority.
 - Run production LOCAL DownloadScheduler and production RemoteStorageDesktopManager WebDAV sync concurrently through one shared observe-only RuntimeResourceCoordinator.

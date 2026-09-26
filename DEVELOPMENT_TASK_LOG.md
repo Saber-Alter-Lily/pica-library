@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J9 merged; J10 Visual indexing foreground-impact design/audit in progress; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J9 merged; J10 source/contract accepted and merge-ready; real-model/representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -1273,8 +1273,10 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
 
 ## NEXT-20 — P2-J10 Desktop Visual indexing foreground impact
-**Status: HARNESS_CANDIDATE / REAL_MODEL_EXTERNAL_EVIDENCE_REQUIRED**
+**Status: SOURCE/CONTRACT_ACCEPTED — PR #188 / MERGE_READY / REAL_MODEL_EXTERNAL_EVIDENCE_REQUIRED**
 
+- First full validation head `2a6840cbd359434bff165408fdb24b5b095b6cae` passed all 17 triggered workflows, including the dedicated J10 source-contract gate, P2-L, normal CI, J3–J9 regressions, Android recovery/memory gates and all experimental packages.
+- Automated acceptance is source/contract only; no real DINOv2 timing is claimed until explicit `--allow-model-network` evidence is collected.
 - Measure the actual browser-side Visual indexing workload; do not synthesize a `cpu-model` RuntimeResourceCoordinator lease that the production Visual path does not currently own.
 - Preserve the product architecture: `visual-worker.js` performs Transformers.js image-feature extraction off the main thread.
 - Reuse the real `onnx-community/dinov2-small` / Transformers.js 4.2.0 runtime contract when collecting true Visual-load evidence.

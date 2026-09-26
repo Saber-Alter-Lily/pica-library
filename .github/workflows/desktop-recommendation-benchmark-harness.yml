@@ -1,0 +1,65 @@
+name: Desktop Recommendation Benchmark Harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'src/library/**'
+      - 'src/recommendation-v3/**'
+      - 'src/runtime/task-diagnostics.ts'
+      - 'scripts/benchmark/seed-desktop-recommendation-benchmark-fixture.ts'
+      - 'scripts/benchmark/desktop-recommendation-batch-harness.mjs'
+      - 'scripts/benchmark/desktop-recommendation-generation-harness.mjs'
+      - 'scripts/run-desktop-recommendation-batch-harness.mjs'
+      - 'scripts/run-desktop-recommendation-generation-harness.mjs'
+      - 'test/unit/desktop-recommendation-benchmark-p2j6.test.ts'
+      - 'docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J6.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-recommendation-benchmark-harness.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'src/library/**'
+      - 'src/recommendation-v3/**'
+      - 'src/runtime/task-diagnostics.ts'
+      - 'scripts/benchmark/seed-desktop-recommendation-benchmark-fixture.ts'
+      - 'scripts/benchmark/desktop-recommendation-batch-harness.mjs'
+      - 'scripts/benchmark/desktop-recommendation-generation-harness.mjs'
+      - 'scripts/run-desktop-recommendation-batch-harness.mjs'
+      - 'scripts/run-desktop-recommendation-generation-harness.mjs'
+      - 'test/unit/desktop-recommendation-benchmark-p2j6.test.ts'
+      - 'docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J6.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-recommendation-benchmark-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  recommendation-batch-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run local managed-V3 batch-switch harness smoke
+        run: >
+          node scripts/run-desktop-recommendation-batch-harness.mjs
+          --rounds=2
+          --harness-validation-only
+          --with-deps
+          --output=test-results/desktop-recommendation/desktop-recommendation-batch-benchmark.json
+      - name: Upload J6 local harness diagnostics
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-recommendation-j6-${{ github.run_id }}-${{ github.job }}
+          path: test-results/desktop-recommendation/
+          retention-days: 1
+          if-no-files-found: ignore

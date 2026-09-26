@@ -29,6 +29,14 @@ describe('P2-K3 Android real download/Reader physical evidence kit',()=>{
     expect(s).toContain('rawIdsPersisted:false')
     expect(s).toContain('syntheticMediaAccepted:false')
   })
+  it('rejects emulator and dirty-tree promotion by default',()=>{
+    const s=read('scripts/run-android-real-load-macrobenchmark.sh')
+    expect(s).toContain('K3 refuses emulator/generic-device evidence')
+    expect(s).toContain('Working tree is dirty')
+    expect(s).toContain('physicalDeviceRequired:true')
+    expect(s).toContain('emulatorAccepted:false')
+    expect(s).toContain('P2K_COMMIT')
+  })
   it('captures Reader meminfo without inventing a budget',()=>{
     const s=read('scripts/run-android-real-load-macrobenchmark.sh')
     const d=read('docs/P2K_ANDROID_REAL_LOAD_K3.md')

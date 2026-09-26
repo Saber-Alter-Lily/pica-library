@@ -259,6 +259,16 @@ async function main() {
         const initial = await waitForDesktop(desktopHome, {
             configured: false
         })
+        const credentialBackend = String(
+            initial.status?.credentialBackend?.kind ?? ''
+        )
+        if (
+            credentialBackend !== 'windows-dpapi' &&
+            credentialBackend !== 'session-memory'
+        )
+            throw new Error(
+                `J4 refuses system-level credential backend "${credentialBackend || 'unknown'}"; run on Windows DPAPI with isolated Desktop home or a session-memory backend`
+            )
         const setupResult = await postSettings(
             initial.instance.url,
             initial.status,

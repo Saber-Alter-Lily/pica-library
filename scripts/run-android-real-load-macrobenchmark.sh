@@ -10,6 +10,7 @@ COMIC_ID=""
 EPISODE_ID=""
 SOURCE="pica"
 TITLE="K3 Reader"
+ALLOW_DIRTY=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -17,6 +18,7 @@ for arg in "$@"; do
     --episode-id=*) EPISODE_ID="${arg#--episode-id=}" ;;
     --source=*) SOURCE="${arg#--source=}" ;;
     --title=*) TITLE="${arg#--title=}" ;;
+    --allow-dirty) ALLOW_DIRTY=1 ;;
     *) echo "Unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -27,6 +29,22 @@ if [[ ! "$MODE" =~ ^(prepare|download-loaded|reader-loaded)$ ]]; then
 fi
 
 adb get-state >/dev/null 2>&1 || { echo "A connected Android device is required." >&2; exit 1; }
+model="$(adb shell getprop ro.product.model | tr -d '\r')"
+qemu="$(adb shell getprop ro.kernel.qemu | tr -d '\r')"
+if [[ "$qemu" == "1" ]] || [[ "$model" =~ [Ee]mulator|[Gg]eneric|[Ss][Dd][Kk].*[Gg]phone ]]; then
+  echo "K3 refuses emulator/generic-device evidence: model=$model qemu=$qemu" >&2
+  exit 1
+fi
+
+cd "$ROOT_DIR"
+commit="$(git rev-parse HEAD | tr -d '\r')"
+[[ "$commit" =~ ^[0-9a-fA-F]{40}$ ]] || { echo "Unable to resolve git commit." >&2; exit 1; }
+dirty=false
+[[ -n "$(git status --porcelain)" ]] && dirty=true
+if [[ "$dirty" == "true" && "$ALLOW_DIRTY" -ne 1 ]]; then
+  echo "Working tree is dirty; commit/stash or pass --allow-dirty for diagnostic-only evidence." >&2
+  exit 1
+fi
 cd "$ANDROID_DIR"
 
 if [[ "$MODE" == "prepare" ]]; then
@@ -48,7 +66,6 @@ fi
 rm -rf "$RESULT_DIR"; mkdir -p "$RESULT_DIR"
 serial="$(adb get-serialno | tr -d '\r')"
 serial_hash="$(P2K_SERIAL="$serial" node -e "const c=require('node:crypto');process.stdout.write(c.createHash('sha256').update(process.env.P2K_SERIAL||'').digest('hex'))")"
-model="$(adb shell getprop ro.product.model | tr -d '\r')"
 api="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 abi="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
 
@@ -87,12 +104,13 @@ find macrobenchmark/build -type f \( -name '*benchmarkData.json' -o -name '*.per
     cp "$file" "$RESULT_DIR/$(basename "$file")"
   done
 
-P2K_OUT="$RESULT_DIR/session.json" P2K_SCENARIO="$scenario" P2K_MODEL="$model" P2K_API="$api" P2K_ABI="$abi" P2K_SERIAL_HASH="$serial_hash" P2K_COMIC="$COMIC_ID" P2K_EPISODE="$EPISODE_ID" P2K_SOURCE="$SOURCE" P2K_EXIT="$code" node <<'NODE'
+P2K_OUT="$RESULT_DIR/session.json" P2K_SCENARIO="$scenario" P2K_MODEL="$model" P2K_API="$api" P2K_ABI="$abi" P2K_SERIAL_HASH="$serial_hash" P2K_COMIC="$COMIC_ID" P2K_EPISODE="$EPISODE_ID" P2K_SOURCE="$SOURCE" P2K_EXIT="$code" P2K_COMMIT="$commit" P2K_DIRTY="$dirty" node <<'NODE'
 const fs=require('node:fs'),crypto=require('node:crypto'),e=process.env
 const hash=v=>v?crypto.createHash('sha256').update(v).digest('hex'):null
 fs.writeFileSync(e.P2K_OUT,JSON.stringify({
  schemaVersion:1,evidenceType:'p2-k-android-real-load-k3',collectedAt:new Date().toISOString(),
- scenario:e.P2K_SCENARIO,device:{serialSha256:e.P2K_SERIAL_HASH,model:e.P2K_MODEL,api:Number(e.P2K_API||0),abi:e.P2K_ABI},
+ scenario:e.P2K_SCENARIO,commit:e.P2K_COMMIT,dirty:e.P2K_DIRTY==='true',physicalDeviceRequired:true,emulatorAccepted:false,
+ device:{serialSha256:e.P2K_SERIAL_HASH,model:e.P2K_MODEL,api:Number(e.P2K_API||0),abi:e.P2K_ABI},
  realInput:{comicIdSha256:hash(e.P2K_COMIC),episodeIdSha256:hash(e.P2K_EPISODE),source:e.P2K_SOURCE||null},
  rawIdsPersisted:false,syntheticMediaAccepted:false,exitCode:Number(e.P2K_EXIT),
  budgetSelected:false,concurrencyCapacitySelected:false

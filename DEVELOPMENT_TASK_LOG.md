@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J5 merged; J6 Reader long-session retention harness candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J6 merged; J7 controlled active-download foreground latency candidate; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -479,15 +479,25 @@ J5 merged (PR #181):
 - hosted timing remains harness-only and no foreground budget is selected.
 - Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
 
-J6 candidate:
+J6 merged (PR #182):
 - reuses the J5 isolated Desktop/Playwright/fixture runner rather than cloning setup and credential logic;
 - keeps one Chromium Reader session alive while repeatedly switching between two fully local chapters;
 - requests GC before periodic CDP memory samples and records Runtime heap, DOM counters and Layout/RecalcStyle counts;
 - records chapter-switch-to-usable latency every cycle;
 - records controlled-scroll requestAnimationFrame interval distributions as a descriptive main-thread cadence signal;
 - explicitly does not call CDP heap/DOM metrics full browser-process RSS or compositor jank;
-- CI runs only a short harness-validation session and does not select a memory/frame budget.
+- source/harness acceptance passed Reader Long Session `36227293068`, P2-L `36227292880`, J3 `36227293051`, J4 `36227292990`, J5 `36227293002`, Macrobenchmark `36227292839`, CI `36227292875`, G16 `36227292969`, and G15 `36227292952`;
+- hosted-runner memory/frame values remain harness-only and no budget is selected.
 - Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
+
+J7 candidate:
+- refactors J2 into a reusable `runHttpLatencyScenario(...)` function while preserving its CLI and one authoritative load-window validity rule;
+- starts a fully local deterministic synthetic Pica adapter but runs the real production LOCAL `DownloadScheduler`, `MediaRequestGate`, SQLite progress writes and filesystem writes;
+- requires `local-download-runner` to cover every foreground J2 sample and separately requires actual `appendFile()` writes during the measured window;
+- emits the full J2 profile plus controlled-fixture/download metadata;
+- uses no Provider credentials or external network and explicitly does not claim real Pica throughput;
+- CI is a short harness smoke only; no latency budget is selected.
+- Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J7.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1213,17 +1223,24 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
 
 ## NEXT-16 — P2-J6 Desktop Reader long-session retention measurement
-**Status: J6_CANDIDATE**
+**Status: DONE — PR #182**
 
-- Reuse J5 isolation, local fixture and Playwright install through the shared runner.
-- Keep one Chromium Reader session alive across repeated first↔second chapter switches.
-- Require full local image decode after every chapter transition.
-- Sample GC-normalized Chromium Runtime heap + DOM counters periodically.
-- Measure every chapter-switch readiness latency and controlled-scroll RAF interval distribution.
-- Report final-minus-baseline retention and peaks, but do not label these counters as full-process RSS.
-- Treat RAF cadence as descriptive main-thread observation, not compositor telemetry or an approved jank threshold.
-- CI runs a 6-cycle harness smoke only; no hosted-runner memory/frame budget is selected.
+- J6 long-lived Chromium Reader harness is merged.
+- Final head passed the dedicated J6 harness, P2-L promotion gate, J3/J4/J5 harnesses, Macrobenchmark, normal CI and G15/G16 regressions.
+- Hosted-runner retention/RAF values remain harness-only; representative Windows x64 evidence is still required for P2-K.
 - Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
+
+## NEXT-17 — P2-J7 Desktop active-download foreground latency
+**Status: J7_CANDIDATE**
+
+- Reuse J1/J2 telemetry/window validity instead of cloning latency logic.
+- Start a real production LOCAL download runner against a deterministic local synthetic Provider adapter.
+- Keep Provider/network traffic absent; the fixture exists only to exercise scheduler/media-gate/SQLite/filesystem contention repeatably.
+- Require `local-download-runner` to cover every accepted foreground sample.
+- Require at least one actual fixture file write during the measured window.
+- Emit machine-readable J2 profile plus controlled fixture/download metadata.
+- CI validates harness execution only; no P2-K latency threshold or Provider throughput claim.
+- Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J7.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1237,6 +1254,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J7 controlled active-download foreground latency
+
+State update:
+- J6 is merged as PR #182 at `476484fa88115f0c9c21a1ec45e57227eed25819` after all nine harness/regression workflows passed.
+- The next P2-J checklist item is download queue API responsiveness under active transfers.
+- J1 already owns low-cardinality HTTP latency telemetry and J2 already owns load-window validity, so J7 must reuse J2 rather than clone measurement logic.
+- `http-latency-scenario.ts` exposes `runHttpLatencyScenario(...)` while preserving direct CLI behavior.
+- J7 creates one fully local synthetic Provider fixture but runs the real LOCAL `DownloadScheduler`, `MediaRequestGate`, SQLite progress persistence and filesystem writes.
+- The fixture makes no Pica/E-H/WebDAV/external network requests and exports no credentials.
+- A valid J7 window requires both full J2 `local-download-runner` coverage and at least one real fixture file write during the measured interval.
+- Output is machine-readable and threshold-free. Hosted CI timing remains harness validation only, and the workload is not promoted as Provider throughput evidence.
+- Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J7.md`.
 
 ## 2026-09-26 — P2-J6 Reader long-session retention harness
 

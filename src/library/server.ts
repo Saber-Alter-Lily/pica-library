@@ -65,6 +65,7 @@ export interface DesktopServerController {
     ) => Promise<Record<string, unknown>>
     applyUpdate?: (id: string) => Promise<Record<string, unknown>>
     updateProgress?: () => unknown
+    runtimeTasks?: () => unknown
     browserSessionOpened?: (sessionId: string) => void
     browserSessionClosed?: (sessionId: string) => void
     shutdown: () => void
@@ -1139,7 +1140,8 @@ export async function startLibraryServer(options: {
                 return json(
                     response,
                     200,
-                    options.service.runtimeTaskDiagnostics()
+                    options.desktop.runtimeTasks?.() ??
+                        options.service.runtimeTaskDiagnostics()
                 )
             }
             if (

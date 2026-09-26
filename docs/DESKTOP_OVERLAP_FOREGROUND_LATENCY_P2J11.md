@@ -1,6 +1,27 @@
 # Desktop Overlapping-task Foreground Latency — P2 J11
 
-Status: **controlled overlap harness candidate / no concurrency budget selected**
+Status: **SOURCE/HARNESS PASS / PR #189 merge-ready / no concurrency budget selected**
+
+Accepted first-head source/harness evidence on `55d62f6edce2fb8780fc8ab4e12968cb1201ab87`:
+- Desktop Overlap Foreground Latency Harness `36237597706`: PASS;
+- P2 Runtime Hardening Promotion Gate `36237597682`: PASS;
+- normal CI `36237597619`: PASS;
+- Desktop Visual Index Foreground Harness `36237597698`: PASS;
+- Desktop WebDAV Foreground Latency Harness `36237597683`: PASS;
+- Desktop Active Download Latency Harness `36237597702`: PASS;
+- Desktop Startup/Home/Detail/Reader/Recommendation regressions: PASS;
+- Android Macrobenchmark, force-stop and memory/background gates: PASS;
+- Linux/macOS/Windows ARM64/Docker experimental package workflows: PASS.
+
+J11 hosted smoke validity evidence:
+- `local-download-runner`: 24/24 foreground samples;
+- `remote-storage-sync`: 24/24 foreground samples;
+- real LOCAL file writes during measured window: 7;
+- real WebDAV requests during measured window: 6;
+- LOCAL download: 120/120 COMPLETED;
+- WebDAV sync: 243 uploaded objects, 0 issues.
+
+Hosted values establish overlap-harness validity only. They do not define P2-K budgets or P2-C3 capacities.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-J Performance instrumentation;

@@ -65,9 +65,15 @@ implementation.
 ### 2. Windows current-package smoke
 
 On `windows-latest`:
+- reads the current version from `package.json`;
+- queries GitHub Releases for the newest lower formal semver release;
+- downloads its accepted Windows x64 asset into `artifacts/release-base`;
 - builds the current repository version with `pnpm build:windows`;
-- resolves the package filename from `package.json`;
+- leaves the existing build script's accepted-base SHA and unchanged-launcher checks authoritative;
+- resolves the candidate package filename from `package.json`;
 - runs the existing `scripts/test-windows-artifact.ps1`.
+
+The gate does not bypass the stable launcher's accepted-base rule merely to build a candidate.
 
 The smoke continues to validate:
 - package structure/runtime assets;

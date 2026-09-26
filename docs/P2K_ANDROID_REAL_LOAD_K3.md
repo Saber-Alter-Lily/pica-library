@@ -73,6 +73,21 @@ bash scripts/run-android-real-load-macrobenchmark.sh reader-loaded \
   --comic-id=<REAL_ID> --episode-id=<REAL_CHAPTER_ID> --source=pica --title="..."
 ```
 
+Each measured run now writes to its own timestamped directory under
+`test-results/p2k/android-real-load-k3/` by default, so the Reader run cannot
+silently delete the preceding download-loaded evidence.
+
+An explicit archive path may be supplied:
+
+```bash
+bash scripts/run-android-real-load-macrobenchmark.sh download-loaded \
+  --result-dir=test-results/p2k/android-real-load-k3/rc-download
+```
+
+A non-empty target directory is refused. The collector also uses a current-run
+artifact marker and copies only benchmarkData/Perfetto files newer than that
+marker; the previous broad 90-minute artifact window is removed.
+
 ## Evidence boundary
 
 K3 remains tooling until executed repeatedly on representative physical hardware.

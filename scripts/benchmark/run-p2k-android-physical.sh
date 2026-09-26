@@ -24,7 +24,10 @@ cd "$ROOT_DIR"
 for tool in adb git node bash; do command -v "$tool" >/dev/null || { echo "Missing $tool" >&2; exit 1; }; done
 
 if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-  mapfile -t devices < <(adb devices | awk 'NR>1 && $2=="device"{print $1}')
+  devices=()
+  while IFS= read -r device; do
+    [[ -n "$device" ]] && devices+=("$device")
+  done < <(adb devices | awk 'NR>1 && $2=="device"{print $1}')
   [[ "${#devices[@]}" -eq 1 ]] || { echo "K2 requires exactly one adb device unless ANDROID_SERIAL is set." >&2; exit 1; }
   export ANDROID_SERIAL="${devices[0]}"
 fi

@@ -37,6 +37,30 @@ describe('P2-K K2 Android physical-device evidence kit', () => {
     expect(builder).toContain('p2-k-android-physical-reference')
   })
 
+  it('keeps a baseline-only Android bundle incomplete until G19 is present', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(),'p2k-android-baseline-only-'))
+    roots.push(root)
+    const commit = 'd'.repeat(40)
+    fs.mkdirSync(path.join(root,'g18-idle'))
+    fs.writeFileSync(path.join(root,'g18-idle','result.json'),'{}')
+    fs.writeFileSync(path.join(root,'environment.json'),JSON.stringify({
+      schemaVersion:1,evidenceType:'p2-k-android-physical-reference',commit,dirty:false,
+      device:{serialSha256:'e'.repeat(64)},physicalDeviceRequired:true,emulatorAccepted:false
+    }))
+    fs.writeFileSync(path.join(root,'run-status.json'),JSON.stringify({
+      schemaVersion:1,evidenceType:'p2-k-android-physical-reference',commit,dirty:false,
+      runs:[{id:'G18_IDLE',output:'g18-idle',outputExists:true,exitCode:0}]
+    }))
+    const result = spawnSync(process.execPath,[
+      'scripts/benchmark/build-p2k-evidence-manifest.mjs',
+      `--root=${root}`,`--commit=${commit}`,
+      '--evidence-type=p2-k-android-physical-reference'
+    ],{encoding:'utf8'})
+    expect(result.status).toBe(0)
+    const manifest=JSON.parse(fs.readFileSync(path.join(root,'p2k-evidence-manifest.json'),'utf8'))
+    expect(manifest.complete).toBe(false)
+  })
+
   it('builds a complete two-run Android physical manifest fixture', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(),'p2k-android-manifest-'))
     roots.push(root)

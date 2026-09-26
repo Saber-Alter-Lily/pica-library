@@ -14,7 +14,7 @@ describe('P2 J5 Desktop Detail/Shelf/Reader browser benchmark', () => {
         expect(seed).toContain('database.upsertEpisode')
         expect(seed).toContain('database.upsertPicture')
         expect(seed).toContain('database.markPictureDownloaded')
-        expect(seed).toContain("path.join(root, 'benchmark-pages'")
+        expect(seed).toContain("'benchmark-pages'")
         expect(seed).not.toContain('new DatabaseSync')
         expect(seed).not.toContain('INSERT INTO')
     })

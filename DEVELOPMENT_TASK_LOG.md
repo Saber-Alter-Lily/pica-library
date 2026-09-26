@@ -5,8 +5,8 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-26**  
-Authoritative repository baseline before the current K4 source/contract accepted (PR #193): `main@f5517a7c34eec06a6db66a11055ab9aa784316e7` (P2-K3 / PR #192 merged)  
-Current critical-path work: **P2-K representative evidence / K4 manual-acceptance source-contract closeout**
+Authoritative repository baseline before the current K5 candidate: `main@9197e9935543c01915222ed106d492d837101b85` (P2-K4 / PR #193 merged)  
+Current critical-path work: **P2-K representative evidence / K5 evidence completeness and integrity review**
 
 ---
 
@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1/K2/K3 tooling merged; K4 source/contract accepted in PR #193 with final-head validation pending; representative execution still required; no budgets selected**
+**Status: IN_PROGRESS — K1/K2/K3/K4 tooling merged; K5 evidence-review candidate in progress; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -589,7 +589,7 @@ K3 merged (PR #192):
 - physical execution remains external and must use representative hardware.
 - Detailed boundary: `docs/P2K_ANDROID_REAL_LOAD_K3.md`.
 
-K4 candidate:
+K4 merged (PR #193):
 - adds a shared manual-acceptance recorder for the remaining P2-L Windows and Android physical/OEM blockers;
 - scenario structure follows open-source Cucumber/Gherkin-style Given/When/Then semantics without adding a dependency;
 - Windows requires native Windows; Android requires one physical non-emulator device;
@@ -599,8 +599,19 @@ K4 candidate:
 - human FAIL remains preserved evidence and keeps promotion incomplete;
 - no performance budget or concurrency capacity is selected;
 - implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` passed all 18/18 triggered workflows, including the dedicated K4 contract, K1/K2/K3 contracts, P2-L, CI, Desktop J3–J11 regressions and Android runtime/build gates;
-- this accepts only the source/evidence contract; native-Windows and physical-Android execution remain external, and the documentation head created by this evidence write must pass the full triggered matrix before merge.
+- final documentation head `a46c3d5567970434301a2c28800e5937b6fd732b` passed all 18/18 triggered workflows with zero failures; PR #193 merged as `9197e9935543c01915222ed106d492d837101b85`;
+- this accepts only the source/evidence contract; native-Windows and physical-Android execution remain external.
 - Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
+
+K5 candidate:
+- adds a read-only evidence review/completeness layer rather than another benchmark framework;
+- verifies K1/K2/K4 manifest file hashes, embedded commit authority, platform authority and required run IDs independently of the collector's `complete=true`;
+- accepts K3 as its approved standalone physical session format, rechecking physical-device authority, hashed identities, real-media policy and benchmarkData presence;
+- recognizes nine structural evidence categories: Windows K1, Android K2, K3 download, K3 Reader, Windows K4, Android K4, J7B real Provider, J10 real Visual and low-end Windows trace;
+- blocks mixed-commit evidence and preserves `budgetSelected=false` / `concurrencyCapacitySelected=false`;
+- when all categories are structurally present, the strongest automatic state is `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW`, never P2 complete;
+- K3 collection is hardened so download-loaded and Reader runs default to independent timestamped roots and only current-run artifacts are copied.
+- Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
 
 ## P2-L — Runtime hardening regression gate
 **Status: AUTOMATED_GATE_PASS / MERGED — PR #178; P2 exit remains blocked by external evidence**
@@ -1374,7 +1385,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_ANDROID_REAL_LOAD_K3.md`.
 
 ## NEXT-25 — P2-K K4 Windows/Android manual task-control and OEM acceptance
-**Status: SOURCE/CONTRACT_ACCEPTED — PR #193 / FINAL_HEAD_VALIDATION_PENDING**
+**Status: DONE — PR #193**
 
 - Reuse the common P2-K SHA-256 manifest rather than inventing another report format.
 - Record human acceptance as explicit Given/When/Then scenarios.
@@ -1383,9 +1394,21 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Cover Windows long-task visibility, pause/resume, cancel and foreground usability.
 - Cover Android Task Center, foreground notification, pause/resume/cancel, OEM/background behavior and foreground usability.
 - Preserve human FAIL as valid evidence; do not turn it into a synthetic PASS.
-- Source/contract acceptance: implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` passed 18/18 workflows; representative human execution remains external.
-- Merge gate: the final documentation head must also pass the complete triggered workflow matrix before #193 is merged.
+- Source/contract acceptance: implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` passed 18/18 workflows.
+- Final documentation head `a46c3d5567970434301a2c28800e5937b6fd732b` also passed 18/18 workflows; merged commit is `9197e9935543c01915222ed106d492d837101b85`.
+- Representative Windows/Android human execution remains external and is not implied by source completion.
 - Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
+
+## NEXT-26 — P2-K K5 evidence completeness / integrity review
+**Status: IN_PROGRESS — K5_CANDIDATE**
+
+- Reuse the existing K1/K2/K4 SHA-256 manifests and approved K3 session format; do not invent another measurement harness.
+- Independently verify file hashes, exact commit, platform/device authority and required run IDs.
+- Treat J7B real Provider and low-end Windows trace as explicit external evidence sidecars; J10 may be satisfied by K1 `-IncludeVisual` or an approved standalone sidecar.
+- Require the nine named evidence categories before structural completeness.
+- Do not choose a minimum repetition count, latency/frame/memory budget or P2-C3 concurrency capacity automatically.
+- Harden K3 evidence archival so consecutive physical scenarios cannot overwrite each other or pull stale 90-minute artifacts.
+- Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1399,6 +1422,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — K4 merged; K5 begins read-only evidence reconciliation
+
+State update:
+- PR #193 final documentation head `a46c3d5567970434301a2c28800e5937b6fd732b` passed 18/18 triggered workflows and merged as `9197e9935543c01915222ed106d492d837101b85`.
+- K4 source/contract completion does not claim native-Windows or physical-Android human acceptance.
+- K5 is introduced only to reconcile already-approved raw evidence formats before human variance/budget review; it does not run synthetic substitutes for missing hardware evidence.
+- K5 independently rechecks manifest hashes, required run IDs, platform/device authority and commit coherence instead of trusting a hand-edited `complete=true`.
+- K3 physical evidence collection now preserves each measured scenario in an independent result root and copies only artifacts generated by the current run, preventing later Reader collection from deleting download-loaded evidence or importing stale recent artifacts.
+- P2-C3 enforcement and release budgets remain blocked until representative evidence is collected and reviewed.
 
 ## 2026-09-26 — P2-K4 source/contract accepted after full automated matrix
 

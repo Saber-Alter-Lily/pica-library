@@ -110,6 +110,18 @@ async function fetchJson(page, pathname) {
 async function initialRecommendationReady(page, timeoutMs) {
     await page.locator('nav [data-view="discover"]').click()
     await page.locator('[data-tab="recommend"]').click()
+
+    // Strict precondition: do not let the benchmark create an unmeasured first
+    // cycle. The configured Desktop must already own one usable managed V3 cycle.
+    const existing = await fetchJson(
+        page,
+        '/api/v1/recommendation-sessions/status?mode=final'
+    )
+    if (!existing?.activeCycleId || existing?.buildingCycleId)
+        throw new Error(
+            'J6 real generation requires one existing usable managed V3 cycle before any recommendation UI action'
+        )
+
     await page.locator('#recommend-button').click()
     await page.waitForFunction(
         () =>
@@ -120,15 +132,18 @@ async function initialRecommendationReady(page, timeoutMs) {
         undefined,
         { timeout: timeoutMs }
     )
-    const status = await fetchJson(
+    const loaded = await fetchJson(
         page,
         '/api/v1/recommendation-sessions/status?mode=final'
     )
-    if (!status?.activeCycleId || status?.buildingCycleId)
+    if (
+        loaded?.activeCycleId !== existing.activeCycleId ||
+        loaded?.buildingCycleId
+    )
         throw new Error(
-            'J6 real generation requires one existing usable managed V3 cycle before the measured regeneration'
+            'J6 recommendation precondition changed before the measured regeneration'
         )
-    return status
+    return existing
 }
 
 async function runRound(chromium, options, index) {

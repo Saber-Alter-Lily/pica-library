@@ -12,6 +12,19 @@ describe('P2-L runtime hardening promotion gate', () => {
         const workflow = read('.github/workflows/p2-runtime-hardening-gate.yml')
 
         expect(workflow).toContain('workflow_dispatch:')
+        expect(workflow).toContain(
+            'P2_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}'
+        )
+        expect(workflow).toContain(
+            'PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}'
+        )
+        expect(workflow).toContain(
+            'P2_GATE_SHA: ${{ env.P2_CANDIDATE_SHA }}'
+        )
+        expect(workflow).not.toContain(
+            'PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}'
+        )
+        expect(workflow).not.toContain('P2_GATE_SHA: ${{ github.sha }}')
         expect(workflow).toContain('pnpm type:check')
         expect(workflow).toContain('pnpm web:check')
         expect(workflow).toContain('pnpm test')

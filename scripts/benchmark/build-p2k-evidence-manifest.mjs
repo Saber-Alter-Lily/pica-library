@@ -76,6 +76,22 @@ if (androidPhysicalEvidenceTypes.has(evidenceType)) {
     if (!/^[0-9a-f]{64}$/i.test(String(environment?.device?.serialSha256 ?? '')))
         throw new Error('Android P2-K evidence requires a hashed physical-device identity')
 }
+const manualAcceptanceEvidenceTypes = new Set([
+    'p2-k-windows-manual-acceptance',
+    'p2-k-android-manual-acceptance'
+])
+if (manualAcceptanceEvidenceTypes.has(evidenceType)) {
+    if (
+        environment.manualAcceptance !== true ||
+        environment.humanJudgmentRequired !== true
+    )
+        throw new Error('K4 manual acceptance evidence must declare human-judgment authority')
+}
+if (
+    evidenceType === 'p2-k-windows-manual-acceptance' &&
+    environment.nativeWindowsRequired !== true
+)
+    throw new Error('Windows K4 evidence must declare native-Windows authority')
 
 const manifestName = 'p2k-evidence-manifest.json'
 const files = filesRecursively(root)

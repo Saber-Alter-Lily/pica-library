@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J8 merged; J9 controlled WebDAV foreground-latency candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J8 merged; J9 source/harness accepted and merge-ready; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -505,7 +505,9 @@ J8 merged (PR #186):
 - hosted timing remains harness-only and no latency budget is selected.
 - Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
 
-J9 candidate:
+J9 source/harness accepted (PR #187 merge-ready):
+- first full validation head `7367aa5f21a67fa84db15a76b110f46aa79c0772` passed all 16 triggered workflows, including dedicated J9, P2-L, normal CI, J3–J8 regressions, Android recovery/memory gates and all experimental packages;
+- hosted smoke confirmed 24/24 `remote-storage-sync` foreground-sample coverage plus 6 real WebDAV requests inside the measured window;
 - follows the open-source `webdav-client` test pattern by provisioning pinned `webdav-server@2.6.2` only in a temporary benchmark tool root;
 - runs the real `RemoteStorageDesktopManager.sync()`, `WebDavStorageProvider`, `RemoteLibrarySyncService` and process-shared `RuntimeResourceCoordinator`;
 - J2 requires `remote-storage-sync` to cover every foreground sample;
@@ -1263,7 +1265,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
 
 ## NEXT-19 — P2-J9 Desktop WebDAV foreground latency
-**Status: J9_CANDIDATE**
+**Status: SOURCE/HARNESS_ACCEPTED — PR #187 / MERGE_READY**
 
 - Provision pinned open-source `webdav-server@2.6.2` in a temporary tool root; do not add it to production dependencies.
 - Run the real RemoteStorageDesktopManager/WebDavStorageProvider/RemoteLibrarySyncService path against loopback WebDAV.

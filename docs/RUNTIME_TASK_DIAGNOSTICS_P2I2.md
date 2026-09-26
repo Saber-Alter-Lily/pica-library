@@ -1,6 +1,17 @@
 # External Desktop Runtime Task Diagnostics — P2 I2
 
-Status: **implementation candidate / external-owner adapter batch**
+Status: **PASS / merged as PR #177 / external-owner adapter batch**
+
+Accepted evidence before merge:
+- normal CI run `36212602733`: PASS;
+- Linux x64 package run `36212602711`: PASS;
+- macOS arm64 package run `36212602662`: PASS;
+- Windows ARM64 package run `36212602709`: PASS;
+- Docker headless package run `36212602678`: PASS;
+- Android Macrobenchmark build run `36212602738`: PASS;
+- Android force-stop recovery run `36212602671`: PASS;
+- Android memory/background run `36212602704`: PASS with the corrected no-fixed-JobScheduler-SLA recovery gate;
+- merged commit: `c7eab55f0b54d6a520aa524e50a9ab6c93258404`.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-I Observability without exposing internals to ordinary users.

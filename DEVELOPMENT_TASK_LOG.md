@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J6 merged; J7 Recommendation generation/batch measurement candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J7 merged; J8 controlled active-download foreground latency candidate; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -487,13 +487,22 @@ J6 merged (PR #182):
 - hosted timing/memory counters remain non-promotional.
 - Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
 
-J7 candidate:
+J7 merged (PR #184):
 - separates Recommendation generation from already-built managed-V3 batch switching;
 - J7A seeds a local 72-candidate V3 cycle through production LibraryDatabase + CycleCoordinatorV3 APIs and measures only `#recommend-next-batch` click → usable changed 12-card batch;
-- J7B is explicit real-Provider evidence: one usable cycle must already exist before any Recommendation UI action, regeneration requires user confirmation, and the measured window must observe the authoritative `recommendation-v3` task using `provider-network`;
-- CI executes only J7A local batch-switch harness; J7B is never faked on hosted runners;
-- no J7 threshold is selected.
+- J7B remains opt-in real-Provider evidence: one usable cycle must already exist before any Recommendation UI action, regeneration requires explicit confirmation, and the measured window must observe the authoritative `recommendation-v3` task using `provider-network`;
+- source/harness acceptance passed Recommendation `36228962705`, P2-L `36228962691`, J3 `36228962718`, J4 `36228962698`, J5 `36228962715`, J6 `36228962707`, Macrobenchmark `36228962712`, normal CI `36228962722`, G16 `36228962702`, and G15 `36228962741`;
+- J7B is never faked on hosted runners and no J7 threshold is selected.
 - Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
+
+J8 candidate:
+- refactors J2 into a reusable `runHttpLatencyScenario(...)` function while preserving its CLI and one authoritative load-window validity rule;
+- starts a fully local deterministic synthetic Provider adapter but runs the real production LOCAL `DownloadScheduler`, `MediaRequestGate`, SQLite progress writes and filesystem writes;
+- requires `local-download-runner` to cover every foreground J2 sample and separately requires actual `appendFile()` writes during the measured window;
+- emits the full J2 profile plus controlled-fixture/download metadata;
+- uses no Provider credentials or external network and explicitly does not claim real Pica throughput;
+- CI is a short harness smoke only; no latency budget is selected.
+- Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1227,15 +1236,25 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
 
 ## NEXT-17 — P2-J7 Desktop Recommendation generation / batch measurement
-**Status: J7_CANDIDATE**
+**Status: DONE — PR #184**
 
-- **J7A local batch switch:** seed 72 non-favorite candidates through production LibraryDatabase/CycleCoordinatorV3, render the current managed V3 batch, then measure `#recommend-next-batch` click → changed 12-card usable batch.
-- Batch-switch measurement excludes Desktop/Chromium startup, Provider success and cycle generation.
-- **J7B real generation:** requires an already-configured loopback Desktop and one preexisting usable managed V3 cycle before any Recommendation UI action.
-- Real generation measures confirmation click → new cycle + rendered first batch, and accepts a sample only after observing the I1/I2 `recommendation-v3` diagnostic with `provider-network` RUNNING.
-- J7B requires `--confirm-regeneration=YES`, intentionally mutates the recommendation cycle, and reads/exports no credentials.
-- Hosted CI runs only two J7A local harness-validation rounds. It does not execute or fake J7B.
+- J7A local managed-V3 batch-switch harness and J7B opt-in real-Provider regeneration harness are merged.
+- Recommendation, P2-L, J3/J4/J5/J6, Macrobenchmark, normal CI and G15/G16 gates all passed on the final head.
+- Hosted CI runs only J7A; J7B remains explicit real-Provider evidence and is never simulated.
+- No Recommendation performance budget is selected.
 - Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
+
+## NEXT-18 — P2-J8 Desktop active-download foreground latency
+**Status: J8_CANDIDATE**
+
+- Reuse J1/J2 telemetry/window validity instead of cloning latency logic.
+- Start a real production LOCAL download runner against a deterministic local synthetic Provider adapter.
+- Keep Provider/network traffic absent; the fixture exists only to exercise scheduler/media-gate/SQLite/filesystem contention repeatably.
+- Require `local-download-runner` to cover every accepted foreground sample.
+- Require at least one actual fixture file write during the measured window.
+- Emit machine-readable J2 profile plus controlled fixture/download metadata.
+- CI validates harness execution only; no P2-K latency threshold or Provider throughput claim.
+- Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1249,6 +1268,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J8 controlled active-download foreground latency
+
+State update:
+- J7 Recommendation benchmark is merged as PR #184 at `5750a52d671c9e6db1854d84897c263cb5f26ad0`.
+- J7 final head passed Recommendation `36228962705`, P2-L `36228962691`, J3 `36228962718`, J4 `36228962698`, J5 `36228962715`, J6 `36228962707`, Macrobenchmark `36228962712`, normal CI `36228962722`, G16 `36228962702`, and G15 `36228962741`.
+- The parallel active-download branch had also used J7 while #184 was still open; it is deliberately rebuilt from post-#184 `main` as J8 rather than carrying duplicate task IDs forward.
+- J1 already owns low-cardinality HTTP latency telemetry and J2 already owns load-window validity, so J8 reuses J2 rather than cloning measurement logic.
+- J8 creates one fully local synthetic Provider fixture but runs the real LOCAL `DownloadScheduler`, `MediaRequestGate`, SQLite progress persistence and filesystem writes.
+- The fixture makes no Pica/E-H/WebDAV/external network requests and exports no credentials.
+- A valid J8 window requires both full J2 `local-download-runner` coverage and at least one real fixture file write during the measured interval.
+- Output is machine-readable and threshold-free. Hosted CI timing remains harness validation only, and the workload is not promoted as Provider throughput evidence.
+- Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
 
 ## 2026-09-26 — P2-J7 Recommendation generation and batch switching are separate benchmarks
 

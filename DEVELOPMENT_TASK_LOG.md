@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J9 merged; J10 source/contract accepted and merge-ready; real-model/representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J10 merged; J11 source/harness accepted and merge-ready; real-model/representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -515,6 +515,24 @@ J9 merged (PR #187):
 - production dependencies and lockfile remain unchanged;
 - CI is harness validation only and no WebDAV/provider latency budget is selected.
 - Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
+
+J10 merged (PR #188):
+- final pre-merge head `f4db47bdbdab1e1ceb342b1385cba3dea18ddf44` passed all 17 triggered workflows; merge commit is `fd471b22280d0c67e2a9015cec9ab9190b9239cd`;
+- automated acceptance remains source/contract only: the real DINOv2 run still requires explicit `--allow-model-network` and representative hardware;
+- the harness measures the real browser Visual worker and does not fabricate a backend `cpu-model` lease;
+- cold/bootstrap evidence is separated from warm-inference foreground navigation/RAF observations;
+- hosted CI does not silently download the model and no Visual performance budget is selected.
+- Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
+
+J11 source/harness accepted (PR #189 merge-ready):
+- first full validation head `55d62f6edce2fb8780fc8ab4e12968cb1201ab87` passed all 18 triggered workflows;
+- hosted smoke confirmed both task types covered 24/24 foreground samples, with 7 real LOCAL writes and 6 real WebDAV requests inside the measured window;
+- combines the accepted J8 LOCAL download and J9 WebDAV workload patterns in one Desktop process;
+- both production owners share one observe-only `RuntimeResourceCoordinator`;
+- J2 accepts a foreground window only when `local-download-runner` and `remote-storage-sync` both cover every recorded sample;
+- independent validity checks require real LOCAL `appendFile()` writes and real WebDAV requests during the measured wall-clock interval;
+- the workload is fully local/deterministic and selects no latency/concurrency budget.
+- Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1273,19 +1291,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
 
 ## NEXT-20 — P2-J10 Desktop Visual indexing foreground impact
-**Status: SOURCE/CONTRACT_ACCEPTED — PR #188 / MERGE_READY / REAL_MODEL_EXTERNAL_EVIDENCE_REQUIRED**
+**Status: DONE — PR #188 / REAL_MODEL_EXTERNAL_EVIDENCE_REQUIRED**
 
-- First full validation head `2a6840cbd359434bff165408fdb24b5b095b6cae` passed all 17 triggered workflows, including the dedicated J10 source-contract gate, P2-L, normal CI, J3–J9 regressions, Android recovery/memory gates and all experimental packages.
-- Automated acceptance is source/contract only; no real DINOv2 timing is claimed until explicit `--allow-model-network` evidence is collected.
-- Measure the actual browser-side Visual indexing workload; do not synthesize a `cpu-model` RuntimeResourceCoordinator lease that the production Visual path does not currently own.
-- Preserve the product architecture: `visual-worker.js` performs Transformers.js image-feature extraction off the main thread.
-- Reuse the real `onnx-community/dinov2-small` / Transformers.js 4.2.0 runtime contract when collecting true Visual-load evidence.
-- Separate cold model/bootstrap/network + first persistence from repeated warm inference.
-- Reuse the J4/J5/J6 Playwright foreground measurement plane rather than creating a second browser timing implementation.
-- Count navigation/RAF samples only when the warm inference sequence remains active for the whole observation window.
-- Require the exact local fixture to leave Visual pending state before cold-phase acceptance.
-- Hosted CI validates source/harness contracts only; real execution requires explicit `--allow-model-network`.
+- J10 source/contract harness is merged at `fd471b22280d0c67e2a9015cec9ab9190b9239cd`.
+- Final pre-merge head passed the dedicated Visual contract gate, P2-L, normal CI, J3–J9 regressions, Android recovery/memory gates and all experimental package workflows.
+- Automated acceptance does not claim real DINOv2 timing; explicit `--allow-model-network` representative-machine evidence remains P2-K work.
 - Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
+
+## NEXT-21 — P2-J11 Desktop overlapping-task foreground latency
+**Status: SOURCE/HARNESS_ACCEPTED — PR #189 / MERGE_READY**
+
+- Reuse J2 as the only foreground latency/window authority.
+- Run production LOCAL DownloadScheduler and production RemoteStorageDesktopManager WebDAV sync concurrently through one shared observe-only RuntimeResourceCoordinator.
+- Require `local-download-runner` and `remote-storage-sync` to cover every accepted foreground sample.
+- Independently require real LOCAL filesystem writes and real WebDAV requests during the measured interval.
+- Reuse the J9 temporary pinned `webdav-server@2.6.2` tool environment; do not add a production dependency.
+- CI validates controlled contention harness execution only; no P2-C3 capacity or P2-K latency threshold is selected.
+- Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1299,6 +1321,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J11 overlaps two real task owners before any concurrency enforcement
+
+State update:
+- J10 Visual source/contract harness is merged as PR #188 at `fd471b22280d0c67e2a9015cec9ab9190b9239cd`; final pre-merge head passed 17/17 workflows.
+- The remaining local automation-friendly P2-J gap is explicit task-concurrency behavior.
+- J11 combines production LOCAL download and production WebDAV sync rather than inventing generic CPU/network stress.
+- Both tasks receive the same process-shared observe-only RuntimeResourceCoordinator, preserving the P2-C evidence-first rule.
+- J2 requires both `local-download-runner` and `remote-storage-sync` to cover every foreground sample; J11 separately proves actual LOCAL file writes and actual WebDAV requests occurred inside the same measurement window.
+- The J9 temporary open-source WebDAV tool runner is generalized by benchmark-script selection while J9 remains the default, avoiding duplicated tool-install logic.
+- J11 is controlled contention evidence only. No concurrency capacity, throttling rule or latency budget is authorized until P2-K representative hardware evidence exists.
+- Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## 2026-09-26 — P2-J10 measures the real browser Visual worker, not a synthetic cpu-model lease
 

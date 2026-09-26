@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1 Windows x64 reference evidence collection tooling candidate; no budgets selected**
+**Status: IN_PROGRESS — K1 merged; K2 Android physical evidence session tooling candidate; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -558,15 +558,22 @@ Initial budgets should be evidence-driven; do not invent flattering thresholds b
 - checked-in benchmark report with environment and variance;
 - regressions above approved budget fail or at minimum block release promotion.
 
-K1 candidate:
-- adds a Windows x64 reference collector over safe deterministic J3/J4/J5/J6/J7A/J8/J9/J11 scenarios;
-- J10 real Visual model is explicit opt-in via `-IncludeVisual`; J7B real Provider regeneration remains separate and is never called automatically;
-- captures commit/dirty state, Windows/CPU/RAM/GPU/refresh-rate/power-plan/Node/pnpm metadata;
-- builds a SHA-256 indexed `p2k-evidence-manifest.json` over raw result files and run statuses;
-- refuses dirty-tree promotion by default;
-- explicitly keeps `budgetSelected=false` and `concurrencyCapacitySelected=false`;
-- tooling merge does not satisfy P2-K without repeated representative Windows/Android/real-provider evidence.
+K1 merged (PR #190):
+- Windows x64 reference collector is merged at `7b09fa1943512c9b631b86eb52c993287832a7f1`;
+- final K1 head passed its evidence-kit contract plus P2-L, CI, Desktop benchmark regressions and Android runtime gates;
+- deterministic J3/J4/J5/J6/J7A/J8/J9/J11 scenarios are bundled with commit/environment metadata and SHA-256 manifest;
+- J10 real Visual remains explicit opt-in and J7B real Provider regeneration remains separate;
+- no performance or concurrency budget was selected.
 - Detailed boundary: `docs/P2K_REFERENCE_EVIDENCE_K1.md`.
+
+K2 candidate:
+- stages G18 idle baseline and G19 real recommendation-loaded Macrobenchmark on one physical Android device and exact commit;
+- rejects emulator/generic devices, cross-device/cross-commit sessions and dirty-tree promotion by default;
+- stores a SHA-256 device identity instead of raw adb serial in the K2 evidence copy;
+- reuses the generic P2-K SHA-256 manifest while preserving K1's default Windows evidence type;
+- CI validates only script/contracts; physical timings are never generated or promoted by CI;
+- explicit real download/Reader loaded scenarios remain external and may not be replaced with synthetic media.
+- Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
 
 ## P2-L — Runtime hardening regression gate
 **Status: AUTOMATED_GATE_PASS / MERGED — PR #178; P2 exit remains blocked by external evidence**
@@ -1318,15 +1325,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## NEXT-22 — P2-K K1 Windows x64 reference evidence collection tooling
-**Status: K1_CANDIDATE**
+**Status: DONE — PR #190**
 
-- Provide one reproducible Windows x64 collector for deterministic J3/J4/J5/J6/J7A/J8/J9/J11 evidence.
-- Require clean git authority by default and record commit + hardware/runtime environment.
-- Hash every raw evidence file into one machine-readable manifest.
-- Keep J10 real-model collection explicit opt-in and J7B real Provider regeneration separate.
-- Do not choose budgets or concurrency capacities in K1.
-- K1 remains tooling only until representative evidence bundles are actually collected and reviewed.
+- K1 collector is merged at `7b09fa1943512c9b631b86eb52c993287832a7f1`.
+- It standardizes deterministic Windows x64 evidence bundles but does not itself provide representative measurements.
+- J10 real-model and J7B real-Provider collection remain explicit opt-ins/separate evidence.
 - Detailed boundary: `docs/P2K_REFERENCE_EVIDENCE_K1.md`.
+
+## NEXT-23 — P2-K K2 Android physical-device evidence session tooling
+**Status: K2_CANDIDATE**
+
+- Reuse the accepted G18/G19 Macrobenchmarks; do not create synthetic Provider/media load.
+- Pair G18 idle and G19 real recommendation-loaded evidence on the same physical device and exact commit.
+- Reject emulator/generic device evidence and dirty-tree promotion by default.
+- Hash device identity in the evidence bundle and use the shared P2-K manifest format.
+- Physical execution remains external; CI validates script/contracts only.
+- Real download/Reader loaded scenarios remain separately required with explicit user-selected real inputs.
+- Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1340,6 +1355,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-K K2 pairs physical Android baseline and real loaded evidence without synthetic media
+
+State update:
+- K1 Windows x64 evidence collection tooling is merged as PR #190 at `7b09fa1943512c9b631b86eb52c993287832a7f1`; tooling merge did not create a performance verdict.
+- K2 reuses the accepted G18 idle and G19 real Native Recommendation loaded Macrobenchmarks instead of creating another Android timing implementation.
+- One K2 evidence session is bound to the exact git commit and one physical-device identity; emulator/generic devices, device changes and commit changes are rejected.
+- The copied evidence redacts raw adb serial and retains only SHA-256 identity for same-device verification.
+- G19 remains a true real-source precondition: `prepare-loaded` installs/opens the benchmark app, then a human configures the real Pica source/candidate base before `loaded`.
+- CI may parse the K2 script and validate manifest contracts only. Emulator/shared-runner timings are not Android P2-K evidence.
+- Explicit real download-loaded navigation, recommendation+download overlap, Reader-loaded interaction and long Reader evidence remain external requirements and may not be substituted with synthetic media.
+- No P2-C3 capacity or performance budget is selected by K2.
+- Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
 
 ## 2026-09-26 — P2-K K1 standardizes reference evidence before any budget decision
 

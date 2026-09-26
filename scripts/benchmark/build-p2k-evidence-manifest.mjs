@@ -34,6 +34,11 @@ function filesRecursively(root) {
 
 const rootArg = option('root')
 const commit = String(option('commit') ?? '').trim()
+const evidenceType = String(
+    option('evidence-type') ?? 'p2-k-windows-x64-reference'
+).trim()
+if (!/^[a-z0-9][a-z0-9-]{2,80}$/.test(evidenceType))
+    throw new Error('--evidence-type is invalid')
 if (!rootArg) throw new Error('--root is required')
 if (!/^[0-9a-f]{40}$/i.test(commit))
     throw new Error('--commit must be a 40-character git SHA')
@@ -51,6 +56,22 @@ const environment = readJson(environmentFile)
 const status = readJson(statusFile)
 if (String(environment.commit ?? '') !== commit || String(status.commit ?? '') !== commit)
     throw new Error('P2-K evidence commit mismatch between manifest inputs')
+if (
+    environment.evidenceType &&
+    String(environment.evidenceType) !== evidenceType
+)
+    throw new Error('P2-K environment evidence type does not match requested manifest type')
+if (status.evidenceType && String(status.evidenceType) !== evidenceType)
+    throw new Error('P2-K run-status evidence type does not match requested manifest type')
+if (evidenceType === 'p2-k-android-physical-reference') {
+    if (
+        environment.physicalDeviceRequired !== true ||
+        environment.emulatorAccepted !== false
+    )
+        throw new Error('Android P2-K evidence must declare physical-device-only policy')
+    if (!/^[0-9a-f]{64}$/i.test(String(environment?.device?.serialSha256 ?? '')))
+        throw new Error('Android P2-K evidence requires a hashed physical-device identity')
+}
 
 const manifestName = 'p2k-evidence-manifest.json'
 const files = filesRecursively(root)
@@ -78,18 +99,32 @@ const files = filesRecursively(root)
     })
 
 const runs = Array.isArray(status.runs) ? status.runs : []
-const complete = runs.length > 0 && runs.every((run) => {
+function successfulRun(run) {
     const output = path.join(root, String(run.output ?? ''))
     return (
         Number(run.exitCode) === 0 &&
         run.outputExists === true &&
         fs.existsSync(output)
     )
+}
+const allRecordedRunsSuccessful =
+    runs.length > 0 && runs.every((run) => successfulRun(run))
+const androidRequiredRunIds = [
+    'G18_IDLE',
+    'G19_RECOMMENDATION_LOADED'
+]
+const androidRequiredRunsComplete = androidRequiredRunIds.every((id) => {
+    const run = runs.find((item) => item?.id === id)
+    return Boolean(run && successfulRun(run))
 })
+const complete =
+    evidenceType === 'p2-k-android-physical-reference'
+        ? allRecordedRunsSuccessful && androidRequiredRunsComplete
+        : allRecordedRunsSuccessful
 
 const manifest = {
     schemaVersion: 1,
-    evidenceType: 'p2-k-windows-x64-reference',
+    evidenceType,
     generatedAt: new Date().toISOString(),
     commit,
     dirty: status.dirty === true,
@@ -99,13 +134,24 @@ const manifest = {
     environment,
     runStatus: status,
     files,
-    externalEvidenceStillRequired: [
-        'J7B real Provider regeneration with approved provider/network context',
-        'J10 repeated representative cold-cache and warm-cache real-model evidence',
-        'Android representative physical-device G18/G19 evidence',
-        'Android explicit real download and Reader loaded scenarios',
-        'manual Windows and Android task-control acceptance'
-    ],
+    externalEvidenceStillRequired:
+        evidenceType === 'p2-k-android-physical-reference'
+            ? [
+                  'repeated representative Android physical-device runs',
+                  'Android explicit real download-loaded navigation',
+                  'Android recommendation + real download overlap',
+                  'Android Reader interaction under representative background load',
+                  'Android long Reader memory/jank evidence',
+                  'manual Android task-control acceptance',
+                  'Windows K1 and real Provider/Visual evidence review'
+              ]
+            : [
+                  'J7B real Provider regeneration with approved provider/network context',
+                  'J10 repeated representative cold-cache and warm-cache real-model evidence',
+                  'Android representative physical-device G18/G19 evidence',
+                  'Android explicit real download and Reader loaded scenarios',
+                  'manual Windows and Android task-control acceptance'
+              ],
     warning:
         'This manifest is an evidence bundle index, not a performance verdict. Thresholds and resource capacities remain unset until representative evidence is reviewed.'
 }

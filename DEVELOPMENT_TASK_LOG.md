@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J7 merged; J8 controlled active-download foreground latency candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J7 merged; J8 source/harness accepted and merge-ready; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -495,7 +495,8 @@ J7 merged (PR #184):
 - J7B is never faked on hosted runners and no J7 threshold is selected.
 - Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
 
-J8 candidate:
+J8 source/harness accepted (PR #186 merge-ready):
+- first full validation head `49378566d15e369b8a31ccd9732532b80e6e63a1` passed all 15 triggered workflows, including dedicated J8, P2-L, normal CI, J3–J7 regressions, Android recovery/memory gates and all experimental packages;
 - refactors J2 into a reusable `runHttpLatencyScenario(...)` function while preserving its CLI and one authoritative load-window validity rule;
 - starts a fully local deterministic synthetic Provider adapter but runs the real production LOCAL `DownloadScheduler`, `MediaRequestGate`, SQLite progress writes and filesystem writes;
 - requires `local-download-runner` to cover every foreground J2 sample and separately requires actual `appendFile()` writes during the measured window;
@@ -1245,7 +1246,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
 
 ## NEXT-18 — P2-J8 Desktop active-download foreground latency
-**Status: J8_CANDIDATE**
+**Status: SOURCE/HARNESS_ACCEPTED — PR #186 / MERGE_READY**
 
 - Reuse J1/J2 telemetry/window validity instead of cloning latency logic.
 - Start a real production LOCAL download runner against a deterministic local synthetic Provider adapter.

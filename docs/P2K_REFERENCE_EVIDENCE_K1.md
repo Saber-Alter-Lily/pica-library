@@ -1,6 +1,6 @@
 # P2-K Reference Evidence Collection — K1
 
-Status: **collection-tooling candidate / no performance budgets selected**
+Status: **SOURCE/CONTRACT PASS / merged as PR #190 / representative execution required / no performance budgets selected**
 
 ## Purpose
 

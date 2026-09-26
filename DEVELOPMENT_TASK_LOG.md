@@ -1071,7 +1071,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - **G16 finding 1:** PicaLibraryApp had no trim-memory handling while CoverRepository and ImageRepository could each retain up to 72 MiB of decoded Bitmaps.
 - **G16 memory correction:** Application.onTrimMemory now evicts only reconstructible in-memory Bitmap LRUs at UI_HIDDEN/background pressure; encoded disk caches and durable work are untouched. Robolectric + real `am send-trim-memory ... HIDDEN` evidence cover this boundary.
 - **G16 finding 2:** Android durable work still used WorkManager 2.9.1, predating Android 15 SDK/network/foreground-timeout fixes. G16 upgrades both runtime and work-testing to stable 2.12.0 while preserving the G14/G15 recovery suite.
-- **G16 merged (PR #170):** normal CI, direct-upgrade, G15 force-stop regression and the API-35 HIDDEN/Doze gate all passed. Generic trim-memory and Doze defer/resume evidence is accepted.
+- **G16 merged (PR #170):** normal CI, direct-upgrade, G15 force-stop regression and the API-35 HIDDEN/Doze gate all passed. Generic trim-memory and Doze defer/durable-recovery evidence is accepted; no fixed post-Doze JobScheduler dispatch SLA is claimed.
 - **G17 merged (PR #171):** AndroidTaskResources provides observe-only resource tags and de-duplicated RUNNING/ENQUEUED-BLOCKED snapshots for RT-17–RT-20 without changing scheduling, concurrency or task controls.
 - Current classes: provider-network, media-network, bridge-network, cpu-analysis, filesystem-heavy.
 - A debug-only ADB collector writes an app-private JSON snapshot for representative-device overlap sampling; it is absent from release UI/manifest.
@@ -1119,6 +1119,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — G16 post-Doze gate corrected for OS-controlled JobScheduler timing
+
+State update:
+- I2 PR #177 exposed a G16 test-harness assumption after GitHub runners began using Android Emulator 37.1.11: the probe stayed durable through forced Doze, but the OS did not dispatch it within the old fixed 60 s post-unforce window.
+- The failure was isolated to the existing G16 emulator gate; I2 Desktop code passed the other seven CI/platform gates.
+- Android does not guarantee a fixed background JobScheduler dispatch latency immediately after leaving Doze, so the old 60 s requirement was stronger than the application contract.
+- G16 now continues to require zero probe execution while forced idle.
+- After unforce, the gate briefly observes natural background dispatch; if no dispatch occurs, it performs a normal launcher re-entry and requires the same already-seeded WorkRequest to execute.
+- No `jobscheduler run -f` or equivalent forced scheduler execution is used.
+- The result artifact records whether recovery was `background-auto` or `launcher-reentry`.
+- Product WorkManager code and G16 resource/Doze semantics are unchanged; only the evidence harness is corrected.
 
 ## 2026-09-25 — P2-I2 external Desktop task diagnostics
 
@@ -1228,7 +1240,7 @@ State update:
 - G16 also upgrades WorkManager runtime/testing from 2.9.1 to stable 2.12.0. This crosses the Android 15 compatibility fixes for dataSync foreground timeout handling, blocked-network constraint tracking and background network execution.
 - Existing durable network families remain WorkManager-owned with CONNECTED/UNMETERED constraints; no new raw service scheduler is introduced.
 - The real emulator gate primes both Bitmap LRUs, sends ActivityManager HIDDEN trim in the same PID and requires both memory sizes to reach zero.
-- The same API-35 emulator then enqueues a delayed network-constrained debug Worker, forces Doze past the eligibility boundary, requires zero execution while idle, exits Doze and requires the Worker to execute.
+- The same API-35 emulator then enqueues a delayed network-constrained debug Worker, forces Doze past the eligibility boundary and requires zero execution while idle. After unforce, the gate first observes natural background dispatch and, if the OS has not scheduled it yet, performs a normal launcher re-entry and requires the same durable WorkRequest to execute. This validates durability/recovery without inventing a fixed JobScheduler latency SLA.
 - Debug probes remain outside the release manifest.
 - OEM battery managers, Android 16+ long-running Worker quota behavior, foreground-notification reconstruction on representative devices and enforceable concurrency budgets remain later evidence gates.
 - Detailed boundary: `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`.

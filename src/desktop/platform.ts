@@ -69,7 +69,7 @@ export function defaultDesktopRoot(
             'Pica Library'
         )
     if (platform === 'darwin')
-        return path.join(
+        return path.posix.join(
             home,
             'Library',
             'Application Support',
@@ -77,9 +77,9 @@ export function defaultDesktopRoot(
         )
     if (platform === 'linux')
         return environment.XDG_DATA_HOME
-            ? path.join(environment.XDG_DATA_HOME, 'pica-library')
-            : path.join(home, '.local', 'share', 'pica-library')
-    return path.join(home, '.pica-library')
+            ? path.posix.join(environment.XDG_DATA_HOME, 'pica-library')
+            : path.posix.join(home, '.local', 'share', 'pica-library')
+    return path.posix.join(home, '.pica-library')
 }
 
 export function browserLaunchSpec(

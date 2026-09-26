@@ -5,8 +5,8 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-26**  
-Authoritative repository baseline before the current unpublished RC candidate: `main@8d31d8a9c4f7c5a5786cbb60a01a6e267c8e2b4e` (P2-K5 / PR #194 merged)  
-Current critical-path work: **unpublished Windows/Android P2 RC final-head validation → representative manual/physical evidence**
+Authoritative repository baseline after unpublished RC packaging: `main@a6115aa2a9e60bf9e1c8a8f2e0ead9d02099a1de` (P2 RC / PR #195 merged)  
+Current critical-path work: **representative Windows/Android RC manual/physical evidence → K5 variance/budget review**
 
 ---
 
@@ -1417,7 +1417,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
 
 ## NEXT-27 — Unpublished P2 Windows/Android RC test packages
-**Status: SOURCE/ARTIFACT_ACCEPTED — PR #195 / FINAL_HEAD_VALIDATION_PENDING**
+**Status: DONE — PR #195**
 
 - Keep the public stable channel at v0.4.11; do not reserve or publish v0.4.12.
 - Derive an ephemeral candidate identity `0.4.11-p2rc.<source-sha>`.
@@ -1430,7 +1430,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Windows-host full-suite execution exposed and fixed host-dependent POSIX path simulation in macOS/Linux Desktop roots and macOS managed-browser discovery; POSIX chmod semantics are explicitly skipped on Windows.
 - Source/artifact acceptance: implementation head `7a66d02d1523cf4c603c4850b28e3b96aced63ef` passed all 25/25 PR workflows with zero failures.
 - Dedicated RC push run `36275848212` passed 3/3 jobs and produced Windows artifact `10916927763` and Android artifact `10917522055`.
-- Merge gate: the final documentation head must again pass the complete PR workflow matrix and the dedicated branch-push RC package run.
+- Final documentation head `957d0cdee9b0899f575255328557e5aa4edeef6a` passed all 25/25 PR workflows and the dedicated branch-push RC run `36276530774` passed 3/3 jobs; PR #195 merged as `a6115aa2a9e60bf9e1c8a8f2e0ead9d02099a1de`.
 - Detailed boundary: `docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md`.
 
 ## PARALLEL-1 — W5C PR #109
@@ -1445,6 +1445,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2 unpublished dual-client RC merged and ready for representative QA
+
+State update:
+- PR #195 final documentation head `957d0cdee9b0899f575255328557e5aa4edeef6a` passed all 25/25 triggered PR workflows with zero failures.
+- Final branch-push RC run `36276530774` passed 3/3 jobs and produced Windows artifact `10917613011` and Android artifact `10917238940`.
+- PR #195 merged as `a6115aa2a9e60bf9e1c8a8f2e0ead9d02099a1de`.
+- NEXT-27 is complete. The repository-side blocker to beginning isolated Windows/Android manual QA is removed.
+- Remaining P2 blockers are representative execution/evidence: K1 Windows measurements, K2/K3 physical Android, K4 human/OEM acceptance, J7B real Provider, J10 real Visual, low-end Windows trace, then K5 human variance/budget review.
+- No formal release, v0.4.12 reservation, stable OTA mutation or P2-C3 enforcement occurred.
 
 ## 2026-09-26 — P2 unpublished dual-client RC source/artifact contract accepted
 

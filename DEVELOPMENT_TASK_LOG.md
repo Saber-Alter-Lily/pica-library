@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J10 merged; J11 source/harness accepted and merge-ready; real-model/representative hardware evidence remains open**
+**Status: AUTOMATION_COMPLETE_EXTERNAL_EVIDENCE_REQUIRED — J1–J11 merged; representative hardware/real-model evidence moves to P2-K**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -524,8 +524,8 @@ J10 merged (PR #188):
 - hosted CI does not silently download the model and no Visual performance budget is selected.
 - Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
 
-J11 source/harness accepted (PR #189 merge-ready):
-- first full validation head `55d62f6edce2fb8780fc8ab4e12968cb1201ab87` passed all 18 triggered workflows;
+J11 merged (PR #189):
+- final pre-merge head `92cc8dc2d3687cacd0cd68203d88dc134885426e` passed all 18 triggered workflows; merge commit is `f954414b23ca5ca4409e9de56481593be17ad3fc`;
 - hosted smoke confirmed both task types covered 24/24 foreground samples, with 7 real LOCAL writes and 6 real WebDAV requests inside the measured window;
 - combines the accepted J8 LOCAL download and J9 WebDAV workload patterns in one Desktop process;
 - both production owners share one observe-only `RuntimeResourceCoordinator`;
@@ -535,7 +535,7 @@ J11 source/harness accepted (PR #189 merge-ready):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: PLANNED**
+**Status: IN_PROGRESS — K1 Windows x64 reference evidence collection tooling candidate; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -557,6 +557,16 @@ Initial budgets should be evidence-driven; do not invent flattering thresholds b
 **Acceptance**
 - checked-in benchmark report with environment and variance;
 - regressions above approved budget fail or at minimum block release promotion.
+
+K1 candidate:
+- adds a Windows x64 reference collector over safe deterministic J3/J4/J5/J6/J7A/J8/J9/J11 scenarios;
+- J10 real Visual model is explicit opt-in via `-IncludeVisual`; J7B real Provider regeneration remains separate and is never called automatically;
+- captures commit/dirty state, Windows/CPU/RAM/GPU/refresh-rate/power-plan/Node/pnpm metadata;
+- builds a SHA-256 indexed `p2k-evidence-manifest.json` over raw result files and run statuses;
+- refuses dirty-tree promotion by default;
+- explicitly keeps `budgetSelected=false` and `concurrencyCapacitySelected=false`;
+- tooling merge does not satisfy P2-K without repeated representative Windows/Android/real-provider evidence.
+- Detailed boundary: `docs/P2K_REFERENCE_EVIDENCE_K1.md`.
 
 ## P2-L — Runtime hardening regression gate
 **Status: AUTOMATED_GATE_PASS / MERGED — PR #178; P2 exit remains blocked by external evidence**
@@ -1299,15 +1309,24 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
 
 ## NEXT-21 — P2-J11 Desktop overlapping-task foreground latency
-**Status: SOURCE/HARNESS_ACCEPTED — PR #189 / MERGE_READY**
+**Status: DONE — PR #189**
 
-- Reuse J2 as the only foreground latency/window authority.
-- Run production LOCAL DownloadScheduler and production RemoteStorageDesktopManager WebDAV sync concurrently through one shared observe-only RuntimeResourceCoordinator.
-- Require `local-download-runner` and `remote-storage-sync` to cover every accepted foreground sample.
-- Independently require real LOCAL filesystem writes and real WebDAV requests during the measured interval.
-- Reuse the J9 temporary pinned `webdav-server@2.6.2` tool environment; do not add a production dependency.
-- CI validates controlled contention harness execution only; no P2-C3 capacity or P2-K latency threshold is selected.
+- J11 is merged at `f954414b23ca5ca4409e9de56481593be17ad3fc`.
+- Final pre-merge head passed all 18 triggered workflows.
+- Hosted overlap evidence confirmed both task types covered 24/24 foreground samples, with real LOCAL writes and WebDAV requests in the same window.
+- No P2-C3 concurrency capacity was selected.
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
+
+## NEXT-22 — P2-K K1 Windows x64 reference evidence collection tooling
+**Status: K1_CANDIDATE**
+
+- Provide one reproducible Windows x64 collector for deterministic J3/J4/J5/J6/J7A/J8/J9/J11 evidence.
+- Require clean git authority by default and record commit + hardware/runtime environment.
+- Hash every raw evidence file into one machine-readable manifest.
+- Keep J10 real-model collection explicit opt-in and J7B real Provider regeneration separate.
+- Do not choose budgets or concurrency capacities in K1.
+- K1 remains tooling only until representative evidence bundles are actually collected and reviewed.
+- Detailed boundary: `docs/P2K_REFERENCE_EVIDENCE_K1.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1321,6 +1340,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-K K1 standardizes reference evidence before any budget decision
+
+State update:
+- P2-J11 is merged as PR #189 at `f954414b23ca5ca4409e9de56481593be17ad3fc`; final pre-merge head passed 18/18 workflows.
+- P2-J local automation-friendly instrumentation is now complete from J1 through J11; remaining promotion evidence belongs to P2-K.
+- K1 creates a Windows x64 reference collector instead of manually copying benchmark numbers into prose.
+- The collector records exact commit/dirty state and machine/runtime context, runs deterministic local benchmark lanes, and builds a SHA-256 indexed evidence manifest.
+- K1 deliberately does not automate J7B real Provider regeneration because it mutates the active recommendation cycle and requires explicit confirmation.
+- K1 deliberately keeps J10 real model behind `-IncludeVisual` because model/CDN access is an external dependency whose cold/warm cache context must be explicit.
+- A merged K1 tool is not P2-K completion. Repeated representative Windows x64, physical Android and real-provider evidence must exist before proposing budgets or P2-C3 enforcement.
+- Detailed boundary: `docs/P2K_REFERENCE_EVIDENCE_K1.md`.
 
 ## 2026-09-26 — P2-J11 overlaps two real task owners before any concurrency enforcement
 

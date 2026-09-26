@@ -17,7 +17,9 @@ internal static class RcLauncher
             if (!File.Exists(runtime) || !File.Exists(entry))
                 throw new FileNotFoundException("The P2 RC runtime is incomplete. Extract the entire ZIP before starting Pica Library.");
 
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+            if (String.IsNullOrWhiteSpace(localAppData))
+                localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (String.IsNullOrWhiteSpace(localAppData))
                 throw new InvalidOperationException("Windows LocalAppData could not be resolved.");
             string rcHome = Path.Combine(localAppData, "Pica Library P2 RC");

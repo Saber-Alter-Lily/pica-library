@@ -30,8 +30,34 @@ function safeEnvironment(extra = {}) {
     return env
 }
 
+function optionValue(name) {
+    const prefix = `--${name}=`
+    const inline = process.argv.slice(2).find((arg) => arg.startsWith(prefix))
+    if (inline) return inline.slice(prefix.length)
+    const index = process.argv.indexOf(`--${name}`)
+    return index >= 0 ? process.argv[index + 1] : undefined
+}
+
+function benchmarkArguments() {
+    const script =
+        optionValue('benchmark-script') ??
+        'scripts/benchmark/desktop-webdav-load-harness.ts'
+    const args = []
+    for (let index = 0; index < process.argv.slice(2).length; index += 1) {
+        const current = process.argv.slice(2)[index]
+        if (current.startsWith('--benchmark-script=')) continue
+        if (current === '--benchmark-script') {
+            index += 1
+            continue
+        }
+        args.push(current)
+    }
+    return { script, args }
+}
+
 function main() {
-    const toolRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-j9-webdav-tool-'))
+    const benchmark = benchmarkArguments()
+    const toolRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-webdav-benchmark-tool-'))
     fs.writeFileSync(
         path.join(toolRoot, 'package.json'),
         JSON.stringify({ private: true }) + '\n',
@@ -55,8 +81,8 @@ function main() {
             [
                 'exec',
                 'tsx',
-                'scripts/benchmark/desktop-webdav-load-harness.ts',
-                ...process.argv.slice(2)
+                benchmark.script,
+                ...benchmark.args
             ],
             {
                 env: safeEnvironment({

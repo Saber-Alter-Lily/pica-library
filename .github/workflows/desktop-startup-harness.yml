@@ -1,0 +1,54 @@
+name: Desktop Startup Harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'scripts/benchmark/desktop-startup-harness.ts'
+      - 'test/unit/desktop-startup-benchmark-p2j3.test.ts'
+      - 'docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - 'package.json'
+      - '.github/workflows/desktop-startup-harness.yml'
+  pull_request:
+    paths:
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'scripts/benchmark/desktop-startup-harness.ts'
+      - 'test/unit/desktop-startup-benchmark-p2j3.test.ts'
+      - 'docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - 'package.json'
+      - '.github/workflows/desktop-startup-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  startup-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run Desktop startup harness smoke
+        run: >
+          pnpm benchmark:desktop-startup --
+          --rounds=2
+          --harness-validation-only
+          --output=test-results/desktop-startup/desktop-startup-benchmark.json
+      - name: Upload harness diagnostics
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-startup-harness-${{ github.run_id }}-${{ github.job }}
+          path: test-results/desktop-startup/
+          retention-days: 1
+          if-no-files-found: ignore

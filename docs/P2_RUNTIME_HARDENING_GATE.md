@@ -1,6 +1,14 @@
 # P2 Runtime Hardening Promotion Gate
 
-Status: **automated gate candidate / P2 promotion still requires external evidence**
+Status: **AUTOMATED_GATE_PASS / merged as PR #178 / P2 promotion still requires external evidence**
+
+Accepted implementation evidence:
+- PR #178 merged at `1ea23e52e538d0627b152c475a84a2ad05a96d07`;
+- P2 Runtime Hardening Promotion Gate self-test run `36214176210`: PASS;
+- normal CI `36214176155`: PASS;
+- Android Macrobenchmark build `36214176147`: PASS;
+- Android memory/background regression `36214176219`: PASS;
+- Android force-stop recovery regression `36214176209`: PASS.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-L Runtime hardening regression gate.

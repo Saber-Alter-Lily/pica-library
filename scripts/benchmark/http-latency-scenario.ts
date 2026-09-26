@@ -1,8 +1,9 @@
 import { performance } from 'node:perf_hooks'
+import { pathToFileURL } from 'node:url'
 
 type ScenarioMode = 'idle' | 'load'
 
-interface ScenarioOptions {
+export interface ScenarioOptions {
     baseUrl: string
     mode: ScenarioMode
     tasks: string[]
@@ -87,7 +88,7 @@ function normalizeBaseUrl(value: string) {
     return url.origin
 }
 
-function scenarioOptions(args = process.argv.slice(2)): ScenarioOptions {
+export function scenarioOptions(args = process.argv.slice(2)): ScenarioOptions {
     const values = parseArguments(args)
     const mode = (values.get('mode')?.at(-1) ?? 'idle') as ScenarioMode
     if (mode !== 'idle' && mode !== 'load')
@@ -326,8 +327,7 @@ function validateWindow(
     }
 }
 
-async function main() {
-    const options = scenarioOptions()
+export async function runHttpLatencyScenario(options: ScenarioOptions) {
     const desktop = await responseJson<{ csrfToken?: string }>(options.baseUrl, {
         method: 'GET',
         path: '/api/v1/desktop/status'
@@ -403,13 +403,22 @@ async function main() {
         rounds,
         validWindows: rounds.filter((round) => round.valid).length
     }
-    console.log(JSON.stringify(output, null, 2))
-    if (rounds.some((round) => !round.valid)) process.exitCode = 2
+    return output
 }
 
-main().catch((error) => {
-    console.error(
-        error instanceof Error ? error.message : String(error)
-    )
-    process.exitCode = 1
-})
+async function main() {
+    const output = await runHttpLatencyScenario(scenarioOptions())
+    console.log(JSON.stringify(output, null, 2))
+    if (output.rounds.some((round) => !round.valid)) process.exitCode = 2
+}
+
+if (
+    process.argv[1] &&
+    import.meta.url === pathToFileURL(process.argv[1]).href
+)
+    main().catch((error) => {
+        console.error(
+            error instanceof Error ? error.message : String(error)
+        )
+        process.exitCode = 1
+    })

@@ -36,7 +36,10 @@ describe('P2-L runtime hardening promotion gate', () => {
 
         expect(workflow).toContain('Prepare previous accepted Windows package')
         expect(workflow).toContain(
-            'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'
+            "$releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'"
+        )
+        expect(workflow).not.toContain(
+            "$releases = @(Invoke-RestMethod"
         )
         expect(workflow).toContain("'artifacts\\release-base'")
         expect(workflow).toContain('Previous accepted Windows asset missing')

@@ -258,7 +258,7 @@ async function main() {
                 bytesPerChunk: config.bytesPerChunk,
                 chunkDelayMs: config.chunkDelayMs,
                 totalBytesWritten: totalWritten,
-                writesDuringMeasuredWindow
+                writesDuringMeasuredWindow: writesDuringWindow
             },
             download: {
                 status: terminal.status,

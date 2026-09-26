@@ -31,7 +31,9 @@ describe('P2 J7 controlled active-download latency harness', () => {
         expect(j7).toContain('globalMediaConcurrency: 1')
         expect(j7).toContain('jobConcurrency: 1')
         expect(j7).toContain('fs.promises.appendFile(output, chunk)')
-        expect(j7).toContain('writesDuringMeasuredWindow')
+        expect(j7).toContain(
+            'writesDuringMeasuredWindow: writesDuringWindow'
+        )
         expect(j7).toContain(
             'J7 measurement window contained no real fixture file writes'
         )

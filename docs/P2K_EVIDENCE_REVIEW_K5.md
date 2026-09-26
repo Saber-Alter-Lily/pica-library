@@ -1,6 +1,6 @@
 # P2-K Evidence Review / Completeness Audit — K5
 
-Status: **candidate / source-contract validation pending / no budgets selected**
+Status: **SOURCE/CONTRACT_ACCEPTED — PR #194 / final-head validation pending / representative execution still required / no budgets selected**
 
 Parent:
 - P2-K real benchmark matrix;
@@ -184,6 +184,29 @@ The report therefore always retains:
 - `minimumRepetitionCountSelected=false`;
 - `budgetSelected=false`;
 - `concurrencyCapacitySelected=false`.
+
+## Automated source/contract acceptance
+
+The K5 implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f`
+passed all **19/19** triggered pull-request workflows before this documentation
+write.
+
+The passing matrix included:
+
+- dedicated P2-K Evidence Review K5 Contract;
+- K1/K2/K3/K4 evidence-kit contracts;
+- normal CI;
+- Desktop startup/Home/Detail/Reader/Recommendation/download/WebDAV/Visual/overlap regressions;
+- Android Macrobenchmark build;
+- Android force-stop recovery;
+- Android memory/background restriction acceptance;
+- the aggregate P2 Runtime Hardening Promotion Gate, including Windows package
+  smoke and its repeated Android durable-recovery jobs.
+
+This accepts the **K5 source and review contract only**. It does not claim that
+representative Windows/Android/Provider/model evidence is already present. The
+documentation head created by this acceptance write must also pass the complete
+triggered workflow matrix before PR #194 is merged.
 
 ## What remains external after K5 source acceptance
 

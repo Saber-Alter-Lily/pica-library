@@ -1,6 +1,8 @@
 # P2-K Android Real Download / Reader Evidence — K3
 
-Status: **SOURCE/CONTRACT PASS / PR #192 merge-ready / physical-device execution required / no budgets selected**
+Status: **SOURCE/CONTRACT PASS / merged as PR #192 / physical-device execution required / no budgets selected**
+
+Final pre-merge head `d1b191cd32f72336d0693d2ead93a9b28b3a5afc` passed all 17 triggered workflows; merged commit: `f5517a7c34eec06a6db66a11055ab9aa784316e7`.
 
 Accepted automated source/contract evidence on head `3792d8775d45c645d75a989cdee333283f3ea125`:
 - P2-K Android Real Load K3 Contract `36242654203`: PASS;

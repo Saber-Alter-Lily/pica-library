@@ -6,7 +6,7 @@
 
 Last reconciled: **2026-09-26**  
 Authoritative repository baseline before the current unpublished RC candidate: `main@8d31d8a9c4f7c5a5786cbb60a01a6e267c8e2b4e` (P2-K5 / PR #194 merged)  
-Current critical-path work: **unpublished Windows/Android P2 RC packaging → representative manual/physical evidence**
+Current critical-path work: **unpublished Windows/Android P2 RC final-head validation → representative manual/physical evidence**
 
 ---
 
@@ -612,7 +612,6 @@ K5 merged (PR #194):
 - when all categories are structurally present, the strongest automatic state is `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW`, never P2 complete;
 - K3 collection is hardened so download-loaded and Reader runs default to independent timestamped roots and only current-run artifacts are copied;
 - implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f` passed all 19/19 triggered workflows with zero failures, including dedicated K5/K1/K2/K3/K4 contracts, normal CI, Desktop J3–J11 regressions, Android recovery/background gates, Macrobenchmark build and the aggregate P2-L promotion gate;
-- implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f` passed all 19/19 triggered workflows with zero failures;
 - final documentation head `9989a47a835f442b7d7904ba9e2ec24e1f342db5` also passed 19/19 workflows with zero failures; PR #194 merged as `8d31d8a9c4f7c5a5786cbb60a01a6e267c8e2b4e`;
 - this accepts only the source/review contract; representative hardware/provider/model evidence remains external.
 - Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
@@ -1418,7 +1417,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
 
 ## NEXT-27 — Unpublished P2 Windows/Android RC test packages
-**Status: IN_PROGRESS — RC_PACKAGE_CANDIDATE**
+**Status: SOURCE/ARTIFACT_ACCEPTED — PR #195 / FINAL_HEAD_VALIDATION_PENDING**
 
 - Keep the public stable channel at v0.4.11; do not reserve or publish v0.4.12.
 - Derive an ephemeral candidate identity `0.4.11-p2rc.<source-sha>`.
@@ -1428,6 +1427,10 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Workflow permissions remain read-only; artifacts are GitHub Actions manual-QA outputs only.
 - Do not weaken the updater security boundary: stable v0.4.11 must not accept unpublished `local-test` packages.
 - Register public v0.4.11 as app API 2 / schema 13. Current development schema 16 must classify as `FULL_APPLICATION / SCHEMA_JUMP`; migration/rollback acceptance is separate from broad isolated RC QA.
+- Windows-host full-suite execution exposed and fixed host-dependent POSIX path simulation in macOS/Linux Desktop roots and macOS managed-browser discovery; POSIX chmod semantics are explicitly skipped on Windows.
+- Source/artifact acceptance: implementation head `7a66d02d1523cf4c603c4850b28e3b96aced63ef` passed all 25/25 PR workflows with zero failures.
+- Dedicated RC push run `36275848212` passed 3/3 jobs and produced Windows artifact `10916927763` and Android artifact `10917522055`.
+- Merge gate: the final documentation head must again pass the complete PR workflow matrix and the dedicated branch-push RC package run.
 - Detailed boundary: `docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md`.
 
 ## PARALLEL-1 — W5C PR #109
@@ -1442,6 +1445,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2 unpublished dual-client RC source/artifact contract accepted
+
+State update:
+- PR #195 implementation head `7a66d02d1523cf4c603c4850b28e3b96aced63ef` passed all 25/25 triggered pull-request workflows with zero failures.
+- Dedicated branch-push run `36275848212` passed `contract`, `windows-rc` and `android-rc`.
+- The run produced unpublished one-day manual-QA artifacts: Windows id `10916927763` (36,063,197 bytes) and Android id `10917522055` (4,110,039 bytes).
+- Windows broad QA uses the isolated `%LOCALAPPDATA%\Pica Library P2 RC` root. Android QA uses `com.picalibrary.android.dev`; neither replaces stable user state by default.
+- Stable `build-windows-package.ps1` remains unchanged. RC assembly lives in the dedicated `build-windows-rc-package.ps1` wrapper/repackager.
+- Windows full-suite execution exposed and fixed two host-dependent POSIX path bugs; the POSIX chmod test is now explicitly non-Windows.
+- Public stable remains v0.4.11. No v0.4.12 tag/release/update-channel mutation occurred.
+- This is source/artifact acceptance, not representative human/physical-device evidence. Final-head validation remains required before merge.
 
 ## 2026-09-26 — K5 merged; move critical path to unpublished dual-client RC
 

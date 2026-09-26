@@ -18,7 +18,8 @@ permissions:
   contents: read
 
 env:
-  P2_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  P2_TESTED_SHA: ${{ github.sha }}
+  P2_CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   desktop-contracts:
@@ -119,7 +120,7 @@ jobs:
       - name: Build and smoke current Windows package
         shell: pwsh
         env:
-          PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}
+          PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_TESTED_SHA }}
         run: |
           pnpm build:windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -250,7 +251,8 @@ jobs:
           node-version: '24'
       - name: Write machine-readable P2 gate report
         env:
-          P2_GATE_SHA: ${{ env.P2_CANDIDATE_SHA }}
+          P2_GATE_SHA: ${{ env.P2_TESTED_SHA }}
+          P2_GATE_CANDIDATE_HEAD_SHA: ${{ env.P2_CANDIDATE_HEAD_SHA }}
           P2_GATE_DESKTOP: ${{ needs.desktop-contracts.result }}
           P2_GATE_WINDOWS: ${{ needs.windows-package-smoke.result }}
           P2_GATE_ANDROID: ${{ needs.android-static.result }}

@@ -17,24 +17,26 @@ describe('P2-L runtime hardening promotion gate', () => {
         )
         expect(workflow).toContain('cancel-in-progress: true')
         expect(workflow).toContain(
-            'P2_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}'
+            'P2_TESTED_SHA: ${{ github.sha }}'
         )
         expect(workflow).toContain(
-            'PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}'
+            'P2_CANDIDATE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}'
         )
         expect(workflow).toContain(
-            '- name: Build and smoke current Windows package\n        shell: pwsh\n        env:\n          PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}'
+            'PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_TESTED_SHA }}'
+        )
+        expect(workflow).not.toContain(
+            '- name: Build and smoke current Windows package\n        shell: pwsh\n        env:\n          PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_TESTED_SHA }}'
         )
         expect(workflow).not.toContain(
             'windows-package-smoke:\n    runs-on: windows-latest\n    timeout-minutes: 45\n    env:\n      PICA_LIBRARY_BUILD_PROVENANCE'
         )
         expect(workflow).toContain(
-            'P2_GATE_SHA: ${{ env.P2_CANDIDATE_SHA }}'
+            'P2_GATE_SHA: ${{ env.P2_TESTED_SHA }}'
         )
-        expect(workflow).not.toContain(
-            'PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}'
+        expect(workflow).toContain(
+            'P2_GATE_CANDIDATE_HEAD_SHA: ${{ env.P2_CANDIDATE_HEAD_SHA }}'
         )
-        expect(workflow).not.toContain('P2_GATE_SHA: ${{ github.sha }}')
         expect(workflow).toContain('pnpm type:check')
         expect(workflow).toContain('pnpm web:check')
         expect(workflow).toContain('pnpm test')
@@ -113,6 +115,7 @@ describe('P2-L runtime hardening promotion gate', () => {
                         ...process.env,
                         P2_GATE_OUTPUT: output,
                         P2_GATE_SHA: 'a'.repeat(40),
+                        P2_GATE_CANDIDATE_HEAD_SHA: 'c'.repeat(40),
                         P2_GATE_DESKTOP: 'success',
                         P2_GATE_WINDOWS: 'success',
                         P2_GATE_ANDROID: 'success',
@@ -125,6 +128,8 @@ describe('P2-L runtime hardening promotion gate', () => {
             const report = JSON.parse(fs.readFileSync(output, 'utf8'))
             expect(report).toMatchObject({
                 schemaVersion: 1,
+                sourceSha: 'a'.repeat(40),
+                candidateHeadSha: 'c'.repeat(40),
                 automatedStatus: 'PASS',
                 promotionStatus:
                     'AUTOMATED_PASS_EXTERNAL_EVIDENCE_REQUIRED'

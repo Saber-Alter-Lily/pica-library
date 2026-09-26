@@ -24,9 +24,15 @@ Artifact:
 
 `Pica-Library-P2-RC-Windows-x64.zip`
 
-The Windows package is built from the normal production bundle, but only when
-`PICA_LIBRARY_UNPUBLISHED_RC=1` and the temporary package version matches the
-strict P2 RC pattern.
+The authoritative stable `scripts/build-windows-package.ps1` remains unchanged.
+
+The dedicated `scripts/build-windows-rc-package.ps1` first exercises that
+normal v0.4.11 full-package path against the checksum-pinned official v0.4.10
+baseline. It then unpacks the resulting application tree in an isolated
+temporary directory, temporarily injects the strict commit-derived RC version
+only while rebuilding the bundled JavaScript, restores `package.json` in a
+`finally` block, and replaces only the bundled application JavaScript plus the
+launcher needed for the isolated RC.
 
 The package uses `RcLauncher.cs`, which sets:
 

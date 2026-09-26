@@ -29,6 +29,7 @@ describe('P2 unpublished RC package contract', () => {
     const smoke = read('scripts/test-windows-artifact.ps1')
 
     expect(launcher).toContain('PICA_LIBRARY_DESKTOP_HOME')
+    expect(launcher).toContain('Environment.GetEnvironmentVariable("LOCALAPPDATA")')
     expect(launcher).toContain('Pica Library P2 RC')
     expect(launcher).toContain('PICA_LIBRARY_TEST_BUILD')
     expect(launcher).toContain('p2-unpublished-rc')

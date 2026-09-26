@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J4 merged; J5 real Chromium Detail/Shelf/Reader harness candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J5 merged; J6 Reader long-session retention harness candidate; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -461,7 +461,7 @@ J3 merged (PR #179):
 - J3 source/harness acceptance passed Desktop Startup Harness `36222961030`, normal CI `36222960972`, P2-L `36222961015`, Linux `36222960986`, macOS `36222961039`, Windows ARM64 `36222961116`, Docker `36222960967`, Macrobenchmark `36222961067`, G15 `36222960988`, and G16 `36222961046`.
 - Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
-J4 candidate:
+J4 merged (PR #180):
 - reuses pinned Playwright Chromium 1.63.0 from a temporary tool directory rather than adding it to production/project dependencies;
 - assumes a ready loopback Desktop engine so engine startup stays J3-owned;
 - prepares synthetic local Desktop configuration outside the measured browser window and isolates external Provider access behind a dead loopback proxy;
@@ -470,6 +470,24 @@ J4 candidate:
 - usable shell requires connected mode plus completed local Library count, not merely DOMContentLoaded;
 - CI runs only two `harnessValidationOnly` rounds and does not promote hosted-runner timing into P2-K.
 - Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
+
+J5 merged (PR #181):
+- uses a deterministic fully local Library/shelf/downloaded-Reader fixture through LibraryDatabase APIs;
+- measures Library→Detail, Shelves→list, Shelf→contents, Shelf→Reader and Reader→next chapter separately;
+- Reader readiness includes successful decode of every expected local image;
+- source/harness acceptance passed the dedicated J5 Chromium workflow, normal CI, P2-L gate, J3/J4 harnesses, Android Macrobenchmark and G15/G16 regressions;
+- hosted timing remains harness-only and no foreground budget is selected.
+- Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
+
+J6 candidate:
+- reuses the J5 isolated Desktop/Playwright/fixture runner rather than cloning setup and credential logic;
+- keeps one Chromium Reader session alive while repeatedly switching between two fully local chapters;
+- requests GC before periodic CDP memory samples and records Runtime heap, DOM counters and Layout/RecalcStyle counts;
+- records chapter-switch-to-usable latency every cycle;
+- records controlled-scroll requestAnimationFrame interval distributions as a descriptive main-thread cadence signal;
+- explicitly does not call CDP heap/DOM metrics full browser-process RSS or compositor jank;
+- CI runs only a short harness-validation session and does not select a memory/frame budget.
+- Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1187,16 +1205,25 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
 
 ## NEXT-15 — P2-J5 Desktop Chromium Detail/Shelf/Reader measurement
-**Status: J5_CANDIDATE**
+**Status: DONE — PR #181**
 
-- Reuse the J4 isolated built-Desktop + temporary Playwright toolchain; no project dependency/lockfile change.
-- Seed a fully local deterministic Library fixture before Desktop startup using LibraryDatabase APIs, not direct SQL.
-- Measure Library→Detail, Shelves→list, Shelf→contents, Shelf→local Reader and Reader→next chapter.
-- Reader readiness includes successful local page image decode, not only DOM insertion.
-- Keep Provider success out of the measurement with the same dead loopback proxy.
-- Reports expose only fixture shape, timing samples and environment; no comic/shelf IDs, URLs, credentials or temporary paths.
-- CI is harness-executability evidence only; no hosted-runner timing threshold is selected.
+- J5 local Detail/Shelf/Reader source and harness are merged.
+- Dedicated J5 Chromium, normal CI, P2-L, J3/J4, Android Macrobenchmark and G15/G16 gates all passed on the final head.
+- Hosted-runner timing remains harness-only; representative Windows x64 evidence is still required for P2-K.
 - Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
+
+## NEXT-16 — P2-J6 Desktop Reader long-session retention measurement
+**Status: J6_CANDIDATE**
+
+- Reuse J5 isolation, local fixture and Playwright install through the shared runner.
+- Keep one Chromium Reader session alive across repeated first↔second chapter switches.
+- Require full local image decode after every chapter transition.
+- Sample GC-normalized Chromium Runtime heap + DOM counters periodically.
+- Measure every chapter-switch readiness latency and controlled-scroll RAF interval distribution.
+- Report final-minus-baseline retention and peaks, but do not label these counters as full-process RSS.
+- Treat RAF cadence as descriptive main-thread observation, not compositor telemetry or an approved jank threshold.
+- CI runs a 6-cycle harness smoke only; no hosted-runner memory/frame budget is selected.
+- Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1210,6 +1237,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J6 Reader long-session retention harness
+
+State update:
+- J5 is merged as PR #181 at `faf06ad6267352f166c9629816920cce0e063231`.
+- J5 final head passed the dedicated Detail/Reader Chromium harness, normal CI, P2-L promotion gate, J3/J4 harnesses, Android Macrobenchmark build and G15/G16 regressions.
+- J6 is the next unblocked local measurement because Recommendation generation requires real Provider evidence and should not be simulated merely to fill the benchmark matrix.
+- The existing J5 isolated Desktop/credential/fixture/Playwright runner gains an optional benchmark-script argument; J5 remains the default.
+- J6 keeps one real Chromium Reader session alive across repeated local chapter transitions and uses CDP `HeapProfiler.collectGarbage`, `Runtime.getHeapUsage`, `Memory.getDOMCounters` and `Performance.getMetrics`.
+- J6 also records chapter-switch readiness latency and controlled-scroll `requestAnimationFrame` intervals.
+- CDP Runtime/DOM counters are explicitly not full browser-process RSS; RAF interval observations are explicitly not compositor telemetry.
+- CI is limited to a short 6-cycle harness validation and cannot establish P2-K memory/jank budgets.
+- Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
 
 ## 2026-09-26 — P2-J5 Desktop Detail/Shelf/Reader browser measurement
 

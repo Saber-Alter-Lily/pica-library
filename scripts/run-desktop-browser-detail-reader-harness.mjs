@@ -187,6 +187,9 @@ async function main() {
             'desktop-browser-detail-reader',
             'desktop-browser-detail-reader-benchmark.json'
         )
+    const benchmarkScript =
+        optionValue('benchmark-script') ??
+        'scripts/benchmark/desktop-browser-detail-reader-harness.mjs'
     const harnessValidationOnly =
         process.argv.includes('--harness-validation-only') ||
         process.env.PICA_BENCHMARK_HARNESS_ONLY === '1'
@@ -300,7 +303,7 @@ async function main() {
               })
 
         const benchmarkArgs = [
-            'scripts/benchmark/desktop-browser-detail-reader-harness.mjs',
+            benchmarkScript,
             `--base-url=${configured.instance.url}`,
             `--fixture=${fixtureFile}`,
             `--rounds=${rounds}`,

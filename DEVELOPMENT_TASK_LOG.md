@@ -1273,15 +1273,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
 
 ## NEXT-20 — P2-J10 Desktop Visual indexing foreground impact
-**Status: DESIGN_AUDIT_IN_PROGRESS**
+**Status: HARNESS_CANDIDATE / REAL_MODEL_EXTERNAL_EVIDENCE_REQUIRED**
 
 - Measure the actual browser-side Visual indexing workload; do not synthesize a `cpu-model` RuntimeResourceCoordinator lease that the production Visual path does not currently own.
 - Preserve the product architecture: `visual-worker.js` performs Transformers.js image-feature extraction off the main thread.
 - Reuse the real `onnx-community/dinov2-small` / Transformers.js 4.2.0 runtime contract when collecting true Visual-load evidence.
-- Separate model/bootstrap/network cost from repeated inference impact where practical.
+- Separate cold model/bootstrap/network + first persistence from repeated warm inference.
 - Reuse the J4/J5/J6 Playwright foreground measurement plane rather than creating a second browser timing implementation.
-- Hosted CI may validate source/harness contracts; model-download timing must not become a P2-K budget.
-- Detailed J10 boundary document pending implementation.
+- Count navigation/RAF samples only when the warm inference sequence remains active for the whole observation window.
+- Require the exact local fixture to leave Visual pending state before cold-phase acceptance.
+- Hosted CI validates source/harness contracts only; real execution requires explicit `--allow-model-network`.
+- Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**

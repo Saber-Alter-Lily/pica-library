@@ -1,0 +1,50 @@
+name: Desktop Visual Index Foreground Harness
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/benchmark/desktop-visual-index-harness.mjs'
+      - 'scripts/run-desktop-browser-detail-reader-harness.mjs'
+      - 'test/unit/desktop-visual-index-benchmark-p2j10.test.ts'
+      - 'web/visual-runtime.js'
+      - 'web/visual-worker.js'
+      - 'docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - 'package.json'
+      - '.github/workflows/desktop-visual-index-harness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark/desktop-visual-index-harness.mjs'
+      - 'scripts/run-desktop-browser-detail-reader-harness.mjs'
+      - 'test/unit/desktop-visual-index-benchmark-p2j10.test.ts'
+      - 'web/visual-runtime.js'
+      - 'web/visual-worker.js'
+      - 'docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - 'package.json'
+      - '.github/workflows/desktop-visual-index-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  visual-index-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run J10 source contracts
+        run: pnpm exec vitest run test/unit/desktop-visual-index-benchmark-p2j10.test.ts
+      - name: Explain real-model evidence boundary
+        run: |
+          echo "J10 CI intentionally does not download DINOv2."
+          echo "Real evidence requires benchmark:desktop-visual-index --allow-model-network."

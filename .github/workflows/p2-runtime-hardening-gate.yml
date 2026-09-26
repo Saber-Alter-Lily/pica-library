@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  P2_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   desktop-contracts:
     runs-on: ubuntu-latest
@@ -66,7 +69,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     env:
-      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -242,7 +245,7 @@ jobs:
           node-version: '24'
       - name: Write machine-readable P2 gate report
         env:
-          P2_GATE_SHA: ${{ github.sha }}
+          P2_GATE_SHA: ${{ env.P2_CANDIDATE_SHA }}
           P2_GATE_DESKTOP: ${{ needs.desktop-contracts.result }}
           P2_GATE_WINDOWS: ${{ needs.windows-package-smoke.result }}
           P2_GATE_ANDROID: ${{ needs.android-static.result }}

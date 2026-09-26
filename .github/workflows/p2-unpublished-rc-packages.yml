@@ -9,6 +9,7 @@ on:
       - 'mobile/android-alpha2/**'
       - 'packaging/windows/RcLauncher.cs'
       - 'scripts/build-windows-package.ps1'
+      - 'scripts/build-windows-rc-package.ps1'
       - 'scripts/test-windows-artifact.ps1'
       - 'test/unit/p2-unpublished-rc-package.test.ts'
       - 'docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'packaging/windows/RcLauncher.cs'
       - 'scripts/build-windows-package.ps1'
+      - 'scripts/build-windows-rc-package.ps1'
       - 'scripts/test-windows-artifact.ps1'
       - 'test/unit/p2-unpublished-rc-package.test.ts'
       - 'docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md'
@@ -55,7 +57,6 @@ jobs:
     timeout-minutes: 45
     env:
       PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
-      PICA_LIBRARY_UNPUBLISHED_RC: '1'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,7 +69,7 @@ jobs:
         with:
           version: '11.16.0'
           run_install: false
-      - name: Validate repository before candidate version injection
+      - name: Validate repository before RC assembly
         shell: pwsh
         run: |
           pnpm install --frozen-lockfile
@@ -79,20 +80,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download checksum-pinned v0.4.10 Windows baseline
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts\release-base | Out-Null
+          $name='Pica-Library-v0.4.10-windows-x64.zip'
+          $path=Join-Path 'artifacts\release-base' $name
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.10/$name" -OutFile $path
+          $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+          $expected='6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab'
+          if($actual -ne $expected){ throw "Official v0.4.10 package checksum mismatch: $actual" }
       - name: Build isolated Windows RC
         shell: pwsh
         run: |
           $short=$env:GITHUB_SHA.Substring(0,12)
           $rcVersion="0.4.11-p2rc.$short"
-          $env:RC_VERSION=$rcVersion
           "RC_VERSION=$rcVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.RC_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" 
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          pnpm build:windows
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $zip="artifacts\Pica-Library-v$rcVersion-local-test-windows-x64.zip"
+          ./scripts/build-windows-rc-package.ps1 -RcVersion $rcVersion -Output $zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path -LiteralPath $zip)) { throw 'Windows RC package was not created' }
 
           ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $rcVersion -DesktopHomeName 'Pica Library P2 RC' -PortCollision -SetupPersistence

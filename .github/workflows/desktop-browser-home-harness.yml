@@ -1,0 +1,57 @@
+name: Desktop Browser Home Harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'scripts/benchmark/desktop-browser-home-harness.mjs'
+      - 'scripts/run-desktop-browser-home-harness.mjs'
+      - 'test/unit/desktop-browser-home-benchmark-p2j4.test.ts'
+      - 'docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-browser-home-harness.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'scripts/benchmark/desktop-browser-home-harness.mjs'
+      - 'scripts/run-desktop-browser-home-harness.mjs'
+      - 'test/unit/desktop-browser-home-benchmark-p2j4.test.ts'
+      - 'docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-browser-home-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-home-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run Desktop Chromium Home/Library harness smoke
+        run: >
+          node scripts/run-desktop-browser-home-harness.mjs
+          --rounds=2
+          --harness-validation-only
+          --with-deps
+          --output=test-results/desktop-browser-home/desktop-browser-home-benchmark.json
+      - name: Upload J4 harness diagnostics
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-browser-home-${{ github.run_id }}-${{ github.job }}
+          path: test-results/desktop-browser-home/
+          retention-days: 1
+          if-no-files-found: ignore

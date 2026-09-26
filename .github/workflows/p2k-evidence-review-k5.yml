@@ -1,0 +1,50 @@
+name: P2-K Evidence Review K5 Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark/review-p2k-evidence.mjs'
+      - 'scripts/run-android-real-load-macrobenchmark.sh'
+      - 'test/unit/p2k-evidence-review-k5.test.ts'
+      - 'test/unit/p2k-android-real-load-k3.test.ts'
+      - 'docs/P2K_EVIDENCE_REVIEW_K5.md'
+      - 'docs/P2K_ANDROID_REAL_LOAD_K3.md'
+      - 'docs/P2K_MANUAL_ACCEPTANCE_K4.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-evidence-review-k5.yml'
+  pull_request:
+    paths:
+      - 'scripts/benchmark/review-p2k-evidence.mjs'
+      - 'scripts/run-android-real-load-macrobenchmark.sh'
+      - 'test/unit/p2k-evidence-review-k5.test.ts'
+      - 'test/unit/p2k-android-real-load-k3.test.ts'
+      - 'docs/P2K_EVIDENCE_REVIEW_K5.md'
+      - 'docs/P2K_ANDROID_REAL_LOAD_K3.md'
+      - 'docs/P2K_MANUAL_ACCEPTANCE_K4.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-evidence-review-k5.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-review-k5-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Parse K5 reviewer and K3 collector
+        run: |
+          node --check scripts/benchmark/review-p2k-evidence.mjs
+          bash -n scripts/run-android-real-load-macrobenchmark.sh
+      - name: Run K5 and K3 evidence contract tests
+        run: pnpm exec vitest run test/unit/p2k-evidence-review-k5.test.ts test/unit/p2k-android-real-load-k3.test.ts

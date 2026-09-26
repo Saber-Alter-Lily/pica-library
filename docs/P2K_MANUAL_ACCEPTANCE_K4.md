@@ -1,6 +1,6 @@
 # P2-K Manual Task-control / OEM Acceptance — K4
 
-Status: **SOURCE/CONTRACT_ACCEPTED — PR #193 / final-head validation pending / representative human execution required / no budgets selected**
+Status: **SOURCE/CONTRACT PASS / merged as PR #193 / representative human execution required / no budgets selected**
 
 Parent:
 - P2-L Windows manual task-control external blocker;
@@ -119,7 +119,9 @@ The K4 implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` passed all
 - Desktop J3–J11 benchmark regressions;
 - Android force-stop, memory/background and Macrobenchmark build gates.
 
-That automated result accepts the **source and evidence contract only**. It does not replace native-Windows or physical-Android human evidence. The documentation head created by this acceptance write must also pass the complete triggered workflow matrix before PR #193 is merged.
+That automated result accepts the **source and evidence contract only**. The final documentation head `a46c3d5567970434301a2c28800e5937b6fd732b` subsequently passed all **18/18** triggered workflows with zero failures, and PR #193 was merged as `9197e9935543c01915222ed106d492d837101b85`.
+
+This still does not replace native-Windows or physical-Android human evidence.
 
 ## Evidence boundary
 

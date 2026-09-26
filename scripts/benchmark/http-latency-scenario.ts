@@ -210,7 +210,19 @@ async function discoverLocalTargets(baseUrl: string) {
             chapters.length && typeof chapters[0].id === 'string'
                 ? chapters[0].id
                 : null
-        return { comicId, episodeId }
+        if (!episodeId) return { comicId, episodeId: null }
+        try {
+            await responseJson<unknown>(baseUrl, {
+                method: 'GET',
+                path: `/api/v1/reader/comics/${encodeURIComponent(comicId)}/chapters/${encodeURIComponent(episodeId)}`
+            })
+            return { comicId, episodeId }
+        } catch {
+            // A chapter may already be listed while an active download has not
+            // committed every local page yet. Reader detail belongs in the
+            // foreground set only after the normal local endpoint is readable.
+            return { comicId, episodeId: null }
+        }
     } catch {
         return { comicId, episodeId: null }
     }

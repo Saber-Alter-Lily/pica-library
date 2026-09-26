@@ -17,6 +17,10 @@ const report = {
     schemaVersion: 1,
     gate: 'P2-runtime-hardening-promotion',
     sourceSha: process.env.P2_GATE_SHA ?? null,
+    candidateHeadSha:
+        process.env.P2_GATE_CANDIDATE_HEAD_SHA ??
+        process.env.P2_GATE_SHA ??
+        null,
     generatedAt: new Date().toISOString(),
     automatedStatus: allAutomatedPass ? 'PASS' : 'FAIL',
     promotionStatus: allAutomatedPass

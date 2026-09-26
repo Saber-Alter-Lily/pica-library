@@ -35,6 +35,15 @@ describe('P2-K4 manual acceptance evidence tooling',()=>{
     expect(script).toContain('physicalDeviceRequired: true')
   })
 
+  it('makes direct-manifest bypasses retain platform and human authority',()=>{
+    const manifest=read('scripts/benchmark/build-p2k-evidence-manifest.mjs')
+    expect(manifest).toContain('manualAcceptanceEvidenceTypes')
+    expect(manifest).toContain('environment.manualAcceptance !== true')
+    expect(manifest).toContain('environment.humanJudgmentRequired !== true')
+    expect(manifest).toContain('environment.nativeWindowsRequired !== true')
+    expect(manifest).toContain('androidPhysicalEvidenceTypes.has(evidenceType)')
+  })
+
   it('makes manifest completeness depend on every required manual scenario',()=>{
     const manifest=read('scripts/benchmark/build-p2k-evidence-manifest.mjs')
     for(const id of [

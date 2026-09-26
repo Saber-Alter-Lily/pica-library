@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1/J2 implemented; J3 Desktop process startup/shutdown harness candidate; browser usable-Home and representative physical evidence remain open**
+**Status: IN_PROGRESS — J1/J2/J3 merged; J4 real Chromium Home/Library harness candidate; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -450,15 +450,26 @@ Add consistent measurement for:
 **Acceptance**
 - metrics are reproducible and emitted in machine-readable form where practical.
 
-J3 candidate:
+J3 merged (PR #179):
 - adds `pnpm benchmark:desktop-startup` over the real built `dist/desktop.js --headless` entry;
 - records a separate fresh-home sample, then repeated cold-process starts against the same isolated data root;
 - measures spawn → instance publication, spawn → identified local API readiness, shutdown response and shutdown → process exit;
 - emits raw samples plus min / median / max JSON summaries;
 - build time and Provider credentials are outside the measured window;
 - CI runs only a two-round `harnessValidationOnly` smoke; GitHub-runner milliseconds are not P2-K performance evidence;
-- browser open → usable Home/Library is intentionally deferred to J4 rather than approximated from static Web smoke.
+- browser open → usable Home/Library is intentionally deferred to J4 rather than approximated from static Web smoke;
+- J3 source/harness acceptance passed Desktop Startup Harness `36222961030`, normal CI `36222960972`, P2-L `36222961015`, Linux `36222960986`, macOS `36222961039`, Windows ARM64 `36222961116`, Docker `36222960967`, Macrobenchmark `36222961067`, G15 `36222960988`, and G16 `36222961046`.
 - Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
+
+J4 candidate:
+- reuses pinned Playwright Chromium 1.63.0 from a temporary tool directory rather than adding it to production/project dependencies;
+- assumes a ready loopback Desktop engine so engine startup stays J3-owned;
+- prepares synthetic local Desktop configuration outside the measured browser window and isolates external Provider access behind a dead loopback proxy;
+- every round launches a new Chromium process;
+- measures Chromium launch, navigation → usable Home shell, real Library-tab click → usable Library, and combined browser/navigation intervals;
+- usable shell requires connected mode plus completed local Library count, not merely DOMContentLoaded;
+- CI runs only two `harnessValidationOnly` rounds and does not promote hosted-runner timing into P2-K.
+- Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1164,6 +1175,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - After J3 acceptance, J4 should measure real Chromium navigation → usable Home/Library, then remaining Reader/loaded scenarios can feed P2-K.
 - Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
+## NEXT-14 — P2-J4 Desktop Chromium Home/Library measurement
+**Status: J4_CANDIDATE**
+
+- Keep engine startup outside the browser measurement; J3 remains the process-startup authority.
+- Prepare configured synthetic local Desktop state before timing and require no successful external Provider request.
+- Measure browser launch, navigation → usable Home shell, real Library-tab click → usable Library and end-to-end browser → Library intervals.
+- Use local Library-query completion (`#library-count`) as part of readiness rather than DOMContentLoaded.
+- Keep Playwright pinned in a temporary benchmark tool directory; no project dependency/lockfile change.
+- CI proves harness executability only; no browser-performance threshold is selected.
+- Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
+
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
 
@@ -1176,6 +1198,21 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-J4 real Desktop Chromium Home/Library measurement
+
+State update:
+- J3 is merged as PR #179 at `e4112a9c9cc1a7a654d1be16c2a197a21d5feb79` after the full startup-harness/platform/P2-L/Android regression matrix passed.
+- J4 keeps Desktop engine startup out of the browser timing window so J3 and J4 remain diagnostically separable.
+- J4 reuses Playwright Chromium 1.63.0 in a temporary tool root; project dependencies and lockfile remain unchanged.
+- The runner builds, starts an isolated headless Desktop engine, persists synthetic local settings through the real Desktop API, waits for configured restart, then starts browser measurement.
+- External Provider success is not a prerequisite: the synthetic setup uses a dead loopback proxy.
+- Every measured round launches a new Chromium process.
+- Shell readiness requires the Home view, visible nav, non-detecting mode and non-empty `#library-count`; DOMContentLoaded alone is insufficient.
+- Library readiness requires a real nav click, active Library view, populated Library count and enabled filter input.
+- Reports expose launch/navigation/Library timing distributions but no P2-K threshold.
+- CI is harness-only and may not promote Ubuntu hosted-runner numbers into reference Windows evidence.
+- Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
 
 ## 2026-09-25 — P2-J3 Desktop process cold-start measurement
 

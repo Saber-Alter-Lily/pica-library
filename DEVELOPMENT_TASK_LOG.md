@@ -1165,14 +1165,13 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2_RUNTIME_HARDENING_GATE.md`.
 
 ## NEXT-13 — P2-J3 Desktop process startup/shutdown measurement
-**Status: J3_CANDIDATE**
+**Status: DONE — J3 merged as PR #179**
 
-- Measure the built Desktop process rather than TypeScript dev startup.
-- Separate fresh-home initialization from repeated reused-home cold-process rounds.
-- Record instance publication, API readiness and graceful shutdown timings in machine-readable JSON.
-- Keep Provider credentials, build time and temporary data-root path out of measurement/output.
-- CI smoke proves harness executability only; no threshold is selected from hosted-runner timing.
-- After J3 acceptance, J4 should measure real Chromium navigation → usable Home/Library, then remaining Reader/loaded scenarios can feed P2-K.
+- Built Desktop process cold-start/shutdown harness is merged and source/harness acceptance passed.
+- Fresh-home initialization remains separated from reused-home cold-process rounds.
+- Instance publication, API readiness, shutdown response and shutdown→exit are machine-readable.
+- Provider credentials, build time and temporary data-root path remain outside measurement/output.
+- CI smoke validates harness execution only; hosted-runner timing is not promoted to a budget.
 - Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
 ## NEXT-14 — P2-J4 Desktop Chromium Home/Library measurement

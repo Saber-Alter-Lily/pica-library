@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current I1 candidate: `main@60abf3a17516e98ab6f4bda0e63af2908e926338` (P2-H3 / PR #175 merged)  
+Authoritative repository baseline before the current I2 candidate: `main@e4d508dea0d342f4f9b173a20520e69e8262b1b5` (P2-I1 / PR #176 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -380,7 +380,7 @@ Current reconciliation:
 - Detailed recovery matrix: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## P2-I — Observability without exposing internals to ordinary users
-**Status: IN_PROGRESS — I1 unified LibraryService task diagnostics candidate**
+**Status: IN_PROGRESS — I1 merged; I2 external Desktop owner adapters candidate**
 
 Internal diagnostics should expose:
 - task ID/type/state/phase;
@@ -394,22 +394,31 @@ Internal diagnostics should expose:
 Ordinary UI should expose only useful status, progress and actionable errors.
 
 Security:
-- no provider credentials, cookies, bearer tokens or sensitive local paths in normal diagnostic exports.
+- no provider credentials, cookies, bearer tokens or sensitive local paths in normal diagnostic exports;
+- providerRoute, when present, must be a fixed low-cardinality label and must never contain URL/host/account/path values.
 
 **Acceptance**
 - enough structured telemetry to diagnose “stuck” vs “slow” vs “waiting” vs “failed”;
 - diagnostic data follows existing credential-exclusion rules.
 
-I1 candidate:
-- adds a read-only adapter over existing task authorities; it does not create a second scheduler/registry;
+I1 merged (PR #176):
+- read-only adapter over existing task authorities; no second scheduler/registry;
 - Desktop-only `GET /api/v1/desktop/runtime/tasks`;
 - first batch covers Recommendation V3, Favorites, Maintenance Update/Repair/Organize, V5 Shadow, Work Identity evidence and aggregate LOCAL downloads;
 - unavailable task IDs/timestamps/control flags remain `null` instead of being synthesized;
 - current resource wait/run state is correlated from the existing RuntimeResourceCoordinator;
 - bounded error text redacts URLs, absolute paths, Bearer/token/password/cookie/authorization shapes;
-- endpoint is excluded from Remote API and from J1 HTTP latency samples;
-- external owners such as WebDAV/update/Browser Lite remain later owner-specific adapters.
-- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`.
+- endpoint is excluded from Remote API and from J1 HTTP latency samples.
+
+I2 candidate:
+- extends the same schema/endpoint to WebDAV, Browser Lite export, managed E-H login and software update;
+- external owners remain authoritative; Desktop main only aggregates snapshots;
+- WebDAV reuses the existing shared `remote-storage-sync` resource lease;
+- Browser Lite/E-H/updater do not receive invented resource leases/timestamps/IDs;
+- adds safe `providerRoute` labels only for `webdav`, `eh-managed-browser`, and `github-release`;
+- failed external-owner messages pass through the same I1 sanitizer;
+- Remote API/browser-session boundaries remain unchanged.
+- Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
 **Status: IN_PROGRESS — J1 runtime telemetry + J2 repeatable Desktop scenario harness implemented; startup/browser/Android measurements remain open**
@@ -1087,16 +1096,16 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## NEXT-11 — P2-I unified structured task diagnostics
-**Status: I1_CANDIDATE**
+**Status: I1_DONE / I2_CANDIDATE**
 
-- Add one safe read-only schema over existing task-owned status surfaces; do not create a second task authority.
-- First LibraryService batch covers eight logical task families.
-- Correlate resource waiting/running durations through the existing shared RuntimeResourceCoordinator.
-- Keep unavailable metadata null instead of guessing.
-- Redact secret/path-bearing error text.
-- Expose only through the local Desktop control plane and keep Remote API/browser-session boundaries unchanged.
-- Exclude the diagnostic endpoint from J1 latency samples.
-- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`.
+- **I1 merged (PR #176):** safe read-only schema + LibraryService-owned batch + Desktop-only endpoint.
+- I1 full CI/platform/Android regression matrix passed before merge.
+- **I2 candidate:** aggregate WebDAV, Browser Lite export, managed E-H login and software update without moving task authority.
+- Additive `providerRoute` is fixed/low-cardinality only; no configured URL/host/account/path values.
+- WebDAV correlates against the shared C2 resource coordinator; owners without a real lease remain resourceState=none.
+- Keep absent IDs/timestamps/control metadata null/false according to the actual owner rather than synthesizing them.
+- External failed messages reuse the I1 sanitizer.
+- Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1110,6 +1119,20 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-I2 external Desktop task diagnostics
+
+State update:
+- I1 is merged as PR #176 at `e4d508dea0d342f4f9b173a20520e69e8262b1b5` after the full CI/platform/Android regression matrix passed.
+- I2 keeps the I1 endpoint/schema authority model and extends it through a Desktop-controller aggregation layer rather than moving external owners into LibraryService.
+- External batch: WebDAV remote sync, Browser Lite export, managed E-H web login, software update.
+- WebDAV maps its authoritative `syncProgress` and the existing shared `remote-storage-sync` RuntimeResourceCoordinator lease.
+- Browser Lite only exposes the state/phase/completion timestamp it actually owns; missing start/update/resource metadata remains null/empty.
+- E-H `opening/verifying` normalize to running and `waiting` remains waiting; only failed message is treated as sanitized lastError.
+- Updater `staged` normalizes to waiting; apply/stage phases normalize to running; complete/failed stay terminal.
+- I2 adds additive `providerRoute` with fixed safe labels only: `webdav`, `eh-managed-browser`, `github-release`.
+- Remote API remains excluded; the existing Desktop-only endpoint is still excluded from J1 latency samples.
+- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## 2026-09-25 — P2-I1 unified LibraryService runtime task diagnostics
 

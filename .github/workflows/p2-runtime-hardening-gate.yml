@@ -10,6 +10,10 @@ on:
       - 'docs/P2_RUNTIME_HARDENING_GATE.md'
       - 'DEVELOPMENT_TASK_LOG.md'
 
+concurrency:
+  group: p2-runtime-hardening-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

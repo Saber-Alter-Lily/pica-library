@@ -1,0 +1,61 @@
+name: Desktop Browser Detail Reader Harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'src/services/reader-service.ts'
+      - 'scripts/benchmark/seed-desktop-browser-detail-reader-fixture.ts'
+      - 'scripts/benchmark/desktop-browser-detail-reader-harness.mjs'
+      - 'scripts/run-desktop-browser-detail-reader-harness.mjs'
+      - 'test/unit/desktop-browser-detail-reader-benchmark-p2j5.test.ts'
+      - 'docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-browser-detail-reader-harness.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'src/services/reader-service.ts'
+      - 'scripts/benchmark/seed-desktop-browser-detail-reader-fixture.ts'
+      - 'scripts/benchmark/desktop-browser-detail-reader-harness.mjs'
+      - 'scripts/run-desktop-browser-detail-reader-harness.mjs'
+      - 'test/unit/desktop-browser-detail-reader-benchmark-p2j5.test.ts'
+      - 'docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-browser-detail-reader-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-detail-reader-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run Desktop Chromium Detail/Shelf/Reader harness smoke
+        run: >
+          node scripts/run-desktop-browser-detail-reader-harness.mjs
+          --rounds=2
+          --harness-validation-only
+          --with-deps
+          --output=test-results/desktop-browser-detail-reader/desktop-browser-detail-reader-benchmark.json
+      - name: Upload J5 harness diagnostics
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-browser-detail-reader-${{ github.run_id }}-${{ github.job }}
+          path: test-results/desktop-browser-detail-reader/
+          retention-days: 1
+          if-no-files-found: ignore

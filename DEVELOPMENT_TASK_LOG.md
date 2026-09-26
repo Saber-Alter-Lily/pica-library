@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current P2-L candidate: `main@c7eab55f0b54d6a520aa524e50a9ab6c93258404` (P2-I2 / PR #177 merged)  
+Authoritative repository baseline before the current J5 candidate: `main@e70d9dc20e47fa2d6b5d7a9cdd184d4409e41881` (P2-J4 / PR #180 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1/J2/J3 merged; J4 real Chromium Home/Library harness candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J4 merged; J5 real Chromium Detail/Shelf/Reader harness candidate; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -1175,7 +1175,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
 ## NEXT-14 — P2-J4 Desktop Chromium Home/Library measurement
-**Status: J4_CANDIDATE**
+**Status: DONE — PR #180**
 
 - Keep engine startup outside the browser measurement; J3 remains the process-startup authority.
 - Prepare configured synthetic local Desktop state before timing and require no successful external Provider request.
@@ -1183,7 +1183,20 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Use local Library-query completion (`#library-count`) as part of readiness rather than DOMContentLoaded.
 - Keep Playwright pinned in a temporary benchmark tool directory; no project dependency/lockfile change.
 - CI proves harness executability only; no browser-performance threshold is selected.
+- J4 source/harness acceptance passed CI, Desktop Browser Home Harness, Desktop Startup Harness, P2-L gate, Android Macrobenchmark Build and G15/G16 regressions before merge.
 - Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
+
+## NEXT-15 — P2-J5 Desktop Chromium Detail/Shelf/Reader measurement
+**Status: J5_CANDIDATE**
+
+- Reuse the J4 isolated built-Desktop + temporary Playwright toolchain; no project dependency/lockfile change.
+- Seed a fully local deterministic Library fixture before Desktop startup using LibraryDatabase APIs, not direct SQL.
+- Measure Library→Detail, Shelves→list, Shelf→contents, Shelf→local Reader and Reader→next chapter.
+- Reader readiness includes successful local page image decode, not only DOM insertion.
+- Keep Provider success out of the measurement with the same dead loopback proxy.
+- Reports expose only fixture shape, timing samples and environment; no comic/shelf IDs, URLs, credentials or temporary paths.
+- CI is harness-executability evidence only; no hosted-runner timing threshold is selected.
+- Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1197,6 +1210,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J5 Desktop Detail/Shelf/Reader browser measurement
+
+State update:
+- J4 is merged as PR #180 at `e70d9dc20e47fa2d6b5d7a9cdd184d4409e41881` after all source/harness/regression gates passed.
+- J5 continues the browser foreground measurement plane instead of selecting a premature P2-K threshold.
+- A deterministic local fixture is created through LibraryDatabase APIs before Desktop startup: 3 local comics, 1 shelf, 2 downloaded chapters and 3 local PNG pages per chapter.
+- J5 measures real Chromium UI actions for Detail, Shelves, shelf contents, local Reader first chapter and next-chapter transition.
+- Reader readiness requires page images to be complete with non-zero natural width, so local HTTP page serving + image decode remain inside the Reader usability boundary.
+- Browser launch and Desktop engine startup are excluded from J5 timing because J4/J3 already own those measurements.
+- Provider success is excluded through the same dead loopback proxy used by J4.
+- CI is harness-only; representative Windows x64 J3/J4/J5 evidence remains required before P2-K budgets.
+- Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
 
 ## 2026-09-25 — P2-J4 real Desktop Chromium Home/Library measurement
 

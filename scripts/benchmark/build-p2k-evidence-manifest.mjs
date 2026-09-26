@@ -63,7 +63,11 @@ if (
     throw new Error('P2-K environment evidence type does not match requested manifest type')
 if (status.evidenceType && String(status.evidenceType) !== evidenceType)
     throw new Error('P2-K run-status evidence type does not match requested manifest type')
-if (evidenceType === 'p2-k-android-physical-reference') {
+const androidPhysicalEvidenceTypes = new Set([
+    'p2-k-android-physical-reference',
+    'p2-k-android-manual-acceptance'
+])
+if (androidPhysicalEvidenceTypes.has(evidenceType)) {
     if (
         environment.physicalDeviceRequired !== true ||
         environment.emulatorAccepted !== false
@@ -72,6 +76,22 @@ if (evidenceType === 'p2-k-android-physical-reference') {
     if (!/^[0-9a-f]{64}$/i.test(String(environment?.device?.serialSha256 ?? '')))
         throw new Error('Android P2-K evidence requires a hashed physical-device identity')
 }
+const manualAcceptanceEvidenceTypes = new Set([
+    'p2-k-windows-manual-acceptance',
+    'p2-k-android-manual-acceptance'
+])
+if (manualAcceptanceEvidenceTypes.has(evidenceType)) {
+    if (
+        environment.manualAcceptance !== true ||
+        environment.humanJudgmentRequired !== true
+    )
+        throw new Error('K4 manual acceptance evidence must declare human-judgment authority')
+}
+if (
+    evidenceType === 'p2-k-windows-manual-acceptance' &&
+    environment.nativeWindowsRequired !== true
+)
+    throw new Error('Windows K4 evidence must declare native-Windows authority')
 
 const manifestName = 'p2k-evidence-manifest.json'
 const files = filesRecursively(root)
@@ -109,18 +129,33 @@ function successfulRun(run) {
 }
 const allRecordedRunsSuccessful =
     runs.length > 0 && runs.every((run) => successfulRun(run))
-const androidRequiredRunIds = [
-    'G18_IDLE',
-    'G19_RECOMMENDATION_LOADED'
-]
-const androidRequiredRunsComplete = androidRequiredRunIds.every((id) => {
+const requiredRunIdsByEvidenceType = {
+    'p2-k-android-physical-reference': [
+        'G18_IDLE',
+        'G19_RECOMMENDATION_LOADED'
+    ],
+    'p2-k-windows-manual-acceptance': [
+        'WINDOWS_LONG_TASK_VISIBLE',
+        'WINDOWS_PAUSE_RESUME',
+        'WINDOWS_CANCEL',
+        'WINDOWS_FOREGROUND_USABILITY'
+    ],
+    'p2-k-android-manual-acceptance': [
+        'ANDROID_TASK_CENTER_VISIBILITY',
+        'ANDROID_FOREGROUND_NOTIFICATION',
+        'ANDROID_PAUSE_RESUME_CANCEL',
+        'ANDROID_BACKGROUND_OEM',
+        'ANDROID_FOREGROUND_USABILITY'
+    ]
+}
+const requiredRunIds = requiredRunIdsByEvidenceType[evidenceType] ?? []
+const requiredRunsComplete = requiredRunIds.every((id) => {
     const run = runs.find((item) => item?.id === id)
     return Boolean(run && successfulRun(run))
 })
 const complete =
-    evidenceType === 'p2-k-android-physical-reference'
-        ? allRecordedRunsSuccessful && androidRequiredRunsComplete
-        : allRecordedRunsSuccessful
+    allRecordedRunsSuccessful &&
+    (requiredRunIds.length === 0 || requiredRunsComplete)
 
 const manifest = {
     schemaVersion: 1,
@@ -145,13 +180,25 @@ const manifest = {
                   'manual Android task-control acceptance',
                   'Windows K1 and real Provider/Visual evidence review'
               ]
-            : [
-                  'J7B real Provider regeneration with approved provider/network context',
-                  'J10 repeated representative cold-cache and warm-cache real-model evidence',
-                  'Android representative physical-device G18/G19 evidence',
-                  'Android explicit real download and Reader loaded scenarios',
-                  'manual Windows and Android task-control acceptance'
-              ],
+            : evidenceType === 'p2-k-android-manual-acceptance'
+              ? [
+                    'K2/K3 repeated representative Android performance evidence',
+                    'Windows K1/manual acceptance',
+                    'J7B real Provider and J10 real Visual evidence review'
+                ]
+              : evidenceType === 'p2-k-windows-manual-acceptance'
+                ? [
+                      'repeated Windows K1 benchmark evidence',
+                      'Android K2/K3/manual acceptance',
+                      'J7B real Provider and J10 real Visual evidence review'
+                  ]
+                : [
+                      'J7B real Provider regeneration with approved provider/network context',
+                      'J10 repeated representative cold-cache and warm-cache real-model evidence',
+                      'Android representative physical-device G18/G19 evidence',
+                      'Android explicit real download and Reader loaded scenarios',
+                      'manual Windows and Android task-control acceptance'
+                  ],
     warning:
         'This manifest is an evidence bundle index, not a performance verdict. Thresholds and resource capacities remain unset until representative evidence is reviewed.'
 }

@@ -1,0 +1,44 @@
+name: P2-K Manual Acceptance K4 Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark/p2k-manual-acceptance.mjs'
+      - 'scripts/benchmark/build-p2k-evidence-manifest.mjs'
+      - 'test/unit/p2k-manual-acceptance-k4.test.ts'
+      - 'docs/P2K_MANUAL_ACCEPTANCE_K4.md'
+      - 'docs/P2K_ANDROID_REAL_LOAD_K3.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-manual-acceptance-k4.yml'
+  pull_request:
+    paths:
+      - 'scripts/benchmark/p2k-manual-acceptance.mjs'
+      - 'scripts/benchmark/build-p2k-evidence-manifest.mjs'
+      - 'test/unit/p2k-manual-acceptance-k4.test.ts'
+      - 'docs/P2K_MANUAL_ACCEPTANCE_K4.md'
+      - 'docs/P2K_ANDROID_REAL_LOAD_K3.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-manual-acceptance-k4.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  manual-acceptance-k4-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Parse K4 recorder
+        run: node --check scripts/benchmark/p2k-manual-acceptance.mjs
+      - name: Run K4 contract tests
+        run: pnpm exec vitest run test/unit/p2k-manual-acceptance-k4.test.ts

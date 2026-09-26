@@ -309,7 +309,10 @@ async function main() {
             `--rounds=${rounds}`,
             `--timeout-ms=${timeoutMs}`,
             `--output=${output}`,
-            ...(harnessValidationOnly ? ['--harness-validation-only'] : [])
+            ...(harnessValidationOnly ? ['--harness-validation-only'] : []),
+            ...(process.argv.includes('--allow-model-network')
+                ? ['--allow-model-network']
+                : [])
         ]
 
         run(process.execPath, benchmarkArgs, {

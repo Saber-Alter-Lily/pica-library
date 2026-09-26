@@ -227,6 +227,84 @@ describe('desktop remediation boundaries', () => {
         reopened.close()
     })
 
+    it('persists LOCAL jobs as PAUSED before a quiesce timeout', async () => {
+        const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-shutdown-timeout-'))
+        directories.push(dataDir)
+        const database = new LibraryDatabase(path.join(dataDir, 'library.db'))
+
+        let started!: () => void
+        let release!: () => void
+        const startedPromise = new Promise<void>((resolve) => {
+            started = resolve
+        })
+        const blocked = new Promise<void>((resolve) => {
+            release = resolve
+        })
+        const provider = {
+            comicInfo: async () => ({
+                _id: 'timeout-comic',
+                title: 'Timeout comic',
+                author: 'Author',
+                categories: [],
+                tags: [],
+                allowDownload: true
+            }),
+            episodesAll: async () => [
+                { id: 'episode-1', _id: 'episode-1', order: 1, title: 'One' }
+            ],
+            picturesAll: async () => [
+                {
+                    id: 'picture-1',
+                    name: '1.jpg',
+                    url: 'https://example.test/1.jpg',
+                    media: {
+                        path: '1.jpg',
+                        fileServer: '',
+                        originalName: '1.jpg'
+                    }
+                }
+            ],
+            downloadToFile: async (_url: string, output: string) => {
+                started()
+                await blocked
+                fs.mkdirSync(path.dirname(output), { recursive: true })
+                fs.writeFileSync(output, 'x')
+                return { bytes: 1, sha256: 'hash' }
+            }
+        }
+        const service = new LibraryService(
+            database,
+            dataDir,
+            provider as unknown as Pica
+        )
+        const job = service.enqueueDownload({ comicId: 'timeout-comic' })
+        const running = service.runDownloadQueue({
+            profile: 'custom',
+            custom: {
+                jobConcurrency: 1,
+                globalMediaConcurrency: 1,
+                requestIntervalMs: 0,
+                maxRetries: 0
+            }
+        })
+
+        await startedPromise
+        const quiescing = service.quiesceLocalDownloads(20)
+        expect(database.getDownloadJob(job.id).status).toBe('PAUSED')
+        await expect(quiescing).rejects.toThrow(
+            'Timed out waiting for active downloads to pause'
+        )
+        expect(database.getDownloadJob(job.id).status).toBe('PAUSED')
+        expect(() =>
+            service.enqueueDownload({ comicId: 'must-not-start' })
+        ).toThrow('shutting down')
+
+        release()
+        await running
+        expect(database.getDownloadJob(job.id).status).toBe('PAUSED')
+        database.close()
+    })
+
     it('detects local active jobs before a library directory switch', () => {
         const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-switch-'))
         directories.push(dataDir)

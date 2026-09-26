@@ -86,6 +86,11 @@ The smoke continues to validate:
 P2-L reuses this existing package authority rather than inventing a smaller
 mock package.
 
+For PR self-test, the package provenance records the same merge SHA that
+`actions/checkout` actually tests. The PR head SHA is recorded separately in
+the final report. For manual `workflow_dispatch`, tested and candidate-head
+SHAs are identical.
+
 ### 3. Android static/runtime build
 
 Runs:
@@ -132,7 +137,8 @@ Output:
 `test-results/p2-runtime-hardening-gate.json`
 
 Key fields:
-- source SHA;
+- `sourceSha`: the exact checkout/tested SHA (PR merge SHA during PR self-test; selected ref SHA during workflow_dispatch);
+- `candidateHeadSha`: the PR head SHA during PR self-test, otherwise the same selected ref SHA;
 - per-job automated results;
 - `automatedStatus`;
 - `promotionStatus`;

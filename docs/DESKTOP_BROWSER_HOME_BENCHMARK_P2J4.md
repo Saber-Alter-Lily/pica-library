@@ -63,6 +63,15 @@ The synthetic settings use:
 - balanced profile;
 - dead loopback proxy `http://127.0.0.1:9`.
 
+Credential persistence is allowed only when the live Desktop reports:
+- `windows-dpapi`, where the protected credential file lives under the isolated
+  temporary Desktop home; or
+- `session-memory`, where no persistent system credential is written.
+
+The runner refuses `macos-keychain`, `linux-secret-service`, and unknown
+credential backends so a benchmark cannot overwrite a developer's real
+system-level Pica credential entry.
+
 The dead proxy prevents successful external Provider access from becoming a
 benchmark prerequisite.
 

@@ -31,6 +31,12 @@ describe('P2 J2 repeatable Desktop latency scenario', () => {
         expect(script).toContain("path: '/api/v1/library/query'")
         expect(script).toContain("path: '/api/v1/reader/progress'")
         expect(script).toContain(
+            'Reader detail belongs in the'
+        )
+        expect(script).toContain(
+            'foreground set only after the normal local endpoint is readable.'
+        )
+        expect(script).toContain(
             "No latency threshold or release budget is selected by this harness."
         )
         expect(script).not.toContain('RuntimeResourceCoordinator')

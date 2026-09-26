@@ -1,0 +1,67 @@
+name: Desktop Active Download Latency Harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark/http-latency-scenario.ts'
+      - 'scripts/benchmark/desktop-download-load-harness.ts'
+      - 'test/unit/http-latency-scenario-p2j2.test.ts'
+      - 'test/unit/desktop-download-load-benchmark-p2j8.test.ts'
+      - 'docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - 'package.json'
+      - '.github/workflows/desktop-download-load-harness.yml'
+  pull_request:
+    paths:
+      - 'scripts/benchmark/http-latency-scenario.ts'
+      - 'scripts/benchmark/desktop-download-load-harness.ts'
+      - 'test/unit/http-latency-scenario-p2j2.test.ts'
+      - 'test/unit/desktop-download-load-benchmark-p2j8.test.ts'
+      - 'docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - 'package.json'
+      - '.github/workflows/desktop-download-load-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  active-download-latency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run J2/J8 contract tests
+        run: >-
+          pnpm exec vitest run
+          test/unit/http-latency-scenario-p2j2.test.ts
+          test/unit/desktop-download-load-benchmark-p2j8.test.ts
+      - name: Run controlled active-download harness smoke
+        run: >-
+          pnpm benchmark:desktop-download-load --
+          --rounds=1
+          --iterations=3
+          --warmup=1
+          --interval-ms=10
+          --pages=80
+          --chunks-per-page=4
+          --chunk-delay-ms=15
+          --bytes-per-chunk=8192
+          --output=test-results/desktop-download-load/j8-smoke.json
+      - name: Upload J8 harness diagnostics
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-download-load-${{ github.run_id }}-${{ github.job }}
+          path: test-results/desktop-download-load/
+          retention-days: 1
+          if-no-files-found: ignore

@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1/K2 merged; K3 source/contract accepted and merge-ready; representative execution still required; no budgets selected**
+**Status: IN_PROGRESS — K1/K2/K3 tooling merged; K4 manual task-control/OEM acceptance tooling candidate; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -577,8 +577,9 @@ K2 merged (PR #191):
 - explicit real download/Reader loaded scenarios remain external and may not be replaced with synthetic media.
 - Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
 
-K3 source/contract accepted (PR #192 merge-ready):
-- final automated validation head `3792d8775d45c645d75a989cdee333283f3ea125` passed all 17 triggered workflows, including dedicated K3, K1/K2 evidence contracts, P2-L, CI and Android runtime gates;
+K3 merged (PR #192):
+- final pre-merge head `d1b191cd32f72336d0693d2ead93a9b28b3a5afc` passed all 17 triggered workflows; merged commit is `f5517a7c34eec06a6db66a11055ab9aa784316e7`;
+- final automated validation included dedicated K3, K1/K2 evidence contracts, P2-L, CI and Android runtime gates;
 - adds physical-device-only real download-loaded and Reader-under-download Macrobenchmark scenarios using AndroidX Macrobenchmark/UiAutomator already adopted by G18/G19;
 - synthetic media is explicitly prohibited;
 - download-loaded acceptance requires `media-network` + `filesystem-heavy` RUNNING before and after measured navigation;
@@ -587,6 +588,17 @@ K3 source/contract accepted (PR #192 merge-ready):
 - Reader collector preserves before/after raw `dumpsys meminfo` snapshots for review but selects no memory/frame budget;
 - physical execution remains external and must use representative hardware.
 - Detailed boundary: `docs/P2K_ANDROID_REAL_LOAD_K3.md`.
+
+K4 candidate:
+- adds a shared manual-acceptance recorder for the remaining P2-L Windows and Android physical/OEM blockers;
+- scenario structure follows open-source Cucumber/Gherkin-style Given/When/Then semantics without adding a dependency;
+- Windows requires native Windows; Android requires one physical non-emulator device;
+- PASS requires at least one attached screenshot/recording/log and every copied artifact is SHA-256 indexed;
+- Android device identity is hashed and current standby/device-idle observations are recorded when available;
+- the generic P2-K manifest now requires every named Windows/Android manual scenario before manual acceptance can be complete;
+- human FAIL remains preserved evidence and keeps promotion incomplete;
+- no performance budget or concurrency capacity is selected.
+- Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
 
 ## P2-L — Runtime hardening regression gate
 **Status: AUTOMATED_GATE_PASS / MERGED — PR #178; P2 exit remains blocked by external evidence**
@@ -1353,15 +1365,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
 
 ## NEXT-24 — P2-K K3 Android real download / Reader physical evidence tooling
-**Status: SOURCE/CONTRACT_ACCEPTED — PR #192 / MERGE_READY**
+**Status: DONE — PR #192**
 
-- Reuse AndroidX Macrobenchmark + UiAutomator; do not create a new benchmark framework.
-- Require a user-selected real download and verify `media-network` + `filesystem-heavy` remain RUNNING through measured navigation.
-- Add benchmark-only Reader launcher for explicit real comic/chapter inputs, then measure Reader gestures while a real download remains active.
-- Persist only SHA-256 input identities; never store raw comic/chapter IDs or credentials.
-- Save raw pre/post Reader meminfo snapshots for review without choosing a memory threshold.
-- Physical execution remains external and synthetic media is prohibited.
+- K3 source/contract tooling is merged at `f5517a7c34eec06a6db66a11055ab9aa784316e7`.
+- Physical real-download/Reader execution remains external.
 - Detailed boundary: `docs/P2K_ANDROID_REAL_LOAD_K3.md`.
+
+## NEXT-25 — P2-K K4 Windows/Android manual task-control and OEM acceptance
+**Status: K4_CANDIDATE**
+
+- Reuse the common P2-K SHA-256 manifest rather than inventing another report format.
+- Record human acceptance as explicit Given/When/Then scenarios.
+- Require native Windows or physical Android authority and clean commit by default.
+- Require at least one evidence artifact for every PASS.
+- Cover Windows long-task visibility, pause/resume, cancel and foreground usability.
+- Cover Android Task Center, foreground notification, pause/resume/cancel, OEM/background behavior and foreground usability.
+- Preserve human FAIL as valid evidence; do not turn it into a synthetic PASS.
+- Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1375,6 +1395,16 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-K4 records human task-control/OEM acceptance without automating the verdict
+
+State update:
+- K3 Android real-load evidence tooling is merged as PR #192 at `f5517a7c34eec06a6db66a11055ab9aa784316e7`; final pre-merge head passed 17/17 workflows.
+- Remaining P2-L blockers include Windows manual task-control acceptance and Android physical Task Center/foreground-notification/OEM behavior.
+- K4 follows open-source Cucumber/Gherkin-style scenario semantics (Given/When/Then) for readable human acceptance steps but adds no Gherkin runtime dependency.
+- Machine evidence remains the existing P2-K SHA-256 manifest. PASS requires at least one attached artifact; FAIL remains preserved evidence and blocks completeness.
+- Windows evidence must be initialized on native Windows; Android evidence must use one physical non-emulator device, with hashed device identity.
+- K4 does not automate subjective/perceptual verdicts, does not select budgets and does not authorize P2-C3 enforcement.
 
 ## 2026-09-26 — P2-K3 requires real Android download and Reader inputs
 

@@ -11,6 +11,7 @@ import { remoteApiConfiguration } from '../../src/remote-api/config'
 
 const roots: string[] = []
 const servers: Server[] = []
+const posixIt = process.platform === 'win32' ? it.skip : it
 
 afterEach(async () => {
     await Promise.all(
@@ -84,7 +85,7 @@ function authorization(token = 't'.repeat(48)) {
 }
 
 describe('authenticated Remote API gateway', () => {
-    it('loads only strong token files with restricted POSIX permissions', () => {
+    posixIt('loads only strong token files with restricted POSIX permissions', () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-remote-token-'))
         roots.push(root)
         const tokenFile = path.join(root, 'token')

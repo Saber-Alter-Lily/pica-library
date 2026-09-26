@@ -198,6 +198,11 @@ function validateManifestRoot(root) {
   const baseCategory = MANIFEST_CATEGORY[type]
   if (!baseCategory) errors.push(`unsupported manifest evidenceType: ${type}`)
   if (!commitValid(manifest.commit)) errors.push('manifest commit is invalid')
+  if (
+    String(manifest.environment?.commit ?? '') !== String(manifest.commit ?? '') ||
+    String(manifest.runStatus?.commit ?? '') !== String(manifest.commit ?? '')
+  )
+    errors.push('manifest commit does not match embedded environment/run-status authority')
   if (manifest.complete !== true) errors.push('manifest is not complete')
   if (manifest.dirty === true) errors.push('dirty evidence cannot be promotion authority')
   if (manifest.budgetSelected !== false)

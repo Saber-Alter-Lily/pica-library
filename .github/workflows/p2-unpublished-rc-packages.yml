@@ -1,0 +1,193 @@
+name: P2 Unpublished RC Test Packages
+
+on:
+  push:
+    branches: [release/p2-unpublished-rc-packages-v2]
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'mobile/android-alpha2/**'
+      - 'packaging/windows/RcLauncher.cs'
+      - 'scripts/build-windows-package.ps1'
+      - 'scripts/test-windows-artifact.ps1'
+      - 'test/unit/p2-unpublished-rc-package.test.ts'
+      - 'docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2-unpublished-rc-packages.yml'
+  pull_request:
+    paths:
+      - 'packaging/windows/RcLauncher.cs'
+      - 'scripts/build-windows-package.ps1'
+      - 'scripts/test-windows-artifact.ps1'
+      - 'test/unit/p2-unpublished-rc-package.test.ts'
+      - 'docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2-unpublished-rc-packages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p2-unpublished-rc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run unpublished RC contract
+        run: pnpm exec vitest run test/unit/p2-unpublished-rc-package.test.ts
+
+  windows-rc:
+    if: github.event_name != 'pull_request' && github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_LIBRARY_UNPUBLISHED_RC: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - name: Validate repository before candidate version injection
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm type:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build isolated Windows RC
+        shell: pwsh
+        run: |
+          $short=$env:GITHUB_SHA.Substring(0,12)
+          $rcVersion="0.4.11-p2rc.$short"
+          "RC_VERSION=$rcVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.RC_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" 
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          pnpm build:windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $zip="artifacts\Pica-Library-v$rcVersion-local-test-windows-x64.zip"
+          if (-not (Test-Path -LiteralPath $zip)) { throw 'Windows RC package was not created' }
+
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $rcVersion -DesktopHomeName 'Pica Library P2 RC' -PortCollision -SetupPersistence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          New-Item -ItemType Directory -Force -Path candidate\windows | Out-Null
+          $out="candidate\windows\Pica-Library-P2-RC-Windows-x64.zip"
+          Copy-Item -LiteralPath $zip -Destination $out
+          $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $out).Hash.ToLowerInvariant()
+          "$hash  Pica-Library-P2-RC-Windows-x64.zip" | Set-Content -Encoding ascii 'candidate\windows\SHA256SUMS.txt'
+          $env:GITHUB_SHA | Set-Content -Encoding ascii 'candidate\windows\SOURCE_SHA.txt'
+          $rcVersion | Set-Content -Encoding ascii 'candidate\windows\VERSION.txt'
+          @'
+          UNPUBLISHED P2 RC — MANUAL QA ONLY.
+          Not a GitHub Release. Not connected to the stable update channel.
+          Desktop data is isolated under %LOCALAPPDATA%\Pica Library P2 RC.
+          The stable %LOCALAPPDATA%\Pica Library data root is not read or migrated.
+          '@ | Set-Content -Encoding utf8 'candidate\windows\STATUS.txt'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-P2-RC-Windows
+          path: candidate/windows/
+          retention-days: 1
+          if-no-files-found: error
+
+  android-rc:
+    if: github.event_name != 'pull_request' && github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test and lint Android before loading signing material
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Build fixed-signature side-by-side Android RC
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
+          test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
+          short="${GITHUB_SHA:0:12}"
+          rc_version="0.4.11-p2rc.$short"
+          export PICA_ANDROID_VERSION_NAME="$rc_version"
+          export PICA_ANDROID_VERSION_CODE=54
+
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-p2rc-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+
+          gradle :app:assembleDebug --no-daemon
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -f "$apk"
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/p2rc-cert.txt"
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/p2rc-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$cert" = "$EXPECTED_CERT"
+
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/p2rc-package.txt"
+          grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/p2rc-package.txt"
+          grep -q "versionCode='54'" "$RUNNER_TEMP/p2rc-package.txt"
+          grep -q "versionName='$rc_version-dev-pr35'" "$RUNNER_TEMP/p2rc-package.txt"
+          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/p2rc-package.txt"
+
+          mkdir -p candidate-p2rc
+          cp "$apk" candidate-p2rc/Pica-Library-P2-RC-Android-SideBySide.apk
+          cp "$RUNNER_TEMP/p2rc-package.txt" candidate-p2rc/PACKAGE_INFO.txt
+          printf '%s\n' "$cert" > candidate-p2rc/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate-p2rc/SOURCE_SHA.txt
+          printf '%s\n' "$rc_version" > candidate-p2rc/VERSION.txt
+          printf '%s\n' 'UNPUBLISHED P2 RC. Separate com.picalibrary.android.dev package/data; fixed QA signing; manual QA only; formal OTA disabled.' > candidate-p2rc/STATUS.txt
+          (cd candidate-p2rc && sha256sum Pica-Library-P2-RC-Android-SideBySide.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-P2-RC-Android
+          path: mobile/android-alpha2/candidate-p2rc/
+          retention-days: 1
+          if-no-files-found: error

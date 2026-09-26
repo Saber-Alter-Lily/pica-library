@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current I2 candidate: `main@e4d508dea0d342f4f9b173a20520e69e8262b1b5` (P2-I1 / PR #176 merged)  
+Authoritative repository baseline before the current P2-L candidate: `main@c7eab55f0b54d6a520aa524e50a9ab6c93258404` (P2-I2 / PR #177 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -380,7 +380,7 @@ Current reconciliation:
 - Detailed recovery matrix: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## P2-I — Observability without exposing internals to ordinary users
-**Status: IN_PROGRESS — I1 merged; I2 external Desktop owner adapters candidate**
+**Status: IMPLEMENTATION_COMPLETE_CORE_DESKTOP — I1/I2 merged; Visual remains browser-owned with H2B diagnostics unless a concrete trace proves a gap**
 
 Internal diagnostics should expose:
 - task ID/type/state/phase;
@@ -410,14 +410,21 @@ I1 merged (PR #176):
 - bounded error text redacts URLs, absolute paths, Bearer/token/password/cookie/authorization shapes;
 - endpoint is excluded from Remote API and from J1 HTTP latency samples.
 
-I2 candidate:
+I2 merged (PR #177):
 - extends the same schema/endpoint to WebDAV, Browser Lite export, managed E-H login and software update;
 - external owners remain authoritative; Desktop main only aggregates snapshots;
 - WebDAV reuses the existing shared `remote-storage-sync` resource lease;
 - Browser Lite/E-H/updater do not receive invented resource leases/timestamps/IDs;
 - adds safe `providerRoute` labels only for `webdav`, `eh-managed-browser`, and `github-release`;
 - failed external-owner messages pass through the same I1 sanitizer;
-- Remote API/browser-session boundaries remain unchanged.
+- Remote API/browser-session boundaries remain unchanged;
+- full CI/platform/Android regression matrix passed before merge.
+
+Visual decision:
+- do not add an I3 adapter merely for uniformity;
+- Visual indexing task authority remains browser page/Worker-owned;
+- H2B already exposes bounded Desktop Visual runtime timing/profile diagnostics;
+- revisit only if representative traces show that current Visual diagnostics cannot distinguish slow/stuck/failed behavior.
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
@@ -468,7 +475,7 @@ Initial budgets should be evidence-driven; do not invent flattering thresholds b
 - regressions above approved budget fail or at minimum block release promotion.
 
 ## P2-L — Runtime hardening regression gate
-**Status: PLANNED**
+**Status: AUTOMATED_GATE_CANDIDATE — checked-in promotion workflow; P2 exit remains blocked by external evidence**
 
 Final P2 gate combines:
 - TypeScript/unit/integration tests;
@@ -481,8 +488,25 @@ Final P2 gate combines:
 - runtime concurrency/performance checks;
 - manual Windows + Android task-control acceptance.
 
+L1 automated candidate:
+- adds `.github/workflows/p2-runtime-hardening-gate.yml` as an explicit workflow-dispatch promotion gate;
+- Desktop job runs full validation plus named critical runtime contracts;
+- Windows job builds the current package and reuses `test-windows-artifact.ps1`;
+- Android static job runs unit/lint/release plus Macrobenchmark harness build;
+- G15 force-stop and G16 memory/Doze emulator gates are rerun as first-class jobs;
+- final report `p2-runtime-hardening-gate.json` is machine-readable and fails when any automated job fails;
+- automated PASS is deliberately named `AUTOMATED_PASS_EXTERNAL_EVIDENCE_REQUIRED`, never P2 complete;
+- external blockers include P2-K real benchmark matrix, Windows manual task control, Android physical task control/G18-G19 performance, and low-end Windows/browser trace.
+- Detailed boundary: `docs/P2_RUNTIME_HARDENING_GATE.md`.
+
 **P2 exit criterion**
 P2 is not complete until the product can demonstrate that heavy work may take time **without making ordinary use feel frozen or opaque**.
+
+Current promotion state:
+- automated regression gate: candidate in P2-L1;
+- real performance budgets: blocked on P2-K evidence;
+- representative Windows/Android task-control acceptance: external/manual;
+- therefore P2 completion remains **BLOCKED_EXTERNAL_EVIDENCE** even if P2-L automated jobs pass.
 
 ---
 
@@ -1096,16 +1120,27 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## NEXT-11 — P2-I unified structured task diagnostics
-**Status: I1_DONE / I2_CANDIDATE**
+**Status: DONE — I1/I2 merged**
 
 - **I1 merged (PR #176):** safe read-only schema + LibraryService-owned batch + Desktop-only endpoint.
-- I1 full CI/platform/Android regression matrix passed before merge.
-- **I2 candidate:** aggregate WebDAV, Browser Lite export, managed E-H login and software update without moving task authority.
+- **I2 merged (PR #177):** WebDAV, Browser Lite export, managed E-H login and software update adapters.
+- Both batches passed full CI/platform/Android regression matrices.
 - Additive `providerRoute` is fixed/low-cardinality only; no configured URL/host/account/path values.
-- WebDAV correlates against the shared C2 resource coordinator; owners without a real lease remain resourceState=none.
-- Keep absent IDs/timestamps/control metadata null/false according to the actual owner rather than synthesizing them.
-- External failed messages reuse the I1 sanitizer.
+- Owners without real IDs/timestamps/resource leases remain null/none rather than synthesized.
+- Visual remains browser-owned with H2B runtime diagnostics; no I3 adapter is planned without a concrete diagnostic regression.
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
+
+## NEXT-12 — P2-L automated runtime hardening promotion gate
+**Status: L1_CANDIDATE / P2_EXIT_BLOCKED_EXTERNAL_EVIDENCE**
+
+- One workflow-dispatch gate re-runs the automated runtime-hardening core on a single candidate commit.
+- Desktop/Web: typecheck, syntax, full tests/build, Chromium smoke, and explicit long-task/network/large-queue/resource/diagnostic/shutdown contracts.
+- Windows: build current package and run existing packaged artifact smoke.
+- Android: unit/lint/release + Macrobenchmark build + G15 force-stop + G16 trim-memory/Doze durable recovery.
+- Final JSON report differentiates automated PASS/FAIL from external promotion blockers.
+- Automated green does **not** authorize P2 completion, G20 resource enforcement or performance budgets.
+- Remaining blockers are P2-K real benchmark matrix, representative Windows/Android manual task control, Android physical G18/G19 evidence and low-end Windows/browser trace.
+- Detailed boundary: `docs/P2_RUNTIME_HARDENING_GATE.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1119,6 +1154,28 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-L1 automated runtime hardening promotion gate
+
+State update:
+- P2-I core Desktop structured observability is complete through I1/I2; no Visual I3 is added without a concrete diagnostic regression.
+- P2-K real benchmark budgets remain blocked on representative hardware and variance evidence, so P2-L must not convert CI wall times into performance budgets.
+- L1 adds a manual `P2 Runtime Hardening Promotion Gate` workflow and self-tests it on the implementation PR.
+- Automated jobs cover Desktop/Web full validation + named critical runtime contracts, current Windows package smoke, Android unit/lint/release/Macrobenchmark build, G15 force-stop recovery and G16 trim-memory/Doze durable recovery.
+- `write-p2-runtime-hardening-gate-report.mjs` emits one machine-readable candidate report.
+- Automated all-green yields `AUTOMATED_PASS_EXTERNAL_EVIDENCE_REQUIRED`; there is intentionally no automated `P2_COMPLETE` state.
+- External blockers remain explicit: P2-K real benchmark matrix, Windows manual task-control acceptance, Android physical task-control/G18-G19 performance and low-end Windows/browser CPU+jank trace.
+- Detailed boundary: `docs/P2_RUNTIME_HARDENING_GATE.md`.
+
+## 2026-09-25 — P2-I2 accepted; core Desktop structured task observability complete
+
+State update:
+- I2 is merged as PR #177 at `c7eab55f0b54d6a520aa524e50a9ab6c93258404`.
+- Accepted runs: CI `36212602733`, Linux `36212602711`, macOS `36212602662`, Windows ARM64 `36212602709`, Docker `36212602678`, Macrobenchmark build `36212602738`, Android force-stop `36212602671`, Android memory/background `36212602704`.
+- Core Desktop long-task diagnostics now cover both LibraryService-owned and external Desktop-owned task families through the same read-only schema/endpoint.
+- Visual is intentionally not copied into Desktop task authority: browser Worker/page remains authoritative and H2B already supplies timing/profile diagnostics.
+- P2-I code work is considered complete unless a concrete trace/regression demonstrates a remaining observability gap.
+- Next unblocked architecture task is P2-L automated runtime-hardening gate; P2-K performance budgets remain blocked on real-hardware evidence.
 
 ## 2026-09-25 — G16 post-Doze gate corrected for OS-controlled JobScheduler timing
 

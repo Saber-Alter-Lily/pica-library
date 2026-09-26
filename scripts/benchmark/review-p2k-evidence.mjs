@@ -175,6 +175,42 @@ function validateManifestRoot(root) {
   if (manifest.concurrencyCapacitySelected !== false)
     errors.push('manifest must not preselect concurrency capacity')
 
+  const environment = manifest.environment ?? {}
+  if (type === 'p2-k-windows-x64-reference') {
+    const architecture = String(environment.architecture ?? '').toUpperCase()
+    if (environment.platform !== 'win32')
+      errors.push('K1 reference evidence must declare native Windows')
+    if (!['AMD64', 'X64'].includes(architecture))
+      errors.push('K1 reference evidence must declare Windows x64/AMD64')
+  }
+  if (
+    type === 'p2-k-android-physical-reference' ||
+    type === 'p2-k-android-manual-acceptance'
+  ) {
+    if (
+      environment.physicalDeviceRequired !== true ||
+      environment.emulatorAccepted !== false
+    )
+      errors.push('Android evidence must declare physical-device-only authority')
+    if (!/^[0-9a-f]{64}$/i.test(String(environment.device?.serialSha256 ?? '')))
+      errors.push('Android evidence requires a hashed physical-device identity')
+  }
+  if (
+    type === 'p2-k-windows-manual-acceptance' ||
+    type === 'p2-k-android-manual-acceptance'
+  ) {
+    if (
+      environment.manualAcceptance !== true ||
+      environment.humanJudgmentRequired !== true
+    )
+      errors.push('K4 evidence must declare human-judgment authority')
+  }
+  if (
+    type === 'p2-k-windows-manual-acceptance' &&
+    environment.nativeWindowsRequired !== true
+  )
+    errors.push('Windows K4 evidence must declare native-Windows authority')
+
   const indexed = Array.isArray(manifest.files) ? manifest.files : []
   if (indexed.length === 0) errors.push('manifest has no indexed files')
   for (const row of indexed) {

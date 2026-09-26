@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-26**  
-Authoritative repository baseline before the current K5 candidate: `main@9197e9935543c01915222ed106d492d837101b85` (P2-K4 / PR #193 merged)  
+Authoritative repository baseline before the current K5 source/contract accepted (PR #194): `main@9197e9935543c01915222ed106d492d837101b85` (P2-K4 / PR #193 merged)  
 Current critical-path work: **P2-K representative evidence / K5 evidence completeness and integrity review**
 
 ---
@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1/K2/K3/K4 tooling merged; K5 evidence-review candidate in progress; representative execution still required; no budgets selected**
+**Status: IN_PROGRESS — K1/K2/K3/K4 tooling merged; K5 source/contract accepted in PR #194 with final-head validation pending; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -610,7 +610,9 @@ K5 candidate:
 - recognizes nine structural evidence categories: Windows K1, Android K2, K3 download, K3 Reader, Windows K4, Android K4, J7B real Provider, J10 real Visual and low-end Windows trace;
 - blocks mixed-commit evidence and preserves `budgetSelected=false` / `concurrencyCapacitySelected=false`;
 - when all categories are structurally present, the strongest automatic state is `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW`, never P2 complete;
-- K3 collection is hardened so download-loaded and Reader runs default to independent timestamped roots and only current-run artifacts are copied.
+- K3 collection is hardened so download-loaded and Reader runs default to independent timestamped roots and only current-run artifacts are copied;
+- implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f` passed all 19/19 triggered workflows with zero failures, including dedicated K5/K1/K2/K3/K4 contracts, normal CI, Desktop J3–J11 regressions, Android recovery/background gates, Macrobenchmark build and the aggregate P2-L promotion gate;
+- this accepts only the source/review contract; representative hardware/provider/model evidence remains external, and the documentation head created by this acceptance write must pass the full triggered matrix before merge.
 - Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
 
 ## P2-L — Runtime hardening regression gate
@@ -1400,7 +1402,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
 
 ## NEXT-26 — P2-K K5 evidence completeness / integrity review
-**Status: IN_PROGRESS — K5_CANDIDATE**
+**Status: SOURCE/CONTRACT_ACCEPTED — PR #194 / FINAL_HEAD_VALIDATION_PENDING**
 
 - Reuse the existing K1/K2/K4 SHA-256 manifests and approved K3 session format; do not invent another measurement harness.
 - Independently verify file hashes, exact commit, platform/device authority and required run IDs.
@@ -1408,6 +1410,8 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Require the nine named evidence categories before structural completeness.
 - Do not choose a minimum repetition count, latency/frame/memory budget or P2-C3 concurrency capacity automatically.
 - Harden K3 evidence archival so consecutive physical scenarios cannot overwrite each other or pull stale 90-minute artifacts.
+- Source/contract acceptance: implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f` passed 19/19 workflows with zero failures.
+- Merge gate: the final documentation head must also pass the complete triggered workflow matrix before #194 is merged.
 - Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
 
 ## PARALLEL-1 — W5C PR #109
@@ -1422,6 +1426,14 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-K5 source/review contract accepted after full automated matrix
+
+State update:
+- PR #194 implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f` passed all 19/19 triggered workflows with zero failures.
+- The passing matrix includes the dedicated K5 contract, K1/K2/K3/K4 contracts, normal CI, Desktop J3–J11 regressions, Android Macrobenchmark build, force-stop recovery, memory/background restrictions and the aggregate P2-L promotion gate.
+- K5 remains a structural authority/integrity review only. It does not assert sufficient repetition, acceptable variance, a performance budget, a concurrency capacity or P2 completion.
+- The acceptance documentation commit must receive its own full green matrix before merge.
 
 ## 2026-09-26 — K4 merged; K5 begins read-only evidence reconciliation
 

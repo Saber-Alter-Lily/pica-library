@@ -83,14 +83,28 @@ const files = filesRecursively(root)
     })
 
 const runs = Array.isArray(status.runs) ? status.runs : []
-const complete = runs.length > 0 && runs.every((run) => {
+function successfulRun(run) {
     const output = path.join(root, String(run.output ?? ''))
     return (
         Number(run.exitCode) === 0 &&
         run.outputExists === true &&
         fs.existsSync(output)
     )
+}
+const allRecordedRunsSuccessful =
+    runs.length > 0 && runs.every((run) => successfulRun(run))
+const androidRequiredRunIds = [
+    'G18_IDLE',
+    'G19_RECOMMENDATION_LOADED'
+]
+const androidRequiredRunsComplete = androidRequiredRunIds.every((id) => {
+    const run = runs.find((item) => item?.id === id)
+    return Boolean(run && successfulRun(run))
 })
+const complete =
+    evidenceType === 'p2-k-android-physical-reference'
+        ? allRecordedRunsSuccessful && androidRequiredRunsComplete
+        : allRecordedRunsSuccessful
 
 const manifest = {
     schemaVersion: 1,

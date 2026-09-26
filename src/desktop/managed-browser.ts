@@ -111,13 +111,13 @@ function macCandidates(home: string): Candidate[] {
         {
             kind,
             displayName,
-            executable: path.join('/Applications', suffix),
+            executable: path.posix.join('/Applications', suffix),
             filePath: true
         },
         {
             kind,
             displayName,
-            executable: path.join(home, 'Applications', suffix),
+            executable: path.posix.join(home, 'Applications', suffix),
             filePath: true
         }
     ])

@@ -20,6 +20,8 @@ describe('P2-K K2 Android physical-device evidence kit', () => {
     expect(script).toContain('K2 refuses emulator/generic-device evidence')
     expect(script).toContain('K2 evidence session commit mismatch')
     expect(script).toContain('K2 evidence session device mismatch')
+    expect(script).toContain('while IFS= read -r device')
+    expect(script).not.toContain('mapfile')
     expect(script).not.toContain('synthetic recommendation')
   })
 

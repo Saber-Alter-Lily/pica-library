@@ -63,6 +63,32 @@ describe('P2-K K2 Android physical-device evidence kit', () => {
     expect(manifest.complete).toBe(false)
   })
 
+  it('rejects an Android manifest request when the session is not physical-device typed', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(),'p2k-android-type-mismatch-'))
+    roots.push(root)
+    const commit = 'f'.repeat(40)
+    fs.mkdirSync(path.join(root,'g18-idle'))
+    fs.mkdirSync(path.join(root,'g19-recommendation-loaded'))
+    fs.writeFileSync(path.join(root,'g18-idle','result.json'),'{}')
+    fs.writeFileSync(path.join(root,'g19-recommendation-loaded','result.json'),'{}')
+    fs.writeFileSync(path.join(root,'environment.json'),JSON.stringify({
+      schemaVersion:1,commit,dirty:false
+    }))
+    fs.writeFileSync(path.join(root,'run-status.json'),JSON.stringify({
+      schemaVersion:1,commit,dirty:false,runs:[
+        {id:'G18_IDLE',output:'g18-idle',outputExists:true,exitCode:0},
+        {id:'G19_RECOMMENDATION_LOADED',output:'g19-recommendation-loaded',outputExists:true,exitCode:0}
+      ]
+    }))
+    const result = spawnSync(process.execPath,[
+      'scripts/benchmark/build-p2k-evidence-manifest.mjs',
+      `--root=${root}`,`--commit=${commit}`,
+      '--evidence-type=p2-k-android-physical-reference'
+    ],{encoding:'utf8'})
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('physical-device-only policy')
+  })
+
   it('builds a complete two-run Android physical manifest fixture', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(),'p2k-android-manifest-'))
     roots.push(root)

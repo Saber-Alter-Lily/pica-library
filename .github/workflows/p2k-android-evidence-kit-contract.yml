@@ -1,0 +1,49 @@
+name: P2-K Android Physical Evidence Kit Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark/run-p2k-android-physical.sh'
+      - 'scripts/benchmark/build-p2k-evidence-manifest.mjs'
+      - 'test/unit/p2k-android-physical-kit.test.ts'
+      - 'test/unit/p2k-windows-reference-kit.test.ts'
+      - 'docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md'
+      - 'docs/P2K_REFERENCE_EVIDENCE_K1.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-android-evidence-kit-contract.yml'
+  pull_request:
+    paths:
+      - 'scripts/benchmark/run-p2k-android-physical.sh'
+      - 'scripts/benchmark/build-p2k-evidence-manifest.mjs'
+      - 'test/unit/p2k-android-physical-kit.test.ts'
+      - 'test/unit/p2k-windows-reference-kit.test.ts'
+      - 'docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md'
+      - 'docs/P2K_REFERENCE_EVIDENCE_K1.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-android-evidence-kit-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-evidence-kit-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Parse K2 Bash collector
+        run: bash -n scripts/benchmark/run-p2k-android-physical.sh
+      - name: Validate K1/K2 evidence contracts
+        run: >-
+          pnpm exec vitest run
+          test/unit/p2k-windows-reference-kit.test.ts
+          test/unit/p2k-android-physical-kit.test.ts

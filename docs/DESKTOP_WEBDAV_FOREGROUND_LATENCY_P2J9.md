@@ -1,6 +1,32 @@
 # Desktop WebDAV Foreground Latency — P2 J9
 
-Status: **controlled local WebDAV harness candidate / no latency budget selected**
+Status: **SOURCE/HARNESS PASS / PR #187 merge-ready / no latency budget selected**
+
+Accepted first-head source/harness evidence on `7367aa5f21a67fa84db15a76b110f46aa79c0772`:
+- Desktop WebDAV Foreground Latency Harness `36233681156`: PASS;
+- P2 Runtime Hardening Promotion Gate `36233681126`: PASS;
+- normal CI `36233681103`: PASS;
+- Desktop Startup Harness `36233681036`: PASS;
+- Desktop Browser Home Harness `36233681098`: PASS;
+- Desktop Browser Detail Reader Harness `36233681116`: PASS;
+- Desktop Reader Long Session Harness `36233681170`: PASS;
+- Desktop Recommendation Benchmark Harness `36233681143`: PASS;
+- Desktop Active Download Latency Harness `36233681140`: PASS;
+- Android Macrobenchmark Build `36233681063`: PASS;
+- Android Worker Force-Stop Recovery `36233681130`: PASS;
+- Android Memory and Background Restrictions `36233681134`: PASS;
+- Experimental Linux Package `36233681108`: PASS;
+- Experimental macOS arm64 Package `36233681109`: PASS;
+- Experimental Windows ARM64 Package `36233681112`: PASS;
+- Experimental Docker Headless Package `36233681099`: PASS.
+
+J9 hosted smoke validity evidence:
+- `remote-storage-sync` coverage: 24/24 foreground samples;
+- local WebDAV requests observed during measured window: 6;
+- measured request methods: 4 × MKCOL, 1 × PROPFIND, 1 × PUT;
+- controlled sync completed with 0 issues, 163 uploaded objects and 1,318,912 uploaded bytes.
+
+These hosted values establish harness validity only. They do not define P2-K performance budgets.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-J Performance instrumentation;

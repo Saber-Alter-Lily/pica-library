@@ -1,6 +1,19 @@
 # Desktop Recommendation Generation / Batch Benchmark — P2 J7
 
-Status: **measurement harness candidate / recommendation generation and batch switching remain separate metrics**
+Status: **SOURCE/HARNESS PASS / merged as PR #184 / recommendation generation and batch switching remain separate metrics**
+
+Accepted source/harness evidence before merge:
+- Desktop Recommendation Benchmark Harness `36228962705`: PASS;
+- P2 Runtime Hardening Promotion Gate `36228962691`: PASS;
+- Desktop Startup Harness `36228962718`: PASS;
+- Desktop Browser Home Harness `36228962698`: PASS;
+- Desktop Browser Detail Reader Harness `36228962715`: PASS;
+- Desktop Reader Long Session Harness `36228962707`: PASS;
+- Android Macrobenchmark Build `36228962712`: PASS;
+- normal CI `36228962722`: PASS;
+- G16 memory/background regression `36228962702`: PASS;
+- G15 force-stop regression `36228962741`: PASS;
+- merged commit: `5750a52d671c9e6db1854d84897c263cb5f26ad0`.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-J Performance instrumentation;

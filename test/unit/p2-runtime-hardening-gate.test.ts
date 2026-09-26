@@ -23,6 +23,12 @@ describe('P2-L runtime hardening promotion gate', () => {
             'PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}'
         )
         expect(workflow).toContain(
+            '- name: Build and smoke current Windows package\n        shell: pwsh\n        env:\n          PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}'
+        )
+        expect(workflow).not.toContain(
+            'windows-package-smoke:\n    runs-on: windows-latest\n    timeout-minutes: 45\n    env:\n      PICA_LIBRARY_BUILD_PROVENANCE'
+        )
+        expect(workflow).toContain(
             'P2_GATE_SHA: ${{ env.P2_CANDIDATE_SHA }}'
         )
         expect(workflow).not.toContain(

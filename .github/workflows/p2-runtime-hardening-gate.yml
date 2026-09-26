@@ -65,6 +65,8 @@ jobs:
   windows-package-smoke:
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -202,6 +204,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: Write machine-readable P2 gate report
         env:
           P2_GATE_SHA: ${{ github.sha }}

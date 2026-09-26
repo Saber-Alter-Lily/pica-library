@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1 runtime telemetry + J2 repeatable Desktop scenario harness implemented; startup/browser/Android measurements remain open**
+**Status: IN_PROGRESS — J1/J2 implemented; J3 Desktop process startup/shutdown harness candidate; browser usable-Home and representative physical evidence remain open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -449,6 +449,16 @@ Add consistent measurement for:
 
 **Acceptance**
 - metrics are reproducible and emitted in machine-readable form where practical.
+
+J3 candidate:
+- adds `pnpm benchmark:desktop-startup` over the real built `dist/desktop.js --headless` entry;
+- records a separate fresh-home sample, then repeated cold-process starts against the same isolated data root;
+- measures spawn → instance publication, spawn → identified local API readiness, shutdown response and shutdown → process exit;
+- emits raw samples plus min / median / max JSON summaries;
+- build time and Provider credentials are outside the measured window;
+- CI runs only a two-round `harnessValidationOnly` smoke; GitHub-runner milliseconds are not P2-K performance evidence;
+- browser open → usable Home/Library is intentionally deferred to J4 rather than approximated from static Web smoke.
+- Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -475,7 +485,7 @@ Initial budgets should be evidence-driven; do not invent flattering thresholds b
 - regressions above approved budget fail or at minimum block release promotion.
 
 ## P2-L — Runtime hardening regression gate
-**Status: AUTOMATED_GATE_CANDIDATE — checked-in promotion workflow; P2 exit remains blocked by external evidence**
+**Status: AUTOMATED_GATE_PASS / MERGED — PR #178; P2 exit remains blocked by external evidence**
 
 Final P2 gate combines:
 - TypeScript/unit/integration tests;
@@ -503,7 +513,7 @@ L1 automated candidate:
 P2 is not complete until the product can demonstrate that heavy work may take time **without making ordinary use feel frozen or opaque**.
 
 Current promotion state:
-- automated regression gate: candidate in P2-L1;
+- automated regression gate: merged and self-tested in P2-L1;
 - real performance budgets: blocked on P2-K evidence;
 - representative Windows/Android task-control acceptance: external/manual;
 - therefore P2 completion remains **BLOCKED_EXTERNAL_EVIDENCE** even if P2-L automated jobs pass.
@@ -1131,8 +1141,9 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## NEXT-12 — P2-L automated runtime hardening promotion gate
-**Status: L1_CANDIDATE / P2_EXIT_BLOCKED_EXTERNAL_EVIDENCE**
+**Status: DONE — L1 merged as PR #178 / P2_EXIT_BLOCKED_EXTERNAL_EVIDENCE**
 
+- PR #178 merged the workflow-dispatch gate and its implementation self-test passed (`36214176210`).
 - One workflow-dispatch gate re-runs the automated runtime-hardening core on a single candidate commit.
 - Desktop/Web: typecheck, syntax, full tests/build, Chromium smoke, and explicit long-task/network/large-queue/resource/diagnostic/shutdown contracts.
 - Windows: build current package and run existing packaged artifact smoke.
@@ -1141,6 +1152,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Automated green does **not** authorize P2 completion, G20 resource enforcement or performance budgets.
 - Remaining blockers are P2-K real benchmark matrix, representative Windows/Android manual task control, Android physical G18/G19 evidence and low-end Windows/browser trace.
 - Detailed boundary: `docs/P2_RUNTIME_HARDENING_GATE.md`.
+
+## NEXT-13 — P2-J3 Desktop process startup/shutdown measurement
+**Status: J3_CANDIDATE**
+
+- Measure the built Desktop process rather than TypeScript dev startup.
+- Separate fresh-home initialization from repeated reused-home cold-process rounds.
+- Record instance publication, API readiness and graceful shutdown timings in machine-readable JSON.
+- Keep Provider credentials, build time and temporary data-root path out of measurement/output.
+- CI smoke proves harness executability only; no threshold is selected from hosted-runner timing.
+- After J3 acceptance, J4 should measure real Chromium navigation → usable Home/Library, then remaining Reader/loaded scenarios can feed P2-K.
+- Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1154,6 +1176,20 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-J3 Desktop process cold-start measurement
+
+State update:
+- P2-L1 is merged as PR #178 and its promotion-gate self-test `36214176210` passed; automated gate availability is no longer merely a candidate.
+- P2 exit remains blocked because P2-K real benchmark evidence and representative Windows/Android manual/physical evidence are still missing.
+- J3 adds a repeatable process-level measurement over built `dist/desktop.js --headless`.
+- One fresh-home sample is reported separately; the main comparable window is repeated new processes against the same isolated data root.
+- J3 measures spawn→instance publication, spawn→identified local API readiness, shutdown POST response and shutdown→process exit.
+- Reports contain raw samples plus min/median/max and environment metadata, but no performance budget.
+- Provider credential environment variables are stripped from the measured child process.
+- CI only runs a short `harnessValidationOnly` smoke and must not promote hosted-runner timings into P2-K thresholds.
+- Browser open→usable Home/Library remains J4.
+- Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
 ## 2026-09-25 — P2-L1 automated runtime hardening promotion gate
 

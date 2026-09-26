@@ -1,0 +1,40 @@
+name: P2-K Evidence Kit Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/benchmark/run-p2k-windows-reference.ps1'
+      - 'scripts/benchmark/build-p2k-evidence-manifest.mjs'
+      - 'test/unit/p2k-windows-reference-kit.test.ts'
+      - 'docs/P2K_REFERENCE_EVIDENCE_K1.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-evidence-kit-contract.yml'
+  pull_request:
+    paths:
+      - 'scripts/benchmark/run-p2k-windows-reference.ps1'
+      - 'scripts/benchmark/build-p2k-evidence-manifest.mjs'
+      - 'test/unit/p2k-windows-reference-kit.test.ts'
+      - 'docs/P2K_REFERENCE_EVIDENCE_K1.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-evidence-kit-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-kit-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate K1 evidence-kit contracts
+        run: pnpm exec vitest run test/unit/p2k-windows-reference-kit.test.ts

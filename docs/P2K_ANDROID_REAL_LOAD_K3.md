@@ -1,6 +1,19 @@
 # P2-K Android Real Download / Reader Evidence — K3
 
-Status: **physical-device collection tooling candidate / real user-selected inputs required / no budgets selected**
+Status: **SOURCE/CONTRACT PASS / PR #192 merge-ready / physical-device execution required / no budgets selected**
+
+Accepted automated source/contract evidence on head `3792d8775d45c645d75a989cdee333283f3ea125`:
+- P2-K Android Real Load K3 Contract `36242654203`: PASS;
+- P2 Runtime Hardening Promotion Gate `36242654004`: PASS;
+- normal CI `36242654001`: PASS;
+- Android Macrobenchmark Build `36242654043`: PASS;
+- Android Worker Force-Stop Recovery `36242654000`: PASS;
+- Android Memory and Background Restrictions `36242654061`: PASS;
+- P2-K Android Physical Evidence Kit Contract `36242654080`: PASS;
+- P2-K Evidence Kit Contract `36242654015`: PASS;
+- Desktop Startup/Home/Detail/Reader/Recommendation/Active-download/WebDAV/Visual/Overlap regressions: PASS.
+
+This acceptance proves K3 collector syntax, privacy/authority contracts and benchmark-variant/Macrobenchmark compilation. It does not claim that representative physical-device real-download/Reader measurements have already been collected.
 
 K3 fills the Android evidence gap deliberately left open by K2.
 

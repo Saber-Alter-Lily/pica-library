@@ -1,6 +1,8 @@
 # Desktop Overlapping-task Foreground Latency — P2 J11
 
-Status: **SOURCE/HARNESS PASS / PR #189 merge-ready / no concurrency budget selected**
+Status: **SOURCE/HARNESS PASS / merged as PR #189 / no concurrency budget selected**
+
+Final pre-merge head `92cc8dc2d3687cacd0cd68203d88dc134885426e` passed all 18 triggered workflows; merged commit: `f954414b23ca5ca4409e9de56481593be17ad3fc`.
 
 Accepted first-head source/harness evidence on `55d62f6edce2fb8780fc8ab4e12968cb1201ab87`:
 - Desktop Overlap Foreground Latency Harness `36237597706`: PASS;

@@ -56,6 +56,22 @@ const environment = readJson(environmentFile)
 const status = readJson(statusFile)
 if (String(environment.commit ?? '') !== commit || String(status.commit ?? '') !== commit)
     throw new Error('P2-K evidence commit mismatch between manifest inputs')
+if (
+    environment.evidenceType &&
+    String(environment.evidenceType) !== evidenceType
+)
+    throw new Error('P2-K environment evidence type does not match requested manifest type')
+if (status.evidenceType && String(status.evidenceType) !== evidenceType)
+    throw new Error('P2-K run-status evidence type does not match requested manifest type')
+if (evidenceType === 'p2-k-android-physical-reference') {
+    if (
+        environment.physicalDeviceRequired !== true ||
+        environment.emulatorAccepted !== false
+    )
+        throw new Error('Android P2-K evidence must declare physical-device-only policy')
+    if (!/^[0-9a-f]{64}$/i.test(String(environment?.device?.serialSha256 ?? '')))
+        throw new Error('Android P2-K evidence requires a hashed physical-device identity')
+}
 
 const manifestName = 'p2k-evidence-manifest.json'
 const files = filesRecursively(root)

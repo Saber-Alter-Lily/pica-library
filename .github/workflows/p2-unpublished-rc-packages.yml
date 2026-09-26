@@ -84,6 +84,7 @@ jobs:
         run: |
           $short=$env:GITHUB_SHA.Substring(0,12)
           $rcVersion="0.4.11-p2rc.$short"
+          $env:RC_VERSION=$rcVersion
           "RC_VERSION=$rcVersion" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
           node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.RC_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" 

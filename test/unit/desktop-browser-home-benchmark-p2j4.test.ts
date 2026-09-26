@@ -29,7 +29,7 @@ describe('P2 J4 Desktop browser Home/Library benchmark', () => {
             'utf8'
         )
         expect(runner).toContain("const PLAYWRIGHT_VERSION = '1.63.0'")
-        expect(runner).toContain("'@playwright/test@${PLAYWRIGHT_VERSION}'")
+        expect(runner).toContain('@playwright/test@${PLAYWRIGHT_VERSION}')
         expect(runner).toContain("PICA_LIBRARY_DESKTOP_HOME: desktopHome")
         expect(runner).toContain("credentialBackend !== 'windows-dpapi'")
         expect(runner).toContain("credentialBackend !== 'session-memory'")

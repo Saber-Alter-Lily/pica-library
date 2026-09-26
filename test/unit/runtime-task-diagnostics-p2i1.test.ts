@@ -197,12 +197,12 @@ describe('P2 I1 unified runtime task diagnostics', () => {
         )
         expect(gateway).not.toContain('/api/v1/desktop/runtime/tasks')
 
-        const diagnosticGuard = server.indexOf(
-            "url.pathname === '/api/v1/desktop/runtime/tasks'"
-        )
+        const occurrences =
+            server.match(/\/api\/v1\/desktop\/runtime\/tasks/g) ?? []
+        expect(occurrences).toHaveLength(2)
         const latencyStart = server.indexOf('const latencyDiagnostic =')
-        expect(diagnosticGuard).toBeGreaterThan(latencyStart)
-        expect(server.slice(latencyStart, diagnosticGuard)).toContain(
+        const latencyEnd = server.indexOf('const recordLatency =', latencyStart)
+        expect(server.slice(latencyStart, latencyEnd)).toContain(
             "'/api/v1/desktop/runtime/tasks'"
         )
     })

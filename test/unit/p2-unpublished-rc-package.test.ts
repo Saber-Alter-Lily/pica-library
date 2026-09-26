@@ -1,5 +1,8 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { releasedUpdateBaseline } from '../../src/update/released-baselines'
+import { classifyUpdateCompatibility } from '../../src/update/compatibility'
+import { latestMigrationVersion } from '../../src/storage/sqlite/migrations'
 
 const read = (file: string) => fs.readFileSync(file, 'utf8')
 
@@ -62,5 +65,22 @@ describe('P2 unpublished RC package contract', () => {
     expect(manager).toContain('Stable builds reject local-test update packages')
     expect(workflow).not.toContain('build:local-update')
     expect(workflow).not.toContain('update-from-v0.4.11')
+  })
+
+  it('registers v0.4.11 as schema 13 and requires a full application gate for current schema 16', () => {
+    expect(releasedUpdateBaseline('0.4.11')).toMatchObject({
+      appApiVersion: 2,
+      advertisedDatabaseSchemaVersion: 13,
+      actualMigrationVersion: 13
+    })
+    expect(latestMigrationVersion).toBe(16)
+    expect(
+      classifyUpdateCompatibility({
+        currentAppApiVersion: 2,
+        currentDatabaseSchemaVersion: 13,
+        targetAppApiVersion: 2,
+        targetDatabaseSchemaVersion: latestMigrationVersion
+      })
+    ).toEqual({ kind: 'FULL_APPLICATION', reason: 'SCHEMA_JUMP' })
   })
 })

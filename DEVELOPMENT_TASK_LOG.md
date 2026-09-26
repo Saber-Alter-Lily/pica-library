@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J5 merged; J6 Reader long-session retention harness candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J6 merged; J7 Recommendation generation/batch measurement candidate; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -479,15 +479,21 @@ J5 merged (PR #181):
 - hosted timing remains harness-only and no foreground budget is selected.
 - Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
 
-J6 candidate:
-- reuses the J5 isolated Desktop/Playwright/fixture runner rather than cloning setup and credential logic;
-- keeps one Chromium Reader session alive while repeatedly switching between two fully local chapters;
-- requests GC before periodic CDP memory samples and records Runtime heap, DOM counters and Layout/RecalcStyle counts;
-- records chapter-switch-to-usable latency every cycle;
-- records controlled-scroll requestAnimationFrame interval distributions as a descriptive main-thread cadence signal;
-- explicitly does not call CDP heap/DOM metrics full browser-process RSS or compositor jank;
-- CI runs only a short harness-validation session and does not select a memory/frame budget.
+J6 merged (PR #182):
+- one long-lived Chromium Reader session repeatedly switches two fully local chapters from the J5 fixture;
+- GC-normalized Runtime heap + DOM counters and chapter-switch readiness are sampled over the session;
+- controlled-scroll RAF intervals remain descriptive main-thread cadence only, not compositor-jank or RSS claims;
+- source/harness acceptance passed Reader Long Session `36227293068`, P2-L `36227292880`, J3 `36227293051`, J4 `36227292990`, J5 `36227293002`, Macrobenchmark `36227292839`, CI `36227292875`, G16 `36227292969`, and G15 `36227292952`;
+- hosted timing/memory counters remain non-promotional.
 - Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
+
+J7 candidate:
+- separates Recommendation generation from already-built managed-V3 batch switching;
+- J7A seeds a local 72-candidate V3 cycle through production LibraryDatabase + CycleCoordinatorV3 APIs and measures only `#recommend-next-batch` click → usable changed 12-card batch;
+- J7B is explicit real-Provider evidence: one usable cycle must already exist before any Recommendation UI action, regeneration requires user confirmation, and the measured window must observe the authoritative `recommendation-v3` task using `provider-network`;
+- CI executes only J7A local batch-switch harness; J7B is never faked on hosted runners;
+- no J7 threshold is selected.
+- Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1213,17 +1219,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
 
 ## NEXT-16 — P2-J6 Desktop Reader long-session retention measurement
-**Status: J6_CANDIDATE**
+**Status: DONE — PR #182**
 
-- Reuse J5 isolation, local fixture and Playwright install through the shared runner.
-- Keep one Chromium Reader session alive across repeated first↔second chapter switches.
-- Require full local image decode after every chapter transition.
-- Sample GC-normalized Chromium Runtime heap + DOM counters periodically.
-- Measure every chapter-switch readiness latency and controlled-scroll RAF interval distribution.
-- Report final-minus-baseline retention and peaks, but do not label these counters as full-process RSS.
-- Treat RAF cadence as descriptive main-thread observation, not compositor telemetry or an approved jank threshold.
-- CI runs a 6-cycle harness smoke only; no hosted-runner memory/frame budget is selected.
+- J6 Reader long-session source/harness is merged.
+- Reader Long Session, P2-L, J3/J4/J5, Macrobenchmark, CI and G15/G16 gates all passed on the final head.
+- Hosted heap/DOM/RAF values remain harness-only; representative Windows x64 evidence is still required for P2-K.
 - Detailed boundary: `docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md`.
+
+## NEXT-17 — P2-J7 Desktop Recommendation generation / batch measurement
+**Status: J7_CANDIDATE**
+
+- **J7A local batch switch:** seed 72 non-favorite candidates through production LibraryDatabase/CycleCoordinatorV3, render the current managed V3 batch, then measure `#recommend-next-batch` click → changed 12-card usable batch.
+- Batch-switch measurement excludes Desktop/Chromium startup, Provider success and cycle generation.
+- **J7B real generation:** requires an already-configured loopback Desktop and one preexisting usable managed V3 cycle before any Recommendation UI action.
+- Real generation measures confirmation click → new cycle + rendered first batch, and accepts a sample only after observing the I1/I2 `recommendation-v3` diagnostic with `provider-network` RUNNING.
+- J7B requires `--confirm-regeneration=YES`, intentionally mutates the recommendation cycle, and reads/exports no credentials.
+- Hosted CI runs only two J7A local harness-validation rounds. It does not execute or fake J7B.
+- Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1237,6 +1249,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J7 Recommendation generation and batch switching are separate benchmarks
+
+State update:
+- J6 Reader long-session benchmark is merged as PR #182 at `476484fa88115f0c9c21a1ec45e57227eed25819`.
+- J6 final head passed Reader Long Session `36227293068`, P2-L `36227292880`, J3 `36227293051`, J4 `36227292990`, J5 `36227293002`, Macrobenchmark `36227292839`, CI `36227292875`, G16 `36227292969`, and G15 `36227292952`.
+- A parallel Recommendation benchmark originally used J6 while PR #182 was still open; after #182 landed first, that work was moved cleanly to J7 rather than allowing duplicate task IDs.
+- J7 does not collapse Recommendation generation and batch switching into one timing number.
+- J7A uses an isolated deterministic 72-candidate V3 cycle created through production LibraryDatabase + CycleCoordinatorV3 APIs and measures only the real managed next-batch UI transition.
+- J7B is opt-in real Provider evidence. It requires a preexisting usable cycle before any Recommendation UI action, then measures confirmed `force_new` regeneration until a new cycle's cards are usable.
+- J7B additionally requires structured task diagnostics to observe `recommendation-v3` using `provider-network` while generation is active. A result that completes without that observation is rejected.
+- CI runs J7A only; no fake Provider workload substitutes for J7B and no hosted timing becomes a P2-K budget.
+- Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
 
 ## 2026-09-26 — P2-J6 Reader long-session retention harness
 

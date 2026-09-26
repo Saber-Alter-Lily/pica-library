@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J4 merged; J5 real Chromium Detail/Shelf/Reader harness candidate; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J5 merged; J6 Recommendation generation/batch measurement candidate; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -461,15 +461,26 @@ J3 merged (PR #179):
 - J3 source/harness acceptance passed Desktop Startup Harness `36222961030`, normal CI `36222960972`, P2-L `36222961015`, Linux `36222960986`, macOS `36222961039`, Windows ARM64 `36222961116`, Docker `36222960967`, Macrobenchmark `36222961067`, G15 `36222960988`, and G16 `36222961046`.
 - Detailed boundary: `docs/DESKTOP_STARTUP_BENCHMARK_P2J3.md`.
 
-J4 candidate:
-- reuses pinned Playwright Chromium 1.63.0 from a temporary tool directory rather than adding it to production/project dependencies;
-- assumes a ready loopback Desktop engine so engine startup stays J3-owned;
-- prepares synthetic local Desktop configuration outside the measured browser window and isolates external Provider access behind a dead loopback proxy;
-- every round launches a new Chromium process;
-- measures Chromium launch, navigation → usable Home shell, real Library-tab click → usable Library, and combined browser/navigation intervals;
-- usable shell requires connected mode plus completed local Library count, not merely DOMContentLoaded;
-- CI runs only two `harnessValidationOnly` rounds and does not promote hosted-runner timing into P2-K.
+J4 merged (PR #180):
+- real Chromium Home/Library harness is accepted; engine startup stays J3-owned;
+- pinned Playwright Chromium 1.63.0 remains temporary tooling rather than a project dependency;
+- hosted-runner timing remains non-promotional.
 - Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
+
+J5 merged (PR #181):
+- deterministic local Library/Detail/Shelf/Reader fixture uses LibraryDatabase APIs and real local Reader page decode;
+- measures Library→Detail, Shelves→list, Shelf→contents, Shelf→Reader and Reader→next chapter;
+- source/harness acceptance passed Detail Reader `36226509983`, CI `36226510016`, J3 `36226509996`, J4 `36226510024`, P2-L `36226510004`, Macrobenchmark `36226509982`, G15 `36226510122`, G16 `36226510031`;
+- hosted-runner timing remains non-promotional.
+- Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
+
+J6 candidate:
+- separates Recommendation generation from already-built managed-V3 batch switching;
+- J6A seeds a local 72-candidate V3 cycle through production LibraryDatabase + CycleCoordinatorV3 APIs and measures only `#recommend-next-batch` click → usable next 12-card batch;
+- J6B is an explicit real-Provider benchmark: it requires an already usable cycle before any Recommendation UI action, user confirmation to mutate the cycle, and actual `provider-network` resource observation while regeneration runs;
+- CI executes only J6A local batch-switch smoke; J6B is never replaced by a fake Provider in hosted CI;
+- no J6 threshold is selected.
+- Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J6.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1187,16 +1198,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_BROWSER_HOME_BENCHMARK_P2J4.md`.
 
 ## NEXT-15 — P2-J5 Desktop Chromium Detail/Shelf/Reader measurement
-**Status: J5_CANDIDATE**
+**Status: DONE — PR #181**
 
-- Reuse the J4 isolated built-Desktop + temporary Playwright toolchain; no project dependency/lockfile change.
-- Seed a fully local deterministic Library fixture before Desktop startup using LibraryDatabase APIs, not direct SQL.
-- Measure Library→Detail, Shelves→list, Shelf→contents, Shelf→local Reader and Reader→next chapter.
-- Reader readiness includes successful local page image decode, not only DOM insertion.
-- Keep Provider success out of the measurement with the same dead loopback proxy.
-- Reports expose only fixture shape, timing samples and environment; no comic/shelf IDs, URLs, credentials or temporary paths.
-- CI is harness-executability evidence only; no hosted-runner timing threshold is selected.
+- Local Detail/Shelf/Reader harness is merged and all source/harness/regression checks passed.
+- Reader usability includes successful local image decode.
+- Hosted timing remains non-promotional.
 - Detailed boundary: `docs/DESKTOP_BROWSER_DETAIL_READER_BENCHMARK_P2J5.md`.
+
+## NEXT-16 — P2-J6 Desktop Recommendation generation / batch measurement
+**Status: J6_CANDIDATE**
+
+- **J6A local batch switch:** seed 72 non-favorite candidates through production LibraryDatabase/CycleCoordinatorV3, render the current managed V3 batch, then measure `#recommend-next-batch` click → changed 12-card usable batch.
+- Batch-switch measurement excludes Desktop/Chromium startup, Provider success and cycle generation.
+- **J6B real generation:** requires an already-configured loopback Desktop and one preexisting usable managed V3 cycle before any Recommendation UI action.
+- Real generation measures confirmation click → new cycle + rendered first batch, and accepts a sample only after observing the existing I1/I2 `recommendation-v3` diagnostic with `provider-network` RUNNING.
+- J6B requires `--confirm-regeneration=YES`, mutates the recommendation cycle intentionally, and reads/exports no credentials.
+- Hosted CI runs only two J6A local harness-validation rounds. It does not execute or fake J6B.
+- Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J6.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1210,6 +1228,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J6 Recommendation generation and batch switching are separate benchmarks
+
+State update:
+- J5 is merged as PR #181 at `faf06ad6267352f166c9629816920cce0e063231` after Detail Reader `36226509983`, CI `36226510016`, J3 `36226509996`, J4 `36226510024`, P2-L `36226510004`, Macrobenchmark `36226509982`, G15 `36226510122`, and G16 `36226510031` passed.
+- J6 does not collapse Recommendation generation and batch switching into one timing number.
+- J6A uses an isolated deterministic 72-candidate V3 cycle created through production LibraryDatabase + CycleCoordinatorV3 APIs and measures only the real managed next-batch UI transition.
+- J6A requires 12 changed cards and a changed managed-batch label; duplicate/reused prior-batch cards invalidate the sample.
+- J6B is opt-in real Provider evidence. It requires a preexisting usable cycle before any Recommendation UI action, then measures the confirmed `force_new` regeneration until a new cycle's cards are usable.
+- J6B additionally requires that structured task diagnostics observe `recommendation-v3` using `provider-network` while generation is active. A result that completes without that observation is rejected.
+- J6B explicitly mutates the current recommendation cycle and therefore requires `--confirm-regeneration=YES`.
+- CI runs J6A only; no fake Provider workload is substituted for J6B and no hosted timing becomes a P2-K budget.
+- Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J6.md`.
 
 ## 2026-09-26 — P2-J5 Desktop Detail/Shelf/Reader browser measurement
 

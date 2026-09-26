@@ -1,6 +1,18 @@
 # Desktop Reader Long-session Benchmark — P2 J6
 
-Status: **measurement harness candidate / no Reader memory or jank budget selected**
+Status: **SOURCE/HARNESS PASS / merged as PR #182 / no Reader memory or jank budget selected**
+
+Accepted source/harness evidence before merge:
+- Desktop Reader Long Session Harness `36227293068`: PASS;
+- P2 Runtime Hardening Promotion Gate `36227292880`: PASS;
+- Desktop Startup Harness `36227293051`: PASS;
+- Desktop Browser Home Harness `36227292990`: PASS;
+- Desktop Browser Detail Reader Harness `36227293002`: PASS;
+- Android Macrobenchmark Build `36227292839`: PASS;
+- normal CI `36227292875`: PASS;
+- G16 memory/background regression `36227292969`: PASS;
+- G15 force-stop regression `36227292952`: PASS;
+- merged commit: `476484fa88115f0c9c21a1ec45e57227eed25819`.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-J Performance instrumentation;

@@ -303,7 +303,8 @@ export async function startLibraryServer(options: {
         const url = new URL(request.url ?? '/', `http://${host}:${port}`)
         const latencyDiagnostic =
             url.pathname === '/api/v1/desktop/runtime/http-profile' ||
-            url.pathname === '/api/v1/desktop/runtime/http-profile/reset'
+            url.pathname === '/api/v1/desktop/runtime/http-profile/reset' ||
+            url.pathname === '/api/v1/desktop/runtime/tasks'
         const recordLatency = latencyDiagnostic
             ? (_statusCode: number) => undefined
             : httpLatency.start({
@@ -1125,6 +1126,20 @@ export async function startLibraryServer(options: {
                     response,
                     200,
                     options.service.runtimeResourceProfile()
+                )
+            }
+            if (
+                url.pathname === '/api/v1/desktop/runtime/tasks' &&
+                request.method === 'GET'
+            ) {
+                if (!options.desktop)
+                    return json(response, 409, {
+                        error: 'Desktop control plane is unavailable'
+                    })
+                return json(
+                    response,
+                    200,
+                    options.service.runtimeTaskDiagnostics()
                 )
             }
             if (

@@ -13,6 +13,10 @@ describe('P2-L runtime hardening promotion gate', () => {
 
         expect(workflow).toContain('workflow_dispatch:')
         expect(workflow).toContain(
+            'group: p2-runtime-hardening-${{ github.event.pull_request.number || github.ref }}'
+        )
+        expect(workflow).toContain('cancel-in-progress: true')
+        expect(workflow).toContain(
             'P2_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}'
         )
         expect(workflow).toContain(

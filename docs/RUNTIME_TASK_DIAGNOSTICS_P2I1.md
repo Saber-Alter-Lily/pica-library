@@ -1,6 +1,17 @@
 # Unified Desktop Runtime Task Diagnostics — P2 I1
 
-Status: **implementation candidate / LibraryService-owned task batch**
+Status: **PASS / merged as PR #176 / LibraryService-owned task batch**
+
+Accepted evidence before merge:
+- normal CI run `36205909691`: PASS;
+- Linux x64 package run `36205909814`: PASS;
+- macOS arm64 package run `36205909697`: PASS;
+- Windows ARM64 package run `36205909681`: PASS;
+- Docker headless package run `36205909726`: PASS;
+- Android Macrobenchmark build run `36205909754`: PASS;
+- Android memory/background regression run `36205909709`: PASS;
+- Android force-stop recovery regression run `36205909682`: PASS;
+- merged commit: `e4d508dea0d342f4f9b173a20520e69e8262b1b5`.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-I Observability without exposing internals to ordinary users.

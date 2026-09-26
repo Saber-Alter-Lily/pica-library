@@ -1,6 +1,17 @@
 # Desktop Browser Detail / Shelf / Reader Benchmark — P2 J5
 
-Status: **measurement harness candidate / no foreground browser budget selected**
+Status: **PASS / merged as PR #181 / no foreground browser budget selected**
+
+Accepted source/harness evidence before merge:
+- Desktop Browser Detail Reader Harness run `36226509983`: PASS;
+- normal CI run `36226510016`: PASS;
+- Desktop Startup Harness run `36226509996`: PASS;
+- Desktop Browser Home Harness run `36226510024`: PASS;
+- P2 Runtime Hardening Promotion Gate run `36226510004`: PASS;
+- Android Macrobenchmark Build run `36226509982`: PASS;
+- Android force-stop regression run `36226510122`: PASS;
+- Android memory/background regression run `36226510031`: PASS;
+- merged commit: `faf06ad6267352f166c9629816920cce0e063231`.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-J Performance instrumentation;

@@ -1,0 +1,63 @@
+name: Desktop Reader Long Session Harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'src/services/reader-service.ts'
+      - 'scripts/benchmark/seed-desktop-browser-detail-reader-fixture.ts'
+      - 'scripts/benchmark/desktop-reader-long-session-harness.mjs'
+      - 'scripts/run-desktop-browser-detail-reader-harness.mjs'
+      - 'scripts/run-desktop-reader-long-session-harness.mjs'
+      - 'test/unit/desktop-reader-long-session-benchmark-p2j6.test.ts'
+      - 'docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-reader-long-session-harness.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'src/desktop/**'
+      - 'src/library/**'
+      - 'src/services/reader-service.ts'
+      - 'scripts/benchmark/seed-desktop-browser-detail-reader-fixture.ts'
+      - 'scripts/benchmark/desktop-reader-long-session-harness.mjs'
+      - 'scripts/run-desktop-browser-detail-reader-harness.mjs'
+      - 'scripts/run-desktop-reader-long-session-harness.mjs'
+      - 'test/unit/desktop-reader-long-session-benchmark-p2j6.test.ts'
+      - 'docs/DESKTOP_READER_LONG_SESSION_BENCHMARK_P2J6.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/desktop-reader-long-session-harness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reader-long-session-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run Desktop Chromium Reader long-session harness smoke
+        run: >
+          node scripts/run-desktop-reader-long-session-harness.mjs
+          --cycles=6
+          --harness-validation-only
+          --with-deps
+          --output=test-results/desktop-reader-long-session/desktop-reader-long-session-benchmark.json
+      - name: Upload J6 harness diagnostics
+        if: always() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-reader-long-session-${{ github.run_id }}-${{ github.job }}
+          path: test-results/desktop-reader-long-session/
+          retention-days: 1
+          if-no-files-found: ignore

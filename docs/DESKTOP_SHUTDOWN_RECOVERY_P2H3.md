@@ -13,6 +13,17 @@ Accepted evidence before merge:
 - Android force-stop recovery regression run `36204308553`: PASS;
 - merged commit: `60abf3a17516e98ab6f4bda0e63af2908e926338`.
 
+Accepted evidence before merge:
+- normal CI run `36204308430`: PASS;
+- Linux x64 package run `36204308449`: PASS;
+- macOS arm64 package run `36204308443`: PASS;
+- Windows ARM64 package run `36204308453`: PASS;
+- Docker headless package run `36204308468`: PASS;
+- Android Macrobenchmark Build run `36204308433`: PASS;
+- Android memory/background regression run `36204308462`: PASS;
+- Android force-stop regression run `36204308553`: PASS;
+- merged commit: `60abf3a17516e98ab6f4bda0e63af2908e926338`.
+
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-H Startup, shutdown and crash recovery.
 - Existing long-task baseline: `docs/LONG_TASK_STABILITY_V047.md`.

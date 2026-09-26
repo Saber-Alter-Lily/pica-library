@@ -89,7 +89,7 @@ jobs:
             'X-GitHub-Api-Version' = '2022-11-28'
             'User-Agent' = 'pica-library-p2-hardening-gate'
           }
-          $releases = @(Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100')
+          $releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'
           $candidates = @(
             $releases | ForEach-Object {
               if ([string]$_.tag_name -match '^v(\d+\.\d+\.\d+)$') {

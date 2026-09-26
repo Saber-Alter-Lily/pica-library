@@ -17,6 +17,9 @@ describe('P2 unpublished RC package contract', () => {
         expect(workflow).toContain('0.4.11-p2rc.')
         expect(workflow).toContain('permissions:\n  contents: read')
         expect(workflow).toContain('workflow_dispatch:')
+        expect(workflow).toContain(
+            'push:\n    branches: [release/p2-unpublished-rc-packages-v2]\n  pull_request:'
+        )
         expect(workflow).not.toMatch(/contents:\s*write/)
         expect(workflow).not.toContain('gh release')
         expect(workflow).not.toContain('git tag')

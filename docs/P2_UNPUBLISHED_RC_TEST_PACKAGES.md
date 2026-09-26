@@ -1,6 +1,6 @@
 # P2 Unpublished RC Test Packages
 
-Status: **candidate / unpublished manual-QA packages / stable release unchanged**
+Status: **SOURCE/ARTIFACT_ACCEPTED — PR #195 / final-head validation pending / stable release unchanged**
 
 ## Purpose
 
@@ -100,6 +100,37 @@ rather than silently producing a normal v0.4.11 incremental package.
 - runs the static RC contract on pull requests;
 - builds installable RC artifacts only on the dedicated RC branch or explicit
   workflow dispatch.
+
+## Automated acceptance before final-head write
+
+Implementation head `7a66d02d1523cf4c603c4850b28e3b96aced63ef`
+passed both required acceptance planes before this documentation write:
+
+- PR validation: **25/25** triggered workflows passed with zero failures,
+  including normal CI, v0.4 direct-upgrade acceptance, P2-L, Desktop J3–J11
+  regression harnesses, Android durable recovery, Macrobenchmark build and
+  experimental platform package gates;
+- dedicated branch-push RC run `36275848212`: **3/3** jobs passed:
+  `contract`, `windows-rc`, and `android-rc`.
+
+The branch-push run produced one-day manual-QA artifacts:
+
+- Windows artifact id `10916927763`,
+  `Pica-Library-P2-RC-Windows`, 36,063,197 bytes;
+- Android artifact id `10917522055`,
+  `Pica-Library-P2-RC-Android`, 4,110,039 bytes.
+
+The Windows job exercised the full repository test suite on a Windows host,
+which exposed and then fixed host-dependent POSIX path simulation in
+`defaultDesktopRoot` and macOS managed-browser discovery. The POSIX chmod
+token-file test is now explicitly skipped on Windows because Windows does not
+provide the Unix permission-bit semantics that test is designed to validate.
+
+This acceptance proves the RC build/source contract and that installable
+candidate artifacts can be produced from the exact source head. It does not
+replace representative human/physical-device evidence. The documentation head
+created by this acceptance write must again pass both the full PR matrix and
+the branch-push RC package run before PR #195 is merged.
 
 ## Intended manual test scope
 

@@ -1,6 +1,6 @@
 # P2-K Manual Task-control / OEM Acceptance — K4
 
-Status: **manual-evidence tooling candidate / representative human execution required / no budgets selected**
+Status: **SOURCE/CONTRACT_ACCEPTED — PR #193 / final-head validation pending / representative human execution required / no budgets selected**
 
 Parent:
 - P2-L Windows manual task-control external blocker;
@@ -108,6 +108,18 @@ node scripts/benchmark/p2k-manual-acceptance.mjs finalize --root=<EVIDENCE_ROOT>
 
 A recorded FAIL remains valid evidence but finalization exits non-zero and the
 manifest remains incomplete for promotion.
+
+## Automated source/contract acceptance
+
+The K4 implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` passed all **18/18** pull-request workflows before this documentation write, including:
+- the dedicated P2-K Manual Acceptance K4 Contract;
+- K1/K2/K3 evidence-kit contracts;
+- the P2 Runtime Hardening Promotion Gate;
+- normal CI;
+- Desktop J3–J11 benchmark regressions;
+- Android force-stop, memory/background and Macrobenchmark build gates.
+
+That automated result accepts the **source and evidence contract only**. It does not replace native-Windows or physical-Android human evidence. The documentation head created by this acceptance write must also pass the complete triggered workflow matrix before PR #193 is merged.
 
 ## Evidence boundary
 

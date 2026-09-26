@@ -177,6 +177,7 @@ import {
 } from '../recommendation-v5/work-identity-foundation'
 import { AnalysisTimingRegistry } from '../runtime/analysis-timing'
 import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
+import { runtimeTaskDiagnosticSnapshot } from '../runtime/task-diagnostics'
 
 export const WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION =
     'PREPARE_CANONICAL_WORK_BINDING'
@@ -613,6 +614,222 @@ export class LibraryService {
 
     runtimeResourceProfile() {
         return this.runtimeResources.snapshot()
+    }
+
+    runtimeTaskDiagnostics() {
+        const resources = this.runtimeResourceProfile()
+        const recommendation = this.recommendationBuildProgress()
+        const favorites = this.favoritesSyncProgress()
+        const update = this.maintenanceUpdateStatus()
+        const repair = this.maintenanceRepairStatus()
+        const organize = this.libraryOrganizeStatus()
+        const shadow = this.recommendationV5ShadowStatus()
+        const identity = this.recommendationV5WorkIdentityEvidenceRefreshStatus()
+        const downloads = this.localDownloadRuntime()
+        const downloadPage = this.database.listDownloadJobsPage({
+            view: 'active',
+            runner: 'LOCAL',
+            limit: 1
+        })
+        const firstDownload = downloadPage.items[0]
+        const downloadState = downloads.running
+            ? 'running'
+            : firstDownload?.status === 'PAUSED'
+              ? 'paused'
+              : firstDownload?.status === 'FAILED'
+                ? 'failed'
+                : firstDownload
+                  ? 'waiting'
+                  : 'idle'
+
+        return runtimeTaskDiagnosticSnapshot(
+            [
+                {
+                    taskKey: 'recommendation-v3',
+                    taskId: this.recommendationBuildCycleId,
+                    taskType: 'recommendation-v3-build',
+                    state: recommendation.state,
+                    phase: recommendation.phase,
+                    done: recommendation.done,
+                    total: recommendation.total,
+                    canPause: recommendation.canPause,
+                    canResume: recommendation.canResume,
+                    canCancel: recommendation.canCancel,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: [
+                        'provider-network',
+                        'cpu-analysis',
+                        'sqlite-read-heavy',
+                        'sqlite-write-heavy'
+                    ],
+                    lastError: recommendation.error,
+                    recoveryMode: 'reset_interrupted_build_keep_last_good',
+                    commitBoundary:
+                        'new recommendation cycle promoted only after successful final build'
+                },
+                {
+                    taskKey: 'favorites-sync',
+                    taskType: 'favorites-sync',
+                    state: favorites.state,
+                    phase: favorites.phase,
+                    done: favorites.processed ?? favorites.fetched,
+                    total: favorites.total,
+                    canPause: favorites.canPause,
+                    canResume: favorites.canResume,
+                    canCancel: favorites.canCancel,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: [
+                        'provider-network',
+                        'sqlite-write-heavy'
+                    ],
+                    lastError: favorites.error,
+                    recoveryMode: 'rerun_with_committed_cache_reuse',
+                    commitBoundary:
+                        'favorite reconciliation committed only after completed remote listing'
+                },
+                {
+                    taskKey: 'maintenance-update',
+                    taskType: 'maintenance-update-scan',
+                    state: update.state,
+                    phase: update.phase,
+                    done: update.done,
+                    total: update.total,
+                    startedAt: update.startedAt,
+                    updatedAt: update.updatedAt,
+                    canPause: update.canPause,
+                    canResume: update.canResume,
+                    canCancel: update.canCancel,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: [
+                        'provider-network',
+                        'sqlite-write-heavy'
+                    ],
+                    lastError: update.error,
+                    recoveryMode: 'restart_scan',
+                    commitBoundary:
+                        'findings become authoritative only through completed scan state'
+                },
+                {
+                    taskKey: 'maintenance-repair',
+                    taskType: 'maintenance-repair-scan',
+                    state: repair.state,
+                    phase: repair.phase,
+                    done: repair.done,
+                    total: repair.total,
+                    startedAt: repair.startedAt,
+                    updatedAt: repair.updatedAt,
+                    canPause: repair.canPause,
+                    canResume: repair.canResume,
+                    canCancel: repair.canCancel,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: [
+                        'filesystem-heavy',
+                        'sqlite-read-heavy'
+                    ],
+                    lastError: repair.error,
+                    recoveryMode: 'restart_scan',
+                    commitBoundary:
+                        'repair scan is review-only; no destructive mutation is committed by the scan'
+                },
+                {
+                    taskKey: 'library-organize',
+                    taskType: 'library-organize',
+                    state: organize.state,
+                    phase: organize.phase,
+                    done: organize.done,
+                    total: organize.total,
+                    startedAt: organize.startedAt,
+                    updatedAt: organize.updatedAt,
+                    canPause: organize.canPause,
+                    canResume: organize.canResume,
+                    canCancel: organize.canCancel,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: ['filesystem-heavy'],
+                    lastError: organize.error,
+                    recoveryMode: 'restart_from_checkpointed_filesystem_state',
+                    commitBoundary:
+                        'final indexes and manifests publish only after the last organize checkpoint'
+                },
+                {
+                    taskKey: 'recommendation-v5-shadow',
+                    taskType: 'recommendation-v5-shadow',
+                    state: shadow.state,
+                    phase: shadow.phase,
+                    done: shadow.done,
+                    total: shadow.total,
+                    startedAt: shadow.startedAt,
+                    updatedAt: shadow.updatedAt,
+                    canPause: shadow.canPause,
+                    canResume: shadow.canResume,
+                    canCancel: shadow.canCancel,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: [
+                        'provider-network',
+                        'cpu-analysis',
+                        'sqlite-write-heavy'
+                    ],
+                    lastError: shadow.error,
+                    recoveryMode: 'restart_shadow_analysis',
+                    commitBoundary:
+                        'shadow result remains non-serving and publishes only at terminal success'
+                },
+                {
+                    taskKey: 'work-identity-evidence',
+                    taskType: 'work-identity-evidence-refresh',
+                    state: identity.state,
+                    phase: identity.phase,
+                    done: identity.done,
+                    total: identity.total,
+                    startedAt: identity.startedAt,
+                    updatedAt: identity.updatedAt,
+                    canPause: identity.canPause,
+                    canResume: identity.canResume,
+                    canCancel: identity.canCancel,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: [
+                        'cpu-analysis',
+                        'sqlite-read-heavy',
+                        'sqlite-write-heavy'
+                    ],
+                    lastError: identity.error,
+                    recoveryMode: 'restart_checkpointed_evidence_refresh',
+                    commitBoundary:
+                        'evidence persists only after the final cooperative checkpoint'
+                },
+                {
+                    taskKey: 'local-downloads',
+                    taskType: 'local-download-runner',
+                    state: downloadState,
+                    phase: downloads.running
+                        ? 'draining'
+                        : firstDownload?.status.toLowerCase() ?? 'idle',
+                    startedAt: downloads.startedAt,
+                    updatedAt: firstDownload?.progressUpdatedAt,
+                    canPause: null,
+                    canResume: null,
+                    canCancel: null,
+                    canRetry: null,
+                    pauseSemantics: 'in_place',
+                    resourceClasses: [
+                        'media-network',
+                        'filesystem-heavy',
+                        'sqlite-write-heavy'
+                    ],
+                    lastError: downloads.lastError,
+                    recoveryMode: 'db_backed_verified_page_resume',
+                    commitBoundary:
+                        'verified files/pages plus SQLite download job state'
+                }
+            ],
+            resources
+        )
     }
 
     runtimeActiveTaskTypes() {

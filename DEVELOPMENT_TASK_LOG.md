@@ -5,7 +5,7 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-25**  
-Authoritative repository baseline after G19 source/build completion: `main@529638cd1ff3ebe8c16e6ba54e8f43ea85c9a116` (P2-G19 / PR #173 merged)  
+Authoritative repository baseline before the current I1 candidate: `main@60abf3a17516e98ab6f4bda0e63af2908e926338` (P2-H3 / PR #175 merged)  
 Current critical-path work: **P2 Architecture & Runtime Hardening**
 
 ---
@@ -350,7 +350,7 @@ Remaining:
 - background task UI is reconstructible after Activity recreation.
 
 ## P2-H — Startup, shutdown and crash recovery
-**Status: IMPLEMENTATION_RECONCILED / H3_SHUTDOWN_CANDIDATE — existing recovery matrix passes; Desktop shutdown fault isolation pending CI; OEM/device evidence remains external**
+**Status: IMPLEMENTATION_COMPLETE — H3 merged; automated recovery matrix reconciled; external Android/OEM evidence tracked under P2-G/P2-K**
 
 Required:
 - stale recommendation building state cleanup;
@@ -375,11 +375,12 @@ Current reconciliation:
 - schema pre-migration backup: implemented and tested;
 - browser-close Mobile Bridge lease protection: implemented and tested;
 - headless/browser lifecycle separation: implemented and tested;
-- **H3 candidate:** Desktop shutdown now needs fault-isolated cleanup plus a global hard deadline so one failed close step cannot skip HTTP/DB/instance cleanup.
+- **H3 merged (PR #175):** Desktop shutdown is globally bounded and fault-isolated; one failed close owner cannot skip later HTTP/DB/instance cleanup.
+- Full platform/package acceptance plus Android regressions passed before merge.
 - Detailed recovery matrix: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## P2-I — Observability without exposing internals to ordinary users
-**Status: PLANNED / PARTIAL**
+**Status: IN_PROGRESS — I1 unified LibraryService task diagnostics candidate**
 
 Internal diagnostics should expose:
 - task ID/type/state/phase;
@@ -398,6 +399,17 @@ Security:
 **Acceptance**
 - enough structured telemetry to diagnose “stuck” vs “slow” vs “waiting” vs “failed”;
 - diagnostic data follows existing credential-exclusion rules.
+
+I1 candidate:
+- adds a read-only adapter over existing task authorities; it does not create a second scheduler/registry;
+- Desktop-only `GET /api/v1/desktop/runtime/tasks`;
+- first batch covers Recommendation V3, Favorites, Maintenance Update/Repair/Organize, V5 Shadow, Work Identity evidence and aggregate LOCAL downloads;
+- unavailable task IDs/timestamps/control flags remain `null` instead of being synthesized;
+- current resource wait/run state is correlated from the existing RuntimeResourceCoordinator;
+- bounded error text redacts URLs, absolute paths, Bearer/token/password/cookie/authorization shapes;
+- endpoint is excluded from Remote API and from J1 HTTP latency samples;
+- external owners such as WebDAV/update/Browser Lite remain later owner-specific adapters.
+- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`.
 
 ## P2-J — Performance instrumentation
 **Status: IN_PROGRESS — J1 runtime telemetry + J2 repeatable Desktop scenario harness implemented; startup/browser/Android measurements remain open**
@@ -1066,15 +1078,25 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`, `docs/ANDROID_RESOURCE_OBSERVATION_P2G17.md`, `docs/ANDROID_FOREGROUND_PERFORMANCE_P2G18.md`, and `docs/ANDROID_LOADED_PERFORMANCE_P2G19.md`.
 
 ## NEXT-10 — P2-H Desktop shutdown/recovery reconciliation
-**Status: H3_CANDIDATE**
+**Status: DONE — H3 merged as PR #175**
 
-- Existing P2-H requirements were reconciled into one checked-in matrix; all non-shutdown items already have implementation/test evidence.
-- **H3 finding:** the old `stop()` registered its final exit fallback only after `closeEngine()` returned. Any rejection inside Remote API/Mobile Bridge/E-H/download quiesce/HTTP/DB cleanup could therefore skip later cleanup, instance-lock release and the final exit fallback.
-- **H3 candidate:** register a 35 s global hard deadline before cleanup; isolate each cleanup owner through `shutdownStep(...)`; keep the normal ordered close sequence; clear the global timer only after cleanup/instance release; preserve a final 250 ms third-party-handle grace.
-- LOCAL download safety remains authoritative: `quiesceLocalDownloads()` persists eligible jobs to PAUSED before awaiting active runner settlement.
-- New behavior test forces a real download quiesce timeout and requires the job to remain PAUSED before and after the rejection, with new LOCAL work rejected after shutdown begins.
-- After H3 CI acceptance, P2-H code/recovery implementation can be marked complete; the next unblocked architecture lane becomes P2-I structured observability.
+- Recovery matrix reconciled and checked in.
+- Global shutdown deadline + fault-isolated cleanup merged.
+- Download quiesce timeout regression proves active LOCAL work is durably PAUSED before fallback exit.
+- CI, Linux, macOS arm64, Windows ARM64, Docker and Android regression gates passed.
 - Detailed boundary: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
+
+## NEXT-11 — P2-I unified structured task diagnostics
+**Status: I1_CANDIDATE**
+
+- Add one safe read-only schema over existing task-owned status surfaces; do not create a second task authority.
+- First LibraryService batch covers eight logical task families.
+- Correlate resource waiting/running durations through the existing shared RuntimeResourceCoordinator.
+- Keep unavailable metadata null instead of guessing.
+- Redact secret/path-bearing error text.
+- Expose only through the local Desktop control plane and keep Remote API/browser-session boundaries unchanged.
+- Exclude the diagnostic endpoint from J1 latency samples.
+- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1088,6 +1110,20 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-I1 unified LibraryService runtime task diagnostics
+
+State update:
+- P2-H3 is merged as PR #175 at `60abf3a17516e98ab6f4bda0e63af2908e926338` after the full platform/package + Android regression matrix passed.
+- P2-I begins with a read-only adapter, not a new task registry.
+- `runtimeTaskDiagnostics()` maps eight LibraryService-owned logical tasks into one schema while leaving each original status method authoritative.
+- `taskKey` is a stable diagnostic identity; `taskId` is null unless the underlying owner actually exposes a current run/job ID.
+- Resource waiting/running state, priority and durations are correlated from RuntimeResourceCoordinator requested/started timestamps.
+- LOCAL downloads remain an aggregate queue diagnostic and do not claim one comic job ID as the whole runtime identity.
+- `sanitizeRuntimeDiagnosticError()` bounds and redacts URLs, absolute paths, Bearer values and common token/password/cookie/authorization key-value forms.
+- New Desktop-only `GET /api/v1/desktop/runtime/tasks` is excluded from J1 latency sampling and is not added to Remote API.
+- WebDAV/update/Browser Lite/E-H login/Visual browser-worker owners remain future owner-specific adapters.
+- Detailed boundary: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`.
 
 ## 2026-09-25 — P2-H3 Desktop shutdown fault isolation
 

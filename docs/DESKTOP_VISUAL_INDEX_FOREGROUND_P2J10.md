@@ -1,6 +1,8 @@
 # Desktop Visual Index Foreground Impact — P2 J10
 
-Status: **SOURCE/CONTRACT PASS / PR #188 merge-ready / external real-model evidence required / no performance budget selected**
+Status: **SOURCE/CONTRACT PASS / merged as PR #188 / external real-model evidence required / no performance budget selected**
+
+Final pre-merge head `f4db47bdbdab1e1ceb342b1385cba3dea18ddf44` passed all 17 triggered workflows; merged commit: `fd471b22280d0c67e2a9015cec9ab9190b9239cd`.
 
 Accepted automated source/contract evidence on head `2a6840cbd359434bff165408fdb24b5b095b6cae`:
 - Desktop Visual Index Foreground Harness `36235931222`: PASS;

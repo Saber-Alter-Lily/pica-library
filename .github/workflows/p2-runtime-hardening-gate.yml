@@ -73,8 +73,6 @@ jobs:
   windows-package-smoke:
     runs-on: windows-latest
     timeout-minutes: 45
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -87,6 +85,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Prepare previous accepted Windows package
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $currentText = [string]((Get-Content -Raw -LiteralPath 'package.json' | ConvertFrom-Json).version)
           $current = [version]$currentText

@@ -4,9 +4,9 @@
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
-Last reconciled: **2026-09-25**  
-Authoritative repository baseline before the current J5 candidate: `main@e70d9dc20e47fa2d6b5d7a9cdd184d4409e41881` (P2-J4 / PR #180 merged)  
-Current critical-path work: **P2 Architecture & Runtime Hardening**
+Last reconciled: **2026-09-26**  
+Authoritative repository baseline before the current K4 source/contract accepted (PR #193): `main@f5517a7c34eec06a6db66a11055ab9aa784316e7` (P2-K3 / PR #192 merged)  
+Current critical-path work: **P2-K representative evidence / K4 manual-acceptance source-contract closeout**
 
 ---
 
@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1/K2/K3 tooling merged; K4 manual task-control/OEM acceptance tooling candidate; representative execution still required; no budgets selected**
+**Status: IN_PROGRESS — K1/K2/K3 tooling merged; K4 source/contract accepted in PR #193 with final-head validation pending; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -597,7 +597,9 @@ K4 candidate:
 - Android device identity is hashed and current standby/device-idle observations are recorded when available;
 - the generic P2-K manifest now requires every named Windows/Android manual scenario before manual acceptance can be complete;
 - human FAIL remains preserved evidence and keeps promotion incomplete;
-- no performance budget or concurrency capacity is selected.
+- no performance budget or concurrency capacity is selected;
+- implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` passed all 18/18 triggered workflows, including the dedicated K4 contract, K1/K2/K3 contracts, P2-L, CI, Desktop J3–J11 regressions and Android runtime/build gates;
+- this accepts only the source/evidence contract; native-Windows and physical-Android execution remain external, and the documentation head created by this evidence write must pass the full triggered matrix before merge.
 - Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
 
 ## P2-L — Runtime hardening regression gate
@@ -1372,7 +1374,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_ANDROID_REAL_LOAD_K3.md`.
 
 ## NEXT-25 — P2-K K4 Windows/Android manual task-control and OEM acceptance
-**Status: K4_CANDIDATE**
+**Status: SOURCE/CONTRACT_ACCEPTED — PR #193 / FINAL_HEAD_VALIDATION_PENDING**
 
 - Reuse the common P2-K SHA-256 manifest rather than inventing another report format.
 - Record human acceptance as explicit Given/When/Then scenarios.
@@ -1381,6 +1383,8 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Cover Windows long-task visibility, pause/resume, cancel and foreground usability.
 - Cover Android Task Center, foreground notification, pause/resume/cancel, OEM/background behavior and foreground usability.
 - Preserve human FAIL as valid evidence; do not turn it into a synthetic PASS.
+- Source/contract acceptance: implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` passed 18/18 workflows; representative human execution remains external.
+- Merge gate: the final documentation head must also pass the complete triggered workflow matrix before #193 is merged.
 - Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
 
 ## PARALLEL-1 — W5C PR #109
@@ -1395,6 +1399,14 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-K4 source/contract accepted after full automated matrix
+
+State update:
+- PR #193 implementation head `f661dc9de0b5fe35db2c4e45afd10b3f965a4bdf` is mergeable and passed 18/18 triggered workflows.
+- The passing matrix includes the dedicated K4 contract, K1/K2/K3 evidence contracts, P2-L, normal CI, Desktop J3–J11 regressions and Android runtime/build gates.
+- This is not representative Windows/Android evidence and does not select budgets or capacities.
+- The acceptance documentation commit must receive its own full green matrix before merge.
 
 ## 2026-09-26 — P2-K4 records human task-control/OEM acceptance without automating the verdict
 

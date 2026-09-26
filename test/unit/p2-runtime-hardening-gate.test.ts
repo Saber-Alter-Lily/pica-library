@@ -59,6 +59,12 @@ describe('P2-L runtime hardening promotion gate', () => {
         ])
             expect(workflow).toContain(contract)
 
+        expect(workflow).toContain(
+            '- name: Prepare previous accepted Windows package\n        shell: pwsh\n        env:\n          GH_TOKEN: ${{ github.token }}'
+        )
+        expect(workflow).not.toContain(
+            'windows-package-smoke:\n    runs-on: windows-latest\n    timeout-minutes: 45\n    env:\n      GH_TOKEN'
+        )
         expect(workflow).toContain('Prepare previous accepted Windows package')
         expect(workflow).toContain(
             "$releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'"

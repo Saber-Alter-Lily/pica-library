@@ -1,6 +1,25 @@
 # Desktop Active-download Foreground Latency — P2 J8
 
-Status: **controlled-load harness candidate / no latency budget selected**
+Status: **SOURCE/HARNESS PASS / PR #186 merge-ready / no latency budget selected**
+
+Accepted source/harness evidence on head `49378566d15e369b8a31ccd9732532b80e6e63a1`:
+- Desktop Active Download Latency Harness `36231026283`: PASS;
+- P2 Runtime Hardening Promotion Gate `36231026257`: PASS;
+- normal CI `36231026271`: PASS;
+- Desktop Startup Harness `36231026336`: PASS;
+- Desktop Browser Home Harness `36231026254`: PASS;
+- Desktop Browser Detail Reader Harness `36231026391`: PASS;
+- Desktop Reader Long Session Harness `36231026242`: PASS;
+- Desktop Recommendation Benchmark Harness `36231026327`: PASS;
+- Android Macrobenchmark Build `36231026302`: PASS;
+- Android Worker Force-Stop Recovery `36231026239`: PASS;
+- Android Memory and Background Restrictions `36231026291`: PASS;
+- Experimental Linux Package `36231026245`: PASS;
+- Experimental macOS arm64 Package `36231026292`: PASS;
+- Experimental Windows ARM64 Package `36231026265`: PASS;
+- Experimental Docker Headless Package `36231026290`: PASS.
+
+These hosted-runner results establish source/harness acceptance only. They do not establish P2-K reference performance budgets.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-J Performance instrumentation;

@@ -7,7 +7,6 @@ import androidx.test.filters.LargeTest;
 import androidx.test.filters.SdkSuppress;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.uiautomator.By;
-import androidx.test.uiautomator.Direction;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import androidx.test.uiautomator.Until;
@@ -19,8 +18,6 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -93,9 +90,15 @@ public final class PicaRealLoadMacrobenchmark {
             scope->{
                 UiDevice device=scope.getDevice();
                 assertDownloadRunning(device,"before Reader interaction");
-                UiObject2 reader=requireReaderSurface(device);
+                requireReaderSurface(device);
+                int width=device.getDisplayWidth();
+                int height=device.getDisplayHeight();
                 for(int i=0;i<24;i++){
-                    reader.swipe(i%2==0?Direction.UP:Direction.DOWN,0.65f);
+                    int x=width/2;
+                    int fromY=i%2==0?(int)(height*0.78f):(int)(height*0.30f);
+                    int toY=i%2==0?(int)(height*0.30f):(int)(height*0.78f);
+                    if(!device.swipe(x,fromY,x,toY,18))
+                        throw new AssertionError("Reader swipe failed at step "+i);
                     device.waitForIdle(120L);
                 }
                 assertDownloadRunning(device,"after Reader interaction");

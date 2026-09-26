@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1 merged; K2 Android physical evidence session tooling candidate; representative execution still required; no budgets selected**
+**Status: IN_PROGRESS — K1/K2 merged; K3 source/contract accepted and merge-ready; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -566,7 +566,9 @@ K1 merged (PR #190):
 - no performance or concurrency budget was selected.
 - Detailed boundary: `docs/P2K_REFERENCE_EVIDENCE_K1.md`.
 
-K2 candidate:
+K2 merged (PR #191):
+- Android physical G18/G19 collection tooling is merged at `5bb3085cb22c60bca23e98d15fbaafd2f6942324`;
+- final K2 head passed its dedicated contract, P2-L, CI, Android runtime gates and Desktop benchmark regressions;
 - stages G18 idle baseline and G19 real recommendation-loaded Macrobenchmark on one physical Android device and exact commit;
 - rejects emulator/generic devices, cross-device/cross-commit sessions and dirty-tree promotion by default;
 - stores a SHA-256 device identity instead of raw adb serial in the K2 evidence copy;
@@ -574,6 +576,17 @@ K2 candidate:
 - CI validates only script/contracts; physical timings are never generated or promoted by CI;
 - explicit real download/Reader loaded scenarios remain external and may not be replaced with synthetic media.
 - Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
+
+K3 source/contract accepted (PR #192 merge-ready):
+- final automated validation head `3792d8775d45c645d75a989cdee333283f3ea125` passed all 17 triggered workflows, including dedicated K3, K1/K2 evidence contracts, P2-L, CI and Android runtime gates;
+- adds physical-device-only real download-loaded and Reader-under-download Macrobenchmark scenarios using AndroidX Macrobenchmark/UiAutomator already adopted by G18/G19;
+- synthetic media is explicitly prohibited;
+- download-loaded acceptance requires `media-network` + `filesystem-heavy` RUNNING before and after measured navigation;
+- Reader evidence uses a benchmark-only exported bridge to launch production `ReaderActivity` with tester-supplied real comic/chapter inputs; release/debug manifests remain unchanged;
+- evidence JSON stores only SHA-256 comic/chapter identities, never raw IDs or credentials;
+- Reader collector preserves before/after raw `dumpsys meminfo` snapshots for review but selects no memory/frame budget;
+- physical execution remains external and must use representative hardware.
+- Detailed boundary: `docs/P2K_ANDROID_REAL_LOAD_K3.md`.
 
 ## P2-L — Runtime hardening regression gate
 **Status: AUTOMATED_GATE_PASS / MERGED — PR #178; P2 exit remains blocked by external evidence**
@@ -1333,15 +1346,22 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_REFERENCE_EVIDENCE_K1.md`.
 
 ## NEXT-23 — P2-K K2 Android physical-device evidence session tooling
-**Status: K2_CANDIDATE**
+**Status: DONE — PR #191**
 
-- Reuse the accepted G18/G19 Macrobenchmarks; do not create synthetic Provider/media load.
-- Pair G18 idle and G19 real recommendation-loaded evidence on the same physical device and exact commit.
-- Reject emulator/generic device evidence and dirty-tree promotion by default.
-- Hash device identity in the evidence bundle and use the shared P2-K manifest format.
-- Physical execution remains external; CI validates script/contracts only.
-- Real download/Reader loaded scenarios remain separately required with explicit user-selected real inputs.
+- K2 collector is merged at `5bb3085cb22c60bca23e98d15fbaafd2f6942324`.
+- Physical G18/G19 execution remains external; CI only validates contracts.
 - Detailed boundary: `docs/P2K_ANDROID_PHYSICAL_EVIDENCE_K2.md`.
+
+## NEXT-24 — P2-K K3 Android real download / Reader physical evidence tooling
+**Status: SOURCE/CONTRACT_ACCEPTED — PR #192 / MERGE_READY**
+
+- Reuse AndroidX Macrobenchmark + UiAutomator; do not create a new benchmark framework.
+- Require a user-selected real download and verify `media-network` + `filesystem-heavy` remain RUNNING through measured navigation.
+- Add benchmark-only Reader launcher for explicit real comic/chapter inputs, then measure Reader gestures while a real download remains active.
+- Persist only SHA-256 input identities; never store raw comic/chapter IDs or credentials.
+- Save raw pre/post Reader meminfo snapshots for review without choosing a memory threshold.
+- Physical execution remains external and synthetic media is prohibited.
+- Detailed boundary: `docs/P2K_ANDROID_REAL_LOAD_K3.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1355,6 +1375,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-K3 requires real Android download and Reader inputs
+
+State update:
+- K2 Android physical G18/G19 evidence tooling is merged as PR #191 at `5bb3085cb22c60bca23e98d15fbaafd2f6942324`.
+- K2 intentionally leaves real download-loaded navigation and Reader-loaded interaction unresolved.
+- K3 extends the existing AndroidX Macrobenchmark 1.5.0 / UiAutomator 2.4.0 plane rather than introducing synthetic media or a parallel benchmark stack.
+- Download-loaded measurement is accepted only while real WorkManager `media-network` and `filesystem-heavy` resources remain RUNNING.
+- Reader measurement uses a benchmark-only same-package bridge into production ReaderActivity with tester-supplied real comic/chapter IDs; the release/debug app is not made externally launchable.
+- Evidence output hashes comic/chapter IDs and stores no credentials; raw pre/post Reader meminfo is retained only for later review.
+- K3 tooling does not satisfy P2-K without representative physical-device execution and does not authorize P2-C3 capacities or budgets.
 
 ## 2026-09-26 — P2-K K2 pairs physical Android baseline and real loaded evidence without synthetic media
 

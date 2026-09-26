@@ -1,0 +1,58 @@
+name: P2-K Android Real Load K3 Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/android-alpha2/app/src/benchmark/**'
+      - 'mobile/android-alpha2/macrobenchmark/**'
+      - 'scripts/run-android-real-load-macrobenchmark.sh'
+      - 'test/unit/p2k-android-real-load-k3.test.ts'
+      - 'docs/P2K_ANDROID_REAL_LOAD_K3.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-android-real-load-k3.yml'
+  pull_request:
+    paths:
+      - 'mobile/android-alpha2/app/src/benchmark/**'
+      - 'mobile/android-alpha2/macrobenchmark/**'
+      - 'scripts/run-android-real-load-macrobenchmark.sh'
+      - 'test/unit/p2k-android-real-load-k3.test.ts'
+      - 'docs/P2K_ANDROID_REAL_LOAD_K3.md'
+      - 'DEVELOPMENT_TASK_LOG.md'
+      - '.github/workflows/p2k-android-real-load-k3.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-real-load-k3-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Parse physical collector
+        run: bash -n scripts/run-android-real-load-macrobenchmark.sh
+      - name: Run K3 contract tests
+        run: pnpm exec vitest run test/unit/p2k-android-real-load-k3.test.ts
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compile benchmark-only Reader bridge and K3 Macrobenchmark
+        working-directory: mobile/android-alpha2
+        run: gradle :app:assembleBenchmark :macrobenchmark:assembleBenchmark --stacktrace

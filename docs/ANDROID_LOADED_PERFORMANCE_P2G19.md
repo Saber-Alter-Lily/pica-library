@@ -1,11 +1,20 @@
 # Android Loaded Foreground Performance — P2 G19
 
-Status: **loaded-scenario harness candidate / real physical-device evidence required**
+Status: **SOURCE/BUILD PASS / merged as PR #173 / real physical-device evidence required**
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-G Android runtime hardening;
 - P2-C Android resource-budget evidence;
 - P2-J Android foreground performance instrumentation.
+
+Accepted source/build evidence before merge:
+- Android Macrobenchmark Build run `36160396121`: PASS;
+- normal CI run `36160396044`: PASS;
+- G15 force-stop regression run `36160396042`: PASS;
+- G16 memory/background regression run `36160396108`: PASS;
+- merged commit: `529638cd1ff3ebe8c16e6ba54e8f43ea85c9a116`.
+
+These runs prove the loaded harness builds and preserves existing runtime behavior. They do **not** constitute the required physical-device loaded-performance result.
 
 Baseline:
 - G17 observe-only resource classification is merged.

@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J8 merged; J9 source/harness accepted and merge-ready; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J9 merged; J10 source/contract accepted and merge-ready; real-model/representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -505,9 +505,9 @@ J8 merged (PR #186):
 - hosted timing remains harness-only and no latency budget is selected.
 - Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
 
-J9 source/harness accepted (PR #187 merge-ready):
-- first full validation head `7367aa5f21a67fa84db15a76b110f46aa79c0772` passed all 16 triggered workflows, including dedicated J9, P2-L, normal CI, J3–J8 regressions, Android recovery/memory gates and all experimental packages;
-- hosted smoke confirmed 24/24 `remote-storage-sync` foreground-sample coverage plus 6 real WebDAV requests inside the measured window;
+J9 merged (PR #187):
+- final pre-merge head `6a57cfa891528a8a388e433366626d298aa54743` passed all 16 triggered workflows; merge commit is `d90c697c08f9a009c5584989a2f41de51d9a935e`;
+- first accepted smoke confirmed 24/24 `remote-storage-sync` foreground-sample coverage plus 6 real WebDAV requests inside the measured window;
 - follows the open-source `webdav-client` test pattern by provisioning pinned `webdav-server@2.6.2` only in a temporary benchmark tool root;
 - runs the real `RemoteStorageDesktopManager.sync()`, `WebDavStorageProvider`, `RemoteLibrarySyncService` and process-shared `RuntimeResourceCoordinator`;
 - J2 requires `remote-storage-sync` to cover every foreground sample;
@@ -1265,15 +1265,27 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
 
 ## NEXT-19 — P2-J9 Desktop WebDAV foreground latency
-**Status: SOURCE/HARNESS_ACCEPTED — PR #187 / MERGE_READY**
+**Status: DONE — PR #187**
 
-- Provision pinned open-source `webdav-server@2.6.2` in a temporary tool root; do not add it to production dependencies.
-- Run the real RemoteStorageDesktopManager/WebDavStorageProvider/RemoteLibrarySyncService path against loopback WebDAV.
-- Reuse J2 foreground measurement and require full `remote-storage-sync` coverage.
-- Independently require actual WebDAV requests inside the measured window.
-- Emit machine-readable J2 + WebDAV fixture evidence without credentials or local paths.
-- CI validates harness/source execution only; no P2-K latency threshold or hosted-provider throughput claim.
+- J9 is merged at `d90c697c08f9a009c5584989a2f41de51d9a935e`.
+- Final pre-merge head passed the dedicated J9 workflow, P2-L, normal CI, J3–J8 regressions, Android recovery/memory gates and all experimental package workflows.
+- Hosted timing remains harness-only; real Windows/provider evidence is still P2-K work.
 - Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
+
+## NEXT-20 — P2-J10 Desktop Visual indexing foreground impact
+**Status: SOURCE/CONTRACT_ACCEPTED — PR #188 / MERGE_READY / REAL_MODEL_EXTERNAL_EVIDENCE_REQUIRED**
+
+- First full validation head `2a6840cbd359434bff165408fdb24b5b095b6cae` passed all 17 triggered workflows, including the dedicated J10 source-contract gate, P2-L, normal CI, J3–J9 regressions, Android recovery/memory gates and all experimental packages.
+- Automated acceptance is source/contract only; no real DINOv2 timing is claimed until explicit `--allow-model-network` evidence is collected.
+- Measure the actual browser-side Visual indexing workload; do not synthesize a `cpu-model` RuntimeResourceCoordinator lease that the production Visual path does not currently own.
+- Preserve the product architecture: `visual-worker.js` performs Transformers.js image-feature extraction off the main thread.
+- Reuse the real `onnx-community/dinov2-small` / Transformers.js 4.2.0 runtime contract when collecting true Visual-load evidence.
+- Separate cold model/bootstrap/network + first persistence from repeated warm inference.
+- Reuse the J4/J5/J6 Playwright foreground measurement plane rather than creating a second browser timing implementation.
+- Count navigation/RAF samples only when the warm inference sequence remains active for the whole observation window.
+- Require the exact local fixture to leave Visual pending state before cold-phase acceptance.
+- Hosted CI validates source/harness contracts only; real execution requires explicit `--allow-model-network`.
+- Detailed boundary: `docs/DESKTOP_VISUAL_INDEX_FOREGROUND_P2J10.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1287,6 +1299,17 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J10 measures the real browser Visual worker, not a synthetic cpu-model lease
+
+State update:
+- J9 WebDAV foreground latency is merged as PR #187 at `d90c697c08f9a009c5584989a2f41de51d9a935e`; final pre-merge head passed 16/16 workflows.
+- Production Visual indexing is browser-side: `web/visual-worker.js` dynamically imports Transformers.js and runs `pipeline('image-feature-extraction', 'onnx-community/dinov2-small')` in a Web Worker.
+- `cpu-model` exists in the runtime resource taxonomy, but the current Visual browser worker is not an authoritative RuntimeResourceCoordinator task owner. J10 therefore must not fabricate a resource lease merely to satisfy J2 load-window semantics.
+- J10 will measure browser foreground responsiveness while the actual Visual worker performs inference, using the existing Playwright browser benchmark plane.
+- Model/bootstrap/download time and steady inference impact must remain distinguishable; hosted/shared-runner timing is validation evidence only.
+- Official Transformers.js guidance/examples use Web Workers to keep model inference off the browser main thread, matching the production architecture already present in Pica Library.
+- No Visual latency budget is selected here; representative hardware evidence remains P2-K work.
 
 ## 2026-09-26 — P2-J9 controlled local WebDAV foreground impact
 

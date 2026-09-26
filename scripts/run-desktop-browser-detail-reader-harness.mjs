@@ -175,21 +175,29 @@ async function shutdownDesktop(home, child) {
 
 async function main() {
     const rounds = positiveInteger(optionValue('rounds'), 5, 'rounds')
+    const benchmarkScript =
+        optionValue('benchmark-script') ??
+        'scripts/benchmark/desktop-browser-detail-reader-harness.mjs'
+    const visualBenchmark =
+        benchmarkScript === 'scripts/benchmark/desktop-visual-index-harness.mjs'
     const timeoutMs = positiveInteger(
         optionValue('timeout-ms'),
-        15_000,
+        visualBenchmark ? 180_000 : 15_000,
         'timeout-ms'
     )
     const output =
         optionValue('output') ??
-        path.join(
-            'test-results',
-            'desktop-browser-detail-reader',
-            'desktop-browser-detail-reader-benchmark.json'
-        )
-    const benchmarkScript =
-        optionValue('benchmark-script') ??
-        'scripts/benchmark/desktop-browser-detail-reader-harness.mjs'
+        (visualBenchmark
+            ? path.join(
+                  'test-results',
+                  'desktop-visual-index',
+                  'desktop-visual-index-benchmark.json'
+              )
+            : path.join(
+                  'test-results',
+                  'desktop-browser-detail-reader',
+                  'desktop-browser-detail-reader-benchmark.json'
+              ))
     const harnessValidationOnly =
         process.argv.includes('--harness-validation-only') ||
         process.env.PICA_BENCHMARK_HARNESS_ONLY === '1'
@@ -309,7 +317,10 @@ async function main() {
             `--rounds=${rounds}`,
             `--timeout-ms=${timeoutMs}`,
             `--output=${output}`,
-            ...(harnessValidationOnly ? ['--harness-validation-only'] : [])
+            ...(harnessValidationOnly ? ['--harness-validation-only'] : []),
+            ...(process.argv.includes('--allow-model-network')
+                ? ['--allow-model-network']
+                : [])
         ]
 
         run(process.execPath, benchmarkArgs, {

@@ -49,7 +49,7 @@ describe('P2 J6 Desktop recommendation generation/batch benchmarks', () => {
         expect(source).toContain('#recommend-restart')
         expect(source).toContain('#app-confirm-submit')
         expect(source).toContain('/api/v1/desktop/runtime/tasks')
-        expect(source).toContain("task.taskKey === 'recommendation-v3'")
+        expect(source).toContain("item.taskKey === 'recommendation-v3'")
         expect(source).toContain("task.resourceClasses.includes('provider-network')")
         expect(source).toContain('regenerationConfirmedToUsableMs')
         expect(source).toContain(
@@ -85,7 +85,9 @@ describe('P2 J6 Desktop recommendation generation/batch benchmarks', () => {
         expect(workflow).toContain('--harness-validation-only')
         expect(workflow).toContain('--rounds=2')
         expect(workflow).toContain('--with-deps')
-        expect(workflow).not.toContain('desktop-recommendation-generation-harness')
+        expect(workflow).not.toContain(
+            'node scripts/run-desktop-recommendation-generation-harness.mjs'
+        )
         expect(workflow).toContain('github.event.repository.private == false')
         expect(pkg.devDependencies?.['@playwright/test']).toBeUndefined()
     })

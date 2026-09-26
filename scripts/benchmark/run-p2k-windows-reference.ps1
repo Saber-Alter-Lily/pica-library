@@ -7,13 +7,17 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-if (-not $IsWindows) {
+if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
     throw "P2-K K1 Windows reference collection must run on Windows."
 }
 
-$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
-if ($architecture -ne "X64") {
-    throw "P2-K K1 Windows reference collection requires Windows x64; observed $architecture."
+$architecture = if ($env:PROCESSOR_ARCHITEW6432) {
+    [string]$env:PROCESSOR_ARCHITEW6432
+} else {
+    [string]$env:PROCESSOR_ARCHITECTURE
+}
+if ($architecture.ToUpperInvariant() -ne "AMD64") {
+    throw "P2-K K1 Windows reference collection requires Windows x64/AMD64; observed $architecture."
 }
 
 $git = (Get-Command git -ErrorAction Stop).Source
@@ -106,7 +110,7 @@ function Invoke-ReferenceBenchmark {
         id = $Id
         executable = [System.IO.Path]::GetFileName($Executable)
         arguments = @($Arguments)
-        output = [System.IO.Path]::GetRelativePath($OutputRoot, $OutputFile)
+        output = [System.IO.Path]::GetFileName($OutputFile)
         outputExists = Test-Path $OutputFile
         exitCode = $exitCode
         startedAt = $started.ToString("o")

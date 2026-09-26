@@ -44,8 +44,11 @@ describe('P2-K K1 Windows reference evidence kit', () => {
         expect(script).toContain('[switch]$AllowDirty')
         expect(script).toContain('git status --porcelain')
         expect(script).toContain('dirty evidence cannot be promoted silently')
-        expect(script).toContain('OSArchitecture')
-        expect(script).toContain('requires Windows x64')
+        expect(script).toContain('PROCESSOR_ARCHITECTURE')
+        expect(script).toContain('PROCESSOR_ARCHITEW6432')
+        expect(script).toContain('requires Windows x64/AMD64')
+        expect(script).not.toContain('$IsWindows')
+        expect(script).not.toContain('GetRelativePath')
     })
 
     it('builds a hashed machine-readable evidence manifest without budgets', () => {

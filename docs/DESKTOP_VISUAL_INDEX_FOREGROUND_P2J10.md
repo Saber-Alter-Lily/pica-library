@@ -1,6 +1,27 @@
 # Desktop Visual Index Foreground Impact — P2 J10
 
-Status: **real-model harness candidate / external real-model evidence required / no performance budget selected**
+Status: **SOURCE/CONTRACT PASS / PR #188 merge-ready / external real-model evidence required / no performance budget selected**
+
+Accepted automated source/contract evidence on head `2a6840cbd359434bff165408fdb24b5b095b6cae`:
+- Desktop Visual Index Foreground Harness `36235931222`: PASS;
+- P2 Runtime Hardening Promotion Gate `36235931224`: PASS;
+- normal CI `36235931239`: PASS;
+- Desktop Startup Harness `36235931188`: PASS;
+- Desktop Browser Home Harness `36235931131`: PASS;
+- Desktop Browser Detail Reader Harness `36235931116`: PASS;
+- Desktop Reader Long Session Harness `36235931231`: PASS;
+- Desktop Recommendation Benchmark Harness `36235931118`: PASS;
+- Desktop Active Download Latency Harness `36235931219`: PASS;
+- Desktop WebDAV Foreground Latency Harness `36235931178`: PASS;
+- Android Macrobenchmark Build `36235931164`: PASS;
+- Android Worker Force-Stop Recovery `36235931220`: PASS;
+- Android Memory and Background Restrictions `36235931158`: PASS;
+- Experimental Linux Package `36235931100`: PASS;
+- Experimental macOS arm64 Package `36235931248`: PASS;
+- Experimental Windows ARM64 Package `36235931122`: PASS;
+- Experimental Docker Headless Package `36235931171`: PASS.
+
+This acceptance proves the J10 harness contract and project regressions only. It does **not** claim that real DINOv2 model execution has already been collected. Real cold/warm model evidence remains an explicit external gate.
 
 J10 measures foreground browser responsiveness while the actual Pica Library
 Visual Web Worker performs real inference. It does not fabricate a backend

@@ -350,7 +350,7 @@ Remaining:
 - background task UI is reconstructible after Activity recreation.
 
 ## P2-H — Startup, shutdown and crash recovery
-**Status: IN_PROGRESS — G13–G16 generic recovery/memory/Doze evidence merged; OEM/device evidence open**
+**Status: IMPLEMENTATION_RECONCILED / H3_SHUTDOWN_CANDIDATE — existing recovery matrix passes; Desktop shutdown fault isolation pending CI; OEM/device evidence remains external**
 
 Required:
 - stale recommendation building state cleanup;
@@ -366,6 +366,17 @@ Required:
 **Acceptance**
 - automated kill/restart tests for critical durable tasks;
 - explicit recovery table checked into docs/tests.
+
+Current reconciliation:
+- Recommendation interrupted-building recovery: implemented and tested;
+- Desktop LOCAL download restart/PAUSED preservation: implemented and tested;
+- WebDAV publication safety: implemented;
+- Visual unfinished-work preservation: implemented;
+- schema pre-migration backup: implemented and tested;
+- browser-close Mobile Bridge lease protection: implemented and tested;
+- headless/browser lifecycle separation: implemented and tested;
+- **H3 candidate:** Desktop shutdown now needs fault-isolated cleanup plus a global hard deadline so one failed close step cannot skip HTTP/DB/instance cleanup.
+- Detailed recovery matrix: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## P2-I — Observability without exposing internals to ordinary users
 **Status: PLANNED / PARTIAL**
@@ -1054,6 +1065,17 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - OEM battery-manager / foreground-notification evidence and large-Catalog/long-Reader timing/jank/memory remain physical-device gates.
 - Detailed boundaries: `docs/ANDROID_RUNTIME_HARDENING_P2G1.md` through `P2G12.md`, `docs/ANDROID_WORKER_RECOVERY_P2G13.md`, `docs/ANDROID_WORKMANAGER_RECOVERY_TEST_P2G14.md`, `docs/ANDROID_FORCE_STOP_RECOVERY_P2G15.md`, `docs/ANDROID_MEMORY_BACKGROUND_P2G16.md`, `docs/ANDROID_RESOURCE_OBSERVATION_P2G17.md`, `docs/ANDROID_FOREGROUND_PERFORMANCE_P2G18.md`, and `docs/ANDROID_LOADED_PERFORMANCE_P2G19.md`.
 
+## NEXT-10 — P2-H Desktop shutdown/recovery reconciliation
+**Status: H3_CANDIDATE**
+
+- Existing P2-H requirements were reconciled into one checked-in matrix; all non-shutdown items already have implementation/test evidence.
+- **H3 finding:** the old `stop()` registered its final exit fallback only after `closeEngine()` returned. Any rejection inside Remote API/Mobile Bridge/E-H/download quiesce/HTTP/DB cleanup could therefore skip later cleanup, instance-lock release and the final exit fallback.
+- **H3 candidate:** register a 35 s global hard deadline before cleanup; isolate each cleanup owner through `shutdownStep(...)`; keep the normal ordered close sequence; clear the global timer only after cleanup/instance release; preserve a final 250 ms third-party-handle grace.
+- LOCAL download safety remains authoritative: `quiesceLocalDownloads()` persists eligible jobs to PAUSED before awaiting active runner settlement.
+- New behavior test forces a real download quiesce timeout and requires the job to remain PAUSED before and after the rejection, with new LOCAL work rejected after shutdown begins.
+- After H3 CI acceptance, P2-H code/recovery implementation can be marked complete; the next unblocked architecture lane becomes P2-I structured observability.
+- Detailed boundary: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
+
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
 
@@ -1066,6 +1088,19 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-25 — P2-H3 Desktop shutdown fault isolation
+
+State update:
+- Recovery inventory shows the recommendation, download, WebDAV, Visual, schema-migration, Mobile Bridge and headless lifecycle requirements already have implementation/test evidence.
+- The remaining concrete P2-H defect was shutdown fault isolation: `stop()` awaited an unguarded `closeEngine()` before registering its final process-exit fallback.
+- H3 registers `SHUTDOWN_HARD_DEADLINE_MS = 35_000` before cleanup begins, covering the existing 30 s download-quiesce bound plus local HTTP close margin.
+- `shutdownStep(...)` records one cleanup owner's failure and continues later owners instead of aborting the shutdown chain.
+- Cleanup order remains Remote API → Mobile Bridge → managed E-H login → local downloads → local HTTP server → SQLite → instance lock.
+- The normal short `SHUTDOWN_FINAL_HANDLE_GRACE_MS = 250` remains only after cleanup has completed/fault-isolated.
+- A new behavior regression forces `quiesceLocalDownloads(20)` to time out while a real provider write is blocked and requires the LOCAL job to stay PAUSED.
+- H3 does not claim same-run resume for every subsystem; documented safe-stop/restart semantics remain valid.
+- Detailed boundary: `docs/DESKTOP_SHUTDOWN_RECOVERY_P2H3.md`.
 
 ## 2026-09-25 — G19 source/build accepted; Android enforcement enters physical-evidence gate
 

@@ -87,20 +87,27 @@ describe('Desktop headless runtime foundation P5C', () => {
         )
     })
 
-    it('keeps graceful cleanup but guarantees explicit shutdown cannot be held open by background handles', () => {
+    it('keeps graceful cleanup globally bounded and fault-isolated', () => {
         const main = fs.readFileSync('src/desktop/main.ts', 'utf8')
+        expect(main).toContain('const SHUTDOWN_HARD_DEADLINE_MS = 35_000')
+        expect(main).toContain('const SHUTDOWN_FINAL_HANDLE_GRACE_MS = 250')
+        expect(main).toContain('async function shutdownStep(')
+        expect(main).toContain('const hardExit = setTimeout(() => {')
         expect(main).toContain('await closeEngine()')
-        expect(main).toContain('instance.release()')
-        expect(main).toContain('process.exitCode = exitCode')
-        expect(main).toContain(
-            'const finalExit = setTimeout(() => process.exit(exitCode), 250)'
-        )
+        expect(main).toContain('releaseInstanceLock(errors)')
+        expect(main).toContain('clearTimeout(hardExit)')
+        expect(main).toContain('SHUTDOWN_FINAL_HANDLE_GRACE_MS')
         expect(main).toContain('finalExit.unref()')
         expect(main).toContain(
             'Shutdown: Desktop controller request received'
         )
         expect(main).toContain('void stop()')
         expect(main).not.toContain('setImmediate(() => void stop())')
+
+        const hardDeadline = main.indexOf('const hardExit = setTimeout(() => {')
+        const gracefulClose = main.indexOf('errors.push(...(await closeEngine()))')
+        expect(hardDeadline).toBeGreaterThan(-1)
+        expect(gracefulClose).toBeGreaterThan(hardDeadline)
     })
 
     it('does not treat headless mode as a formal remote-server or release capability', () => {

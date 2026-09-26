@@ -52,13 +52,19 @@ describe('P2 J6 Desktop recommendation generation/batch benchmarks', () => {
         expect(source).toContain("task.taskKey === 'recommendation-v3'")
         expect(source).toContain("task.resourceClasses.includes('provider-network')")
         expect(source).toContain('regenerationConfirmedToUsableMs')
+        expect(source).toContain(
+            'before any recommendation UI action'
+        )
         expect(source).toContain('preexistingUsableCycleRequired: true')
         expect(source).toContain('providerNetworkResourceObservationRequired: true')
         expect(runner).toContain('already-configured Pica Library Desktop')
         expect(runner).toContain('--confirm-regeneration=YES')
         expect(runner).toContain('No credentials were read or exported')
-        expect(runner).not.toContain('PICA_ACCOUNT')
-        expect(runner).not.toContain('PICA_PASSWORD')
+        expect(runner).toContain(
+            '/^PICA_(ACCOUNT|PASSWORD|PROXY|TOKEN|COOKIE|AUTHORIZATION)$/i'
+        )
+        expect(runner).not.toContain('process.env.PICA_ACCOUNT')
+        expect(runner).not.toContain('process.env.PICA_PASSWORD')
     })
 
     it('keeps the local CI harness isolated and non-promotional', () => {

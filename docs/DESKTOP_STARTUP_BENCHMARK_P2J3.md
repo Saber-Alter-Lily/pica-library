@@ -1,6 +1,22 @@
 # Desktop Process Startup Benchmark — P2 J3
 
-Status: **measurement harness candidate / no startup budget selected**
+Status: **PASS / merged as PR #179 / no startup budget selected**
+
+Accepted source/harness evidence before merge:
+- Desktop Startup Harness run `36222961030`: PASS;
+- normal CI run `36222960972`: PASS;
+- P2 Runtime Hardening Promotion Gate run `36222961015`: PASS;
+- Linux x64 package run `36222960986`: PASS;
+- macOS arm64 package run `36222961039`: PASS;
+- Windows ARM64 package run `36222961116`: PASS;
+- Docker headless package run `36222960967`: PASS;
+- Android Macrobenchmark build run `36222961067`: PASS;
+- Android force-stop regression run `36222960988`: PASS;
+- Android memory/background regression run `36222961046`: PASS;
+- merged commit: `e4112a9c9cc1a7a654d1be16c2a197a21d5feb79`.
+
+The hosted-runner millisecond values from the harness smoke are not promoted to
+P2-K budgets.
 
 Parent:
 - `DEVELOPMENT_TASK_LOG.md` → P2-J Performance instrumentation;

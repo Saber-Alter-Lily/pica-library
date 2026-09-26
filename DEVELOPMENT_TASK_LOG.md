@@ -5,8 +5,8 @@
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
 Last reconciled: **2026-09-26**  
-Authoritative repository baseline before the current K5 source/contract accepted (PR #194): `main@9197e9935543c01915222ed106d492d837101b85` (P2-K4 / PR #193 merged)  
-Current critical-path work: **P2-K representative evidence / K5 evidence completeness and integrity review**
+Authoritative repository baseline before the current unpublished RC candidate: `main@8d31d8a9c4f7c5a5786cbb60a01a6e267c8e2b4e` (P2-K5 / PR #194 merged)  
+Current critical-path work: **unpublished Windows/Android P2 RC final-head validation → representative manual/physical evidence**
 
 ---
 
@@ -535,7 +535,7 @@ J11 merged (PR #189):
 - Detailed boundary: `docs/DESKTOP_OVERLAP_FOREGROUND_LATENCY_P2J11.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
-**Status: IN_PROGRESS — K1/K2/K3/K4 tooling merged; K5 source/contract accepted in PR #194 with final-head validation pending; representative execution still required; no budgets selected**
+**Status: IN_PROGRESS — K1/K2/K3/K4/K5 tooling merged; representative execution still required; no budgets selected**
 
 Do not call synthetic benchmarks real throughput tests.
 
@@ -603,7 +603,7 @@ K4 merged (PR #193):
 - this accepts only the source/evidence contract; native-Windows and physical-Android execution remain external.
 - Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
 
-K5 candidate:
+K5 merged (PR #194):
 - adds a read-only evidence review/completeness layer rather than another benchmark framework;
 - verifies K1/K2/K4 manifest file hashes, embedded commit authority, platform authority and required run IDs independently of the collector's `complete=true`;
 - accepts K3 as its approved standalone physical session format, rechecking physical-device authority, hashed identities, real-media policy and benchmarkData presence;
@@ -612,7 +612,8 @@ K5 candidate:
 - when all categories are structurally present, the strongest automatic state is `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW`, never P2 complete;
 - K3 collection is hardened so download-loaded and Reader runs default to independent timestamped roots and only current-run artifacts are copied;
 - implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f` passed all 19/19 triggered workflows with zero failures, including dedicated K5/K1/K2/K3/K4 contracts, normal CI, Desktop J3–J11 regressions, Android recovery/background gates, Macrobenchmark build and the aggregate P2-L promotion gate;
-- this accepts only the source/review contract; representative hardware/provider/model evidence remains external, and the documentation head created by this acceptance write must pass the full triggered matrix before merge.
+- final documentation head `9989a47a835f442b7d7904ba9e2ec24e1f342db5` also passed 19/19 workflows with zero failures; PR #194 merged as `8d31d8a9c4f7c5a5786cbb60a01a6e267c8e2b4e`;
+- this accepts only the source/review contract; representative hardware/provider/model evidence remains external.
 - Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
 
 ## P2-L — Runtime hardening regression gate
@@ -1402,7 +1403,7 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/P2K_MANUAL_ACCEPTANCE_K4.md`.
 
 ## NEXT-26 — P2-K K5 evidence completeness / integrity review
-**Status: SOURCE/CONTRACT_ACCEPTED — PR #194 / FINAL_HEAD_VALIDATION_PENDING**
+**Status: DONE — PR #194**
 
 - Reuse the existing K1/K2/K4 SHA-256 manifests and approved K3 session format; do not invent another measurement harness.
 - Independently verify file hashes, exact commit, platform/device authority and required run IDs.
@@ -1411,8 +1412,26 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Do not choose a minimum repetition count, latency/frame/memory budget or P2-C3 concurrency capacity automatically.
 - Harden K3 evidence archival so consecutive physical scenarios cannot overwrite each other or pull stale 90-minute artifacts.
 - Source/contract acceptance: implementation head `ad64b2eaa40b968afae1d9fff6876a80086fa56f` passed 19/19 workflows with zero failures.
-- Merge gate: the final documentation head must also pass the complete triggered workflow matrix before #194 is merged.
+- Final documentation head `9989a47a835f442b7d7904ba9e2ec24e1f342db5` also passed 19/19 workflows; merged commit is `8d31d8a9c4f7c5a5786cbb60a01a6e267c8e2b4e`.
+- Representative evidence remains external; K5 completion does not imply P2 completion.
 - Detailed boundary: `docs/P2K_EVIDENCE_REVIEW_K5.md`.
+
+## NEXT-27 — Unpublished P2 Windows/Android RC test packages
+**Status: SOURCE/ARTIFACT_ACCEPTED — PR #195 / FINAL_HEAD_VALIDATION_PENDING**
+
+- Keep the public stable channel at v0.4.11; do not reserve or publish v0.4.12.
+- Derive an ephemeral candidate identity `0.4.11-p2rc.<source-sha>`.
+- Windows candidate must use `RcLauncher.cs` and isolate all Desktop state under `%LOCALAPPDATA%\Pica Library P2 RC`.
+- Android candidate must use the side-by-side `com.picalibrary.android.dev` QA identity and must not replace the formal app.
+- Reuse the existing fixed QA signing material for Android candidate continuity; do not publish or modify `android-preview`.
+- Workflow permissions remain read-only; artifacts are GitHub Actions manual-QA outputs only.
+- Do not weaken the updater security boundary: stable v0.4.11 must not accept unpublished `local-test` packages.
+- Register public v0.4.11 as app API 2 / schema 13. Current development schema 16 must classify as `FULL_APPLICATION / SCHEMA_JUMP`; migration/rollback acceptance is separate from broad isolated RC QA.
+- Windows-host full-suite execution exposed and fixed host-dependent POSIX path simulation in macOS/Linux Desktop roots and macOS managed-browser discovery; POSIX chmod semantics are explicitly skipped on Windows.
+- Source/artifact acceptance: implementation head `7a66d02d1523cf4c603c4850b28e3b96aced63ef` passed all 25/25 PR workflows with zero failures.
+- Dedicated RC push run `36275848212` passed 3/3 jobs and produced Windows artifact `10916927763` and Android artifact `10917522055`.
+- Merge gate: the final documentation head must again pass the complete PR workflow matrix and the dedicated branch-push RC package run.
+- Detailed boundary: `docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1426,6 +1445,29 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2 unpublished dual-client RC source/artifact contract accepted
+
+State update:
+- PR #195 implementation head `7a66d02d1523cf4c603c4850b28e3b96aced63ef` passed all 25/25 triggered pull-request workflows with zero failures.
+- Dedicated branch-push run `36275848212` passed `contract`, `windows-rc` and `android-rc`.
+- The run produced unpublished one-day manual-QA artifacts: Windows id `10916927763` (36,063,197 bytes) and Android id `10917522055` (4,110,039 bytes).
+- Windows broad QA uses the isolated `%LOCALAPPDATA%\Pica Library P2 RC` root. Android QA uses `com.picalibrary.android.dev`; neither replaces stable user state by default.
+- Stable `build-windows-package.ps1` remains unchanged. RC assembly lives in the dedicated `build-windows-rc-package.ps1` wrapper/repackager.
+- Windows full-suite execution exposed and fixed two host-dependent POSIX path bugs; the POSIX chmod test is now explicitly non-Windows.
+- Public stable remains v0.4.11. No v0.4.12 tag/release/update-channel mutation occurred.
+- This is source/artifact acceptance, not representative human/physical-device evidence. Final-head validation remains required before merge.
+
+## 2026-09-26 — K5 merged; move critical path to unpublished dual-client RC
+
+State update:
+- PR #194 final documentation head `9989a47a835f442b7d7904ba9e2ec24e1f342db5` passed 19/19 triggered workflows and merged as `8d31d8a9c4f7c5a5786cbb60a01a6e267c8e2b4e`.
+- K1–K5 now cover source/contract collection and evidence reconciliation; missing representative hardware/human evidence remains external.
+- The next repository-side deliverable is an unpublished manual-QA RC, not another benchmark framework.
+- Windows RC is isolated from the stable Desktop data root; Android RC uses the side-by-side Dev identity.
+- Stable v0.4.11 remains the public release. RC version identity is commit-derived and does not reserve v0.4.12.
+- v0.4.11 is explicitly registered as schema 13. Current schema 16 is a schema jump and requires a full-application migration/rollback gate for any future formal upgrade path.
+- Stable-to-RC local update bypasses are prohibited; existing updater trust rules remain unchanged.
 
 ## 2026-09-26 — P2-K5 source/review contract accepted after full automated matrix
 

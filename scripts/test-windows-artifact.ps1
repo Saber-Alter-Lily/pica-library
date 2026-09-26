@@ -1,11 +1,20 @@
 param(
     [Parameter(Mandatory = $true)][string]$Zip,
     [switch]$PortCollision,
-    [switch]$SetupPersistence
+    [switch]$SetupPersistence,
+    [string]$ExpectedVersion = '',
+    [string]$DesktopHomeName = 'Pica Library'
 )
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$expectedVersion = [string]((Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'package.json') | ConvertFrom-Json).version)
+$expectedVersion = if ([string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+    [string]((Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'package.json') | ConvertFrom-Json).version)
+} else {
+    [string]$ExpectedVersion
+}
+if ([string]::IsNullOrWhiteSpace($DesktopHomeName) -or $DesktopHomeName -match '[\\/:*?"<>|]') {
+    throw 'DesktopHomeName must be one safe Windows directory name'
+}
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ("pica-artifact-smoke-" + [guid]::NewGuid().ToString('N'))
 $extract = Join-Path $work 'extract'
@@ -80,7 +89,8 @@ try {
     }
     $watch = [Diagnostics.Stopwatch]::StartNew()
     Start-Process -FilePath $launcher -ArgumentList '--no-open' -WorkingDirectory $rootPath -WindowStyle Hidden
-    $instanceFile = Join-Path $local 'Pica Library\runtime-state\instance.json'
+    $desktopHome = Join-Path $local $DesktopHomeName
+    $instanceFile = Join-Path $desktopHome 'runtime-state\instance.json'
     $deadline = (Get-Date).AddSeconds(30)
     do {
         Start-Sleep -Milliseconds 150
@@ -134,8 +144,8 @@ try {
         $payload = @{ account='synthetic-account'; password='synthetic-password'; libraryDirectory=$library; profile='fast'; proxyUrl='http://proxy-user:proxy-password@127.0.0.1:7890' } | ConvertTo-Json
         Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/desktop/settings') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body $payload -TimeoutSec 15 | Out-Null
         Start-Sleep -Seconds 1
-        $configFile = Join-Path $local 'Pica Library\config\config.json'
-        $credentialFile = Join-Path $local 'Pica Library\config\credentials.dat'
+        $configFile = Join-Path $desktopHome 'config\config.json'
+        $credentialFile = Join-Path $desktopHome 'config\credentials.dat'
         $configText = [IO.File]::ReadAllText($configFile)
         $credentialText = [IO.File]::ReadAllText($credentialFile)
         foreach ($secret in @('synthetic-account','synthetic-password','proxy-user','proxy-password')) {
@@ -176,7 +186,7 @@ try {
         if (Get-Process -Id $second.pid -ErrorAction SilentlyContinue) { throw 'Relaunched packaged process did not stop' }
         $relaunch='PASS'
     }
-    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
+    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; desktop_home_name=$DesktopHomeName; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
     $smokePassed = $true
 } finally {
     if ($listener) { $listener.Stop() }

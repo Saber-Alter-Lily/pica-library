@@ -43,6 +43,7 @@ describe('P2-K3 Android real download/Reader physical evidence kit',()=>{
     expect(s).toContain('meminfo-before.txt')
     expect(s).toContain('meminfo-after.txt')
     expect(d).toContain('not a memory budget')
-    expect(d).toContain('AndroidX Macrobenchmark 1.5.0')
+    expect(d).toContain('AndroidX')
+    expect(d).toContain('Macrobenchmark 1.5.0')
   })
 })

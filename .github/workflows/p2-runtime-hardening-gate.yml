@@ -73,7 +73,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     env:
-      PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -119,6 +118,8 @@ jobs:
           Write-Host "Prepared accepted launcher baseline: v$baseVersion"
       - name: Build and smoke current Windows package
         shell: pwsh
+        env:
+          PICA_LIBRARY_BUILD_PROVENANCE: ${{ env.P2_CANDIDATE_SHA }}
         run: |
           pnpm build:windows
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

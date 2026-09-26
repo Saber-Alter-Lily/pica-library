@@ -3,18 +3,6 @@ name: P2 Unpublished RC Test Packages
 on:
   push:
     branches: [release/p2-unpublished-rc-packages-v2]
-    paths:
-      - 'src/**'
-      - 'web/**'
-      - 'mobile/android-alpha2/**'
-      - 'packaging/windows/RcLauncher.cs'
-      - 'scripts/build-windows-package.ps1'
-      - 'scripts/build-windows-rc-package.ps1'
-      - 'scripts/test-windows-artifact.ps1'
-      - 'test/unit/p2-unpublished-rc-package.test.ts'
-      - 'docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md'
-      - 'DEVELOPMENT_TASK_LOG.md'
-      - '.github/workflows/p2-unpublished-rc-packages.yml'
   pull_request:
     paths:
       - 'packaging/windows/RcLauncher.cs'

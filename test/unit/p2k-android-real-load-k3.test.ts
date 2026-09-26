@@ -46,4 +46,12 @@ describe('P2-K3 Android real download/Reader physical evidence kit',()=>{
     expect(d).toContain('AndroidX')
     expect(d).toContain('Macrobenchmark 1.5.0')
   })
+  it('preserves independent real-load runs and only copies current benchmark artifacts',()=>{
+    const s=read('scripts/run-android-real-load-macrobenchmark.sh')
+    expect(s).toContain('--result-dir=')
+    expect(s).toContain('test-results/p2k/android-real-load-k3/')
+    expect(s).toContain('result directory already exists and is not empty')
+    expect(s).toContain('-newer "$artifact_marker"')
+    expect(s).not.toContain('-mmin -90')
+  })
 })

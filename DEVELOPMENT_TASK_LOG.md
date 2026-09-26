@@ -428,7 +428,7 @@ Visual decision:
 - Detailed boundaries: `docs/RUNTIME_TASK_DIAGNOSTICS_P2I1.md`, `docs/RUNTIME_TASK_DIAGNOSTICS_P2I2.md`.
 
 ## P2-J — Performance instrumentation
-**Status: IN_PROGRESS — J1–J7 merged; J8 source/harness accepted and merge-ready; representative hardware evidence remains open**
+**Status: IN_PROGRESS — J1–J8 merged; J9 source/harness accepted and merge-ready; representative hardware evidence remains open**
 
 Current `docs/audit/PERFORMANCE_REPORT.md` contains implementation bounds, not a complete real benchmark.
 
@@ -495,15 +495,26 @@ J7 merged (PR #184):
 - J7B is never faked on hosted runners and no J7 threshold is selected.
 - Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
 
-J8 source/harness accepted (PR #186 merge-ready):
-- first full validation head `49378566d15e369b8a31ccd9732532b80e6e63a1` passed all 15 triggered workflows, including dedicated J8, P2-L, normal CI, J3–J7 regressions, Android recovery/memory gates and all experimental packages;
+J8 merged (PR #186):
+- final pre-merge head `aeb91224c72737afb2f9f279ae58f75c4d86b5d0` passed all 15 triggered workflows; merge commit is `97d37db7ee29279ba5cd6549ba5ab80a541f3275`;
 - refactors J2 into a reusable `runHttpLatencyScenario(...)` function while preserving its CLI and one authoritative load-window validity rule;
 - starts a fully local deterministic synthetic Provider adapter but runs the real production LOCAL `DownloadScheduler`, `MediaRequestGate`, SQLite progress writes and filesystem writes;
 - requires `local-download-runner` to cover every foreground J2 sample and separately requires actual `appendFile()` writes during the measured window;
 - emits the full J2 profile plus controlled-fixture/download metadata;
 - uses no Provider credentials or external network and explicitly does not claim real Pica throughput;
-- CI is a short harness smoke only; no latency budget is selected.
+- hosted timing remains harness-only and no latency budget is selected.
 - Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
+
+J9 source/harness accepted (PR #187 merge-ready):
+- first full validation head `7367aa5f21a67fa84db15a76b110f46aa79c0772` passed all 16 triggered workflows, including dedicated J9, P2-L, normal CI, J3–J8 regressions, Android recovery/memory gates and all experimental packages;
+- hosted smoke confirmed 24/24 `remote-storage-sync` foreground-sample coverage plus 6 real WebDAV requests inside the measured window;
+- follows the open-source `webdav-client` test pattern by provisioning pinned `webdav-server@2.6.2` only in a temporary benchmark tool root;
+- runs the real `RemoteStorageDesktopManager.sync()`, `WebDavStorageProvider`, `RemoteLibrarySyncService` and process-shared `RuntimeResourceCoordinator`;
+- J2 requires `remote-storage-sync` to cover every foreground sample;
+- a second validity condition requires actual local WebDAV requests inside the measured window;
+- production dependencies and lockfile remain unchanged;
+- CI is harness validation only and no WebDAV/provider latency budget is selected.
+- Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
 
 ## P2-K — Real benchmark matrix and performance budgets
 **Status: PLANNED**
@@ -1246,16 +1257,23 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Detailed boundary: `docs/DESKTOP_RECOMMENDATION_BENCHMARK_P2J7.md`.
 
 ## NEXT-18 — P2-J8 Desktop active-download foreground latency
-**Status: SOURCE/HARNESS_ACCEPTED — PR #186 / MERGE_READY**
+**Status: DONE — PR #186**
 
-- Reuse J1/J2 telemetry/window validity instead of cloning latency logic.
-- Start a real production LOCAL download runner against a deterministic local synthetic Provider adapter.
-- Keep Provider/network traffic absent; the fixture exists only to exercise scheduler/media-gate/SQLite/filesystem contention repeatably.
-- Require `local-download-runner` to cover every accepted foreground sample.
-- Require at least one actual fixture file write during the measured window.
-- Emit machine-readable J2 profile plus controlled fixture/download metadata.
-- CI validates harness execution only; no P2-K latency threshold or Provider throughput claim.
+- J8 source/harness is merged at `97d37db7ee29279ba5cd6549ba5ab80a541f3275`.
+- Final pre-merge head passed the dedicated J8 harness, P2-L, normal CI, J3–J7 regressions, Android recovery/memory gates and all experimental package workflows.
+- Hosted timing remains harness-only; representative Windows x64 active-download evidence is still required for P2-K.
 - Detailed boundary: `docs/DESKTOP_ACTIVE_DOWNLOAD_LATENCY_P2J8.md`.
+
+## NEXT-19 — P2-J9 Desktop WebDAV foreground latency
+**Status: SOURCE/HARNESS_ACCEPTED — PR #187 / MERGE_READY**
+
+- Provision pinned open-source `webdav-server@2.6.2` in a temporary tool root; do not add it to production dependencies.
+- Run the real RemoteStorageDesktopManager/WebDavStorageProvider/RemoteLibrarySyncService path against loopback WebDAV.
+- Reuse J2 foreground measurement and require full `remote-storage-sync` coverage.
+- Independently require actual WebDAV requests inside the measured window.
+- Emit machine-readable J2 + WebDAV fixture evidence without credentials or local paths.
+- CI validates harness/source execution only; no P2-K latency threshold or hosted-provider throughput claim.
+- Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
 
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
@@ -1269,6 +1287,18 @@ May continue independently if:
 ---
 
 # 12. Decision / scope-change log
+
+## 2026-09-26 — P2-J9 controlled local WebDAV foreground impact
+
+State update:
+- J8 active-download foreground latency is merged as PR #186 at `97d37db7ee29279ba5cd6549ba5ab80a541f3275`; its final pre-merge head passed 15/15 triggered workflows.
+- The next P2-J item is WebDAV scan/sync impact on foreground API latency.
+- J9 does not implement a WebDAV protocol fake. It follows the open-source `webdav-client` testing pattern and installs pinned `webdav-server@2.6.2` into an ephemeral tool directory.
+- The measured workload is owned by production `RemoteStorageDesktopManager.sync()`, which acquires the existing process-shared `remote-storage-sync` resource lease.
+- J2 remains the single foreground latency/window authority.
+- Validity additionally requires the loopback WebDAV server to observe real requests during the measured window, preventing a stale/idle lease from counting as WebDAV load.
+- The local server is workload control only; real provider/network behavior, Windows filesystem effects and performance budgets remain P2-K evidence.
+- Detailed boundary: `docs/DESKTOP_WEBDAV_FOREGROUND_LATENCY_P2J9.md`.
 
 ## 2026-09-26 — P2-J8 controlled active-download foreground latency
 

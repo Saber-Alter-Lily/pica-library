@@ -33,7 +33,8 @@
     "benchmark:library-query": "tsx scripts/benchmark/library-query-harness.ts",
     "benchmark:comic-select-picture-count": "tsx scripts/benchmark/comic-select-picture-count-harness.ts",
     "benchmark:desktop-startup": "pnpm build && tsx scripts/benchmark/desktop-startup-harness.ts",
-    "benchmark:desktop-download-load": "tsx scripts/benchmark/desktop-download-load-harness.ts"
+    "benchmark:desktop-download-load": "tsx scripts/benchmark/desktop-download-load-harness.ts",
+    "benchmark:desktop-webdav-load": "node scripts/run-desktop-webdav-load-harness.mjs"
   },
   "engines": {
     "node": ">=22.5"

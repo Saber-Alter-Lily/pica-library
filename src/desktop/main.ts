@@ -130,6 +130,8 @@ let currentUrl = ''
 const browserSessions = new Set<string>()
 const BROWSER_CLOSE_GRACE_MS = 5_000
 const MOBILE_BRIDGE_ACTIVITY_GRACE_MS = 30_000
+const SHUTDOWN_HARD_DEADLINE_MS = 35_000
+const SHUTDOWN_FINAL_HANDLE_GRACE_MS = 250
 const ACTIVE_DESKTOP_TASK_STATES = new Set([
     'running',
     'pausing',
@@ -302,48 +304,120 @@ async function waitForHealth(url: string, timeoutMs = 30_000) {
     return false
 }
 
+function shutdownReason(error: unknown) {
+    return error instanceof Error ? error.message : String(error)
+}
+
+async function shutdownStep(
+    label: string,
+    action: () => Promise<void> | void,
+    errors: string[]
+) {
+    try {
+        await action()
+    } catch (error) {
+        const reason = shutdownReason(error)
+        errors.push(`${label}: ${reason}`)
+        log.write(`Shutdown: ${label} failed: ${reason}`)
+    }
+}
+
 async function closeEngine() {
+    const errors: string[] = []
+
     log.write('Shutdown: closing Remote API gateway')
-    await remoteApiGateway?.close()
+    await shutdownStep(
+        'Remote API gateway',
+        async () => {
+            await remoteApiGateway?.close()
+        },
+        errors
+    )
     remoteApiGateway = null
+
     log.write('Shutdown: closing Mobile Bridge')
-    await mobileBridge?.close()
+    await shutdownStep(
+        'Mobile Bridge',
+        async () => {
+            await mobileBridge?.close()
+        },
+        errors
+    )
     mobileBridge = null
+
     log.write('Shutdown: closing managed E-H login')
-    await ehWebLogin?.cancel()
+    await shutdownStep(
+        'managed E-H login',
+        async () => {
+            await ehWebLogin?.cancel()
+        },
+        errors
+    )
     ehWebLogin = null
+
     log.write('Shutdown: quiescing local downloads')
-    await service?.quiesceLocalDownloads()
-    log.write('Shutdown: local downloads quiesced')
+    await shutdownStep(
+        'local download quiesce',
+        async () => {
+            await service?.quiesceLocalDownloads()
+            log.write('Shutdown: local downloads quiesced')
+        },
+        errors
+    )
+
     if (server) {
         log.write('Shutdown: closing local HTTP server')
         const closing = server
-        closing.closeIdleConnections()
-        await new Promise<void>((resolve) => {
-            let settled = false
-            const finish = () => {
-                if (settled) return
-                settled = true
-                resolve()
-            }
-            closing.close(finish)
-            setTimeout(() => {
-                log.write(
-                    'Shutdown: forcing remaining local HTTP connections closed'
-                )
-                closing.closeAllConnections()
-                finish()
-            }, 1_000)
-        })
-        log.write('Shutdown: local HTTP server closed')
+        await shutdownStep(
+            'local HTTP server',
+            async () => {
+                closing.closeIdleConnections()
+                await new Promise<void>((resolve) => {
+                    let settled = false
+                    const finish = () => {
+                        if (settled) return
+                        settled = true
+                        resolve()
+                    }
+                    closing.close(finish)
+                    setTimeout(() => {
+                        log.write(
+                            'Shutdown: forcing remaining local HTTP connections closed'
+                        )
+                        closing.closeAllConnections()
+                        finish()
+                    }, 1_000)
+                })
+                log.write('Shutdown: local HTTP server closed')
+            },
+            errors
+        )
     }
     server = null
+
     log.write('Shutdown: closing database')
-    database?.close()
+    await shutdownStep(
+        'database',
+        () => {
+            database?.close()
+        },
+        errors
+    )
     database = null
     service = null
     remoteStorageManager = null
     log.write('Shutdown: engine resources closed')
+    return errors
+}
+
+function releaseInstanceLock(errors: string[]) {
+    try {
+        instance.release()
+    } catch (error) {
+        const reason = shutdownReason(error)
+        errors.push(`instance lock: ${reason}`)
+        log.write(`Shutdown: instance lock release failed: ${reason}`)
+    }
 }
 
 async function stop(exitCode = 0) {
@@ -355,14 +429,47 @@ async function stop(exitCode = 0) {
     }
     stopping = true
     cancelBrowserCloseShutdown()
-    log.write('Stopping desktop engine')
-    await closeEngine()
-    instance.release()
     process.exitCode = exitCode
-    // Durable state and local services are already closed. A third-party handle
-    // can still keep Node alive, especially in persistent/headless runtimes.
-    // Explicit user/container shutdown must therefore have a final bounded exit.
-    const finalExit = setTimeout(() => process.exit(exitCode), 250)
+
+    const hardExit = setTimeout(() => {
+        log.write(
+            `Shutdown: hard deadline ${SHUTDOWN_HARD_DEADLINE_MS} ms reached; forcing process exit`
+        )
+        try {
+            instance.release()
+        } catch (error) {
+            log.write(
+                `Shutdown: instance lock release at hard deadline failed: ${shutdownReason(error)}`
+            )
+        }
+        process.exit(exitCode)
+    }, SHUTDOWN_HARD_DEADLINE_MS)
+    hardExit.unref()
+
+    log.write('Stopping desktop engine')
+    const errors: string[] = []
+    try {
+        errors.push(...(await closeEngine()))
+    } catch (error) {
+        const reason = shutdownReason(error)
+        errors.push(`unexpected closeEngine failure: ${reason}`)
+        log.write(`Shutdown: unexpected closeEngine failure: ${reason}`)
+    }
+
+    releaseInstanceLock(errors)
+    clearTimeout(hardExit)
+
+    if (errors.length > 0)
+        log.write(
+            `Shutdown: cleanup completed with ${errors.length} error(s): ${errors.join(' | ')}`
+        )
+
+    // Engine state is now closed or fault-isolated. A third-party handle can
+    // still keep Node alive, so explicit shutdown gets one final short grace.
+    const finalExit = setTimeout(
+        () => process.exit(exitCode),
+        SHUTDOWN_FINAL_HANDLE_GRACE_MS
+    )
     finalExit.unref()
 }
 

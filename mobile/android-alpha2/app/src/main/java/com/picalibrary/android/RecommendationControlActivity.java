@@ -27,6 +27,8 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
     private JSONArray loadedControls=new JSONArray(),loadedInferred=new JSONArray();
     private final Set<String> expanded=new LinkedHashSet<>();
     private final Set<String> expandedFacets=new LinkedHashSet<>();
+    private final Map<String,Integer> facetScrollY=new HashMap<>();
+    private TextView sessionStatus;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private int loadGeneration;
     private boolean destroyed,loadedOnce;
@@ -100,14 +102,14 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         intro.addView(SettingsRow.statusLine(this,"Portable Policy",Ui.text(this,"revision "+state.optInt("revision",0),12,Ui.MUTED,true)));
         intro.addView(SettingsRow.statusLine(this,"待同步人工调整",Ui.text(this,RecommendationPolicyStore.pendingControlCount(this)+" 项",12,RecommendationPolicyStore.pendingControlCount(this)>0?Ui.PRIMARY:Ui.MUTED,true)));
         String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";
-        intro.addView(SettingsRow.statusLine(this,"本次想看",Ui.text(this,session+" · 仅本机",12,Ui.MUTED,true)));
+        sessionStatus=Ui.text(this,session+" · 仅本机",12,Ui.MUTED,true);intro.addView(SettingsRow.statusLine(this,"本次想看",sessionStatus));
         intro.addView(SettingsRow.statusLine(this,"屏蔽偏好 / 作品",Ui.text(this,blockedTargets+" / "+hardSuppressedCount,12,Ui.MUTED,true)));
         content.addView(intro);
 
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.addView(Ui.button(this,"推荐同步",v->startActivity(new Intent(this,RecommendationSyncActivity.class)),false),new LinearLayout.LayoutParams(0,-2,1));
         Ui.gap(actions,this,6);
-        actions.addView(Ui.button(this,"清除本次想看",v->{RecommendationPolicyStore.clearLocalSessionIntent(this);loadAsync();},true),new LinearLayout.LayoutParams(0,-2,1));
+        actions.addView(Ui.button(this,"清除本次想看",v->{RecommendationPolicyStore.clearLocalSessionIntent(this);refreshPolicySnapshotOnly();updateSessionStatus();},true),new LinearLayout.LayoutParams(0,-2,1));
         content.addView(actions);Ui.gap(content,this,10);
 
         LinearLayout find=SettingsRow.panel(this,null);
@@ -178,7 +180,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
                     boolean facetOpen=!q.isEmpty()||expandedFacets.contains(expansionId);
                     Button facetHeader=Ui.foldHeader(this,(facetOpen?"▾ ":"▸ ")+facet.label+" · "+facet.rows.size()+" 项",false,v->{if(expandedFacets.contains(expansionId))expandedFacets.remove(expansionId);else expandedFacets.add(expansionId);renderSignals(currentQuery());});
                     LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,-2);fp.setMargins(0,Ui.dp(this,5),0,0);section.addView(facetHeader,fp);
-                    if(facetOpen)addFacetWindow(section,facet.rows);
+                    if(facetOpen)addFacetWindow(section,facet.rows,expansionId);
                 }
             }
             content.addView(section);
@@ -194,11 +196,12 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         }
     }
 
-    private void addFacetWindow(LinearLayout parent,List<JSONObject> rows){
+    private void addFacetWindow(LinearLayout parent,List<JSONObject> rows,String scrollKey){
         NestedScrollView scroll=new NestedScrollView(this);
         scroll.setNestedScrollingEnabled(false);
         scroll.setFillViewport(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        scroll.setOnScrollChangeListener((v,x,y,oldX,oldY)->facetScrollY.put(scrollKey,Math.max(0,y)));
         scroll.setOnTouchListener((view,event)->{
             int action=event.getActionMasked();
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)
@@ -214,6 +217,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,rows.size()>5?Ui.dp(this,visible*118):LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0,Ui.dp(this,4),0,Ui.dp(this,4));
         parent.addView(scroll,lp);
+        int restoreY=facetScrollY.getOrDefault(scrollKey,0);if(restoreY>0)scroll.post(()->scroll.scrollTo(0,restoreY));
     }
 
     private void renderSignal(LinearLayout parent,JSONObject row){
@@ -232,20 +236,32 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         card.addView(Ui.text(this,typeLabel(type)+" · "+(row.optBoolean("systemUnknown",false)?"系统未判断 · 5/10 中性起点":"系统 "+baseline+"/10 · 证据 "+row.optInt("supportCount",0)+" 本"),11.5f,Ui.MUTED,false));
 
         SeekBar slider=new SeekBar(this);slider.setMax(10);slider.setProgress(current);slider.setEnabled(!blocked);
-        final int base=baseline;
+        final int base=baseline;final boolean[] blockedState={blocked};
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
-            public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser)value.setText(progress+"/10");}
+            public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser&&!blockedState[0]){value.setText(progress+"/10");value.setTextColor(Ui.PRIMARY);}}
             public void onStartTrackingTouch(SeekBar bar){}
-            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress(),delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);loadAsync();}
+            public void onStopTrackingTouch(SeekBar bar){if(blockedState[0])return;int desired=bar.getProgress(),delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);refreshPolicySnapshotOnly();}
         });
         card.addView(slider);
 
         LinearLayout buttons=new LinearLayout(this);buttons.setGravity(Gravity.CENTER_VERTICAL);
-        buttons.addView(Ui.button(this,blocked?"取消屏蔽":"屏蔽",v->{RecommendationPolicyStore.setLocalControl(this,type,key,label,blocked?"DEFAULT":"BLOCK","PERSISTENT",null);loadAsync();},true),new LinearLayout.LayoutParams(0,-2,1));
+        Button blockButton=Ui.button(this,blocked?"取消屏蔽":"屏蔽",null,true);
+        blockButton.setOnClickListener(v->{boolean nextBlocked=!blockedState[0];RecommendationPolicyStore.setLocalControl(this,type,key,label,nextBlocked?"BLOCK":"DEFAULT","PERSISTENT",null);blockedState[0]=nextBlocked;refreshPolicySnapshotOnly();blockButton.setText(nextBlocked?"取消屏蔽":"屏蔽");slider.setEnabled(!nextBlocked);if(nextBlocked){value.setText("已屏蔽");value.setTextColor(Ui.BAD);}else{slider.setProgress(base);value.setText(base+"/10");value.setTextColor(Ui.PRIMARY);}});
+        buttons.addView(blockButton,new LinearLayout.LayoutParams(0,-2,1));
         Ui.gap(buttons,this,6);
-        buttons.addView(Ui.button(this,"本次想看",v->{RecommendationPolicyStore.setLocalSessionIntent(this,type,key,label);loadAsync();},true),new LinearLayout.LayoutParams(0,-2,1));
+        buttons.addView(Ui.button(this,"本次想看",v->{RecommendationPolicyStore.setLocalSessionIntent(this,type,key,label);refreshPolicySnapshotOnly();updateSessionStatus();},true),new LinearLayout.LayoutParams(0,-2,1));
         card.addView(buttons);
         parent.addView(card);
+    }
+
+    private void refreshPolicySnapshotOnly(){
+        loadedState=RecommendationPolicyStore.snapshot(this);
+        JSONArray controls=loadedState.optJSONArray("controls");loadedControls=controls==null?new JSONArray():controls;
+    }
+    private void updateSessionStatus(){
+        if(sessionStatus==null)return;JSONObject intent=loadedState==null?null:loadedState.optJSONObject("sessionIntent");
+        String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";
+        sessionStatus.setText(session+" · 仅本机");
     }
 
     private JSONObject findControl(String type,String key){

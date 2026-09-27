@@ -62,6 +62,16 @@ describe('Android RC corrective batch', () => {
         expect(engine).toContain('cycleAuthor.getOrDefault(authorKey,0)>=cycleAuthorCap')
     })
 
+    it('balances positive and negative detail recommendation controls', () => {
+        const dialog = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationItemControlDialog.java'
+        )
+        expect(dialog).toContain('更多推荐此作者')
+        expect(dialog).toContain('本次想看此作者')
+        expect(dialog).toContain('减少推荐此作者')
+        expect(dialog).toContain('屏蔽此作者')
+    })
+
     it('shows explicit library/work-identity loading feedback and detail page count', () => {
         const home = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'

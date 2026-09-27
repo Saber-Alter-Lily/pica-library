@@ -201,7 +201,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         scroll.setNestedScrollingEnabled(false);
         scroll.setFillViewport(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
-        scroll.setOnScrollChangeListener((v,x,y,oldX,oldY)->facetScrollY.put(scrollKey,Math.max(0,y)));
+        scroll.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)(v,x,y,oldX,oldY)->facetScrollY.put(scrollKey,Math.max(0,y)));
         scroll.setOnTouchListener((view,event)->{
             int action=event.getActionMasked();
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)

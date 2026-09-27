@@ -27,8 +27,14 @@
     <string name="onboarding_next">下一步</string>
     <string name="tour_library_title">书库</string>
     <string name="tour_library_body">Pica、E-H、本地下载和远程副本都在这里统一整理。</string>
+    <string name="tour_library_workflow_title">建立书架与批量整理</string>
+    <string name="tour_library_workflow_body">从“书架”建立或切换收藏分组。回到书库后长按任一作品即可进入多选，可全选或自行勾选，再批量加入书架或取消收藏。</string>
     <string name="tour_recommend_title">推荐</string>
     <string name="tour_recommend_body">推荐会结合长期兴趣、最近行为、显式偏好和本次想看。</string>
+    <string name="tour_recommend_generate_title">生成一轮推荐</string>
+    <string name="tour_recommend_generate_body">首次在这里生成手机自己的推荐；之后也可重新生成新一轮。系统会先增量检查收藏变化，只有必要时才完整校验收藏夹。</string>
+    <string name="tour_recommend_adjust_title">人工调整与画风推荐</string>
+    <string name="tour_recommend_adjust_body">进入“画像 / 调整”可查看推荐依据，把作者、IP、标签等调到 0–10，进行屏蔽，设置仅本机生效的“本次想看”，并配置画风推荐及强度。作品详情里的“推荐”也同时提供正向与负向控制。</string>
     <string name="tour_online_title">在线</string>
     <string name="tour_online_body">可以浏览 Pica、E-Hentai，以及账号可用时的 ExHentai。</string>
     <string name="tour_settings_title">设置</string>

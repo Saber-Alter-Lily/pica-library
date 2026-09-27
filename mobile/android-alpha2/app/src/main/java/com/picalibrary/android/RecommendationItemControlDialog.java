@@ -14,8 +14,27 @@ final class RecommendationItemControlDialog {
         ArrayList<String> labels=new ArrayList<>();
         ArrayList<Runnable> actions=new ArrayList<>();
 
+        boolean liked=RecommendationFeedbackStore.isLiked(activity,entry.id);
+        labels.add(liked?"👍 已喜欢":"👍 喜欢这部作品");
+        actions.add(()->{
+            if(!liked)RecommendationFeedbackStore.setSentiment(activity,entry.id,"like");
+            changed(activity,onChanged,liked?"已记录喜欢":"已标记喜欢");
+        });
+
         String author=entry.displayAuthor();
         if(author!=null&&!author.trim().isEmpty()){
+            labels.add("更多推荐此作者");
+            actions.add(()->{
+                RecommendationPolicyStore.setLocalControl(
+                    activity,"AUTHOR",author,author,"MORE","PERSISTENT",2
+                );
+                changed(activity,onChanged,"已提高此作者偏好");
+            });
+            labels.add("本次想看此作者");
+            actions.add(()->{
+                RecommendationPolicyStore.setLocalSessionIntent(activity,"AUTHOR",author,author);
+                changed(activity,onChanged,"本次推荐会优先考虑此作者");
+            });
             labels.add("调节作者 / 标签…");
             actions.add(()->{
                 Intent intent=new Intent(activity,RecommendationControlActivity.class);

@@ -13,7 +13,7 @@
     <string name="onboarding_settings_title">Help &amp; Onboarding</string>
     <string name="onboarding_settings_help">Replay the main feature tour at any time. Turning off automatic prompts never disables manual replay.</string>
     <string name="onboarding_replay">Replay onboarding</string>
-    <string name="onboarding_replay_summary">Library / recommendations / connections / settings</string>
+    <string name="onboarding_replay_summary">Library / shelves / recommendations / visual style / connections / settings</string>
     <string name="onboarding_auto">Show new-feature onboarding automatically</string>
     <string name="onboarding_welcome_title">Welcome to the new Pica Library</string>
     <string name="onboarding_welcome_body">Take a minute to see the library, recommendations, connections and settings. You can skip the tour at any time. Later, replay it from Settings → Help &amp; Onboarding.</string>
@@ -43,6 +43,24 @@
     <string name="tour_update_body">Check and install formal Android updates here.</string>
     <string name="tour_help_title">Help &amp; Onboarding</string>
     <string name="tour_help_body">Replay this feature tour at any time, even when automatic prompts are disabled.</string>
+    <string name="tour_shelf_workflow_title">Shelves &amp; batch selection</string>
+    <string name="tour_shelf_workflow_body">Open Shelves to create and manage collections. In Library or a shelf, long-press a comic to enter selection mode; you can select all, clear selection, add items to a shelf, remove them from the current shelf, or unfavorite them.</string>
+    <string name="tour_library_refresh_title">Refresh with visible progress</string>
+    <string name="tour_library_refresh_body">Refresh checks Desktop, favorites, shelves and remote storage with visible phases. Normal favorite checks reconcile recent changes first and only fall back to a full scan when needed.</string>
+    <string name="tour_generate_recommend_title">Generate recommendations</string>
+    <string name="tour_generate_recommend_body">Use this button to generate or intentionally rebuild the phone-local recommendation cycle. Each cycle is split into 12-item batches; switching batches reuses the current cycle instead of rebuilding it.</string>
+    <string name="tour_adjust_recommend_title">Profile &amp; adjustment</string>
+    <string name="tour_adjust_recommend_body">Open here to inspect why recommendations are being made, tune explicit preferences, sync portable recommendation state, and control visual-style influence.</string>
+    <string name="tour_profile_title">Recommendation profile</string>
+    <string name="tour_profile_body">See long-term interests, recent behavior, this phone session and the current recommendation composition before changing any controls.</string>
+    <string name="tour_manual_adjust_title">Manual 0–10 adjustment</string>
+    <string name="tour_manual_adjust_body">Tune authors, IPs, tags, categories and visual families from 0–10. 5 is neutral; you can also block a target or mark it as “want this now” for the current phone session.</string>
+    <string name="tour_recommend_sync_title">Recommendation sync</string>
+    <string name="tour_recommend_sync_body">Desktop and phone keep independent live recommendation cycles. Sync merges durable preferences, feedback and portable foundations; true preference conflicts are shown for you to resolve.</string>
+    <string name="tour_visual_mode_title">Visual-style mode</string>
+    <string name="tour_visual_mode_body">Choose Off, analysis-only, or live ranking. The phone consumes lightweight visual affinity computed from the Desktop foundation; it does not run the full visual model itself.</string>
+    <string name="tour_visual_strength_title">Visual influence strength</string>
+    <string name="tour_visual_strength_body">Choose how strongly visual similarity affects ranking. This changes the visual contribution without replacing your normal author, tag, recent and session preferences.</string>
     <string name="tour_complete_title">You are ready</string>
     <string name="tour_complete_body">That covers the main features. This tour remains available in Settings.</string>
 </resources>

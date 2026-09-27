@@ -14,6 +14,9 @@ final class AndroidOnboarding {
     static final String NAV_RECOMMEND="pica-tour-nav-1";
     static final String NAV_ONLINE="pica-tour-nav-2";
     static final String NAV_SETTINGS="pica-tour-nav-3";
+    static final String LIBRARY_SHELF="pica-tour-library-shelf";
+    static final String RECOMMEND_CONTROLS="pica-tour-recommend-controls";
+    static final String RECOMMEND_GENERATE="pica-tour-recommend-generate";
     static final String SETTINGS_RECOMMEND="pica-tour-settings-recommend";
     static final String SETTINGS_PAIR="pica-tour-settings-pair";
     static final String SETTINGS_LANGUAGE="pica-tour-settings-language";
@@ -112,6 +115,50 @@ final class AndroidOnboarding {
             .addStep(recommend,activity.getString(R.string.tour_recommend_title),activity.getString(R.string.tour_recommend_body))
             .addStep(online,activity.getString(R.string.tour_online_title),activity.getString(R.string.tour_online_body))
             .addStep(settings,activity.getString(R.string.tour_settings_title),activity.getString(R.string.tour_settings_body))
+            .setCallback(new VSpotView.Callback(){
+                @Override public void onDismiss(View last,boolean completed,int index){
+                    if(activity.isFinishing()||activity.isDestroyed())return;
+                    if(completed)activity.onboardingShowTab(0,()->showLibraryWorkflowTour(activity));
+                    else handleSkip(activity);
+                }
+            })
+            .build();
+        tour.show();
+    }
+
+    private static void showLibraryWorkflowTour(HomeActivity activity){
+        View shelf=target(activity,LIBRARY_SHELF);
+        if(!ready(shelf)){
+            activity.getWindow().getDecorView().postDelayed(()->showLibraryWorkflowTour(activity),120);
+            return;
+        }
+        VSpotView tour=new VSpotView.Builder(activity)
+            .setStyle(style(activity))
+            .setDismissType(VSpotView.DismissType.NONE)
+            .addStep(shelf,activity.getString(R.string.tour_library_workflow_title),activity.getString(R.string.tour_library_workflow_body))
+            .setCallback(new VSpotView.Callback(){
+                @Override public void onDismiss(View last,boolean completed,int index){
+                    if(activity.isFinishing()||activity.isDestroyed())return;
+                    if(completed)activity.onboardingShowTab(1,()->showRecommendationWorkflowTour(activity));
+                    else handleSkip(activity);
+                }
+            })
+            .build();
+        tour.show();
+    }
+
+    private static void showRecommendationWorkflowTour(HomeActivity activity){
+        View controls=target(activity,RECOMMEND_CONTROLS);
+        View generate=target(activity,RECOMMEND_GENERATE);
+        if(!ready(controls,generate)){
+            activity.getWindow().getDecorView().postDelayed(()->showRecommendationWorkflowTour(activity),120);
+            return;
+        }
+        VSpotView tour=new VSpotView.Builder(activity)
+            .setStyle(style(activity))
+            .setDismissType(VSpotView.DismissType.NONE)
+            .addStep(generate,activity.getString(R.string.tour_recommend_generate_title),activity.getString(R.string.tour_recommend_generate_body))
+            .addStep(controls,activity.getString(R.string.tour_recommend_adjust_title),activity.getString(R.string.tour_recommend_adjust_body))
             .setCallback(new VSpotView.Callback(){
                 @Override public void onDismiss(View last,boolean completed,int index){
                     if(activity.isFinishing()||activity.isDestroyed())return;

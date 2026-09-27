@@ -1,7 +1,8 @@
 package com.picalibrary.android;
 
+import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.content.Intent;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
@@ -14,11 +15,20 @@ final class AndroidOnboarding {
     static final String NAV_RECOMMEND="pica-tour-nav-1";
     static final String NAV_ONLINE="pica-tour-nav-2";
     static final String NAV_SETTINGS="pica-tour-nav-3";
+    static final String LIBRARY_SHELVES="pica-tour-library-shelves";
+    static final String LIBRARY_REFRESH="pica-tour-library-refresh";
+    static final String RECOMMEND_BUILD="pica-tour-recommend-build";
+    static final String RECOMMEND_PREFERENCES="pica-tour-recommend-preferences";
     static final String SETTINGS_RECOMMEND="pica-tour-settings-recommend";
     static final String SETTINGS_PAIR="pica-tour-settings-pair";
     static final String SETTINGS_LANGUAGE="pica-tour-settings-language";
     static final String SETTINGS_UPDATE="pica-tour-settings-update";
     static final String SETTINGS_HELP="pica-tour-settings-help";
+    static final String REC_PROFILE="pica-tour-rec-profile";
+    static final String REC_ADJUST="pica-tour-rec-adjust";
+    static final String REC_SYNC="pica-tour-rec-sync";
+    static final String REC_VISUAL_MODE="pica-tour-rec-visual-mode";
+    static final String REC_VISUAL_STRENGTH="pica-tour-rec-visual-strength";
 
     private AndroidOnboarding(){}
 
@@ -60,7 +70,7 @@ final class AndroidOnboarding {
         activity.onboardingShowTab(0,()->showBottomTour(activity));
     }
 
-    private static VSpotView.Style style(HomeActivity activity){
+    private static VSpotView.Style style(Activity activity){
         VSpotView.Style style=new VSpotView.Style();
         style.overlayColor=0xD9000000;
         style.cardColor=Ui.SURFACE;
@@ -86,7 +96,7 @@ final class AndroidOnboarding {
         return style;
     }
 
-    private static View target(HomeActivity activity,String tag){
+    private static View target(Activity activity,String tag){
         return activity.getWindow().getDecorView().findViewWithTag(tag);
     }
 
@@ -115,12 +125,54 @@ final class AndroidOnboarding {
             .setCallback(new VSpotView.Callback(){
                 @Override public void onDismiss(View last,boolean completed,int index){
                     if(activity.isFinishing()||activity.isDestroyed())return;
-                    if(completed)activity.onboardingShowTab(3,()->showSettingsTour(activity));
+                    if(completed)activity.onboardingShowTab(0,()->showLibraryWorkflowTour(activity));
                     else handleSkip(activity);
                 }
             })
             .build();
         tour.show();
+    }
+
+    private static void showLibraryWorkflowTour(HomeActivity activity){
+        View shelves=target(activity,LIBRARY_SHELVES);
+        View refresh=target(activity,LIBRARY_REFRESH);
+        if(!ready(shelves,refresh)){
+            activity.getWindow().getDecorView().postDelayed(()->showLibraryWorkflowTour(activity),120);
+            return;
+        }
+        new VSpotView.Builder(activity)
+            .setStyle(style(activity))
+            .setDismissType(VSpotView.DismissType.NONE)
+            .addStep(shelves,activity.getString(R.string.tour_shelf_workflow_title),activity.getString(R.string.tour_shelf_workflow_body))
+            .addStep(refresh,activity.getString(R.string.tour_library_refresh_title),activity.getString(R.string.tour_library_refresh_body))
+            .setCallback(new VSpotView.Callback(){
+                @Override public void onDismiss(View last,boolean completed,int index){
+                    if(activity.isFinishing()||activity.isDestroyed())return;
+                    if(completed)activity.onboardingShowTab(1,()->showRecommendationWorkflowTour(activity));
+                    else handleSkip(activity);
+                }
+            }).build().show();
+    }
+
+    private static void showRecommendationWorkflowTour(HomeActivity activity){
+        View build=target(activity,RECOMMEND_BUILD);
+        View preferences=target(activity,RECOMMEND_PREFERENCES);
+        if(!ready(build,preferences)){
+            activity.getWindow().getDecorView().postDelayed(()->showRecommendationWorkflowTour(activity),120);
+            return;
+        }
+        new VSpotView.Builder(activity)
+            .setStyle(style(activity))
+            .setDismissType(VSpotView.DismissType.NONE)
+            .addStep(build,activity.getString(R.string.tour_generate_recommend_title),activity.getString(R.string.tour_generate_recommend_body))
+            .addStep(preferences,activity.getString(R.string.tour_adjust_recommend_title),activity.getString(R.string.tour_adjust_recommend_body))
+            .setCallback(new VSpotView.Callback(){
+                @Override public void onDismiss(View last,boolean completed,int index){
+                    if(activity.isFinishing()||activity.isDestroyed())return;
+                    if(completed)activity.onboardingShowTab(3,()->showSettingsTour(activity));
+                    else handleSkip(activity);
+                }
+            }).build().show();
     }
 
     private static void showSettingsTour(HomeActivity activity){
@@ -145,12 +197,9 @@ final class AndroidOnboarding {
                 @Override public void onDismiss(View last,boolean completed,int index){
                     if(activity.isFinishing()||activity.isDestroyed())return;
                     if(completed){
-                        OnboardingStore.complete(activity);
-                        new AlertDialog.Builder(activity)
-                            .setTitle(R.string.tour_complete_title)
-                            .setMessage(R.string.tour_complete_body)
-                            .setPositiveButton(R.string.common_ok,null)
-                            .show();
+                        Intent intent=new Intent(activity,RecommendationStyleActivity.class);
+                        intent.putExtra("startDetailedOnboarding",true);
+                        activity.startActivity(intent);
                     }else handleSkip(activity);
                 }
             })
@@ -158,7 +207,32 @@ final class AndroidOnboarding {
         tour.show();
     }
 
-    private static void handleSkip(HomeActivity activity){
+    static void startRecommendationStyleTour(RecommendationStyleActivity activity){
+        View profile=target(activity,REC_PROFILE),adjust=target(activity,REC_ADJUST),sync=target(activity,REC_SYNC),visualMode=target(activity,REC_VISUAL_MODE),visualStrength=target(activity,REC_VISUAL_STRENGTH);
+        if(!ready(profile,adjust,sync,visualMode,visualStrength)){
+            activity.getWindow().getDecorView().postDelayed(()->startRecommendationStyleTour(activity),120);
+            return;
+        }
+        new VSpotView.Builder(activity)
+            .setStyle(style(activity))
+            .setDismissType(VSpotView.DismissType.NONE)
+            .addStep(profile,activity.getString(R.string.tour_profile_title),activity.getString(R.string.tour_profile_body))
+            .addStep(adjust,activity.getString(R.string.tour_manual_adjust_title),activity.getString(R.string.tour_manual_adjust_body))
+            .addStep(sync,activity.getString(R.string.tour_recommend_sync_title),activity.getString(R.string.tour_recommend_sync_body))
+            .addStep(visualMode,activity.getString(R.string.tour_visual_mode_title),activity.getString(R.string.tour_visual_mode_body))
+            .addStep(visualStrength,activity.getString(R.string.tour_visual_strength_title),activity.getString(R.string.tour_visual_strength_body))
+            .setCallback(new VSpotView.Callback(){
+                @Override public void onDismiss(View last,boolean completed,int index){
+                    if(activity.isFinishing()||activity.isDestroyed())return;
+                    if(completed){
+                        OnboardingStore.complete(activity);
+                        new AlertDialog.Builder(activity).setTitle(R.string.tour_complete_title).setMessage(R.string.tour_complete_body).setPositiveButton(R.string.common_ok,null).show();
+                    }else handleSkip(activity);
+                }
+            }).build().show();
+    }
+
+    private static void handleSkip(Activity activity){
         OnboardingStore.skip(activity);
         new AlertDialog.Builder(activity)
             .setTitle(R.string.onboarding_skip)

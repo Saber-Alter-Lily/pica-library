@@ -36,6 +36,32 @@ describe('Android RC corrective batch', () => {
         expect(controls).toContain('scroll.post(()->scroll.scrollTo(0,restoreY))')
     })
 
+    it('keeps favorite collection order distinct from comic update time', () => {
+        const catalog = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedCatalogStore.java'
+        )
+        const filter = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedLibraryFilter.java'
+        )
+        const home = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+        )
+        expect(catalog).toContain('favoriteRank=-1')
+        expect(filter).toContain('FAVORITE_NEWEST')
+        expect(filter).toContain('FAVORITE_OLDEST')
+        expect(home).toContain('"最近收藏","最早收藏","最近更新"')
+    })
+
+    it('bounds author exposure across batches while allowing explicit author session intent', () => {
+        const engine = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/NativeRecommendationEngine.java'
+        )
+        expect(engine).toContain('cycleAuthorExposure')
+        expect(engine).toContain('targetAuthorKey')
+        expect(engine).toContain('{{4,2,4,4,2},{5,3,6,5,3}')
+        expect(engine).toContain('cycleAuthor.getOrDefault(authorKey,0)>=cycleAuthorCap')
+    })
+
     it('shows explicit library/work-identity loading feedback and detail page count', () => {
         const home = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'

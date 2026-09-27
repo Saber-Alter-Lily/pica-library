@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.*;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.*;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -28,6 +29,7 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private String conceptId = "", sourceMode = "all";
     private TextView heading, status;
+    private ProgressBar progress;
     private RecyclerView list;
     private boolean destroyed, refreshing, localLoading;
     private int localLoadGeneration;
@@ -107,6 +109,10 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
             Ui.dp(this, 3)
         );
         root.addView(status);
+        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setIndeterminate(true);
+        progress.setVisibility(View.GONE);
+        root.addView(progress, new LinearLayout.LayoutParams(-1, Ui.dp(this, 3)));
 
         list = new RecyclerView(this);
         list.setLayoutManager(new LinearLayoutManager(this));
@@ -186,8 +192,9 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
 
     private void renderWorks() {
         if (status == null || list == null) return;
+        if(progress!=null)progress.setVisibility(localLoading||refreshing?View.VISIBLE:View.GONE);
         if (localLoading || catalog == null) {
-            status.setText(LocalizedText.ui("正在读取本地作者作品…"));
+            status.setText(LocalizedText.ui("正在建立作者作品目录…"));
             list.setAdapter(
                 new UnifiedComicCollectionAdapter(
                     this,
@@ -255,14 +262,9 @@ public final class AuthorWorksActivity extends LocaleAwareActivity {
                 safe(b.updatedAt).compareTo(safe(a.updatedAt))
         );
         status.setText(
-            (
-                refreshing
-                    ? LocalizedText.ui("正在刷新在线作品 · ")
-                    : ""
-            ) +
-            items.size() +
-            LocalizedText.ui(" 部已识别作品 · ") +
-            AuthorConceptStore.sourceLabel(concept)
+            refreshing
+                ? LocalizedText.ui("正在补全在线作者作品… · 已显示 ")+items.size()+LocalizedText.ui(" 部")
+                : LocalizedText.ui("检测完成 · ")+items.size()+LocalizedText.ui(" 部已识别作品 · ")+AuthorConceptStore.sourceLabel(concept)
         );
         list.setAdapter(
             new UnifiedComicCollectionAdapter(

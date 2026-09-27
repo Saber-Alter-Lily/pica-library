@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 
 /** Versioned onboarding state. Later is session-only; Skip/Done are version-scoped and Replay is always available. */
 final class OnboardingStore {
-    static final int CURRENT_VERSION=1;
+    static final int CURRENT_VERSION=2;
     private static final String PREFS="pica-onboarding-v1";
     private static final String COMPLETED="completedVersion";
     private static final String DISMISSED="dismissedVersion";

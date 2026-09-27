@@ -72,7 +72,7 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
     private Button small(String text,View.OnClickListener action){return Ui.button(this,text,action,true);}
     private String authorSummary(){return localAuthorSummary.isEmpty()?entry.displayAuthor():localAuthorSummary;}
     private void openAuthors(){Intent i=new Intent(this,AuthorDirectoryActivity.class);i.putExtra("comicId",entry.id);startActivity(i);}
-    private String detailMeta(){ArrayList<String> values=new ArrayList<>();if(entry.sourceBindings.contains("pica")||entry.picaAvailable)values.add("Pica");if(entry.sourceBindings.contains("eh"))values.add("E-H");if(entry.sourceBindings.contains("exh"))values.add("ExH");if(values.isEmpty())values.add(EhClient.isEhId(entry.id)?"E-H":"本地");if(!Double.isNaN(entry.rating))values.add("★ "+String.format(Locale.ROOT,"%.2f",entry.rating));if("FINISHED".equals(entry.completionStatus)||entry.finished)values.add("完结");else if("ONGOING".equals(entry.completionStatus))values.add("连载");return String.join(" · ",values);}
+    private String detailMeta(){ArrayList<String> values=new ArrayList<>();if(entry.sourceBindings.contains("pica")||entry.picaAvailable)values.add("Pica");if(entry.sourceBindings.contains("eh"))values.add("E-H");if(entry.sourceBindings.contains("exh"))values.add("ExH");if(values.isEmpty())values.add(EhClient.isEhId(entry.id)?"E-H":"本地");int pages=Math.max(entry.knownPictures,entry.remotePageCount);if(pages>0)values.add(pages+" 页");else values.add("页数未知");if(!Double.isNaN(entry.rating))values.add("★ "+String.format(Locale.ROOT,"%.2f",entry.rating));if("FINISHED".equals(entry.completionStatus)||entry.finished)values.add("完结");else if("ONGOING".equals(entry.completionStatus))values.add("连载");return String.join(" · ",values);}
     private String tagLine(){return localTagLine;}
     private String workVariantRelation(JSONObject row){
         String relation=row.optString("relation","");
@@ -100,7 +100,7 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
         int count=value==null?0:value.optInt("count",0);
         int favoriteCount=workVariantDerivedCount(value,"favoriteCount");
         int downloadedCount=workVariantDerivedCount(value,"downloadedCount");
-        StringBuilder text=new StringBuilder(LocalizedText.ui(this,"同一作品 · "+count,"Same work · "+count,"同一作品 · "+count));
+        StringBuilder text=new StringBuilder(LocalizedText.ui(this,"同一作品 · "+count+" · 已检测","Same work · "+count+" · Checked","同一作品 · "+count+" · 確認済み"));
         if(count>0){
             if(favoriteCount>0)text.append(LocalizedText.ui(this," · 已收藏 "+favoriteCount," · Favorited "+favoriteCount," · お気に入り "+favoriteCount));
             else text.append(LocalizedText.ui(this," · 无收藏"," · None favorited"," · お気に入りなし"));
@@ -113,21 +113,34 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
     private void loadWorkVariants(){
         if(workVariantToggle==null||entry==null)return;
         final String comicId=entry.id;
+        workVariantPayload=null;
+        workVariantToggle.setEnabled(false);
+        workVariantToggle.setText(LocalizedText.ui(this,"同一作品 · 正在检测…","Same work · Checking…","同一作品 · 確認中…"));
         worker.submit(()->{
-            JSONObject value=WorkVariantResolver.load(this,comicId);
-            runOnUiThread(()->{
-                if(destroyed||entry==null||!comicId.equals(entry.id))return;
-                workVariantPayload=value;
-                int count=value==null?0:value.optInt("count",0);
-                workVariantToggle.setText(workVariantToggleText(value));
-                workVariantToggle.setEnabled(count>0);
-                if(workVariantsExpanded)renderWorkVariants();
-            });
+            try{
+                JSONObject value=WorkVariantResolver.load(this,comicId);
+                runOnUiThread(()->{
+                    if(destroyed||entry==null||!comicId.equals(entry.id))return;
+                    workVariantPayload=value;
+                    int count=value==null?0:value.optInt("count",0);
+                    workVariantToggle.setText(workVariantToggleText(value));
+                    workVariantToggle.setEnabled(count>0);
+                    if(workVariantsExpanded)renderWorkVariants();
+                });
+            }catch(Exception error){
+                runOnUiThread(()->{
+                    if(destroyed||entry==null||!comicId.equals(entry.id))return;
+                    workVariantPayload=null;
+                    workVariantToggle.setText(LocalizedText.ui(this,"同一作品 · 检测失败 · 点击重试","Same work · Check failed · Retry","同一作品 · 確認失敗 · 再試行"));
+                    workVariantToggle.setEnabled(true);
+                });
+            }
         });
     }
 
     private void toggleWorkVariants(){
-        int count=workVariantPayload==null?0:workVariantPayload.optInt("count",0);
+        if(workVariantPayload==null){loadWorkVariants();return;}
+        int count=workVariantPayload.optInt("count",0);
         if(count<=0)return;
         workVariantsExpanded=!workVariantsExpanded;
         workVariantArea.setVisibility(workVariantsExpanded?View.VISIBLE:View.GONE);

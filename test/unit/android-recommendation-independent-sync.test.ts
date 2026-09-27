@@ -111,6 +111,8 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(controls).toContain('SeekBar')
         expect(controls).toContain('NestedScrollView')
         expect(controls).toContain('expandedFacets')
+        expect(controls).toContain('facetScrollY')
+        expect(controls).toContain('refreshControlsSnapshot()')
         expect(controls).toContain('作为标签添加')
         expect(controls).toContain('本次想看')
         expect(hub).toContain('推荐画像')
@@ -122,6 +124,19 @@ describe('Android independent recommendation runtime and sync UI', () => {
         expect(ui).toContain('new TouchDelegate(hit,info)')
     })
 
+    it('does not rebuild the whole profile after every slider release', () => {
+        const controls = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationControlActivity.java'
+        )
+        const start = controls.indexOf('public void onStopTrackingTouch(SeekBar bar)')
+        const end = controls.indexOf('});', start)
+        const handler = controls.slice(start, end)
+        expect(handler).toContain('RecommendationPolicyStore.setLocalControl')
+        expect(handler).toContain('refreshControlsSnapshot()')
+        expect(handler).not.toContain('loadAsync()')
+        expect(controls).toContain('addFacetWindow(section,facet.rows,expansionId)')
+        expect(controls).toContain('facetScrollY.put(windowId,scrollY)')
+    })
 
     it('keeps ordinary sync differences quiet by default while preserving optional conflict alerts', () => {
         const prefs = read(

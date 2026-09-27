@@ -16,12 +16,19 @@ import java.util.List;
 final class UnifiedComicCollectionAdapter extends RecyclerView.Adapter<UnifiedComicCollectionAdapter.Holder> {
     static final int MODE_LIST=0, MODE_GRID_LARGE=2, MODE_GRID_MEDIUM=3, MODE_GRID_SMALL=5;
     interface Open { void open(UnifiedCatalogStore.Entry entry); }
+    interface Selection {
+        boolean active();
+        boolean selected(String comicId);
+        void toggle(UnifiedCatalogStore.Entry entry,boolean fromLongPress);
+    }
     private final Activity activity;
     private final List<UnifiedCatalogStore.Entry> items=new ArrayList<>();
     private final Open open;
+    private final Selection selection;
     private int mode;
 
-    UnifiedComicCollectionAdapter(Activity activity,int mode,List<UnifiedCatalogStore.Entry> initial,Open open){this.activity=activity;this.mode=normalizeMode(mode);this.open=open;replace(initial);}
+    UnifiedComicCollectionAdapter(Activity activity,int mode,List<UnifiedCatalogStore.Entry> initial,Open open){this(activity,mode,initial,open,null);}
+    UnifiedComicCollectionAdapter(Activity activity,int mode,List<UnifiedCatalogStore.Entry> initial,Open open,Selection selection){this.activity=activity;this.mode=normalizeMode(mode);this.open=open;this.selection=selection;replace(initial);}
     static int normalizeMode(int value){return value==MODE_LIST||value==MODE_GRID_LARGE||value==MODE_GRID_MEDIUM||value==MODE_GRID_SMALL?value:MODE_GRID_MEDIUM;}
     int mode(){return mode;}
     void setMode(int value){int next=normalizeMode(value);if(next==mode)return;mode=next;notifyDataSetChanged();}
@@ -37,7 +44,7 @@ final class UnifiedComicCollectionAdapter extends RecyclerView.Adapter<UnifiedCo
         LinearLayout copy=new LinearLayout(activity);copy.setOrientation(LinearLayout.VERTICAL);copy.setPadding(list?Ui.dp(activity,12):0,list?0:Ui.dp(activity,6),0,0);TextView title=Ui.text(activity,"",titleSize(type),Ui.TEXT,true);title.setMaxLines(type==MODE_GRID_SMALL?2:3);copy.addView(title);TextView author=Ui.text(activity,"",metaSize(type),Ui.MUTED,false);author.setMaxLines(1);copy.addView(author);TextView tags=Ui.text(activity,"",tagSize(type),Ui.PRIMARY,false);tags.setMaxLines(list?2:1);copy.addView(tags);TextView state=Ui.text(activity,"",tagSize(type),Ui.MUTED,false);state.setMaxLines(1);copy.addView(state);
         if(list)card.addView(copy,new LinearLayout.LayoutParams(0,-2,1));else card.addView(copy);return new Holder(card,cover,title,author,tags,state);
     }
-    @Override public void onBindViewHolder(Holder h,int position){UnifiedCatalogStore.Entry item=items.get(position);h.title.setText(item.title);h.author.setText(item.displayAuthor());String tags=tagLine(item);h.tags.setText(tags);h.tags.setVisibility(tags.isEmpty()||mode==MODE_GRID_SMALL?View.GONE:View.VISIBLE);String state=availability(item);h.state.setText(state);h.state.setVisibility(mode==MODE_GRID_SMALL?View.GONE:View.VISIBLE);h.itemView.setOnClickListener(v->{if(open!=null)open.open(item);else{Intent i=new Intent(activity,UnifiedComicDetailActivity.class);i.putExtra("comicId",item.id);i.putExtra("title",item.title);i.putExtra("author",item.displayAuthor());activity.startActivity(i);}});CoverRepository.load(activity,h.cover,item,Ui.PLACEHOLDER);}
+    @Override public void onBindViewHolder(Holder h,int position){UnifiedCatalogStore.Entry item=items.get(position);boolean selected=selection!=null&&selection.selected(item.id);h.title.setText(item.title);h.author.setText(item.displayAuthor());String tags=tagLine(item);h.tags.setText(tags);h.tags.setVisibility(tags.isEmpty()||mode==MODE_GRID_SMALL?View.GONE:View.VISIBLE);String state=(selected?"✓ 已选择"+(availability(item).isEmpty()?"":" · "):"")+availability(item);h.state.setText(state);h.state.setVisibility(mode==MODE_GRID_SMALL&&!selected?View.GONE:View.VISIBLE);h.itemView.setBackground(Ui.rounded(selected?Ui.PRIMARY_SOFT:Ui.SURFACE,14,activity));h.itemView.setOnClickListener(v->{if(selection!=null&&selection.active()){selection.toggle(item,false);notifyDataSetChanged();return;}if(open!=null)open.open(item);else{Intent i=new Intent(activity,UnifiedComicDetailActivity.class);i.putExtra("comicId",item.id);i.putExtra("title",item.title);i.putExtra("author",item.displayAuthor());activity.startActivity(i);}});h.itemView.setOnLongClickListener(v->{if(selection==null)return false;selection.toggle(item,true);notifyDataSetChanged();return true;});CoverRepository.load(activity,h.cover,item,Ui.PLACEHOLDER);}
     private int coverHeight(int type){int width=activity.getResources().getDisplayMetrics().widthPixels-Ui.dp(activity,24);int span=Math.max(1,type);int cell=Math.max(Ui.dp(activity,58),width/span-Ui.dp(activity,10));return Math.max(Ui.dp(activity,86),(int)(cell*1.42f));}
     private float titleSize(int type){return type==MODE_LIST?16:type==MODE_GRID_LARGE?15:type==MODE_GRID_MEDIUM?13.5f:11.5f;}
     private float metaSize(int type){return type==MODE_LIST?12.5f:type==MODE_GRID_SMALL?10:11.5f;}

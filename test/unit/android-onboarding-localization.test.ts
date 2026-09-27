@@ -7,7 +7,7 @@ const read=(p:string)=>fs.readFileSync(root+p,'utf8')
 describe('Android onboarding contracts',()=>{
   it('keeps versioned onboarding state with session-only Later and persistent Skip/Complete',()=>{
     const store=read('app/src/main/java/com/picalibrary/android/OnboardingStore.java')
-    expect(store).toContain('CURRENT_VERSION=1')
+    expect(store).toContain('CURRENT_VERSION=2')
     expect(store).toContain('static boolean sessionDismissed=false')
     expect(store).toContain('static void later(){sessionDismissed=true;}')
     expect(store).toContain('putInt(DISMISSED,CURRENT_VERSION)')
@@ -29,6 +29,8 @@ describe('Android onboarding contracts',()=>{
     expect(tour).toContain('showBottomTour(activity)')
     expect(tour).toContain('showSettingsTour(activity)')
     expect(tour).toContain('style.skipButtonText=activity.getString(R.string.onboarding_skip)')
+    expect(tour).toContain('if(completed)activity.onboardingShowTab(0,()->showLibraryWorkflowTour(activity))')
+    expect(tour).toContain('showRecommendationWorkflowTour(activity)')
     expect(tour).toContain('if(completed)activity.onboardingShowTab(3,()->showSettingsTour(activity))')
     expect(tour).toContain('else handleSkip(activity)')
     expect(tour).toContain('OnboardingStore.complete(activity)')
@@ -49,7 +51,7 @@ describe('Android onboarding contracts',()=>{
   it('ships complete zh-CN / ja / en onboarding resources',()=>{
     for(const file of ['app/src/main/res/values/strings.xml','app/src/main/res/values-zh-rCN/strings.xml','app/src/main/res/values-ja/strings.xml']){
       const value=read(file)
-      for(const key of ['onboarding_settings_title','onboarding_welcome_title','onboarding_start','onboarding_skip','tour_library_title','tour_recommend_settings_title','tour_complete_title']){
+      for(const key of ['onboarding_settings_title','onboarding_welcome_title','onboarding_start','onboarding_skip','tour_library_title','tour_library_workflow_title','tour_recommend_generate_title','tour_recommend_adjust_title','tour_recommend_settings_title','tour_complete_title']){
         expect(value).toContain(`name="${key}"`)
       }
     }

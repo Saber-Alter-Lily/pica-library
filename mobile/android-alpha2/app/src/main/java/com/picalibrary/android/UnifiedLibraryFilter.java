@@ -7,7 +7,7 @@ final class UnifiedLibraryFilter {
     enum Location { PHONE, DESKTOP, WEBDAV, ONLINE }
     enum Provider { PICA, EH, EXH }
     enum TagMode { ANY, ALL }
-    enum Sort { LATEST, TITLE, AUTHOR }
+    enum Sort { FAVORITED_NEWEST, FAVORITED_OLDEST, LATEST, TITLE, AUTHOR }
 
     static final class Spec {
         String text="";
@@ -33,7 +33,9 @@ final class UnifiedLibraryFilter {
 
     private UnifiedLibraryFilter(){}
 
-    static List<UnifiedCatalogStore.Entry> apply(List<UnifiedCatalogStore.Entry> source,Spec spec){
+    static List<UnifiedCatalogStore.Entry> apply(List<UnifiedCatalogStore.Entry> source,Spec spec){return apply(source,spec,Collections.emptyMap());}
+
+    static List<UnifiedCatalogStore.Entry> apply(List<UnifiedCatalogStore.Entry> source,Spec spec,Map<String,Integer> favoriteRanks){
         ArrayList<UnifiedCatalogStore.Entry> out=new ArrayList<>();String text=norm(spec.text);
         for(UnifiedCatalogStore.Entry item:source){
             if(!text.isEmpty()&&!contains(item,text))continue;
@@ -47,12 +49,13 @@ final class UnifiedLibraryFilter {
             if(!matches(item.categories,spec.categories,TagMode.ANY))continue;
             out.add(item);
         }
-        Comparator<UnifiedCatalogStore.Entry> comparator;if(spec.sort==Sort.TITLE)comparator=Comparator.comparing(a->norm(a.title));else if(spec.sort==Sort.AUTHOR)comparator=Comparator.comparing(a->norm(author(a)));else comparator=(a,b)->safe(b.updatedAt).compareTo(safe(a.updatedAt));out.sort(comparator.thenComparing(a->norm(a.title)));return out;
+        Comparator<UnifiedCatalogStore.Entry> comparator;if(spec.sort==Sort.TITLE)comparator=Comparator.comparing(a->norm(a.title));else if(spec.sort==Sort.AUTHOR)comparator=Comparator.comparing(a->norm(author(a)));else if(spec.sort==Sort.FAVORITED_NEWEST)comparator=(a,b)->compareFavoriteRank(a,b,favoriteRanks,false);else if(spec.sort==Sort.FAVORITED_OLDEST)comparator=(a,b)->compareFavoriteRank(a,b,favoriteRanks,true);else comparator=(a,b)->safe(b.updatedAt).compareTo(safe(a.updatedAt));out.sort(comparator.thenComparing(a->norm(a.title)));return out;
     }
 
     static Facets facets(List<UnifiedCatalogStore.Entry> items){Map<String,Integer> authors=new HashMap<>(),tags=new HashMap<>(),categories=new HashMap<>();for(UnifiedCatalogStore.Entry item:items){add(authors,author(item));for(String value:item.tags)add(tags,value);for(String value:item.categories)add(categories,value);}return new Facets(facetList(authors),facetList(tags),facetList(categories));}
 
-    static String sortLabel(Sort sort){if(sort==Sort.TITLE)return "标题";if(sort==Sort.AUTHOR)return "作者";return "最近更新";}
+    static String sortLabel(Sort sort){if(sort==Sort.FAVORITED_NEWEST)return "最近收藏";if(sort==Sort.FAVORITED_OLDEST)return "最早收藏";if(sort==Sort.TITLE)return "标题";if(sort==Sort.AUTHOR)return "作者";return "最近更新";}
+    private static int compareFavoriteRank(UnifiedCatalogStore.Entry a,UnifiedCatalogStore.Entry b,Map<String,Integer> ranks,boolean oldest){int ra=ranks==null?Integer.MAX_VALUE:ranks.getOrDefault(a.id,Integer.MAX_VALUE),rb=ranks==null?Integer.MAX_VALUE:ranks.getOrDefault(b.id,Integer.MAX_VALUE);boolean ka=ra!=Integer.MAX_VALUE,kb=rb!=Integer.MAX_VALUE;if(ka!=kb)return ka?-1:1;if(!ka)return 0;return oldest?Integer.compare(rb,ra):Integer.compare(ra,rb);}
     private static boolean locationMatch(UnifiedCatalogStore.Entry item,Set<Location> selected){for(Location source:selected){if(source==Location.PHONE&&item.phoneDownloaded)return true;if(source==Location.DESKTOP&&item.desktopDownloaded)return true;if(source==Location.WEBDAV&&item.remoteAvailable)return true;if(source==Location.ONLINE&&online(item))return true;}return false;}
     private static boolean online(UnifiedCatalogStore.Entry item){return item.picaAvailable||item.ehAvailable||item.sourceBindings.contains("pica")||item.sourceBindings.contains("eh")||item.sourceBindings.contains("exh");}
     private static boolean providerMatch(UnifiedCatalogStore.Entry item,Set<Provider> selected){for(Provider provider:selected){if(provider==Provider.PICA&&(item.picaAvailable||item.sourceBindings.contains("pica")))return true;if(provider==Provider.EH&&(item.sourceBindings.contains("eh")||(item.ehAvailable&&!item.sourceBindings.contains("exh"))))return true;if(provider==Provider.EXH&&item.sourceBindings.contains("exh"))return true;}return false;}

@@ -27,6 +27,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
     private JSONArray loadedControls=new JSONArray(),loadedInferred=new JSONArray();
     private final Set<String> expanded=new LinkedHashSet<>();
     private final Set<String> expandedFacets=new LinkedHashSet<>();
+    private final Map<String,Integer> facetScrollY=new HashMap<>();
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private int loadGeneration;
     private boolean destroyed,loadedOnce;
@@ -178,7 +179,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
                     boolean facetOpen=!q.isEmpty()||expandedFacets.contains(expansionId);
                     Button facetHeader=Ui.foldHeader(this,(facetOpen?"▾ ":"▸ ")+facet.label+" · "+facet.rows.size()+" 项",false,v->{if(expandedFacets.contains(expansionId))expandedFacets.remove(expansionId);else expandedFacets.add(expansionId);renderSignals(currentQuery());});
                     LinearLayout.LayoutParams fp=new LinearLayout.LayoutParams(-1,-2);fp.setMargins(0,Ui.dp(this,5),0,0);section.addView(facetHeader,fp);
-                    if(facetOpen)addFacetWindow(section,facet.rows);
+                    if(facetOpen)addFacetWindow(section,facet.rows,expansionId);
                 }
             }
             content.addView(section);
@@ -194,11 +195,12 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         }
     }
 
-    private void addFacetWindow(LinearLayout parent,List<JSONObject> rows){
+    private void addFacetWindow(LinearLayout parent,List<JSONObject> rows,String windowId){
         NestedScrollView scroll=new NestedScrollView(this);
         scroll.setNestedScrollingEnabled(false);
         scroll.setFillViewport(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        scroll.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)(view,scrollX,scrollY,oldScrollX,oldScrollY)->facetScrollY.put(windowId,scrollY));
         scroll.setOnTouchListener((view,event)->{
             int action=event.getActionMasked();
             if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)
@@ -214,6 +216,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,rows.size()>5?Ui.dp(this,visible*118):LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0,Ui.dp(this,4),0,Ui.dp(this,4));
         parent.addView(scroll,lp);
+        Integer restore=facetScrollY.get(windowId);if(restore!=null&&restore>0)scroll.post(()->scroll.scrollTo(0,restore));
     }
 
     private void renderSignal(LinearLayout parent,JSONObject row){
@@ -236,7 +239,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser)value.setText(progress+"/10");}
             public void onStartTrackingTouch(SeekBar bar){}
-            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress(),delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);loadAsync();}
+            public void onStopTrackingTouch(SeekBar bar){int desired=bar.getProgress(),delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);refreshControlsSnapshot();}
         });
         card.addView(slider);
 
@@ -247,6 +250,8 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         card.addView(buttons);
         parent.addView(card);
     }
+
+    private void refreshControlsSnapshot(){JSONObject state=RecommendationPolicyStore.snapshot(this);JSONArray controls=state.optJSONArray("controls");loadedState=state;loadedControls=controls==null?new JSONArray():controls;}
 
     private JSONObject findControl(String type,String key){
         JSONArray controls=loadedControls==null?new JSONArray():loadedControls;

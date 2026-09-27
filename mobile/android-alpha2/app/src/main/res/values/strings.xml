@@ -27,8 +27,14 @@
     <string name="onboarding_next">Next</string>
     <string name="tour_library_title">Library</string>
     <string name="tour_library_body">Your Pica, E-H, local downloads and remote copies are organized here.</string>
+    <string name="tour_library_workflow_title">Shelves &amp; batch actions</string>
+    <string name="tour_library_workflow_body">Use Shelves to create and switch collections. Back in Library, long-press a work to enter multi-select, then select all or choose items to add to a shelf or remove from favorites.</string>
     <string name="tour_recommend_title">Recommendations</string>
     <string name="tour_recommend_body">Recommendations use long-term interests, recent behavior, explicit preferences and current-session intent.</string>
+    <string name="tour_recommend_generate_title">Generate a recommendation cycle</string>
+    <string name="tour_recommend_generate_body">Generate the first phone-local recommendation here, or rebuild the cycle later. Favorite changes are checked incrementally first; a full verification is only used when needed.</string>
+    <string name="tour_recommend_adjust_title">Tune recommendations &amp; visual style</string>
+    <string name="tour_recommend_adjust_body">Open Profile / Adjust to inspect why items are recommended, tune authors, IPs and tags from 0–10, block targets, set a phone-only “want this now” intent, and configure visual-style strength. Item detail also provides positive and negative controls.</string>
     <string name="tour_online_title">Online</string>
     <string name="tour_online_body">Browse Pica, E-Hentai and ExHentai when the corresponding source is available.</string>
     <string name="tour_settings_title">Settings</string>

@@ -1433,6 +1433,63 @@ P2-D remains evidence-gated. The critical cache authority pass is now complete e
 - Final documentation head `957d0cdee9b0899f575255328557e5aa4edeef6a` passed all 25/25 PR workflows and the dedicated branch-push RC run `36276530774` passed 3/3 jobs; PR #195 merged as `a6115aa2a9e60bf9e1c8a8f2e0ead9d02099a1de`.
 - Detailed boundary: `docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md`.
 
+## NEXT-28 — Android RC manual-QA corrective batch
+**Status: IN PROGRESS — isolated development branch; current tester RC remains unchanged**
+
+User-reported Android RC findings are now tracked as one acceptance-driven corrective batch. Do not publish, retag, mutate stable/preview channels, or replace the two RC artifacts while the current manual test pass is still collecting evidence.
+
+### A. Runtime feedback and incremental reconciliation — highest priority
+1. **Visible task state for user-triggered loading**
+   - Library refresh must immediately show a visible busy state, disable duplicate refresh, and expose useful phase text instead of appearing inert.
+   - Work-variant ("同一作品") resolution must expose loading/completed/failed state while preserving the current bounded resolver.
+   - Author directory/author works loading must visually distinguish local results, online enrichment in progress, completion and failure.
+   - Reuse existing task/progress authorities where available; do not invent a second scheduler.
+2. **Incremental favorites/library reconciliation**
+   - Android recommendation generation must stop calling full `favoritesAll()` on every new cycle when a validated local favorite snapshot exists.
+   - Port the existing Desktop quick-reconciliation semantics: remote count + newest page(s) + stable overlap/delta first; fall back to full sync only on count/order/overlap anomaly or periodic integrity verification.
+   - Split "refresh" semantics into change detection, incremental merge and exceptional full reconciliation. Avoid unconditional whole-catalog rewrite on a normal no-change refresh.
+3. **Recommendation control editor should not jump after a slider edit**
+   - A 1–10 edit must update the edited row in place where possible.
+   - Do not reload the whole catalog / inferred profile merely to persist one local control.
+   - Preserve outer and nested scroll positions for any action that genuinely requires a structural rerender.
+
+### B. Library/detail product completeness
+4. **Detail page count**
+   - Surface known page count from existing catalog/provider fields; explicitly show unknown when not available and never fabricate a count.
+5. **Favorite-order sorting**
+   - Add a durable favorite-order/rank field independent from comic `updatedAt`.
+   - Support newest-favorited / oldest-favorited sorting without treating publication/update time as favorite time.
+6. **Shared long-press multi-selection for Library and Shelves**
+   - Long press enters selection mode; tap toggles selection; support select all / clear selection.
+   - Library bulk actions: add to shelf and remove/unfavorite with explicit confirmation for destructive remote mutation.
+   - Shelf bulk actions: remove from current shelf and add to another shelf.
+   - Prefer the established AndroidX RecyclerView SelectionTracker interaction model/pattern over ad-hoc per-screen implementations; keep one shared collection-selection authority.
+
+### C. Recommendation diversity and item controls
+7. **Author concentration**
+   - Keep a batch-level author cap, but also track cycle-level author exposure/decay across all batches in the same cycle.
+   - Candidate scarcity may relax diversity only through an explicit staged fallback; record the relaxation reason for explainability/tests.
+   - A targeted author Session may intentionally loosen the author cap, otherwise one strong author must not repeatedly dominate consecutive batches.
+8. **Detail "推荐" controls need symmetric positive/negative semantics**
+   - The detail entry must expose positive controls (more like this / author or tag preference / session target) alongside reduce/block/state-exclusion controls.
+   - Keep ownership, duplicate-report, temporary suppression and taste feedback semantically separate.
+
+### D. Onboarding after interaction contracts stabilize
+9. **Task-oriented onboarding expansion**
+   - Retain the current VSpot interaction style, Skip and replay-from-Settings behavior.
+   - Extend from navigation-only tour to workflows: create shelf, add works, generate recommendation, like/dislike, 1–10 adjustment, block/temporary suppression, Session target, Visual enable/strength, sync, download/Reader/task center.
+   - Defer final copy/spotlight graph until the above controls stop moving.
+
+### Open-source/reference constraints
+- Multi-selection should follow AndroidX RecyclerView SelectionTracker conventions rather than inventing a separate gesture/state system.
+- Long-running progress should follow the same principle used by Android WorkManager/Material progress patterns: visible authoritative state, useful phase/progress, duplicate-action suppression, and reconstructible UI.
+- Avoid adding a dependency solely for behavior already provided by current AndroidX dependencies unless it materially reduces custom state code.
+
+### Acceptance boundaries
+- The existing unpublished Windows/Android P2 RC artifacts remain the user's active test baseline.
+- NEXT-28 development occurs on a separate branch and must not be released until the user finishes the present test pass and a replacement RC is intentionally requested.
+- Every behavior change requires unit/contract coverage where practical; performance fixes must prove removal of unnecessary full-read/full-rerender paths rather than only changing labels/spinners.
+
 ## PARALLEL-1 — W5C PR #109
 **Status: DONE**
 

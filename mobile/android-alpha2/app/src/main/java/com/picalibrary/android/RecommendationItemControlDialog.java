@@ -16,14 +16,29 @@ final class RecommendationItemControlDialog {
 
         String author=entry.displayAuthor();
         if(author!=null&&!author.trim().isEmpty()){
+            labels.add("更多推荐此作者");
+            actions.add(()->{
+                RecommendationPolicyStore.setLocalControl(activity,"AUTHOR",author,author,"MORE","PERSISTENT",2);
+                changed(activity,onChanged,"已提高此作者偏好");
+            });
+            labels.add("本次想看此作者");
+            actions.add(()->{
+                RecommendationPolicyStore.setLocalSessionIntent(activity,"AUTHOR",author,author);
+                changed(activity,onChanged,"本次推荐将优先考虑此作者");
+            });
             labels.add("调节作者 / 标签…");
             actions.add(()->{
                 Intent intent=new Intent(activity,RecommendationControlActivity.class);
                 intent.putExtra("query",author.trim());
                 activity.startActivity(intent);
             });
+            labels.add("减少推荐此作者");
+            actions.add(()->{
+                RecommendationPolicyStore.setLocalControl(activity,"AUTHOR",author,author,"LESS","PERSISTENT",-2);
+                changed(activity,onChanged,"已降低此作者偏好");
+            });
             boolean authorBlocked=authorBlocked(activity,author);
-            labels.add(authorBlocked?"恢复推荐此作者":"不推荐此作者");
+            labels.add(authorBlocked?"恢复推荐此作者":"屏蔽此作者");
             actions.add(()->{
                 RecommendationPolicyStore.setLocalControl(
                     activity,"AUTHOR",author,author,

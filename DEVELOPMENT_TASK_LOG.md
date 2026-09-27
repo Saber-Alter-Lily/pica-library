@@ -2566,3 +2566,18 @@ State update:
 - Initial CI found two implementation-contract issues only: ambiguous `NestedScrollView.setOnScrollChangeListener` overload and a legacy test that pinned the refresh button local variable. Both were corrected on the branch; a fresh full matrix is queued on head `554421eaca993428810fbdb47df0180dbfa2980a`.
 - B3/B4 shared multi-select, A5 deeper Desktop/library incremental decomposition, A3 author completion prominence and E onboarding expansion remain open.
 - Current public/RC release assets are untouched; the user's existing isolated RC remains the active manual-test package.
+
+
+## 2026-09-27 — NEXT-28 B3/B4 + E onboarding implementation
+
+State update:
+- B3/B4 shared collection selection is implemented on the corrective branch using Android contextual `ActionMode` over the existing shared `UnifiedComicCollectionAdapter`; no second Library/Shelf adapter was introduced.
+- Long-press on either Library or Shelf enters selection mode. Normal taps toggle selection while the mode is active.
+- Context actions include visible-count selection, clear selection, add selected works to a shelf, remove selected works from the current shelf, and cancel favorites from Library.
+- Shelf batch membership uses `ShelfStore.setMemberships(...)` so one batch performs one snapshot load/save/reconciliation rather than one complete persistence cycle per comic.
+- Library batch unfavorite is Provider-aware: Pica uses the existing confirmed remote favorite mutation and then updates the favorite cache in one batch; E-H remote favorite removal uses the existing E-H/desktop-relay mutation while E-H local favorite provenance is removed separately. Failed remote items remain represented as failures instead of being silently cleared locally.
+- E1/E2 onboarding is expanded from a navigation skeleton into a versioned task workflow. `OnboardingStore.CURRENT_VERSION` is now 2 so users who completed the old skeleton can receive the richer guide once in the first version that ships it.
+- The VSpot flow now covers: bottom navigation -> create/manage shelves and long-press batch selection -> visible Library refresh -> generate/rebuild a phone recommendation cycle -> profile/adjust entry -> Settings -> Recommendation profile -> 0–10/BLOCK/Session controls -> explicit recommendation sync -> Visual mode -> Visual strength.
+- Recommendation-style onboarding uses stable tagged controls in `RecommendationStyleActivity`; automatic Desktop Visual status refresh is suppressed while the spotlight tour is active so target Views are not destroyed under the overlay.
+- English, Simplified Chinese and Japanese onboarding resources were extended together.
+- Existing P2 RC/stable release assets remain untouched. Full CI/Android matrix is queued on head `b1d0e9fcb8b63f34b41a5e89c06bafc3ac7b48de`.

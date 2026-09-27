@@ -2499,3 +2499,53 @@ Decision:
 
 Reason:
 Recent work correctly advanced multi-platform and Remote Web foundations, but progress reporting had begun to underrepresent the earlier architecture/runtime optimization work. This reconciliation makes the full task package explicit so later development cannot drift into “add more platforms/features” while leaving runtime hardening and real performance validation unfinished.
+
+
+## NEXT-28 — Android RC UX / performance corrective batch
+**Status: IN PROGRESS — implementation branch `fix/android-rc-ux-performance-batch`**
+
+Source: representative Android RC testing after NEXT-27 dual-client candidate packaging. These findings are product/runtime defects or gaps, not a new release scope. Public stable remains v0.4.11; the current isolated RC remains valid for continued user testing while this batch is developed.
+
+### A. Runtime feedback and incremental refresh
+- **A1 Library refresh progress:** make refresh visibly enter a running state immediately; expose meaningful phases such as checking Desktop, comparing favorites, syncing shelves, checking remote storage and reconciling local references. Avoid a silent background Future with only a final rerender.
+- **A2 Work-variant progress:** "同一作品" must distinguish checking/running/completed/failed states. The user must not have to infer completion from a count that suddenly appears.
+- **A3 Author-work progress:** strengthen local/online discovery feedback so a partially rendered author page is not visually mistaken for a completed scan.
+- **A4 Quick favorite reconciliation on Android:** stop calling full `PicaClient.favoritesAll()` for every recommendation cycle. Reuse the mature Desktop quick-sync semantics: inspect newest page/count, find stable overlap with the known snapshot, apply bounded deltas, and fall back to full scan only when count/order/overlap cannot be reconciled or a periodic full audit is due.
+- **A5 Library refresh decomposition:** separate "check for changes", "apply remote delta" and "local reference reconciliation". Do not treat every visible refresh as authority to re-read every remote page and rewrite the entire local catalog.
+- Acceptance: ordinary no-change refresh/recommendation generation should use bounded newest-page checks rather than full favorite pagination; full sync remains an explicit safety fallback.
+
+### B. Library/detail interaction
+- **B1 Detail page count:** surface authoritative known page count on the comic detail header when available; preserve "unknown" instead of inventing a value.
+- **B2 Favorite-order sort:** add a real favorite-order/rank field and Library sort modes based on collection order. Do not reuse comic `updatedAt` as a proxy for favorite time/order.
+- **B3 Shared collection selection mode:** Library and Shelf share one long-press multi-select interaction through the common collection adapter. Required primitives: enter/exit selection mode, select/deselect item, select all, clear all and contextual batch actions.
+- **B4 Batch actions:** Library selection must support add-to-shelf and cancel-favorite where provider capability allows it; Shelf selection must support remove-from-shelf and add-to-another-shelf without forking a second selection implementation.
+
+### C. Recommendation composition and controls
+- **C1 Batch author diversity:** review the current 12-item allocator. Existing per-batch author cap is insufficient because counters reset for each batch.
+- **C2 Cycle exposure:** add cycle-level author exposure cap/decay across all batches in one recommendation cycle, while preserving an explicit Session/TARGET exception when the user intentionally requests an author.
+- **C3 Detail recommendation controls:** redesign the detail-page "推荐/调节" entry so positive controls ("更多类似", positive author/tag intent, Session target where appropriate) are visible alongside negative/suppression/ownership semantics. Do not label an almost entirely negative menu as the complete recommendation control surface.
+- Acceptance: one strong author cannot repeatedly dominate consecutive 12-item batches under default mode; semantic facts such as owned/seen/duplicate/temp hide stay separate from taste feedback.
+
+### D. Recommendation-control UI state
+- **D1 Preserve nested facet scroll:** changing a 0–10 slider, BLOCK state or Session target must not jump the active subcategory to its first row.
+- **D2 Avoid full-profile reload for a row edit:** current `onStopTrackingTouch -> setLocalControl -> loadAsync()` reloads policy, whole Unified Catalog and inferred profile, then destroys/recreates all nested scroll views. Replace ordinary row edits with local state mutation/rebind where possible; reserve full profile rebuild for structural changes.
+- Acceptance: the edited row stays in place and remains visible after a preference change; no whole-catalog read is required merely to persist one slider value.
+
+### E. Onboarding expansion
+- **E1 Keep the existing VSpot interaction model**, but treat the current two-stage navigation tour as a skeleton.
+- **E2 After the affected product flows stabilize**, expand onboarding to task-oriented walkthroughs: create/manage shelf, add comics, generate a first recommendation cycle, Like/Dislike, 0–10 tuning, BLOCK/temporary suppression, Session intent, recommendation sync, Visual/style enablement and strength, task/progress UI, download and Reader entry points.
+- Acceptance: defer detailed tour coordinates/tags until the underlying controls in A–D are stable, avoiding churn from documenting moving UI.
+
+### Implementation order
+1. A4/A5 incremental favorite/library reconciliation.
+2. A1/A2/A3 visible task feedback.
+3. D1/D2 preference-editor state/performance.
+4. B1/B2 detail and sort data gaps.
+5. B3/B4 shared selection mode.
+6. C1/C2/C3 recommendation diversity and control IA.
+7. E1/E2 onboarding expansion after UI stabilization.
+
+### Release boundary
+- Do not mutate v0.4.11 Release assets, stable OTA metadata or `android-preview` while this corrective batch is under development.
+- Do not publish a new formal package until the corrective branch has automated coverage and a fresh dual-client RC is intentionally requested.
+- Current RC testing may continue in parallel; new tester findings should be appended to NEXT-28 rather than spawning unrelated ad-hoc fixes.

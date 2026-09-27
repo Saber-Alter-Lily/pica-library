@@ -13,7 +13,7 @@
     <string name="onboarding_settings_title">帮助与新手引导</string>
     <string name="onboarding_settings_help">可以随时重新查看主要功能引导。关闭自动提示后，仍然可以手动启动。</string>
     <string name="onboarding_replay">重新查看新手引导</string>
-    <string name="onboarding_replay_summary">书库 / 推荐 / 连接 / 设置</string>
+    <string name="onboarding_replay_summary">书库 / 书架 / 推荐 / 画风 / 连接 / 设置</string>
     <string name="onboarding_auto">自动显示新版功能引导</string>
     <string name="onboarding_welcome_title">欢迎使用新版 Pica Library</string>
     <string name="onboarding_welcome_body">花一分钟了解书库、推荐、连接与设置。引导可以随时跳过；之后也可以在“设置 → 帮助与新手引导”重新查看。</string>
@@ -43,6 +43,24 @@
     <string name="tour_update_body">在这里检查和安装 Android 正式更新。</string>
     <string name="tour_help_title">帮助与新手引导</string>
     <string name="tour_help_body">即使关闭自动提示，也可以随时从这里重新查看本引导。</string>
+    <string name="tour_shelf_workflow_title">书架与批量选择</string>
+    <string name="tour_shelf_workflow_body">点击“书架”可以新建和管理书架。在书库或书架中长按任一本漫画即可进入多选模式；可以全选、取消全选、批量加入书架、移出当前书架或取消收藏。</string>
+    <string name="tour_library_refresh_title">刷新过程可见</string>
+    <string name="tour_library_refresh_body">刷新时会明确显示正在检查电脑端、收藏、书架、远程存储和本地整理。收藏通常先核对最近变化，只有无法安全判断时才进行完整扫描。</string>
+    <string name="tour_generate_recommend_title">生成推荐</string>
+    <string name="tour_generate_recommend_body">点击这里生成或主动重建手机自己的推荐周期。每个周期按 12 本分批；切换上一批/下一批只复用当前周期，不会重新完整生成。</string>
+    <string name="tour_adjust_recommend_title">画像与调整</string>
+    <string name="tour_adjust_recommend_body">从这里查看推荐为什么这样组成，调整明确偏好、同步推荐状态，并设置画风对排序的影响。</string>
+    <string name="tour_profile_title">推荐画像</string>
+    <string name="tour_profile_body">先查看长期兴趣、最近行为、本次手机 Session 和当前推荐构成，再决定需要调整哪些方向。</string>
+    <string name="tour_manual_adjust_title">人工 0–10 调整</string>
+    <string name="tour_manual_adjust_body">作者、IP、标签、分类和画风族都可以按 0–10 调整；5 为中性。还可以直接屏蔽，或用“本次想看”只影响当前手机 Session。</string>
+    <string name="tour_recommend_sync_title">推荐同步</string>
+    <string name="tour_recommend_sync_body">电脑和手机各自保留独立的当前推荐周期。同步只合并长期偏好、反馈和可移植基础；如果两边同时改了同一偏好，会交给你选择保留哪一边。</string>
+    <string name="tour_visual_mode_title">画风接入模式</string>
+    <string name="tour_visual_mode_body">可以选择关闭、仅分析或参与排序。完整画风模型仍由电脑端计算，手机只消费同步后的轻量画风相似度。</string>
+    <string name="tour_visual_strength_title">画风影响强度</string>
+    <string name="tour_visual_strength_body">这里决定画风相似度对排序影响多大；只改变画风这一部分，不会取代作者、标签、最近行为和本次偏好。</string>
     <string name="tour_complete_title">已经准备好了</string>
     <string name="tour_complete_body">主要功能已经介绍完毕；以后仍可从设置重新查看本引导。</string>
 </resources>

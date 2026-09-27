@@ -2580,4 +2580,4 @@ State update:
 - The VSpot flow now covers: bottom navigation -> create/manage shelves and long-press batch selection -> visible Library refresh -> generate/rebuild a phone recommendation cycle -> profile/adjust entry -> Settings -> Recommendation profile -> 0–10/BLOCK/Session controls -> explicit recommendation sync -> Visual mode -> Visual strength.
 - Recommendation-style onboarding uses stable tagged controls in `RecommendationStyleActivity`; automatic Desktop Visual status refresh is suppressed while the spotlight tour is active so target Views are not destroyed under the overlay.
 - English, Simplified Chinese and Japanese onboarding resources were extended together.
-- Existing P2 RC/stable release assets remain untouched. Full CI/Android matrix is queued on head `b1d0e9fcb8b63f34b41a5e89c06bafc3ac7b48de`.
+- Existing P2 RC/stable release assets remain untouched. Full CI/Android matrix is queued on the current corrective head; the latest code head is `e1c898ad1525ae2750b56e6440c7a2f49b37b10f` after adding visible batch-unfavorite progress.

@@ -45,6 +45,9 @@ final class FavoriteCacheStore {
         if(desired&&!found)next.add(new BridgeClient.ComicItem(comicId,title==null||title.isEmpty()?"未命名漫画":title,author==null||author.isEmpty()?"未知作者":author,"",0));
         save(context,next,false);UnifiedCatalogStore.reconcileLocalReferences(context);NativeRecommendationStore.markFavoriteChange(context);
     }
+    static synchronized void removeLocalFavorites(Context context,Collection<String> comicIds){
+        if(comicIds==null||comicIds.isEmpty())return;Set<String> remove=new HashSet<>(comicIds);Snapshot prior=load(context);List<BridgeClient.ComicItem> next=new ArrayList<>();boolean changed=false;for(BridgeClient.ComicItem item:prior.items){if(remove.contains(item.id)){changed=true;continue;}next.add(item);}if(!changed)return;save(context,next,false);UnifiedCatalogStore.reconcileLocalReferences(context);NativeRecommendationStore.markFavoriteChange(context);
+    }
 
     static long metadataBytes(Context context){File f=file(context);return f.isFile()?f.length():0;}
     static void clear(Context context){File f=file(context);if(f.exists())f.delete();}

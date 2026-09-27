@@ -11,7 +11,7 @@ import java.util.*;
  */
 final class PicaFavoriteReconciler {
     interface Progress {
-        void update(String phase,String mode,int page,int pages,int fetched,int total,int found,String fallbackReason);
+        void update(String phase,String mode,int page,int pages,int fetched,int total,int found,String fallbackReason) throws Exception;
     }
     interface Control { void checkpoint() throws Exception; }
 

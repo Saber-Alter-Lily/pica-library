@@ -2549,3 +2549,20 @@ Source: representative Android RC testing after NEXT-27 dual-client candidate pa
 - Do not mutate v0.4.11 Release assets, stable OTA metadata or `android-preview` while this corrective batch is under development.
 - Do not publish a new formal package until the corrective branch has automated coverage and a fresh dual-client RC is intentionally requested.
 - Current RC testing may continue in parallel; new tester findings should be appended to NEXT-28 rather than spawning unrelated ad-hoc fixes.
+
+
+## 2026-09-27 — NEXT-28 Android RC corrective batch started
+
+State update:
+- Created branch `fix/android-rc-ux-performance-batch` and Draft PR #197 from the accepted P2 RC packaging head.
+- Recorded all nine representative Android RC findings before implementation so continued testing can append to the same corrective batch.
+- A4 first implementation is in place: Recommendation generation now uses newest-page Pica favorite reconciliation, bounded overlap search for small append-only changes, 24-hour periodic full audit, and safe full-pagination fallback for ambiguous count/order/removal cases. Ordinary unchanged cycles no longer require `favoritesAll()`.
+- D1/D2 first implementation is in place: 0–10 and BLOCK edits update policy state in place instead of reloading the whole Unified Catalog/inferred profile; nested facet scroll positions are retained across structural rerenders; Session-target changes no longer rebuild the full page.
+- B1 is implemented: authoritative `knownPictures` is displayed as page count on comic detail when known.
+- B2 is implemented at the data/UI layer: `favoriteRank` is kept separately from comic `updatedAt`, with “最近收藏 / 最早收藏” sort modes.
+- C1/C2 first implementation is in place: default batch author exposure starts at 2, cycle-level author exposure is bounded across batches, and only an explicit AUTHOR Session TARGET receives a controlled relaxation.
+- C3 first implementation is in place: detail recommendation controls now expose positive author actions (“更多推荐此作者 / 本次想看此作者”) alongside detailed tuning, LESS/BLOCK, ownership/exposure and temporary-suppression actions.
+- A1/A2 first implementation is in place: Library refresh exposes visible phases and disables the refresh control while running; same-work resolution explicitly shows a checking state. A3 author-work completion prominence remains open.
+- Initial CI found two implementation-contract issues only: ambiguous `NestedScrollView.setOnScrollChangeListener` overload and a legacy test that pinned the refresh button local variable. Both were corrected on the branch; a fresh full matrix is queued on head `554421eaca993428810fbdb47df0180dbfa2980a`.
+- B3/B4 shared multi-select, A5 deeper Desktop/library incremental decomposition, A3 author completion prominence and E onboarding expansion remain open.
+- Current public/RC release assets are untouched; the user's existing isolated RC remains the active manual-test package.

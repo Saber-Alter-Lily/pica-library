@@ -1,0 +1,105 @@
+import fs from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+const read=(p:string)=>fs.readFileSync(p,'utf8')
+const java=(name:string)=>read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/'+name)
+
+describe('NEXT-28 Android RC manual-QA corrections',()=>{
+  it('makes long-running library and same-work work visible',()=>{
+    const home=java('HomeActivity.java')
+    const detail=java('UnifiedComicDetailActivity.java')
+    const works=java('AuthorWorksActivity.java')
+    expect(home).toContain('正在检查书库变化')
+    expect(home).toContain('libraryRefreshButton.setEnabled(!active)')
+    expect(home).toContain('正在同步收藏变化')
+    expect(detail).toContain('同一作品 · 正在检测')
+    expect(detail).toContain('同一作品 · 检测失败 · 点击重试')
+    expect(detail).toContain('已检测')
+    expect(works).toContain('正在补全在线作者作品')
+    expect(works).toContain('检测完成 · ')
+  })
+
+  it('shows page count and preserves real favorite order as its own sort authority',()=>{
+    const detail=java('UnifiedComicDetailActivity.java')
+    const filter=java('UnifiedLibraryFilter.java')
+    const cache=java('FavoriteCacheStore.java')
+    expect(detail).toContain('Math.max(entry.knownPictures,entry.remotePageCount)')
+    expect(detail).toContain('页数未知')
+    expect(filter).toContain('FAVORITED_NEWEST')
+    expect(filter).toContain('FAVORITED_OLDEST')
+    expect(filter).toContain('compareFavoriteRank')
+    expect(cache).toContain('favoriteRankById()')
+    expect(cache).toContain('lastPicaFullSyncAt')
+  })
+
+  it('uses quick favorite reconciliation before full pagination during recommendation generation',()=>{
+    const engine=java('NativeRecommendationEngine.java')
+    const reconciler=java('PicaFavoriteReconciler.java')
+    const buildStart=engine.indexOf('static NativeRecommendationStore.Snapshot build(Context context,Progress progress,Control control)')
+    const buildEnd=engine.indexOf('private static List<Intent> buildExplicitIntents',buildStart)
+    const build=engine.slice(buildStart,buildEnd)
+    expect(build).toContain('PicaFavoriteReconciler.sync')
+    expect(build).not.toContain('client.favoritesAll(')
+    expect(reconciler).toContain('MAX_QUICK_PAGES=5')
+    expect(reconciler).toContain('STABLE_OVERLAP_IDS=8')
+    expect(reconciler).toContain('remoteTotal==known.size()+unseen.size()')
+    expect(reconciler).toContain('pagination-ordering-anomaly')
+    expect(reconciler).toContain('stable-overlap-not-found')
+    expect(reconciler).toContain('client.favoritesAll(')
+  })
+
+  it('keeps ordinary preference slider changes local and preserves nested scroll',()=>{
+    const controls=java('RecommendationControlActivity.java')
+    const start=controls.indexOf('public void onStopTrackingTouch(SeekBar bar)')
+    const end=controls.indexOf('});',start)
+    const handler=controls.slice(start,end)
+    expect(handler).toContain('setLocalControl')
+    expect(handler).toContain('refreshControlsSnapshot()')
+    expect(handler).not.toContain('loadAsync()')
+    expect(controls).toContain('facetScrollY.put(windowId,scrollY)')
+    expect(controls).toContain('scroll.scrollTo(0,restore)')
+  })
+
+  it('shares long-press multi-selection across Library and Shelves',()=>{
+    const home=java('HomeActivity.java')
+    const adapter=java('UnifiedComicCollectionAdapter.java')
+    const shelves=java('ShelfStore.java')
+    expect(adapter).toContain('interface Selection')
+    expect(adapter).toContain('setOnLongClickListener')
+    expect(adapter).toContain('selection.toggle(item,true)')
+    expect(home).toContain('addCollectionSelectionBar(p,false)')
+    expect(home).toContain('addCollectionSelectionBar(p,true)')
+    expect(home).toContain('selectAllCollection()')
+    expect(home).toContain('confirmBatchUnfavorite()')
+    expect(home).toContain('batchRemoveFromShelf()')
+    expect(shelves).toContain('setMemberships(Context context,String shelfId,Collection<UnifiedCatalogStore.Entry> entries,boolean desired)')
+  })
+
+  it('limits author exposure both within and across recommendation batches',()=>{
+    const engine=java('NativeRecommendationEngine.java')
+    expect(engine).toContain('Map<String,Integer> cycleAuthorExposure')
+    expect(engine).toContain('int[][] caps={{4,2,4,2,4},{5,3,5,3,6}')
+    expect(engine).toContain('targetedAuthorKey(policyState)')
+    expect(engine).toContain('候选不足时已放宽多样性')
+  })
+
+  it('offers positive and negative item-level recommendation controls',()=>{
+    const dialog=java('RecommendationItemControlDialog.java')
+    expect(dialog).toContain('👍 喜欢这部作品')
+    expect(dialog).toContain('更多推荐此作者')
+    expect(dialog).toContain('本次想看此作者')
+    expect(dialog).toContain('不推荐此作者')
+    expect(dialog).toContain('暂时不想看（30 天）')
+  })
+
+  it('expands onboarding from navigation to shelf and recommendation workflows',()=>{
+    const tour=java('AndroidOnboarding.java')
+    const store=java('OnboardingStore.java')
+    expect(store).toContain('CURRENT_VERSION=2')
+    expect(tour).toContain('showLibraryWorkflowTour(activity)')
+    expect(tour).toContain('showRecommendationWorkflowTour(activity)')
+    expect(tour).toContain('LIBRARY_SHELF')
+    expect(tour).toContain('RECOMMEND_GENERATE')
+    expect(tour).toContain('RECOMMEND_CONTROLS')
+  })
+})

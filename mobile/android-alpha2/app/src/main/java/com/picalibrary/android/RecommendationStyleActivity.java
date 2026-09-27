@@ -14,14 +14,14 @@ import org.json.JSONObject;
 public final class RecommendationStyleActivity extends LocaleAwareActivity {
     private LinearLayout content;
     private JSONObject desktopVisual;
-    private boolean loading,destroyed;
+    private boolean loading,destroyed,detailedOnboarding;
 
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);Ui.applyWindow(this);renderShell();if(getIntent().getBooleanExtra("startDetailedOnboarding",false)&&content!=null)content.postDelayed(()->AndroidOnboarding.startRecommendationStyleTour(this),260);
+        super.onCreate(saved);Ui.applyWindow(this);detailedOnboarding=getIntent().getBooleanExtra("startDetailedOnboarding",false);getIntent().removeExtra("startDetailedOnboarding");renderShell();if(detailedOnboarding&&content!=null)content.postDelayed(()->AndroidOnboarding.startRecommendationStyleTour(this),260);
     }
     @Override protected void onResume(){
         super.onResume();renderContent();
-        if(BridgeStore.paired(this))loadDesktopVisual(false);
+        if(BridgeStore.paired(this)&&!detailedOnboarding)loadDesktopVisual(false);
     }
     @Override protected void onDestroy(){destroyed=true;super.onDestroy();}
 

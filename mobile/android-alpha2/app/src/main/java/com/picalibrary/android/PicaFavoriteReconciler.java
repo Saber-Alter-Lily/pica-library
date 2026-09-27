@@ -13,7 +13,7 @@ final class PicaFavoriteReconciler {
     interface Progress {
         void update(String phase,String mode,int page,int pages,int fetched,int total,int found,String fallbackReason);
     }
-    interface Control { void checkpoint() throws InterruptedException; }
+    interface Control { void checkpoint() throws Exception; }
 
     static final class Result {
         final List<PicaClient.Comic> refreshedComics;
@@ -138,5 +138,5 @@ final class PicaFavoriteReconciler {
         try{return System.currentTimeMillis()-Instant.parse(prior.lastPicaFullSyncAt).toEpochMilli()>=FULL_RECONCILE_INTERVAL_MS;}catch(Exception ignored){return true;}
     }
 
-    private static void checkpoint(Control control) throws InterruptedException {if(control!=null)control.checkpoint();}
+    private static void checkpoint(Control control) throws Exception {if(control!=null)control.checkpoint();}
 }

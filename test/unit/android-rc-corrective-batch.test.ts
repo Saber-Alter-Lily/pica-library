@@ -72,6 +72,51 @@ describe('Android RC corrective batch', () => {
         expect(dialog).toContain('屏蔽此作者')
     })
 
+    it('shares long-press contextual selection across Library and Shelves', () => {
+        const adapter = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/UnifiedComicCollectionAdapter.java'
+        )
+        const selection = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/CollectionSelectionController.java'
+        )
+        const shelf = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/ShelfStore.java'
+        )
+        const home = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'
+        )
+        expect(adapter).toContain('setOnLongClickListener')
+        expect(adapter).toContain('selection.active()')
+        expect(selection).toContain('ActionMode.Callback')
+        expect(selection).toContain('"全选"')
+        expect(selection).toContain('"取消全选"')
+        expect(selection).toContain('"加入书架"')
+        expect(selection).toContain('"移出当前书架"')
+        expect(selection).toContain('"取消收藏"')
+        expect(shelf).toContain('setMemberships(Context context')
+        expect(home).toContain('addSelectedToShelf')
+        expect(home).toContain('removeSelectedFromShelf')
+        expect(home).toContain('removeSelectedFavorites')
+    })
+
+    it('expands onboarding into shelf, recommendation and visual workflows', () => {
+        const onboarding = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AndroidOnboarding.java'
+        )
+        const store = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/OnboardingStore.java'
+        )
+        const style = read(
+            'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/RecommendationStyleActivity.java'
+        )
+        expect(store).toContain('CURRENT_VERSION=2')
+        expect(onboarding).toContain('showLibraryWorkflowTour')
+        expect(onboarding).toContain('showRecommendationWorkflowTour')
+        expect(onboarding).toContain('startRecommendationStyleTour')
+        expect(style).toContain('REC_VISUAL_MODE')
+        expect(style).toContain('REC_VISUAL_STRENGTH')
+    })
+
     it('shows explicit library/work-identity loading feedback and detail page count', () => {
         const home = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java'

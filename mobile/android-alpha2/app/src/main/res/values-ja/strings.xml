@@ -27,8 +27,14 @@
     <string name="onboarding_next">次へ</string>
     <string name="tour_library_title">ライブラリ</string>
     <string name="tour_library_body">Pica、E-H、ローカルダウンロード、リモートコピーをここでまとめて整理します。</string>
+    <string name="tour_library_workflow_title">本棚と一括整理</string>
+    <string name="tour_library_workflow_body">「本棚」でコレクションを作成・切り替えます。ライブラリで作品を長押しすると複数選択に入り、全選択または個別選択して、本棚への追加やお気に入り解除をまとめて実行できます。</string>
     <string name="tour_recommend_title">おすすめ</string>
     <string name="tour_recommend_body">長期的な興味、最近の行動、明示的な嗜好、今回見たいものを組み合わせておすすめします。</string>
+    <string name="tour_recommend_generate_title">おすすめサイクルを生成</string>
+    <string name="tour_recommend_generate_body">ここでスマートフォン独自のおすすめを初回生成し、後から新しいサイクルを再生成できます。お気に入りはまず差分確認し、必要な場合だけ全件検証します。</string>
+    <string name="tour_recommend_adjust_title">おすすめ調整と画風</string>
+    <string name="tour_recommend_adjust_body">「プロフィール / 調整」では、おすすめ理由を確認し、作者・IP・タグを0–10で調整、ブロック、端末限定の「今回見たいもの」を設定し、画風おすすめの強さも変更できます。作品詳細の「おすすめ」には正負両方の操作があります。</string>
     <string name="tour_online_title">オンライン</string>
     <string name="tour_online_body">Pica、E-Hentai、利用可能な場合は ExHentai を閲覧できます。</string>
     <string name="tour_settings_title">設定</string>

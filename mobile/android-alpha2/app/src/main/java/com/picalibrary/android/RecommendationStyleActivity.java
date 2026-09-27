@@ -17,7 +17,7 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
     private boolean loading,destroyed;
 
     @Override public void onCreate(Bundle saved){
-        super.onCreate(saved);Ui.applyWindow(this);renderShell();
+        super.onCreate(saved);Ui.applyWindow(this);renderShell();if(getIntent().getBooleanExtra("startDetailedOnboarding",false)&&content!=null)content.postDelayed(()->AndroidOnboarding.startRecommendationStyleTour(this),260);
     }
     @Override protected void onResume(){
         super.onResume();renderContent();
@@ -46,9 +46,9 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         runtimeCard.addView(SettingsRow.statusLine(this,"候选基础",Ui.rawText(this,portable.available()?LocalizedText.ui(this,portable.candidates.size()+" 个 · "+shortId(portable.reservoirGeneration),portable.candidates.size()+" items · "+shortId(portable.reservoirGeneration),portable.candidates.size()+" 件 · "+shortId(portable.reservoirGeneration)):LocalizedText.ui(this,"尚未同步","Not synced yet","未同期"),12,Ui.MUTED,true)));
         content.addView(runtimeCard);
 
-        content.addView(SettingsRow.row(this,"推荐画像","长期 / 最近 / 本次 / 当前构成",v->startActivity(new Intent(this,RecommendationProfileActivity.class))));
-        int pendingControls=RecommendationPolicyStore.pendingControlCount(this);content.addView(SettingsRow.row(this,"人工调整",pendingControls>0?LocalizedText.ui(this,"有 "+pendingControls+" 项待同步",pendingControls+" items pending sync",pendingControls+" 件の同期待ち"):LocalizedText.ui(this,"0–10 档 / 屏蔽 / 本次想看","0–10 levels / blocks / session intent","0–10 段階 / ブロック / 今回見たいもの"),v->startActivity(new Intent(this,RecommendationControlActivity.class))));
-        content.addView(SettingsRow.row(this,"推荐同步",BridgeStore.paired(this)?"与 Desktop 比较并双向合并":"未连接电脑",v->startActivity(new Intent(this,RecommendationSyncActivity.class))));
+        LinearLayout profileRow=SettingsRow.row(this,"推荐画像","长期 / 最近 / 本次 / 当前构成",v->startActivity(new Intent(this,RecommendationProfileActivity.class)));profileRow.setTag(AndroidOnboarding.REC_PROFILE);content.addView(profileRow);
+        int pendingControls=RecommendationPolicyStore.pendingControlCount(this);LinearLayout adjustRow=SettingsRow.row(this,"人工调整",pendingControls>0?LocalizedText.ui(this,"有 "+pendingControls+" 项待同步",pendingControls+" items pending sync",pendingControls+" 件の同期待ち"):LocalizedText.ui(this,"0–10 档 / 屏蔽 / 本次想看","0–10 levels / blocks / session intent","0–10 段階 / ブロック / 今回見たいもの"),v->startActivity(new Intent(this,RecommendationControlActivity.class)));adjustRow.setTag(AndroidOnboarding.REC_ADJUST);content.addView(adjustRow);
+        LinearLayout syncRow=SettingsRow.row(this,"推荐同步",BridgeStore.paired(this)?"与 Desktop 比较并双向合并":"未连接电脑",v->startActivity(new Intent(this,RecommendationSyncActivity.class)));syncRow.setTag(AndroidOnboarding.REC_SYNC);content.addView(syncRow);
         boolean reasons=RecommendationFeedbackStore.askReasons(this);
         content.addView(SettingsRow.row(this,"反馈原因",reasons?"开启":"关闭",v->{RecommendationFeedbackStore.setAskReasons(this,!RecommendationFeedbackStore.askReasons(this));renderContent();}));
 
@@ -58,8 +58,8 @@ public final class RecommendationStyleActivity extends LocaleAwareActivity {
         int covered=0;for(PortableRecommendationPackageStore.Candidate row:portable.candidates)if(row.visualAvailable)covered++;
         visual.addView(SettingsRow.statusLine(this,"候选 Visual 覆盖",Ui.text(this,covered+" / "+portable.candidates.size(),12,Ui.MUTED,true)));
         visual.addView(SettingsRow.statusLine(this,"手机画风接入",Ui.text(this,MobileVisualPolicyStore.label(this),12,Ui.MUTED,true)));
-        visual.addView(Ui.button(this,"调整手机画风接入模式",v->chooseMobileVisualMode(),true),new LinearLayout.LayoutParams(-1,-2));
-        visual.addView(Ui.button(this,LocalizedText.ui(this,"画风影响强度 · ","Visual influence strength · ","画風の影響強度 · ")+MobileVisualPolicyStore.strengthLabel(this),v->chooseMobileVisualStrength(),true),new LinearLayout.LayoutParams(-1,-2));
+        Button visualMode=Ui.button(this,"调整手机画风接入模式",v->chooseMobileVisualMode(),true);visualMode.setTag(AndroidOnboarding.REC_VISUAL_MODE);visual.addView(visualMode,new LinearLayout.LayoutParams(-1,-2));
+        Button visualStrength=Ui.button(this,LocalizedText.ui(this,"画风影响强度 · ","Visual influence strength · ","画風の影響強度 · ")+MobileVisualPolicyStore.strengthLabel(this),v->chooseMobileVisualStrength(),true);visualStrength.setTag(AndroidOnboarding.REC_VISUAL_STRENGTH);visual.addView(visualStrength,new LinearLayout.LayoutParams(-1,-2));
         content.addView(visual);
 
         if(BridgeStore.paired(this)){

@@ -72,7 +72,7 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
     private Button small(String text,View.OnClickListener action){return Ui.button(this,text,action,true);}
     private String authorSummary(){return localAuthorSummary.isEmpty()?entry.displayAuthor():localAuthorSummary;}
     private void openAuthors(){Intent i=new Intent(this,AuthorDirectoryActivity.class);i.putExtra("comicId",entry.id);startActivity(i);}
-    private String detailMeta(){ArrayList<String> values=new ArrayList<>();if(entry.sourceBindings.contains("pica")||entry.picaAvailable)values.add("Pica");if(entry.sourceBindings.contains("eh"))values.add("E-H");if(entry.sourceBindings.contains("exh"))values.add("ExH");if(values.isEmpty())values.add(EhClient.isEhId(entry.id)?"E-H":"本地");if(!Double.isNaN(entry.rating))values.add("★ "+String.format(Locale.ROOT,"%.2f",entry.rating));if("FINISHED".equals(entry.completionStatus)||entry.finished)values.add("完结");else if("ONGOING".equals(entry.completionStatus))values.add("连载");return String.join(" · ",values);}
+    private String detailMeta(){ArrayList<String> values=new ArrayList<>();if(entry.sourceBindings.contains("pica")||entry.picaAvailable)values.add("Pica");if(entry.sourceBindings.contains("eh"))values.add("E-H");if(entry.sourceBindings.contains("exh"))values.add("ExH");if(values.isEmpty())values.add(EhClient.isEhId(entry.id)?"E-H":"本地");if(entry.knownPictures>0)values.add(LocalizedText.ui(this,entry.knownPictures+" 页",entry.knownPictures+" pages",entry.knownPictures+" ページ"));if(!Double.isNaN(entry.rating))values.add("★ "+String.format(Locale.ROOT,"%.2f",entry.rating));if("FINISHED".equals(entry.completionStatus)||entry.finished)values.add("完结");else if("ONGOING".equals(entry.completionStatus))values.add("连载");return String.join(" · ",values);}
     private String tagLine(){return localTagLine;}
     private String workVariantRelation(JSONObject row){
         String relation=row.optString("relation","");
@@ -112,6 +112,8 @@ public final class UnifiedComicDetailActivity extends LocaleAwareActivity {
 
     private void loadWorkVariants(){
         if(workVariantToggle==null||entry==null)return;
+        workVariantToggle.setEnabled(false);
+        workVariantToggle.setText(LocalizedText.ui(this,"同一作品 · 检测中…","Same work · Checking…","同一作品 · 確認中…"));
         final String comicId=entry.id;
         worker.submit(()->{
             JSONObject value=WorkVariantResolver.load(this,comicId);

@@ -13,7 +13,7 @@
     <string name="onboarding_settings_title">ヘルプと初回ガイド</string>
     <string name="onboarding_settings_help">主な機能ガイドはいつでも再表示できます。自動表示をオフにしても手動再生は利用できます。</string>
     <string name="onboarding_replay">初回ガイドをもう一度見る</string>
-    <string name="onboarding_replay_summary">ライブラリ / おすすめ / 接続 / 設定</string>
+    <string name="onboarding_replay_summary">ライブラリ / 本棚 / おすすめ / 画風 / 接続 / 設定</string>
     <string name="onboarding_auto">新機能ガイドを自動表示</string>
     <string name="onboarding_welcome_title">新しい Pica Library へようこそ</string>
     <string name="onboarding_welcome_body">ライブラリ、おすすめ、接続、設定を短時間で確認できます。いつでもスキップでき、後から「設定 → ヘルプと初回ガイド」で再表示できます。</string>
@@ -43,6 +43,24 @@
     <string name="tour_update_body">Android 正式版の更新をここで確認・インストールします。</string>
     <string name="tour_help_title">ヘルプと初回ガイド</string>
     <string name="tour_help_body">自動表示をオフにしても、ここからいつでもガイドを再表示できます。</string>
+    <string name="tour_shelf_workflow_title">本棚と一括選択</string>
+    <string name="tour_shelf_workflow_body">「本棚」から本棚を作成・管理できます。ライブラリまたは本棚で作品を長押しすると選択モードになり、全選択、選択解除、本棚への追加、現在の本棚からの削除、お気に入り解除をまとめて実行できます。</string>
+    <string name="tour_library_refresh_title">進捗が見える更新</string>
+    <string name="tour_library_refresh_body">更新中は Desktop、お気に入り、本棚、リモート保存先、ローカル整理の各段階を表示します。通常は最近の変更だけを照合し、安全に判断できない場合だけ全件確認します。</string>
+    <string name="tour_generate_recommend_title">おすすめを生成</string>
+    <string name="tour_generate_recommend_body">ここからスマートフォン独自のおすすめサイクルを生成または明示的に再生成します。1サイクルは12件ずつのバッチに分かれ、前後のバッチ移動では再生成しません。</string>
+    <string name="tour_adjust_recommend_title">プロフィールと調整</string>
+    <string name="tour_adjust_recommend_body">おすすめの構成理由を確認し、明示的な嗜好、同期、画風の影響をここから調整できます。</string>
+    <string name="tour_profile_title">おすすめプロフィール</string>
+    <string name="tour_profile_body">長期嗜好、最近の行動、この端末の Session、現在のおすすめ構成を確認してから調整できます。</string>
+    <string name="tour_manual_adjust_title">0–10 の手動調整</string>
+    <string name="tour_manual_adjust_body">作者、IP、タグ、カテゴリ、画風ファミリーを0–10で調整できます。5が中立です。ブロックや、現在の端末 Session だけに効く「今回見たい」も設定できます。</string>
+    <string name="tour_recommend_sync_title">おすすめ同期</string>
+    <string name="tour_recommend_sync_body">Desktop とスマートフォンは現在のおすすめサイクルを別々に保持します。同期するのは永続的な嗜好、フィードバック、移植可能な基盤で、競合はユーザーが選択して解決します。</string>
+    <string name="tour_visual_mode_title">画風連携モード</string>
+    <string name="tour_visual_mode_body">オフ、分析のみ、順位付けに反映、の3段階から選べます。重い画風モデルは Desktop 側で計算し、スマートフォンは軽量な類似度だけを利用します。</string>
+    <string name="tour_visual_strength_title">画風の影響強度</string>
+    <string name="tour_visual_strength_body">画風類似度を順位付けにどの程度反映するかを設定します。作者、タグ、最近の行動、今回の嗜好はそのまま維持されます。</string>
     <string name="tour_complete_title">準備完了</string>
     <string name="tour_complete_body">主な機能の説明は以上です。設定からいつでもこのガイドを再表示できます。</string>
 </resources>

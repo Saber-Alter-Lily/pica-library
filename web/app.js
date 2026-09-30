@@ -246,6 +246,7 @@ function showOperationToast(message, tone = 'neutral', timeout = 4600) {
     stack.appendChild(node)
     window.setTimeout(() => node.remove(), timeout)
 }
+window.picaShowOperationToast = showOperationToast
 
 function setBackgroundTaskIndicator(message = '') {
     let node = $('#background-task-indicator')
@@ -423,6 +424,21 @@ async function api(path, options) {
     const value = await response.json()
     if (!response.ok) throw new Error(value.error || `HTTP ${response.status}`)
     return value
+}
+
+async function ensureConnectedEngine(forceProbe = false) {
+    if (!forceProbe && state.mode === 'connected') return true
+    try {
+        await api('/api/v1/status')
+        const recovered = state.mode !== 'connected'
+        state.mode = 'connected'
+        $('#mode').textContent = t('mode.connected')
+        if (recovered)
+            showOperationToast(t('message.engineRecovered'), 'success', 5200)
+        return true
+    } catch {
+        return false
+    }
 }
 
 const post = (path, value) =>
@@ -3619,7 +3635,7 @@ async function syncFavorites(message = $('#import-result'), mode = 'quick') {
         canCancel: true
     })
     try {
-        if (state.mode !== 'connected')
+        if (state.mode !== 'connected' && !(await ensureConnectedEngine(true)))
             throw new Error(t('message.syncNeedsEngine'))
         message.textContent =
             mode === 'full' ? t('sync.fullStarting') : t('sync.quickStarting')
@@ -5187,11 +5203,23 @@ async function detect() {
         } else if (recommendation.buildingCycleId) {
             $('#recommend-message').textContent = t('recommend.preparing')
         }
-    } catch {
-        state.mode = 'lite'
-        $('#mode').textContent = t('mode.lite')
-        if (!state.authors.length && state.records.length) deriveAuthors()
-        renderAll()
+    } catch (error) {
+        if (await ensureConnectedEngine(true)) {
+            showOperationToast(
+                t('message.partialInit', {
+                    reason: localizeError(language, error)
+                }),
+                'warning',
+                7600
+            )
+            if (!state.authors.length && state.records.length) deriveAuthors()
+            renderAll()
+        } else {
+            state.mode = 'lite'
+            $('#mode').textContent = t('mode.lite')
+            if (!state.authors.length && state.records.length) deriveAuthors()
+            renderAll()
+        }
     }
     if (state.recommendations.length) renderPreparedRecommendations()
     if (new URLSearchParams(location.search).get('view') === 'chronicle') {

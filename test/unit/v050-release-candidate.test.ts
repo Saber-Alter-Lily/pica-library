@@ -26,6 +26,13 @@ describe('v0.5.0 formal release candidate workflow', () => {
         expect(workflow).toContain(
             'PICA_ANDROID_VERSION_NAME: \'0.5.0\''
         )
+        expect(workflow).toContain(
+            'ReactiveCircus/android-emulator-runner@v2'
+        )
+        expect(workflow).toContain('adb install -r "$new"')
+        expect(workflow).toContain(
+            'ANDROID_V54_TO_V55_INPLACE_UPDATE=PASS'
+        )
         expect(workflow).not.toContain('gh release create')
         expect(workflow).not.toContain('git push --force')
         expect(workflow).not.toContain('gh release upload android-preview')

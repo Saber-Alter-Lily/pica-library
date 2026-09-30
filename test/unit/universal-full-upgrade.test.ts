@@ -239,6 +239,24 @@ describe('universal full application upgrade', () => {
         expect(fs.readFileSync(assistant.helperPath, 'utf8')).toBe(
             'full-upgrader'
         )
+
+        const installedHelper = path.join(
+            applicationRoot,
+            'app',
+            'full-upgrader.js'
+        )
+        fs.writeFileSync(installedHelper, 'corrupted-installed-helper')
+        const externalRecovery =
+            updateManager.preparePersistentUpgradeAssistant()
+        expect(externalRecovery.available).toBe(true)
+        expect(fs.readFileSync(assistant.helperPath, 'utf8')).toBe(
+            'full-upgrader'
+        )
+
+        fs.writeFileSync(assistant.helperPath, 'corrupted-external-helper')
+        expect(() =>
+            updateManager.preparePersistentUpgradeAssistant()
+        ).toThrow(/both failed verification/i)
     })
 
     it('refuses a persistent assistant inside the application tree', () => {

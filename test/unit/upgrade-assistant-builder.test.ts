@@ -84,6 +84,10 @@ describe('generic Upgrade Assistant builder', () => {
         expect(readme).toContain(
             'Normal v0.4.11 users should use the in-app one-click update first.'
         )
+        expect(readme).not.toContain('Template lineage:')
+        expect(readme).not.toContain(
+            '此助手只接受已验证的 v0.4.0'
+        )
     })
 
     it('rejects a target package whose SOURCE_SHA does not match', () => {

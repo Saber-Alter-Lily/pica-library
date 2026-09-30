@@ -949,6 +949,9 @@ body.reader-active .reader-header {
     font-size: .9rem;
 }
 #ux-runtime-settings {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
     margin-top: 12px;
 }
 #ux-runtime-settings .ux-runtime-settings-body {

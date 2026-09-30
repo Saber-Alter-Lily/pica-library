@@ -2730,6 +2730,7 @@ Architecture:
 - When the latest stable Release has no compatible incremental asset but has the verified Windows x64 full package, `/api/v1/update/prepare-latest` downloads and stages the full application automatically.
 - Full application archives are SHA-256 verified against the official GitHub Release and must not contain user-data roots/SQLite payloads.
 - A full package accepted for one-click use must itself contain both `app/updater.js` and `app/full-upgrader.js`, preserving the same upgrade capability for the next release.
+- The installed stable baseline also registers a persistent copy under `runtime-state/upgrade-assistant` (default Windows path: `%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant`) containing the bundled Node runtime, `full-upgrader.js` and hash-bound metadata. Full replacement copies from this fixed external authority into a per-update bootstrap before shutdown, so the helper is both discoverable between releases and never self-replaced while executing.
 - Before full replacement, the bundled Node runtime and `full-upgrader.js` are copied under the external Desktop runtime-state update directory. The bootstrap therefore runs outside the application tree and can replace the updater/runtime/application itself.
 - Full replacement waits for the old process to exit, snapshots configuration plus SQLite/WAL/SHM, moves the old application tree to a sibling backup, installs the staged tree, launches the target, and verifies `/api/v1/capabilities`.
 - Failed startup/migration health automatically restores the old application tree and the pre-upgrade user-state snapshot, then relaunches the old version.
@@ -2833,6 +2834,7 @@ Release requirement:
   `Pica-Library-v<TARGET>-update-from-v0.4.11.zip`;
 - v0.4.11 users should be able to press the existing Web one-click update action once and enter the new stable baseline without manually downloading the Upgrade Assistant;
 - after that transition, the installed baseline contains the Universal Upgrade Assistant and future incompatible schema/architecture changes can use verified full-application replacement.
+- first startup of that new baseline must materialize the persistent assistant at `runtime-state/upgrade-assistant`; acceptance requires its runtime/helper bytes to match the installed package and `assistant.json` to bind product version + source SHA + SHA-256.
 
 Fallback:
 - keep the v0.4.11 Upgrade Assistant/full-package path in the Release as a recovery/exception path until the real published v0.4.11 -> target one-click acceptance passes;
@@ -2857,10 +2859,22 @@ The next stable release may contain already-implemented runtime/internal improve
 ### R4 — Current release blockers after this reconciliation
 Before publication:
 1. AZZ migration passes Web/Android/localization tests and old support endpoints are absent from active surfaces.
-2. v0.4.11 -> target source-scoped incremental package is generated from the real public v0.4.11 Windows ZIP and proves schema 13 -> 14 plus unchanged legacy `app/updater.js`.
+2. v0.4.11 -> target source-scoped incremental package is generated from the real public v0.4.11 Windows ZIP and proves schema 13 -> 14 plus unchanged legacy `app/updater.js`; after the upgraded target starts, the external persistent assistant under `runtime-state/upgrade-assistant` must also be present and hash-bound to that target.
 3. The final version number / Android versionCode are stamped once release scope is frozen.
 4. Windows and Android formal candidates are built from one final source SHA and pass the release-intent matrix.
 5. The formal Release carries full Windows package, source-scoped v0.4.11 incremental package, one-time Upgrade Assistant fallback, SHA256/provenance, Android production APK/update metadata and release notes.
 6. Stable OTA/latest pointers are changed only after the uploaded assets are verified.
 
 This NEXT-32 entry is a release-scope reconciliation. It does not supersede or delete earlier task families.
+
+
+## 2026-09-30 — NEXT-32 persistent upgrade-assistant registration
+
+State update:
+- Added a fixed external upgrade-assistant authority under Desktop `runtime-state/upgrade-assistant` (default Windows path `%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant`).
+- The new stable baseline registers the bundled Node runtime and `app/full-upgrader.js` there on startup and writes `assistant.json` with product version, source SHA and SHA-256 identities.
+- Full-application replacement no longer copies its detached bootstrap directly from the mutable application tree. It first refreshes/verifies the persistent external assistant, then copies that verified external runtime/helper into the transaction-specific `updates/bootstrap-<id>` directory before the old application exits.
+- This preserves two distinct safety roles: a stable discoverable assistant location across releases, plus an immutable per-update bootstrap that is never self-replaced while running.
+- The v0.4.11 incremental acceptance now additionally requires that after the candidate starts, the persistent assistant exists, matches the installed runtime/helper byte-for-byte, and is bound to the candidate version/source SHA.
+- Ordinary startup remains fail-open if persistent-assistant registration cannot be refreshed, so the application remains usable; an actual full-application upgrade remains fail-closed if the assistant cannot be prepared and verified.
+- Stable v0.4.11 Release assets/OTA remain untouched. Final published-release acceptance under NEXT-32 is still required after target version stamping and formal asset upload.

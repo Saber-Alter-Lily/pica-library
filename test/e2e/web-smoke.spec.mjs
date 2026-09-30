@@ -4,7 +4,7 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
     await page.addInitScript(() => {
         localStorage.setItem(
             'pica-onboarding-state-v1',
-            JSON.stringify({ completedVersion: 1, dismissedVersion: 0, autoShow: true })
+            JSON.stringify({ completedVersion: 2, dismissedVersion: 0, autoShow: true })
         )
     })
     const pageErrors = []

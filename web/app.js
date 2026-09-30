@@ -1103,17 +1103,18 @@ function showAvailableUpdateInSettings(value) {
             url: escapeHtml(value.releaseUrl)
         })
     }
-    activateView('settings')
+    activateView('maintenance')
     requestAnimationFrame(() => {
-        const softwareHub = document.querySelector(
-            '.a87-hub-nav button[data-hub-panel="software"]'
-        )
-        if (softwareHub) softwareHub.click()
-        else
-            $('#settings-update')?.scrollIntoView({
-                block: 'start',
-                behavior: 'smooth'
-            })
+        document.querySelector('#a87-maintenance-tab')?.click()
+        document
+            .querySelector(
+                '#a87-maintenance-panel > .tabs [data-tab="software-updates"]'
+            )
+            ?.click()
+        $('#settings-update')?.scrollIntoView({
+            block: 'start',
+            behavior: 'smooth'
+        })
     })
 }
 

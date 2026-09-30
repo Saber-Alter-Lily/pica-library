@@ -662,6 +662,8 @@ export const translations = {
         'message.importWrite': 'Writing to local library',
         'message.importAuthors': 'Updating author index',
         'message.syncNeedsEngine': 'Sync Favorites requires the local engine.',
+        'message.engineRecovered': 'Local service is reachable again. Continuing with the requested action.',
+        'message.partialInit': 'The local service is connected, but one optional module did not finish loading: {reason}',
         'message.searchNeedsEngine':
             'Provider search requires the local engine.',
         'message.searching': 'Searching…',
@@ -1447,6 +1449,8 @@ export const translations = {
         'message.importWrite': '写入本地漫画库',
         'message.importAuthors': '更新作者索引',
         'message.syncNeedsEngine': '同步收藏需要连接本地服务。',
+        'message.engineRecovered': '本地服务已重新确认可用，继续执行当前操作。',
+        'message.partialInit': '本地服务仍然在线，但有一个可选模块没有完成初始化：{reason}',
         'message.searchNeedsEngine': '站内搜索需要连接本地服务。',
         'message.searching': '正在搜索…',
         'message.searchCount': '找到 {count} 条结果。',

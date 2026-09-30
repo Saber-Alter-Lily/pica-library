@@ -75,6 +75,19 @@ describe('P2 unpublished RC package contract', () => {
         expect(smoke).toContain(
             '$desktopHome = Join-Path $local $DesktopHomeName'
         )
+        const fullUpgrade = read(
+            'scripts/test-windows-universal-full-upgrade.ps1'
+        )
+        expect(workflow).toContain(
+            'test-windows-universal-full-upgrade.ps1'
+        )
+        expect(workflow).toContain('-BaselineZip')
+        expect(workflow).toContain('-CandidateZip')
+        expect(fullUpgrade).toContain('universal_full_upgrade')
+        expect(fullUpgrade).toContain(
+            'external_database_preserved'
+        )
+        expect(smoke).toContain("'app\\full-upgrader.js'")
     })
 
     it('builds Android as a signed side-by-side QA identity only', () => {

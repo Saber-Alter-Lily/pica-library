@@ -35,6 +35,8 @@ describe('cross-client UI hierarchy corrective pass', () => {
         expect(hub).toContain("['maintenance', 'maintenance']")
         expect(hub).not.toContain("['software', 'software']")
         expect(hub).toContain("maintenancePanel.prepend(software)")
+        expect(hub).toContain("[data-tab=\"software-updates\"]")
+        expect(hub).not.toContain("updateTabButton?.remove()")
         expect(hub).toContain("connectionsSlot.prepend(connectionStatus)")
         expect(hub).toContain("if (id === 'software') id = 'maintenance'")
         expect(connections).toContain("const connections = $c('#a87-connections-panel')")

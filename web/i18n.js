@@ -1383,7 +1383,7 @@ export const translations = {
         'update.fullStaged':
             '完整程序包已通过校验，可以安全替换。',
         'update.reconnectFailed':
-            '更新已启动，但当前页面没有自动重新连接。请继续使用升级助手已打开的 Pica Library 窗口。'
+            '更新已启动，但当前页面没有自动重新连接。请继续使用升级助手已打开的 Pica Library 窗口。',
         'update.apply': '使用已上传更新包并重启',
         'action.close': '关闭',
         'common.confirm': '确认',

@@ -2751,3 +2751,38 @@ Acceptance before release:
 3. A Windows replacement acceptance exercises an external bootstrap against an older application tree while reusing an external user-data root, and verifies target health plus data preservation.
 4. Full-package rejection tests cover embedded user data and missing universal helper.
 5. Formal Release assets still provide SHA256SUMS / provenance; stable OTA must never bypass official-asset verification.
+
+
+## 2026-09-30 — NEXT-31 Universal Upgrade Assistant acceptance
+**Status: PASS — release candidate contract implemented and validated**
+
+Validated source:
+- `038da317dc76e6b9e28650eb8f485d14b6d1a8d8`
+
+Behavior now implemented:
+- Web/Desktop exposes one primary one-click update path for both normal incremental releases and verified full Windows application replacements.
+- Update discovery preserves the historical response shape for incremental updates and adds `oneClick + assetName + assetUrl` only when an official full Windows package is actually available for automatic replacement.
+- Full packages are verified against the official GitHub Release / SHA-256 before extraction.
+- Full-package staging rejects user-data roots, SQLite payloads, unsafe paths, missing launcher/runtime/Desktop entry, and missing `app/updater.js` or `app/full-upgrader.js`.
+- The current runtime + `full-upgrader.js` are copied to an external bootstrap directory under Desktop runtime state before shutdown, so updater/runtime/application replacement does not self-lock the old application tree.
+- Full replacement snapshots Desktop configuration/credentials plus SQLite/WAL/SHM, replaces only the application tree, launches the target version, validates `/api/v1/capabilities`, and automatically restores old application + pre-upgrade state if target startup/migration health fails.
+- Automatic full upgrade fails closed when Desktop user data or the configured Library directory is inside the application tree.
+- Web waits for the target version and automatically reloads via `window.location.reload()`; the update monitor independently reloads on backend version change. A changed localhost port is handled by the detached helper opening the healthy new loopback URL.
+- Manual full-package replacement guidance is retained only as a fallback when a Release does not expose a verifiable automatic full asset.
+
+Acceptance evidence:
+- CI Web/Desktop type-check, Web syntax, full unit/integration suite: PASS.
+- Real-browser Web smoke: PASS.
+- Android CI: PASS.
+- v0.4 Direct Upgrade Acceptance / Desktop data-preservation and schema contracts: PASS.
+- P2 Runtime Hardening Promotion Gate: PASS.
+- Dedicated unpublished RC contract: PASS.
+- Dedicated Android RC unit/lint/signing/package verification: PASS.
+- Dedicated Windows RC repository preflight + artifact smoke: PASS.
+- Dedicated Windows real full-replacement acceptance: PASS. The test launches the checksum-pinned older Windows package, creates external user state, runs the detached universal bootstrap, replaces the entire application tree with the candidate, verifies candidate version/schema/source SHA, confirms external config and Library database remain intact, and requires the normal pre-migration DB backup when schema advances.
+
+Compatibility boundary:
+- Public v0.4.11 predates NEXT-31 and cannot acquire the new helper retroactively. The next stable release must still ship the existing v0.4.11 one-time upgrade-assistant/full-package bridge.
+- After users install the first stable release containing NEXT-31, future Windows x64 stable schema jumps, updater replacements and major application-tree changes must preserve this universal one-click contract.
+
+Stable v0.4.11 Release assets and stable OTA metadata remain untouched.

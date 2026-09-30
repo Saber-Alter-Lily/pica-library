@@ -35,7 +35,7 @@ function localizeStaticEhAccount() {
     setLabelPrefix($('#eh-igneous'),ehT('igneous（可选）','igneous (optional)','igneous（任意）'))
     setLabelPrefix($('#eh-cf-clearance'),ehT('cf_clearance（仅遇到 Cloudflare 时可选）','cf_clearance (optional for Cloudflare)','cf_clearance（Cloudflare 利用時のみ任意）'))
     const copy = [
-        ['#eh-web-login-start','网页登录（推荐）','Web login (recommended)','Web ログイン（推奨）'],
+        ['#eh-web-login-start','网页登录并自动回传（推荐）','Web login with automatic status return (recommended)','Web ログイン・状態を自動反映（推奨）'],
         ['#eh-web-login-cancel','取消网页登录','Cancel web login','Web ログインをキャンセル'],
         ['#eh-account-save','保存并验证会话','Save & verify session','セッションを保存して検証'],
         ['#eh-account-verify','重新验证','Verify again','再検証'],
@@ -48,7 +48,7 @@ function localizeStaticEhAccount() {
         if(node) node.textContent=ehT(zh,en,ja)
     }
     const login=panel.querySelector('a[href*="act=Login"]')
-    if(login) login.textContent=ehT('默认浏览器打开官方登录页（手动）','Open official login page in default browser (manual)','既定ブラウザで公式ログインページを開く（手動）')
+    if(login) login.textContent=ehT('手动打开官网登录页（不会自动回传状态）','Open official login manually (no automatic status return)','公式ログインを手動で開く（状態は自動反映されません）')
     const register=panel.querySelector('a[href*="act=Reg"]')
     if(register) register.textContent=ehT('打开官方注册页','Open official registration page','公式登録ページを開く')
 }
@@ -182,15 +182,18 @@ async function status() {
     csrf = value.csrfToken || csrf
     applyPlatformStatus(value)
     render(value.ehAccount || { configured: false })
+    document.dispatchEvent(new CustomEvent('pica-eh-status-change', { detail: value.ehAccount || { configured: false } }))
 }
 
 function render(value) {
     const configured = Boolean(value.configured)
     const state = $('#eh-account-state')
-    if (state)
+    if (state) {
         state.textContent = configured
-            ? ehT('E-H 会话已加密保存；公共模式仍可独立使用。','E-H session is encrypted and saved; public mode remains independently available.','E-H セッションは暗号化して保存されています。公開モードは引き続き単独で利用できます。')
-            : ehT('未配置 E-H 会话；公共 E-H 功能可正常使用。','No E-H session is configured; public E-H features remain available.','E-H セッションは未設定です。公開 E-H 機能は通常どおり利用できます。')
+            ? ehT('✓ E-H 已连接 · 会话已加密保存','✓ E-H connected · session encrypted and saved','✓ E-H 接続済み · セッションを暗号化して保存')
+            : ehT('○ E-H 未连接 · 公共搜索/阅读仍可使用','○ E-H not connected · public search/reading still works','○ E-H 未接続 · 公開検索/閲覧は利用可能')
+        state.dataset.state = configured ? 'connected' : 'disconnected'
+    }
     if ($('#eh-account-message'))
         $('#eh-account-message').textContent = ehT('ExH 扩展：','ExH extension: ','ExH 拡張：') + exhLabel(value.exHentai, configured)
 }
@@ -207,6 +210,7 @@ async function action(payload) {
     const value = await response.json()
     if (!response.ok) throw new Error(value.error || 'E-H account action failed')
     render(value.ehAccount || {})
+    document.dispatchEvent(new CustomEvent('pica-eh-status-change', { detail: value.ehAccount || {} }))
     return value
 }
 
@@ -241,10 +245,16 @@ function renderWebLoginState(value) {
     if (value?.state === 'complete') {
         stopWebLoginPoll()
         void status().then(() => {
-            if (message) message.textContent = ehT('E-H 登录成功，会话已自动验证并加密保存。','E-H login succeeded. The session was verified and encrypted automatically.','E-H ログインに成功しました。セッションは自動検証され、暗号化して保存されました。')
+            const success = ehT('E-H 登录成功，会话已自动验证并加密保存。','E-H login succeeded. The session was verified and encrypted automatically.','E-H ログインに成功しました。セッションは自動検証され、暗号化して保存されました。')
+            if (message) message.textContent = success
+            try { window.focus() } catch {}
+            window.picaShowOperationToast?.(success, 'success', 6500)
+            document.dispatchEvent(new CustomEvent('pica-eh-login-complete'))
         })
     } else if (value?.state === 'failed' || value?.state === 'cancelled') {
         stopWebLoginPoll()
+        if (value?.state === 'failed' && value?.message)
+            window.picaShowOperationToast?.(value.message, 'warning', 7000)
     }
 }
 

@@ -157,6 +157,73 @@ describe('universal full application upgrade', () => {
         })
     })
 
+    it('persists a verified upgrade assistant outside the application tree', () => {
+        const root = temporaryRoot()
+        const applicationRoot = path.join(root, 'current-app')
+        const stateRoot = path.join(root, 'desktop-state', 'runtime-state', 'updates')
+        const assistantRoot = path.join(
+            root,
+            'desktop-state',
+            'runtime-state',
+            'upgrade-assistant'
+        )
+        fs.mkdirSync(path.join(applicationRoot, 'runtime'), { recursive: true })
+        fs.mkdirSync(path.join(applicationRoot, 'app'), { recursive: true })
+        fs.writeFileSync(
+            path.join(applicationRoot, 'runtime', 'node.exe'),
+            'node-runtime'
+        )
+        fs.writeFileSync(
+            path.join(applicationRoot, 'app', 'full-upgrader.js'),
+            'full-upgrader'
+        )
+
+        const updateManager = new UpdateManager({
+            currentVersion: '0.5.0',
+            currentSourceSha: targetSourceSha,
+            applicationRoot,
+            stateRoot,
+            assistantRoot,
+            launcherPath: path.join(applicationRoot, 'Pica Library.exe'),
+            runtimePath: path.join(applicationRoot, 'runtime', 'node.exe'),
+            desktopEntryPath: path.join(applicationRoot, 'app', 'desktop.js'),
+            instanceFile: path.join(
+                root,
+                'desktop-state',
+                'runtime-state',
+                'instance.json'
+            ),
+            target: { platform: 'windows', arch: 'x64' },
+            fetchImplementation: vi.fn() as unknown as typeof fetch
+        })
+
+        const assistant = updateManager.preparePersistentUpgradeAssistant()
+        expect(assistant).toMatchObject({
+            available: true,
+            root: assistantRoot,
+            productVersion: '0.5.0',
+            sourceSha: targetSourceSha
+        })
+        if (!assistant.available) throw new Error('assistant unavailable')
+        expect(fs.readFileSync(assistant.runtimePath, 'utf8')).toBe(
+            'node-runtime'
+        )
+        expect(fs.readFileSync(assistant.helperPath, 'utf8')).toBe(
+            'full-upgrader'
+        )
+        const metadata = JSON.parse(
+            fs.readFileSync(assistant.metadataPath, 'utf8')
+        )
+        expect(metadata).toMatchObject({
+            schemaVersion: 1,
+            productVersion: '0.5.0',
+            sourceSha: targetSourceSha,
+            runtimeSha256: assistant.runtimeSha256,
+            helperSha256: assistant.helperSha256
+        })
+        expect(path.relative(applicationRoot, assistantRoot)).toMatch(/^\.\./)
+    })
+
     it('rejects full application archives that contain user data', async () => {
         const archive = fullPackage({
             'data/library.db': 'must-not-be-packaged'
@@ -194,7 +261,41 @@ describe('universal full application upgrade', () => {
             "'full-upgrader': 'src/update/full-upgrader.ts'"
         )
         expect(managerSource).toContain(
-            'bootstrap-' + '$' + '{full.id}'
+            'bootstrap-' + '
+        expect(managerSource).toContain(
+            "'app',\n                'full-upgrader.js'"
+        )
+        expect(helper).toContain(
+            'snapshotUserState(instruction)'
+        )
+        expect(helper).toContain(
+            'rollbackApplication(instruction)'
+        )
+        expect(helper).toContain(
+            'restoreUserState(instruction, snapshot)'
+        )
+        expect(server).toContain(
+            "status === 'full-install'"
+        )
+        expect(server).toContain(
+            '512 * 1024 * 1024'
+        )
+        expect(web).toContain(
+            'async function reconnectAfterUpdate('
+        )
+        expect(web).toContain('window.location.reload()')
+        expect(artifact).toContain(
+            "'app\\full-upgrader.js'"
+        )
+    })
+})
+ + '{full.id}'
+        )
+        expect(managerSource).toContain(
+            "'upgrade-assistant'"
+        )
+        expect(managerSource).toContain(
+            'preparePersistentUpgradeAssistant()'
         )
         expect(managerSource).toContain(
             "'app',\n                'full-upgrader.js'"

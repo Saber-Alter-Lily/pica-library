@@ -77,6 +77,8 @@ export const jaCommonChronicleTranslations = {
     'message.importWrite': 'ローカルライブラリへ書き込み',
     'message.importAuthors': '作者インデックスを更新',
     'message.syncNeedsEngine': 'お気に入りの同期にはローカルエンジンへの接続が必要です。',
+    'message.engineRecovered': 'ローカルサービスへの接続を再確認しました。操作を続行します。',
+    'message.partialInit': 'ローカルサービスには接続されていますが、任意機能の初期化が完了しませんでした：{reason}',
     'message.searchNeedsEngine': 'プロバイダー検索にはローカルエンジンへの接続が必要です。',
     'message.searching': '検索中…',
     'message.searchCount': '{count} 件見つかりました。',

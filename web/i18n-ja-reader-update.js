@@ -148,13 +148,13 @@ export const jaReaderUpdateTranslations = {
     'update.fullGuide': '<strong>v{version} への更新にはWindows完全版パッケージが必要です。</strong><span class="full-install-note">アプリ本体だけを一度置き換えます。ライブラリデータは別の場所に保存されています。</span><ol><li><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">Pica-Library-v{version}-windows-x64.zipをダウンロード</a>します。</li><li>プログラムファイルを置き換える前にPica Libraryを完全に終了します。</li><li>ZIPを新しいフォルダーに展開して実行するか、旧版終了後にアプリフォルダーだけを置き換えます。</li><li><strong><code>%LOCALAPPDATA%\\Pica Library</code> は削除しないでください。</strong>データベース、本棚、履歴、設定、認証情報、ダウンロード済みコンテンツはここに残ります。アンインストールや再インポートは不要です。</li></ol><div class="full-install-actions"><a href="{downloadUrl}" target="_blank" rel="noopener noreferrer">Windowsパッケージをダウンロード</a><a href="{releaseUrl}" target="_blank" rel="noopener noreferrer">Releaseとチェックサムを表示</a></div>',
     'update.incrementalFound': 'v{version} の互換増分更新が見つかりました。<a href="{url}" target="_blank" rel="noopener noreferrer">公式更新パッケージをダウンロード</a>し、上の欄でZIPを選択またはドロップしてください。',
     'update.confirm': '{version} に更新して再起動しますか？',
-    'update.applying': 'アプリを終了して更新を完了します。しばらくお待ちください…',
+    'update.applying': 'Pica Library を安全に更新しています…',
     'update.phase.downloading': '公式更新をダウンロード',
     'update.phase.validating': '更新パッケージを検証',
     'update.phase.extracting': '一時フォルダーへ展開',
     'update.phase.staged': '検証・準備完了',
     'update.phase.preparingBackup': 'バックアップを準備',
-    'update.phase.waitingExit': 'アプリ終了を待機',
+    'update.phase.waitingExit': '新バージョンへ切り替え',
     'update.phase.replacing': 'ファイルを置換',
     'update.phase.starting': '新バージョンを起動',
     'update.phase.health': '動作状態を確認',
@@ -163,5 +163,5 @@ export const jaReaderUpdateTranslations = {
     'update.phase.failed': '更新に失敗しました',
     'update.panelEyebrow': 'ローカル更新',
     'update.panelTitle': '更新',
-    'update.panelText': '互換性のある増分リリースは自動更新できます。完全版パッケージへの置き換えが必要な場合は、対応するWindows ZIPと手順をこのページに表示します。'
+    'update.panelText': '通常の更新も大規模な構成変更もワンクリックで更新できます。Pica Library が安全な増分更新または完全アプリ更新を自動選択し、ライブラリデータはプログラムとは別に保持します。'
 }

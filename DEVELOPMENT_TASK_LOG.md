@@ -2658,3 +2658,30 @@ The vendored Driver supports both `advanceOnClick` and custom `onNextClick`. For
 - Specifically gate steps 10, 11, 13, 14, 15, 16 and 17 because these cross panel boundaries or depend on dynamic panel relocation.
 
 Current RC remains manual-QA evidence only; no code fix is applied in this audit commit.
+
+
+## 2026-09-30 — NEXT-29 Web Library display controls missing: competing DOM owners
+
+Manual QA finding:
+- The Web Library no longer visibly exposes the expected display controls (cover grid / compact list and grid-size small / medium / large), even though the underlying view-switch functionality still exists.
+
+Source audit:
+- The controls are still present in `web/index.html`: `#view-grid`, `#view-list` and `.grid-size-controls`.
+- `web/app.js` still binds them normally through `setLibraryView(...)` and `setGridSize(...)`; this is not a feature-removal regression.
+- Two independent DOM-rewrite layers currently claim ownership of the exact same controls:
+  1. `ui-polish-v5.js::installLibraryToolbar()` promotes `#view-grid`, `#view-list`, `.grid-size-controls` and the cover toggle into the visible `.ux-toolbar-primary`.
+  2. `v040-parity.js::installLibraryParity()` moves those same controls into the collapsed `.v040-library-more` (“更多筛选与显示”) disclosure.
+- `v040-parity.js` is dynamically imported from `eh-account.js`, while `ui-polish-v5.js` is loaded as a separate static module. Their effective initialization order is therefore not a stable single-owner contract.
+- If UI polish runs first and parity runs later, parity removes the display controls from the visible primary toolbar and nests them under the collapsed “更多筛选与显示” disclosure. `ui-polish-v5.js` does not observe/reconcile Library toolbar mutations and its `data-ux-polished` guard prevents a normal second install pass.
+- The language-change path is more dangerous: `v040-parity.js` removes `.v040-library-more` and recreates it on `pica-language-change`. If display controls are children of that disclosure at removal time, they can be removed from the DOM with the disclosure; subsequent re-install cannot recover nodes that no longer exist.
+
+Required correction:
+- Establish exactly one DOM owner for Library display controls. The modern visible Library toolbar should own grid/list and grid-size controls; the parity layer must not relocate them.
+- `v040-parity.js` should be limited to provider/parity additions and must not move controls already owned by the modern toolbar.
+- Language refresh must update labels in place rather than remove a container that may own live controls.
+- Add E2E assertions that after startup and after each language switch:
+  - `#view-grid` and `#view-list` are connected and visible;
+  - `.grid-size-controls` is connected and visible in grid mode;
+  - one click changes the rendered Library mode;
+  - no duplicate or competing “display controls” owner exists.
+- Current manual-test RC is unchanged; this is recorded as another NEXT-29 Web corrective finding.

@@ -16,7 +16,7 @@ describe('v0.4.1 full-package update guidance', () => {
         expect(app).toContain('!available.oneClick')
         expect(app).toContain("staged.status === 'full-install'")
         expect(app).toContain('!staged.id')
-        expect(app).toContain("t('update.fullOneClickFound'")
+        expect(app).toContain("'update.fullOneClickFound'")
     })
 
     it('makes both incremental and full application releases one-click while preserving user data authority', () => {

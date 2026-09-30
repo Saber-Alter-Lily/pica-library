@@ -255,6 +255,7 @@ export interface UpdateManagerOptions {
     currentSourceSha?: string
     applicationRoot: string
     stateRoot: string
+    assistantRoot?: string
     launcherPath: string
     runtimePath: string
     desktopEntryPath: string
@@ -271,6 +272,89 @@ export class UpdateManager {
     constructor(private readonly options: UpdateManagerOptions) {
         this.progressFile = path.join(options.stateRoot, 'update-progress.json')
         fs.mkdirSync(options.stateRoot, { recursive: true })
+    }
+
+    private persistentAssistantRoot() {
+        return (
+            this.options.assistantRoot ??
+            path.join(path.dirname(this.options.stateRoot), 'upgrade-assistant')
+        )
+    }
+
+    preparePersistentUpgradeAssistant() {
+        const target = this.updateTarget()
+        if (!target || updateTargetKey(target) !== 'windows-x64')
+            return {
+                available: false as const,
+                reason: 'unsupported-target'
+            }
+
+        const sourceRuntime = this.options.runtimePath
+        const sourceHelper = path.join(
+            this.options.applicationRoot,
+            'app',
+            'full-upgrader.js'
+        )
+        if (!fs.existsSync(sourceRuntime))
+            throw new Error(
+                'Bundled runtime is unavailable for the persistent upgrade assistant'
+            )
+        if (!fs.existsSync(sourceHelper))
+            throw new Error(
+                'Full application upgrade helper is unavailable for persistent registration'
+            )
+
+        const root = this.persistentAssistantRoot()
+        const runtimeDirectory = path.join(root, 'runtime')
+        const runtimePath = path.join(runtimeDirectory, 'node.exe')
+        const helperPath = path.join(root, 'full-upgrader.js')
+        const metadataPath = path.join(root, 'assistant.json')
+        fs.mkdirSync(runtimeDirectory, { recursive: true })
+
+        const installFile = (source: string, destination: string) => {
+            const temporary = destination + '.next'
+            fs.rmSync(temporary, { force: true })
+            fs.copyFileSync(source, temporary)
+            const expected = sha256(fs.readFileSync(source))
+            const actual = sha256(fs.readFileSync(temporary))
+            if (actual !== expected) {
+                fs.rmSync(temporary, { force: true })
+                throw new Error(
+                    'Persistent upgrade assistant copy verification failed'
+                )
+            }
+            fs.rmSync(destination, { force: true })
+            fs.renameSync(temporary, destination)
+            return expected
+        }
+
+        const runtimeSha256 = installFile(sourceRuntime, runtimePath)
+        const helperSha256 = installFile(sourceHelper, helperPath)
+        const metadata = {
+            schemaVersion: 1,
+            productVersion: this.options.currentVersion,
+            sourceSha: this.options.currentSourceSha ?? null,
+            runtimeSha256,
+            helperSha256,
+            installedAt: new Date().toISOString()
+        }
+        const temporaryMetadata = metadataPath + '.next'
+        fs.writeFileSync(
+            temporaryMetadata,
+            JSON.stringify(metadata, null, 2),
+            'utf8'
+        )
+        fs.rmSync(metadataPath, { force: true })
+        fs.renameSync(temporaryMetadata, metadataPath)
+
+        return {
+            available: true as const,
+            root,
+            runtimePath,
+            helperPath,
+            metadataPath,
+            ...metadata
+        }
     }
 
     private updateTarget() {
@@ -833,6 +917,12 @@ export class UpdateManager {
                     'Full application upgrade context is unavailable'
                 )
             const full = this.stagedFull
+            const persistentAssistant =
+                this.preparePersistentUpgradeAssistant()
+            if (!persistentAssistant.available)
+                throw new Error(
+                    'Persistent upgrade assistant is unavailable on this target'
+                )
             const bootstrapRoot = path.join(
                 this.options.stateRoot,
                 `bootstrap-${full.id}`
@@ -846,28 +936,27 @@ export class UpdateManager {
                 bootstrapRoot,
                 'node.exe'
             )
-            const sourceHelper = path.join(
-                this.options.applicationRoot,
-                'app',
-                'full-upgrader.js'
-            )
             const bootstrapHelper = path.join(
                 bootstrapRoot,
                 'full-upgrader.js'
             )
-            if (!fs.existsSync(this.options.runtimePath))
-                throw new Error(
-                    'Bundled runtime is unavailable for full upgrade'
-                )
-            if (!fs.existsSync(sourceHelper))
-                throw new Error(
-                    'Full application upgrade helper is missing'
-                )
             fs.copyFileSync(
-                this.options.runtimePath,
+                persistentAssistant.runtimePath,
                 bootstrapRuntime
             )
-            fs.copyFileSync(sourceHelper, bootstrapHelper)
+            fs.copyFileSync(
+                persistentAssistant.helperPath,
+                bootstrapHelper
+            )
+            if (
+                sha256(fs.readFileSync(bootstrapRuntime)) !==
+                    persistentAssistant.runtimeSha256 ||
+                sha256(fs.readFileSync(bootstrapHelper)) !==
+                    persistentAssistant.helperSha256
+            )
+                throw new Error(
+                    'Detached upgrade bootstrap does not match the persistent assistant'
+                )
 
             const stamp = new Date()
                 .toISOString()

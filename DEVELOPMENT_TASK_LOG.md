@@ -2627,3 +2627,34 @@ Required correction before the next Web RC:
 - Replace fixed timing assumptions with state-based readiness (`panel.active && !panel.hidden`, target visible, non-zero bounding box).
 - Add browser/E2E coverage that asserts each task-oriented onboarding step is anchored to a visible element and that the expected Settings hub panel is active at Visual, Connections and Software Update steps.
 - Do not alter the current manual-test RC retroactively; treat this as a recorded NEXT-29 follow-up finding.
+
+
+## 2026-09-30 — NEXT-29 Web onboarding v2 full late-step audit (steps 9–18)
+
+Manual QA reported that multiple steps after the Visual onboarding step no longer match the visible Settings section. A full source audit confirms this is a sequence/state-machine defect rather than one isolated popover-position bug.
+
+### Step-by-step audit
+- **9/18 — 推荐与画风 tab:** target is the visible Settings Hub sidebar tab. The step is structurally addressable, but its transition pattern is unsafe: it combines `advanceOnClick: true` with an `onNextClick` handler that programmatically clicks the same active target and then calls `moveNext()` after a fixed 140 ms.
+- **10/18 — 画风接入模式:** target `#visual-rerank-mode` belongs to `#a87-recommendations-panel`. If the prior panel activation has not completed/stuck, the node still exists in DOM while hidden. The vendored Driver target resolver only uses `document.querySelector`; it does not require visibility/non-zero geometry. Result: a hidden target is accepted and the popover becomes effectively unanchored (observed top-left).
+- **11/18 — 画风影响强度:** same failure class as step 10 because `#visual-strength` is in the same Recommendations panel.
+- **12/18 — 连接与同步 tab:** sidebar target itself is visible, but it repeats the same unsafe `advanceOnClick + synthetic click + fixed-delay moveNext` transition pattern as step 9.
+- **13/18 — 连接状态:** target `#a83-connections` is not owned by the Connections panel in the current hub. `alpha8-connections.js` inserts it relative to `#settings-form`; after Settings Hub migration it lands in / remains associated with **General**. Thus a tour that has just activated Connections is structurally pointing at a hidden General target.
+- **14/18 — E-H 登录方式:** guaranteed ownership mismatch. `alpha8-7-desktop-hub.js` explicitly moves `#settings-eh-account` into **General** (`panels.get('general').appendChild(ehAccount)`), while the onboarding sequence remains on Connections.
+- **15/18 — 手机直接读取电脑内容:** `#settings-mobile-bridge` is correctly owned by **Connections**. This step can align only if the Connections transition survived steps 12–14; otherwise it inherits stale panel state.
+- **16/18 — 语言与地区:** the previous Mobile step explicitly calls `openSettingsPanel('general')` before advancing, so this target is conceptually correct, but it still depends on the same fixed-delay transition style rather than a readiness assertion.
+- **17/18 — 软件更新:** the previous Language step clicks the Software sidebar tab before advancing. The target is the sidebar tab itself, so it is generally addressable, but the tutorial does not verify that `#a87-software-panel` is active/visible or spotlight an actual update control.
+- **18/18 — 完成:** no anchored target; no ownership issue.
+
+### Additional Driver integration defect
+The vendored Driver supports both `advanceOnClick` and custom `onNextClick`. For steps 1/4/6/8/9/12 the current tour sets `advanceOnClick: true` while `onNextClick` programmatically invokes `.click()` on the same highlighted element. The Driver's document click listener treats clicks inside the active element as `activeElementClick` and can re-enter the same next-step callback. Browser click-in-progress suppression prevents infinite native activation but the nested callback can still schedule an additional delayed `moveNext()`, creating an intermittent double-advance / step-skip risk. This is a separate sequencing defect from hidden-target geometry.
+
+### Required redesign before next Web RC
+- Treat onboarding as an explicit state machine: every step declares the owning top-level view and Settings Hub panel.
+- Before highlighting a target, activate the owner and wait until **owner active + target visible + non-zero bounding rect**.
+- Replace Driver's current existence-only target readiness for this tour; hidden DOM nodes must be treated as unavailable.
+- Remove the mixed `advanceOnClick + programmatic click + fixed 140 ms` pattern. Use one transition authority only.
+- Reorder General-vs-Connections content to match actual product ownership: E-H account is intentionally General; connection-summary ownership must be made explicit instead of assumed.
+- Add Playwright coverage for the entire 18-step sequence, asserting at each step: active index/title, active top-level view, active Settings panel when applicable, target visibility, non-zero bounding box, and no unexpected index skip after one Next action.
+- Specifically gate steps 10, 11, 13, 14, 15, 16 and 17 because these cross panel boundaries or depend on dynamic panel relocation.
+
+Current RC remains manual-QA evidence only; no code fix is applied in this audit commit.

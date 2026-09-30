@@ -110,19 +110,62 @@ jobs:
           $compatRoot=Join-Path $env:RUNNER_TEMP 'pica-v0411-one-click-compat'
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $compatRoot
           $oldRoot=Join-Path $compatRoot 'old'
-          $newRoot=Join-Path $compatRoot 'new'
+          $newRoot=Join-Path $compatRoot 'formal-layout-candidate'
           $bridgeRoot=Join-Path $compatRoot 'bridge'
           New-Item -ItemType Directory -Force -Path $oldRoot,$newRoot,$bridgeRoot | Out-Null
           $v0411='artifacts\release-base\Pica-Library-v0.4.11-windows-x64.zip'
+
+          # The isolated RC intentionally replaces the root launcher and adds TEST_BUILD.txt,
+          # so it is not a valid proxy for the stable incremental surface. Build a second,
+          # formal-layout candidate from the current stable-layout package: accepted launcher
+          # is preserved, only production app bundles are rebuilt with the ephemeral target
+          # version, and no RC-only root file is introduced.
+          $stableLayout='artifacts\Pica-Library-v0.4.11-windows-x64.zip'
+          if(-not (Test-Path -LiteralPath $stableLayout)){ throw 'Current formal-layout package is missing after RC assembly' }
+          Expand-Archive -LiteralPath $stableLayout -DestinationPath $newRoot
+          $compatVersion="$rcVersion-bridgecheck"
+          $formalZip=Join-Path $compatRoot "Pica-Library-v$compatVersion-local-test-windows-x64.zip"
+          $packageFile=Join-Path $PWD 'package.json'
+          $originalPackage=[IO.File]::ReadAllText($packageFile)
+          try {
+            $candidatePackage=$originalPackage | ConvertFrom-Json
+            $candidatePackage.version=$compatVersion
+            [IO.File]::WriteAllText(
+              $packageFile,
+              (($candidatePackage | ConvertTo-Json -Depth 100) + "`n"),
+              (New-Object Text.UTF8Encoding($false))
+            )
+            pnpm build
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $newRoot 'app\*.js')
+            Copy-Item -Path 'dist\*.js' -Destination (Join-Path $newRoot 'app') -Force
+            Copy-Item -LiteralPath 'dist\licenses\THIRD_PARTY_LICENSES.txt' -Destination (Join-Path $newRoot 'licenses\THIRD_PARTY_LICENSES.txt') -Force
+            [IO.File]::WriteAllText(
+              (Join-Path $newRoot 'SOURCE_SHA.txt'),
+              "$env:GITHUB_SHA`n",
+              (New-Object Text.UTF8Encoding($false))
+            )
+          } finally {
+            [IO.File]::WriteAllText(
+              $packageFile,
+              $originalPackage,
+              (New-Object Text.UTF8Encoding($false))
+            )
+          }
+          Compress-Archive -Path (Join-Path $newRoot '*') -DestinationPath $formalZip -CompressionLevel Optimal
+
           Expand-Archive -LiteralPath $v0411 -DestinationPath $oldRoot
-          Expand-Archive -LiteralPath $zip -DestinationPath $newRoot
           $oldUpdater=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $oldRoot 'app\updater.js')).Hash.ToLowerInvariant()
           $newUpdater=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $newRoot 'app\updater.js')).Hash.ToLowerInvariant()
           if($oldUpdater -ne $newUpdater){ throw "v0.4.11 one-click bridge would replace app/updater.js: $oldUpdater -> $newUpdater" }
           if(-not (Test-Path -LiteralPath (Join-Path $newRoot 'app\full-upgrader.js'))){ throw 'Candidate is missing app/full-upgrader.js' }
+          if(Test-Path -LiteralPath (Join-Path $newRoot 'TEST_BUILD.txt')){ throw 'Formal-layout compatibility candidate contains RC-only TEST_BUILD.txt' }
+          $oldLauncher=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $oldRoot 'Pica Library.exe')).Hash.ToLowerInvariant()
+          $newLauncher=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $newRoot 'Pica Library.exe')).Hash.ToLowerInvariant()
+          if($oldLauncher -ne $newLauncher){ throw "Formal-layout compatibility candidate changed the accepted launcher: $oldLauncher -> $newLauncher" }
 
           $bridgeZip=Join-Path $compatRoot 'v0411-to-candidate-local-test.zip'
-          pnpm exec tsx scripts/build-local-update-package.ts $v0411 $zip $bridgeZip
+          pnpm exec tsx scripts/build-local-update-package.ts $v0411 $formalZip $bridgeZip
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Expand-Archive -LiteralPath $bridgeZip -DestinationPath $bridgeRoot
           $manifest=Get-Content -Raw -LiteralPath (Join-Path $bridgeRoot 'update-manifest.json') | ConvertFrom-Json

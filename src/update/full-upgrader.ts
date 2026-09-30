@@ -78,6 +78,16 @@ function validateStagedApplication(
         'Upgrade bootstrap directory'
     )
     assertOutside(
+        instruction.desktopHomeRoot,
+        instruction.applicationRoot,
+        'Desktop user-data directory'
+    )
+    assertOutside(
+        instruction.libraryDirectory,
+        instruction.applicationRoot,
+        'Library directory'
+    )
+    assertOutside(
         instruction.stagedApplicationRoot,
         instruction.applicationRoot,
         'Staged application directory'

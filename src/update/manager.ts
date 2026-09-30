@@ -25,6 +25,8 @@ import {
     type UpdateTarget
 } from './target'
 import type {
+    FullApplicationUpdaterInstruction,
+    StagedFullApplicationUpdate,
     StagedUpdate,
     UpdateManifest,
     UpdateManifestFile,
@@ -35,6 +37,66 @@ import type {
 const officialRepository = 'Saber-Alter-Lily/pica-library'
 const forbiddenPayload =
     /(^|\/)(data|cache|downloads?|previews?|logs?|browser-lite)(\/|$)|\.(?:db|sqlite)(?:-|$)|(^|\/)\.env/i
+
+const forbiddenFullPackageRoot =
+    /^(?:config|data|cache|downloads?|logs?|runtime-state|packs)(?:\/|$)|\.(?:db|sqlite)(?:-|$)/i
+
+function normalizeFullPackagePath(value: string) {
+    const raw = String(value ?? '').replaceAll('\\', '/')
+    if (
+        !raw ||
+        raw.startsWith('/') ||
+        raw.startsWith('//') ||
+        /^[a-z]:/i.test(raw) ||
+        raw.includes(':')
+    )
+        throw new Error('Full application package path is unsafe')
+    const segments = raw.split('/')
+    if (
+        segments.some(
+            (segment) =>
+                !segment ||
+                segment === '.' ||
+                segment === '..' ||
+                /[. ]$/.test(segment)
+        )
+    )
+        throw new Error('Full application package path is unsafe')
+    return segments.join('/')
+}
+
+function validateFullApplicationArchive(zip: AdmZip) {
+    const entries = zip.getEntries().filter((entry) => !entry.isDirectory)
+    const declared = new Map<string, AdmZip.IZipEntry>()
+    for (const entry of entries) {
+        const safe = normalizeFullPackagePath(entry.entryName)
+        if (forbiddenFullPackageRoot.test(safe))
+            throw new Error(
+                `User data is forbidden in full application packages: ${safe}`
+            )
+        if (declared.has(safe))
+            throw new Error(`Duplicate full application path: ${safe}`)
+        declared.set(safe, entry)
+    }
+    for (const required of [
+        'Pica Library.exe',
+        'runtime/node.exe',
+        'app/desktop.js',
+        'SOURCE_SHA.txt'
+    ])
+        if (!declared.has(required))
+            throw new Error(
+                `Full application package is incomplete: ${required}`
+            )
+    const sourceSha = declared
+        .get('SOURCE_SHA.txt')!
+        .getData()
+        .toString('utf8')
+        .trim()
+    if (!/^[0-9a-f]{40}$/.test(sourceSha))
+        throw new Error('Full application SOURCE_SHA.txt is invalid')
+    return { declared, sourceSha }
+}
 
 function sha256(value: Buffer | string) {
     return createHash('sha256').update(value).digest('hex')
@@ -201,6 +263,7 @@ export interface UpdateManagerOptions {
 
 export class UpdateManager {
     private staged: StagedUpdate | null = null
+    private stagedFull: StagedFullApplicationUpdate | null = null
     readonly progressFile: string
 
     constructor(private readonly options: UpdateManagerOptions) {
@@ -241,13 +304,13 @@ export class UpdateManager {
         )
     }
 
-    private async verifyOfficialRelease(
-        manifest: UpdateManifest,
+    private async verifyOfficialArchive(
+        version: string,
         archiveName: string,
         archiveHash: string
     ) {
         const request = this.options.fetchImplementation ?? applicationFetch
-        const tag = `v${manifest.targetVersion}`
+        const tag = `v${version}`
         try {
             const response = await request(
                 `https://api.github.com/repos/${officialRepository}/releases/tags/${encodeURIComponent(tag)}`,
@@ -273,17 +336,30 @@ export class UpdateManager {
                 if (release.tag_name !== tag)
                     throw new Error('Official release tag mismatch')
                 if (release.draft || release.prerelease)
-                    throw new Error('Official release must be a published stable release')
-                const asset = release.assets?.find((item) => item.name === archiveName)
-                if (!asset) throw new Error('Update asset is not in the official release')
+                    throw new Error(
+                        'Official release must be a published stable release'
+                    )
+                const asset = release.assets?.find(
+                    (item) => item.name === archiveName
+                )
+                if (!asset)
+                    throw new Error(
+                        'Update asset is not in the official release'
+                    )
                 if (asset.digest === `sha256:${archiveHash}`) return
-                const sums = release.assets?.find((item) => item.name === 'SHA256SUMS.txt')
+                const sums = release.assets?.find(
+                    (item) => item.name === 'SHA256SUMS.txt'
+                )
                 if (sums?.browser_download_url) {
-                    const sumsResponse = await request(sums.browser_download_url, {
-                        signal: AbortSignal.timeout(12_000)
-                    })
+                    const sumsResponse = await request(
+                        sums.browser_download_url,
+                        { signal: AbortSignal.timeout(12_000) }
+                    )
                     if (sumsResponse.ok) {
-                        const expected = this.shaFromSums(await sumsResponse.text(), archiveName)
+                        const expected = this.shaFromSums(
+                            await sumsResponse.text(),
+                            archiveName
+                        )
                         if (expected === archiveHash) return
                     }
                 }
@@ -292,16 +368,34 @@ export class UpdateManager {
             // Fall through to the GitHub-hosted checksum path below.
         }
 
-        const sumsUrl = `https://github.com/${officialRepository}/releases/download/${encodeURIComponent(tag)}/SHA256SUMS.txt`
+        const sumsUrl =
+            `https://github.com/${officialRepository}/releases/download/${encodeURIComponent(tag)}/SHA256SUMS.txt`
         const sumsResponse = await request(sumsUrl, {
             headers: { 'user-agent': 'Pica-Library-UpdateManager' },
             signal: AbortSignal.timeout(12_000)
         })
         if (!sumsResponse.ok)
             throw new Error('Official release checksum is unavailable')
-        const expected = this.shaFromSums(await sumsResponse.text(), archiveName)
+        const expected = this.shaFromSums(
+            await sumsResponse.text(),
+            archiveName
+        )
         if (expected !== archiveHash)
-            throw new Error('Update archive does not match the official SHA-256')
+            throw new Error(
+                'Update archive does not match the official SHA-256'
+            )
+    }
+
+    private async verifyOfficialRelease(
+        manifest: UpdateManifest,
+        archiveName: string,
+        archiveHash: string
+    ) {
+        await this.verifyOfficialArchive(
+            manifest.targetVersion,
+            archiveName,
+            archiveHash
+        )
     }
 
     private shaFromSums(text: string, archiveName: string) {
@@ -311,20 +405,38 @@ export class UpdateManager {
             .find((parts) => parts[1]?.replace(/^\*/, '') === archiveName)?.[0]
     }
 
-    private availableFromRelease(version: string, releaseUrl: string, assetName?: string, assetUrl?: string) {
-        if (!stableVersionParts(version) || !isNewerStable(version, this.options.currentVersion))
+    private availableFromRelease(
+        version: string,
+        releaseUrl: string,
+        assetName?: string,
+        assetUrl?: string,
+        fullAssetName?: string,
+        fullAssetUrl?: string
+    ) {
+        if (
+            !stableVersionParts(version) ||
+            !isNewerStable(version, this.options.currentVersion)
+        )
             return {
                 status: 'current' as const,
                 currentVersion: this.options.currentVersion
             }
         if (!assetName || !assetUrl)
-            return { status: 'full-install' as const, version, releaseUrl }
+            return {
+                status: 'full-install' as const,
+                version,
+                releaseUrl,
+                assetName: fullAssetName,
+                assetUrl: fullAssetUrl,
+                oneClick: Boolean(fullAssetName && fullAssetUrl)
+            }
         return {
             status: 'incremental' as const,
             version,
             releaseUrl,
             assetName,
-            assetUrl
+            assetUrl,
+            oneClick: true
         }
     }
 
@@ -367,11 +479,23 @@ export class UpdateManager {
                               target
                           )
                         : null
+                    const fullAssetName =
+                        target &&
+                        updateTargetKey(target) === 'windows-x64'
+                            ? `Pica-Library-v${version}-windows-x64.zip`
+                            : undefined
+                    const fullAsset = fullAssetName
+                        ? release.assets?.find(
+                              (item) => item.name === fullAssetName
+                          )
+                        : undefined
                     return this.availableFromRelease(
                         version,
                         releaseUrl,
                         updateAsset?.name,
-                        updateAsset?.url
+                        updateAsset?.url,
+                        fullAsset?.name,
+                        fullAsset?.browser_download_url
                     )
                 }
             }
@@ -402,12 +526,25 @@ export class UpdateManager {
                   ).find((name) => this.shaFromSums(sums, name))
                 : undefined
             const releaseUrl = `https://github.com/${officialRepository}/releases/tag/v${version}`
+            const fullAssetName =
+                target &&
+                updateTargetKey(target) === 'windows-x64'
+                    ? `Pica-Library-v${version}-windows-x64.zip`
+                    : undefined
+            const verifiedFullAssetName =
+                fullAssetName && this.shaFromSums(sums, fullAssetName)
+                    ? fullAssetName
+                    : undefined
             return this.availableFromRelease(
                 version,
                 releaseUrl,
                 assetName,
                 assetName
                     ? `https://github.com/${officialRepository}/releases/download/v${version}/${assetName}`
+                    : undefined,
+                verifiedFullAssetName,
+                verifiedFullAssetName
+                    ? `https://github.com/${officialRepository}/releases/download/v${version}/${verifiedFullAssetName}`
                     : undefined
             )
         } catch {

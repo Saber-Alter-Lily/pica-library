@@ -166,6 +166,71 @@ describe('SQLite migrations', () => {
         backup.close()
     })
 
+    it('frees unpublished schema numbers before a future stable migration uses them', () => {
+        const databaseFile = file()
+        const initial = new LibraryDatabase(databaseFile)
+        initial.close()
+
+        const legacyRc = new DatabaseSync(databaseFile)
+        legacyRc
+            .prepare(
+                "UPDATE schema_migrations SET name = 'p2d2_author_reverse_lookup_indexes' WHERE version = 14"
+            )
+            .run()
+        legacyRc
+            .prepare(
+                'INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)'
+            )
+            .run(
+                15,
+                'p2d5b_work_identity_detail_indexes',
+                '2026-09-24T00:00:00.000Z'
+            )
+        legacyRc
+            .prepare(
+                'INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)'
+            )
+            .run(
+                16,
+                'p2d8a_picture_comic_status_index',
+                '2026-09-24T00:01:00.000Z'
+            )
+
+        runMigrations(legacyRc, [
+            ...migrations,
+            {
+                version: 15,
+                name: 'future_stable_schema_15',
+                up: 'CREATE TABLE future_stable_schema_15(value TEXT);'
+            }
+        ])
+
+        expect(
+            legacyRc
+                .prepare(
+                    'SELECT version, name FROM schema_migrations WHERE version >= 14 ORDER BY version'
+                )
+                .all()
+        ).toEqual([
+            {
+                version: 14,
+                name: 'post_v0411_index_bundle'
+            },
+            {
+                version: 15,
+                name: 'future_stable_schema_15'
+            }
+        ])
+        expect(
+            legacyRc
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='future_stable_schema_15'"
+                )
+                .get()
+        ).toBeTruthy()
+        legacyRc.close()
+    })
+
     it('upgrades a legacy unversioned database without deleting data', () => {
         const databaseFile = file()
         const database: DatabaseSyncType = new DatabaseSync(databaseFile)

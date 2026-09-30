@@ -86,16 +86,18 @@ describe('Alpha8.7/8.8 desktop/mobile convergence', () => {
         const hub = fs.readFileSync('web/alpha8-7-desktop-hub.js', 'utf8')
         for (const section of [
             '基本设置',
+            '推荐与画风',
             '连接与同步',
             '外观与个性化',
             '下载与存储',
-            '维护工具',
-            '软件更新'
+            '维护与更新'
         ])
             expect(hub).toContain(section)
+        expect(hub).not.toContain("['software', 'software']")
         expect(hub).toContain('#settings-nav{display:none!important}')
         expect(hub).toContain('maintenanceNav.textContent = text().nav')
-        expect(hub).toContain("panels.get('software').appendChild(software)")
+        expect(hub).toContain('maintenancePanel.prepend(software)')
+        expect(hub).toContain("connectionsSlot.prepend(connectionStatus)")
     })
 
     it('keeps personalization full-width instead of the squeezed layout reported in acceptance testing', () => {

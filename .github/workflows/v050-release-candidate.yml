@@ -6,6 +6,17 @@ on:
     branches: [fix/android-rc-ux-performance-batch]
     paths:
       - '.github/workflows/v050-release-candidate.yml'
+      - 'package.json'
+      - 'scripts/build-windows-package.ps1'
+      - 'scripts/build-local-update-package.ts'
+      - 'scripts/build-upgrade-assistant.ts'
+      - 'scripts/test-windows-v0411-incremental-upgrade.ps1'
+      - 'src/update/**'
+      - 'src/storage/sqlite/migrations.ts'
+      - 'src/library/database.ts'
+      - 'src/desktop/**'
+      - 'mobile/android-alpha2/app/build.gradle'
+      - 'mobile/android-alpha2/app/src/main/**'
 
 permissions:
   contents: read

@@ -95,7 +95,7 @@ Android APKs are distributed only through this repository's official Release.
 
 ## Support
 
-Pica Library is free and open source. Development can be supported voluntarily through [AFDIAN](https://afdian.com/a/PicaLibrary).
+Pica Library is free and open source. Development can be supported voluntarily through [AZZ](https://azz.net/PicaLibrary).
 
 Support does not unlock extra features, content, or download privileges.
 

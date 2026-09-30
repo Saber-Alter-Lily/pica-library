@@ -65,7 +65,7 @@ The current Desktop Settings Hub has seven areas:
 
 ### General
 
-Account and basic settings, plus **Support the Project**. AFDIAN and GitHub links are available here. Support is voluntary and never unlocks extra features, content, or access.
+Account and basic settings, plus **Support the Project**. AZZ and GitHub links are available here. Support is voluntary and never unlocks extra features, content, or access.
 
 ### Recommendations & Visual Style
 

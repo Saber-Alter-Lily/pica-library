@@ -95,7 +95,7 @@ Android APK 不通过应用商店分发，请只从本仓库正式 Release 下�
 
 ## 支持项目
 
-Pica Library 免费、开源。可通过 [爱发电](https://afdian.com/a/PicaLibrary) 自愿支持维护。
+Pica Library 免费、开源。可通过 [爱赞助](https://azz.net/PicaLibrary) 自愿支持维护。
 
 赞助不会解锁额外功能、内容或下载权限。
 

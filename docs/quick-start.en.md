@@ -87,7 +87,7 @@ Desktop: **Settings → General → Support the Project**
 
 Android: **Settings → Support the Project**
 
-AFDIAN and the GitHub project page are available there. Support is voluntary and never unlocks extra features, content, or access.
+AZZ and the GitHub project page are available there. Support is voluntary and never unlocks extra features, content, or access.
 
 ## 08 Software updates
 

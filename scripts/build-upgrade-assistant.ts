@@ -84,7 +84,15 @@ export function buildUpgradeAssistant(options: {
         'utf8'
     )
     const targetHash = sha256(targetBuffer)
+    const targetVersionToken = '__PICA_TARGET_VERSION_WITH_V__'
+    const sourceVersionToken = '__PICA_SOURCE_VERSION_WITH_V__'
+
+    // Replace template prose/file-name version literals with neutral tokens
+    // before injecting real release versions. This prevents prefix collisions
+    // such as v0.4.1 accidentally rewriting the start of v0.4.11.
     script = script
+        .replaceAll('v0.4.1', targetVersionToken)
+        .replaceAll('v0.4.0', sourceVersionToken)
         .replace(
             "$TargetVersion = '0.4.1'",
             `$TargetVersion = '${targetVersion}'`
@@ -92,14 +100,6 @@ export function buildUpgradeAssistant(options: {
         .replace(
             "$RequiredSourceVersion = '0.4.0'",
             `$RequiredSourceVersion = '${sourceVersion}'`
-        )
-        .replace(
-            "$TargetZipName = 'Pica-Library-v0.4.1-windows-x64.zip'",
-            `$TargetZipName = '${targetZipName}'`
-        )
-        .replace(
-            "$TargetZipUrl = 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.1/Pica-Library-v0.4.1-windows-x64.zip'",
-            `$TargetZipUrl = 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v${targetVersion}/${targetZipName}'`
         )
         .replace(
             "$ExpectedZipSha256 = '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d'",
@@ -113,18 +113,16 @@ export function buildUpgradeAssistant(options: {
             '$ExpectedDatabaseSchema = 13',
             `$ExpectedDatabaseSchema = ${schema}`
         )
-        .replaceAll('v0.4.1', `v${targetVersion}`)
-        .replaceAll('v0.4.0', `v${sourceVersion}`)
+        .replaceAll(targetVersionToken, `v${targetVersion}`)
+        .replaceAll(sourceVersionToken, `v${sourceVersion}`)
 
     const targetScriptName =
         `Upgrade-Pica-Library-v${targetVersion}.ps1`
     launcher = launcher
-        .replaceAll('v0.4.1', `v${targetVersion}`)
-        .replaceAll('v0.4.0', `v${sourceVersion}`)
-        .replace(
-            'Upgrade-Pica-Library-v0.4.1.ps1',
-            targetScriptName
-        )
+        .replaceAll('v0.4.1', targetVersionToken)
+        .replaceAll('v0.4.0', sourceVersionToken)
+        .replaceAll(targetVersionToken, `v${targetVersion}`)
+        .replaceAll(sourceVersionToken, `v${sourceVersion}`)
 
     const readme = [
         `Pica Library v${sourceVersion} -> v${targetVersion} fallback Upgrade Assistant`,

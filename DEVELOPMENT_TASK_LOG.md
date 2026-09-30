@@ -2608,3 +2608,22 @@ Source: representative Windows/Web RC testing after NEXT-27 packaging while Andr
 - Keep PR #197 draft until the full Web/Desktop + Android matrix passes.
 - Produce a fresh unpublished isolated Windows/Web RC plus side-by-side Android RC from the same validated source SHA.
 - Do not mutate v0.4.11 Release assets or stable OTA metadata.
+
+## 2026-09-30 — NEXT-29 Web onboarding v2 manual-QA finding: hidden target / wrong panel
+
+Observed on the fresh Windows/Web corrective RC during the Web onboarding v2 tour:
+- At step 10/18, “画风接入模式”, the spotlight popover appears detached in the upper-left corner while Settings still visibly has “基本设置” active.
+- The intended target `#visual-rerank-mode` belongs to the “推荐与画风” panel and is therefore hidden at that moment.
+
+Root-cause assessment:
+- `onboarding-v1.js` resolves tour targets by DOM presence only. `#visual-rerank-mode` remains queryable even when its parent Settings panel is hidden.
+- The transition into the recommendation Settings panel relies on a previous-step synthetic `.click()` plus a fixed 140 ms delay before `driver.moveNext()`; it does not verify that `#a87-recommendations-panel` is actually active/visible before entering the Visual step.
+- Therefore a stale/failed panel transition can advance the tour with a hidden target. Driver then has no usable visible geometry and renders the popover as an effectively unanchored top-left card.
+- The same structural risk applies to later cross-panel onboarding steps such as Connections and Software Update.
+
+Required correction before the next Web RC:
+- Cross-view/cross-panel steps must explicitly activate the owning view/panel and wait on a visible-target readiness predicate before advancing.
+- A hidden DOM node must never count as a valid tour target; target readiness must require rendered/visible geometry.
+- Replace fixed timing assumptions with state-based readiness (`panel.active && !panel.hidden`, target visible, non-zero bounding box).
+- Add browser/E2E coverage that asserts each task-oriented onboarding step is anchored to a visible element and that the expected Settings hub panel is active at Visual, Connections and Software Update steps.
+- Do not alter the current manual-test RC retroactively; treat this as a recorded NEXT-29 follow-up finding.

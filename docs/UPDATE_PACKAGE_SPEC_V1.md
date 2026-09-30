@@ -81,6 +81,12 @@ Windows x64 为保持旧客户端连续升级，仍可同时发布历史来源�
 
 每一个可被该路径接受的完整 Windows 包都必须继续携带 `app/full-upgrader.js`，这是后续版本仍可一键跨越 Schema/架构更新的持续性契约。
 
+首个包含 Universal Upgrade Assistant 的稳定版启动后，还必须把当前正式 runtime 与 `app/full-upgrader.js` 注册到 Desktop 用户数据根下的固定外置位置：
+
+`%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant\`
+
+默认目录至少包含 `runtime/node.exe`、`full-upgrader.js` 与 `assistant.json`（版本、source SHA、runtime/helper SHA-256）。该固定目录是长期可发现的恢复/升级入口，不直接在原地执行自替换；每次完整升级仍从它复制出独立的 transaction bootstrap 后再退出旧程序。使用自定义 Desktop home 时，同样放在对应 `runtime-state/upgrade-assistant` 下。启动时刷新失败不得破坏普通应用启动，但正式完整升级在无法重新验证/准备该助手时必须 fail closed。
+
 历史客户端无法被未来代码反向赋予 detached `full-upgrader` 能力，但这不等于它们一定需要人工完整安装。若首个新基线仍满足旧客户端已经发布的增量协议边界（例如 public v0.4.11 的 App API 2、Schema 13 → 14，且 `app/updater.js` 构建产物保持不变），正式 Release 可以发布来源限定的增量包，让旧客户端通过现有一键更新路径安装新基线，并同时新增 `app/full-upgrader.js`。只有当 App API / Schema / updater 自替换边界不满足，或正式资产校验失败时，才回退到 Upgrade Assistant / 完整包路径。从安装了新基线开始，后续正式 Windows x64 大版本更新沿用上述 universal full-application replacement 路径。
 
 ## Schema authority

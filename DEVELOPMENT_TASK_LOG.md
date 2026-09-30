@@ -2685,3 +2685,34 @@ Required correction:
   - one click changes the rendered Library mode;
   - no duplicate or competing “display controls” owner exists.
 - Current manual-test RC is unchanged; this is recorded as another NEXT-29 Web corrective finding.
+
+
+## NEXT-30 — Cross-client interaction hierarchy / UI simplification
+**Status: IN PROGRESS — corrective branch / PR #197**
+
+Source: manual QA comparison of the fresh Windows/Web and Android RCs.
+
+### U1 — Windows/Web action hierarchy
+- Reduce permanent button density without hiding core capabilities.
+- Library: keep grid/list mode directly visible; move grid-size and cover-loading options into one display disclosure; keep search/scope/apply as primary; retain advanced filters and batch organization as separate secondary disclosures.
+- Establish one DOM owner for Library display controls. Remove the v040 parity layer's authority to relocate grid/list/size/cover controls.
+- Recommendation page: keep the primary recommendation action visible; move destructive/rare restart and secondary display controls out of the primary action cluster where appropriate.
+- Settings: reduce top-level section count and align feature ownership with the user's mental model. Merge Maintenance + Software Update into one section, move unified connection health into Connections & Sync, keep account credentials in General, and collapse local runtime/network utilities instead of showing every control at once.
+- Avoid a visual redesign that changes product semantics; this pass is information architecture + progressive disclosure.
+
+### U2 — Android selection-mode bottom action bar
+- Replace the ActionMode overflow-menu dependency after long-press selection.
+- While collection selection is active, the normal four-destination bottom navigation is temporarily replaced by a contextual action bar.
+- Required directly visible actions: Finish/selected count, Select all, Clear, Add to shelf, and Unfavorite (Library) or Remove from shelf (Shelf).
+- Exiting selection restores the normal bottom navigation without rerendering the collection.
+- Back should exit selection before leaving the screen.
+- The shared Library/Shelf selection controller remains the single selection state owner.
+
+### U3 — Web onboarding realignment after UI stabilization
+- Rebuild onboarding transitions around explicit view/panel ownership and visible-target readiness after U1 is complete.
+- Remove the mixed Driver `advanceOnClick + synthetic click + fixed-delay moveNext` pattern.
+- Full E2E tour must assert one-step-at-a-time progression, active view/panel, visible target geometry, and no hidden target anchoring.
+
+### Release boundary
+- Keep v0.4.11 and stable OTA untouched.
+- Do not produce another RC until U1/U2/U3 automated gates are green.

@@ -934,3 +934,52 @@ body.reader-active .reader-header {
         flex-wrap: wrap;
     }
 }
+
+/* Clear action hierarchy ------------------------------------------------ */
+#ux-library-display .ux-more-body {
+    align-items: center;
+}
+#ux-library-display .grid-size-controls {
+    margin: 0;
+}
+#ux-recommend-more {
+    margin: -4px 0 12px;
+}
+#ux-recommend-more > summary {
+    font-size: .9rem;
+}
+#ux-runtime-settings {
+    margin-top: 12px;
+}
+#ux-runtime-settings .ux-runtime-settings-body {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+#ux-runtime-settings .ux-runtime-settings-body > .wide,
+#ux-runtime-settings .ux-runtime-settings-body > .setup-proxy-section,
+#ux-runtime-settings .ux-runtime-settings-body > .actions,
+#ux-runtime-settings #settings-message,
+#ux-runtime-settings #browser-lite-timestamps {
+    grid-column: 1 / -1;
+}
+#ux-runtime-settings .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+#a87-general-panel > #settings-eh-account {
+    margin-top: 12px;
+}
+#a87-connections-panel > #a83-connections {
+    margin-top: 0;
+}
+@media (max-width: 760px) {
+    #ux-runtime-settings .ux-runtime-settings-body {
+        grid-template-columns: 1fr;
+    }
+    #ux-runtime-settings .ux-runtime-settings-body > * {
+        grid-column: 1 !important;
+    }
+}

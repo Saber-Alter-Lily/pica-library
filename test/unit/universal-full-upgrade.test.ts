@@ -292,39 +292,9 @@ describe('universal full application upgrade', () => {
             "'full-upgrader': 'src/update/full-upgrader.ts'"
         )
         expect(managerSource).toContain(
-            'bootstrap-' + '
-        expect(managerSource).toContain(
-            "'app',\n                'full-upgrader.js'"
+            'bootstrap-' + '$' + '{full.id}'
         )
-        expect(helper).toContain(
-            'snapshotUserState(instruction)'
-        )
-        expect(helper).toContain(
-            'rollbackApplication(instruction)'
-        )
-        expect(helper).toContain(
-            'restoreUserState(instruction, snapshot)'
-        )
-        expect(server).toContain(
-            "status === 'full-install'"
-        )
-        expect(server).toContain(
-            '512 * 1024 * 1024'
-        )
-        expect(web).toContain(
-            'async function reconnectAfterUpdate('
-        )
-        expect(web).toContain('window.location.reload()')
-        expect(artifact).toContain(
-            "'app\\full-upgrader.js'"
-        )
-    })
-})
- + '{full.id}'
-        )
-        expect(managerSource).toContain(
-            "'upgrade-assistant'"
-        )
+        expect(managerSource).toContain("'upgrade-assistant'")
         expect(managerSource).toContain(
             'preparePersistentUpgradeAssistant()'
         )

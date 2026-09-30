@@ -805,11 +805,16 @@ function renderStagedUpdate(value) {
                 : ''
         }
     )}`
-    $('#update-apply').hidden = Boolean(value.requiresFullInstall)
+    $('#update-apply').hidden = Boolean(
+        value.requiresFullInstall && value.mode !== 'full-application'
+    )
     clearFullInstallGuide()
-    $('#update-message').textContent = value.requiresFullInstall
-        ? t('update.fullRequired')
-        : t('update.staged')
+    $('#update-message').textContent =
+        value.mode === 'full-application'
+            ? t('update.fullStaged')
+            : value.requiresFullInstall
+              ? t('update.fullRequired')
+              : t('update.staged')
     renderUpdateProgress({
         phase: 'staged',
         current: value.fileCount,
@@ -840,6 +845,34 @@ async function stageUpdateFile(file) {
     return renderStagedUpdate(value)
 }
 
+async function reconnectAfterUpdate(
+    targetVersion,
+    timeoutMs = 90_000
+) {
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+        try {
+            const response = await fetch('/api/v1/capabilities', {
+                cache: 'no-store'
+            })
+            if (response.ok) {
+                const value = await response.json()
+                if (
+                    String(value?.appVersion || '') ===
+                    String(targetVersion || '')
+                ) {
+                    window.location.reload()
+                    return
+                }
+            }
+        } catch {
+            // The old engine is expected to disappear while files are replaced.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250))
+    }
+    throw new Error(t('update.reconnectFailed'))
+}
+
 async function applyStagedUpdate(
     value = state.stagedUpdate,
     skipConfirm = false
@@ -852,9 +885,17 @@ async function applyStagedUpdate(
         ))
     )
         return
-    await desktopPost('/api/v1/update/apply', { id: value.id })
+    const result = await desktopPost('/api/v1/update/apply', {
+        id: value.id
+    })
+    const targetVersion =
+        result?.targetVersion || value.targetVersion
     $('#update-message').textContent = t('update.applying')
-    renderUpdateProgress({ phase: 'waiting-for-exit' })
+    renderUpdateProgress({
+        phase: 'waiting-for-exit',
+        targetVersion
+    })
+    await reconnectAfterUpdate(targetVersion)
 }
 
 function fullInstallDownloadUrl(version) {
@@ -925,7 +966,14 @@ $('#update-check').onclick = async (event) => {
                 return
             }
             if (value.status === 'full-install') {
-                renderFullInstallGuide(value)
+                if (value.oneClick) {
+                    message.textContent = t(
+                        'update.fullOneClickFound',
+                        { version: value.version }
+                    )
+                } else {
+                    renderFullInstallGuide(value)
+                }
                 return
             }
             message.innerHTML = t('update.incrementalFound', {
@@ -953,7 +1001,10 @@ $('#update-one-click').onclick = async () => {
             message.textContent = t('update.current')
             return
         }
-        if (available.status === 'full-install') {
+        if (
+            available.status === 'full-install' &&
+            !available.oneClick
+        ) {
             renderFullInstallGuide(available)
             return
         }
@@ -973,7 +1024,10 @@ $('#update-one-click').onclick = async () => {
             renderUpdateProgress({ phase: 'idle' })
             return
         }
-        if (staged.status === 'full-install') {
+        if (
+            staged.status === 'full-install' &&
+            !staged.id
+        ) {
             renderFullInstallGuide(staged)
             renderUpdateProgress({ phase: 'idle' })
             return
@@ -1037,7 +1091,12 @@ function showAvailableUpdateInSettings(value) {
     const message = $('#update-message')
     clearFullInstallGuide()
     if (value.status === 'full-install') {
-        renderFullInstallGuide(value)
+        if (value.oneClick && message)
+            message.textContent = t(
+                'update.fullOneClickFound',
+                { version: value.version }
+            )
+        else renderFullInstallGuide(value)
     } else if (message) {
         message.innerHTML = t('update.incrementalFound', {
             version: escapeHtml(value.version),

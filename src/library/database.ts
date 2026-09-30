@@ -33,6 +33,8 @@ import type {
 } from './types'
 import {
     latestMigrationVersion,
+    needsUnreleasedMigrationReconciliation,
+    reconcileUnreleasedMigrationHistory,
     runMigrations
 } from '../storage/sqlite/migrations'
 import type { UpdateFinding } from '../maintenance/updates'
@@ -245,6 +247,14 @@ export class LibraryDatabase {
         fs.mkdirSync(path.dirname(this.file), { recursive: true })
         this.db = new DatabaseSync(this.file)
         this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
+        if (needsUnreleasedMigrationReconciliation(this.db)) {
+            this.db.exec('PRAGMA wal_checkpoint(FULL)')
+            fs.copyFileSync(
+                this.file,
+                `${this.file}.pre-unreleased-schema-reconcile.bak`
+            )
+            reconcileUnreleasedMigrationHistory(this.db)
+        }
         this.backupBeforeMigration()
         this.migrate()
     }

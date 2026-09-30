@@ -5,7 +5,7 @@ test('recommendation controls render persisted adjustments after localization', 
         localStorage.setItem('pica-library-language', 'zh-CN')
         localStorage.setItem(
             'pica-onboarding-state-v1',
-            JSON.stringify({ completedVersion: 1, dismissedVersion: 0, autoShow: true })
+            JSON.stringify({ completedVersion: 2, dismissedVersion: 0, autoShow: true })
         )
     })
 

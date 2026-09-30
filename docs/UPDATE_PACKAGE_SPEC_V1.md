@@ -61,7 +61,27 @@ Windows x64 为保持旧客户端连续升级，仍可同时发布历史来源�
 
 健康检查失败时恢复备份、移除本次新增文件、恢复删除项并重启旧版。Library DB、DPAPI 凭据、书架、阅读进度、下载、设置和漫画目录从不进入替换集合。新程序迁移数据库前另建 migration backup。
 
-`requiresFullInstall: true` 时只显示完整安装提示和 GitHub Release 入口，禁止危险的部分应用。
+`requiresFullInstall: true` 的 Manifest v1 增量包仍然**禁止部分应用**；它不能通过把 `requiresFullInstall` 设为 true 来绕过 Schema/API/updater 边界。对于安装了 Universal Upgrade Assistant 的 Windows x64 客户端，Web 更新控制器可以改走独立的 **verified full-application replacement path**：从同一正式 GitHub Release 下载 `Pica-Library-v<target>-windows-x64.zip`，核验 Release digest / `SHA256SUMS.txt`，在应用目录外暂存并启动 detached `full-upgrader`，然后整体替换应用树。若正式 Release 缺少可验证完整包，则仍回退为手工完整安装提示。
+
+完整应用路径与 Manifest v1 增量协议是两条不同路径：完整 Windows ZIP 不伪装成增量 ZIP，也不要求包含 `update-manifest.json`。完整包必须至少包含 `Pica Library.exe`、`runtime/node.exe`、`app/desktop.js`、`app/updater.js`、`app/full-upgrader.js` 和 `SOURCE_SHA.txt`；不得包含数据库、凭据、设置、缓存、下载、日志等用户数据。当前 helper 复制到外部 Desktop runtime-state 后才允许旧程序退出和整树替换，因此 helper/runtime 自身也能随完整包升级。
+
+## Universal full-application replacement
+
+正式 Windows x64 客户端在进入完整应用路径时必须：
+
+1. 只接受官方稳定 Release 中精确命名的 Windows x64 完整包，并验证 SHA-256；
+2. 将完整包解压到用户数据根下的独立 staging，而不是旧应用目录；
+3. 在旧进程退出前，把当前 bundled Node runtime 与 `app/full-upgrader.js` 复制到应用目录之外的 bootstrap；
+4. 确认 Desktop user-data root 与配置的 Library directory 均不位于应用树内，否则 fail closed；
+5. 等旧进程完全退出后，建立配置/凭据和 SQLite/WAL/SHM 安全快照，再备份旧应用树并复制新应用树；
+6. 启动目标版本并通过 `/api/v1/capabilities` 核对目标版本；Schema 提升仍由数据库自身的 pre-migration backup 机制负责；
+7. 健康检查失败时停止候选、恢复旧应用树与升级前安全快照，并重新启动旧版；
+8. 健康检查成功后才删除临时应用备份/安全快照；
+9. Web 页面必须自动重连目标版本并刷新，不能把“请手动刷新/等待重启”作为正常完成状态。
+
+每一个可被该路径接受的完整 Windows 包都必须继续携带 `app/full-upgrader.js`，这是后续版本仍可一键跨越 Schema/架构更新的持续性契约。
+
+历史客户端无法被未来代码反向赋予该能力。首个包含 Universal Upgrade Assistant 的稳定版之前的 public 客户端仍需要其已经发布/随下一版提供的一次性完整升级助手进入新基线；从新基线开始，后续正式 Windows x64 大版本更新沿用上述路径。
 
 ## Schema authority
 

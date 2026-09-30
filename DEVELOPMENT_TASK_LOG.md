@@ -2716,3 +2716,38 @@ Source: manual QA comparison of the fresh Windows/Web and Android RCs.
 ### Release boundary
 - Keep v0.4.11 and stable OTA untouched.
 - Do not produce another RC until U1/U2/U3 automated gates are green.
+
+## NEXT-31 — Universal Web/Desktop Upgrade Assistant
+**Status: IN PROGRESS — release-preparation blocker**
+
+Goal:
+- Make the Web/Desktop “one-click update” entry remain usable across ordinary incremental releases, database-schema jumps, updater replacement and major architecture changes.
+- The user must not need to manually download/extract/replace the application tree merely because the next release requires a full application package.
+- User data remains external authority: database, shelves, history, settings, encrypted credentials, downloads, packs and other Desktop state are never treated as application payload.
+
+Architecture:
+- Keep existing manifest-based incremental updater as the fast path.
+- When the latest stable Release has no compatible incremental asset but has the verified Windows x64 full package, `/api/v1/update/prepare-latest` downloads and stages the full application automatically.
+- Full application archives are SHA-256 verified against the official GitHub Release and must not contain user-data roots/SQLite payloads.
+- A full package accepted for one-click use must itself contain both `app/updater.js` and `app/full-upgrader.js`, preserving the same upgrade capability for the next release.
+- Before full replacement, the bundled Node runtime and `full-upgrader.js` are copied under the external Desktop runtime-state update directory. The bootstrap therefore runs outside the application tree and can replace the updater/runtime/application itself.
+- Full replacement waits for the old process to exit, snapshots configuration plus SQLite/WAL/SHM, moves the old application tree to a sibling backup, installs the staged tree, launches the target, and verifies `/api/v1/capabilities`.
+- Failed startup/migration health automatically restores the old application tree and the pre-upgrade user-state snapshot, then relaunches the old version.
+- Automatic full upgrade fails closed if Desktop user data or the selected Library directory is located inside the application tree.
+
+Web UX:
+- One primary “one-click check & update” action covers incremental and full-application upgrades.
+- Full-package/manual replacement instructions remain only as a fallback when a Release lacks an automatically verifiable full package.
+- After `/api/v1/update/apply`, the current page polls the local capabilities endpoint; once the target version is healthy it calls `window.location.reload()` automatically.
+- Do not finish on “wait for restart” / “please refresh” copy. A changed localhost port is handled by the detached full-upgrader opening the new loopback URL as a fallback.
+
+Release compatibility boundary:
+- Public v0.4.11 predates this assistant and cannot gain it retroactively. The next stable release still needs the existing one-time v0.4.11 full-upgrade/assistant compatibility path.
+- Once the first stable build containing NEXT-31 is installed, future Windows x64 stable upgrades must preserve the universal assistant contract.
+
+Acceptance before release:
+1. Type-check, Web syntax, unit/integration tests and real-browser smoke PASS.
+2. Windows artifact contains both update helpers.
+3. A Windows replacement acceptance exercises an external bootstrap against an older application tree while reusing an external user-data root, and verifies target health plus data preservation.
+4. Full-package rejection tests cover embedded user data and missing universal helper.
+5. Formal Release assets still provide SHA256SUMS / provenance; stable OTA must never bypass official-asset verification.

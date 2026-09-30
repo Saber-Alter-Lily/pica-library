@@ -287,6 +287,11 @@ foreach ($file in $textFiles) {
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
 $hash = Get-Sha256 $zip
 [IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
+$launcherBaseReport = if ($reuseAcceptedLauncher) {
+    if ($launcherBaseVersion) { $launcherBaseVersion } else { 'historical-fixed' }
+} else {
+    $null
+}
 [ordered]@{
     path=$zip
     sha256=$hash
@@ -296,9 +301,7 @@ $hash = Get-Sha256 $zip
     node_version=$nodeVersion
     product_version=$version
     source_sha=$sourceSha
-    launcher_base_version=if ($reuseAcceptedLauncher) {
-        if ($launcherBaseVersion) { $launcherBaseVersion } else { 'historical-fixed' }
-    } else { $null }
+    launcher_base_version=$launcherBaseReport
 } | ConvertTo-Json
 ) {
             throw "Invalid PICA_WINDOWS_LAUNCHER_BASE_VERSION: $launcherBaseVersion"

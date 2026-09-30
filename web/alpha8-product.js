@@ -109,8 +109,8 @@ function supportPanel() {
     if (!settings || $('#a83-support')) return
     const panel = document.createElement('article')
     panel.id = 'a83-support'; panel.className = 'panel a83-panel'
-    panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project', 'プロジェクトを支援')}</h3><p data-a83-product-copy="support-text">${productText('Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。', 'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.', 'Pica Libraryは無料のオープンソースです。今後の開発・テスト・保守を支援したい場合は、AFDIANから任意で支援できます。支援によって追加機能・コンテンツ・アクセス権が解放されることはありません。')}</p><div class="a83-row"><button type="button" id="a83-afdian">${productText('❤ 爱发电支持', '❤ Support on AFDIAN', '❤ AFDIANで支援')}</button><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page', '⭐ GitHubプロジェクト')}</button></div>`
-    panel.querySelector('#a83-afdian').onclick = () => window.open('https://afdian.com/a/PicaLibrary', '_blank', 'noopener')
+    panel.innerHTML = `<h3 data-a83-product-copy="support-title">${productText('支持项目', 'Support the project', 'プロジェクトを支援')}</h3><p data-a83-product-copy="support-text">${productText('Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱赞助自愿赞助；赞助不会解锁额外功能、内容或权限。', 'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AZZ. Sponsorship never unlocks extra features, content, or access.', 'Pica Libraryは無料のオープンソースです。今後の開発・テスト・保守を支援したい場合は、AZZから任意で支援できます。支援によって追加機能・コンテンツ・アクセス権が解放されることはありません。')}</p><div class="a83-row"><button type="button" id="a83-azz">${productText('❤ 爱赞助支持', '❤ Support on AZZ', '❤ AZZで支援')}</button><button type="button" id="a83-star">${productText('⭐ GitHub 项目主页', '⭐ GitHub project page', '⭐ GitHubプロジェクト')}</button></div>`
+    panel.querySelector('#a83-azz').onclick = () => window.open('https://azz.net/PicaLibrary', '_blank', 'noopener')
     panel.querySelector('#a83-star').onclick = () => window.open('https://github.com/Saber-Alter-Lily/pica-library', '_blank', 'noopener')
     const appearance = $('#a83-appearance')
     if (appearance) appearance.insertAdjacentElement('afterend', panel)
@@ -173,16 +173,16 @@ function refreshProductCopy() {
     const supportText = $('[data-a83-product-copy="support-text"]')
     if (supportText)
         supportText.textContent = productText(
-            'Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱发电自愿赞助；赞助不会解锁额外功能、内容或权限。',
-            'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AFDIAN. Sponsorship never unlocks extra features, content, or access.',
-            'Pica Libraryは無料のオープンソースです。今後の開発・テスト・保守を支援したい場合は、AFDIANから任意で支援できます。支援によって追加機能・コンテンツ・アクセス権が解放されることはありません。'
+            'Pica Library 免费开源。如果你愿意支持后续开发、测试和维护，可以通过爱赞助自愿赞助；赞助不会解锁额外功能、内容或权限。',
+            'Pica Library is free and open source. If you would like to support continued development, testing, and maintenance, you can sponsor the project voluntarily on AZZ. Sponsorship never unlocks extra features, content, or access.',
+            'Pica Libraryは無料のオープンソースです。今後の開発・テスト・保守を支援したい場合は、AZZから任意で支援できます。支援によって追加機能・コンテンツ・アクセス権が解放されることはありません。'
         )
-    const afdian = $('#a83-afdian')
-    if (afdian)
-        afdian.textContent = productText(
-            '❤ 爱发电支持',
-            '❤ Support on AFDIAN',
-            '❤ AFDIANで支援'
+    const azz = $('#a83-azz')
+    if (azz)
+        azz.textContent = productText(
+            '❤ 爱赞助支持',
+            '❤ Support on AZZ',
+            '❤ AZZで支援'
         )
     const star = $('#a83-star')
     if (star)

@@ -227,7 +227,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         p.addView(SettingsRow.row(this,"数据与缓存","缓存与本地数据",v->startActivity(new Intent(this,StorageSettingsActivity.class))));
         LinearLayout updateRow=SettingsRow.row(this,"软件更新","检查并安装正式更新",v->startActivity(new Intent(this,UpdateActivity.class)));updateRow.setTag(AndroidOnboarding.SETTINGS_UPDATE);p.addView(updateRow);
         LinearLayout helpRow=SettingsRow.row(this,getString(R.string.onboarding_settings_title),getString(R.string.onboarding_replay_summary),v->startActivity(new Intent(this,OnboardingSettingsActivity.class)));helpRow.setTag(AndroidOnboarding.SETTINGS_HELP);p.addView(helpRow);
-        p.addView(SettingsRow.row(this,"支持项目","爱发电 / GitHub · 支持开源开发",v->startActivity(new Intent(this,SupportActivity.class))));
+        p.addView(SettingsRow.row(this,"支持项目","爱赞助 / GitHub · 支持开源开发",v->startActivity(new Intent(this,SupportActivity.class))));
         p.addView(SettingsRow.row(this,"关于","版本 / 开源 / 使用说明",v->startActivity(new Intent(this,AboutActivity.class))));
     }
 }

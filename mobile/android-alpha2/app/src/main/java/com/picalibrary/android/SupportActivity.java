@@ -26,11 +26,11 @@ public final class SupportActivity extends LocaleAwareActivity {
 
         LinearLayout intro=SettingsRow.panel(this,null);
         intro.addView(Ui.text(this,"支持 Pica Library 的继续开发",17,Ui.TEXT,true));
-        intro.addView(Ui.text(this,"Pica Library 免费、开源。如果它对你有帮助，可以通过爱发电自愿支持后续开发、测试和维护。每一份支持都会帮助项目继续改进。",13,Ui.MUTED,false));
+        intro.addView(Ui.text(this,"Pica Library 免费、开源。如果它对你有帮助，可以通过爱赞助自愿支持后续开发、测试和维护。每一份支持都会帮助项目继续改进。",13,Ui.MUTED,false));
         intro.addView(Ui.text(this,"赞助完全自愿，不会解锁额外功能、内容、下载权限或访问权限，也不会影响免费版本的完整使用。",12,Ui.MUTED,false));
         content.addView(intro);
 
-        content.addView(SettingsRow.row(this,"❤ 爱发电支持","支持后续开发与维护",v->open("https://afdian.com/a/PicaLibrary")));
+        content.addView(SettingsRow.row(this,"❤ 爱赞助支持","支持后续开发与维护",v->open("https://azz.net/PicaLibrary")));
         content.addView(SettingsRow.row(this,"⭐ GitHub 项目主页","Star、反馈问题或参与开发",v->open("https://github.com/Saber-Alter-Lily/pica-library")));
         setContentView(root);root.requestApplyInsets();
     }

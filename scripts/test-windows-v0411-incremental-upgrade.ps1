@@ -227,6 +227,37 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $installRoot 'app\full-upgrader.js'))) {
         throw 'Incremental replacement did not install the universal full-upgrader'
     }
+
+    $assistantRoot = Join-Path $desktopHome 'runtime-state\upgrade-assistant'
+    $assistantRuntime = Join-Path $assistantRoot 'runtime\node.exe'
+    $assistantHelper = Join-Path $assistantRoot 'full-upgrader.js'
+    $assistantMetadata = Join-Path $assistantRoot 'assistant.json'
+    foreach ($requiredAssistantFile in @(
+        $assistantRuntime,
+        $assistantHelper,
+        $assistantMetadata
+    )) {
+        if (-not (Test-Path -LiteralPath $requiredAssistantFile)) {
+            throw "Candidate startup did not register persistent upgrade assistant: $requiredAssistantFile"
+        }
+    }
+    if ((File-Sha256 $assistantRuntime) -ne (File-Sha256 (Join-Path $installRoot 'runtime\node.exe'))) {
+        throw 'Persistent upgrade assistant runtime does not match installed runtime'
+    }
+    if ((File-Sha256 $assistantHelper) -ne (File-Sha256 (Join-Path $installRoot 'app\full-upgrader.js'))) {
+        throw 'Persistent upgrade assistant helper does not match installed helper'
+    }
+    $assistant = Get-Content -Raw -LiteralPath $assistantMetadata | ConvertFrom-Json
+    if ([int]$assistant.schemaVersion -ne 1) {
+        throw "Unexpected persistent assistant metadata schema: $($assistant.schemaVersion)"
+    }
+    if ([string]$assistant.productVersion -ne $CandidateVersion) {
+        throw "Persistent assistant version mismatch: $($assistant.productVersion)"
+    }
+    if ([string]$assistant.sourceSha -ne $CandidateSourceSha) {
+        throw "Persistent assistant source SHA mismatch: $($assistant.sourceSha)"
+    }
+
     if ((File-Sha256 (Join-Path $installRoot 'app\updater.js')) -ne (File-Sha256 (Join-Path $candidateRoot 'app\updater.js'))) {
         throw 'Legacy updater changed during incremental replacement'
     }
@@ -265,6 +296,8 @@ try {
         source_sha = $CandidateSourceSha
         legacy_updater_preserved = $true
         universal_full_upgrader_installed = $true
+        persistent_upgrade_assistant = 'PASS'
+        persistent_upgrade_assistant_root = '%LOCALAPPDATA%\Pica Library Incremental Acceptance\runtime-state\upgrade-assistant'
         external_config_preserved = $true
         external_database_preserved = $true
         pre_migration_backup = 'PASS'

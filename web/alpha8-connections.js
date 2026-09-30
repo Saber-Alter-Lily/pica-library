@@ -16,6 +16,9 @@ const COPY = {
         available: '可用',
         reachable: '可连接',
         unavailable: '当前不可用',
+        sessionValid: '会话有效',
+        exhAvailable: 'ExH 可用',
+        exhUnavailable: 'ExH 不可用',
         checking: '正在检查…',
         check: '检查连接状态',
         failed: '状态读取失败',
@@ -33,6 +36,9 @@ const COPY = {
         available: '利用可能',
         reachable: '接続可能',
         unavailable: '現在利用不可',
+        sessionValid: 'セッション有効',
+        exhAvailable: 'ExH 利用可能',
+        exhUnavailable: 'ExH 利用不可',
         checking: '確認中…',
         check: '接続状態を確認',
         failed: '状態を読み込めませんでした',
@@ -50,6 +56,9 @@ const COPY = {
         available: 'Available',
         reachable: 'Reachable',
         unavailable: 'Currently unavailable',
+        sessionValid: 'Session valid',
+        exhAvailable: 'ExH available',
+        exhUnavailable: 'ExH unavailable',
         checking: 'Checking…',
         check: 'Check connections',
         failed: 'Failed to read status',
@@ -79,6 +88,20 @@ async function postProbe(body) {
         connectionCsrf = current.csrfToken || ''
     }
     return requestJson('/api/v1/desktop/test-connection', {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-pica-csrf': connectionCsrf
+        },
+        body: JSON.stringify(body)
+    })
+}
+async function postDesktopSettings(body) {
+    if (!connectionCsrf) {
+        const current = await requestJson('/api/v1/desktop/status')
+        connectionCsrf = current.csrfToken || ''
+    }
+    return requestJson('/api/v1/desktop/settings', {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -123,6 +146,7 @@ function renderConfigured(snapshot = connectionSnapshot) {
         return
     }
     const picaConfigured = Boolean(snapshot.configured)
+    const ehConfigured = Boolean(snapshot.ehAccount?.configured)
     const remoteConfigured = Boolean(snapshot.remoteStorage?.configured)
     const mobileConfigured = Boolean(snapshot.mobileBridge?.enabled)
     panel.innerHTML = `
@@ -137,6 +161,7 @@ function renderConfigured(snapshot = connectionSnapshot) {
         </div>
         <div id="a83-connections-body">
             ${item('pica', 'Pica', picaConfigured, picaConfigured ? text('notChecked') : text('disconnected'), picaConfigured ? 'muted' : 'muted')}
+            ${item('eh', 'E-H / ExH', ehConfigured, ehConfigured ? text('notChecked') : text('disconnected'), ehConfigured ? 'muted' : 'muted')}
             ${item('webdav', 'WebDAV', remoteConfigured, remoteConfigured ? text('notChecked') : text('disconnected'), remoteConfigured ? 'muted' : 'muted')}
             ${item('mobile', language() === 'en' ? 'Phone LAN' : language() === 'ja' ? 'スマートフォンLAN' : '手机局域网', mobileConfigured, mobileConfigured ? text('listening') : text('stopped'), mobileConfigured ? 'good' : 'muted')}
         </div>
@@ -174,6 +199,7 @@ async function checkConnections() {
         connectionCsrf = connectionSnapshot.csrfToken || ''
         renderConfigured()
         const picaConfigured = Boolean(connectionSnapshot.configured)
+        const ehConfigured = Boolean(connectionSnapshot.ehAccount?.configured)
         const remoteConfigured = Boolean(connectionSnapshot.remoteStorage?.configured)
         if (picaConfigured) {
             setProbeResult('pica', text('checking'), 'warn')
@@ -182,6 +208,22 @@ async function checkConnections() {
                 setProbeResult('pica', text('available'), 'good')
             } catch {
                 setProbeResult('pica', text('unavailable'), 'warn')
+            }
+        }
+        if (ehConfigured) {
+            setProbeResult('eh', text('checking'), 'warn')
+            try {
+                const value = await postDesktopSettings({ ehAccountAction: 'verify-session' })
+                const exh = value?.ehAccount?.exHentai
+                setProbeResult(
+                    'eh',
+                    exh === 'AVAILABLE'
+                        ? text('exhAvailable')
+                        : text('sessionValid') + (exh === 'UNAVAILABLE' ? ' · ' + text('exhUnavailable') : ''),
+                    'good'
+                )
+            } catch {
+                setProbeResult('eh', text('unavailable'), 'warn')
             }
         }
         if (remoteConfigured) {
@@ -205,6 +247,9 @@ async function checkConnections() {
 
 document.addEventListener('pica-language-change', () => {
     renderConfigured()
+})
+document.addEventListener('pica-eh-status-change', () => {
+    void loadConnectionConfiguration()
 })
 if (document.readyState === 'loading')
     document.addEventListener('DOMContentLoaded', () => void loadConnectionConfiguration())

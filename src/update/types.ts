@@ -32,6 +32,16 @@ export interface StagedUpdate {
     stagedAt: string
 }
 
+export interface StagedFullApplicationUpdate {
+    id: string
+    archiveName: string
+    archiveSha256: string
+    directory: string
+    targetVersion: string
+    targetSourceSha: string
+    stagedAt: string
+}
+
 export type UpdatePhase =
     | 'idle'
     | 'validating'
@@ -66,5 +76,21 @@ export interface UpdaterInstruction {
     desktopEntryPath: string
     instanceFile: string
     progressFile: string
+    healthTimeoutMs: number
+}
+
+export interface FullApplicationUpdaterInstruction {
+    parentPid: number
+    applicationRoot: string
+    stagedApplicationRoot: string
+    backupRoot: string
+    bootstrapRoot: string
+    desktopHomeRoot: string
+    libraryDirectory: string
+    instanceFile: string
+    progressFile: string
+    targetVersion: string
+    targetSourceSha: string
+    previousUrl?: string
     healthTimeoutMs: number
 }

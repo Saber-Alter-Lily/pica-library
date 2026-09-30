@@ -10,6 +10,7 @@ on:
       - 'scripts/build-windows-rc-package.ps1'
       - 'scripts/test-windows-artifact.ps1'
       - 'scripts/test-windows-universal-full-upgrade.ps1'
+      - 'scripts/test-windows-v0411-incremental-upgrade.ps1'
       - 'test/unit/p2-unpublished-rc-package.test.ts'
       - 'test/unit/universal-full-upgrade.test.ts'
       - 'docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md'
@@ -176,6 +177,9 @@ jobs:
           $bridgePaths=@($manifest.files | ForEach-Object { [string]$_.path })
           if($bridgePaths -contains 'app/updater.js'){ throw 'v0.4.11 bridge must not replace app/updater.js' }
           if($bridgePaths -notcontains 'app/full-upgrader.js'){ throw 'v0.4.11 bridge must install app/full-upgrader.js' }
+
+          ./scripts/test-windows-v0411-incremental-upgrade.ps1 -BaselineZip $v0411 -CandidateZip $formalZip -IncrementalZip $bridgeZip -CandidateVersion $compatVersion -CandidateSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           New-Item -ItemType Directory -Force -Path candidate\windows | Out-Null
           $out="candidate\windows\Pica-Library-P2-RC-Windows-x64.zip"

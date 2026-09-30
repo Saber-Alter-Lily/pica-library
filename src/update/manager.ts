@@ -82,6 +82,8 @@ function validateFullApplicationArchive(zip: AdmZip) {
         'Pica Library.exe',
         'runtime/node.exe',
         'app/desktop.js',
+        'app/updater.js',
+        'app/full-upgrader.js',
         'SOURCE_SHA.txt'
     ])
         if (!declared.has(required))

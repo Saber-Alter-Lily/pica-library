@@ -31,11 +31,12 @@ describe('cross-client UI hierarchy corrective pass', () => {
     it('keeps one six-section Settings hierarchy with connection health in Connections', () => {
         const hub = read('web/alpha8-7-desktop-hub.js')
         const connections = read('web/alpha8-connections.js')
+        const index = read('web/index.html')
         expect(hub).toContain("['recommendations', 'recommendations']")
         expect(hub).toContain("['maintenance', 'maintenance']")
         expect(hub).not.toContain("['software', 'software']")
         expect(hub).toContain("maintenancePanel.prepend(software)")
-        expect(hub).toContain("[data-tab=\"software-updates\"]")
+        expect(index).toContain('data-tab="software-updates"')
         expect(hub).not.toContain("updateTabButton?.remove()")
         expect(hub).toContain("connectionsSlot.prepend(connectionStatus)")
         expect(hub).toContain("if (id === 'software') id = 'maintenance'")

@@ -88,13 +88,13 @@
 ## v0.4.4 — Desktop 设置中心可见性修复
 
 - 修复 Desktop Settings Hub 重组遗漏：旧 `#settings` 被隐藏前，`#a83-support` 现在明确迁入“基本设置”，`#a83-appearance` 明确迁入“外观与个性化”。
-- 支持卡不再依赖旧 Settings 容器的可见性；爱发电与 GitHub 从实际用户入口可见。
-- Playwright 真实浏览器 smoke 新增设置中心可见性断言，直接验证重组后的支持卡、爱发电按钮、GitHub 按钮和基础外观。
+- 支持卡不再依赖旧 Settings 容器的可见性；爱赞助与 GitHub 从实际用户入口可见。
+- Playwright 真实浏览器 smoke 新增设置中心可见性断言，直接验证重组后的支持卡、爱赞助按钮、GitHub 按钮和基础外观。
 - Desktop v0.4.4 / Android versionCode 46；Windows v0.4.1、v0.4.2、v0.4.3 均准备 scoped 增量直升，v0.4.0 使用 v0.4.4 直达助手。
 
 ## v0.4.3 — 支持入口可见性收口
 
-- 修复 Android 主四标签壳的“设置”页未挂“支持项目”入口：现在可直接进入爱发电 / GitHub 支持页，不再依赖旧 SettingsActivity。
+- 修复 Android 主四标签壳的“设置”页未挂“支持项目”入口：现在可直接进入爱赞助 / GitHub 支持页，不再依赖旧 SettingsActivity。
 - Windows / Web 将“支持项目”卡移动到外观设置之后，避免藏在超长 Settings 页面最底部。
 - Android“推荐与画风 → 人工调整”入口由旧文案“1–10 档”修正为实际的“0–10 档”。
 - 增加主入口级回归测试，后续若支持入口再次未挂到 HomeActivity 或 Desktop 又被放回底部，CI 直接失败。
@@ -104,7 +104,7 @@
 
 - 新注册用户即使没有任何收藏，也可以在 Desktop / Android 的人工调整中搜索并添加标签，以 5/10 为中性起点配置 0–10 初始偏好；6–10 正向偏好直接进入首轮 Provider 召回，0–4 为软减少，BLOCK 继续作为独立硬屏蔽。
 - Android Native Recommendation 移除“收藏为空直接失败”路径，加入与 Desktop 一致的显式偏好 intent；没有收藏且没有正向初始偏好时才给出明确引导。
-- Windows / Web 与 Android 设置统一增加“支持项目”，接入爱发电与 GitHub；赞助完全自愿，不与功能、内容或访问权限绑定。
+- Windows / Web 与 Android 设置统一增加“支持项目”，接入爱赞助与 GitHub；赞助完全自愿，不与功能、内容或访问权限绑定。
 - Desktop 软件更新页拆分主更新操作、本地 ZIP 操作、进度与状态区域，并补窄窗口布局约束，修复控件重叠。
 - 正式版本升级到 Desktop v0.4.2 / Android versionCode 44；v0.4.1 Windows 使用 scoped 增量包直接软件内升级，v0.4.0 提供 v0.4.2 跨代升级助手直达最新版。
 

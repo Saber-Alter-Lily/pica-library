@@ -114,7 +114,7 @@ If an update briefly reports that it is waiting for the Android system download 
 
 Open **Settings → Support the Project** for:
 
-- **AFDIAN** — voluntary support for development, testing, and maintenance;
+- **AZZ** — voluntary support for development, testing, and maintenance;
 - **GitHub** — Star the project, report issues, or contribute.
 
 Support is completely voluntary. It does not unlock additional features, content, download privileges, or access.

@@ -691,10 +691,107 @@ export const latestMigrationVersion = Math.max(
     ...migrations.map((migration) => migration.version)
 )
 
+const unpublishedMigrationNames = new Map<number, string>([
+    [14, 'p2d2_author_reverse_lookup_indexes'],
+    [15, 'p2d5b_work_identity_detail_indexes'],
+    [16, 'p2d8a_picture_comic_status_index']
+])
+
+function migrationHistoryRows(database: DatabaseSync) {
+    const table = database
+        .prepare(
+            "SELECT 1 AS found FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
+        )
+        .get()
+    if (!table) return []
+    const columns = database
+        .prepare('PRAGMA table_info(schema_migrations)')
+        .all() as Array<{ name: string }>
+    if (!columns.some((column) => column.name === 'name')) return []
+    return database
+        .prepare(
+            'SELECT version, name, applied_at FROM schema_migrations WHERE version BETWEEN 14 AND 16 ORDER BY version'
+        )
+        .all() as Array<{
+        version: number
+        name: string
+        applied_at: string
+    }>
+}
+
+export function needsUnreleasedMigrationReconciliation(
+    database: DatabaseSync
+) {
+    if (latestMigrationVersion !== 14) return false
+    const rows = migrationHistoryRows(database)
+    if (!rows.length) return false
+    const current14 = migrations.find((migration) => migration.version === 14)
+    if (!current14) return false
+    const recognized = rows.every((row) => {
+        const version = Number(row.version)
+        const name = String(row.name ?? '')
+        if (version === 14 && name === current14.name) return true
+        return unpublishedMigrationNames.get(version) === name
+    })
+    if (!recognized) return false
+    return rows.some((row) => {
+        const version = Number(row.version)
+        const name = String(row.name ?? '')
+        return (
+            version > 14 ||
+            (version === 14 &&
+                name === unpublishedMigrationNames.get(14))
+        )
+    })
+}
+
+export function reconcileUnreleasedMigrationHistory(
+    database: DatabaseSync
+) {
+    if (!needsUnreleasedMigrationReconciliation(database)) return false
+    const current14 = migrations.find((migration) => migration.version === 14)
+    if (!current14)
+        throw new Error(
+            'Current schema-14 migration is unavailable for reconciliation'
+        )
+    const rows = migrationHistoryRows(database)
+    const appliedAt =
+        rows
+            .map((row) => String(row.applied_at ?? ''))
+            .filter(Boolean)
+            .sort()
+            .at(-1) ?? new Date().toISOString()
+
+    database.exec('BEGIN IMMEDIATE')
+    try {
+        // The unpublished 14/15/16 sequence only created indexes. Re-run the
+        // consolidated idempotent index bundle before releasing those private
+        // migration numbers for future stable schemas.
+        database.exec(current14.up)
+        database.exec(
+            'DELETE FROM schema_migrations WHERE version BETWEEN 14 AND 16'
+        )
+        database
+            .prepare(
+                'INSERT INTO schema_migrations(version, name, applied_at) VALUES (14, ?, ?)'
+            )
+            .run(current14.name, appliedAt)
+        database.exec('COMMIT')
+        return true
+    } catch (error) {
+        database.exec('ROLLBACK')
+        throw new Error(
+            'Unreleased migration history reconciliation failed: ' +
+                String(error)
+        )
+    }
+}
+
 export function runMigrations(
     database: DatabaseSync,
     available: Migration[] = migrations
 ) {
+    reconcileUnreleasedMigrationHistory(database)
     database.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
         version INTEGER PRIMARY KEY,
         name TEXT NOT NULL DEFAULT '',

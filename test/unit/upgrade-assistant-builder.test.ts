@@ -77,6 +77,8 @@ describe('generic Upgrade Assistant builder', () => {
         expect(script).not.toContain(
             "$RequiredSourceVersion = '0.4.0'"
         )
+        expect(script).not.toContain('v0.5.01')
+        expect(launcher).not.toContain('v0.5.01')
         expect(launcher).toContain('v0.4.11 -^> v0.5.0')
         expect(launcher).toContain(
             'Upgrade-Pica-Library-v0.5.0.ps1'

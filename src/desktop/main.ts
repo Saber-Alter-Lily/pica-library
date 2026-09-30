@@ -82,7 +82,7 @@ const updateManager = new UpdateManager({
     currentSourceSha,
     applicationRoot,
     stateRoot: path.join(paths.runtimeState, 'updates'),
-    assistantRoot: path.join(paths.runtimeState, 'upgrade-assistant'),
+    assistantRoot: paths.upgradeAssistant,
     launcherPath: path.join(applicationRoot, 'Pica Library.exe'),
     runtimePath: fs.existsSync(path.join(applicationRoot, 'runtime', 'node.exe'))
         ? path.join(applicationRoot, 'runtime', 'node.exe')

@@ -1373,7 +1373,9 @@ async function main() {
         throw new Error('Another Pica Library instance is starting')
     }
     try {
-        const assistant = updateManager.preparePersistentUpgradeAssistant()
+        const assistant = updateManager.preparePersistentUpgradeAssistant({
+            verifyExisting: false
+        })
         if (assistant.available)
             log.write(
                 `Upgrade assistant registered outside application tree: ${assistant.root}`

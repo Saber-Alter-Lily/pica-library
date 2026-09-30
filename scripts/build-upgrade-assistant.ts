@@ -124,8 +124,8 @@ export function buildUpgradeAssistant(options: {
     const targetScriptName =
         `Upgrade-Pica-Library-v${targetVersion}.ps1`
     launcher = launcher
-        .replaceAll('v0.4.0', `v${sourceVersion}`)
         .replaceAll('v0.4.1', `v${targetVersion}`)
+        .replaceAll('v0.4.0', `v${sourceVersion}`)
         .replace(
             'Upgrade-Pica-Library-v0.4.1.ps1',
             targetScriptName

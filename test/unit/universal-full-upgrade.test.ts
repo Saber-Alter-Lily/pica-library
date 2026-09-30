@@ -224,6 +224,37 @@ describe('universal full application upgrade', () => {
         expect(path.relative(applicationRoot, assistantRoot)).toMatch(/^\.\./)
     })
 
+    it('refuses a persistent assistant inside the application tree', () => {
+        const root = temporaryRoot()
+        const applicationRoot = path.join(root, 'current-app')
+        fs.mkdirSync(path.join(applicationRoot, 'runtime'), { recursive: true })
+        fs.mkdirSync(path.join(applicationRoot, 'app'), { recursive: true })
+        fs.writeFileSync(
+            path.join(applicationRoot, 'runtime', 'node.exe'),
+            'node-runtime'
+        )
+        fs.writeFileSync(
+            path.join(applicationRoot, 'app', 'full-upgrader.js'),
+            'full-upgrader'
+        )
+        const updateManager = new UpdateManager({
+            currentVersion: '0.5.0',
+            currentSourceSha: targetSourceSha,
+            applicationRoot,
+            stateRoot: path.join(root, 'desktop-state', 'updates'),
+            assistantRoot: path.join(applicationRoot, 'runtime-state', 'upgrade-assistant'),
+            launcherPath: path.join(applicationRoot, 'Pica Library.exe'),
+            runtimePath: path.join(applicationRoot, 'runtime', 'node.exe'),
+            desktopEntryPath: path.join(applicationRoot, 'app', 'desktop.js'),
+            instanceFile: path.join(root, 'desktop-state', 'instance.json'),
+            target: { platform: 'windows', arch: 'x64' },
+            fetchImplementation: vi.fn() as unknown as typeof fetch
+        })
+        expect(() =>
+            updateManager.preparePersistentUpgradeAssistant()
+        ).toThrow(/outside the application directory/i)
+    })
+
     it('rejects full application archives that contain user data', async () => {
         const archive = fullPackage({
             'data/library.db': 'must-not-be-packaged'

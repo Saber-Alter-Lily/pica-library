@@ -380,26 +380,41 @@ export class UpdateManager {
             fs.existsSync(helperPath)
         ) {
             if (!options.verifyExisting) return result(existingMetadata)
+
             const runtimeSha256 = sha256(fs.readFileSync(runtimePath))
             const helperSha256 = sha256(fs.readFileSync(helperPath))
+            const externalGood =
+                runtimeSha256 === existingMetadata.runtimeSha256 &&
+                helperSha256 === existingMetadata.helperSha256
+            if (externalGood) return result(existingMetadata)
+
             const sourceRuntimeSha256 = sha256(
                 fs.readFileSync(sourceRuntime)
             )
             const sourceHelperSha256 = sha256(
                 fs.readFileSync(sourceHelper)
             )
-            if (
-                runtimeSha256 === existingMetadata.runtimeSha256 &&
-                helperSha256 === existingMetadata.helperSha256 &&
+            const installedGood =
                 sourceRuntimeSha256 === existingMetadata.runtimeSha256 &&
                 sourceHelperSha256 === existingMetadata.helperSha256
-            )
-                return result(existingMetadata)
+            if (!installedGood)
+                throw new Error(
+                    'Persistent and installed upgrade assistants both failed verification'
+                )
         }
 
         fs.mkdirSync(runtimeDirectory, { recursive: true })
         const sourceRuntimeSha256 = sha256(fs.readFileSync(sourceRuntime))
         const sourceHelperSha256 = sha256(fs.readFileSync(sourceHelper))
+        if (existingMetadata && options.verifyExisting) {
+            if (
+                sourceRuntimeSha256 !== existingMetadata.runtimeSha256 ||
+                sourceHelperSha256 !== existingMetadata.helperSha256
+            )
+                throw new Error(
+                    'Installed upgrade assistant no longer matches the registered release identity'
+                )
+        }
         const installFile = (
             source: string,
             destination: string,

@@ -11,6 +11,7 @@ export interface DesktopPaths {
     packs: string
     logs: string
     runtimeState: string
+    upgradeAssistant: string
     lock: string
     instance: string
     exportState: string
@@ -31,6 +32,11 @@ export function desktopPaths(rootOverride?: string): DesktopPaths {
         packs: path.join(local, 'packs'),
         logs: path.join(local, 'logs'),
         runtimeState: path.join(local, 'runtime-state'),
+        upgradeAssistant: path.join(
+            local,
+            'runtime-state',
+            'upgrade-assistant'
+        ),
         lock: path.join(local, 'runtime-state', 'instance.lock'),
         instance: path.join(local, 'runtime-state', 'instance.json'),
         exportState: path.join(

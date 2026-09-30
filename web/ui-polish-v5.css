@@ -514,12 +514,45 @@ body.reader-active .reader-header {
     margin-top: 10px;
 }
 
-#settings-eh-account > .actions {
+#settings-eh-account,
+#settings-eh-account > .actions,
+#settings-eh-account .ux-eh-manual-actions,
+#ux-eh-more,
+#ux-eh-more .ux-more-body {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#settings-eh-account > .actions,
+#settings-eh-account .ux-eh-manual-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: 10px;
 }
 
-.ux-eh-manual-actions {
-    margin-top: 10px;
+#settings-eh-account > .actions > *,
+#settings-eh-account .ux-eh-manual-actions > *,
+#ux-eh-more .ux-more-body > * {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.28;
+}
+
+@media (max-width: 560px) {
+    #settings-eh-account > .actions > *,
+    #settings-eh-account .ux-eh-manual-actions > *,
+    #ux-eh-more .ux-more-body > * {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    #settings-eh-account #eh-web-login-start {
+        width: 100%;
+    }
 }
 
 /* Remaining page-level hierarchy normalization. */

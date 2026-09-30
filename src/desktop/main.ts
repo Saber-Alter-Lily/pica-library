@@ -1199,8 +1199,14 @@ async function startEngine(preferredPort: number) {
         ecosystemPackInventory: () => ecosystemPacks.inventory(),
         checkForUpdate: async () => updateManager.checkForUpdate(),
         stageUpdate: async (name, value) => updateManager.stage(name, value),
+        stageFullUpdate: async (version, name, value) =>
+            updateManager.stageFullApplication(version, name, value),
         applyUpdate: async (id) => {
-            const result = updateManager.apply(id)
+            const result = updateManager.apply(id, {
+                desktopHomeRoot: paths.root,
+                libraryDirectory: config?.libraryDirectory ?? paths.data,
+                currentUrl
+            })
             setTimeout(() => void stop(), 150)
             return result
         },

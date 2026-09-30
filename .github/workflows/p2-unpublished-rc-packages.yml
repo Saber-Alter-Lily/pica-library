@@ -9,7 +9,9 @@ on:
       - 'scripts/build-windows-package.ps1'
       - 'scripts/build-windows-rc-package.ps1'
       - 'scripts/test-windows-artifact.ps1'
+      - 'scripts/test-windows-universal-full-upgrade.ps1'
       - 'test/unit/p2-unpublished-rc-package.test.ts'
+      - 'test/unit/universal-full-upgrade.test.ts'
       - 'docs/P2_UNPUBLISHED_RC_TEST_PACKAGES.md'
       - 'DEVELOPMENT_TASK_LOG.md'
       - '.github/workflows/p2-unpublished-rc-packages.yml'
@@ -91,6 +93,9 @@ jobs:
           if (-not (Test-Path -LiteralPath $zip)) { throw 'Windows RC package was not created' }
 
           ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $rcVersion -DesktopHomeName 'Pica Library P2 RC' -PortCollision -SetupPersistence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip 'artifacts\release-base\Pica-Library-v0.4.10-windows-x64.zip' -CandidateZip $zip -CandidateVersion $rcVersion -CandidateSourceSha $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           New-Item -ItemType Directory -Force -Path candidate\windows | Out-Null

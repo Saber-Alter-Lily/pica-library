@@ -664,19 +664,12 @@ export const migrations: Migration[] = [
     },
     {
         version: 14,
-        name: 'p2d2_author_reverse_lookup_indexes',
+        name: 'post_v0411_index_bundle',
         up: `
             CREATE INDEX IF NOT EXISTS idx_author_aliases_author_display
                 ON author_aliases(author_id, alias_display);
             CREATE INDEX IF NOT EXISTS idx_comic_authors_author_circle
                 ON comic_authors(author_id, circle);
-        `
-    }
-,
-    {
-        version: 15,
-        name: 'p2d5b_work_identity_detail_indexes',
-        up: `
             CREATE INDEX IF NOT EXISTS idx_work_identity_decisions_right
                 ON work_identity_decisions(right_comic_id, left_comic_id);
             CREATE INDEX IF NOT EXISTS idx_work_identity_evidence_left_probable
@@ -687,12 +680,6 @@ export const migrations: Migration[] = [
                 ON work_identity_evidence(
                     right_comic_id, relation, confidence DESC, left_comic_id
                 );
-        `
-    },
-    {
-        version: 16,
-        name: 'p2d8a_picture_comic_status_index',
-        up: `
             CREATE INDEX IF NOT EXISTS idx_pictures_comic_status
                 ON pictures(comic_id, status);
         `

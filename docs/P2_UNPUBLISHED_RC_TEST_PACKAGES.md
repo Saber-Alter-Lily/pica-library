@@ -75,18 +75,30 @@ be backed by a published, non-prerelease GitHub Release.
 
 The RC pipeline does not weaken either rule.
 
-There is also a schema boundary:
+The release-preparation branch originally advanced three unpublished,
+index-only schema steps (14, 15 and 16). No public stable build ever shipped
+those versions. Before the next stable release they are consolidated into one
+schema-14 migration containing the same additive indexes.
+
+The resulting formal-release compatibility boundary is:
 
 - public v0.4.11: app API 2 / database schema 13;
-- current P2 development: database schema 16.
+- next-stable candidate: app API 2 / database schema 14.
 
-The released-baseline registry now explicitly records v0.4.11 as schema 13.
-The existing compatibility classifier therefore judges 13 → 16 as:
+The existing v0.4.11 updater permits one additive schema step, so the
+compatibility classifier now judges 13 → 14 as:
 
-`FULL_APPLICATION / SCHEMA_JUMP`
+`INCREMENTAL / COMPATIBLE`
 
-A future formal release must use the full-application migration/rollback gate
-rather than silently producing a normal v0.4.11 incremental package.
+This does **not** make the unpublished RC installable over stable v0.4.11:
+stable clients still reject `local-test` packages and require an official,
+published stable Release for incremental verification. It does mean the final
+stable Release may provide a source-scoped
+`Pica-Library-v<target>-update-from-v0.4.11.zip` and let v0.4.11 users enter
+the new baseline through the existing Web one-click updater, provided the
+final artifact proves that `app/updater.js` itself is unchanged. The update
+may add `app/full-upgrader.js`; after that first stable transition, future
+schema/architecture jumps use the universal full-application replacement path.
 
 ## CI / publication boundary
 

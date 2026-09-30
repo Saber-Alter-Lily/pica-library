@@ -104,7 +104,7 @@ export const RELEASED_UPDATE_BASELINES: Record<
         advertisedDatabaseSchemaVersion: 13,
         actualMigrationVersion: 13,
         notes:
-            'Public v0.4.11 was released on schema 13; later schema-16 development must pass the full-application schema-jump gate rather than silently producing a normal incremental update.'
+            'Public v0.4.11 was released on schema 13. Unreleased index-only migrations 14-16 were consolidated into one schema-14 step before the next stable release so a source-scoped v0.4.11 incremental bridge can remain eligible when the legacy updater helper itself is unchanged.'
     }
 }
 

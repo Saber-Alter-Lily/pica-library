@@ -124,13 +124,13 @@ describe('P2 unpublished RC package contract', () => {
         expect(workflow).not.toContain('update-from-v0.4.11')
     })
 
-    it('registers v0.4.11 as schema 13 and requires a full application gate for current schema 16', () => {
+    it('keeps the next stable one schema step from public v0.4.11', () => {
         expect(releasedUpdateBaseline('0.4.11')).toMatchObject({
             appApiVersion: 2,
             advertisedDatabaseSchemaVersion: 13,
             actualMigrationVersion: 13
         })
-        expect(latestMigrationVersion).toBe(16)
+        expect(latestMigrationVersion).toBe(14)
         expect(
             classifyUpdateCompatibility({
                 currentAppApiVersion: 2,
@@ -139,8 +139,8 @@ describe('P2 unpublished RC package contract', () => {
                 targetDatabaseSchemaVersion: latestMigrationVersion
             })
         ).toEqual({
-            kind: 'FULL_APPLICATION',
-            reason: 'SCHEMA_JUMP'
+            kind: 'INCREMENTAL',
+            reason: 'COMPATIBLE'
         })
     })
 })

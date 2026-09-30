@@ -103,23 +103,23 @@ test('task tour keeps every late Settings step anchored to the correct visible p
     await page.locator('#pica-onboarding-start').click()
 
     const steps = [
-        { title: '统一书库', view: 'library' },
-        { title: '先同步收藏', view: 'library' },
-        { title: '搜索与筛选', view: 'library' },
-        { title: '建立书架', view: 'shelves' },
-        { title: '新建与管理书架', view: 'shelves' },
-        { title: '推荐与在线发现', view: 'discover' },
-        { title: '专属推荐', view: 'discover' },
-        { title: '设置中心', view: 'maintenance' },
-        { title: '推荐与画风', view: 'maintenance', panel: 'recommendations' },
-        { title: '画风接入模式', view: 'maintenance', panel: 'recommendations' },
-        { title: '画风影响强度', view: 'maintenance', panel: 'recommendations' },
-        { title: '连接与同步', view: 'maintenance', panel: 'connections' },
-        { title: '先看连接状态', view: 'maintenance', panel: 'connections' },
-        { title: '手机直接读取电脑内容', view: 'maintenance', panel: 'connections' },
-        { title: 'E-H 登录方式', view: 'maintenance', panel: 'general' },
-        { title: '语言与地区', view: 'maintenance', panel: 'general' },
-        { title: '软件更新', view: 'maintenance', panel: 'maintenance' }
+        { title: '统一书库', view: 'library', target: 'nav [data-view="library"]' },
+        { title: '先同步收藏', view: 'library', target: '#sync-button' },
+        { title: '搜索与筛选', view: 'library', target: '#filter-text' },
+        { title: '建立书架', view: 'shelves', target: 'nav [data-view="shelves"]' },
+        { title: '新建与管理书架', view: 'shelves', target: '#shelf-create' },
+        { title: '推荐与在线发现', view: 'discover', target: 'nav [data-view="discover"]' },
+        { title: '专属推荐', view: 'discover', target: '#recommend-button' },
+        { title: '设置中心', view: 'maintenance', target: 'nav [data-view="maintenance"]' },
+        { title: '推荐与画风', view: 'maintenance', panel: 'recommendations', target: '#a87-recommendations-tab' },
+        { title: '画风接入模式', view: 'maintenance', panel: 'recommendations', target: '#visual-rerank-mode' },
+        { title: '画风影响强度', view: 'maintenance', panel: 'recommendations', target: '#visual-strength' },
+        { title: '连接与同步', view: 'maintenance', panel: 'connections', target: '#a87-connections-tab' },
+        { title: '先看连接状态', view: 'maintenance', panel: 'connections', target: '#a83-connections' },
+        { title: '手机直接读取电脑内容', view: 'maintenance', panel: 'connections', target: '#settings-mobile-bridge' },
+        { title: 'E-H 登录方式', view: 'maintenance', panel: 'general', target: '#settings-eh-account' },
+        { title: '语言与地区', view: 'maintenance', panel: 'general', target: '#a87-language-panel' },
+        { title: '软件更新', view: 'maintenance', panel: 'maintenance', target: '#software-updates' }
     ]
 
     for (let index = 0; index < steps.length; index += 1) {
@@ -130,8 +130,9 @@ test('task tour keeps every late Settings step anchored to the correct visible p
             await expect(page.locator('#a87-' + expected.panel + '-panel')).toBeVisible()
             await expect(page.locator('#a87-' + expected.panel + '-tab')).toHaveAttribute('aria-selected', 'true')
         }
-        const active = page.locator('.driver-active-element')
+        const active = page.locator(expected.target)
         await expect(active).toBeVisible()
+        await expect(active).toHaveClass(/driver-active-element/)
         const box = await active.boundingBox()
         expect(box, 'step ' + (index + 1) + ' should have a real spotlight target').not.toBeNull()
         expect(box.width).toBeGreaterThan(0)

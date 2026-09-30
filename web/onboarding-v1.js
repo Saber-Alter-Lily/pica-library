@@ -259,71 +259,105 @@ function ensureView(id) {
         document.querySelector(`nav [data-view="${id}"]`)?.click()
 }
 
-function viewTarget(viewId, selector) {
-    return () => {
-        ensureView(viewId)
-        return visibleTarget(selector)
+function prepareViewOwner(viewId) {
+    ensureView(viewId)
+}
+
+function prepareSettingsOwner(panelId, selector, disclosureSelector = null) {
+    ensureView('maintenance')
+    const panel = document.querySelector(`#a87-${panelId}-panel`)
+    if (!panel?.classList.contains('active'))
+        document.querySelector(`#a87-${panelId}-tab`)?.click()
+    if (panelId === 'maintenance' && selector === '#software-updates') {
+        const softwareTab = document.querySelector(
+            '#a87-maintenance-panel > .tabs [data-tab="software-updates"]'
+        )
+        if (
+            softwareTab &&
+            !document.querySelector('#software-updates')?.classList.contains('active')
+        )
+            softwareTab.click()
+    }
+    if (disclosureSelector) {
+        const disclosure = document.querySelector(disclosureSelector)
+        if (disclosure instanceof HTMLDetailsElement) disclosure.open = true
     }
 }
 
-function settingsTarget(panelId, selector, disclosureSelector = null) {
-    return () => {
-        ensureView('maintenance')
-        const panel = document.querySelector(`#a87-${panelId}-panel`)
-        if (!panel?.classList.contains('active'))
-            document.querySelector(`#a87-${panelId}-tab`)?.click()
-        if (panelId === 'maintenance' && selector === '#software-updates') {
-            const softwareTab = document.querySelector(
-                '#a87-maintenance-panel > .tabs [data-tab="software-updates"]'
-            )
-            if (softwareTab && !document.querySelector('#software-updates')?.classList.contains('active'))
-                softwareTab.click()
-        }
-        if (disclosureSelector) {
-            const disclosure = document.querySelector(disclosureSelector)
-            if (disclosure instanceof HTMLDetailsElement) disclosure.open = true
-        }
-        return visibleTarget(selector)
+function viewStep(viewId, selector, popover, extra = {}) {
+    return {
+        element: selector,
+        waitForElement: 2500,
+        onHighlightStarted: () => prepareViewOwner(viewId),
+        onHighlighted: (_element,_step,opts) => {
+            if (!visibleTarget(selector)) opts.driver.refresh()
+        },
+        popover,
+        ...extra
+    }
+}
+
+function settingsStep(panelId, selector, popover, disclosureSelector = null, extra = {}) {
+    return {
+        element: selector,
+        waitForElement: 3500,
+        onHighlightStarted: () =>
+            prepareSettingsOwner(panelId, selector, disclosureSelector),
+        onHighlighted: (_element,_step,opts) => {
+            if (!visibleTarget(selector)) opts.driver.refresh()
+        },
+        popover,
+        ...extra
     }
 }
 
 function makeSteps() {
     const copy = stepText()
     return [
-        { element: viewTarget('library','nav [data-view="library"]'), waitForElement: 2500,
-          popover: { title: copy.libraryTitle, description: copy.libraryBody } },
-        { element: viewTarget('library','[data-tour="library-sync"]'), waitForElement: 2500,
-          popover: { title: copy.syncTitle, description: copy.syncBody } },
-        { element: viewTarget('library','[data-tour="library-filter"]'), waitForElement: 2500,
-          popover: { title: copy.filterTitle, description: copy.filterBody } },
-        { element: viewTarget('shelves','nav [data-view="shelves"]'), waitForElement: 2500,
-          popover: { title: copy.shelvesTitle, description: copy.shelvesBody } },
-        { element: viewTarget('shelves','[data-tour="shelf-create"]'), waitForElement: 2500,
-          popover: { title: copy.shelfCreateTitle, description: copy.shelfCreateBody } },
-        { element: viewTarget('discover','nav [data-view="discover"]'), waitForElement: 2500,
-          popover: { title: copy.discoverTitle, description: copy.discoverBody } },
-        { element: viewTarget('discover','[data-tour="recommend-run"]'), waitForElement: 2500,
-          popover: { title: copy.recommendTitle, description: copy.recommendBody } },
-        { element: viewTarget('maintenance','nav [data-view="maintenance"]'), waitForElement: 2500,
-          popover: { title: copy.settingsTitle, description: copy.settingsBody } },
-        { element: settingsTarget('recommendations','#a87-recommendations-tab'), waitForElement: 3500,
-          popover: { title: copy.recSettingsTitle, description: copy.recSettingsBody } },
-        { element: settingsTarget('recommendations','#visual-rerank-mode','#ux-visual-settings'), waitForElement: 3500, skipMissingElement: true,
-          popover: { title: copy.visualModeTitle, description: copy.visualModeBody } },
-        { element: settingsTarget('recommendations','#visual-strength','#ux-visual-settings'), waitForElement: 3500, skipMissingElement: true,
-          popover: { title: copy.visualStrengthTitle, description: copy.visualStrengthBody } },
-        { element: settingsTarget('connections','#a87-connections-tab'), waitForElement: 3500,
-          popover: { title: copy.connectionsTitle, description: copy.connectionsBody } },
-        { element: settingsTarget('connections','#a83-connections'), waitForElement: 3500, skipMissingElement: true,
-          popover: { title: copy.connectionStatusTitle, description: copy.connectionStatusBody } },
-        { element: settingsTarget('connections','#settings-mobile-bridge'), waitForElement: 3500, skipMissingElement: true,
-          popover: { title: copy.mobileTitle, description: copy.mobileBody } },
-        { element: settingsTarget('general','#settings-eh-account'), waitForElement: 3500, skipMissingElement: true,
-          popover: { title: copy.ehTitle, description: copy.ehBody } },
-        { element: settingsTarget('general','#a87-language-panel'), waitForElement: 3500,
-          popover: { title: copy.languageTitle, description: copy.languageBody } },
-        { element: settingsTarget('maintenance','#software-updates'), waitForElement: 3500,
-          popover: { title: copy.updateTitle, description: copy.updateBody } },
+        viewStep('library','nav [data-view="library"]',
+            { title: copy.libraryTitle, description: copy.libraryBody }),
+        viewStep('library','[data-tour="library-sync"]',
+            { title: copy.syncTitle, description: copy.syncBody }),
+        viewStep('library','[data-tour="library-filter"]',
+            { title: copy.filterTitle, description: copy.filterBody }),
+        viewStep('shelves','nav [data-view="shelves"]',
+            { title: copy.shelvesTitle, description: copy.shelvesBody }),
+        viewStep('shelves','[data-tour="shelf-create"]',
+            { title: copy.shelfCreateTitle, description: copy.shelfCreateBody }),
+        viewStep('discover','nav [data-view="discover"]',
+            { title: copy.discoverTitle, description: copy.discoverBody }),
+        viewStep('discover','[data-tour="recommend-run"]',
+            { title: copy.recommendTitle, description: copy.recommendBody }),
+        viewStep('maintenance','nav [data-view="maintenance"]',
+            { title: copy.settingsTitle, description: copy.settingsBody }),
+        settingsStep('recommendations','#a87-recommendations-tab',
+            { title: copy.recSettingsTitle, description: copy.recSettingsBody }),
+        settingsStep('recommendations','#visual-rerank-mode',
+            { title: copy.visualModeTitle, description: copy.visualModeBody },
+            '#ux-visual-settings',
+            { skipMissingElement: true }),
+        settingsStep('recommendations','#visual-strength',
+            { title: copy.visualStrengthTitle, description: copy.visualStrengthBody },
+            '#ux-visual-settings',
+            { skipMissingElement: true }),
+        settingsStep('connections','#a87-connections-tab',
+            { title: copy.connectionsTitle, description: copy.connectionsBody }),
+        settingsStep('connections','#a83-connections',
+            { title: copy.connectionStatusTitle, description: copy.connectionStatusBody },
+            null,
+            { skipMissingElement: true }),
+        settingsStep('connections','#settings-mobile-bridge',
+            { title: copy.mobileTitle, description: copy.mobileBody },
+            null,
+            { skipMissingElement: true }),
+        settingsStep('general','#settings-eh-account',
+            { title: copy.ehTitle, description: copy.ehBody },
+            null,
+            { skipMissingElement: true }),
+        settingsStep('general','#a87-language-panel',
+            { title: copy.languageTitle, description: copy.languageBody }),
+        settingsStep('maintenance','#software-updates',
+            { title: copy.updateTitle, description: copy.updateBody }),
         { popover: { title: copy.doneTitle, description: copy.doneBody,
             onNextClick: (_e,_s,opts) => {
                 writeState({ completedVersion: TOUR_VERSION, dismissedVersion: 0 })

@@ -222,6 +222,23 @@ describe('universal full application upgrade', () => {
             helperSha256: assistant.helperSha256
         })
         expect(path.relative(applicationRoot, assistantRoot)).toMatch(/^\.\./)
+
+        fs.writeFileSync(assistant.helperPath, 'corrupted-helper')
+        const lightweight =
+            updateManager.preparePersistentUpgradeAssistant({
+                verifyExisting: false
+            })
+        expect(lightweight.available).toBe(true)
+        expect(fs.readFileSync(assistant.helperPath, 'utf8')).toBe(
+            'corrupted-helper'
+        )
+
+        const repaired =
+            updateManager.preparePersistentUpgradeAssistant()
+        expect(repaired.available).toBe(true)
+        expect(fs.readFileSync(assistant.helperPath, 'utf8')).toBe(
+            'full-upgrader'
+        )
     })
 
     it('refuses a persistent assistant inside the application tree', () => {

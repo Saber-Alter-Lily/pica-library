@@ -11,7 +11,7 @@ const copy = {
         connections: '连接与同步',
         appearance: '外观与个性化',
         storage: '下载与存储',
-        maintenance: '维护工具',
+        maintenance: '维护与更新',
         software: '软件更新',
         storageTitle: '下载与存储',
         storageCopy: '',
@@ -32,7 +32,7 @@ const copy = {
         connections: '接続と同期',
         appearance: '外観とカスタマイズ',
         storage: 'ダウンロードと保存先',
-        maintenance: 'メンテナンス',
+        maintenance: 'メンテナンスと更新',
         software: 'ソフトウェア更新',
         storageTitle: 'ダウンロードと保存先',
         storageCopy: '',
@@ -53,7 +53,7 @@ const copy = {
         connections: 'Connections & Sync',
         appearance: 'Appearance',
         storage: 'Downloads & Storage',
-        maintenance: 'Maintenance',
+        maintenance: 'Maintenance & Updates',
         software: 'Software Update',
         storageTitle: 'Downloads & Storage',
         storageCopy: '',
@@ -222,8 +222,7 @@ const panelDefinitions = [
     ['connections', 'connections'],
     ['appearance', 'appearance'],
     ['storage', 'storage'],
-    ['maintenance', 'maintenance'],
-    ['software', 'software']
+    ['maintenance', 'maintenance']
 ]
 
 function createPanel(id) {
@@ -237,6 +236,7 @@ function createPanel(id) {
 }
 
 function activateHubPanel(id, focus = false) {
+    if (id === 'software') id = 'maintenance'
     document.querySelectorAll('.a87-hub-panel').forEach((panel) => {
         const active = panel.id === `a87-${id}-panel`
         panel.classList.toggle('active', active)
@@ -263,6 +263,8 @@ function openSettingsHubPanel(id) {
 function moveProductSettingsPanels() {
     const general = hub$('#a87-general-panel')
     const appearanceSlot = hub$('#a87-appearance-panel')
+    const connectionsSlot = hub$('#a87-connections-panel')
+    const connectionStatus = hub$('#a83-connections')
     const support = hub$('#a83-support')
     const appearance = hub$('#a83-appearance')
     const languageControl = hub$('.language-control')
@@ -277,6 +279,9 @@ function moveProductSettingsPanels() {
         }
         if (languageControl.parentElement !== languagePanel)
             languagePanel.appendChild(languageControl)
+    }
+    if (connectionsSlot && connectionStatus && connectionStatus.parentElement !== connectionsSlot) {
+        connectionsSlot.prepend(connectionStatus)
     }
     if (general && support && support.parentElement !== general) {
         general.appendChild(support)
@@ -405,10 +410,7 @@ function buildSettingsHub() {
     if (settingsForm) panels.get('general').appendChild(settingsForm)
 
     const ehAccount = hub$('#settings-eh-account')
-    if (ehAccount) {
-        ehAccount.open = true
-        panels.get('general').appendChild(ehAccount)
-    }
+    if (ehAccount) panels.get('general').appendChild(ehAccount)
 
     const recommendationV4 = hub$('#settings-recommendation-v4')
     if (recommendationV4) panels.get('recommendations').appendChild(recommendationV4)
@@ -440,7 +442,7 @@ function buildSettingsHub() {
     const software = hub$('#software-updates')
     if (software) {
         software.classList.add('active')
-        panels.get('software').appendChild(software)
+        maintenancePanel.prepend(software)
     }
 
     maintenance.replaceChildren(heading, layout)
@@ -449,7 +451,8 @@ function buildSettingsHub() {
     movePersonalization()
     refreshHubLabels()
 
-    const requested = localStorage.getItem('pica-settings-section')
+    const stored = localStorage.getItem('pica-settings-section')
+    const requested = stored === 'software' ? 'maintenance' : stored
     const valid = panelDefinitions.some(([id]) => id === requested)
     activateHubPanel(valid ? requested : 'general')
 }

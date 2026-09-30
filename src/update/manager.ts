@@ -423,22 +423,28 @@ export class UpdateManager {
                 status: 'current' as const,
                 currentVersion: this.options.currentVersion
             }
-        if (!assetName || !assetUrl)
+        if (!assetName || !assetUrl) {
+            if (fullAssetName && fullAssetUrl)
+                return {
+                    status: 'full-install' as const,
+                    version,
+                    releaseUrl,
+                    assetName: fullAssetName,
+                    assetUrl: fullAssetUrl,
+                    oneClick: true
+                }
             return {
                 status: 'full-install' as const,
                 version,
-                releaseUrl,
-                assetName: fullAssetName,
-                assetUrl: fullAssetUrl,
-                oneClick: Boolean(fullAssetName && fullAssetUrl)
+                releaseUrl
             }
+        }
         return {
             status: 'incremental' as const,
             version,
             releaseUrl,
             assetName,
-            assetUrl,
-            oneClick: true
+            assetUrl
         }
     }
 

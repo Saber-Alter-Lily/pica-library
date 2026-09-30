@@ -2891,3 +2891,24 @@ State update:
 - Reconciliation replays the consolidated schema-14 index bundle idempotently, replaces only the recognized unpublished migration metadata with `post_v0411_index_bundle`, and leaves all ordinary application/user rows untouched.
 - Unknown or future migration names are never rewritten by this compatibility path.
 - Added an integration regression that preserves a sentinel RC row, verifies the recovery backup retains the old 14/15/16 history, verifies the live DB ends at schema 14, and verifies the bundled indexes are present.
+
+
+## 2026-09-30 — NEXT-32 generic release tooling and v0.5.0 formal candidate
+
+State update:
+- Windows stable packaging no longer requires adding one hard-coded branch for every future semantic version. Stable `X.Y.Z` package naming is generic.
+- A release may explicitly request reuse of a checksum-pinned prior launcher through `PICA_WINDOWS_LAUNCHER_BASE_VERSION` + `PICA_WINDOWS_LAUNCHER_BASE_SHA256`. The current v0.5.0 bridge pins public v0.4.11 so its launcher remains byte-identical for the old incremental updater. Future releases that use verified full-application replacement may omit this override and allow a launcher change.
+- Added `scripts/build-upgrade-assistant.ts` / `pnpm build:upgrade-assistant` as the reusable fallback-assistant generator. It binds source version, target version, full-package SHA-256, target source SHA and target database schema into the existing audited PowerShell replacement/rollback implementation.
+- Added unit coverage for the generic Windows packaging contract and Upgrade Assistant generator, including the v0.4.11 -> v0.5.0 source label and source-SHA mismatch rejection.
+- Added `.github/workflows/v050-release-candidate.yml` as an unpublished, non-publishing release-intent workflow:
+  - temporary Desktop stamp: v0.5.0;
+  - Android production-identity candidate: versionCode 55 / versionName 0.5.0;
+  - checksum-pinned public v0.4.11 Windows baseline;
+  - formal-layout full Windows package;
+  - source-scoped `Pica-Library-v0.5.0-update-from-v0.4.11.zip`;
+  - actual public-v0.4.11 updater replacement acceptance;
+  - checksum-bound `Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip`;
+  - signed Android candidate using the existing production signing identity;
+  - artifact-only publication to GitHub Actions.
+- The candidate workflow has no `gh release create`, no stable tag mutation, no `android-preview` upload and no OTA/latest update. A dedicated unit contract locks that boundary.
+- Formal repository version stamping and public Release remain blocked until the v0.5.0 formal candidate and the normal release-intent matrix pass.

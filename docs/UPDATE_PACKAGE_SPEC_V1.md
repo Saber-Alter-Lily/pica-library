@@ -89,6 +89,10 @@ Windows x64 为保持旧客户端连续升级，仍可同时发布历史来源�
 
 历史客户端无法被未来代码反向赋予 detached `full-upgrader` 能力，但这不等于它们一定需要人工完整安装。若首个新基线仍满足旧客户端已经发布的增量协议边界（例如 public v0.4.11 的 App API 2、Schema 13 → 14，且 `app/updater.js` 构建产物保持不变），正式 Release 可以发布来源限定的增量包，让旧客户端通过现有一键更新路径安装新基线，并同时新增 `app/full-upgrader.js`。只有当 App API / Schema / updater 自替换边界不满足，或正式资产校验失败时，才回退到 Upgrade Assistant / 完整包路径。从安装了新基线开始，后续正式 Windows x64 大版本更新沿用上述 universal full-application replacement 路径。
 
+## Unpublished schema-history compatibility
+
+Release preparation consolidated the never-published index-only migrations 14/15/16 into one schema-14 bundle so public v0.4.11 can use its already-shipped incremental boundary. Databases created by internal/RC builds that had already recorded the old private migration names are normalized separately: only those exact unpublished names are recognized; the DB is checkpointed and backed up first; the idempotent schema-14 index bundle is applied; then the private 15/16 metadata is released. Public stable databases do not enter this path, and unknown/future migration names are never rewritten.
+
 ## Schema authority
 
 `databaseSchemaVersion` 必须来自 SQLite migration 的唯一权威 `latestMigrationVersion`，不得再维护一个手写的平行 schema 常量。发布 Gate 必须断言 `DATABASE_SCHEMA_VERSION === latestMigrationVersion`。历史 public v0.4.0 实际已执行 migration 9，但旧 capabilities 常量仍为 8；该漂移只作为兼容性历史记录，不得复制到后续版本。

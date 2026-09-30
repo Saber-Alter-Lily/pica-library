@@ -558,13 +558,13 @@ export const translations = {
             'Found a compatible incremental update to v{version}. <a href="{url}" target="_blank" rel="noopener noreferrer">Download the official update package</a>, then select or drop the ZIP above.',
         'update.confirm': 'Update to {version} and restart?',
         'update.applying':
-            'The app will exit and finish updating. Please wait…',
+            'Updating Pica Library safely…',
         'update.phase.downloading': 'Download official update',
         'update.phase.validating': 'Validate update package',
         'update.phase.extracting': 'Extract to temporary folder',
         'update.phase.staged': 'Validated and staged',
         'update.phase.preparingBackup': 'Prepare backup',
-        'update.phase.waitingExit': 'Wait for app exit',
+        'update.phase.waitingExit': 'Switch to the new version',
         'update.phase.replacing': 'Replace files',
         'update.phase.starting': 'Start new version',
         'update.phase.health': 'Check runtime health',
@@ -574,15 +574,21 @@ export const translations = {
         'update.panelEyebrow': 'Local update',
         'update.panelTitle': 'Update',
         'update.panelText':
-            'Compatible incremental releases can update automatically. If a full-package replacement is required, this page will show the exact Windows ZIP and replacement steps.',
+            'Use one-click update for normal releases and major architecture upgrades alike. Pica Library automatically chooses the safe incremental or full-application path while keeping your library data separate.',
         'update.drop': 'Drop a compatible Pica Library incremental update ZIP here',
         'update.choose':
             'Use only update ZIPs explicitly offered by this page; full-package upgrades follow the guide below.',
         'update.check': 'Check for updates',
-        'update.oneClick': 'Check & update (automatic when compatible)',
+        'update.oneClick': 'One-click check & update',
         'update.oneClickConfirm':
-            'Update to {version} now? The app will download, validate, restart, and apply the update.',
+            'Update to {version} now? Pica Library will download, verify, back up when needed, switch versions, and refresh this page automatically.',
         'update.downloading': 'Downloading official update {version}…',
+        'update.fullOneClickFound':
+            'Found v{version}. This release needs a full application upgrade, and it can still be installed with one click.',
+        'update.fullStaged':
+            'The full application package is verified and ready for safe replacement.',
+        'update.reconnectFailed':
+            'The update was started, but this page could not reconnect automatically. Continue in the Pica Library window opened by the updater.',
         'update.apply': 'Use uploaded package and restart',
         'action.close': 'Close',
         'common.confirm': 'Confirm',
@@ -1347,13 +1353,13 @@ export const translations = {
         'update.incrementalFound':
             '发现 v{version} 兼容增量更新。<a href="{url}" target="_blank" rel="noopener noreferrer">下载官方更新包</a>，然后在上方选择或拖入 ZIP。',
         'update.confirm': '确认更新到 {version} 并重启？',
-        'update.applying': '应用即将退出并完成更新，请稍候…',
+        'update.applying': '正在安全更新 Pica Library…',
         'update.phase.downloading': '下载官方更新',
         'update.phase.validating': '校验更新包',
         'update.phase.extracting': '解压到临时目录',
         'update.phase.staged': '已完成校验与暂存',
         'update.phase.preparingBackup': '准备备份',
-        'update.phase.waitingExit': '等待应用退出',
+        'update.phase.waitingExit': '切换到新版本',
         'update.phase.replacing': '替换文件',
         'update.phase.starting': '启动新版本',
         'update.phase.health': '检查运行状态',
@@ -1363,15 +1369,21 @@ export const translations = {
         'update.panelEyebrow': '本地更新',
         'update.panelTitle': '更新',
         'update.panelText':
-            '兼容的增量版本可以自动更新；如果当前版本必须使用完整程序包，这里会直接显示对应 Windows ZIP 和替换步骤。',
+            '普通更新和大规模架构升级都可以直接一键完成。Pica Library 会自动选择安全的增量或完整程序升级路径，漫画库、书架、历史、设置和账号数据继续与程序文件分离保存。',
         'update.drop': '将兼容的 Pica Library 增量更新 ZIP 拖到这里',
         'update.choose':
             '仅使用本页明确提供的更新 ZIP；完整包升级请按下方引导操作。',
         'update.check': '检查更新',
-        'update.oneClick': '检查并更新（兼容时自动）',
+        'update.oneClick': '一键检查并更新',
         'update.oneClickConfirm':
-            '确认立即更新到 {version}？应用会自动下载、校验、重启并应用更新。',
+            '确认立即更新到 {version}？Pica Library 会自动下载、校验、按需备份、切换版本，并在新版本启动后自动刷新当前页面。',
         'update.downloading': '正在下载官方更新 {version}…',
+        'update.fullOneClickFound':
+            '发现 v{version}。本次需要完整程序升级，但仍可直接一键完成。',
+        'update.fullStaged':
+            '完整程序包已通过校验，可以安全替换。',
+        'update.reconnectFailed':
+            '更新已启动，但当前页面没有自动重新连接。请继续使用升级助手已打开的 Pica Library 窗口。'
         'update.apply': '使用已上传更新包并重启',
         'action.close': '关闭',
         'common.confirm': '确认',

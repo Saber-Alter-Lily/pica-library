@@ -107,19 +107,6 @@ for (const directory of [
 ])
     fs.mkdirSync(directory, { recursive: true })
 const log = new DesktopLog(paths.logs)
-try {
-    const assistant = updateManager.preparePersistentUpgradeAssistant()
-    if (assistant.available)
-        log.write(
-            `Upgrade assistant registered outside application tree: ${assistant.root}`
-        )
-} catch (error) {
-    log.write(
-        `Upgrade assistant registration unavailable: ${
-            error instanceof Error ? error.message : String(error)
-        }`
-    )
-}
 const credentialBackend = credentialStoreForPlatform(paths.credentials)
 const credentialsStore = credentialBackend.store
 const platformCapabilities = {
@@ -1384,6 +1371,19 @@ async function main() {
             return
         }
         throw new Error('Another Pica Library instance is starting')
+    }
+    try {
+        const assistant = updateManager.preparePersistentUpgradeAssistant()
+        if (assistant.available)
+            log.write(
+                `Upgrade assistant registered outside application tree: ${assistant.root}`
+            )
+    } catch (error) {
+        log.write(
+            `Upgrade assistant registration unavailable: ${
+                error instanceof Error ? error.message : String(error)
+            }`
+        )
     }
     try {
         credentials = credentialsStore.load()

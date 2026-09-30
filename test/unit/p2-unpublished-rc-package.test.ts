@@ -18,7 +18,7 @@ describe('P2 unpublished RC package contract', () => {
         expect(workflow).toContain('permissions:\n  contents: read')
         expect(workflow).toContain('workflow_dispatch:')
         expect(workflow).toContain(
-            'push:\n    branches: [release/p2-unpublished-rc-packages-v2]\n  pull_request:'
+            'push:\n    branches: [release/p2-unpublished-rc-packages-v2, fix/android-rc-ux-performance-batch]\n  pull_request:'
         )
         expect(workflow).not.toMatch(/contents:\s*write/)
         expect(workflow).not.toContain('gh release')
@@ -67,6 +67,15 @@ describe('P2 unpublished RC package contract', () => {
         expect(workflow).toContain(
             '6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab'
         )
+        expect(workflow).toContain(
+            '0bc9ef7e10fcef8d559739ab0186d6ddb7923d09c5be49a6782ddba096158e39'
+        )
+        expect(workflow).toContain('Pica-Library-v0.4.11-windows-x64.zip')
+        expect(workflow).toContain('v0.4.11 one-click bridge would replace app/updater.js')
+        expect(workflow).toContain('databaseSchemaVersion -ne 14')
+        expect(workflow).toContain("sourceVersionRange -ne '=0.4.11'")
+        expect(workflow).toContain("bridgePaths -contains 'app/updater.js'")
+        expect(workflow).toContain("bridgePaths -notcontains 'app/full-upgrader.js'")
 
         expect(smoke).toContain("[string]$ExpectedVersion = ''")
         expect(smoke).toContain(

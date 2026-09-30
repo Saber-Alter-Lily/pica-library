@@ -2,7 +2,7 @@ name: P2 Unpublished RC Test Packages
 
 on:
   push:
-    branches: [release/p2-unpublished-rc-packages-v2]
+    branches: [release/p2-unpublished-rc-packages-v2, fix/android-rc-ux-performance-batch]
   pull_request:
     paths:
       - 'packaging/windows/RcLauncher.cs'
@@ -80,6 +80,15 @@ jobs:
           $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
           $expected='6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab'
           if($actual -ne $expected){ throw "Official v0.4.10 package checksum mismatch: $actual" }
+      - name: Download checksum-pinned v0.4.11 Windows baseline
+        shell: pwsh
+        run: |
+          $name='Pica-Library-v0.4.11-windows-x64.zip'
+          $path=Join-Path 'artifacts\release-base' $name
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.11/$name" -OutFile $path
+          $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+          $expected='0bc9ef7e10fcef8d559739ab0186d6ddb7923d09c5be49a6782ddba096158e39'
+          if($actual -ne $expected){ throw "Official v0.4.11 package checksum mismatch: $actual" }
       - name: Build isolated Windows RC
         shell: pwsh
         run: |
@@ -97,6 +106,33 @@ jobs:
 
           ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip 'artifacts\release-base\Pica-Library-v0.4.10-windows-x64.zip' -CandidateZip $zip -CandidateVersion $rcVersion -CandidateSourceSha $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $compatRoot=Join-Path $env:RUNNER_TEMP 'pica-v0411-one-click-compat'
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $compatRoot
+          $oldRoot=Join-Path $compatRoot 'old'
+          $newRoot=Join-Path $compatRoot 'new'
+          $bridgeRoot=Join-Path $compatRoot 'bridge'
+          New-Item -ItemType Directory -Force -Path $oldRoot,$newRoot,$bridgeRoot | Out-Null
+          $v0411='artifacts\release-base\Pica-Library-v0.4.11-windows-x64.zip'
+          Expand-Archive -LiteralPath $v0411 -DestinationPath $oldRoot
+          Expand-Archive -LiteralPath $zip -DestinationPath $newRoot
+          $oldUpdater=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $oldRoot 'app\updater.js')).Hash.ToLowerInvariant()
+          $newUpdater=(Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $newRoot 'app\updater.js')).Hash.ToLowerInvariant()
+          if($oldUpdater -ne $newUpdater){ throw "v0.4.11 one-click bridge would replace app/updater.js: $oldUpdater -> $newUpdater" }
+          if(-not (Test-Path -LiteralPath (Join-Path $newRoot 'app\full-upgrader.js'))){ throw 'Candidate is missing app/full-upgrader.js' }
+
+          $bridgeZip=Join-Path $compatRoot 'v0411-to-candidate-local-test.zip'
+          pnpm exec tsx scripts/build-local-update-package.ts $v0411 $zip $bridgeZip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Expand-Archive -LiteralPath $bridgeZip -DestinationPath $bridgeRoot
+          $manifest=Get-Content -Raw -LiteralPath (Join-Path $bridgeRoot 'update-manifest.json') | ConvertFrom-Json
+          if([int]$manifest.appApiVersion -ne 2){ throw "Unexpected bridge App API: $($manifest.appApiVersion)" }
+          if([int]$manifest.databaseSchemaVersion -ne 14){ throw "Unexpected bridge schema: $($manifest.databaseSchemaVersion)" }
+          if([bool]$manifest.requiresFullInstall){ throw 'v0.4.11 bridge unexpectedly requires full install' }
+          if([string]$manifest.sourceVersionRange -ne '=0.4.11'){ throw "Unexpected bridge source range: $($manifest.sourceVersionRange)" }
+          $bridgePaths=@($manifest.files | ForEach-Object { [string]$_.path })
+          if($bridgePaths -contains 'app/updater.js'){ throw 'v0.4.11 bridge must not replace app/updater.js' }
+          if($bridgePaths -notcontains 'app/full-upgrader.js'){ throw 'v0.4.11 bridge must install app/full-upgrader.js' }
 
           New-Item -ItemType Directory -Force -Path candidate\windows | Out-Null
           $out="candidate\windows\Pica-Library-P2-RC-Windows-x64.zip"

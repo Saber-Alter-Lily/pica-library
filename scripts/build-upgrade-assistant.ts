@@ -83,11 +83,6 @@ export function buildUpgradeAssistant(options: {
         path.join(templateRoot, 'Upgrade-Pica-Library-v0.4.1.cmd'),
         'utf8'
     )
-    const templateReadme = fs.readFileSync(
-        path.join(templateRoot, 'README.txt'),
-        'utf8'
-    )
-
     const targetHash = sha256(targetBuffer)
     script = script
         .replace(
@@ -139,8 +134,11 @@ export function buildUpgradeAssistant(options: {
         'It verifies the official full Windows package, preserves the external Desktop data root,',
         'snapshots configuration and SQLite state, and rolls back when target health checks fail.',
         '',
-        'Template lineage:',
-        templateReadme.trim(),
+        'Files:',
+        `- Upgrade-Pica-Library-v${targetVersion}.cmd: double-click launcher`,
+        `- Upgrade-Pica-Library-v${targetVersion}.ps1: checksum-bound replacement logic`,
+        '',
+        'Do not rename or edit the files inside this ZIP before use.',
         ''
     ].join('\n')
 

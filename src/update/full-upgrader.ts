@@ -59,6 +59,8 @@ function requiredApplicationFiles(root: string) {
         'Pica Library.exe',
         path.join('runtime', 'node.exe'),
         path.join('app', 'desktop.js'),
+        path.join('app', 'updater.js'),
+        path.join('app', 'full-upgrader.js'),
         'SOURCE_SHA.txt'
     ].map((item) => path.join(root, item))
 }

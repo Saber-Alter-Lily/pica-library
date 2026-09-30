@@ -2878,3 +2878,16 @@ State update:
 - The v0.4.11 incremental acceptance now additionally requires that after the candidate starts, the persistent assistant exists, matches the installed runtime/helper byte-for-byte, and is bound to the candidate version/source SHA.
 - Ordinary startup remains fail-open if persistent-assistant registration cannot be refreshed, so the application remains usable; an actual full-application upgrade remains fail-closed if the assistant cannot be prepared and verified.
 - Stable v0.4.11 Release assets/OTA remain untouched. Final published-release acceptance under NEXT-32 is still required after target version stamping and formal asset upload.
+
+
+## 2026-09-30 — NEXT-32 unpublished migration history reconciliation
+
+State update:
+- The schema-13 -> 14 release bridge remains unchanged for public v0.4.11 users.
+- A separate development/RC compatibility audit found that testers who had already run unpublished schema 14/15/16 builds could retain private `schema_migrations` rows 15/16 after the release-preparation consolidation to schema 14.
+- Those rows would not block current startup, but they could incorrectly reserve future stable migration numbers and cause a later real schema 15/16 migration to be skipped on those RC-only databases.
+- Added a strict reconciliation path that activates only when the migration names exactly match the never-published P2 index migrations (`p2d2_author_reverse_lookup_indexes`, `p2d5b_work_identity_detail_indexes`, `p2d8a_picture_comic_status_index`).
+- Before reconciliation, LibraryDatabase checkpoints WAL and writes `library.db.pre-unreleased-schema-reconcile.bak`.
+- Reconciliation replays the consolidated schema-14 index bundle idempotently, replaces only the recognized unpublished migration metadata with `post_v0411_index_bundle`, and leaves all ordinary application/user rows untouched.
+- Unknown or future migration names are never rewritten by this compatibility path.
+- Added an integration regression that preserves a sentinel RC row, verifies the recovery backup retains the old 14/15/16 history, verifies the live DB ends at schema 14, and verifies the bundled indexes are present.

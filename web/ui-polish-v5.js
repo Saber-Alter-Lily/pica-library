@@ -422,11 +422,11 @@ function installGeneralRuntimeDisclosure() {
         ux$('#settings-profile')?.closest('label'),
         form.querySelector('.setup-proxy-section'),
         ux$('#settings-detect-proxy'),
-        ux$('#browser-lite-timestamps'),
-        ux$('#settings-message'),
-        form.querySelector('.actions.wide')
+        ux$('#browser-lite-timestamps')
     ])
-    form.appendChild(details)
+    const actions = form.querySelector('.actions.wide')
+    if (actions) form.insertBefore(details, actions)
+    else form.appendChild(details)
 }
 
 function installUpdatePanel() {

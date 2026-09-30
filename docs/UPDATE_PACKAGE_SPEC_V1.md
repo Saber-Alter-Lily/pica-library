@@ -81,7 +81,7 @@ Windows x64 为保持旧客户端连续升级，仍可同时发布历史来源�
 
 每一个可被该路径接受的完整 Windows 包都必须继续携带 `app/full-upgrader.js`，这是后续版本仍可一键跨越 Schema/架构更新的持续性契约。
 
-历史客户端无法被未来代码反向赋予该能力。首个包含 Universal Upgrade Assistant 的稳定版之前的 public 客户端仍需要其已经发布/随下一版提供的一次性完整升级助手进入新基线；从新基线开始，后续正式 Windows x64 大版本更新沿用上述路径。
+历史客户端无法被未来代码反向赋予 detached `full-upgrader` 能力，但这不等于它们一定需要人工完整安装。若首个新基线仍满足旧客户端已经发布的增量协议边界（例如 public v0.4.11 的 App API 2、Schema 13 → 14，且 `app/updater.js` 构建产物保持不变），正式 Release 可以发布来源限定的增量包，让旧客户端通过现有一键更新路径安装新基线，并同时新增 `app/full-upgrader.js`。只有当 App API / Schema / updater 自替换边界不满足，或正式资产校验失败时，才回退到 Upgrade Assistant / 完整包路径。从安装了新基线开始，后续正式 Windows x64 大版本更新沿用上述 universal full-application replacement 路径。
 
 ## Schema authority
 

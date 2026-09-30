@@ -722,7 +722,6 @@ function migrationHistoryRows(database: DatabaseSync) {
 export function needsUnreleasedMigrationReconciliation(
     database: DatabaseSync
 ) {
-    if (latestMigrationVersion !== 14) return false
     const rows = migrationHistoryRows(database)
     if (!rows.length) return false
     const current14 = migrations.find((migration) => migration.version === 14)

@@ -1,0 +1,219 @@
+name: v0.5.0 Formal Release Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/android-rc-ux-performance-batch]
+    paths:
+      - '.github/workflows/v050-release-candidate.yml'
+
+permissions:
+  contents: read
+
+env:
+  TARGET_VERSION: '0.5.0'
+  ANDROID_VERSION_CODE: '55'
+  BASE_VERSION: '0.4.11'
+  BASE_WINDOWS_SHA256: '0bc9ef7e10fcef8d559739ab0186d6ddb7923d09c5be49a6782ddba096158e39'
+  EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+
+jobs:
+  windows-candidate:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 55
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.4.11'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '0bc9ef7e10fcef8d559739ab0186d6ddb7923d09c5be49a6782ddba096158e39'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - name: Re-run Desktop release gates before stamping
+        shell: pwsh
+        run: |
+          pnpm type:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download checksum-pinned public v0.4.11 baseline
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts\release-base | Out-Null
+          $name="Pica-Library-v$env:BASE_VERSION-windows-x64.zip"
+          $path=Join-Path 'artifacts\release-base' $name
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v$env:BASE_VERSION/$name" -OutFile $path
+          $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+          if($actual -ne $env:BASE_WINDOWS_SHA256){ throw "Official v$env:BASE_VERSION package checksum mismatch: $actual" }
+      - name: Temporarily stamp Desktop candidate version
+        shell: pwsh
+        run: |
+          python -c "import json,pathlib; p=pathlib.Path('package.json'); d=json.loads(p.read_text(encoding='utf-8')); assert d['version']=='0.4.11'; d['version']='0.5.0'; p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\\n',encoding='utf-8')"
+      - name: Build formal-layout Windows candidate
+        shell: pwsh
+        run: |
+          pnpm build:windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $target="artifacts\Pica-Library-v$env:TARGET_VERSION-windows-x64.zip"
+          ./scripts/test-windows-artifact.ps1 -Zip $target -ExpectedVersion $env:TARGET_VERSION -PortCollision -SetupPersistence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and exercise v0.4.11 one-click bridge
+        shell: pwsh
+        run: |
+          $base="artifacts\release-base\Pica-Library-v$env:BASE_VERSION-windows-x64.zip"
+          $target="artifacts\Pica-Library-v$env:TARGET_VERSION-windows-x64.zip"
+          $incremental="artifacts\Pica-Library-v$env:TARGET_VERSION-update-from-v$env:BASE_VERSION.zip"
+          pnpm build:local-update $base $target $incremental
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-v0411-incremental-upgrade.ps1 -BaselineZip $base -CandidateZip $target -IncrementalZip $incremental -CandidateVersion $env:TARGET_VERSION -CandidateSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build checksum-bound fallback Upgrade Assistant
+        shell: pwsh
+        run: |
+          $target="artifacts\Pica-Library-v$env:TARGET_VERSION-windows-x64.zip"
+          $assistant="artifacts\Pica-Library-v$env:TARGET_VERSION-upgrade-assistant-from-v$env:BASE_VERSION.zip"
+          pnpm build:upgrade-assistant $env:BASE_VERSION $env:TARGET_VERSION $target $env:GITHUB_SHA 14 $assistant
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $work=Join-Path $env:RUNNER_TEMP 'pica-v050-assistant-parse'
+          Expand-Archive -LiteralPath $assistant -DestinationPath $work
+          $script=Get-Content -Raw -LiteralPath (Join-Path $work 'Upgrade-Pica-Library-v0.5.0.ps1')
+          [scriptblock]::Create($script) | Out-Null
+          if($script -notmatch "\$RequiredSourceVersion = '0\.4\.11'"){ throw 'Fallback assistant source version mismatch' }
+          if($script -notmatch "\$ExpectedDatabaseSchema = 14"){ throw 'Fallback assistant schema mismatch' }
+      - name: Assemble Windows candidate evidence
+        shell: pwsh
+        run: |
+          $names=@(
+            "Pica-Library-v$env:TARGET_VERSION-windows-x64.zip",
+            "Pica-Library-v$env:TARGET_VERSION-update-from-v$env:BASE_VERSION.zip",
+            "Pica-Library-v$env:TARGET_VERSION-upgrade-assistant-from-v$env:BASE_VERSION.zip"
+          )
+          $lines=@()
+          foreach($name in $names){
+            $path=Join-Path 'artifacts' $name
+            if(-not (Test-Path -LiteralPath $path)){ throw "Missing candidate asset: $name" }
+            $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
+            $lines += "$hash  $name"
+          }
+          $lines | Set-Content -Encoding ascii 'artifacts\SHA256SUMS-v050-candidate.txt'
+          [ordered]@{
+            candidateVersion=$env:TARGET_VERSION
+            sourceSha=$env:GITHUB_SHA
+            publicBaseline=$env:BASE_VERSION
+            databaseSchema=14
+            appApi=2
+            launcherBaseVersion=$env:BASE_VERSION
+            publishAuthorized=$false
+            otaMutated=$false
+          } | ConvertTo-Json -Depth 6 | Set-Content -Encoding utf8 'artifacts\BUILD_TRANSPARENCY-v050-Windows-candidate.json'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-v0.5.0-Windows-Formal-Candidate
+          path: |
+            artifacts/Pica-Library-v0.5.0-windows-x64.zip
+            artifacts/Pica-Library-v0.5.0-update-from-v0.4.11.zip
+            artifacts/Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip
+            artifacts/SHA256SUMS-v050-candidate.txt
+            artifacts/BUILD_TRANSPARENCY-v050-Windows-candidate.json
+          retention-days: 2
+          if-no-files-found: error
+
+  android-candidate:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test and lint Android
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Download public v54 identity
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.11/Pica-Library-Android-v54.apk" -o "$RUNNER_TEMP/Pica-Library-Android-v54.apk"
+          curl -fL --retry 3 "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.4.11/Pica-Library-Android-Preview.cert-sha256" -o "$RUNNER_TEMP/v54-cert.txt"
+          oldcert="$(tr -d '\r\n ' < "$RUNNER_TEMP/v54-cert.txt")"
+          test "$oldcert" = "$EXPECTED_CERT"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$RUNNER_TEMP/Pica-Library-Android-v54.apk" > "$RUNNER_TEMP/v54-badging.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='54' versionName='0.4.11'" "$RUNNER_TEMP/v54-badging.txt"
+      - name: Build signed production-identity v55 candidate
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+          PICA_ANDROID_VERSION_CODE: '55'
+          PICA_ANDROID_VERSION_NAME: '0.5.0'
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_PREVIEW_KEYSTORE_B64"
+          test -n "$ANDROID_PREVIEW_KEYSTORE_PASSWORD"
+          umask 077
+          signing_dir="$(mktemp -d "$RUNNER_TEMP/pica-v050-signing-XXXXXXXX")"
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleRelease --no-daemon
+          apk=app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/v55-badging.txt"
+          grep -q "package: name='com.picalibrary.android' versionCode='55' versionName='0.5.0'" "$RUNNER_TEMP/v55-badging.txt"
+          grep -q "application-label:'Pica Library'" "$RUNNER_TEMP/v55-badging.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/v55-cert.txt"
+          cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/v55-cert.txt" | head -1 | tr 'A-F' 'a-f')"
+          oldcert="$(tr -d '\r\n ' < "$RUNNER_TEMP/v54-cert.txt")"
+          test "$cert" = "$EXPECTED_CERT"
+          test "$cert" = "$oldcert"
+          mkdir -p candidate
+          cp "$apk" candidate/Pica-Library-Android-v55.apk
+          sha="$(sha256sum candidate/Pica-Library-Android-v55.apk | awk '{print $1}')"
+          printf '%s\n' "$cert" > candidate/CERTIFICATE_SHA256.txt
+          printf '%s  %s\n' "$sha" 'Pica-Library-Android-v55.apk' > candidate/SHA256SUMS-Android.txt
+          python - "$sha" "$cert" "$GITHUB_SHA" <<'PY'
+          import json,sys
+          sha,cert,source=sys.argv[1:]
+          out={
+            "candidateVersion":"0.5.0",
+            "versionCode":55,
+            "sourceSha":source,
+            "apkSha256":sha,
+            "signerCertificateSha256":cert,
+            "upgradeFromVersionCode":54,
+            "packageName":"com.picalibrary.android",
+            "publishAuthorized":False,
+            "otaMutated":False
+          }
+          with open("candidate/BUILD_TRANSPARENCY-v050-Android-candidate.json","w",encoding="utf-8") as f:
+              json.dump(out,f,ensure_ascii=False,indent=2)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-v0.5.0-Android-v55-Formal-Candidate
+          path: mobile/android-alpha2/candidate/
+          retention-days: 2
+          if-no-files-found: error

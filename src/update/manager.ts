@@ -305,6 +305,21 @@ export class UpdateManager {
             )
 
         const root = this.persistentAssistantRoot()
+        const applicationRoot = path.resolve(this.options.applicationRoot)
+        const assistantRoot = path.resolve(root)
+        const assistantRelative = path.relative(
+            applicationRoot,
+            assistantRoot
+        )
+        if (
+            assistantRoot === applicationRoot ||
+            (!assistantRelative.startsWith('..' + path.sep) &&
+                assistantRelative !== '..' &&
+                !path.isAbsolute(assistantRelative))
+        )
+            throw new Error(
+                'Persistent upgrade assistant must be outside the application directory'
+            )
         const runtimeDirectory = path.join(root, 'runtime')
         const runtimePath = path.join(runtimeDirectory, 'node.exe')
         const helperPath = path.join(root, 'full-upgrader.js')

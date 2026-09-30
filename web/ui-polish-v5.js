@@ -3,8 +3,11 @@ const uxAll = (selector, root = document) => [...root.querySelectorAll(selector)
 
 const UX_COPY = {
     'zh-CN': {
+        displayOptions: '显示选项',
         moreFilters: '更多筛选',
         bulkOrganize: '批量与整理',
+        recommendationMore: '更多推荐操作',
+        runtimeSettings: '本机与网络设置',
         libraryMaintenance: '导入与完整校验',
         sourceFilters: '来源与筛选',
         downloadAdvanced: '性能与导出（高级）',
@@ -23,8 +26,11 @@ const UX_COPY = {
         clearLite: '清除 Browser Lite 本地数据'
     },
     ja: {
+        displayOptions: '表示オプション',
         moreFilters: 'さらに絞り込む',
         bulkOrganize: '一括操作と整理',
+        recommendationMore: 'その他のおすすめ操作',
+        runtimeSettings: '端末とネットワーク設定',
         libraryMaintenance: '読み込みと完全確認',
         sourceFilters: '配信元と絞り込み',
         downloadAdvanced: '性能とエクスポート（詳細）',
@@ -43,8 +49,11 @@ const UX_COPY = {
         clearLite: 'Browser Liteのローカルデータを消去'
     },
     en: {
+        displayOptions: 'Display options',
         moreFilters: 'More filters',
         bulkOrganize: 'Batch & organize',
+        recommendationMore: 'More recommendation actions',
+        runtimeSettings: 'Local & network settings',
         libraryMaintenance: 'Import & full verification',
         sourceFilters: 'Sources & filters',
         downloadAdvanced: 'Performance & export (advanced)',
@@ -132,11 +141,15 @@ function installLibraryToolbar() {
     moveNodes(primary, [
         ux$('#view-grid'),
         ux$('#view-list'),
-        toolbar.querySelector('.grid-size-controls'),
-        ux$('#cover-toggle')?.closest('label'),
         ux$('#filter-text'),
         ux$('#filter-scope'),
         ux$('#apply-filter')
+    ])
+
+    const display = makeDetails('ux-library-display', 'displayOptions')
+    moveNodes(display.querySelector('.ux-more-body'), [
+        toolbar.querySelector('.grid-size-controls'),
+        ux$('#cover-toggle')?.closest('label')
     ])
 
     const filters = makeDetails('ux-library-filters', 'moreFilters')
@@ -163,7 +176,7 @@ function installLibraryToolbar() {
         ux$('#library-selection-status')
     ])
 
-    toolbar.append(primary, filters, bulk, selection)
+    toolbar.append(primary, display, filters, bulk, selection)
     const search = ux$('#filter-text')
     if (search && !search.dataset.uxEnterFilter) {
         search.dataset.uxEnterFilter = '1'
@@ -192,8 +205,11 @@ function installRecommendationToolbar() {
     if (heading && recommend && restart && !heading.querySelector('.ux-heading-actions')) {
         const actions = document.createElement('div')
         actions.className = 'ux-heading-actions'
-        actions.append(recommend, restart)
+        actions.append(recommend)
         heading.appendChild(actions)
+        const more = makeDetails('ux-recommend-more', 'recommendationMore')
+        moveNodes(more.querySelector('.ux-more-body'), [restart])
+        heading.insertAdjacentElement('afterend', more)
     }
 
     const batch = ux$('#recommend-batch')
@@ -374,6 +390,24 @@ function installSettingsUtilities() {
         ux$('#exit-app')
     ])
     actions.insertAdjacentElement('afterend', details)
+}
+
+function installGeneralRuntimeDisclosure() {
+    const form = ux$('#settings-form')
+    if (!form || ux$('#ux-runtime-settings')) return
+    const details = makeDetails('ux-runtime-settings', 'runtimeSettings')
+    const body = details.querySelector('.ux-more-body')
+    body.classList.add('ux-runtime-settings-body')
+    moveNodes(body, [
+        ux$('#settings-directory')?.closest('label'),
+        ux$('#settings-profile')?.closest('label'),
+        form.querySelector('.setup-proxy-section'),
+        ux$('#settings-detect-proxy'),
+        ux$('#browser-lite-timestamps'),
+        ux$('#settings-message'),
+        form.querySelector('.actions.wide')
+    ])
+    form.appendChild(details)
 }
 
 function installUpdatePanel() {
@@ -602,6 +636,7 @@ function installObservers() {
             installExperimentHub()
             installVisualSettingsDisclosure()
             installSettingsUtilities()
+            installGeneralRuntimeDisclosure()
             installUpdatePanel()
             installEhAccountFlow()
             installRemoteStorageFlow()
@@ -639,6 +674,7 @@ function installUxPolish() {
     installCollectionToolbars()
     installVisualSettingsDisclosure()
     installSettingsUtilities()
+    installGeneralRuntimeDisclosure()
     installUpdatePanel()
     installEhAccountFlow()
     installRemoteStorageFlow()

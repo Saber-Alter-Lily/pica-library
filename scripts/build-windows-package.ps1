@@ -3,62 +3,8 @@ $root = Split-Path -Parent $PSScriptRoot
 $package = Get-Content -Raw -LiteralPath (Join-Path $root 'package.json') | ConvertFrom-Json
 $version = [string]$package.version
 $nodeVersion = '24.15.0'
-$name = if ($version -eq '0.2.0') {
-    'Pica-Library-v0.2.0-windows-x64'
-} elseif ($version -eq '0.3.0') {
-    'Pica-Library-v0.3.0-windows-x64'
-} elseif ($version -eq '0.3.1') {
-    'Pica-Library-v0.3.1-windows-x64'
-} elseif ($version -eq '0.3.2') {
-    'Pica-Library-v0.3.2-windows-x64'
-} elseif ($version -eq '0.3.3') {
-    'Pica-Library-v0.3.3-windows-x64'
-} elseif ($version -eq '0.3.4') {
-    'Pica-Library-v0.3.4-windows-x64'
-} elseif ($version -eq '0.3.5') {
-    'Pica-Library-v0.3.5-windows-x64'
-} elseif ($version -eq '0.3.6') {
-    'Pica-Library-v0.3.6-windows-x64'
-} elseif ($version -eq '0.3.7') {
-    'Pica-Library-v0.3.7-windows-x64'
-} elseif ($version -eq '0.3.8') {
-    'Pica-Library-v0.3.8-windows-x64'
-} elseif ($version -eq '0.3.9') {
-    'Pica-Library-v0.3.9-windows-x64'
-} elseif ($version -eq '0.3.10') {
-    'Pica-Library-v0.3.10-windows-x64'
-} elseif ($version -eq '0.3.11') {
-    'Pica-Library-v0.3.11-windows-x64'
-} elseif ($version -eq '0.3.12') {
-    'Pica-Library-v0.3.12-windows-x64'
-} elseif ($version -eq '0.3.13') {
-    'Pica-Library-v0.3.13-windows-x64'
-} elseif ($version -eq '0.3.14') {
-    'Pica-Library-v0.3.14-windows-x64'
-} elseif ($version -eq '0.4.0') {
-    'Pica-Library-v0.4.0-windows-x64'
-} elseif ($version -eq '0.4.1') {
-    'Pica-Library-v0.4.1-windows-x64'
-} elseif ($version -eq '0.4.2') {
-    'Pica-Library-v0.4.2-windows-x64'
-} elseif ($version -eq '0.4.3') {
-    'Pica-Library-v0.4.3-windows-x64'
-} elseif ($version -eq '0.4.4') {
-    'Pica-Library-v0.4.4-windows-x64'
-} elseif ($version -eq '0.4.5') {
-    'Pica-Library-v0.4.5-windows-x64'
-} elseif ($version -eq '0.4.6') {
-    'Pica-Library-v0.4.6-windows-x64'
-} elseif ($version -eq '0.4.7') {
-    'Pica-Library-v0.4.7-windows-x64'
-} elseif ($version -eq '0.4.8') {
-    'Pica-Library-v0.4.8-windows-x64'
-} elseif ($version -eq '0.4.9') {
-    'Pica-Library-v0.4.9-windows-x64'
-} elseif ($version -eq '0.4.10') {
-    'Pica-Library-v0.4.10-windows-x64'
-} elseif ($version -eq '0.4.11') {
-    'Pica-Library-v0.4.11-windows-x64'
+$name = if ($version -match '^\d+\.\d+\.\d+$') {
+    "Pica-Library-v$version-windows-x64"
 } elseif ($version -eq '0.2.0-dev.0') {
     'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
 } elseif ($version -eq '0.2.0-dev.1') {
@@ -158,8 +104,501 @@ if (-not (Test-Path -LiteralPath $csc)) { throw 'The Windows .NET Framework comp
 & $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll "/out:$stage\Pica Library.exe" (Join-Path $root 'packaging\windows\Launcher.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
 
-if ($version -in @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10','0.4.11')) {
-    $baseZip = if ($version -eq '0.2.0-dev.1') {
+$historicLauncherReuseVersions = @('0.2.0-dev.1','0.2.0-dev.2','0.3.0','0.3.1','0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10','0.4.11')
+$launcherBaseVersion = [string]$env:PICA_WINDOWS_LAUNCHER_BASE_VERSION
+$launcherBaseHash = [string]$env:PICA_WINDOWS_LAUNCHER_BASE_SHA256
+$reuseAcceptedLauncher =
+    $version -in $historicLauncherReuseVersions -or
+    -not [string]::IsNullOrWhiteSpace($launcherBaseVersion)
+
+if ($reuseAcceptedLauncher) {
+    $baseZip = if (-not [string]::IsNullOrWhiteSpace($launcherBaseVersion)) {
+        if ($launcherBaseVersion -notmatch '^\d+\.\d+\.\d+
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
+    } elseif ($version -eq '0.2.0-dev.2') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'
+    } elseif ($version -eq '0.3.0') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
+    } elseif ($version -eq '0.3.1') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.0-windows-x64.zip'
+    } elseif ($version -eq '0.3.2') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.1-windows-x64.zip'
+    } elseif ($version -eq '0.3.3') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.2-windows-x64.zip'
+    } elseif ($version -eq '0.3.4') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.3-windows-x64.zip'
+    } elseif ($version -eq '0.3.5') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.4-windows-x64.zip'
+    } elseif ($version -eq '0.3.6') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.5-windows-x64.zip'
+    } elseif ($version -eq '0.3.7') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.6-windows-x64.zip'
+    } elseif ($version -eq '0.3.8') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.7-windows-x64.zip'
+    } elseif ($version -eq '0.3.9') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.8-windows-x64.zip'
+    } elseif ($version -eq '0.3.10') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.9-windows-x64.zip'
+    } elseif ($version -eq '0.3.11') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.10-windows-x64.zip'
+    } elseif ($version -eq '0.3.12') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.11-windows-x64.zip'
+    } elseif ($version -eq '0.3.13') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.12-windows-x64.zip'
+    } elseif ($version -eq '0.3.14') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.13-windows-x64.zip'
+    } elseif ($version -eq '0.4.0') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.14-windows-x64.zip'
+    } elseif ($version -eq '0.4.1') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.0-windows-x64.zip'
+    } elseif ($version -eq '0.4.2') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.1-windows-x64.zip'
+    } elseif ($version -eq '0.4.3') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.2-windows-x64.zip'
+    } elseif ($version -eq '0.4.4') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.3-windows-x64.zip'
+    } elseif ($version -eq '0.4.5') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.4-windows-x64.zip'
+    } elseif ($version -eq '0.4.6') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.5-windows-x64.zip'
+    } elseif ($version -eq '0.4.7') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.6-windows-x64.zip'
+    } elseif ($version -eq '0.4.8') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.7-windows-x64.zip'
+    } elseif ($version -eq '0.4.9') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.8-windows-x64.zip'
+    } elseif ($version -eq '0.4.10') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.9-windows-x64.zip'
+    } elseif ($version -eq '0.4.11') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.10-windows-x64.zip'
+    }
+    if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
+    if (-not [string]::IsNullOrWhiteSpace($launcherBaseVersion)) {
+        if ($launcherBaseHash -notmatch '^[0-9a-fA-F]{64} -and (Get-Sha256 $baseZip) -ne '0356f2c81259c1d8c43022be7be03232c376eb469242b8e41480f6c5f2e4e660') {
+        throw 'The v0.3.11 official base package checksum does not match'
+    }
+    if ($version -eq '0.3.13' -and (Get-Sha256 $baseZip) -ne 'a18cb46d40a077ba6f6ee46b9c8ee6df78812e2e384bbeff63dbc4a563497810') {
+        throw 'The v0.3.12 official base package checksum does not match'
+    }
+    if ($version -eq '0.3.14' -and (Get-Sha256 $baseZip) -ne '4575cc0c073d68baac4a6e34979d25c062b83086053f86a87bd0d4d847cf1c77') {
+        throw 'The v0.3.13 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.0' -and (Get-Sha256 $baseZip) -ne '211bc7d7d4f384af0389288439e38a645a7e8a458e56d947d005cd179848cb56') {
+        throw 'The v0.3.14 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.1' -and (Get-Sha256 $baseZip) -ne '1e22df88d067c34152e1a94008fbb4c378c543fc41450768e01c25c105e698d0') {
+        throw 'The v0.4.0 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.2' -and (Get-Sha256 $baseZip) -ne '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d') {
+        throw 'The v0.4.1 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.3' -and (Get-Sha256 $baseZip) -ne '96bcc020c7cd19aa84f982af9010f6656a44dc01b827839d6e24c40e36ec24c1') {
+        throw 'The v0.4.2 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.4' -and (Get-Sha256 $baseZip) -ne '36283292a1b3aefb1032b11c5064663bef9176d4bf32562be6a3f531c84ac733') {
+        throw 'The v0.4.3 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.5' -and (Get-Sha256 $baseZip) -ne 'cff1c7cf5d79300d8fa38e9faf9d7280c20df1641908fbf28a28e32d3de41bff') {
+        throw 'The v0.4.4 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.6' -and (Get-Sha256 $baseZip) -ne 'f5b93b4a81c78df17bbee793354d4e8df002fad6dcc9c432e334bb7c14fee901') {
+        throw 'The v0.4.5 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.7' -and (Get-Sha256 $baseZip) -ne '914d691b441e8dbc95a9ef0bb7a7ebc46940bfc44907e0595a8953a293bda50c') {
+        throw 'The v0.4.6 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.8' -and (Get-Sha256 $baseZip) -ne 'dafea5417e27055c6a4871b7386f31b66a51f82a5ce01136d467ee1176659947') {
+        throw 'The v0.4.7 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.9' -and (Get-Sha256 $baseZip) -ne '6fd3eb5a1346cd2211efe5b47588b38d4099d6e768f836461969eaf22d64e26d') {
+        throw 'The v0.4.8 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.10' -and (Get-Sha256 $baseZip) -ne '862570ee4517453da594a21e937b6d8ebc6114df6724ac3976457fa38f544941') {
+        throw 'The v0.4.9 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.11' -and (Get-Sha256 $baseZip) -ne '6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab') {
+        throw 'The v0.4.10 official base package checksum does not match'
+    }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [IO.Compression.ZipFile]::OpenRead($baseZip)
+    try {
+        $baseSourceEntry = $archive.GetEntry('SOURCE_SHA.txt')
+        $baseLauncherEntry = $archive.GetEntry('Pica Library.exe')
+        if (-not $baseSourceEntry -or -not $baseLauncherEntry) { throw 'The dev.0 package is missing launcher provenance' }
+        $reader = New-Object IO.StreamReader($baseSourceEntry.Open())
+        try { $baseSourceSha = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
+        if (
+            $version -in @('0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10','0.4.11') -or
+            -not [string]::IsNullOrWhiteSpace($launcherBaseVersion)
+        ) {
+            # Stable packages intentionally store opaque public provenance rather than private Git SHAs.
+            # Verify the launcher source itself is still byte-identical before reusing the accepted launcher binary.
+            $launcherBlob = (git -C $root hash-object 'packaging/windows/Launcher.cs').Trim()
+            if ($launcherBlob -ne '1351568469abf3edcb61354144498ec9734ad08f') {
+                throw 'Launcher source changed since accepted stable package; a full install is required'
+            }
+        } else {
+            & git -C $root diff --quiet "$baseSourceSha..$gitSourceSha" -- 'packaging/windows/Launcher.cs'
+            if ($LASTEXITCODE -ne 0) { throw 'Launcher source changed; a full install is required' }
+        }
+        $destination = [IO.File]::Open((Join-Path $stage 'Pica Library.exe'),[IO.FileMode]::Create,[IO.FileAccess]::Write)
+        try {
+            $source = $baseLauncherEntry.Open()
+            try { $source.CopyTo($destination) } finally { $source.Dispose() }
+        } finally { $destination.Dispose() }
+    } finally { $archive.Dispose() }
+}
+
+$readme = @"
+Pica Library v$version for Windows 10/11 x64
+
+1. Extract the entire ZIP.
+2. Double-click Pica Library.exe.
+3. Complete setup in the browser.
+4. To use Browser Lite, open Settings > Browser Lite and export the data package.
+
+Users upgrading from v0.1.3 must use a complete Windows ZIP.
+From v0.2.0 onward, compatible releases may use the built-in incremental update flow.
+No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
+This unsigned build may show a Windows SmartScreen reputation warning.
+"@
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
+$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
+
+$forbidden = Get-ChildItem -LiteralPath $stage -Recurse -Force | Where-Object {
+    $_.Name -eq '.git' -or
+    $_.Name -match '^\.env($|\.)' -or
+    $_.Name -match '\.db(-shm|-wal)?$' -or
+    $_.FullName -match '\\node_modules\\'
+}
+if ($forbidden) { throw 'Forbidden package content detected' }
+$textFiles = Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object {
+    $_.Extension -in @('.js','.html','.css','.json','.md','.txt')
+}
+foreach ($file in $textFiles) {
+    $text = [IO.File]::ReadAllText($file.FullName)
+    if ($text -match '(?i)[A-Z]:\\Users\\[^\\]+\\' -or $text -match '(?im)^\s*PICA_(ACCOUNT|PASSWORD)\s*=\s*[^;\r\n]+$') {
+        throw "Sensitive or developer-specific content detected in $($file.Name)"
+    }
+}
+Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+$hash = Get-Sha256 $zip
+[IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
+[ordered]@{
+    path=$zip
+    sha256=$hash
+    size_bytes=(Get-Item $zip).Length
+    uncompressed_bytes=(Get-ChildItem $stage -File -Recurse | Measure-Object Length -Sum).Sum
+    file_count=@(Get-ChildItem $stage -File -Recurse).Count
+    node_version=$nodeVersion
+    product_version=$version
+    source_sha=$sourceSha
+    launcher_base_version=if ($reuseAcceptedLauncher) {
+        if ($launcherBaseVersion) { $launcherBaseVersion } else { 'historical-fixed' }
+    } else { $null }
+} | ConvertTo-Json
+) {
+            throw "Invalid PICA_WINDOWS_LAUNCHER_BASE_VERSION: $launcherBaseVersion"
+        }
+        Join-Path $root "artifacts\release-base\Pica-Library-v$launcherBaseVersion-windows-x64.zip"
+    } elseif ($version -eq '0.2.0-dev.1') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
+    } elseif ($version -eq '0.2.0-dev.2') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'
+    } elseif ($version -eq '0.3.0') {
+        Join-Path $root 'artifacts\Pica-Library-v0.2.0-windows-x64.zip'
+    } elseif ($version -eq '0.3.1') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.0-windows-x64.zip'
+    } elseif ($version -eq '0.3.2') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.1-windows-x64.zip'
+    } elseif ($version -eq '0.3.3') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.2-windows-x64.zip'
+    } elseif ($version -eq '0.3.4') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.3-windows-x64.zip'
+    } elseif ($version -eq '0.3.5') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.4-windows-x64.zip'
+    } elseif ($version -eq '0.3.6') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.5-windows-x64.zip'
+    } elseif ($version -eq '0.3.7') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.6-windows-x64.zip'
+    } elseif ($version -eq '0.3.8') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.7-windows-x64.zip'
+    } elseif ($version -eq '0.3.9') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.8-windows-x64.zip'
+    } elseif ($version -eq '0.3.10') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.9-windows-x64.zip'
+    } elseif ($version -eq '0.3.11') {
+        Join-Path $root 'artifacts\Pica-Library-v0.3.10-windows-x64.zip'
+    } elseif ($version -eq '0.3.12') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.11-windows-x64.zip'
+    } elseif ($version -eq '0.3.13') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.12-windows-x64.zip'
+    } elseif ($version -eq '0.3.14') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.13-windows-x64.zip'
+    } elseif ($version -eq '0.4.0') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.3.14-windows-x64.zip'
+    } elseif ($version -eq '0.4.1') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.0-windows-x64.zip'
+    } elseif ($version -eq '0.4.2') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.1-windows-x64.zip'
+    } elseif ($version -eq '0.4.3') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.2-windows-x64.zip'
+    } elseif ($version -eq '0.4.4') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.3-windows-x64.zip'
+    } elseif ($version -eq '0.4.5') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.4-windows-x64.zip'
+    } elseif ($version -eq '0.4.6') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.5-windows-x64.zip'
+    } elseif ($version -eq '0.4.7') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.6-windows-x64.zip'
+    } elseif ($version -eq '0.4.8') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.7-windows-x64.zip'
+    } elseif ($version -eq '0.4.9') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.8-windows-x64.zip'
+    } elseif ($version -eq '0.4.10') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.9-windows-x64.zip'
+    } elseif ($version -eq '0.4.11') {
+        Join-Path $root 'artifacts\release-base\Pica-Library-v0.4.10-windows-x64.zip'
+    }
+    if (-not (Test-Path -LiteralPath $baseZip)) { throw 'The previous accepted package is required to reuse its unchanged launcher' }
+    if ($version -eq '0.3.12' -and (Get-Sha256 $baseZip) -ne '0356f2c81259c1d8c43022be7be03232c376eb469242b8e41480f6c5f2e4e660') {
+        throw 'The v0.3.11 official base package checksum does not match'
+    }
+    if ($version -eq '0.3.13' -and (Get-Sha256 $baseZip) -ne 'a18cb46d40a077ba6f6ee46b9c8ee6df78812e2e384bbeff63dbc4a563497810') {
+        throw 'The v0.3.12 official base package checksum does not match'
+    }
+    if ($version -eq '0.3.14' -and (Get-Sha256 $baseZip) -ne '4575cc0c073d68baac4a6e34979d25c062b83086053f86a87bd0d4d847cf1c77') {
+        throw 'The v0.3.13 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.0' -and (Get-Sha256 $baseZip) -ne '211bc7d7d4f384af0389288439e38a645a7e8a458e56d947d005cd179848cb56') {
+        throw 'The v0.3.14 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.1' -and (Get-Sha256 $baseZip) -ne '1e22df88d067c34152e1a94008fbb4c378c543fc41450768e01c25c105e698d0') {
+        throw 'The v0.4.0 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.2' -and (Get-Sha256 $baseZip) -ne '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d') {
+        throw 'The v0.4.1 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.3' -and (Get-Sha256 $baseZip) -ne '96bcc020c7cd19aa84f982af9010f6656a44dc01b827839d6e24c40e36ec24c1') {
+        throw 'The v0.4.2 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.4' -and (Get-Sha256 $baseZip) -ne '36283292a1b3aefb1032b11c5064663bef9176d4bf32562be6a3f531c84ac733') {
+        throw 'The v0.4.3 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.5' -and (Get-Sha256 $baseZip) -ne 'cff1c7cf5d79300d8fa38e9faf9d7280c20df1641908fbf28a28e32d3de41bff') {
+        throw 'The v0.4.4 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.6' -and (Get-Sha256 $baseZip) -ne 'f5b93b4a81c78df17bbee793354d4e8df002fad6dcc9c432e334bb7c14fee901') {
+        throw 'The v0.4.5 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.7' -and (Get-Sha256 $baseZip) -ne '914d691b441e8dbc95a9ef0bb7a7ebc46940bfc44907e0595a8953a293bda50c') {
+        throw 'The v0.4.6 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.8' -and (Get-Sha256 $baseZip) -ne 'dafea5417e27055c6a4871b7386f31b66a51f82a5ce01136d467ee1176659947') {
+        throw 'The v0.4.7 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.9' -and (Get-Sha256 $baseZip) -ne '6fd3eb5a1346cd2211efe5b47588b38d4099d6e768f836461969eaf22d64e26d') {
+        throw 'The v0.4.8 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.10' -and (Get-Sha256 $baseZip) -ne '862570ee4517453da594a21e937b6d8ebc6114df6724ac3976457fa38f544941') {
+        throw 'The v0.4.9 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.11' -and (Get-Sha256 $baseZip) -ne '6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab') {
+        throw 'The v0.4.10 official base package checksum does not match'
+    }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [IO.Compression.ZipFile]::OpenRead($baseZip)
+    try {
+        $baseSourceEntry = $archive.GetEntry('SOURCE_SHA.txt')
+        $baseLauncherEntry = $archive.GetEntry('Pica Library.exe')
+        if (-not $baseSourceEntry -or -not $baseLauncherEntry) { throw 'The dev.0 package is missing launcher provenance' }
+        $reader = New-Object IO.StreamReader($baseSourceEntry.Open())
+        try { $baseSourceSha = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
+        if ($version -in @('0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10','0.4.11')) {
+            # Stable packages intentionally store opaque public provenance rather than private Git SHAs.
+            # Verify the launcher source itself is still byte-identical before reusing the accepted launcher binary.
+            $launcherBlob = (git -C $root hash-object 'packaging/windows/Launcher.cs').Trim()
+            if ($launcherBlob -ne '1351568469abf3edcb61354144498ec9734ad08f') {
+                throw 'Launcher source changed since accepted stable package; a full install is required'
+            }
+        } else {
+            & git -C $root diff --quiet "$baseSourceSha..$gitSourceSha" -- 'packaging/windows/Launcher.cs'
+            if ($LASTEXITCODE -ne 0) { throw 'Launcher source changed; a full install is required' }
+        }
+        $destination = [IO.File]::Open((Join-Path $stage 'Pica Library.exe'),[IO.FileMode]::Create,[IO.FileAccess]::Write)
+        try {
+            $source = $baseLauncherEntry.Open()
+            try { $source.CopyTo($destination) } finally { $source.Dispose() }
+        } finally { $destination.Dispose() }
+    } finally { $archive.Dispose() }
+}
+
+$readme = @"
+Pica Library v$version for Windows 10/11 x64
+
+1. Extract the entire ZIP.
+2. Double-click Pica Library.exe.
+3. Complete setup in the browser.
+4. To use Browser Lite, open Settings > Browser Lite and export the data package.
+
+Users upgrading from v0.1.3 must use a complete Windows ZIP.
+From v0.2.0 onward, compatible releases may use the built-in incremental update flow.
+No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
+This unsigned build may show a Windows SmartScreen reputation warning.
+"@
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
+$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
+
+$forbidden = Get-ChildItem -LiteralPath $stage -Recurse -Force | Where-Object {
+    $_.Name -eq '.git' -or
+    $_.Name -match '^\.env($|\.)' -or
+    $_.Name -match '\.db(-shm|-wal)?$' -or
+    $_.FullName -match '\\node_modules\\'
+}
+if ($forbidden) { throw 'Forbidden package content detected' }
+$textFiles = Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object {
+    $_.Extension -in @('.js','.html','.css','.json','.md','.txt')
+}
+foreach ($file in $textFiles) {
+    $text = [IO.File]::ReadAllText($file.FullName)
+    if ($text -match '(?i)[A-Z]:\\Users\\[^\\]+\\' -or $text -match '(?im)^\s*PICA_(ACCOUNT|PASSWORD)\s*=\s*[^;\r\n]+$') {
+        throw "Sensitive or developer-specific content detected in $($file.Name)"
+    }
+}
+Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+$hash = Get-Sha256 $zip
+[IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
+[ordered]@{ path=$zip; sha256=$hash; size_bytes=(Get-Item $zip).Length; uncompressed_bytes=(Get-ChildItem $stage -File -Recurse | Measure-Object Length -Sum).Sum; file_count=@(Get-ChildItem $stage -File -Recurse).Count; node_version=$nodeVersion; product_version=$version; source_sha=$sourceSha } | ConvertTo-Json
+) {
+            throw 'PICA_WINDOWS_LAUNCHER_BASE_SHA256 must be a 64-character SHA-256'
+        }
+        $actualBaseHash = Get-Sha256 $baseZip
+        if ($actualBaseHash -ne $launcherBaseHash.ToLowerInvariant()) {
+            throw "Official v$launcherBaseVersion launcher base package checksum mismatch: $actualBaseHash"
+        }
+    }
+    if ($version -eq '0.3.12' -and (Get-Sha256 $baseZip) -ne '0356f2c81259c1d8c43022be7be03232c376eb469242b8e41480f6c5f2e4e660') {
+        throw 'The v0.3.11 official base package checksum does not match'
+    }
+    if ($version -eq '0.3.13' -and (Get-Sha256 $baseZip) -ne 'a18cb46d40a077ba6f6ee46b9c8ee6df78812e2e384bbeff63dbc4a563497810') {
+        throw 'The v0.3.12 official base package checksum does not match'
+    }
+    if ($version -eq '0.3.14' -and (Get-Sha256 $baseZip) -ne '4575cc0c073d68baac4a6e34979d25c062b83086053f86a87bd0d4d847cf1c77') {
+        throw 'The v0.3.13 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.0' -and (Get-Sha256 $baseZip) -ne '211bc7d7d4f384af0389288439e38a645a7e8a458e56d947d005cd179848cb56') {
+        throw 'The v0.3.14 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.1' -and (Get-Sha256 $baseZip) -ne '1e22df88d067c34152e1a94008fbb4c378c543fc41450768e01c25c105e698d0') {
+        throw 'The v0.4.0 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.2' -and (Get-Sha256 $baseZip) -ne '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d') {
+        throw 'The v0.4.1 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.3' -and (Get-Sha256 $baseZip) -ne '96bcc020c7cd19aa84f982af9010f6656a44dc01b827839d6e24c40e36ec24c1') {
+        throw 'The v0.4.2 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.4' -and (Get-Sha256 $baseZip) -ne '36283292a1b3aefb1032b11c5064663bef9176d4bf32562be6a3f531c84ac733') {
+        throw 'The v0.4.3 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.5' -and (Get-Sha256 $baseZip) -ne 'cff1c7cf5d79300d8fa38e9faf9d7280c20df1641908fbf28a28e32d3de41bff') {
+        throw 'The v0.4.4 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.6' -and (Get-Sha256 $baseZip) -ne 'f5b93b4a81c78df17bbee793354d4e8df002fad6dcc9c432e334bb7c14fee901') {
+        throw 'The v0.4.5 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.7' -and (Get-Sha256 $baseZip) -ne '914d691b441e8dbc95a9ef0bb7a7ebc46940bfc44907e0595a8953a293bda50c') {
+        throw 'The v0.4.6 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.8' -and (Get-Sha256 $baseZip) -ne 'dafea5417e27055c6a4871b7386f31b66a51f82a5ce01136d467ee1176659947') {
+        throw 'The v0.4.7 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.9' -and (Get-Sha256 $baseZip) -ne '6fd3eb5a1346cd2211efe5b47588b38d4099d6e768f836461969eaf22d64e26d') {
+        throw 'The v0.4.8 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.10' -and (Get-Sha256 $baseZip) -ne '862570ee4517453da594a21e937b6d8ebc6114df6724ac3976457fa38f544941') {
+        throw 'The v0.4.9 official base package checksum does not match'
+    }
+    if ($version -eq '0.4.11' -and (Get-Sha256 $baseZip) -ne '6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab') {
+        throw 'The v0.4.10 official base package checksum does not match'
+    }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = [IO.Compression.ZipFile]::OpenRead($baseZip)
+    try {
+        $baseSourceEntry = $archive.GetEntry('SOURCE_SHA.txt')
+        $baseLauncherEntry = $archive.GetEntry('Pica Library.exe')
+        if (-not $baseSourceEntry -or -not $baseLauncherEntry) { throw 'The dev.0 package is missing launcher provenance' }
+        $reader = New-Object IO.StreamReader($baseSourceEntry.Open())
+        try { $baseSourceSha = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
+        if ($version -in @('0.3.2','0.3.3','0.3.4','0.3.5','0.3.6','0.3.7','0.3.8','0.3.9','0.3.10','0.3.11','0.3.12','0.3.13','0.3.14','0.4.0','0.4.1','0.4.2','0.4.3','0.4.4','0.4.5','0.4.6','0.4.7','0.4.8','0.4.9','0.4.10','0.4.11')) {
+            # Stable packages intentionally store opaque public provenance rather than private Git SHAs.
+            # Verify the launcher source itself is still byte-identical before reusing the accepted launcher binary.
+            $launcherBlob = (git -C $root hash-object 'packaging/windows/Launcher.cs').Trim()
+            if ($launcherBlob -ne '1351568469abf3edcb61354144498ec9734ad08f') {
+                throw 'Launcher source changed since accepted stable package; a full install is required'
+            }
+        } else {
+            & git -C $root diff --quiet "$baseSourceSha..$gitSourceSha" -- 'packaging/windows/Launcher.cs'
+            if ($LASTEXITCODE -ne 0) { throw 'Launcher source changed; a full install is required' }
+        }
+        $destination = [IO.File]::Open((Join-Path $stage 'Pica Library.exe'),[IO.FileMode]::Create,[IO.FileAccess]::Write)
+        try {
+            $source = $baseLauncherEntry.Open()
+            try { $source.CopyTo($destination) } finally { $source.Dispose() }
+        } finally { $destination.Dispose() }
+    } finally { $archive.Dispose() }
+}
+
+$readme = @"
+Pica Library v$version for Windows 10/11 x64
+
+1. Extract the entire ZIP.
+2. Double-click Pica Library.exe.
+3. Complete setup in the browser.
+4. To use Browser Lite, open Settings > Browser Lite and export the data package.
+
+Users upgrading from v0.1.3 must use a complete Windows ZIP.
+From v0.2.0 onward, compatible releases may use the built-in incremental update flow.
+No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
+This unsigned build may show a Windows SmartScreen reputation warning.
+"@
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
+$readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
+$readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
+[IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
+
+$forbidden = Get-ChildItem -LiteralPath $stage -Recurse -Force | Where-Object {
+    $_.Name -eq '.git' -or
+    $_.Name -match '^\.env($|\.)' -or
+    $_.Name -match '\.db(-shm|-wal)?$' -or
+    $_.FullName -match '\\node_modules\\'
+}
+if ($forbidden) { throw 'Forbidden package content detected' }
+$textFiles = Get-ChildItem -LiteralPath $stage -Recurse -File | Where-Object {
+    $_.Extension -in @('.js','.html','.css','.json','.md','.txt')
+}
+foreach ($file in $textFiles) {
+    $text = [IO.File]::ReadAllText($file.FullName)
+    if ($text -match '(?i)[A-Z]:\\Users\\[^\\]+\\' -or $text -match '(?im)^\s*PICA_(ACCOUNT|PASSWORD)\s*=\s*[^;\r\n]+$') {
+        throw "Sensitive or developer-specific content detected in $($file.Name)"
+    }
+}
+Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+$hash = Get-Sha256 $zip
+[IO.File]::WriteAllText((Join-Path $root 'artifacts\SHA256SUMS.txt'),"$hash  $name.zip`n",(New-Object Text.UTF8Encoding($false)))
+[ordered]@{ path=$zip; sha256=$hash; size_bytes=(Get-Item $zip).Length; uncompressed_bytes=(Get-ChildItem $stage -File -Recurse | Measure-Object Length -Sum).Sum; file_count=@(Get-ChildItem $stage -File -Recurse).Count; node_version=$nodeVersion; product_version=$version; source_sha=$sourceSha } | ConvertTo-Json
+) {
+            throw "Invalid PICA_WINDOWS_LAUNCHER_BASE_VERSION: $launcherBaseVersion"
+        }
+        Join-Path $root "artifacts\release-base\Pica-Library-v$launcherBaseVersion-windows-x64.zip"
+    } elseif ($version -eq '0.2.0-dev.1') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.0-update-base-windows-x64.zip'
     } elseif ($version -eq '0.2.0-dev.2') {
         Join-Path $root 'artifacts\Pica-Library-v0.2.0-dev.1-local-test-windows-x64.zip'

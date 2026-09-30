@@ -125,14 +125,18 @@ function item(id, title, configured, current, currentTone) {
 
 function ensurePanel() {
     const settings = $c('#settings')
-    if (!settings) return null
+    const connections = $c('#a87-connections-panel')
+    if (!settings && !connections) return null
     let panel = $c('#a83-connections')
     if (!panel) {
         panel = document.createElement('article')
         panel.id = 'a83-connections'
         panel.className = 'panel a83-panel'
+    }
+    if (connections && panel.parentElement !== connections) connections.prepend(panel)
+    else if (!panel.isConnected && settings) {
         const form = $c('#settings-form')
-        if (form) form.insertAdjacentElement('beforebegin', panel)
+        if (form && settings.contains(form)) form.insertAdjacentElement('beforebegin', panel)
         else settings.prepend(panel)
     }
     return panel

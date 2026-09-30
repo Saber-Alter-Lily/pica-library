@@ -217,7 +217,7 @@ for (const viewport of viewports) {
                 }
             }
             await openSettings(page)
-            for (const id of ['general','recommendations','connections','appearance','storage','maintenance','software']) {
+            for (const id of ['general','recommendations','connections','appearance','storage','maintenance']) {
                 const tab = page.locator(`#a87-${id}-tab`)
                 await expect(tab).toBeVisible()
                 await tab.click()

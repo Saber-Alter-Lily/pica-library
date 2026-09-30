@@ -31,6 +31,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $rootPath 'Pica Library.exe'))) {
 }
 $launcher = Join-Path $rootPath 'Pica Library.exe'
 if (-not (Test-Path -LiteralPath $launcher)) { throw 'Pica Library.exe is missing' }
+foreach ($helper in @('app\updater.js','app\full-upgrader.js')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $rootPath $helper))) {
+        throw "Packaged update helper is missing: $helper"
+    }
+}
 foreach ($guide in @('README-WINDOWS.txt','README-WINDOWS.zh-CN.txt')) {
     if (-not (Test-Path -LiteralPath (Join-Path $rootPath $guide))) { throw "Windows guide is missing: $guide" }
 }

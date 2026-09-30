@@ -36,7 +36,8 @@
     "benchmark:desktop-download-load": "tsx scripts/benchmark/desktop-download-load-harness.ts",
     "benchmark:desktop-webdav-load": "node scripts/run-desktop-webdav-load-harness.mjs",
     "benchmark:desktop-visual-index": "node scripts/run-desktop-browser-detail-reader-harness.mjs --benchmark-script=scripts/benchmark/desktop-visual-index-harness.mjs",
-    "benchmark:desktop-overlap-load": "node scripts/run-desktop-webdav-load-harness.mjs --benchmark-script=scripts/benchmark/desktop-overlap-load-harness.ts"
+    "benchmark:desktop-overlap-load": "node scripts/run-desktop-webdav-load-harness.mjs --benchmark-script=scripts/benchmark/desktop-overlap-load-harness.ts",
+    "build:upgrade-assistant": "tsx scripts/build-upgrade-assistant.ts"
   },
   "engines": {
     "node": ">=22.5"

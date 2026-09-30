@@ -281,7 +281,9 @@ export class UpdateManager {
         )
     }
 
-    preparePersistentUpgradeAssistant() {
+    preparePersistentUpgradeAssistant(
+        options: { verifyExisting?: boolean } = {}
+    ) {
         const target = this.updateTarget()
         if (!target || updateTargetKey(target) !== 'windows-x64')
             return {
@@ -320,19 +322,94 @@ export class UpdateManager {
             throw new Error(
                 'Persistent upgrade assistant must be outside the application directory'
             )
+
         const runtimeDirectory = path.join(root, 'runtime')
         const runtimePath = path.join(runtimeDirectory, 'node.exe')
         const helperPath = path.join(root, 'full-upgrader.js')
         const metadataPath = path.join(root, 'assistant.json')
-        fs.mkdirSync(runtimeDirectory, { recursive: true })
+        const currentIdentity = {
+            schemaVersion: 1,
+            productVersion: this.options.currentVersion,
+            sourceSha: this.options.currentSourceSha ?? null
+        }
 
-        const installFile = (source: string, destination: string) => {
+        const existingMetadata = (() => {
+            try {
+                const value = JSON.parse(
+                    fs.readFileSync(metadataPath, 'utf8')
+                ) as Record<string, unknown>
+                if (
+                    value.schemaVersion !== currentIdentity.schemaVersion ||
+                    value.productVersion !== currentIdentity.productVersion ||
+                    value.sourceSha !== currentIdentity.sourceSha ||
+                    typeof value.runtimeSha256 !== 'string' ||
+                    typeof value.helperSha256 !== 'string' ||
+                    typeof value.installedAt !== 'string'
+                )
+                    return null
+                return {
+                    ...currentIdentity,
+                    runtimeSha256: value.runtimeSha256,
+                    helperSha256: value.helperSha256,
+                    installedAt: value.installedAt
+                }
+            } catch {
+                return null
+            }
+        })()
+
+        const result = (metadata: {
+            schemaVersion: number
+            productVersion: string
+            sourceSha: string | null
+            runtimeSha256: string
+            helperSha256: string
+            installedAt: string
+        }) => ({
+            available: true as const,
+            root,
+            runtimePath,
+            helperPath,
+            metadataPath,
+            ...metadata
+        })
+
+        if (
+            existingMetadata &&
+            fs.existsSync(runtimePath) &&
+            fs.existsSync(helperPath)
+        ) {
+            if (!options.verifyExisting) return result(existingMetadata)
+            const runtimeSha256 = sha256(fs.readFileSync(runtimePath))
+            const helperSha256 = sha256(fs.readFileSync(helperPath))
+            const sourceRuntimeSha256 = sha256(
+                fs.readFileSync(sourceRuntime)
+            )
+            const sourceHelperSha256 = sha256(
+                fs.readFileSync(sourceHelper)
+            )
+            if (
+                runtimeSha256 === existingMetadata.runtimeSha256 &&
+                helperSha256 === existingMetadata.helperSha256 &&
+                sourceRuntimeSha256 === existingMetadata.runtimeSha256 &&
+                sourceHelperSha256 === existingMetadata.helperSha256
+            )
+                return result(existingMetadata)
+        }
+
+        fs.mkdirSync(runtimeDirectory, { recursive: true })
+        const sourceRuntimeSha256 = sha256(fs.readFileSync(sourceRuntime))
+        const sourceHelperSha256 = sha256(fs.readFileSync(sourceHelper))
+        const installFile = (
+            source: string,
+            destination: string,
+            expectedSha256: string
+        ) => {
             const temporary = destination + '.next'
             fs.rmSync(temporary, { force: true })
             fs.copyFileSync(source, temporary)
-            const expected = sha256(fs.readFileSync(source))
             const actual = sha256(fs.readFileSync(temporary))
-            if (actual !== expected) {
+            if (actual !== expectedSha256) {
                 fs.rmSync(temporary, { force: true })
                 throw new Error(
                     'Persistent upgrade assistant copy verification failed'
@@ -340,17 +417,14 @@ export class UpdateManager {
             }
             fs.rmSync(destination, { force: true })
             fs.renameSync(temporary, destination)
-            return expected
         }
 
-        const runtimeSha256 = installFile(sourceRuntime, runtimePath)
-        const helperSha256 = installFile(sourceHelper, helperPath)
+        installFile(sourceRuntime, runtimePath, sourceRuntimeSha256)
+        installFile(sourceHelper, helperPath, sourceHelperSha256)
         const metadata = {
-            schemaVersion: 1,
-            productVersion: this.options.currentVersion,
-            sourceSha: this.options.currentSourceSha ?? null,
-            runtimeSha256,
-            helperSha256,
+            ...currentIdentity,
+            runtimeSha256: sourceRuntimeSha256,
+            helperSha256: sourceHelperSha256,
             installedAt: new Date().toISOString()
         }
         const temporaryMetadata = metadataPath + '.next'
@@ -361,15 +435,7 @@ export class UpdateManager {
         )
         fs.rmSync(metadataPath, { force: true })
         fs.renameSync(temporaryMetadata, metadataPath)
-
-        return {
-            available: true as const,
-            root,
-            runtimePath,
-            helperPath,
-            metadataPath,
-            ...metadata
-        }
+        return result(metadata)
     }
 
     private updateTarget() {

@@ -60,7 +60,7 @@ test('tour completion records the onboarding version', async ({ page }) => {
         const next = page.locator('.driver-popover-next-btn')
         await expect(next).toBeVisible()
         await next.click()
-        await page.waitForTimeout(260)
+        await page.waitForTimeout(460)
     }
     await expect(page.locator('body')).not.toHaveClass(/driver-active/)
     const state = await page.evaluate(() => JSON.parse(localStorage.getItem('pica-onboarding-state-v1')))
@@ -139,7 +139,7 @@ test('task tour keeps every late Settings step anchored to the correct visible p
 
         const before = await page.locator('.driver-popover-progress-text').textContent()
         await page.locator('.driver-popover-next-btn').click()
-        await page.waitForTimeout(120)
+        await page.waitForTimeout(460)
         if (index < steps.length - 1) {
             const after = await page.locator('.driver-popover-progress-text').textContent()
             expect(after).not.toBe(before)

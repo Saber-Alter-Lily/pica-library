@@ -63,6 +63,11 @@ export interface DesktopServerController {
         name: string,
         value: Buffer
     ) => Promise<Record<string, unknown>>
+    stageFullUpdate?: (
+        version: string,
+        name: string,
+        value: Buffer
+    ) => Promise<Record<string, unknown>>
     applyUpdate?: (id: string) => Promise<Record<string, unknown>>
     updateProgress?: () => unknown
     runtimeTasks?: () => unknown
@@ -1379,61 +1384,88 @@ export async function startLibraryServer(options: {
                 url.pathname === '/api/v1/update/prepare-latest' &&
                 request.method === 'POST'
             ) {
-                if (
-                    !options.desktop?.checkForUpdate ||
-                    !options.desktop?.stageUpdate
-                )
+                if (!options.desktop?.checkForUpdate)
                     throw new Error('Updates are unavailable in this mode')
                 if (
-                    request.headers['x-pica-csrf'] !== options.desktop.csrfToken
+                    request.headers['x-pica-csrf'] !==
+                    options.desktop.csrfToken
                 )
                     return json(response, 403, {
                         error: 'This local request could not be verified'
                     })
+
                 const available = await options.desktop.checkForUpdate()
-                if (available.status !== 'incremental')
+                if (available.status === 'current')
                     return json(response, 200, available)
+
+                const status = String(available.status ?? '')
+                const version = String(available.version ?? '').trim()
                 const assetName = path.basename(
                     String(available.assetName ?? '')
                 )
-                const assetUrl = String(available.assetUrl ?? '')
+                const assetUrl = String(available.assetUrl ?? '').trim()
+
+                if (
+                    status === 'full-install' &&
+                    (!options.desktop.stageFullUpdate ||
+                        !assetName ||
+                        !assetUrl ||
+                        !version)
+                )
+                    return json(response, 200, available)
+
+                if (status === 'incremental' && !options.desktop.stageUpdate)
+                    throw new Error('Incremental updates are unavailable')
+                if (!['incremental', 'full-install'].includes(status))
+                    return json(response, 200, available)
                 if (!assetName || !assetUrl)
                     throw new Error(
-                        'Official incremental update asset is missing'
+                        'Official update asset is missing'
                     )
                 if (updateDownloadController)
                     throw new Error('An update download is already running')
+
                 updateDownloadController = new AbortController()
                 writeUpdateDownloadProgress({
                     phase: 'downloading',
                     current: 0,
                     total: 0,
-                    targetVersion: available.version
+                    targetVersion: version
                 })
                 try {
                     const archive = await downloadUpdateAsset(
                         assetUrl,
-                        128 * 1024 * 1024,
+                        status === 'full-install'
+                            ? 512 * 1024 * 1024
+                            : 128 * 1024 * 1024,
                         (current, total) =>
                             writeUpdateDownloadProgress({
                                 phase: 'downloading',
                                 current,
                                 total: total ?? 0,
-                                targetVersion: available.version
+                                targetVersion: version
                             }),
                         updateDownloadController.signal
                     )
                     updateDownloadController = null
                     updateDownloadProgress = null
-                    const staged = await options.desktop.stageUpdate(
-                        assetName,
-                        archive
-                    )
+                    const staged =
+                        status === 'full-install'
+                            ? await options.desktop.stageFullUpdate!(
+                                  version,
+                                  assetName,
+                                  archive
+                              )
+                            : await options.desktop.stageUpdate!(
+                                  assetName,
+                                  archive
+                              )
                     return json(response, 200, staged)
                 } catch (error) {
                     const cancelled =
                         error instanceof Error &&
-                        (error.name === 'AbortError' || /abort/i.test(error.message))
+                        (error.name === 'AbortError' ||
+                            /abort/i.test(error.message))
                     updateDownloadController = null
                     writeUpdateDownloadProgress({
                         phase: cancelled ? 'cancelled' : 'failed',
@@ -1442,7 +1474,7 @@ export async function startLibraryServer(options: {
                             : error instanceof Error
                               ? error.message
                               : String(error),
-                        targetVersion: available.version
+                        targetVersion: version
                     })
                     if (cancelled)
                         return json(response, 409, {

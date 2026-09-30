@@ -67,7 +67,7 @@ function normalizeFullPackagePath(value: string) {
 
 function validateFullApplicationArchive(zip: AdmZip) {
     const entries = zip.getEntries().filter((entry) => !entry.isDirectory)
-    const declared = new Map<string, AdmZip.IZipEntry>()
+    const declared = new Map<string, (typeof entries)[number]>()
     for (const entry of entries) {
         const safe = normalizeFullPackagePath(entry.entryName)
         if (forbiddenFullPackageRoot.test(safe))
@@ -677,6 +677,7 @@ export class UpdateManager {
             JSON.stringify(manifest, null, 2),
             'utf8'
         )
+        this.stagedFull = null
         this.staged = {
             id,
             archiveName,
@@ -710,11 +711,220 @@ export class UpdateManager {
         }
     }
 
-    apply(id: string) {
+    async stageFullApplication(
+        version: string,
+        archiveName: string,
+        buffer: Buffer
+    ) {
+        this.writeProgress({ phase: 'validating' })
+        try {
+            const target = this.updateTarget()
+            if (!target || updateTargetKey(target) !== 'windows-x64')
+                throw new Error(
+                    'One-click full application upgrade is currently supported only on Windows x64'
+                )
+            if (
+                !stableVersionParts(version) ||
+                !isNewerStable(version, this.options.currentVersion)
+            )
+                throw new Error(
+                    'Full application upgrade requires a newer stable version'
+                )
+            const expectedName =
+                `Pica-Library-v${version}-windows-x64.zip`
+            if (archiveName !== expectedName)
+                throw new Error(
+                    'Unexpected full application package name'
+                )
+            const archiveHash = sha256(buffer)
+            await this.verifyOfficialArchive(
+                version,
+                archiveName,
+                archiveHash
+            )
+            const zip = new AdmZip(buffer)
+            const validated = validateFullApplicationArchive(zip)
+            const id = randomUUID()
+            const directory = path.join(
+                this.options.stateRoot,
+                `full-staged-${id}`,
+                'application'
+            )
+            fs.mkdirSync(directory, { recursive: true })
+            this.writeProgress({
+                phase: 'extracting',
+                current: 0,
+                total: validated.declared.size,
+                targetVersion: version
+            })
+            let current = 0
+            for (const [safe, entry] of validated.declared) {
+                const destination = path.join(
+                    directory,
+                    ...safe.split('/')
+                )
+                fs.mkdirSync(path.dirname(destination), {
+                    recursive: true
+                })
+                fs.writeFileSync(destination, entry.getData())
+                current += 1
+                this.writeProgress({
+                    phase: 'extracting',
+                    current,
+                    total: validated.declared.size,
+                    targetVersion: version
+                })
+            }
+            this.staged = null
+            this.stagedFull = {
+                id,
+                archiveName,
+                archiveSha256: archiveHash,
+                directory,
+                targetVersion: version,
+                targetSourceSha: validated.sourceSha,
+                stagedAt: new Date().toISOString()
+            }
+            this.writeProgress({
+                phase: 'staged',
+                current: validated.declared.size,
+                total: validated.declared.size,
+                targetVersion: version
+            })
+            return {
+                id,
+                mode: 'full-application' as const,
+                archiveName,
+                archiveSha256: archiveHash,
+                targetVersion: version,
+                targetSourceSha: validated.sourceSha,
+                fileCount: validated.declared.size,
+                deletionCount: 0,
+                requiresFullInstall: true,
+                oneClick: true
+            }
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : String(error)
+            this.writeProgress({ phase: 'failed', message })
+            throw error
+        }
+    }
+
+    apply(
+        id: string,
+        context?: {
+            desktopHomeRoot: string
+            libraryDirectory: string
+            currentUrl?: string
+        }
+    ) {
+        if (this.stagedFull?.id === id) {
+            if (!context)
+                throw new Error(
+                    'Full application upgrade context is unavailable'
+                )
+            const full = this.stagedFull
+            const bootstrapRoot = path.join(
+                this.options.stateRoot,
+                `bootstrap-${full.id}`
+            )
+            fs.rmSync(bootstrapRoot, {
+                recursive: true,
+                force: true
+            })
+            fs.mkdirSync(bootstrapRoot, { recursive: true })
+            const bootstrapRuntime = path.join(
+                bootstrapRoot,
+                'node.exe'
+            )
+            const sourceHelper = path.join(
+                this.options.applicationRoot,
+                'app',
+                'full-upgrader.js'
+            )
+            const bootstrapHelper = path.join(
+                bootstrapRoot,
+                'full-upgrader.js'
+            )
+            if (!fs.existsSync(this.options.runtimePath))
+                throw new Error(
+                    'Bundled runtime is unavailable for full upgrade'
+                )
+            if (!fs.existsSync(sourceHelper))
+                throw new Error(
+                    'Full application upgrade helper is missing'
+                )
+            fs.copyFileSync(
+                this.options.runtimePath,
+                bootstrapRuntime
+            )
+            fs.copyFileSync(sourceHelper, bootstrapHelper)
+
+            const stamp = new Date()
+                .toISOString()
+                .replace(/[:.]/g, '-')
+            const backupRoot = path.join(
+                path.dirname(this.options.applicationRoot),
+                `${path.basename(
+                    this.options.applicationRoot
+                )}.backup-before-v${full.targetVersion}-${stamp}`
+            )
+            const instruction: FullApplicationUpdaterInstruction = {
+                parentPid: process.pid,
+                applicationRoot: this.options.applicationRoot,
+                stagedApplicationRoot: full.directory,
+                backupRoot,
+                bootstrapRoot,
+                desktopHomeRoot: context.desktopHomeRoot,
+                libraryDirectory: context.libraryDirectory,
+                instanceFile: this.options.instanceFile,
+                progressFile: this.progressFile,
+                targetVersion: full.targetVersion,
+                targetSourceSha: full.targetSourceSha,
+                previousUrl: context.currentUrl,
+                healthTimeoutMs: 60_000
+            }
+            const instructionFile = path.join(
+                bootstrapRoot,
+                'instruction.json'
+            )
+            fs.writeFileSync(
+                instructionFile,
+                JSON.stringify(instruction),
+                'utf8'
+            )
+            this.writeProgress({
+                phase: 'waiting-for-exit',
+                targetVersion: full.targetVersion
+            })
+            const child = spawn(
+                bootstrapRuntime,
+                [bootstrapHelper, instructionFile],
+                {
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsHide: true,
+                    cwd: bootstrapRoot,
+                    env: sanitizedChildEnv()
+                }
+            )
+            child.unref()
+            return {
+                accepted: true,
+                mode: 'full-application' as const,
+                targetVersion: full.targetVersion
+            }
+        }
+
         if (!this.staged || this.staged.id !== id)
-            throw new Error('The staged update is no longer available')
+            throw new Error(
+                'The staged update is no longer available'
+            )
         if (this.staged.manifest.requiresFullInstall)
-            throw new Error('此更新需要完整安装包。')
+            throw new Error(
+                'This update requires the full application upgrade path'
+            )
         const instruction: UpdaterInstruction = {
             parentPid: process.pid,
             applicationRoot: this.options.applicationRoot,
@@ -735,7 +945,11 @@ export class UpdateManager {
             this.options.stateRoot,
             `instruction-${this.staged.id}.json`
         )
-        fs.writeFileSync(instructionFile, JSON.stringify(instruction), 'utf8')
+        fs.writeFileSync(
+            instructionFile,
+            JSON.stringify(instruction),
+            'utf8'
+        )
         const updater = path.join(
             this.options.applicationRoot,
             'app',
@@ -760,6 +974,7 @@ export class UpdateManager {
         child.unref()
         return {
             accepted: true,
+            mode: 'incremental' as const,
             targetVersion: this.staged.manifest.targetVersion
         }
     }

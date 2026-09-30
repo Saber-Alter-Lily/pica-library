@@ -2786,3 +2786,81 @@ Compatibility boundary:
 - After users install the first stable release containing NEXT-31, future Windows x64 stable schema jumps, updater replacements and major application-tree changes must preserve this universal one-click contract.
 
 Stable v0.4.11 Release assets and stable OTA metadata remain untouched.
+
+
+## NEXT-32 — Next stable release scope / v0.4.11 bridge / support-provider reconciliation
+**Status: IN PROGRESS — release preparation only; does not close the project backlog**
+
+### Why this entry exists
+The next stable release must not be treated as equivalent to “finish every open item in this log”.
+
+Repository history confirms three different scopes:
+
+1. public stable `v0.4.11`;
+2. current `main`, which is **1058 commits ahead of v0.4.11** and already contains a large body of unreleased architecture/runtime, evidence tooling and experimental-platform work;
+3. PR #197, which is a later corrective/release-preparation layer on top of `main` and is currently **121 commits ahead of main** at this reconciliation point.
+
+Therefore P1/P2/P3/P4/W5/P6 remain authoritative project tracks after the next stable release. Their PARTIAL / IN_PROGRESS / PLANNED / DEFERRED items are not silently converted into release blockers or marked DONE merely because a stable package is being prepared.
+
+### R1 — Support provider migration
+Decision:
+- All current user-facing sponsorship/support entry points migrate from AFDIAN / 爱发电 to **AZZ / 爱赞助**.
+- Canonical support URL: `https://azz.net/PicaLibrary`.
+- Web, Android, GitHub Funding, README/guides, localization resources and their tests must move together.
+- Sponsorship remains voluntary and must never gate product features, content or access.
+
+Implementation:
+- support UI/docs migration is committed on PR #197;
+- final validation must include a repository scan proving no active AFDIAN endpoint remains.
+
+### R2 — Preserve direct one-click upgrade eligibility from public v0.4.11
+Public v0.4.11 authority:
+- App API: 2;
+- database schema: 13;
+- existing Web updater supports a source-scoped stable incremental package when App API is unchanged, the schema advances by at most one step and `app/updater.js` itself is not replaced.
+
+Release-preparation audit found that unreleased schema 14/15/16 changes are all additive indexes and no public stable release has shipped those migration numbers. They are therefore consolidated into one schema-14 migration containing the same indexes.
+
+Expected next-stable compatibility:
+- v0.4.11 schema 13 -> candidate schema 14;
+- App API 2 -> 2;
+- compatibility decision: `INCREMENTAL / COMPATIBLE`;
+- `app/full-upgrader.js` may be added by the incremental package;
+- `app/updater.js` must remain byte-compatible for the v0.4.11 direct path.
+
+Release requirement:
+- the formal Release should publish a verified
+  `Pica-Library-v<TARGET>-update-from-v0.4.11.zip`;
+- v0.4.11 users should be able to press the existing Web one-click update action once and enter the new stable baseline without manually downloading the Upgrade Assistant;
+- after that transition, the installed baseline contains the Universal Upgrade Assistant and future incompatible schema/architecture changes can use verified full-application replacement.
+
+Fallback:
+- keep the v0.4.11 Upgrade Assistant/full-package path in the Release as a recovery/exception path until the real published v0.4.11 -> target one-click acceptance passes;
+- do not claim one-click compatibility if the final artifact changes `app/updater.js`, changes App API, exceeds schema 14, or fails official Release verification.
+
+### R3 — Project backlog vs next-stable release scope
+The following remain project-wide tracks and are **not automatically required to be closed for this release**:
+
+- P1 remaining correctness follow-ups (P1-E/P1-F/P1-G);
+- P2 long-task/resource/database/cache/runtime hardening items that still require representative evidence or later enforcement decisions;
+- P2-K real-hardware/performance evidence and budgets;
+- P3 shared-core regression obligations;
+- P4 Linux/macOS/Windows ARM64 experimental support;
+- W5D-W5H Remote Web onboarding, weak-network/offline/write/multi-user work;
+- P6 signing/reputation, performance promotion and longer-term release-governance work.
+
+The next stable release may contain already-implemented runtime/internal improvements from these tracks because they are present in the production source tree, while the track itself remains open. Release notes should distinguish:
+- user-facing stable features/fixes;
+- internal runtime/performance hardening;
+- experimental or unsupported platform work that is **not** being promoted to formal support.
+
+### R4 — Current release blockers after this reconciliation
+Before publication:
+1. AZZ migration passes Web/Android/localization tests and old support endpoints are absent from active surfaces.
+2. v0.4.11 -> target source-scoped incremental package is generated from the real public v0.4.11 Windows ZIP and proves schema 13 -> 14 plus unchanged legacy `app/updater.js`.
+3. The final version number / Android versionCode are stamped once release scope is frozen.
+4. Windows and Android formal candidates are built from one final source SHA and pass the release-intent matrix.
+5. The formal Release carries full Windows package, source-scoped v0.4.11 incremental package, one-time Upgrade Assistant fallback, SHA256/provenance, Android production APK/update metadata and release notes.
+6. Stable OTA/latest pointers are changed only after the uploaded assets are verified.
+
+This NEXT-32 entry is a release-scope reconciliation. It does not supersede or delete earlier task families.

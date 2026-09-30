@@ -272,6 +272,14 @@ function settingsTarget(panelId, selector, disclosureSelector = null) {
         const panel = document.querySelector(`#a87-${panelId}-panel`)
         if (!panel?.classList.contains('active'))
             document.querySelector(`#a87-${panelId}-tab`)?.click()
+        if (panelId === 'maintenance' && selector === '#software-updates') {
+            document.querySelectorAll('#a87-maintenance-panel > .tab').forEach((tab) =>
+                tab.classList.toggle('active', tab.id === 'software-updates')
+            )
+            document.querySelectorAll('#a87-maintenance-panel > .tabs button').forEach((button) =>
+                button.classList.toggle('active', button.dataset.tab === 'software-updates')
+            )
+        }
         if (disclosureSelector) {
             const disclosure = document.querySelector(disclosureSelector)
             if (disclosure instanceof HTMLDetailsElement) disclosure.open = true

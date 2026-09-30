@@ -95,7 +95,6 @@ function injectStyles() {
 .a87-hub-panel>.panel,.a87-hub-panel>.tab,.a87-hub-panel>.settings-form{width:100%;max-width:none;box-sizing:border-box}
 .a87-hub-panel>#software-updates{display:block!important}
 #a87-maintenance-panel>.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-#a87-maintenance-panel>.tabs button[data-tab="software-updates"]{display:none!important}
 #a87-maintenance-panel>.tab:not(.active){display:none}
 #a87-storage-intro{margin-bottom:14px}
 #a87-download-history-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -343,8 +342,6 @@ function buildSettingsHub() {
     })
 
     const oldToolTabs = maintenance.querySelector(':scope > .tabs')
-    const updateTabButton = oldToolTabs?.querySelector('[data-tab="software-updates"]')
-    updateTabButton?.remove()
 
     const heading = document.createElement('div')
     heading.id = 'a87-settings-heading'

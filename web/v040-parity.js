@@ -137,29 +137,38 @@ async function libraryQuery(value) {
     return json
 }
 
+function restoreLegacyLibraryControls() {
+    const more = $('#library .v040-library-more')
+    if (!more) return
+    const toolbar = $('#library [data-control-scope="library"]')
+    const owner = $('#library .ux-toolbar-primary') || toolbar
+    if (owner) {
+        const seen = new Set()
+        for (const selector of ['#view-grid','#view-list','.grid-size-controls','#cover-toggle']) {
+            const node = more.querySelector(selector)
+            if (!node) continue
+            const container = node.closest('label,.control-group') || node
+            if (seen.has(container)) continue
+            seen.add(container)
+            owner.append(container)
+        }
+    }
+    more.remove()
+}
+
 function installLibraryParity() {
     const section = $('#library')
     const toolbar = section?.querySelector('[data-control-scope="library"]')
-    if (!section || !toolbar || $('#v040-library-provider')) return
-    const provider = document.createElement('select')
-    provider.id = 'v040-library-provider'
-    provider.innerHTML = `<option value="all">${t('来源：全部','Source: All','配信元：すべて')}</option><option value="pica">${t('来源：Pica','Source: Pica','配信元：Pica')}</option><option value="eh">${t('来源：E-H','Source: E-H','配信元：E-H')}</option>`
-    const scope = $('#filter-scope')
-    scope?.insertAdjacentElement('afterend', provider)
-    provider.onchange = () => $('#apply-filter')?.click()
-
-    const more = document.createElement('details')
-    more.className = 'v040-library-more'
-    more.innerHTML = `<summary>${t('更多筛选与显示','More filters & display','その他の絞り込みと表示')}</summary><div class="v040-library-more-body"></div>`
-    const body = more.querySelector('div')
-    const move = ['#filter-author-input','#filter-tag','#filter-tag-mode','#view-grid','#view-list','.grid-size-controls','#cover-toggle']
-    for (const selector of move) {
-        const node = toolbar.querySelector(selector) || document.querySelector(selector)
-        if (!node) continue
-        const container = node.closest('label,.control-group') || node
-        if (!body.contains(container)) body.append(container)
+    if (!section || !toolbar) return
+    restoreLegacyLibraryControls()
+    if (!$('#v040-library-provider')) {
+        const provider = document.createElement('select')
+        provider.id = 'v040-library-provider'
+        provider.innerHTML = `<option value="all">${t('来源：全部','Source: All','配信元：すべて')}</option><option value="pica">${t('来源：Pica','Source: Pica','配信元：Pica')}</option><option value="eh">${t('来源：E-H','Source: E-H','配信元：E-H')}</option>`
+        const scope = $('#filter-scope')
+        scope?.insertAdjacentElement('afterend', provider)
+        provider.onchange = () => $('#apply-filter')?.click()
     }
-    toolbar.append(more)
     toolbar.classList.add('v040-library-toolbar')
 
     const headingActions = section.querySelector('.page-heading .actions')
@@ -485,8 +494,8 @@ function boot() {
 }
 document.addEventListener('pica-language-change',()=>{
     $('#v040-eh-tools')?.remove()
+    restoreLegacyLibraryControls()
     $('#v040-library-provider')?.remove()
-    $('#library .v040-library-more')?.remove()
     $('#v040-history-button')?.remove()
     installLibraryParity()
     installEhBrowseParity()

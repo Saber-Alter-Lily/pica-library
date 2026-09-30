@@ -131,6 +131,17 @@ describe('P2 unpublished RC package contract', () => {
         )
         expect(workflow).not.toContain('build:local-update')
         expect(workflow).not.toContain('update-from-v0.4.11')
+        expect(workflow).toContain('formal-layout-candidate')
+        expect(workflow).toContain('TEST_BUILD.txt')
+        expect(workflow).toContain('test-windows-v0411-incremental-upgrade.ps1')
+        expect(workflow).toContain('-CandidateZip $formalZip')
+        const incrementalAcceptance = read(
+            'scripts/test-windows-v0411-incremental-upgrade.ps1'
+        )
+        expect(incrementalAcceptance).toContain("baseline_version = '0.4.11'")
+        expect(incrementalAcceptance).toContain('candidate_schema = 14')
+        expect(incrementalAcceptance).toContain('legacy_updater_preserved = $true')
+        expect(incrementalAcceptance).toContain('universal_full_upgrader_installed = $true')
     })
 
     it('keeps the next stable one schema step from public v0.4.11', () => {

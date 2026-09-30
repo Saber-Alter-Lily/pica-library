@@ -82,6 +82,7 @@ const updateManager = new UpdateManager({
     currentSourceSha,
     applicationRoot,
     stateRoot: path.join(paths.runtimeState, 'updates'),
+    assistantRoot: path.join(paths.runtimeState, 'upgrade-assistant'),
     launcherPath: path.join(applicationRoot, 'Pica Library.exe'),
     runtimePath: fs.existsSync(path.join(applicationRoot, 'runtime', 'node.exe'))
         ? path.join(applicationRoot, 'runtime', 'node.exe')
@@ -106,6 +107,19 @@ for (const directory of [
 ])
     fs.mkdirSync(directory, { recursive: true })
 const log = new DesktopLog(paths.logs)
+try {
+    const assistant = updateManager.preparePersistentUpgradeAssistant()
+    if (assistant.available)
+        log.write(
+            `Upgrade assistant registered outside application tree: ${assistant.root}`
+        )
+} catch (error) {
+    log.write(
+        `Upgrade assistant registration unavailable: ${
+            error instanceof Error ? error.message : String(error)
+        }`
+    )
+}
 const credentialBackend = credentialStoreForPlatform(paths.credentials)
 const credentialsStore = credentialBackend.store
 const platformCapabilities = {

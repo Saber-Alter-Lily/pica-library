@@ -2581,3 +2581,30 @@ State update:
 - Recommendation-style onboarding uses stable tagged controls in `RecommendationStyleActivity`; automatic Desktop Visual status refresh is suppressed while the spotlight tour is active so target Views are not destroyed under the overlay.
 - English, Simplified Chinese and Japanese onboarding resources were extended together.
 - Existing P2 RC/stable release assets remain untouched. Full CI/Android matrix is queued on the current corrective head; the latest code head is `e1c898ad1525ae2750b56e6440c7a2f49b37b10f` after adding visible batch-unfavorite progress.
+
+## NEXT-29 — Windows/Web RC connection-state + onboarding corrective batch
+**Status: IN PROGRESS — same dual-client corrective branch / PR #197**
+
+Source: representative Windows/Web RC testing after NEXT-27 packaging while Android NEXT-28 testing continues.
+
+### W1 — E-H connection feedback and managed-login return
+- Add E-H / ExH to the same visible connection-status surface that already exposes Pica/WebDAV/LAN state.
+- Separate “managed web login (automatic capture/verification)” from “manual official-site link (no automatic callback)” in copy and behavior.
+- Managed login must expose opening / waiting / verifying / complete / failed states, refresh the saved account status on completion, surface a clear success/failure toast, and make a best-effort focus return to the Pica Library window after the managed browser closes.
+- Connection check must verify an existing E-H session rather than treating “cookies are stored” as equivalent to “currently usable”.
+
+### W2 — Favorites sync false local-engine error
+- Decouple Desktop-engine reachability from downstream module initialization. A failure in recommendation/session/profile/library-query bootstrap must not collapse the entire Web UI into Browser Lite mode.
+- Before rejecting Sync Favorites for “no local engine”, perform a bounded local-engine health probe and recover stale frontend state if /api/v1/status is reachable.
+- Preserve degraded feature reporting: a failed optional module should be reported as that module’s failure while Library sync remains available.
+
+### W3 — Web onboarding v2
+- Promote Web onboarding from navigation-only coverage to a task-oriented workflow aligned with Android v2.
+- Cover at minimum: Library sync and progress semantics; Shelves creation; recommendation generation/batches; recommendation profile/manual tuning; Visual mode/strength; E-H connection state; Desktop/Android connection; update/help replay.
+- Increment the Web onboarding version so users who completed v1 receive the richer v2 tour once.
+- Keep the existing driver.js implementation and observer discipline; extend targets/steps rather than replacing the framework.
+
+### RC boundary
+- Keep PR #197 draft until the full Web/Desktop + Android matrix passes.
+- Produce a fresh unpublished isolated Windows/Web RC plus side-by-side Android RC from the same validated source SHA.
+- Do not mutate v0.4.11 Release assets or stable OTA metadata.

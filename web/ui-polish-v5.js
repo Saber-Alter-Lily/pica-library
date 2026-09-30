@@ -212,6 +212,25 @@ function installRecommendationToolbar() {
         heading.insertAdjacentElement('afterend', more)
     }
 
+    const viewToolbar = ux$('#recommend .recommendation-toolbar')
+    if (viewToolbar && !viewToolbar.dataset.uxPolished) {
+        viewToolbar.dataset.uxPolished = '1'
+        viewToolbar.classList.add('ux-toolbar-shell')
+        viewToolbar.classList.remove('toolbar')
+        const viewPrimary = document.createElement('div')
+        viewPrimary.className = 'ux-toolbar-primary'
+        moveNodes(viewPrimary, [
+            ux$('#recommend-grid'),
+            ux$('#recommend-list')
+        ])
+        const display = makeDetails('ux-recommend-display', 'displayOptions')
+        moveNodes(display.querySelector('.ux-more-body'), [
+            viewToolbar.querySelector('.grid-size-controls'),
+            ux$('#recommend-cover-toggle')?.closest('label')
+        ])
+        viewToolbar.append(viewPrimary, display)
+    }
+
     const batch = ux$('#recommend-batch')
     const next = ux$('#recommend-next-batch')
     if (batch && next && !ux$('#ux-recommend-pager')) {

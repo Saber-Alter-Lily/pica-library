@@ -2502,7 +2502,7 @@ Recent work correctly advanced multi-platform and Remote Web foundations, but pr
 
 
 ## NEXT-28 — Android RC UX / performance corrective batch
-**Status: IN PROGRESS — implementation branch `fix/android-rc-ux-performance-batch`**
+**Status: RELEASE-SCOPE IMPLEMENTED — A3/A5 deeper follow-ups remain in the broader project backlog; final release validation is tracked by NEXT-32**
 
 Source: representative Android RC testing after NEXT-27 dual-client candidate packaging. These findings are product/runtime defects or gaps, not a new release scope. Public stable remains v0.4.11; the current isolated RC remains valid for continued user testing while this batch is developed.
 
@@ -2583,7 +2583,7 @@ State update:
 - Existing P2 RC/stable release assets remain untouched. Full CI/Android matrix is queued on the current corrective head; the latest code head is `e1c898ad1525ae2750b56e6440c7a2f49b37b10f` after adding visible batch-unfavorite progress.
 
 ## NEXT-29 — Windows/Web RC connection-state + onboarding corrective batch
-**Status: IN PROGRESS — same dual-client corrective branch / PR #197**
+**Status: IMPLEMENTATION_COMPLETE — W1/W2/W3 implemented; later onboarding/display regressions were corrected under NEXT-30; final release validation is tracked by NEXT-32**
 
 Source: representative Windows/Web RC testing after NEXT-27 packaging while Android NEXT-28 testing continues.
 
@@ -2688,7 +2688,7 @@ Required correction:
 
 
 ## NEXT-30 — Cross-client interaction hierarchy / UI simplification
-**Status: IN PROGRESS — corrective branch / PR #197**
+**Status: IMPLEMENTATION_COMPLETE — U1/U2/U3 implemented with automated contracts; final release-intent validation is tracked by NEXT-32**
 
 Source: manual QA comparison of the fresh Windows/Web and Android RCs.
 

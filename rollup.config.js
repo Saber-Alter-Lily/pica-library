@@ -85,7 +85,8 @@ export default defineConfig({
     input: {
         'pica-library': 'src/library-cli.ts',
         desktop: 'src/desktop/main.ts',
-        updater: 'src/update/updater.ts'
+        updater: 'src/update/updater.ts',
+        'full-upgrader': 'src/update/full-upgrader.ts'
     },
     output: {
         dir: 'dist',

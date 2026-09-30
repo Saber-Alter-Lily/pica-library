@@ -73,6 +73,30 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
 
     await page.locator('nav [data-view="library"]').click()
     await expect(page.locator('#library')).toHaveClass(/\bactive\b/)
+    await expect(page.locator('#view-grid')).toBeVisible()
+    await expect(page.locator('#view-list')).toBeVisible()
+    await expect(page.locator('#ux-library-display')).toBeVisible()
+    await page.locator('#view-list').click()
+    await expect(page.locator('#comic-table')).toBeVisible()
+    await expect(page.locator('#comic-grid')).toBeHidden()
+    await page.locator('#view-grid').click()
+    await expect(page.locator('#comic-grid')).toBeVisible()
+    await page.locator('#ux-library-display > summary').click()
+    await expect(page.locator('#ux-library-display .grid-size-controls')).toBeVisible()
+    await page.locator('#ux-library-display > summary').click()
+
+    const languageSelect = page.locator('#language-select')
+    if (await languageSelect.isVisible().catch(() => false)) {
+        await languageSelect.selectOption('en')
+        await page.waitForTimeout(80)
+        await expect(page.locator('#view-grid')).toBeVisible()
+        await expect(page.locator('#view-list')).toBeVisible()
+        await expect(page.locator('#ux-library-display')).toBeVisible()
+        expect(await page.locator('#view-grid').count()).toBe(1)
+        expect(await page.locator('#view-list').count()).toBe(1)
+        await languageSelect.selectOption('zh-CN')
+        await page.waitForTimeout(80)
+    }
 
     await page.evaluate(() => {
         const filler = document.createElement('div')

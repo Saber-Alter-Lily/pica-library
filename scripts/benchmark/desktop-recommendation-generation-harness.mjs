@@ -165,7 +165,7 @@ async function runRound(chromium, options, index) {
             localStorage.setItem(
                 'pica-onboarding-state-v1',
                 JSON.stringify({
-                    completedVersion: 1,
+                    completedVersion: 2,
                     dismissedVersion: 0,
                     autoShow: true
                 })

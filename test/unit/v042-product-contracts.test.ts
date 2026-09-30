@@ -13,7 +13,7 @@ const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
 describe('v0.4.2 product contracts', () => {
-    it('exposes voluntary AFDIAN support in both client settings', () => {
+    it('exposes voluntary AZZ support in both client settings', () => {
         const web = read('web/alpha8-product.js')
         const settings = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SettingsActivity.java'
@@ -21,11 +21,11 @@ describe('v0.4.2 product contracts', () => {
         const support = read(
             'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SupportActivity.java'
         )
-        expect(web).toContain('https://afdian.com/a/PicaLibrary')
+        expect(web).toContain('https://azz.net/PicaLibrary')
         expect(web).toContain('赞助不会解锁额外功能、内容或权限')
         expect(settings).toContain('"支持项目"')
         expect(settings).toContain('SupportActivity.class')
-        expect(support).toContain('https://afdian.com/a/PicaLibrary')
+        expect(support).toContain('https://azz.net/PicaLibrary')
         expect(support).toContain('赞助完全自愿')
         expect(support).toContain('不会解锁额外功能')
     })

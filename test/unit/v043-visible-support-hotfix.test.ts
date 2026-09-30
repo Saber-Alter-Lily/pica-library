@@ -9,9 +9,9 @@ describe('v0.4.3 visible support hotfix', () => {
     it('shows project support from the Android main Settings tab', () => {
         const home = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/HomeActivity.java')
         const support = read('mobile/android-alpha2/app/src/main/java/com/picalibrary/android/SupportActivity.java')
-        expect(home).toContain('SettingsRow.row(this,"支持项目","爱发电 / GitHub · 支持开源开发"')
+        expect(home).toContain('SettingsRow.row(this,"支持项目","爱赞助 / GitHub · 支持开源开发"')
         expect(home).toContain('new Intent(this,SupportActivity.class)')
-        expect(support).toContain('https://afdian.com/a/PicaLibrary')
+        expect(support).toContain('https://azz.net/PicaLibrary')
     })
 
     it('keeps Desktop support prominent instead of appending it to the bottom', () => {
@@ -23,7 +23,7 @@ describe('v0.4.3 visible support hotfix', () => {
         expect(support).toContain("const appearance = $('#a83-appearance')")
         expect(support).toContain("appearance.insertAdjacentElement('afterend', panel)")
         expect(support).not.toContain('settings.appendChild(panel)')
-        expect(support).toContain('https://afdian.com/a/PicaLibrary')
+        expect(support).toContain('https://azz.net/PicaLibrary')
     })
 
     it('shows the actual 0-10 range in the Android recommendation hub', () => {

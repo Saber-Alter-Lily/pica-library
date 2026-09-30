@@ -27,7 +27,7 @@ describe('v0.4.4 Desktop settings hub visibility', () => {
         const smoke = read('test/e2e/web-smoke.spec.mjs')
         expect(smoke).toContain("#a87-general-panel #a83-support")
         expect(smoke).toContain("#a87-appearance-panel #a83-appearance")
-        expect(smoke).toContain("#a83-afdian")
+        expect(smoke).toContain("#a83-azz")
         expect(smoke).toContain("#a83-star")
     })
 })

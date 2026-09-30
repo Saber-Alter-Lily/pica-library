@@ -64,7 +64,7 @@ test('Web boots and primary navigation stays interactive', async ({ page }) => {
 
     const support = page.locator('#a87-general-panel #a83-support')
     await expect(support).toBeVisible()
-    await expect(support.locator('#a83-afdian')).toBeVisible()
+    await expect(support.locator('#a83-azz')).toBeVisible()
     await expect(support.locator('#a83-star')).toBeVisible()
 
     await page.locator('#a87-appearance-tab').click()

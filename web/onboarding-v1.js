@@ -84,9 +84,9 @@ function welcomeCopy() {
     return {
         title: t('欢迎使用新版 Pica Library','Welcome to the new Pica Library','新しい Pica Library へようこそ'),
         body: t(
-            '花一分钟了解书库、推荐、连接与设置。引导可以随时跳过；之后也可以在“设置 → 帮助与新手引导”重新查看。',
-            'Take a minute to see the library, recommendations, connections and settings. You can skip the tour at any time and replay it later from Settings → Help & Onboarding.',
-            'ライブラリ、おすすめ、接続、設定を短時間で確認できます。いつでもスキップでき、後から「設定 → ヘルプと初回ガイド」で再表示できます。'
+            '花几分钟完成一次真实使用流程：同步收藏、建立书架、生成和调整推荐、检查连接与画风设置。引导可以随时跳过；之后也可以在“设置 → 帮助与新手引导”重新查看。',
+            'Spend a few minutes walking through a real workflow: sync favorites, create shelves, generate and tune recommendations, then check connections and visual-style settings. You can skip at any time and replay it later from Settings → Help & Onboarding.',
+            '数分で実際の利用手順を確認します：お気に入り同期、本棚作成、おすすめ生成・調整、接続状態と画風設定。いつでもスキップでき、後から「設定 → ヘルプと初回ガイド」で再表示できます。'
         ),
         start: t('开始引导','Start tour','ガイドを開始'),
         later: t('稍后再看','Later','後で見る'),
@@ -375,7 +375,7 @@ function startTour({ replay = false } = {}) {
 function settingsCopy() {
     return {
         title: t('帮助与新手引导','Help & Onboarding','ヘルプと初回ガイド'),
-        text: t('可以随时重新查看主要功能引导。关闭自动提示后，仍然可以手动启动。','Replay the main feature tour at any time. Turning off automatic prompts never disables manual replay.','主な機能ガイドはいつでも再表示できます。自動表示をオフにしても手動再生は利用できます。'),
+        text: t('可以随时重新查看完整任务引导：收藏同步、书架、推荐、画风和连接。关闭自动提示后，仍然可以手动启动。','Replay the full task-oriented tour at any time: favorite sync, shelves, recommendations, visual style and connections. Turning off automatic prompts never disables manual replay.','お気に入り同期、本棚、おすすめ、画風、接続を含む完全なタスクガイドをいつでも再表示できます。自動表示をオフにしても手動再生は利用できます。'),
         replay: t('重新查看新手引导','Replay onboarding','初回ガイドをもう一度見る'),
         auto: t('自动显示新版功能引导','Show new-feature onboarding automatically','新機能ガイドを自動表示')
     }

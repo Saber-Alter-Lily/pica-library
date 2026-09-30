@@ -2718,7 +2718,7 @@ Source: manual QA comparison of the fresh Windows/Web and Android RCs.
 - Do not produce another RC until U1/U2/U3 automated gates are green.
 
 ## NEXT-31 — Universal Web/Desktop Upgrade Assistant
-**Status: IN PROGRESS — release-preparation blocker**
+**Status: PASS — universal full-application contract implemented; v0.4.11 entry path tracked separately in NEXT-32**
 
 Goal:
 - Make the Web/Desktop “one-click update” entry remain usable across ordinary incremental releases, database-schema jumps, updater replacement and major architecture changes.
@@ -2742,7 +2742,7 @@ Web UX:
 - Do not finish on “wait for restart” / “please refresh” copy. A changed localhost port is handled by the detached full-upgrader opening the new loopback URL as a fallback.
 
 Release compatibility boundary:
-- Public v0.4.11 predates this assistant and cannot gain it retroactively. The next stable release still needs the existing one-time v0.4.11 full-upgrade/assistant compatibility path.
+- Public v0.4.11 predates the detached full-upgrader and cannot gain that helper retroactively. However, it already supports verified source-scoped incremental updates. NEXT-32 therefore keeps the first target inside that existing compatibility boundary: App API 2, schema 13 → 14, and byte-identical `app/updater.js`. If final artifact acceptance confirms those conditions, v0.4.11 can install the first NEXT-31-capable stable build through its existing Web one-click path; the Upgrade Assistant remains a fallback rather than the primary path.
 - Once the first stable build containing NEXT-31 is installed, future Windows x64 stable upgrades must preserve the universal assistant contract.
 
 Acceptance before release:
@@ -2782,7 +2782,7 @@ Acceptance evidence:
 - Dedicated Windows real full-replacement acceptance: PASS. The test launches the checksum-pinned older Windows package, creates external user state, runs the detached universal bootstrap, replaces the entire application tree with the candidate, verifies candidate version/schema/source SHA, confirms external config and Library database remain intact, and requires the normal pre-migration DB backup when schema advances.
 
 Compatibility boundary:
-- Public v0.4.11 predates NEXT-31 and cannot acquire the new helper retroactively. The next stable release must still ship the existing v0.4.11 one-time upgrade-assistant/full-package bridge.
+- Public v0.4.11 predates NEXT-31 and cannot acquire `full-upgrader` before updating. The release-preparation solution is to use v0.4.11's already-shipped incremental updater for the first hop, provided the final stable package remains App API 2 / schema 14 and does not replace `app/updater.js`. That source-scoped incremental package installs `app/full-upgrader.js` as part of the new baseline. Upgrade Assistant/full-package replacement remains the recovery fallback until the published-release acceptance is proven.
 - After users install the first stable release containing NEXT-31, future Windows x64 stable schema jumps, updater replacements and major application-tree changes must preserve this universal one-click contract.
 
 Stable v0.4.11 Release assets and stable OTA metadata remain untouched.

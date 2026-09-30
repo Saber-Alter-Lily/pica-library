@@ -73,6 +73,99 @@ describe('SQLite migrations', () => {
         database.close()
     })
 
+    it('normalizes unpublished schema 14-16 history without losing RC data', () => {
+        const databaseFile = file()
+        const initial = new LibraryDatabase(databaseFile)
+        initial.setAppState('unpublished-schema-sentinel', { keep: true })
+        initial.close()
+
+        const legacyRc = new DatabaseSync(databaseFile)
+        legacyRc
+            .prepare(
+                "UPDATE schema_migrations SET name = 'p2d2_author_reverse_lookup_indexes' WHERE version = 14"
+            )
+            .run()
+        legacyRc
+            .prepare(
+                'INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)'
+            )
+            .run(
+                15,
+                'p2d5b_work_identity_detail_indexes',
+                '2026-09-24T00:00:00.000Z'
+            )
+        legacyRc
+            .prepare(
+                'INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)'
+            )
+            .run(
+                16,
+                'p2d8a_picture_comic_status_index',
+                '2026-09-24T00:01:00.000Z'
+            )
+        legacyRc.exec('DROP INDEX IF EXISTS idx_pictures_comic_status')
+        legacyRc.close()
+
+        const reconciled = new LibraryDatabase(databaseFile)
+        expect(reconciled.getAppState('unpublished-schema-sentinel')).toEqual({
+            keep: true
+        })
+        reconciled.close()
+
+        expect(
+            fs.existsSync(
+                `${databaseFile}.pre-unreleased-schema-reconcile.bak`
+            )
+        ).toBe(true)
+
+        const verified = new DatabaseSync(databaseFile)
+        expect(
+            verified
+                .prepare(
+                    'SELECT version, name FROM schema_migrations WHERE version >= 14 ORDER BY version'
+                )
+                .all()
+        ).toEqual([
+            {
+                version: 14,
+                name: 'post_v0411_index_bundle'
+            }
+        ])
+        expect(
+            verified
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_pictures_comic_status'"
+                )
+                .get()
+        ).toBeTruthy()
+        verified.close()
+
+        const backup = new DatabaseSync(
+            `${databaseFile}.pre-unreleased-schema-reconcile.bak`
+        )
+        expect(
+            backup
+                .prepare(
+                    'SELECT version, name FROM schema_migrations WHERE version BETWEEN 14 AND 16 ORDER BY version'
+                )
+                .all()
+        ).toEqual([
+            {
+                version: 14,
+                name: 'p2d2_author_reverse_lookup_indexes'
+            },
+            {
+                version: 15,
+                name: 'p2d5b_work_identity_detail_indexes'
+            },
+            {
+                version: 16,
+                name: 'p2d8a_picture_comic_status_index'
+            }
+        ])
+        backup.close()
+    })
+
     it('upgrades a legacy unversioned database without deleting data', () => {
         const databaseFile = file()
         const database: DatabaseSyncType = new DatabaseSync(databaseFile)

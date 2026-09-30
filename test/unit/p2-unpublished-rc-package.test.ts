@@ -76,6 +76,8 @@ describe('P2 unpublished RC package contract', () => {
         expect(workflow).toContain("sourceVersionRange -ne '=0.4.11'")
         expect(workflow).toContain("bridgePaths -contains 'app/updater.js'")
         expect(workflow).toContain("bridgePaths -notcontains 'app/full-upgrader.js'")
+        expect(workflow).toContain('test-windows-v0411-incremental-upgrade.ps1')
+        expect(workflow).toContain('formal-layout-candidate')
 
         expect(smoke).toContain("[string]$ExpectedVersion = ''")
         expect(smoke).toContain(
@@ -131,6 +133,15 @@ describe('P2 unpublished RC package contract', () => {
         )
         expect(workflow).not.toContain('build:local-update')
         expect(workflow).not.toContain('update-from-v0.4.11')
+        const incrementalAcceptance = read(
+            'scripts/test-windows-v0411-incremental-upgrade.ps1'
+        )
+        expect(incrementalAcceptance).toContain(
+            "runtime-state\\upgrade-assistant"
+        )
+        expect(incrementalAcceptance).toContain(
+            "persistent_upgrade_assistant = 'PASS'"
+        )
         expect(workflow).toContain('formal-layout-candidate')
         expect(workflow).toContain('TEST_BUILD.txt')
         expect(workflow).toContain('test-windows-v0411-incremental-upgrade.ps1')

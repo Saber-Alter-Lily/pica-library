@@ -1,10 +1,10 @@
 # Pica Library Desktop / Web 使用说明
 
-> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.4.11**。
+> 适用于 Windows Desktop / 本地 Web UI。当前正式版本：**v0.5.0**。
 
 ## 1. 安装与启动
 
-1. 从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.11 对应 `Pica-Library-v0.4.11-windows-x64.zip`。
+1. 从 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.5.0 对应 `Pica-Library-v0.5.0-windows-x64.zip`。
 2. 完整解压到普通文件夹后运行 `Pica Library.exe`，不要直接在压缩包内运行。
 3. 首次启动会打开本地 Web UI，并进入首次设置。
 4. 按需配置账号、漫画保存目录、下载方式与 HTTP/HTTPS 代理。
@@ -127,7 +127,9 @@ Desktop 与 Android 各自保存当前启用主题，不要求两端显示完全
 
 面向普通用户的公开升级路径只有一条：
 
-- **v0.4.0 → 当前最新版 v0.4.11**：使用 v0.4.11 Release 中的 `Pica-Library-v0.4.11-upgrade-assistant.zip` 一次直达，无需安装任何中间版本。
+- **v0.4.11 → v0.5.0**：在软件更新页点击“一键检查并更新”，使用来源限定增量包直接进入新基线；正常完成后网页自动重新连接。
+- 如软件内通道异常，可使用 v0.5.0 Release 中的 `Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip` 作为恢复备用。
+- v0.5.0 会把后续完整升级所需 runtime/helper 注册到 `%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant\`，以后跨 Schema 或 updater 变化继续走同一个一键更新入口。
 
 升级助手会校验官方完整包、保护 `%LOCALAPPDATA%\Pica Library`、建立程序和数据库安全快照、替换程序并执行健康检查；失败时自动回滚。
 

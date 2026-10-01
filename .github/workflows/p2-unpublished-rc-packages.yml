@@ -2,7 +2,7 @@ name: P2 Unpublished RC Test Packages
 
 on:
   push:
-    branches: [release/p2-unpublished-rc-packages-v2, fix/android-rc-ux-performance-batch]
+    branches: [release/p2-unpublished-rc-packages-v2]
   pull_request:
     paths:
       - 'packaging/windows/RcLauncher.cs'

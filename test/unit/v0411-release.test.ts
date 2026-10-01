@@ -6,15 +6,29 @@ import { releasedUpdateBaseline } from '../../src/update/released-baselines'
 const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
+function versionAtLeast(version: string, floor: [number, number, number]) {
+    const parts = version.split('.').map(Number)
+    for (let index = 0; index < 3; index++) {
+        const current = parts[index] ?? 0
+        if (current !== floor[index]) return current > floor[index]
+    }
+    return true
+}
+
 describe('v0.4.11 formal release contract', () => {
-    it('pins one coordinated Desktop and Android release', () => {
+    it('preserves the public v0.4.11 distribution baseline in later releases', () => {
         const pkg = JSON.parse(read('package.json'))
         const gradle = read('mobile/android-alpha2/app/build.gradle')
         const windows = read('scripts/build-windows-package.ps1')
+        const versionCode = Number(
+            gradle.match(/PICA_ANDROID_VERSION_CODE'\)\s*\?:\s*'(\d+)'/)?.[1] ?? 0
+        )
+        const versionName =
+            gradle.match(/PICA_ANDROID_VERSION_NAME'\)\s*\?:\s*'([^']+)'/)?.[1] ?? '0.0.0'
 
-        expect(pkg.version).toBe('0.4.11')
-        expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '54'")
-        expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.4.11'")
+        expect(versionAtLeast(pkg.version, [0, 4, 11])).toBe(true)
+        expect(versionCode).toBeGreaterThanOrEqual(54)
+        expect(versionAtLeast(versionName, [0, 4, 11])).toBe(true)
         expect(windows).toContain(
             "'0.4.11' = 'artifacts\\release-base\\Pica-Library-v0.4.10-windows-x64.zip'"
         )
@@ -25,6 +39,11 @@ describe('v0.4.11 formal release contract', () => {
             '6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab'
         )
         expect(releasedUpdateBaseline('0.4.10')).toMatchObject({
+            appApiVersion: 2,
+            advertisedDatabaseSchemaVersion: 13,
+            actualMigrationVersion: 13
+        })
+        expect(releasedUpdateBaseline('0.4.11')).toMatchObject({
             appApiVersion: 2,
             advertisedDatabaseSchemaVersion: 13,
             actualMigrationVersion: 13
@@ -42,11 +61,8 @@ describe('v0.4.11 formal release contract', () => {
         const readme = read('README.md')
         expect(log).toContain('Desktop v0.4.11 / Android versionCode 54')
         expect(log).toContain('v0.4.1–v0.4.10')
-        expect(readme).toContain('Pica-Library-v0.4.11-windows-x64.zip')
-        expect(readme).toContain(
-            'Pica-Library-v0.4.11-upgrade-assistant.zip'
-        )
-        expect(readme).toContain('v54 / 0.4.11')
+        expect(readme).toContain('v0.5.0')
+        expect(readme).toContain('v0.4.11')
     })
 
     it('keeps the public homepage focused on user-visible capabilities', () => {
@@ -70,7 +86,7 @@ describe('v0.4.11 formal release contract', () => {
         }
     })
 
-    it('keeps v0.4.0 as the direct public upgrade baseline', () => {
+    it('keeps public v0.4.11 visible as the v0.5.0 one-click upgrade baseline', () => {
         for (const file of [
             'README.md',
             'README.en.md',
@@ -80,7 +96,6 @@ describe('v0.4.11 formal release contract', () => {
             'docs/windows-distribution.md'
         ]) {
             const text = read(file)
-            expect(text).toContain('v0.4.0')
             expect(text).toContain('v0.4.11')
         }
     })

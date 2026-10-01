@@ -144,6 +144,8 @@ describe('Alpha8.8 account auth, theme decoupling and disclaimer', () => {
             "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.11'"
         )
         expect(windows).toContain("'DISCLAIMER.md'")
-        expect(windows).toContain("$version -eq '0.3.8'")
+        expect(windows).toContain(
+            "'0.3.8' = 'artifacts\\Pica-Library-v0.3.7-windows-x64.zip'"
+        )
     })
 })

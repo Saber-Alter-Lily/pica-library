@@ -5,32 +5,6 @@ on:
   workflow_dispatch:
   push:
     branches: [fix/android-rc-ux-performance-batch]
-    paths:
-      - '.github/workflows/v050-release-candidate.yml'
-      - 'package.json'
-      - 'scripts/build-windows-package.ps1'
-      - 'scripts/build-local-update-package.ts'
-      - 'scripts/build-upgrade-assistant.ts'
-      - 'scripts/test-windows-v0411-incremental-upgrade.ps1'
-      - 'scripts/test-android-v54-v55-inplace.sh'
-      - 'src/update/**'
-      - 'src/storage/sqlite/migrations.ts'
-      - 'src/library/database.ts'
-      - 'src/desktop/**'
-      - 'mobile/android-alpha2/app/build.gradle'
-      - 'mobile/android-alpha2/app/src/main/**'
-      - 'test/integration/migrations.test.ts'
-      - 'test/unit/desktop-web.test.ts'
-      - 'test/unit/p2-unpublished-rc-package.test.ts'
-      - 'test/unit/universal-full-upgrade.test.ts'
-      - 'test/unit/upgrade-assistant-builder.test.ts'
-      - 'test/unit/v0411-release.test.ts'
-      - 'test/unit/v042-product-contracts.test.ts'
-      - 'test/unit/v050-release-candidate.test.ts'
-      - 'test/unit/windows-package-future-release.test.ts'
-      - '.github/workflows/v050-release.yml'
-      - 'test/unit/v050-release.test.ts'
-      - 'test/unit/workflow-entrypoint.test.ts'
 
 permissions:
   contents: read

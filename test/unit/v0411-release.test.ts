@@ -70,9 +70,9 @@ describe('v0.4.11 formal release contract', () => {
         const en = read('README.en.md')
 
         expect(zh).toContain('## 主要功能')
-        expect(zh).toContain('## v0.4.11 本次更新')
+        expect(zh).toContain('## v0.5.0 本次更新')
         expect(en).toContain('## Main features')
-        expect(en).toContain('## v0.4.11 highlights')
+        expect(en).toContain('## v0.5.0 highlights')
 
         for (const internal of [
             'PROBABLE_SAME_WORK',

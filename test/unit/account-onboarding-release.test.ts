@@ -8,13 +8,13 @@ describe('account onboarding distribution candidate', () => {
             'mobile/android-alpha2/app/build.gradle',
             'utf8'
         )
-        expect(pkg.version).toBe('0.4.11')
+        expect(pkg.version).toBe('0.5.0')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '54'"
+            "System.getenv('PICA_ANDROID_VERSION_CODE') ?: '55'"
         )
         expect(gradle).toContain('versionCode buildVersionCode')
         expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.11'"
+            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.5.0'"
         )
         expect(gradle).toContain('versionName buildVersionName')
     })

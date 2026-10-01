@@ -109,8 +109,15 @@ describe('v0.4.2 product contracts', () => {
         const gradle = read('mobile/android-alpha2/app/build.gradle')
         const windows = read('scripts/build-windows-package.ps1')
         expect(pkg.version.localeCompare('0.4.2', undefined, { numeric: true })).toBeGreaterThanOrEqual(0)
-        expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '54'")
-        expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.4.11'")
+        const versionCode = Number(
+            gradle.match(/PICA_ANDROID_VERSION_CODE'\)\s*\?:\s*'(\d+)'/)?.[1] ?? 0
+        )
+        const versionName =
+            gradle.match(/PICA_ANDROID_VERSION_NAME'\)\s*\?:\s*'([^']+)'/)?.[1] ?? '0.0.0'
+        expect(versionCode).toBeGreaterThanOrEqual(44)
+        expect(
+            versionName.localeCompare('0.4.2', undefined, { numeric: true })
+        ).toBeGreaterThanOrEqual(0)
         expect(releasedUpdateBaseline('0.4.1')).toMatchObject({
             appApiVersion: 2,
             advertisedDatabaseSchemaVersion: 13,

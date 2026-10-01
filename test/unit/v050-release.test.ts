@@ -15,6 +15,13 @@ describe('v0.5.0 formal publication transaction', () => {
             'uses: ./.github/workflows/v050-release-candidate.yml'
         )
         expect(workflow).toContain('secrets: inherit')
+        expect(workflow).toContain('permissions:\n  contents: read')
+        expect(workflow).toContain(
+            'publish:\n    needs: [validate, candidate]\n    permissions:\n      contents: write'
+        )
+        expect(workflow).toContain(
+            'concurrency:\n  group: v050-formal-release\n  cancel-in-progress: false'
+        )
 
         const draftCreate = workflow.indexOf('--draft')
         const releaseDownload = workflow.indexOf(

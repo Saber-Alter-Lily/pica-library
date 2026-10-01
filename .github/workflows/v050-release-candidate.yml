@@ -27,6 +27,8 @@ on:
       - 'test/unit/v042-product-contracts.test.ts'
       - 'test/unit/v050-release-candidate.test.ts'
       - 'test/unit/windows-package-future-release.test.ts'
+      - '.github/workflows/v050-release.yml'
+      - 'test/unit/v050-release.test.ts'
       - 'test/unit/workflow-entrypoint.test.ts'
 
 permissions:
@@ -61,7 +63,7 @@ jobs:
           version: '11.16.0'
           run_install: false
       - run: pnpm install --frozen-lockfile
-      - name: Re-run Desktop release gates before stamping
+      - name: Re-run Desktop release gates from permanent stamp
         shell: pwsh
         run: |
           pnpm type:check
@@ -79,11 +81,10 @@ jobs:
           Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v$env:BASE_VERSION/$name" -OutFile $path
           $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()
           if($actual -ne $env:BASE_WINDOWS_SHA256){ throw "Official v$env:BASE_VERSION package checksum mismatch: $actual" }
-      - name: Temporarily stamp Desktop candidate version
+      - name: Verify permanent Desktop release stamp
         shell: pwsh
         run: |
-          node -e "const fs=require('fs'); const file='package.json'; const value=JSON.parse(fs.readFileSync(file,'utf8')); if(value.version!=='0.4.11') throw new Error('Unexpected repository version: '+value.version); value.version=process.env.TARGET_VERSION; fs.writeFileSync(file, JSON.stringify(value,null,2)+'\n', 'utf8')"
-          node -e "const p=require('./package.json'); if(p.version!==process.env.TARGET_VERSION) throw new Error('Desktop candidate version stamp failed')"
+          node -e "const p=require('./package.json'); if(p.version!==process.env.TARGET_VERSION) throw new Error('Repository version is not permanently stamped to '+process.env.TARGET_VERSION+': '+p.version)"
       - name: Build formal-layout Windows candidate
         shell: pwsh
         run: |
@@ -217,6 +218,16 @@ jobs:
           sha="$(sha256sum candidate/Pica-Library-Android-v55.apk | awk '{print $1}')"
           printf '%s\n' "$cert" > candidate/CERTIFICATE_SHA256.txt
           printf '%s  %s\n' "$sha" 'Pica-Library-Android-v55.apk' > candidate/SHA256SUMS-Android.txt
+          cat > candidate/android-update.json <<JSON
+          {
+            "versionCode": 55,
+            "versionName": "0.5.0",
+            "apkUrl": "https://github.com/Saber-Alter-Lily/pica-library/releases/download/android-preview/Pica-Library-Android-Preview.apk",
+            "sha256": "$sha",
+            "releaseNotes": "v0.5.0：跨端交互与稳定性更新，新增无痛升级基线、Android 批量操作/收藏顺序、推荐与引导优化。",
+            "minimumSupportedVersionCode": 42
+          }
+          JSON
           python - "$sha" "$cert" "$GITHUB_SHA" <<'PY'
           import json,sys
           sha,cert,source=sys.argv[1:]

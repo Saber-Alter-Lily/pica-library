@@ -23,7 +23,9 @@ describe('v0.5.0 formal publication transaction', () => {
         const checksumVerify = workflow.indexOf(
             'sha256sum -c SHA256SUMS.txt'
         )
-        const publishStable = workflow.indexOf('-F draft=false')
+        const publishStable = workflow.indexOf(
+            'gh release edit "$RELEASE_TAG" --draft=false --latest'
+        )
         const latestVerify = workflow.indexOf(
             'releases/latest" --jq .tag_name'
         )
@@ -52,5 +54,6 @@ describe('v0.5.0 formal publication transaction', () => {
         expect(workflow).toContain(
             'ANDROID_V55_OTA_PUBLICATION=PASS'
         )
+        expect(workflow).not.toContain('gh api --method PATCH')
     })
 })

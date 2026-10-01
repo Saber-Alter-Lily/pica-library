@@ -1,13 +1,13 @@
 # v0.5.0 Release Scope — Draft Freeze
 
-Status: release-preparation authority for the next stable release after public v0.4.11.
+Status: **RELEASE FREEZE** — permanent v0.5.0 / Android v55 stamp committed; final stamped candidate and publication transaction remain.
 
 This document separates the **v0.5.0 stable product scope** from the much larger repository backlog. It does not mark unfinished P1/P2/P3/P4/W5/P6 tracks complete.
 
 ## Version identity
 
-- Proposed Desktop version: **0.5.0**
-- Proposed Android versionCode / versionName: **55 / 0.5.0**
+- Frozen Desktop version: **0.5.0**
+- Frozen Android versionCode / versionName: **55 / 0.5.0**
 - Public upgrade baseline: **v0.4.11**
 - Public v0.4.11 Desktop authority: App API 2 / SQLite schema 13
 - v0.5.0 release candidate authority: App API 2 / SQLite schema 14
@@ -138,4 +138,4 @@ Publication remains blocked until all of the following are true:
 
 The unpublished v0.5.0 candidate workflow is artifact-only. It is not authorization to publish.
 
-After candidate acceptance, version stamping should be committed once, the formal candidate rebuilt from that exact final SHA, and only then should the stable Release/OTA transaction be prepared.
+The repository is now permanently stamped to v0.5.0 / Android v55. The formal candidate must be rebuilt from the exact final stamped SHA; only that SHA may enter the stable Release/OTA transaction.

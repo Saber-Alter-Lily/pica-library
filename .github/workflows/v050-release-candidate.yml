@@ -138,7 +138,7 @@ jobs:
             artifacts/Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip
             artifacts/SHA256SUMS-v050-candidate.txt
             artifacts/BUILD_TRANSPARENCY-v050-Windows-candidate.json
-          retention-days: 2
+          retention-days: 1
           if-no-files-found: error
 
   android-candidate:
@@ -263,5 +263,5 @@ jobs:
         with:
           name: Pica-Library-v0.5.0-Android-v55-Formal-Candidate
           path: mobile/android-alpha2/candidate/
-          retention-days: 2
+          retention-days: 1
           if-no-files-found: error

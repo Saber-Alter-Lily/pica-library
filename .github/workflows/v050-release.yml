@@ -9,7 +9,11 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: v050-formal-release
+  cancel-in-progress: false
 
 jobs:
   validate:
@@ -36,6 +40,8 @@ jobs:
 
   publish:
     needs: [validate, candidate]
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:

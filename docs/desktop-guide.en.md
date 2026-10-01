@@ -1,10 +1,10 @@
 # Pica Library Desktop / Web Guide
 
-> For Windows Desktop and the local Web UI. Current stable release: **v0.4.11**.
+> For Windows Desktop and the local Web UI. Current stable release: **v0.5.0**.
 
 ## 1. Install and start
 
-1. Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest). For v0.4.11, use `Pica-Library-v0.4.11-windows-x64.zip`.
+1. Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest). For v0.5.0, use `Pica-Library-v0.5.0-windows-x64.zip`.
 2. Extract the complete ZIP to a normal folder. Do not run the application from inside an archive viewer.
 3. Run `Pica Library.exe`. The local Web UI opens in your browser.
 4. Configure accounts, library location, download behavior, and an HTTP/HTTPS proxy only when needed.
@@ -120,7 +120,9 @@ Prefer **Settings → Software Update**.
 
 The public user upgrade path is intentionally simple:
 
-- **v0.4.0 → current release v0.4.11**: use `Pica-Library-v0.4.11-upgrade-assistant.zip` from the v0.4.11 Release and move directly to the latest release. No intermediate versions are required.
+- **v0.4.11 → v0.5.0**: use One-click check & update on the Software Update page; the source-scoped incremental package enters the new baseline and reconnects the Web UI automatically.
+- If the in-app route is unavailable, use `Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip` from the v0.5.0 Release as the recovery fallback.
+- v0.5.0 registers the runtime/helper needed for later full replacements under `%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant\`, so future schema/updater changes can keep the same one-click entry.
 
 The upgrade assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database safety snapshots, replaces the application, runs health checks, and rolls back on failure.
 

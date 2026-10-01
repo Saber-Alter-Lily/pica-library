@@ -29,7 +29,10 @@ describe('v0.5.0 formal release candidate workflow', () => {
         expect(workflow).toContain(
             'ReactiveCircus/android-emulator-runner@v2'
         )
-        expect(workflow).toContain('adb install -r "$new"')
+        expect(workflow).toContain(
+            'bash scripts/test-android-v54-v55-inplace.sh'
+        )
+        expect(workflow).not.toContain('set -euo pipefail')
         expect(workflow).toContain(
             'ANDROID_V54_TO_V55_INPLACE_UPDATE=PASS'
         )

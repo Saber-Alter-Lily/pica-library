@@ -168,7 +168,13 @@ jobs:
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false >/dev/null
           fi
           test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)" = "false"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" = "$RELEASE_TAG"
+          latest=''
+          for attempt in {1..12}; do
+            latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name || true)"
+            if [ "$latest" = "$RELEASE_TAG" ]; then break; fi
+            sleep 5
+          done
+          test "$latest" = "$RELEASE_TAG"
 
       - name: Update Android OTA only after stable release is verified
         run: |

@@ -15,8 +15,12 @@ describe('v0.4.11 formal release contract', () => {
         expect(pkg.version).toBe('0.4.11')
         expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '54'")
         expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.4.11'")
-        expect(windows).toContain("$version -eq '0.4.11'")
-        expect(windows).toContain('Pica-Library-v0.4.10-windows-x64.zip')
+        expect(windows).toContain(
+            "'0.4.11' = 'artifacts\\release-base\\Pica-Library-v0.4.10-windows-x64.zip'"
+        )
+        expect(windows).toContain(
+            '$historicLauncherBasePaths.ContainsKey($version)'
+        )
         expect(windows).toContain(
             '6d53832632545634ced23d24c67aa16e0e8c25ffa10e185f0a14a92962575aab'
         )

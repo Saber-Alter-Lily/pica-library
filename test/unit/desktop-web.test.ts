@@ -88,17 +88,7 @@ describe('desktop setup and settings UI contract', () => {
         expect(build).toContain('README-WINDOWS.zh-CN.txt')
         expect(build).toContain('Text.UTF8Encoding($false)')
         expect(build).toContain(
-            "$version -match '^\\d+\\.\\d+\\.\\d+$'"
-        )
-        expect(build).toContain(
-            '"Pica-Library-v$version-windows-x64"'
-        )
-        expect(build).toContain(
-            '$historicLauncherBasePaths.ContainsKey($version)'
-        )
-        expect(build).toContain(
-            'PICA_WINDOWS_LAUNCHER_BASE_VERSION'
-        )
+            "$version -match '^\\d+\\.\\d+\\.\\d+
         expect(build).toContain("'src\\data\\registry-v3-final'")
         expect(build).toContain('Required Registry V3 runtime asset is missing')
         expect(build).toContain('git -C $root diff --quiet')

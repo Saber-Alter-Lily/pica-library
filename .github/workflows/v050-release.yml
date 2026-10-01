@@ -1,0 +1,207 @@
+name: v0.5.0 Formal Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type PUBLISH v0.5.0 to authorize stable publication'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - name: Require explicit release confirmation and permanent stamp
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM" = 'PUBLISH v0.5.0'
+          node -e "const p=require('./package.json'); if(p.version!=='0.5.0') throw new Error('Desktop version is not 0.5.0: '+p.version)"
+          grep -q "PICA_ANDROID_VERSION_CODE') ?: '55'" mobile/android-alpha2/app/build.gradle
+          grep -q "PICA_ANDROID_VERSION_NAME') ?: '0.5.0'" mobile/android-alpha2/app/build.gradle
+
+  candidate:
+    needs: validate
+    uses: ./.github/workflows/v050-release-candidate.yml
+    secrets: inherit
+
+  publish:
+    needs: [validate, candidate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.5.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pica-Library-v0.5.0-Windows-Formal-Candidate
+          path: release/windows
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Pica-Library-v0.5.0-Android-v55-Formal-Candidate
+          path: release/android
+
+      - name: Assemble immutable final payload
+        run: |
+          set -euo pipefail
+          mkdir -p release/final
+          cp release/windows/Pica-Library-v0.5.0-windows-x64.zip release/final/
+          cp release/windows/Pica-Library-v0.5.0-update-from-v0.4.11.zip release/final/
+          cp release/windows/Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip release/final/
+          cp release/windows/BUILD_TRANSPARENCY-v050-Windows-candidate.json release/final/
+          cp release/android/Pica-Library-Android-v55.apk release/final/
+          cp release/android/CERTIFICATE_SHA256.txt release/final/Pica-Library-Android-v55.cert-sha256
+          cp release/android/android-update.json release/final/
+          cp release/android/BUILD_TRANSPARENCY-v050-Android-candidate.json release/final/
+          printf '%s\n' "$GITHUB_SHA" > release/final/SOURCE_SHA.txt
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path("release/final")
+          windows=json.loads((root/"BUILD_TRANSPARENCY-v050-Windows-candidate.json").read_text(encoding="utf-8-sig"))
+          android=json.loads((root/"BUILD_TRANSPARENCY-v050-Android-candidate.json").read_text(encoding="utf-8-sig"))
+          source=os.environ["GITHUB_SHA"]
+          for name, value in [("windows", windows), ("android", android)]:
+              if value.get("sourceSha") != source:
+                  raise SystemExit(f"{name} candidate source SHA mismatch: {value.get('sourceSha')}")
+              if value.get("publishAuthorized") is not False or value.get("otaMutated") is not False:
+                  raise SystemExit(f"{name} candidate was not artifact-only")
+          out={
+              "release":"v0.5.0",
+              "sourceSha":source,
+              "windowsCandidate":windows,
+              "androidCandidate":android,
+              "publication":{
+                  "draftFirst":True,
+                  "downloadVerifyBeforePublish":True,
+                  "stableLatestBeforeAndroidOta":True,
+                  "retryRequiresSameSourceSha":True
+              }
+          }
+          (root/"BUILD_TRANSPARENCY.json").write_text(json.dumps(out,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          PY
+          (
+            cd release/final
+            sha256sum               Pica-Library-v0.5.0-windows-x64.zip               Pica-Library-v0.5.0-update-from-v0.4.11.zip               Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip               Pica-Library-Android-v55.apk               Pica-Library-Android-v55.cert-sha256               android-update.json               BUILD_TRANSPARENCY-v050-Windows-candidate.json               BUILD_TRANSPARENCY-v050-Android-candidate.json               BUILD_TRANSPARENCY.json               SOURCE_SHA.txt > SHA256SUMS.txt
+          )
+
+      - name: Create or resume checksum-verifiable draft release
+        run: |
+          set -euo pipefail
+          mapfile -t assets < <(find release/final -maxdepth 1 -type f -printf '%p\n' | sort)
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            target="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .target_commitish)"
+            draft="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)"
+            test "$target" = "$GITHUB_SHA"
+            if [ "$draft" = "true" ]; then
+              gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+            fi
+          else
+            gh release create "$RELEASE_TAG" "${assets[@]}"               --target "$GITHUB_SHA"               --title 'Pica Library v0.5.0 · One-click Upgrade & Dual-client Polish'               --notes-file docs/V050_RELEASE_NOTES.md               --draft
+          fi
+
+      - name: Verify draft or existing stable release byte-for-byte
+        run: |
+          set -euo pipefail
+          expected="$(cat <<'EOF' | sort
+          BUILD_TRANSPARENCY-v050-Android-candidate.json
+          BUILD_TRANSPARENCY-v050-Windows-candidate.json
+          BUILD_TRANSPARENCY.json
+          Pica-Library-Android-v55.apk
+          Pica-Library-Android-v55.cert-sha256
+          Pica-Library-v0.5.0-update-from-v0.4.11.zip
+          Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip
+          Pica-Library-v0.5.0-windows-x64.zip
+          SHA256SUMS.txt
+          SOURCE_SHA.txt
+          android-update.json
+          EOF
+          )"
+          actual="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq '.assets[].name' | sort)"
+          diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$actual")
+          target="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .target_commitish)"
+          test "$target" = "$GITHUB_SHA"
+
+          rm -rf "$RUNNER_TEMP/v050-release-verify"
+          mkdir -p "$RUNNER_TEMP/v050-release-verify"
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/v050-release-verify"
+          (
+            cd "$RUNNER_TEMP/v050-release-verify"
+            sha256sum -c SHA256SUMS.txt
+            test "$(cat SOURCE_SHA.txt)" = "$GITHUB_SHA"
+          )
+          python - "$RUNNER_TEMP/v050-release-verify" "$GITHUB_SHA" <<'PY'
+          import json,sys
+          from pathlib import Path
+          root=Path(sys.argv[1]); source=sys.argv[2]
+          meta=json.loads((root/"BUILD_TRANSPARENCY.json").read_text(encoding="utf-8"))
+          update=json.loads((root/"android-update.json").read_text(encoding="utf-8"))
+          if meta.get("sourceSha") != source:
+              raise SystemExit("final build transparency source SHA mismatch")
+          if update.get("versionCode") != 55 or update.get("versionName") != "0.5.0":
+              raise SystemExit("Android update metadata version mismatch")
+          PY
+
+      - name: Publish stable only after uploaded-asset verification
+        run: |
+          set -euo pipefail
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          draft="$(jq -r .draft <<<"$release_json")"
+          if [ "$draft" = "true" ]; then
+            id="$(jq -r .id <<<"$release_json")"
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false >/dev/null
+          fi
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)" = "false"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" = "$RELEASE_TAG"
+
+      - name: Update Android OTA only after stable release is verified
+        run: |
+          set -euo pipefail
+          mkdir -p release/ota
+          cp release/final/Pica-Library-Android-v55.apk release/ota/Pica-Library-Android-Preview.apk
+          cp release/final/Pica-Library-Android-v55.cert-sha256 release/ota/Pica-Library-Android-Preview.cert-sha256
+          cp release/final/android-update.json release/ota/
+          cp release/final/BUILD_TRANSPARENCY.json release/ota/
+
+          git tag -f android-preview "$GITHUB_SHA"
+          git push --force origin refs/tags/android-preview
+
+          if gh release view android-preview >/dev/null 2>&1; then
+            gh release upload android-preview               release/ota/Pica-Library-Android-Preview.apk               release/ota/Pica-Library-Android-Preview.cert-sha256               release/ota/android-update.json               release/ota/BUILD_TRANSPARENCY.json               --clobber
+            gh release edit android-preview               --title 'Android Preview v55 · Pica Library 0.5.0'               --notes 'Android v55 / 0.5.0 正式更新通道。与 public v54 保持相同包名和签名；v54→v55 原地升级已通过验收。'               --prerelease
+          else
+            gh release create android-preview               release/ota/Pica-Library-Android-Preview.apk               release/ota/Pica-Library-Android-Preview.cert-sha256               release/ota/android-update.json               release/ota/BUILD_TRANSPARENCY.json               --target "$GITHUB_SHA"               --title 'Android Preview v55 · Pica Library 0.5.0'               --notes 'Android v55 / 0.5.0 正式更新通道。与 public v54 保持相同包名和签名；v54→v55 原地升级已通过验收。'               --prerelease
+          fi
+
+          rm -rf "$RUNNER_TEMP/android-ota-verify"
+          mkdir -p "$RUNNER_TEMP/android-ota-verify"
+          gh release download android-preview             --pattern 'Pica-Library-Android-Preview.apk'             --pattern 'android-update.json'             --dir "$RUNNER_TEMP/android-ota-verify"
+          python - "$RUNNER_TEMP/android-ota-verify" <<'PY'
+          import hashlib,json,sys
+          from pathlib import Path
+          root=Path(sys.argv[1])
+          apk=root/"Pica-Library-Android-Preview.apk"
+          update=json.loads((root/"android-update.json").read_text(encoding="utf-8"))
+          sha=hashlib.sha256(apk.read_bytes()).hexdigest()
+          if update.get("sha256") != sha:
+              raise SystemExit("Android OTA APK SHA-256 mismatch")
+          if update.get("versionCode") != 55 or update.get("versionName") != "0.5.0":
+              raise SystemExit("Android OTA version metadata mismatch")
+          print("ANDROID_V55_OTA_PUBLICATION=PASS")
+          PY

@@ -5,9 +5,19 @@ const workflow = fs.readFileSync(
     '.github/workflows/v050-release-candidate.yml',
     'utf8'
 )
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+const gradle = fs.readFileSync(
+    'mobile/android-alpha2/app/build.gradle',
+    'utf8'
+)
 
 describe('v0.5.0 formal release candidate workflow', () => {
-    it('builds the real v0.4.11 one-click bridge without publishing', () => {
+    it('builds the real v0.4.11 one-click bridge from the permanent v0.5.0 stamp without publishing', () => {
+        expect(pkg.version).toBe('0.5.0')
+        expect(gradle).toContain("PICA_ANDROID_VERSION_CODE') ?: '55'")
+        expect(gradle).toContain("PICA_ANDROID_VERSION_NAME') ?: '0.5.0'")
+        expect(workflow).toContain('Verify permanent Desktop release stamp')
+        expect(workflow).not.toContain('Temporarily stamp Desktop candidate version')
         expect(workflow).toContain(
             'Pica-Library-v$env:TARGET_VERSION-update-from-v$env:BASE_VERSION.zip'
         )
@@ -44,12 +54,7 @@ describe('v0.5.0 formal release candidate workflow', () => {
         expect(androidUpgradeScript).toContain(
             'ANDROID_V54_TO_V55_INPLACE_UPDATE=PASS'
         )
-        expect(workflow).toContain(
-            "JSON.stringify(value,null,2)+'\\n'"
-        )
-        expect(workflow).not.toContain(
-            "json.dumps(d,ensure_ascii=False,indent=2)+'\\\\n'"
-        )
+        expect(workflow).toContain('candidate/android-update.json')
         expect(workflow).not.toContain('gh release create')
         expect(workflow).not.toContain('git push --force')
         expect(workflow).not.toContain('gh release upload android-preview')

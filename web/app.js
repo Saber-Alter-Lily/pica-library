@@ -7,6 +7,7 @@ import {
     saveLiteState
 } from './lite-state.js'
 import { deriveLiteAuthors } from './author-state.js'
+import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
@@ -849,28 +850,9 @@ async function reconnectAfterUpdate(
     targetVersion,
     timeoutMs = 90_000
 ) {
-    const started = Date.now()
-    while (Date.now() - started < timeoutMs) {
-        try {
-            const response = await fetch('/api/v1/capabilities', {
-                cache: 'no-store'
-            })
-            if (response.ok) {
-                const value = await response.json()
-                if (
-                    String(value?.appVersion || '') ===
-                    String(targetVersion || '')
-                ) {
-                    window.location.reload()
-                    return
-                }
-            }
-        } catch {
-            // The old engine is expected to disappear while files are replaced.
-        }
-        await new Promise((resolve) => setTimeout(resolve, 250))
-    }
-    throw new Error(t('update.reconnectFailed'))
+    const ready = await waitForUpdateReconnect(targetVersion, { timeoutMs })
+    if (!ready) throw new Error(t('update.reconnectFailed'))
+    window.location.reload()
 }
 
 async function applyStagedUpdate(

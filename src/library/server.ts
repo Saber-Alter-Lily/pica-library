@@ -373,6 +373,11 @@ export async function startLibraryServer(options: {
                 request.method === 'GET'
             ) {
                 const desktopStatus = options.desktop?.status() ?? null
+                if (desktopStatus?.startupReady === false)
+                    return json(response, 503, {
+                        error: 'Desktop startup is not ready',
+                        startupReady: false
+                    })
                 return json(response, 200, {
                     ...appCapabilities(
                         providerService.capabilities.favoriteMutation,

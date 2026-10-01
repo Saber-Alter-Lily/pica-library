@@ -721,6 +721,7 @@ async function startEngine(preferredPort: number) {
         runtimeResources
     )
     const csrfToken = randomBytes(32).toString('base64url')
+    let startupReady = false
     const desktop: DesktopServerController = {
         csrfToken,
         startEhWebLogin: async () => {
@@ -738,6 +739,7 @@ async function startEngine(preferredPort: number) {
                 : { state: 'cancelled', message: '网页登录已取消' },
         configured: () => Boolean(config && credentials),
         status: () => ({
+            startupReady,
             runtime: runtimeOptions,
             platform: platformCapabilities,
             credentialBackend: credentialBackend.status,
@@ -1344,6 +1346,7 @@ async function startEngine(preferredPort: number) {
         log.write('Mobile Bridge disabled in headless mode; pass --mobile-bridge to enable it')
     }
     instance.publish(currentUrl)
+    startupReady = true
     log.write(
         `Desktop engine ${PRODUCT_VERSION} started at ${currentUrl} [${runtimeOptions.mode}]`
     )

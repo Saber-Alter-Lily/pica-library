@@ -588,7 +588,7 @@ export const translations = {
         'update.fullStaged':
             'The full application package is verified and ready for safe replacement.',
         'update.reconnectFailed':
-            'The update was started, but this page could not reconnect automatically. Continue in the Pica Library window opened by the updater.',
+            'The update was started, but this page could not reconnect automatically. Wait a moment and refresh this page; if it still fails, reopen Pica Library.',
         'update.apply': 'Use uploaded package and restart',
         'action.close': 'Close',
         'common.confirm': 'Confirm',
@@ -1383,7 +1383,7 @@ export const translations = {
         'update.fullStaged':
             '完整程序包已通过校验，可以安全替换。',
         'update.reconnectFailed':
-            '更新已启动，但当前页面没有自动重新连接。请继续使用升级助手已打开的 Pica Library 窗口。',
+            '更新已启动，但当前页面没有自动重新连接。请稍等片刻后刷新本页；如果仍然失败，再重新打开 Pica Library。',
         'update.apply': '使用已上传更新包并重启',
         'action.close': '关闭',
         'common.confirm': '确认',

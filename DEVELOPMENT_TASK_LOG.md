@@ -2924,3 +2924,14 @@ State update:
 - Public docs, quick-start guides, Android guide, Desktop guide and Windows distribution guide now describe v0.4.11 → v0.5.0 in-product one-click upgrade as the normal path, with the generated Upgrade Assistant as recovery fallback.
 - No stable Release, `latest`, or Android OTA pointer has been changed by this stamp commit.
 - Final release authority requires a fresh all-green matrix and v0.5.0 formal candidate built from the exact final stamped source SHA.
+
+
+## 2026-10-01 — POST-v0.5.0 update reconnect stabilization
+
+State update:
+- Field report after the v0.5.0 publication: the Windows update itself completed successfully, but the Web update page attempted its automatic refresh too early; a manual browser refresh shortly afterward connected successfully.
+- Root cause boundary: the old Web client treats the first successful target-version `/api/v1/capabilities` response as sufficient to reload. The local HTTP server can begin listening before Desktop finishes the rest of its startup path, leaving a narrow readiness race.
+- Server-side compatibility fix: Desktop now exposes `startupReady=false` while the engine is still completing startup. `/api/v1/capabilities` returns HTTP 503 only during that explicit state and returns the normal capability payload after instance publication. This means the already-released v0.5.0 Web client will also wait longer when upgrading into the next build, even though its JavaScript cannot be changed retroactively.
+- Client-side hardening for subsequent upgrades: reconnect now probes both target-version capabilities and a no-cache Web shell, requires a 1.5-second continuous stabilization window, and only then reloads.
+- The final reconnect failure copy now tells users to wait briefly and refresh the current page before reopening the application.
+- No v0.5.0 Release asset, tag, OTA pointer, database schema, updater package format or version stamp is changed by this branch. The fix is isolated for the next patch release candidate.

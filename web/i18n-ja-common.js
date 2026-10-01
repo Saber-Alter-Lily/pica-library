@@ -7,7 +7,7 @@ export const jaCommonChronicleTranslations = {
     'update.downloading': '公式更新 {version} をダウンロード中…',
     'update.fullOneClickFound': 'v{version} が見つかりました。完全アプリ更新が必要ですが、ワンクリックで安全に更新できます。',
     'update.fullStaged': '完全アプリパッケージの検証が完了し、安全に置き換える準備ができました。',
-    'update.reconnectFailed': '更新は開始されましたが、このページは自動再接続できませんでした。アップデーターが開いた Pica Library ウィンドウを使用してください。',
+    'update.reconnectFailed': '更新は開始されましたが、このページは自動再接続できませんでした。少し待ってからこのページを再読み込みし、それでも失敗する場合は Pica Library を開き直してください。',
     'update.apply': '選択した更新パッケージを使って再起動',
     'action.close': '閉じる',
     'common.confirm': '確認',

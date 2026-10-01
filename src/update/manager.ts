@@ -1014,7 +1014,9 @@ export class UpdateManager {
                 )
             const full = this.stagedFull
             const persistentAssistant =
-                this.preparePersistentUpgradeAssistant()
+                this.preparePersistentUpgradeAssistant({
+                    verifyExisting: true
+                })
             if (!persistentAssistant.available)
                 throw new Error(
                     'Persistent upgrade assistant is unavailable on this target'

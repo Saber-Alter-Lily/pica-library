@@ -146,9 +146,6 @@ describe('P2 unpublished RC package contract', () => {
         expect(workflow).toContain('TEST_BUILD.txt')
         expect(workflow).toContain('test-windows-v0411-incremental-upgrade.ps1')
         expect(workflow).toContain('-CandidateZip $formalZip')
-        const incrementalAcceptance = read(
-            'scripts/test-windows-v0411-incremental-upgrade.ps1'
-        )
         expect(incrementalAcceptance).toContain("baseline_version = '0.4.11'")
         expect(incrementalAcceptance).toContain('candidate_schema = 14')
         expect(incrementalAcceptance).toContain('legacy_updater_preserved = $true')

@@ -21,7 +21,7 @@
 
 ## 数据与凭据
 
-默认用户数据位置是 `%LOCALAPPDATA%\\Pica Library`：
+默认用户数据位置是 `%LOCALAPPDATA%\Pica Library`：
 
 - `config/`：非敏感设置和受 DPAPI 保护的凭据；
 - `data/`：SQLite 漫画库及相关持久化数据；

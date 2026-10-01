@@ -66,10 +66,10 @@ describe('v0.4.1 full-package update guidance', () => {
             'Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip'
         )
         expect(guide).toContain(
-            '%LOCALAPPDATA%\\\\Pica Library\\\\runtime-state\\\\upgrade-assistant'
+            '%LOCALAPPDATA%\\Pica Library\\runtime-state\\upgrade-assistant'
         )
         expect(quick).toContain(
-            '%LOCALAPPDATA%\\\\Pica Library\\\\runtime-state\\\\upgrade-assistant'
+            '%LOCALAPPDATA%\\Pica Library\\runtime-state\\upgrade-assistant'
         )
         expect(readme).toContain('一键检查并更新')
 

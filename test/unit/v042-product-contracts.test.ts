@@ -126,8 +126,12 @@ describe('v0.4.2 product contracts', () => {
             advertisedDatabaseSchemaVersion: 13,
             actualMigrationVersion: 13
         })
-        expect(windows).toContain("$version -eq '0.4.2'")
-        expect(windows).toContain('Pica-Library-v0.4.1-windows-x64.zip')
+        expect(windows).toContain(
+            "'0.4.2' = 'artifacts\\release-base\\Pica-Library-v0.4.1-windows-x64.zip'"
+        )
+        expect(windows).toContain(
+            '$historicLauncherBasePaths.ContainsKey($version)'
+        )
         expect(windows).toContain(
             '88d87a8f0e5a8413656751ff344052eccbfa796e663e4acc8c7fe4a0e0866b3d'
         )

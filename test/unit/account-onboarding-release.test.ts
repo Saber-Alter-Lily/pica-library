@@ -24,7 +24,12 @@ describe('account onboarding distribution candidate', () => {
             'scripts/build-windows-package.ps1',
             'utf8'
         )
-        expect(script).toContain("$version -eq '0.4.11'")
+        expect(script).toContain(
+            "'0.4.11' = 'artifacts\\release-base\\Pica-Library-v0.4.10-windows-x64.zip'"
+        )
+        expect(script).toContain(
+            '$historicLauncherBasePaths.ContainsKey($version)'
+        )
         expect(script).toContain(
             'artifacts\\release-base\\Pica-Library-v0.4.10-windows-x64.zip'
         )

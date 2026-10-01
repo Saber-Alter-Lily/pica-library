@@ -17,6 +17,16 @@ on:
       - 'src/desktop/**'
       - 'mobile/android-alpha2/app/build.gradle'
       - 'mobile/android-alpha2/app/src/main/**'
+      - 'test/integration/migrations.test.ts'
+      - 'test/unit/desktop-web.test.ts'
+      - 'test/unit/p2-unpublished-rc-package.test.ts'
+      - 'test/unit/universal-full-upgrade.test.ts'
+      - 'test/unit/upgrade-assistant-builder.test.ts'
+      - 'test/unit/v0411-release.test.ts'
+      - 'test/unit/v042-product-contracts.test.ts'
+      - 'test/unit/v050-release-candidate.test.ts'
+      - 'test/unit/windows-package-future-release.test.ts'
+      - 'test/unit/workflow-entrypoint.test.ts'
 
 permissions:
   contents: read

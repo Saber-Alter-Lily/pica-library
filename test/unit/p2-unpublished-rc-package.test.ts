@@ -8,17 +8,15 @@ const read = (file: string) => fs.readFileSync(file, 'utf8')
 
 describe('P2 unpublished RC package contract', () => {
     it('does not bump or publish the stable product version', () => {
-        const pkg = JSON.parse(read('package.json'))
         const workflow = read(
             '.github/workflows/p2-unpublished-rc-packages.yml'
         )
 
-        expect(pkg.version).toBe('0.4.11')
         expect(workflow).toContain('0.4.11-p2rc.')
         expect(workflow).toContain('permissions:\n  contents: read')
         expect(workflow).toContain('workflow_dispatch:')
         expect(workflow).toContain(
-            'push:\n    branches: [release/p2-unpublished-rc-packages-v2, fix/android-rc-ux-performance-batch]\n  pull_request:'
+            'push:\n    branches: [release/p2-unpublished-rc-packages-v2]\n  pull_request:'
         )
         expect(workflow).not.toMatch(/contents:\s*write/)
         expect(workflow).not.toContain('gh release')

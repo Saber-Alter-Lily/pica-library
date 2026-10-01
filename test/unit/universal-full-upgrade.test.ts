@@ -234,7 +234,9 @@ describe('universal full application upgrade', () => {
         )
 
         const repaired =
-            updateManager.preparePersistentUpgradeAssistant()
+            updateManager.preparePersistentUpgradeAssistant({
+                verifyExisting: true
+            })
         expect(repaired.available).toBe(true)
         expect(fs.readFileSync(assistant.helperPath, 'utf8')).toBe(
             'full-upgrader'
@@ -247,7 +249,9 @@ describe('universal full application upgrade', () => {
         )
         fs.writeFileSync(installedHelper, 'corrupted-installed-helper')
         const externalRecovery =
-            updateManager.preparePersistentUpgradeAssistant()
+            updateManager.preparePersistentUpgradeAssistant({
+                verifyExisting: true
+            })
         expect(externalRecovery.available).toBe(true)
         expect(fs.readFileSync(assistant.helperPath, 'utf8')).toBe(
             'full-upgrader'
@@ -255,7 +259,9 @@ describe('universal full application upgrade', () => {
 
         fs.writeFileSync(assistant.helperPath, 'corrupted-external-helper')
         expect(() =>
-            updateManager.preparePersistentUpgradeAssistant()
+            updateManager.preparePersistentUpgradeAssistant({
+                verifyExisting: true
+            })
         ).toThrow(/both failed verification/i)
     })
 
@@ -331,11 +337,10 @@ describe('universal full application upgrade', () => {
         )
         expect(managerSource).toContain("'upgrade-assistant'")
         expect(managerSource).toContain(
-            'preparePersistentUpgradeAssistant()'
+            'preparePersistentUpgradeAssistant({'
         )
-        expect(managerSource).toContain(
-            "'app',\n                'full-upgrader.js'"
-        )
+        expect(managerSource).toContain('verifyExisting: true')
+        expect(managerSource).toContain("'full-upgrader.js'")
         expect(helper).toContain(
             'snapshotUserState(instruction)'
         )

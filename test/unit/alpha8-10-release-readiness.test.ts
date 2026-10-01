@@ -27,8 +27,12 @@ describe('Alpha8.10 release readiness baseline', () => {
         expect(gradle).toContain(
             "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.11'"
         )
-        expect(windows).toContain("$version -eq '0.3.10'")
-        expect(windows).toContain('Pica-Library-v0.3.9-windows-x64.zip')
+        expect(windows).toContain(
+            "'0.3.10' = 'artifacts\\Pica-Library-v0.3.9-windows-x64.zip'"
+        )
+        expect(windows).toContain(
+            '$historicLauncherBasePaths.ContainsKey($version)'
+        )
     })
 
     it('removes teaser microcopy and keeps normal settings/personalization screens quiet', () => {

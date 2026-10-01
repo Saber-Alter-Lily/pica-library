@@ -41,7 +41,7 @@ describe('v0.5.0 formal release candidate workflow', () => {
         )
         expect(androidUpgradeScript).toContain('set -euo pipefail')
         expect(androidUpgradeScript).toContain('adb install -r "$new"')
-        expect(workflow).toContain(
+        expect(androidUpgradeScript).toContain(
             'ANDROID_V54_TO_V55_INPLACE_UPDATE=PASS'
         )
         expect(workflow).toContain(

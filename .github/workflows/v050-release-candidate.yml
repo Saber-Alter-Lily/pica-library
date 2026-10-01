@@ -11,6 +11,7 @@ on:
       - 'scripts/build-local-update-package.ts'
       - 'scripts/build-upgrade-assistant.ts'
       - 'scripts/test-windows-v0411-incremental-upgrade.ps1'
+      - 'scripts/test-android-v54-v55-inplace.sh'
       - 'src/update/**'
       - 'src/storage/sqlite/migrations.ts'
       - 'src/library/database.ts'
@@ -246,30 +247,13 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: |
-            set -euo pipefail
-            old="$RUNNER_TEMP/Pica-Library-Android-v54.apk"
-            new="mobile/android-alpha2/candidate/Pica-Library-Android-v55.apk"
-            adb install "$old"
-            before="$(adb shell dumpsys package com.picalibrary.android | tr -d '\r')"
-            printf '%s\n' "$before" | grep -q 'versionCode=54'
-            first_before="$(printf '%s\n' "$before" | sed -n 's/^[[:space:]]*firstInstallTime=//p' | head -n1)"
-            data_before="$(printf '%s\n' "$before" | sed -n 's/^[[:space:]]*dataDir=//p' | head -n1)"
-            test -n "$first_before"
-            test -n "$data_before"
-
-            adb install -r "$new"
-            after="$(adb shell dumpsys package com.picalibrary.android | tr -d '\r')"
-            printf '%s\n' "$after" | grep -q 'versionCode=55'
-            first_after="$(printf '%s\n' "$after" | sed -n 's/^[[:space:]]*firstInstallTime=//p' | head -n1)"
-            data_after="$(printf '%s\n' "$after" | sed -n 's/^[[:space:]]*dataDir=//p' | head -n1)"
-            test "$first_before" = "$first_after"
-            test "$data_before" = "$data_after"
-
-            adb shell monkey -p com.picalibrary.android -c android.intent.category.LAUNCHER 1
-            sleep 2
-            test -n "$(adb shell pidof com.picalibrary.android | tr -d '\r')"
-            printf '%s\n' 'ANDROID_V54_TO_V55_INPLACE_UPDATE=PASS'
+          script: >-
+            bash scripts/test-android-v54-v55-inplace.sh
+            "$RUNNER_TEMP/Pica-Library-Android-v54.apk"
+            "mobile/android-alpha2/candidate/Pica-Library-Android-v55.apk"
+            "com.picalibrary.android"
+            "54"
+            "55"
       - uses: actions/upload-artifact@v4
         with:
           name: Pica-Library-v0.5.0-Android-v55-Formal-Candidate

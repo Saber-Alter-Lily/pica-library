@@ -1,14 +1,14 @@
 # Pica Library Quick Start
 
-Current stable release: **v0.4.11**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
+Current stable release: **v0.5.0**. A typical first-time Windows setup consists of downloading the application, completing initial settings, synchronizing the library, and optionally configuring recommendations.
 
 ## 01 Download and extract
 
 Download the current stable Windows package from [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest).
 
-For v0.4.11:
+For v0.5.0:
 
-`Pica-Library-v0.4.11-windows-x64.zip`
+`Pica-Library-v0.5.0-windows-x64.zip`
 
 Extract the complete archive to a normal folder. Do not run the executable from inside an archive viewer.
 
@@ -91,19 +91,27 @@ AZZ and the GitHub project page are available there. Support is voluntary and ne
 
 ## 08 Software updates
 
-On Windows, open **Settings → Software Update**.
+On Windows, open **Settings → Maintenance → Software Update**.
 
-Existing **v0.4.0** users should move directly to the current release:
+Existing **v0.4.11** users can use **One-click check & update** to move directly to v0.5.0. The normal path downloads and verifies:
 
-- download `Pica-Library-v0.4.11-upgrade-assistant.zip` from the v0.4.11 Release;
-- run `Upgrade-Pica-Library-v0.4.11.cmd`;
-- no intermediate versions are required.
+`Pica-Library-v0.5.0-update-from-v0.4.11.zip`
 
-The assistant verifies the official full package, protects `%LOCALAPPDATA%\Pica Library`, creates application/database backups, replaces the application, runs health checks, and rolls back on failure.
+After installation, the app restarts and reconnects the Web UI automatically. The library database, shelves, history, downloads, and settings do not need to be re-imported.
 
-Android v42 / 0.4.0 users can update directly through the in-app chain to v51 / 0.4.7; intermediate versions are not required.
+On first v0.5.0 startup, Desktop registers a persistent verified helper under:
 
-Application files and user data are separate. Do not delete `%LOCALAPPDATA%\Pica Library` during an upgrade.
+`%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant\`
+
+This external helper allows future schema jumps or updater replacement to continue using the same in-product one-click update action.
+
+If the in-app route is unavailable, use the recovery fallback from the same stable Release:
+
+`Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip`
+
+The public Android v54 / 0.4.11 package has passed an in-place upgrade acceptance to **v55 / 0.5.0**.
+
+Do not delete `%LOCALAPPDATA%\Pica Library` as part of an update.
 
 ## 09 More documentation
 

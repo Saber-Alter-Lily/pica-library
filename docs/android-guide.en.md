@@ -1,11 +1,11 @@
 # Pica Library Android Guide
 
-> Current stable release: **v0.4.11 · versionCode 54**. The Android app is not distributed through any app store. Download APKs only from this repository's official GitHub Release.
+> Current stable release: **v0.5.0 · versionCode 55**. The Android app is not distributed through any app store. Download APKs only from this repository's official GitHub Release.
 
 ## 1. Download and install
 
 1. Open [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest).
-2. Download the current APK. For v0.4.11, use `Pica-Library-Android-v54.apk`.
+2. Download the current APK. For v0.5.0, use `Pica-Library-Android-v55.apk`.
 3. Open the APK and allow the one-time Android install action when prompted.
 4. Read and acknowledge the startup usage notice.
 
@@ -106,7 +106,7 @@ Formal updates verify:
 - application package name;
 - official signing identity.
 
-Existing **v42 / 0.4.0** users can update in place directly to **v54 / 0.4.11** through the in-app update chain; no intermediate versions are required.
+The public **v54 / 0.4.11** package has passed a formal-candidate in-place upgrade acceptance to **v55 / 0.5.0** and can update through the in-app channel. If a much older build cannot discover the current channel, install the latest official APK over the existing app rather than uninstalling it.
 
 If an update briefly reports that it is waiting for the Android system download service, Android DownloadManager is usually queueing the request; continue later or restart the download if needed.
 

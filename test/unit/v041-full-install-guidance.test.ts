@@ -42,29 +42,41 @@ describe('v0.4.1 full-package update guidance', () => {
         expect(css).toContain('.full-install-actions a:first-child')
     })
 
-    it('keeps v0.4.0 as the public upgrade baseline and points directly to the latest assistant', () => {
+    it('keeps historical v0.4.x assistant contracts without overriding the current v0.5.0 one-click guidance', () => {
         const guide = read('docs/windows-distribution.zh-CN.md')
         const quick = read('docs/quick-start.zh-CN.md')
         const readme = read('README.md')
         const legacy = read('packaging/windows/upgrade-assistant-v041/Upgrade-Pica-Library-v0.4.1.ps1')
 
         for (const content of [guide, quick, readme]) {
-            expect(content).toContain('v0.4.0')
             expect(content).toContain('v0.4.11')
+            expect(content).toContain('v0.5.0')
         }
 
-        expect(guide).toContain('Pica-Library-v0.4.11-upgrade-assistant.zip')
-        expect(quick).toContain('Pica-Library-v0.4.11-upgrade-assistant.zip')
-        expect(guide).toContain('%LOCALAPPDATA%\\\\Pica Library')
-        expect(quick).toContain('%LOCALAPPDATA%\\\\Pica Library')
-        expect(quick).toContain('不需要卸载')
+        expect(guide).toContain(
+            'Pica-Library-v0.5.0-update-from-v0.4.11.zip'
+        )
+        expect(quick).toContain(
+            'Pica-Library-v0.5.0-update-from-v0.4.11.zip'
+        )
+        expect(guide).toContain(
+            'Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip'
+        )
+        expect(quick).toContain(
+            'Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip'
+        )
+        expect(guide).toContain(
+            '%LOCALAPPDATA%\\\\Pica Library\\\\runtime-state\\\\upgrade-assistant'
+        )
+        expect(quick).toContain(
+            '%LOCALAPPDATA%\\\\Pica Library\\\\runtime-state\\\\upgrade-assistant'
+        )
+        expect(readme).toContain('一键检查并更新')
 
-        expect(readme).not.toContain('v0.4.1 / v0.4.2 / v0.4.3 → v0.4.11')
-        expect(quick).not.toContain('v0.4.1 / v0.4.2 / v0.4.3 → v0.4.11')
-        expect(guide).not.toContain('### v0.4.1 / v0.4.2 / v0.4.3 → v0.4.11')
-
-        // Historical assistant contracts remain testable even though they are not public guidance.
+        // Historical assistant contracts remain testable even though they are
+        // no longer the current public guidance.
         expect(legacy).toContain("$RequiredSourceVersion = '0.4.0'")
         expect(legacy).toContain("$TargetVersion = '0.4.1'")
     })
+
 })

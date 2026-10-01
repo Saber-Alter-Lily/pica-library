@@ -81,7 +81,8 @@ jobs:
       - name: Temporarily stamp Desktop candidate version
         shell: pwsh
         run: |
-          python -c "import json,pathlib; p=pathlib.Path('package.json'); d=json.loads(p.read_text(encoding='utf-8')); assert d['version']=='0.4.11'; d['version']='0.5.0'; p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\\n',encoding='utf-8')"
+          node -e "const fs=require('fs'); const file='package.json'; const value=JSON.parse(fs.readFileSync(file,'utf8')); if(value.version!=='0.4.11') throw new Error('Unexpected repository version: '+value.version); value.version=process.env.TARGET_VERSION; fs.writeFileSync(file, JSON.stringify(value,null,2)+'\n', 'utf8')"
+          node -e "const p=require('./package.json'); if(p.version!==process.env.TARGET_VERSION) throw new Error('Desktop candidate version stamp failed')"
       - name: Build formal-layout Windows candidate
         shell: pwsh
         run: |

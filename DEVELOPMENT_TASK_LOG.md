@@ -2790,7 +2790,7 @@ Stable v0.4.11 Release assets and stable OTA metadata remain untouched.
 
 
 ## NEXT-32 — Next stable release scope / v0.4.11 bridge / support-provider reconciliation
-**Status: IN PROGRESS — release preparation only; does not close the project backlog**
+**Status: RELEASE FREEZE — permanent v0.5.0 / Android v55 stamp committed; final stamped candidate + publish transaction pending; broader project backlog remains open**
 
 ### Why this entry exists
 The next stable release must not be treated as equivalent to “finish every open item in this log”.
@@ -2912,3 +2912,15 @@ State update:
   - artifact-only publication to GitHub Actions.
 - The candidate workflow has no `gh release create`, no stable tag mutation, no `android-preview` upload and no OTA/latest update. A dedicated unit contract locks that boundary.
 - Formal repository version stamping and public Release remain blocked until the v0.5.0 formal candidate and the normal release-intent matrix pass.
+
+
+## 2026-09-30 — NEXT-32 permanent v0.5.0 release stamp
+
+State update:
+- Repository Desktop version is permanently stamped to `0.5.0`; Android defaults are permanently stamped to versionCode `55` / versionName `0.5.0`.
+- The v0.5.0 candidate workflow no longer mutates `package.json` temporarily; it now verifies the permanent release identity before packaging.
+- Historical v0.4.x contract tests now preserve their compatibility baselines without forcing the current repository to remain at v0.4.11.
+- The old P2 unpublished RC generator is restored to its historical/manual branch scope and no longer auto-runs from the v0.5.0 release branch.
+- Public docs, quick-start guides, Android guide, Desktop guide and Windows distribution guide now describe v0.4.11 → v0.5.0 in-product one-click upgrade as the normal path, with the generated Upgrade Assistant as recovery fallback.
+- No stable Release, `latest`, or Android OTA pointer has been changed by this stamp commit.
+- Final release authority requires a fresh all-green matrix and v0.5.0 formal candidate built from the exact final stamped source SHA.

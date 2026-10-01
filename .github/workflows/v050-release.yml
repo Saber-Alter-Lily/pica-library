@@ -164,8 +164,7 @@ jobs:
           release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
           draft="$(jq -r .draft <<<"$release_json")"
           if [ "$draft" = "true" ]; then
-            id="$(jq -r .id <<<"$release_json")"
-            gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false >/dev/null
+            gh release edit "$RELEASE_TAG" --draft=false --latest
           fi
           test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq .draft)" = "false"
           latest=''

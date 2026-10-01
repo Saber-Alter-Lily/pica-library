@@ -10,12 +10,14 @@ Supports **PicACG / Pica, E-Hentai / ExHentai, and WebDAV**, bringing discovery,
 
 Windows 10/11 x64 · Android · Local-first · Open Source
 
-## v0.4.11 highlights
+## v0.5.0 highlights
 
-- **Better “Same work” detection**: cross-provider, cross-language, and alternate uploads are more likely to be linked from comic details.
-- **Android can resolve same-work candidates independently** even when Desktop is not connected.
-- **Large libraries are handled more completely**, without dropping older entries from identity checks.
-- **Web detail pages preserve your position**: closing a comic detail returns to the same place in Library, Shelves, Search, or Recommendations.
+- **One-click Windows upgrade from v0.4.11 to v0.5.0** through the existing Software Update page, without manual extraction or reinstall.
+- **Persistent external upgrade assistant**: v0.5.0 registers a verified runtime/helper under `runtime-state/upgrade-assistant`, so later schema jumps or updater replacement can still use one-click full-application replacement.
+- **More direct Android batch actions**: long-press Library/Shelf selection exposes add/remove/unfavorite actions in a contextual bottom bar.
+- **Library and recommendation interaction cleanup**: favorite-order sorting, known page count, visible same-work checks, cycle-level author exposure control, and fewer unnecessary full reloads.
+- **Simpler Desktop/Web hierarchy** across Settings, Library display controls, connection state, and onboarding.
+- **Project support moved to AZZ** across Web, Android, documentation, and GitHub Funding.
 
 See [PROJECT_LOG.md](PROJECT_LOG.md) for the core version history.
 
@@ -70,19 +72,25 @@ Official builds are published through [GitHub Releases](https://github.com/Saber
 
 New users should download and fully extract:
 
-`Pica-Library-v0.4.11-windows-x64.zip`
+`Pica-Library-v0.5.0-windows-x64.zip`
 
 Then run `Pica Library.exe`.
 
-Existing **v0.4.0** users can download:
+Existing **v0.4.11** users can open **Settings → Maintenance → Software Update** and use **One-click check & update**. The stable channel selects:
 
-`Pica-Library-v0.4.11-upgrade-assistant.zip`
+`Pica-Library-v0.5.0-update-from-v0.4.11.zip`
 
-Extract it and run `Upgrade-Pica-Library-v0.4.11.cmd` to move directly to the latest release without installing intermediate versions. Personal data is stored separately; the assistant verifies, backs up, and rolls back on failure.
+and performs verification, application replacement, database migration, and automatic reconnect without an intermediate install.
+
+If the in-app path is unavailable, the same Release provides the recovery fallback:
+
+`Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip`
+
+Personal data remains outside the application tree; neither normal updating nor the fallback assistant treats the library database, shelves, history, downloads, or account configuration as application files.
 
 ### Android
 
-The formal Android release is **v54 / 0.4.11**. Existing **v42 / 0.4.0** and later users can update in place through the in-app update chain.
+The formal Android release is **v55 / 0.5.0**. The public v54 / 0.4.11 package has passed an in-place upgrade acceptance to v55.
 
 Android APKs are distributed only through this repository's official Release.
 

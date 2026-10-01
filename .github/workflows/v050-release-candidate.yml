@@ -1,6 +1,7 @@
 name: v0.5.0 Formal Release Candidate
 
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches: [fix/android-rc-ux-performance-batch]

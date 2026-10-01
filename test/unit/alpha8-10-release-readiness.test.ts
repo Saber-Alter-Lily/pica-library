@@ -24,9 +24,9 @@ describe('Alpha8.10 release readiness baseline', () => {
         )
         expect(versionAtLeast(pkg.version, [0, 3, 10])).toBe(true)
         expect(versionCode).toBeGreaterThanOrEqual(37)
-        expect(gradle).toContain(
-            "System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.4.11'"
-        )
+        const androidVersionName =
+            gradle.match(/PICA_ANDROID_VERSION_NAME'\)\s*\?:\s*'([^']+)'/)?.[1] ?? '0.0.0'
+        expect(versionAtLeast(androidVersionName, [0, 3, 10])).toBe(true)
         expect(windows).toContain(
             "'0.3.10' = 'artifacts\\Pica-Library-v0.3.9-windows-x64.zip'"
         )

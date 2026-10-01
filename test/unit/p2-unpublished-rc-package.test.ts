@@ -46,7 +46,10 @@ describe('P2 unpublished RC package contract', () => {
         expect(stableBuild).not.toContain('PICA_LIBRARY_UNPUBLISHED_RC')
         expect(stableBuild).not.toContain('RcLauncher.cs')
         expect(stableBuild).toContain(
-            "'Pica-Library-v0.4.11-windows-x64'"
+            '"Pica-Library-v$version-windows-x64"'
+        )
+        expect(stableBuild).toContain(
+            "'0.4.11' = 'artifacts\\release-base\\Pica-Library-v0.4.10-windows-x64.zip'"
         )
 
         expect(rcBuild).toContain("$stableVersion -ne '0.4.11'")

@@ -6,9 +6,22 @@
 
 ## 公开升级基线
 
-- 面向普通用户，v0.4 系列的公开升级基线按 **v0.4.0 → 当前最新版** 表达：Windows 使用当前 Release 的升级助手一次直达，Android 通过应用内更新链直接原地升级。
-- v0.4.1–v0.4.3 是短周期过渡版本，继续保留在版本历史、兼容测试和发布资产中，但普通用户无需逐个安装，也不作为主页和使用指南的推荐升级路径。
+- 当前 Windows 推荐升级基线为 **public v0.4.11 → v0.5.0**：优先使用软件内来源限定增量一键升级；Upgrade Assistant 仅作为恢复备用。
+- Android 当前正式版本线升级为 **v54 / 0.4.11 → v55 / 0.5.0**，保持相同包名与签名身份并完成原地覆盖安装验收。
+- 更早 v0.4.x 版本继续保留在版本历史、兼容测试和发布资产中，但不为最后阶段兼容而放宽 updater 自替换或安全校验边界。
 
+
+## v0.5.0 — 无痛升级基线与双端交互收口
+
+- Windows public v0.4.11 可以通过现有软件更新页直接安装来源限定的 `Pica-Library-v0.5.0-update-from-v0.4.11.zip`；真实 Windows 验收使用 v0.4.11 自带 updater 完成 schema 13→14、保留外置配置/数据库并建立 pre-migration backup。
+- v0.5.0 首次启动会在 `%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant` 注册受 SHA-256 约束的 Node runtime、`full-upgrader.js` 与 `assistant.json`；后续 Schema 跳跃、updater 自替换或整个程序树更换均可从该外置 authority 准备一次性 bootstrap。
+- 完整程序升级会校验官方 Release / SHA-256，备份程序与关键用户状态，替换后执行版本/Schema 健康检查；失败时恢复旧程序和升级前状态。网页在新版健康后自动重新连接/刷新。
+- Android 正式版本提升为 versionCode 55 / 0.5.0，保持 `com.picalibrary.android` 与既有正式签名；public v54→v55 已在 API 35 环境完成 `adb install -r` 原地覆盖验收。
+- Android 书库/书架长按多选改为底部 contextual action bar，批量加入书架、取消收藏、移出书架等核心动作直接可见；补充收藏顺序排序和详情已知页数。
+- 推荐交互增加 cycle 级作者曝光控制、正负反馈平衡、偏好编辑局部更新，并减少普通推荐循环对完整收藏夹/完整 Catalog 的重复读取。
+- Desktop/Web 对 Settings、书库显示控制、连接状态和任务型新手引导进行信息架构收口；修复 hidden onboarding target、竞争 DOM owner 和可见状态反馈问题。
+- 支持入口从爱发电完整迁移到 **爱赞助 / AZZ**，Web、Android、README、文档、GitHub Funding 与回归测试统一使用 `https://azz.net/PicaLibrary`。
+- 同期进入生产源码的 P2 runtime/query/cache/observer/WorkManager/recovery 等改进继续作为内部稳定性基础；Linux/macOS/Windows ARM64、Server/Docker、Remote Web 后续阶段及未完成 P1/P2/P3/P4/W5/P6 任务不因 v0.5.0 发布而自动宣称完成或正式支持。
 
 ## v0.4.11 — 同一作品识别升级与详情浏览体验修复
 

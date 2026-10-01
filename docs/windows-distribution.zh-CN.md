@@ -2,11 +2,11 @@
 
 # Windows 一键版使用指南
 
-> 当前稳定版：**v0.4.11**。
+> 当前稳定版：**v0.5.0**。
 
 ## 下载与启动
 
-1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.4.11 对应 `Pica-Library-v0.4.11-windows-x64.zip`。
+1. 从项目的 [GitHub Releases](https://github.com/Saber-Alter-Lily/pica-library/releases/latest) 下载当前稳定版 Windows 完整包；v0.5.0 对应 `Pica-Library-v0.5.0-windows-x64.zip`。
 2. 完整解压到一个普通文件夹，不要直接在压缩软件中运行。
 3. 双击 `Pica Library.exe`。
 4. 浏览器会自动打开本地设置页面；按需配置账号、漫画保存目录、下载方式与 HTTP/HTTPS 代理。
@@ -27,7 +27,7 @@
 - `data/`：SQLite 漫画库及相关持久化数据；
 - `cache/`：本地缓存；
 - `logs/`：经过脱敏的诊断日志；
-- `runtime-state/`：单实例锁与当前本地服务状态。
+- `runtime-state/`：单实例锁、本地服务状态以及 `upgrade-assistant/` 外置升级助手。
 
 密码使用当前 Windows 用户的 DPAPI 加密；如果 DPAPI 不可用，程序不会退回明文保存。普通配置、SQLite 数据库、日志、导出数据和发布 ZIP 不保存明文账号密码。
 
@@ -53,44 +53,44 @@ Desktop 设置中心当前分为：
 
 ## 升级
 
-打开 **设置 → 软件更新** 后先检查正式版本。
+打开 **设置 → 维护工具 → 软件更新**。
 
-### 公开升级路径：v0.4.0 → v0.4.11
+### 推荐路径：v0.4.11 → v0.5.0
 
-从 **v0.4.11 Release** 下载：
+public v0.4.11 用户直接点击 **一键检查并更新**。正式 Release 提供来源限定增量包：
 
-`Pica-Library-v0.4.11-upgrade-assistant.zip`
+`Pica-Library-v0.5.0-update-from-v0.4.11.zip`
 
-解压后双击：
+旧版会使用自己已经发布的 updater 完成校验和替换，数据库从 schema 13 升到 14；升级后的 v0.5.0 会自动启动并重新连接网页。
 
-`Upgrade-Pica-Library-v0.4.11.cmd`
+v0.5.0 首次启动后会在：
 
-升级助手会：
+`%LOCALAPPDATA%\Pica Library\runtime-state\upgrade-assistant\`
 
-- 校验官方完整包 SHA-256 与目标版本；
-- 识别旧程序目录；
-- 保护 `%LOCALAPPDATA%\\Pica Library`；
-- 建立程序与 SQLite 安全快照；
-- 关闭旧版并替换程序；
-- 执行版本和数据库健康检查；
-- 失败时自动回滚。
+注册当前 Node runtime、`full-upgrader.js` 和 `assistant.json`。后续遇到 Schema 跳跃、updater 自替换或整个程序树需要更换时，应用会从该外置位置准备一次性 bootstrap，再替换旧程序，因此仍可继续使用网页的一键更新入口。
 
-这是面向普通用户的推荐升级路径；无需安装任何中间版本。
+### 备用 Upgrade Assistant
+
+如果软件内更新通道异常，可从同一 v0.5.0 Release 下载：
+
+`Pica-Library-v0.5.0-upgrade-assistant-from-v0.4.11.zip`
+
+解压后运行其中的 `Upgrade-Pica-Library-v0.5.0.cmd`。备用助手会固定校验目标完整包 SHA-256、SOURCE_SHA 和数据库版本，保护用户数据并在失败时回滚。
 
 ### 手动替换
 
-手动替换仍可作为备用方案：完全退出旧版，把新版完整 ZIP 解压到新目录后运行。
+手动替换仍可作为最后备用方案：完全退出旧版，把新版完整 ZIP 解压到新目录后运行。
 
-**不要删除 `%LOCALAPPDATA%\\Pica Library`。** 数据库、书架、阅读历史、设置、账号凭据与已下载内容位于独立用户数据目录，不需要卸载或重新导入。
+**不要删除 `%LOCALAPPDATA%\Pica Library`。** 数据库、书架、阅读历史、设置、账号凭据与已下载内容位于独立用户数据目录，不需要卸载或重新导入。
 
-如果漫画保存目录位于旧程序目录内部，升级助手会拒绝自动替换并提示先迁移数据。
+如果漫画保存目录位于旧程序目录内部，自动完整升级会拒绝执行并提示先迁移数据。
 
 ## 校验 SHA-256
 
 从同一官方 Release 下载 `SHA256SUMS.txt`，然后在 PowerShell 中运行：
 
 ```powershell
-Get-FileHash .\Pica-Library-v0.4.11-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\Pica-Library-v0.5.0-windows-x64.zip -Algorithm SHA256
 ```
 
 将完整校验值与官方 Release 提供的值逐字比较，一致后再解压运行。

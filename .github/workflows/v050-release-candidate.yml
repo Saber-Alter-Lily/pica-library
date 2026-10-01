@@ -222,11 +222,18 @@ jobs:
           with open("candidate/BUILD_TRANSPARENCY-v050-Android-candidate.json","w",encoding="utf-8") as f:
               json.dump(out,f,ensure_ascii=False,indent=2)
           PY
+      - name: Enable KVM for Android in-place upgrade acceptance
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Prove v54 -> v55 is an in-place Android package update
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
           api-level: 35
+          target: google_apis
           arch: x86_64
+          profile: pixel_2
           disable-animations: true
           script: |
             set -euo pipefail

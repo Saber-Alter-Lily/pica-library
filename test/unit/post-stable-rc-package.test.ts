@@ -221,8 +221,18 @@ describe('post-stable RC isolation contract', () => {
                     directory,
                     `Pica Library ${postStable ? 'post' : 'legacy'}.exe`
                 )
+                const executable =
+                    shell === 'powershell.exe'
+                        ? path.join(
+                              process.env.SystemRoot || 'C:\\Windows',
+                              'System32',
+                              'WindowsPowerShell',
+                              'v1.0',
+                              'powershell.exe'
+                          )
+                        : shell
                 const result = spawnSync(
-                    shell,
+                    executable,
                     [
                         '-NoProfile',
                         '-ExecutionPolicy',
@@ -233,9 +243,15 @@ describe('post-stable RC isolation contract', () => {
                         output,
                         ...(postStable ? ['-PostStable'] : [])
                     ],
-                    { encoding: 'utf8', timeout: 20000, windowsHide: true }
+                    // Cold .NET/PowerShell startup on hosted Windows is not a
+                    // product performance budget. Keep it bounded, but allow
+                    // compiler startup alongside the full SQLite fixture suite.
+                    { encoding: 'utf8', timeout: 60000, windowsHide: true }
                 )
-                expect(result.status, result.stderr + result.stdout).toBe(0)
+                expect(
+                    result.status,
+                    `${result.error?.message || ''}\n${result.signal || ''}\n${result.stderr}${result.stdout}`
+                ).toBe(0)
                 const binary = fs.readFileSync(output)
                 expect(binary.subarray(0, 2).toString('ascii')).toBe('MZ')
                 expect(
@@ -250,6 +266,6 @@ describe('post-stable RC isolation contract', () => {
                 ).toBe(true)
             }
         },
-        45000
+        135000
     )
 })

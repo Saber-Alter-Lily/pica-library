@@ -15,14 +15,18 @@ internal static class RcLauncher
             string runtime = Path.Combine(root, "runtime", "node.exe");
             string entry = Path.Combine(root, "app", "desktop.js");
             if (!File.Exists(runtime) || !File.Exists(entry))
-                throw new FileNotFoundException("The P2 RC runtime is incomplete. Extract the entire ZIP before starting Pica Library.");
+                throw new FileNotFoundException("The RC runtime is incomplete. Extract the entire ZIP before starting Pica Library.");
 
             string localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA");
             if (String.IsNullOrWhiteSpace(localAppData))
                 localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             if (String.IsNullOrWhiteSpace(localAppData))
                 throw new InvalidOperationException("Windows LocalAppData could not be resolved.");
+#if POST_STABLE_RC
+            string rcHome = Path.Combine(localAppData, "Pica Library Post Stable RC");
+#else
             string rcHome = Path.Combine(localAppData, "Pica Library P2 RC");
+#endif
 
             var quoted = args.Select(Quote);
             var info = new ProcessStartInfo
@@ -35,16 +39,20 @@ internal static class RcLauncher
                 WindowStyle = ProcessWindowStyle.Hidden
             };
             info.EnvironmentVariables["PICA_LIBRARY_DESKTOP_HOME"] = rcHome;
+#if POST_STABLE_RC
+            info.EnvironmentVariables["PICA_LIBRARY_TEST_BUILD"] = "post-stable-unpublished-rc";
+#else
             info.EnvironmentVariables["PICA_LIBRARY_TEST_BUILD"] = "p2-unpublished-rc";
+#endif
             Process.Start(info);
             return 0;
         }
         catch (Exception error)
         {
             MessageBox.Show(
-                "Pica Library P2 RC could not start.\n\n" + error.Message +
+                "Pica Library RC could not start.\n\n" + error.Message +
                 "\n\nExtract the complete RC ZIP and try again.",
-                "Pica Library P2 RC",
+                "Pica Library RC",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             return 1;

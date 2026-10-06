@@ -4,9 +4,31 @@
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
-Last reconciled: **2026-09-26**  
-Authoritative repository baseline after unpublished RC packaging: `main@a6115aa2a9e60bf9e1c8a8f2e0ead9d02099a1de` (P2 RC / PR #195 merged)  
-Current critical-path work: **representative Windows/Android RC manual/physical evidence → K5 variance/budget review**
+Last reconciled: **2026-10-06**
+
+Audited repository baseline: `main@095d6910c34e00824e03b08a30af0ce4e708137e` (post-release reconnect fix, PR #198 merged)
+
+Published baseline: **v0.5.0 / Android v55**, source `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`, published 2026-10-01 UTC
+
+Current critical path: **NEXT-33 isolated post-release RC evidence → representative Windows/Android manual/physical evidence → K5 variance/budget review**
+
+## Current reconciliation — 2026-10-06
+
+Historical dated entries below retain their original context. The table below and the current NEXT status lines supersede obsolete "publication pending" or "J1/J2 only" wording; publication does not close the larger engineering backlog.
+
+| Lane | Verified progress | Still open |
+| --- | --- | --- |
+| NEXT-32 release | [v0.5.0 published](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0); [publish run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800) passed released Windows upgrade, Android signing/install and asset verification | No new release authorized by this reconciliation |
+| Post-release reconnect / NEXT-33 | PR #198 merged; current-main checks passed | A new isolated package and representative restart/reconnect QA; old RC run 36823325484 only passed its contract job, both package jobs skipped, zero artifacts |
+| P2-J / P2-K | J1–J11 measurement harnesses and K1–K5 collection/reconciliation tooling implemented | Nine representative evidence categories listed in NEXT-33; no performance budget or P2 completion claim |
+| P2-C / P2-G | Desktop and Android G17 resource observation implemented | C3/G20 enforcement remains evidence-blocked; do not invent capacities |
+| H2B | Visual QC / Author Atlas / Style Family timing and synthetic scaling available | Real measurements and foreground/background threshold decision |
+| NEXT-28 | Release-scope corrective work shipped through PR #197 | A3 author-work completion prominence and A5 deeper refresh decomposition; PR #196 is a divergent Draft, not an accepted replacement for main |
+| P4 / P4B / P6 | Automated previews and Windows/Android release paths exist | Real-platform/provider/rollback/performance/trust evidence; Server/Docker deployment and soak acceptance |
+| W5 | W5A/B/C complete | W5D onboarding and W5E weak-network acceptance planned; W5F/G/H remain deferred |
+| Community feedback | Open [#199](https://github.com/Saber-Alter-Lily/pica-library/issues/199) and [#200](https://github.com/Saber-Alter-Lily/pica-library/issues/200) registered as NEXT-34/NEXT-35 | Neither issue is implemented or closed by this reconciliation |
+
+P1-E/G follow-ups and P1-F/P3 regression obligations remain open as documented. Old dependency-cleanup Drafts #23/#24 are not evidence of accepted implementation. Do not merge PR #196 wholesale: overlapping changes already shipped through #197, while its remaining author-progress work needs a current-main port and fresh tests.
 
 ---
 
@@ -1137,20 +1159,21 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 - **C1:** add a tested resource coordinator with shared resource-class vocabulary, atomic multi-resource leases, priority/FIFO admission semantics, cancellation and diagnostics. Production mode remains observe-only and does not impose invented capacities.
 - **C2 first batch implemented:** maintenance update, repair, organize, Recommendation V5 Shadow and Work Identity evidence refresh now declare observe-only resource leases; Desktop-only diagnostics expose current/peak overlap.
 - **C2B Desktop batch implemented:** Recommendation V3, favorites sync, local/GitHub download runners and WebDAV now join the same process-wide observe-only resource graph. Desktop injects one coordinator into LibraryService and RemoteStorageDesktopManager; existing task schedulers remain authoritative.
-- **C2 remaining:** collect overlap/latency evidence, keep Visual under its H2B timing path unless phase/resource observation is useful, and design Android-specific cross-task observation rather than copying the Desktop mechanism.
+- **C2 remaining:** collect overlap/latency evidence and keep Visual under its H2B timing path unless phase/resource observation is useful. Android-specific cross-task observation is already implemented under G17; its physical overlap evidence is still pending.
 - **C3 later:** propose enforceable capacities only after overlap and latency evidence exists; before enforcement, task-lifetime leases must become phase-aware where needed so paused tasks do not reserve enforced capacity.
 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
 ## NEXT-5 — P2-J/P2-K performance baseline
-**Status: IN_PROGRESS — J1 telemetry + J2 repeatable Desktop scenario windows**
+**Status: PARTIAL — J1–J11 and K1–K5 tooling implemented; representative evidence and budget decisions pending**
 
 - **J1 implemented:** bounded in-memory local HTTP latency telemetry classifies requests into low-cardinality route classes and correlates them with active resource-task types without storing URLs, comic IDs, search terms, bodies, tokens or paths.
 - Desktop-only `/api/v1/desktop/runtime/http-profile` exposes count/p50/p95/max/error summaries for overall, idle, under-load, route class and active task type.
 - **J2 implemented:** `pnpm benchmark:http-latency-scenario` drives repeatable sequential Library/detail/Reader foreground traffic against an already-running loopback Desktop engine, with warm-up, clean telemetry reset and three rounds by default.
 - J2 idle windows are valid only when every foreground sample is idle; load windows are valid only when each requested observed task covers every foreground sample. This validates the measurement window, not the performance result.
 - The J2 harness never starts or controls the measured background workload, never emits discovered comic/chapter IDs, and selects no latency threshold or release budget.
-- **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
+- **Current reconciliation:** J3–J11, Android G18/G19 and K1–K5 now provide the additional measurement/collection paths; they are no longer future implementation work. The J1/J2 details above describe the original foundation only.
+- **Next:** collect representative Windows x64 idle/load and Android physical startup/jank/overlap evidence using the existing harnesses, reconcile through K5, and only then review variance and budgets. See NEXT-33 for the explicit missing evidence categories.
 
 ## NEXT-6 — P2-D SQLite/query discipline
 **Status: PARTIAL — D1–D8B + D7C merged; evidence collection blocks further production query rewrites**
@@ -2790,12 +2813,14 @@ Stable v0.4.11 Release assets and stable OTA metadata remain untouched.
 
 
 ## NEXT-32 — Next stable release scope / v0.4.11 bridge / support-provider reconciliation
-**Status: RELEASE FREEZE — permanent v0.5.0 / Android v55 stamp committed; final stamped candidate + publish transaction pending; broader project backlog remains open**
+**Status: DONE — v0.5.0 / Android v55 published and release transaction verified; broader project backlog remains open**
+
+Publication authority: [v0.5.0 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0), 2026-10-01 04:46:04 UTC; source `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`; [publish run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800). The post-release reconnect commits on main are not included in these immutable published assets.
 
 ### Why this entry exists
 The next stable release must not be treated as equivalent to “finish every open item in this log”.
 
-Repository history confirms three different scopes:
+The original 2026-09-30 pre-release reconciliation recorded three different scopes (historical counts, not current branch distances):
 
 1. public stable `v0.4.11`;
 2. current `main`, which is **1058 commits ahead of v0.4.11** and already contains a large body of unreleased architecture/runtime, evidence tooling and experimental-platform work;
@@ -2856,8 +2881,8 @@ The next stable release may contain already-implemented runtime/internal improve
 - internal runtime/performance hardening;
 - experimental or unsupported platform work that is **not** being promoted to formal support.
 
-### R4 — Current release blockers after this reconciliation
-Before publication:
+### R4 — Historical release gates, completed by the v0.5.0 publication
+The publication transaction completed the following gates; they are retained as the release contract, not listed as current blockers:
 1. AZZ migration passes Web/Android/localization tests and old support endpoints are absent from active surfaces.
 2. v0.4.11 -> target source-scoped incremental package is generated from the real public v0.4.11 Windows ZIP and proves schema 13 -> 14 plus unchanged legacy `app/updater.js`; after the upgraded target starts, the external persistent assistant under `runtime-state/upgrade-assistant` must also be present and hash-bound to that target.
 3. The final version number / Android versionCode are stamped once release scope is frozen.
@@ -2935,3 +2960,62 @@ State update:
 - Client-side hardening for subsequent upgrades: reconnect now probes both target-version capabilities and a no-cache Web shell, requires a 1.5-second continuous stabilization window, and only then reloads.
 - The final reconnect failure copy now tells users to wait briefly and refresh the current page before reopening the application.
 - No v0.5.0 Release asset, tag, OTA pointer, database schema, updater package format or version stamp is changed by this branch. The fix is isolated for the next patch release candidate.
+
+## NEXT-33 — Post-v0.5.0 isolated RC and evidence-ready handoff
+**Status: IN_PROGRESS — current-baseline packaging and reconnect regression path; artifact/physical gates must be reported separately**
+
+Scope:
+- Keep main's existing reconnect fix; add real-Chromium regression coverage for startup 503, a transient shell failure resetting the stability window, wrong version, non-HTML shell and network loss.
+- Preserve the historical 0.4.11 P2 RC workflow. Its hard-coded baseline cannot build current 0.5.0 metadata; add `post-stable-rc-packages.yml` and a guarded `-PostStable` builder mode instead.
+- Use source-bound `0.5.0-postrc.<12-char-sha>` application metadata, a checksum-pinned public v0.5.0 Windows launcher baseline and a new `%LOCALAPPDATA%\Pica Library Post Stable RC` root. Do not read/copy/migrate stable or historical P2 RC user data.
+- Android remains the fixed-certificate `com.picalibrary.android.dev` side-by-side identity. Stop on signature/version incompatibility; do not uninstall the user's Dev app or copy its data.
+- PR events run the non-secret contract only. Trusted branch/manual runs build and verify both installables. A machine-readable `RC_STATUS.json` distinguishes contract-only from package-ready and always keeps manual/physical QA pending.
+- No stable version bump, release/tag/OTA change, production database operation or local deployment is authorized by this lane.
+
+Acceptance:
+1. Type, Web, unit/integration and Chromium regression checks pass.
+2. Trusted CI uploads source/hash-bound Windows and Android artifacts; skipped jobs do not count as package PASS.
+3. Isolated Windows artifact smoke and released-v0.5.0 full-replacement acceptance preserve the temporary external test data. This does not bypass stable-to-RC OTA validation and is not user-machine evidence.
+4. Representative restart/reconnect behavior and Android device acceptance remain separate manual gates.
+
+Representative evidence still required before K5 variance/budget review:
+- Windows K1;
+- Android K2;
+- Android K3 real download;
+- Android K3 real Reader;
+- Windows K4 manual/recovery;
+- Android K4 manual/OEM;
+- J7B real Provider;
+- J10 real Visual;
+- low-end Windows CPU/jank trace.
+
+K5 tooling completion permits at most `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW` after valid evidence reconciliation, not automatic P2 completion or concurrency enforcement. Detailed operator boundary: [POST_STABLE_RC_READINESS.md](docs/POST_STABLE_RC_READINESS.md).
+
+## NEXT-34 — Optional preference-aware collection-map view (#199)
+**Status: PLANNED — registered from user feedback; not implemented**
+
+Source: [issue #199](https://github.com/Saber-Alter-Lily/pica-library/issues/199), opened 2026-10-03 UTC.
+
+- Provide an optional display-only view/filter for BLOCK, LESS and explicit manual exclusions, with clear objective collection vs preference-view semantics.
+- Preserve the default objective collection view and clearly expose the selected view/filter.
+- Do not mutate favorites, embeddings, original analysis inputs, recommendation policy, feedback or sync state when toggling the view.
+- Before implementation, resolve treatment of LESS vs BLOCK, denominator/count labels, empty states and refresh persistence; acceptance must prove both views operate on the same authoritative underlying data.
+- Registration is not closure of the issue or authorization to change recommendation science.
+
+## NEXT-35 — Sparse-tag and interest-explanation discovery (#200)
+**Status: PLANNED — design/evidence first; no taxonomy import or model change implemented**
+
+Source: [issue #200](https://github.com/Saber-Alter-Lily/pica-library/issues/200), opened 2026-10-03 UTC, including the reporter's taxonomy suggestion.
+
+- Separate sparse/coarse Provider tags, collection-frequency summaries and explicit/inferred personal interest in the UI and audit evidence; a collection count is not an interest label by itself.
+- Reproduce the reported manual-tuning burden with a bounded, user-authorized audit export; do not silently inspect or mutate production databases.
+- Assess explanation, unknown-evidence handling and opt-in taxonomy normalization before any recommendation-weight change.
+- An external taxonomy suggestion is a design input, not permission to scrape/import it. Evaluate licensing, provenance, term mapping, updates and user control before choosing a source.
+- Acceptance must preserve existing explicit preferences, avoid fabricated inferred interest and demonstrate whether the agreed change reduces unnecessary manual adjustments.
+
+## 2026-10-06 — Post-release task reconciliation
+
+- Reconciled the current release state against GitHub Release, workflow jobs/artifacts, open PRs/issues and current-main source. Historical implementation notes remain intact.
+- NEXT-32 publication is DONE; NEXT-33 contains unreleased packaging/reconnect acceptance. NEXT-34/#199 and NEXT-35/#200 are tracked but not claimed fixed.
+- This change does not close PR #196 or import its divergent branch. A3/A5 residual work needs a separately reviewed current-main change.
+- Validation outcomes belong to the exact reviewed source/CI run; no CI success is a substitute for the nine external evidence categories above.

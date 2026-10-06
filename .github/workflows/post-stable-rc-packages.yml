@@ -1,0 +1,209 @@
+name: Post-stable Isolated RC Packages
+
+on:
+  push:
+    branches: [codex/post-v050-rc-readiness]
+  pull_request:
+    paths:
+      - '.github/workflows/post-stable-rc-packages.yml'
+      - 'scripts/build-windows-rc-package.ps1'
+      - 'scripts/build-windows-rc-launcher.ps1'
+      - 'scripts/test-windows-universal-full-upgrade.ps1'
+      - 'scripts/write-rc-artifact-summary.mjs'
+      - 'packaging/windows/RcLauncher.cs'
+      - 'test/unit/post-stable-rc-package.test.ts'
+      - 'test/unit/update-reconnect-stability.test.ts'
+      - 'test/e2e/update-reconnect.spec.mjs'
+      - 'web/update-reconnect.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-stable-rc-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  STABLE_VERSION: '0.5.0'
+  BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run test/unit/p2-unpublished-rc-package.test.ts test/unit/post-stable-rc-package.test.ts test/unit/update-reconnect-stability.test.ts
+
+  windows-rc:
+    needs: contract
+    if: github.event_name != 'pull_request' && github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    env:
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.5.0'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - name: Validate Windows source without changing stable metadata
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((Get-Content -Raw package.json | ConvertFrom-Json).version -ne $env:STABLE_VERSION) { throw 'Stable baseline changed; review this RC workflow before reuse' }
+          pnpm type:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm web:check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Download checksum-pinned released baseline
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $name="Pica-Library-v$env:STABLE_VERSION-windows-x64.zip"
+          $path=Join-Path 'artifacts/release-base' $name
+          Invoke-WebRequest -Uri "https://github.com/Saber-Alter-Lily/pica-library/releases/download/v$env:STABLE_VERSION/$name" -OutFile $path
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant() -ne $env:BASE_WINDOWS_SHA256) { throw 'Released baseline checksum mismatch' }
+      - name: Build and exercise isolated current-baseline RC
+        shell: pwsh
+        run: |
+          $rcVersion="$env:STABLE_VERSION-postrc.$($env:GITHUB_SHA.Substring(0,12))"
+          $zip='artifacts/Pica-Library-Post-Stable-RC-Windows-x64.zip'
+          ./scripts/build-windows-rc-package.ps1 -PostStable -RcVersion $rcVersion -Output $zip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $rcVersion -DesktopHomeName 'Pica Library Post Stable RC' -PortCollision -SetupPersistence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $base="artifacts/release-base/Pica-Library-v$env:STABLE_VERSION-windows-x64.zip"
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $rcVersion -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
+          Copy-Item -LiteralPath $zip -Destination candidate/windows/
+          Copy-Item -LiteralPath docs/POST_STABLE_RC_READINESS.md -Destination candidate/windows/READ_ME_FIRST.md
+          $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          "$hash  Pica-Library-Post-Stable-RC-Windows-x64.zip" | Set-Content -Encoding ascii candidate/windows/SHA256SUMS.txt
+          $env:GITHUB_SHA | Set-Content -Encoding ascii candidate/windows/SOURCE_SHA.txt
+          $rcVersion | Set-Content -Encoding ascii candidate/windows/VERSION.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Post-Stable-RC-Windows
+          path: candidate/windows/
+          retention-days: 1
+          if-no-files-found: error
+
+  android-rc:
+    needs: contract
+    if: github.event_name != 'pull_request' && github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test and lint before loading signing material
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Build and verify fixed-signature side-by-side RC
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('../../package.json').version")" = "$STABLE_VERSION"
+          test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
+          test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
+          rc_version="$STABLE_VERSION-postrc.${GITHUB_SHA:0:12}"
+          export PICA_ANDROID_VERSION_NAME="$rc_version"
+          export PICA_ANDROID_VERSION_CODE=55
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-postrc-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -rf -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleDebug --no-daemon
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/postrc-cert.txt"
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/postrc-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$cert" = "$EXPECTED_CERT"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/postrc-package.txt"
+          grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/postrc-package.txt"
+          grep -q "versionCode='55'" "$RUNNER_TEMP/postrc-package.txt"
+          grep -q "versionName='$rc_version-dev-pr35'" "$RUNNER_TEMP/postrc-package.txt"
+          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/postrc-package.txt"
+          mkdir -p candidate-postrc
+          cp "$apk" candidate-postrc/Pica-Library-Post-Stable-RC-Android.apk
+          cp "$RUNNER_TEMP/postrc-package.txt" candidate-postrc/PACKAGE_INFO.txt
+          printf '%s\n' "$cert" > candidate-postrc/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate-postrc/SOURCE_SHA.txt
+          printf '%s\n' "$rc_version" > candidate-postrc/VERSION.txt
+          printf '%s\n' 'UNPUBLISHED side-by-side Dev RC. Formal OTA unchanged. Do not uninstall the existing Dev app; stop on signature mismatch. Physical-device QA remains pending.' > candidate-postrc/STATUS.txt
+          (cd candidate-postrc && sha256sum Pica-Library-Post-Stable-RC-Android.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Post-Stable-RC-Android
+          path: mobile/android-alpha2/candidate-postrc/
+          retention-days: 1
+          if-no-files-found: error
+
+  artifact-summary:
+    needs: [contract, windows-rc, android-rc]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      RC_EVENT: ${{ github.event_name }}
+      RC_SOURCE_SHA: ${{ github.sha }}
+      RC_CONTRACT_RESULT: ${{ needs.contract.result }}
+      RC_WINDOWS_RESULT: ${{ needs.windows-rc.result }}
+      RC_ANDROID_RESULT: ${{ needs.android-rc.result }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Distinguish contract checks from installable artifacts
+        run: node scripts/write-rc-artifact-summary.mjs candidate/RC_STATUS.json
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event.repository.private == false
+        with:
+          name: Pica-Library-Post-Stable-RC-Status
+          path: candidate/RC_STATUS.json
+          retention-days: 1
+          if-no-files-found: error

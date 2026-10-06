@@ -59,10 +59,12 @@ This does not claim an end-to-end physical Windows update. The separate temporar
 Local preflight on 2026-10-06 (Windows, Node 24.15.0, isolated source checkout):
 
 - TypeScript and Web syntax: PASS (37 Web modules).
-- Vitest: 225 files PASS, 1211 tests PASS, 1 existing skip.
+- Vitest after the launcher fix: 225 files PASS, 1213 tests PASS, 1 existing skip.
 - Real Chromium / Playwright 1.63.0: 27 tests PASS, including 4 new reconnect cases; loopback static fixtures and a fresh browser profile only.
 - Application bundle and both legacy/post-stable C# launcher variants: build PASS.
-- Both changed PowerShell scripts: syntax parse PASS; package execution is a separate trusted CI gate.
+- Changed packaging/acceptance PowerShell scripts: syntax parse PASS; package execution is a separate trusted CI gate.
+
+The first trusted run passed the full Windows suite but exposed scalar splatting of the conditional C# compiler flag during RC repackaging. Launcher compilation is now a shared helper with a real argument array, and Windows-only tests invoke both Windows PowerShell and PowerShell 7 in both launcher modes. This is a packaging fix, not a change to user data or runtime policy.
 
 These results do not claim the new Windows/Android artifacts have already been built. Consult the exact candidate workflow run and its `RC_STATUS.json` for that result.
 

@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/post-stable-rc-packages.yml'
       - 'scripts/build-windows-rc-package.ps1'
+      - 'scripts/build-windows-rc-launcher.ps1'
       - 'scripts/test-windows-universal-full-upgrade.ps1'
       - 'scripts/write-rc-artifact-summary.mjs'
       - 'packaging/windows/RcLauncher.cs'

@@ -120,15 +120,7 @@ try {
     Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $extract 'app') -Force
     Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $extract 'licenses\THIRD_PARTY_LICENSES.txt') -Force
 
-    $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-    if (-not (Test-Path -LiteralPath $csc)) {
-        throw 'The Windows .NET Framework compiler is unavailable'
-    }
-    $defines = if ($PostStable) { @('/define:POST_STABLE_RC') } else { @() }
-    & $csc /nologo /target:winexe /optimize+ /platform:x64 /reference:System.Windows.Forms.dll @defines "/out:$extract\Pica Library.exe" (Join-Path $root 'packaging\windows\RcLauncher.cs')
-    if ($LASTEXITCODE -ne 0) {
-        throw 'RC launcher compilation failed'
-    }
+    & (Join-Path $root 'scripts\build-windows-rc-launcher.ps1') -Output (Join-Path $extract 'Pica Library.exe') -PostStable:$PostStable
 
     $readme = @"
 Pica Library $RcVersion — UNPUBLISHED $buildLabel

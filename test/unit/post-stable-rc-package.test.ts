@@ -153,7 +153,10 @@ describe('post-stable RC isolation contract', () => {
             "$desktopHomeName = 'Pica Library Post Stable RC'"
         )
         expect(builder).toContain("$desktopHomeName = 'Pica Library P2 RC'")
-        expect(builder).toContain('/define:POST_STABLE_RC')
+        expect(builder).toContain('-PostStable:$PostStable')
+        expect(read('scripts/build-windows-rc-launcher.ps1')).toContain(
+            '/define:POST_STABLE_RC'
+        )
         const launcher = read('packaging/windows/RcLauncher.cs')
         expect(launcher).toContain('#if POST_STABLE_RC')
         expect(launcher).toContain(
@@ -205,4 +208,48 @@ describe('post-stable RC isolation contract', () => {
         expect(test).toContain('wrong-version')
         expect(test).toContain('network-loss')
     })
+
+    it.runIf(process.platform === 'win32').each(['powershell.exe', 'pwsh.exe'])(
+        'compiles both launcher modes with real %s argument handling',
+        (shell) => {
+            const directory = fs.mkdtempSync(
+                path.join(os.tmpdir(), 'pica-rc-summary-')
+            )
+            temporaryDirectories.push(directory)
+            for (const postStable of [false, true]) {
+                const output = path.join(
+                    directory,
+                    `Pica Library ${postStable ? 'post' : 'legacy'}.exe`
+                )
+                const result = spawnSync(
+                    shell,
+                    [
+                        '-NoProfile',
+                        '-ExecutionPolicy',
+                        'Bypass',
+                        '-File',
+                        path.resolve('scripts/build-windows-rc-launcher.ps1'),
+                        '-Output',
+                        output,
+                        ...(postStable ? ['-PostStable'] : [])
+                    ],
+                    { encoding: 'utf8', timeout: 20000, windowsHide: true }
+                )
+                expect(result.status, result.stderr + result.stdout).toBe(0)
+                const binary = fs.readFileSync(output)
+                expect(binary.subarray(0, 2).toString('ascii')).toBe('MZ')
+                expect(
+                    binary.includes(
+                        Buffer.from(
+                            postStable
+                                ? 'Pica Library Post Stable RC'
+                                : 'Pica Library P2 RC',
+                            'utf16le'
+                        )
+                    )
+                ).toBe(true)
+            }
+        },
+        45000
+    )
 })

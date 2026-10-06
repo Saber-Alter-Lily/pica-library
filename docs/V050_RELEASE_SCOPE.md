@@ -1,6 +1,10 @@
-# v0.5.0 Release Scope — Draft Freeze
+# v0.5.0 Release Scope — Published
 
-Status: **RELEASE FREEZE** — permanent v0.5.0 / Android v55 stamp committed; final stamped candidate and publication transaction remain.
+Status: **PUBLISHED** — v0.5.0 / Android v55 published 2026-10-01 04:46:04 UTC from `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`.
+
+Authority: [v0.5.0 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0) and [successful publish/verification run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800). The released Windows v0.4.11 → v0.5.0 upgrade, Android v54 → v55 signed install and uploaded assets were checked in that transaction. This is not completion of all platform/performance tracks.
+
+Post-release PR #198's reconnect stabilization is on main but not in these released assets. Its current-baseline candidate path is tracked separately in [POST_STABLE_RC_READINESS.md](POST_STABLE_RC_READINESS.md); do not republish v0.5.0 to include it.
 
 This document separates the **v0.5.0 stable product scope** from the much larger repository backlog. It does not mark unfinished P1/P2/P3/P4/W5/P6 tracks complete.
 
@@ -42,7 +46,7 @@ The minor-version boundary is intentional: the release contains a large post-v0.
 - balanced positive/negative recommendation controls;
 - preference editing without unnecessary whole-catalog reload;
 - expanded task-oriented onboarding;
-- same production package identity and signing lineage, proposed versionCode 55.
+- same production package identity and signing lineage, released versionCode 55.
 
 ## Internal improvements included in the production source
 
@@ -121,9 +125,9 @@ The formal APK must preserve:
 - the existing production signing certificate;
 - versionCode strictly greater than public v54.
 
-## Release blockers
+## Completed publication gates
 
-Publication remains blocked until all of the following are true:
+The published transaction completed these gates; retain them as historical release requirements, not open blockers:
 
 1. latest release-intent CI is green;
 2. v0.5.0 formal Windows candidate is built from one frozen source SHA;
@@ -134,8 +138,8 @@ Publication remains blocked until all of the following are true:
 7. release assets and SHA/provenance metadata are internally consistent;
 8. no stable Release, `latest`, or Android OTA pointer is changed until uploaded assets are verified.
 
-## Publication rule
+## Future publication boundary
 
 The unpublished v0.5.0 candidate workflow is artifact-only. It is not authorization to publish.
 
-The repository is now permanently stamped to v0.5.0 / Android v55. The formal candidate must be rebuilt from the exact final stamped SHA; only that SHA may enter the stable Release/OTA transaction.
+The v0.5.0 / Android v55 transaction is complete. Later changes need their own explicitly authorized release decision and verified source/artifacts; this reconciliation does not alter the published tag, assets or OTA pointers.

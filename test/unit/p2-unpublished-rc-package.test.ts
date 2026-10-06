@@ -61,7 +61,7 @@ describe('P2 unpublished RC package contract', () => {
         expect(rcBuild).toContain('$candidatePackage.version = $RcVersion')
         expect(rcBuild).toContain('$originalPackageText')
         expect(rcBuild).toContain('packaging\\windows\\RcLauncher.cs')
-        expect(rcBuild).toContain('%LOCALAPPDATA%\\Pica Library P2 RC')
+        expect(rcBuild).toContain("$desktopHomeName = 'Pica Library P2 RC'")
         expect(rcBuild).toContain('local-test-windows-x64')
 
         expect(workflow).toContain('build-windows-rc-package.ps1')

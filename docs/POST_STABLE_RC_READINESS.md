@@ -66,8 +66,10 @@ Local preflight on 2026-10-06 (Windows, Node 24.15.0, isolated source checkout):
 
 The first trusted run passed the full Windows suite but exposed scalar splatting of the conditional C# compiler flag during RC repackaging. Launcher compilation is now a shared helper with a real argument array, and Windows-only tests invoke both Windows PowerShell and PowerShell 7 in both launcher modes. This is a packaging fix, not a change to user data or runtime policy.
 
-These results do not claim the new Windows/Android artifacts have already been built. Consult the exact candidate workflow run and its `RC_STATUS.json` for that result.
+Historical package gate, reconciled 2026-10-12: [run 37492489884](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/37492489884) completed successfully at exact source `454e9fef1a04a5fdbc17227af2fe755e52c6fbd7`; contract, Windows RC, Android RC and artifact-summary jobs all passed. The run's artifact API now lists no remaining downloads, consistent with the one-day retention policy. Historical build success does not imply present artifact availability. A later authorized package test needs a fresh trusted run, not a stable Release upload.
+
+The separate local issue fixes and Reader gesture slice are recorded under [已推进但未验证](UNVERIFIED_PROGRESS_20261012.md). Their application source is not uploaded by this documentation update. Neither their full-package acceptance nor their device QA is established by the older RC run or by the documentation-only head.
 
 K1 Windows, K2 Android, K3 real download/Reader, K4 Windows/manual and Android/OEM, J7B real Provider, J10 real Visual and low-end Windows CPU/jank traces remain pending until representative evidence is collected and reconciled. Their harnesses already exist; building this RC does not supply their results.
 
-H2B threshold decisions, C3/G20 resource enforcement, P4 platform promotion and later Remote Web stages remain outside this change. See `DEVELOPMENT_TASK_LOG.md` NEXT-33–35 for the current queue and new issues.
+H2B threshold decisions, C3/G20 resource enforcement, P4 platform promotion and later Remote Web stages remain outside this change. See `DEVELOPMENT_TASK_LOG.md` NEXT-33–37 for the current queue, community issues and bounded Reader follow-up.

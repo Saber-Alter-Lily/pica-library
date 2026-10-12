@@ -4,7 +4,7 @@
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
-Last reconciled: **2026-10-06**
+Last reconciled: **2026-10-12**
 
 Audited repository baseline: `main@095d6910c34e00824e03b08a30af0ce4e708137e` (post-release reconnect fix, PR #198 merged)
 
@@ -12,21 +12,27 @@ Published baseline: **v0.5.0 / Android v55**, source `bec7f9f31828e8c57e0a2c103b
 
 Current critical path: **NEXT-33 isolated post-release RC evidence → representative Windows/Android manual/physical evidence → K5 variance/budget review**
 
-## Current reconciliation — 2026-10-06
+## Current reconciliation — 2026-10-12
 
 Historical dated entries below retain their original context. The table below and the current NEXT status lines supersede obsolete "publication pending" or "J1/J2 only" wording; publication does not close the larger engineering backlog.
 
 | Lane | Verified progress | Still open |
 | --- | --- | --- |
 | NEXT-32 release | [v0.5.0 published](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0); [publish run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800) passed released Windows upgrade, Android signing/install and asset verification | No new release authorized by this reconciliation |
-| Post-release reconnect / NEXT-33 | PR #198 merged; current-main checks passed | A new isolated package and representative restart/reconnect QA; old RC run 36823325484 only passed its contract job, both package jobs skipped, zero artifacts |
+| Post-release reconnect / NEXT-33 | PR #198 merged; [RC run 37492489884](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/37492489884) passed contract, Windows, Android and summary jobs at `454e9fef1a04` | Representative restart/reconnect and device QA remain pending. Artifacts are no longer listed by the run API on 2026-10-12; historical package PASS is not current download availability |
 | P2-J / P2-K | J1–J11 measurement harnesses and K1–K5 collection/reconciliation tooling implemented | Nine representative evidence categories listed in NEXT-33; no performance budget or P2 completion claim |
 | P2-C / P2-G | Desktop and Android G17 resource observation implemented | C3/G20 enforcement remains evidence-blocked; do not invent capacities |
 | H2B | Visual QC / Author Atlas / Style Family timing and synthetic scaling available | Real measurements and foreground/background threshold decision |
 | NEXT-28 | Release-scope corrective work shipped through PR #197 | A3 author-work completion prominence and A5 deeper refresh decomposition; PR #196 is a divergent Draft, not an accepted replacement for main |
 | P4 / P4B / P6 | Automated previews and Windows/Android release paths exist | Real-platform/provider/rollback/performance/trust evidence; Server/Docker deployment and soak acceptance |
 | W5 | W5A/B/C complete | W5D onboarding and W5E weak-network acceptance planned; W5F/G/H remain deferred |
-| Community feedback | Open [#199](https://github.com/Saber-Alter-Lily/pica-library/issues/199) and [#200](https://github.com/Saber-Alter-Lily/pica-library/issues/200) registered as NEXT-34/NEXT-35 | Neither issue is implemented or closed by this reconciliation |
+| Community feedback / NEXT-34–35 | Display-only atlas projection and full-local-catalog preference discovery implemented in local-only `e12d48839d0a`; local automated gates passed | Implementation is not uploaded in this documentation update. Fresh remote CI, Windows package/human acceptance and #200 explanation/taxonomy/Android gaps remain open; neither issue is closed |
+| Reader reference analysis / NEXT-36 | Isolated static analysis and 14-feature inventory completed; 27 analysis-model tests passed | Target APK was not executed; 28 reference-runtime scenarios remain pending. No third-party implementation or assets are imported |
+| Android Reader gestures / NEXT-37 | Phone-local double-tap switch and 1.5×/2×/3× zoom implemented locally; 28/28 targeted tests passed | Uncommitted local source only; full Android build/lint/APK, ReaderActivity integration and device QA are not complete |
+
+### 已推进但未验证 / Unreleased implementation inventory
+
+The local-only work above is **PARTIAL**, not released capability. [Conversation progress and evidence limits](docs/UNVERIFIED_PROGRESS_20261012.md) records NEXT-34–37 with the remaining acceptance gates. This documentation commit uploads no application source, APK, decompiled material or private data. Historical RC checks do not validate the newer local implementations.
 
 P1-E/G follow-ups and P1-F/P3 regression obligations remain open as documented. Old dependency-cleanup Drafts #23/#24 are not evidence of accepted implementation. Do not merge PR #196 wholesale: overlapping changes already shipped through #197, while its remaining author-progress work needs a current-main port and fresh tests.
 
@@ -2962,7 +2968,7 @@ State update:
 - No v0.5.0 Release asset, tag, OTA pointer, database schema, updater package format or version stamp is changed by this branch. The fix is isolated for the next patch release candidate.
 
 ## NEXT-33 — Post-v0.5.0 isolated RC and evidence-ready handoff
-**Status: IN_PROGRESS — current-baseline packaging and reconnect regression path; artifact/physical gates must be reported separately**
+**Status: PARTIAL — automated installable-package gates passed at `454e9fef1a04`; representative physical/manual evidence remains pending; UNRELEASED**
 
 Scope:
 - Keep main's existing reconnect fix; add real-Chromium regression coverage for startup 503, a transient shell failure resetting the stability window, wrong version, non-HTML shell and network loss.
@@ -2989,21 +2995,25 @@ Representative evidence still required before K5 variance/budget review:
 - J10 real Visual;
 - low-end Windows CPU/jank trace.
 
+Verified historical package evidence: [run 37492489884](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/37492489884), exact source `454e9fef1a04a5fdbc17227af2fe755e52c6fbd7`, completed successfully; contract, Windows RC, Android RC and artifact summary jobs all succeeded. The run's artifact API lists no remaining downloads as of 2026-10-12. Do not relabel an old package as the local NEXT-34/35/37 implementation or claim the documentation-only head was built.
+
 K5 tooling completion permits at most `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW` after valid evidence reconciliation, not automatic P2 completion or concurrency enforcement. Detailed operator boundary: [POST_STABLE_RC_READINESS.md](docs/POST_STABLE_RC_READINESS.md).
 
 ## NEXT-34 — Optional preference-aware collection-map view (#199)
-**Status: PLANNED — registered from user feedback; not implemented**
+**Status: PARTIAL — Desktop/Web display projection implemented and locally tested; Windows package/human acceptance pending; LOCAL ONLY / UNRELEASED**
 
 Source: [issue #199](https://github.com/Saber-Alter-Lily/pica-library/issues/199), opened 2026-10-03 UTC.
 
-- Provide an optional display-only view/filter for BLOCK, LESS and explicit manual exclusions, with clear objective collection vs preference-view semantics.
+- Local implementation selects the reporter's opt-in BLOCK/LESS display alternative, with independent switches and default-off objective view. A separate manual exclusion list is not implemented.
 - Preserve the default objective collection view and clearly expose the selected view/filter.
 - Do not mutate favorites, embeddings, original analysis inputs, recommendation policy, feedback or sync state when toggling the view.
-- Before implementation, resolve treatment of LESS vs BLOCK, denominator/count labels, empty states and refresh persistence; acceptance must prove both views operate on the same authoritative underlying data.
+- Automated synthetic-fixture tests cover original snapshot counts/denominators/IDs, empty/error/legacy states, browser-local refresh persistence, immutable projection and read-only service/GET behavior. Filtered views cannot use the old objective PDF export.
+- Local source: `codex/issue199-200-preference-discovery@e12d48839d0ad1ac86964c14cdc0164a5ebfe0a0`, based on the separate PR #203 readiness candidate; this source is NOT part of the current GitHub documentation commit.
+- Required next gate: fresh frozen dependency installation/remote CI, an isolated Windows package, and human objective → BLOCK → LESS → both → objective acceptance without production mutation. See [evidence and limitations](docs/UNVERIFIED_PROGRESS_20261012.md#next-3435--issues-199200-local-implementation).
 - Registration is not closure of the issue or authorization to change recommendation science.
 
 ## NEXT-35 — Sparse-tag and interest-explanation discovery (#200)
-**Status: PLANNED — design/evidence first; no taxonomy import or model change implemented**
+**Status: PARTIAL — full-local-catalog discovery and evidence wording implemented locally; explanation/taxonomy/cross-client work remains open; LOCAL ONLY / UNRELEASED**
 
 Source: [issue #200](https://github.com/Saber-Alter-Lily/pica-library/issues/200), opened 2026-10-03 UTC, including the reporter's taxonomy suggestion.
 
@@ -3012,6 +3022,10 @@ Source: [issue #200](https://github.com/Saber-Alter-Lily/pica-library/issues/200
 - Assess explanation, unknown-evidence handling and opt-in taxonomy normalization before any recommendation-weight change.
 - An external taxonomy suggestion is a design input, not permission to scrape/import it. Evaluate licensing, provenance, term mapping, updates and user control before choosing a source.
 - Acceptance must preserve existing explicit preferences, avoid fabricated inferred interest and demonstrate whether the agreed change reduces unnecessary manual adjustments.
+- Local implementation searches the complete local catalog before capping results, uses simplified/traditional and existing-alias matching for discovery only, preserves raw preference keys and retains staged edits across searches. Default/mobile bounded snapshots and ranking/matching semantics remain unchanged.
+- Local automated evidence at `e12d48839d0a`: TypeScript PASS; Web syntax 38/38; unit/integration 226 files / 1231 PASS + 1 existing skip; headless Edge 28/28; Rollup and bundled OpenCC MIT/Apache notices PASS. Frozen lockfile-only check is not a fresh dependency installation.
+- Still unverified/unimplemented: actual tuning-burden reduction, artist/style-vs-tag explanations, missing-evidence/opt-in annotation design, versioned cross-client alias migration, Android full-discovery parity and external taxonomy licensing/mapping. No Moegirl import or neural-model change.
+- Windows packaging, Android native/device acceptance and remote CI for this local implementation were NOT RUN; PR #203's earlier CI must not be reused as their evidence.
 
 ## 2026-10-06 — Post-release task reconciliation
 
@@ -3019,3 +3033,63 @@ Source: [issue #200](https://github.com/Saber-Alter-Lily/pica-library/issues/200
 - NEXT-32 publication is DONE; NEXT-33 contains unreleased packaging/reconnect acceptance. NEXT-34/#199 and NEXT-35/#200 are tracked but not claimed fixed.
 - This change does not close PR #196 or import its divergent branch. A3/A5 residual work needs a separately reviewed current-main change.
 - Validation outcomes belong to the exact reviewed source/CI run; no CI success is a substitute for the nine external evidence categories above.
+
+## NEXT-36 — External reader behavior analysis and bounded adaptation design
+
+**Status: PARTIAL — isolated static analysis/inventory completed; reference-runtime validation pending; no feature integration claim**
+
+- Reference: user-provided MH-ARK 0.4.3.3. Complete APK/DEX/Smali/native capture was audited locally; high-level decompilation remains PARTIAL and is not original rebuildable source.
+- Reader analysis verified 5 JNI classes / 27 bindings and 48 configuration fields. Its 27 passing tests are analysis-design-model tests, not Android runtime tests.
+- The feature inventory contains 14 feature cards, 51 evidence groups and 142 source anchors. The 115 selected protected inputs remained unchanged at that phase; this is not a claim that all recovered code was behaviorally verified.
+- Target APK execution, runtime/performance/network/format compatibility and all 28 inventory QA scenarios are still pending.
+- Learning priorities: per-comic reading presets, adjustable gestures and split/spread display; later evaluate local directory/CBZ reading and comic/chapter cache control. These are design candidates, not accepted release scope or completed features.
+- Existing multi-WebDAV, categorized cache, preloading and library filtering should be reused, not rebuilt. Do not copy unsafe original-file deletion semantics or describe a privacy lock as proven encryption.
+- Third-party code, libraries, resources, APKs and decompilation outputs remain local isolated analysis material. Any Pica change must be independently implemented and separately verified; this documentation update uploads none of those materials.
+
+Acceptance still required:
+
+1. Confirm the chosen Pica source baseline against current main before implementation.
+2. Define only a small user-visible slice, original-page progress identity and non-destructive fallback.
+3. Verify target reference behavior where needed; treat unavailable runtime evidence as unknown.
+4. Complete the slice's own build/integration/device/data-preservation gates. NEXT-37 is the only local implementation slice so far.
+
+## NEXT-37 — Android phone-local double-tap and zoom options
+
+**Status: PARTIAL — local implementation + targeted tests PASS; full app/package/device gates PENDING; LOCAL ONLY / UNRELEASED**
+
+Local authority:
+
+- Branch `codex/android-reader-gesture-polish`; base `e12d48839d0ad1ac86964c14cdc0164a5ebfe0a0`, not asserted to be latest main.
+- Seven changed/new source/test files remain uncommitted locally. No implementation push, merge, APK installation or release is performed by this record.
+
+Implemented:
+
+- Reader → 阅读设置 → 手势与放大（仅此手机）.
+- Phone-local double-tap enable/disable, default enabled; selectable 1.5× / 2× / 3×, default 2×.
+- Disabling double-tap removes tap-confirmation waiting; pinch zoom stays available.
+- Existing/rebound page holders use current settings without chapter reload, reading-progress reset or zoom reset.
+- Scrollable Chinese/English/Japanese options; existing ReaderSource, cache, progress, portable settings and sync contracts are unchanged.
+
+Evidence:
+
+- 28/28 targeted tests PASS, zero failures/skips: settings 5, options 4, zoom 9, existing ReaderPolicy regression 10 (**18 new tests**, not 28 new tests).
+- Isolated SDK-free Java/Robolectric 4.17 harness compiles the repository settings/options/zoom classes directly against API 35; JDK 21 / harness Gradle 9.0.0.
+- This is NOT a full Android AGP/CI build, and does not establish ReaderActivity integration. Project build/signing/version settings are unchanged.
+- `git diff --check` PASS; all seven file hashes match the local validation record at this reconciliation. Production data/application, provider, recommendation and sync state are untouched.
+
+Acceptance still required:
+
+1. Review/rebase against current main without losing the local issue work.
+2. Full Android build, lint and Dev APK verification; the earlier local test run lacked an Android SDK.
+3. ReaderActivity integration and physical-device touch QA: immediate single tap when disabled, selected double-tap scale, pinch/pan, gesture cancellation and parent-scroll/page conflicts.
+4. Settings persistence after relaunch, recycling/rebind, active-page updates and orientation; unchanged chapter/progress/cache/source/sync behavior.
+5. Human acceptance before any merge or release. Do not infer package/device PASS from the 28 targeted tests.
+
+## 2026-10-12 — Conversation progress recorded, documentation only
+
+- Reconciled NEXT-33 against the exact successful historical run; kept its manual/physical gates and missing current artifact downloads explicit.
+- Advanced NEXT-34/35 from design registration to **local implementation / PARTIAL**, not issue closure or released behavior.
+- Registered NEXT-36 static reference analysis and NEXT-37 local Reader gesture slice separately, with independent evidence levels and remaining gates.
+- Documentation is updated on existing Draft PR #203 only. The PR remains unmerged; the current source implementations and private analysis remain local.
+- No application-source upload, version/signing/schema/model change, release/tag/OTA transaction, production-data operation or deployment is authorized.
+- The documentation-only commit skips automatic push/PR CI. Prior checks remain bound to their exact implementation SHA; no new application validation is claimed.

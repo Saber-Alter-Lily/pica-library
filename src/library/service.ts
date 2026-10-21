@@ -1,4 +1,6 @@
 import fs from 'node:fs'
+import { JmProvider } from '../providers/jm-provider'
+import { ProviderFavoritesImport } from '../providers/favorites-import'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import pLimit from 'p-limit'
@@ -157,11 +159,22 @@ import {
 } from '../recommendation-v5/advanced-learning-gate'
 import {
     filterCandidatesAgainstOwnedV5,
+    RECOMMENDATION_V5_POLICY_STATE_KEY,
+    type PortablePolicyStateV5,
     normalizePreferenceKey,
     preferenceAdjustmentV5,
     workIdentityEvidenceV5,
     workIdentitySignalsV2
 } from '../recommendation-v5/portable-policy'
+import {
+    createPreferencePresentationIndex,
+    searchPreferenceSignalsV5,
+    type PreferencePresentationIndex
+} from '../recommendation-v5/preference-discovery'
+import {
+    projectTasteChronicleView,
+    type ChronicleViewOptions
+} from '../recommendation-v3/taste-chronicle-view'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 import {
     WORK_IDENTITY_V3_RESOLVER_VERSION,
@@ -460,6 +473,10 @@ function sortCode(pica: Pica, sort: SortMode | undefined) {
 export class LibraryService {
     private pica: Pica | null = null
     private readonly ehProvider: EhProvider
+    private readonly jmProvider = new JmProvider()
+    private readonly jmFavorites = new ProviderFavoritesImport()
+    private jmMetadataGeneration = 0
+    private jmMetadataBusy = false
     private acceptingLocalDownloads = true
     private readonly activeLocalRuns = new Set<Promise<void>>()
     private readonly activeLocalSchedulers = new Set<DownloadScheduler>()
@@ -972,6 +989,61 @@ export class LibraryService {
 
     recordRecommendationEvents(inputs: UserEventInput[]) {
         return this.database.recordUserEvents(inputs)
+    }
+
+    private preferencePresentationIndex?: PreferencePresentationIndex
+
+    private preferencePresentation() {
+        if (!this.preferencePresentationIndex) {
+            try {
+                this.preferencePresentationIndex = createPreferencePresentationIndex(
+                    loadTagRegistryV3(runtimeRegistryDirectory())
+                )
+            } catch {
+                // Do not silently claim semantic equivalence when assets fail.
+                return createPreferencePresentationIndex()
+            }
+        }
+        return this.preferencePresentationIndex
+    }
+
+    private preferenceViewState() {
+        // These GET views must not initialize/persist a policy on an empty library.
+        const state = this.database.getAppState<PortablePolicyStateV5>(
+            RECOMMENDATION_V5_POLICY_STATE_KEY
+        )
+        return {
+            controls: Array.isArray(state?.controls) ? state.controls : [],
+            tasteExcludedComicIds: Array.isArray(state?.tasteExcludedComicIds)
+                ? state.tasteExcludedComicIds
+                : []
+        }
+    }
+
+    recommendationV5SearchPreferences(query: string, limit = 100) {
+        if (query.length > 160)
+            throw new Error('Preference search is limited to 160 characters')
+        return searchPreferenceSignalsV5(
+            this.database.listAllComics(),
+            this.preferenceViewState(),
+            query.trim(),
+            this.preferencePresentation(),
+            limit
+        )
+    }
+
+    tasteChronicleView(options: ChronicleViewOptions = {}) {
+        const snapshot = this.tasteChronicle()
+        if (!snapshot) return { available: false, snapshot: null, view: null }
+        return {
+            available: true,
+            ...projectTasteChronicleView(
+                snapshot,
+                this.preferenceViewState().controls,
+                options,
+                this.preferencePresentation()
+            )
+        }
     }
 
     recommendationV5Snapshot() {
@@ -3802,7 +3874,7 @@ export class LibraryService {
         source: OnlineSource
     ): FavoriteRecord {
         const record = providerComicToRecord(comic)
-        if (source === 'pica') return record
+        if (source !== 'eh' && source !== 'exh') return record
         const previous =
             this.database.getComic(record.comicId)?.providerMetadata ?? {}
         const known = new Set<string>([
@@ -3865,9 +3937,49 @@ export class LibraryService {
         return new ProviderService(
             () => this.connect(),
             this.database,
-            this.ehProvider
+            this.ehProvider,
+            this.jmProvider
         )
     }
+
+    jmAccountStatus() { return this.jmProvider.accountStatus() }
+    jmRuntimeAvailable() { return this.jmProvider.available }
+    setJmCredentials(username?: string, password?: string) { this.jmProvider.setRememberedCredentials(username, password) }
+    async jmLogin(username: string, password: string) {
+        this.jmMetadataGeneration++
+        this.jmFavorites.clear()
+        return this.jmProvider.login(username, password)
+    }
+    async jmClearAccount() { this.jmMetadataGeneration++; this.jmFavorites.clear(); await this.jmProvider.clearAccount() }
+    jmPreviewFavorites(folderId = 0, checkpoint?: () => Promise<void>) {
+        return this.jmFavorites.scan(this.jmProvider, folderId, checkpoint)
+    }
+    async jmConfirmFavorites(token: string) {
+        return this.jmFavorites.confirm(token, await this.jmProvider.accountStatus(), this.database)
+    }
+    jmCancelFavorites() { this.jmMetadataGeneration++; this.jmFavorites.clear() }
+    async jmEnrichFavorites(checkpoint?: () => Promise<void>) {
+        if (this.jmMetadataBusy) throw new Error('JM 资料补全正在进行')
+        this.jmMetadataBusy = true
+        const generation = ++this.jmMetadataGeneration
+        const pending = this.database.listComicsForLibraryQueryBase({ scope: 'favorites', providerIds: ['jm'] })
+            .filter((comic) => comic.providerMetadata?.metadataCompleteness !== 'DETAIL')
+        let updated = 0, failed = 0
+        try {
+            for (const comic of pending.slice(0, 20)) {
+                await checkpoint?.()
+                if (generation !== this.jmMetadataGeneration) break
+                try {
+                    const details = await this.jmProvider.details(comic.comicId)
+                    if (generation !== this.jmMetadataGeneration) break
+                    this.database.importCatalog([providerComicToRecord(details)], 'jm:metadata:details')
+                    updated++
+                } catch { failed++ }
+            }
+            return { updated, failed, remaining: pending.length - updated, batchLimit: 20, explicitLikesCreated: 0 }
+        } finally { this.jmMetadataBusy = false }
+    }
+    closeSources() { this.jmMetadataGeneration++; this.jmFavorites.clear(); this.jmProvider.close() }
 
     async refreshAuthorWorks(authorId: string) {
         const author = this.database.listAuthors().find((item) => item.id === authorId)
@@ -6422,7 +6534,7 @@ export class LibraryService {
             shouldStop?: () => boolean
         }
     ): Promise<DownloadResult> {
-        if (!comicId.startsWith('eh:'))
+        if (!comicId.includes(':'))
             return this.downloadPicaComicNow(comicId, options)
         const providerService = this.providerService()
         const comic = await providerService.getComicDetails(comicId)

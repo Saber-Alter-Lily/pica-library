@@ -1,9 +1,9 @@
 import type { Episode, Picture } from '../types'
 import type { FavoriteRecord } from '../library/types'
 
-export type ProviderId = 'pica' | 'eh'
+export type ProviderId = 'pica' | 'eh' | 'jm'
 export type EhSurface = 'eh' | 'exh'
-export type OnlineSource = 'pica' | EhSurface
+export type OnlineSource = 'pica' | 'jm' | EhSurface
 export type CompletionStatus = 'FINISHED' | 'ONGOING' | 'UNKNOWN'
 export type EhBrowseMode = 'latest' | 'popular' | 'favorites' | 'watched' | 'toplist'
 
@@ -90,6 +90,30 @@ export interface ComicProvider {
     episodes(comicId: string): Promise<Episode[]>
     pages(comicId: string, episode: Episode): Promise<Picture[]>
     fetchPage(locator: string, maxBytes?: number): Promise<{ data: Buffer; contentType: string }>
+}
+
+export interface ProviderAccountIdentity {
+    configured: boolean
+    accountId?: string
+    username?: string
+}
+
+export interface ProviderFavoritesPage {
+    accountId: string
+    page: number
+    pages: number
+    total: number
+    folderId: number
+    folders: Record<string, string>
+    items: ProviderComic[]
+}
+
+/** Account/favorites are optional capabilities, independent from search/reading. */
+export interface AccountComicProvider extends ComicProvider {
+    accountStatus(): Promise<ProviderAccountIdentity>
+    login(username: string, password: string): Promise<ProviderAccountIdentity>
+    clearAccount(): Promise<void>
+    favoritesPage(page: number, folderId?: number): Promise<ProviderFavoritesPage>
 }
 
 export function providerComicToRecord(comic: ProviderComic): FavoriteRecord {

@@ -10,6 +10,7 @@ import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
+import { createChronicleView } from './chronicle-view.js'
 import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
 import {
     applyTranslations,
@@ -87,6 +88,7 @@ const state = {
     recommendationExhausted: false,
     updateProgress: null,
     chronicleSnapshot: null,
+    chronicleView: null,
     downloadRunnerRunning: false,
     downloadRecoveryNotified: false,
     reader: {
@@ -1611,6 +1613,7 @@ document.addEventListener('pica-open-comic-detail', (event) => {
 
 function librarySourceBindings(comic) {
     const values = []
+    if (providerIdForComic(comic) === 'jm') values.push('JM')
     if ((comic?.providerId || '').toLowerCase() === 'pica' || (!comic?.providerId && !String(comic?.comicId || '').startsWith('eh:'))) values.push('Pica')
     const known = Array.isArray(comic?.providerMetadata?.knownSurfaces) ? comic.providerMetadata.knownSurfaces : []
     if ((comic?.providerId === 'eh' || String(comic?.comicId || '').startsWith('eh:')) && !known.length) values.push('E-H')
@@ -1770,14 +1773,15 @@ function renderAuthors() {
 
 function providerIdForComic(comic) {
     return comic?.providerId ||
-        (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : 'pica')
+        (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : String(comic?.comicId || '').startsWith('jm:') ? 'jm' : 'pica')
 }
 
 function providerLabelForComic(comic) {
-    return providerIdForComic(comic) === 'eh' ? 'E-H' : 'Pica'
+    return providerIdForComic(comic) === 'eh' ? 'E-H' : providerIdForComic(comic) === 'jm' ? 'JM' : 'Pica'
 }
 
 function providerPopularityForComic(comic) {
+    if (providerIdForComic(comic) === 'jm') return t('provider.publicMetadata')
     if (providerIdForComic(comic) === 'eh') {
         const rating = Number(comic?.rating)
         return Number.isFinite(rating) && rating > 0
@@ -1791,7 +1795,7 @@ function providerPopularityForComic(comic) {
 }
 
 function providerFavoriteLabel(comic) {
-    return providerIdForComic(comic) === 'eh' ? t('provider.localFavorite') : t('result.favorite')
+    return providerIdForComic(comic) !== 'pica' ? t('provider.localFavorite') : t('result.favorite')
 }
 
 function renderResultCards(records, target, recommendation = false) {
@@ -3939,7 +3943,9 @@ $('#search-button').onclick = async () => {
             keyword: $('#search-keyword').value,
             tags: splitList($('#search-tags').value),
             providers:
-                providerChoice === 'pica'
+                providerChoice === 'jm'
+                    ? ['jm']
+                    : providerChoice === 'pica'
                     ? ['pica']
                     : providerChoice === 'eh'
                       ? ['eh']
@@ -4820,6 +4826,7 @@ function renderChronicleUniverse(snapshot) {
 
 function renderChronicleV2(snapshot) {
     const content = $('#chronicle-content')
+    const filteredView = state.chronicleView?.mode === 'FILTERED_COLLECTION'
     const metric = (label, value) =>
         `<div class="chronicle-metric"><strong>${chronicleEscape(value)}</strong><span>${chronicleEscape(label)}</span></div>`
     const bands = snapshot.facetBands || []
@@ -4929,20 +4936,37 @@ function renderChronicleV2(snapshot) {
         )
         .join('')
 
-    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(snapshot.reportNarratives.summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
+    // Narrative counts belong to the objective cached snapshot, not this projection.
+    const summary = filteredView
+        ? t('chronicle.filteredSummary')
+        : snapshot.reportNarratives.summary
+
+    content.innerHTML = `<article class="chronicle-hero atlas-hero"><p class="eyebrow">Pica Library · ${t('chronicle.book')}</p><h2>${t('chronicle.heroV2')}</h2><p>${chronicleEscape(summary)}</p><div class="chronicle-metrics">${metric(t('chronicle.favoritesMetric'), snapshot.favoriteCount)}${metric(t('chronicle.authorsMetric'), snapshot.globalStats.authors)}${metric(t('chronicle.canonicalInterests'), snapshot.globalStats.canonicalInterests)}${metric(t('chronicle.themesMetric'), (snapshot.themes || []).length)}</div><small>${t('chronicle.localV2')}</small></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">01</p><h2>${t('chronicle.keywordsV2')}</h2></div></div><div class="atlas-keyword-groups">${keywordGroups}</div></article>
-    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">02</p><h2>${t('chronicle.themes')}</h2></div><p>${t('chronicle.themesNote')}</p></div><div class="atlas-themes">${themes}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">02</p><h2>${t('chronicle.themes')}</h2></div><p>${t('chronicle.themesNote')}</p></div><div class="atlas-themes">${themes || `<div class="atlas-empty">${t('chronicle.noThemes')}</div>`}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">03</p><h2>${t('chronicle.universe')}</h2></div><p>${t('chronicle.universeNoteV2')}</p></div>${renderChronicleUniverse(snapshot)}</article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">04</p><h2>${t('chronicle.preferenceMap')}</h2></div><p>${t('chronicle.preferenceMapNote')}</p></div><div class="atlas-heatmap">${heatmap}</div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">05</p><h2>${t('chronicle.familiarV2')}</h2></div></div><div class="chronicle-preference-grid atlas-preference-grid"><section><h3>${t('chronicle.fandoms')}</h3>${preferenceList(snapshot.fandomPreferences)}</section><section><h3>${t('chronicle.authors')}</h3>${preferenceList(snapshot.authorPreferences)}</section><section><h3>${t('chronicle.circles')}</h3>${preferenceList(snapshot.circlePreferences)}</section></div></article>
     <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">06</p><h2>${t('chronicle.combinationsV2')}</h2></div><p>${t('chronicle.combinationsNoteV2')}</p></div><div class="atlas-combinations">${combinations || `<div class="atlas-empty">${t('chronicle.noCombinations')}</div>`}</div></article>
-    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">07</p><h2>${t('chronicle.styleV2')}</h2></div></div><div class="atlas-style-grid">${style}</div></article>
+    <article class="chronicle-section chronicle-page"><div class="atlas-section-heading"><div><p class="eyebrow">07</p><h2>${t('chronicle.styleV2')}</h2></div></div><div class="atlas-style-grid">${filteredView ? t('chronicle.filteredStyleNote') : style}</div></article>
     <article class="chronicle-section chronicle-page atlas-about"><p>${chronicleEscape(snapshot.reportNarratives.privacy)}</p><small>Snapshot v${snapshot.snapshotVersion} · ${chronicleEscape(snapshot.generatedAt)} · ${t('chronicle.generatedLocally')}</small></article>`
 }
 
-function renderChronicle(snapshot) {
+const chronicleView = createChronicleView({
+    request: api,
+    isConnected: () => state.mode === 'connected',
+    render: renderChronicle,
+    onError: (error) => {
+        $('#chronicle-content').replaceChildren()
+        $('#chronicle-status').textContent = localizeError(language, error)
+    }
+})
+
+function renderChronicle(snapshot, view = null) {
     if (!snapshot) return
     state.chronicleSnapshot = snapshot
+    state.chronicleView = view
+    $('#chronicle-status').textContent = ''
     if (Number(snapshot.snapshotVersion || 0) >= 2 && snapshot.facetBands) {
         renderChronicleV2(snapshot)
         return
@@ -4952,12 +4976,12 @@ function renderChronicle(snapshot) {
 
 async function loadChronicle() {
     if (state.mode !== 'connected') {
+        chronicleView.paint()
         $('#chronicle-status').textContent = t('chronicle.lite')
         return
     }
     try {
-        const value = await api('/api/v1/recommendation/profile')
-        renderChronicle(value.snapshot)
+        await chronicleView.load()
     } catch {
         $('#chronicle-status').textContent = t('chronicle.needSync')
     }
@@ -4967,8 +4991,8 @@ async function rebuildChronicle() {
     $('#chronicle-status').textContent = t('chronicle.building')
     try {
         const value = await post('/api/v1/recommendation/profile/rebuild', {})
-        renderChronicle(value.snapshot)
-        $('#chronicle-status').textContent = t('chronicle.ready')
+        if (value.snapshot && await chronicleView.load())
+            $('#chronicle-status').textContent = t('chronicle.ready')
     } catch (error) {
         $('#chronicle-status').textContent = localizeError(language, error)
     }
@@ -5178,6 +5202,7 @@ async function waitForChroniclePrintImages(root) {
 }
 
 $('#chronicle-print').onclick = async () => {
+    if (!chronicleView.canPrint()) return
     const previousTitle = document.title
     const day = new Date().toISOString().slice(0, 10).replaceAll('-', '')
     document.title = `${t('chronicle.filename')}-${day}`

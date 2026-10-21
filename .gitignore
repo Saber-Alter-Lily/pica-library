@@ -19,6 +19,11 @@ artifacts/
 _validation/
 /temp/
 /cache/
+/source-jvm/.gradle/
+/mobile/android-alpha2/.gradle/
+/source-jvm/build/
+/runtime/jm/
+/runtime/.jm-build-*/
 /screenshots/
 /output/
 /PICA_V3_ACCEPTANCE/

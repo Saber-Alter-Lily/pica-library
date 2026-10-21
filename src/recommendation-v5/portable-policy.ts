@@ -625,6 +625,15 @@ export function portableInferredSignalsV5(
     limit = 120,
     tasteExcludedComicIds: Iterable<string> = []
 ): PortablePreferenceSignalV5[] {
+    return collectPortableInferredSignalsV5(catalog, tasteExcludedComicIds)
+        .slice(0, Math.max(1, Math.min(500, limit)))
+}
+
+/** Full local universe for explicit search; default/mobile snapshots stay bounded. */
+export function collectPortableInferredSignalsV5(
+    catalog: StoredComic[],
+    tasteExcludedComicIds: Iterable<string> = []
+): PortablePreferenceSignalV5[] {
     const excluded = new Set(
         [...tasteExcludedComicIds].map(normalizePreferenceKey)
     )
@@ -667,7 +676,6 @@ export function portableInferredSignalsV5(
             )
         }))
         .sort((a, b) => b.supportCount - a.supportCount || a.targetType.localeCompare(b.targetType) || a.key.localeCompare(b.key))
-        .slice(0, Math.max(1, Math.min(500, limit)))
 }
 
 export function portablePolicySnapshotV5(state: PortablePolicyStateV5, catalog: StoredComic[]): PortablePolicySnapshotV5 {

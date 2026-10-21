@@ -89,3 +89,7 @@ Still required, in order:
 This update contains Markdown progress records only. It uploads no application implementation, APK, recovered source/library/resource, private catalog, database, credentials, screenshots or behavior records. Production data and installation remain untouched; no release, tag, stable OTA, version bump or deployment is performed.
 
 The documentation commit skips automatic push/PR CI to avoid creating new package/signing jobs for a record-only change. Historical PASS results keep their exact source identities. This document is not authorization to merge PR #203 or to begin any new feature slice.
+
+## 2026-10-21 — Separately authorized integration follow-up
+
+The user has now authorized NEXT-38 isolated implementation/build and, separately, a candidate-branch push, Draft PR and fixed-signature CI. This does not retroactively change the documentation-only scope above. The previous issue and Reader implementations are preserved and integrated with the opt-in JM adapter; current results and remaining gaps are in [NEXT_ACCEPTANCE_EXECUTION.md](NEXT_ACCEPTANCE_EXECUTION.md). Main merge, formal release/OTA, deployment and physical/provider acceptance remain outside the completed gates.

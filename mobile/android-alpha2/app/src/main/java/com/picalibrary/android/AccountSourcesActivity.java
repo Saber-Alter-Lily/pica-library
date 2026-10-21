@@ -110,6 +110,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         card.addView(SettingsRow.statusLine(this,"ExH 扩展",exhState));
         content.addView(card);
 
+        content.addView(SettingsRow.row(this,"JM","本机登录、收藏导入与在线阅读",v->startActivity(new Intent(this,JmSourceActivity.class))));
         if(paired&&(desktop.picaConfigured||desktop.ehConfigured)){
             TextView note=Ui.text(
                 this,

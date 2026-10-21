@@ -394,6 +394,35 @@ export async function startLibraryServer(options: {
             )
                 return json(response, 200, options.service.recommendationV5Snapshot())
 
+            if (url.pathname.startsWith('/api/v1/desktop/sources/jm/') && options.desktop) {
+                const action = url.pathname.slice('/api/v1/desktop/sources/jm/'.length)
+                if (action === 'status' && request.method === 'GET')
+                    return json(response, 200, { available: options.service.jmRuntimeAvailable(), ...await options.service.jmAccountStatus() })
+                if (request.method === 'POST') {
+                    const input = await body(request)
+                    if (action === 'login' || action === 'logout') return json(response, 200, await options.desktop.save({ ...input, jmAccountAction: action }))
+                    if (action === 'preview') return json(response, 200, await options.service.jmPreviewFavorites(Number(input.folderId ?? 0), async () => { if (response.destroyed) throw new Error('收藏扫描已取消') }))
+                    if (action === 'confirm') return json(response, 200, await options.service.jmConfirmFavorites(String(input.token ?? '')))
+                    if (action === 'cancel') { options.service.jmCancelFavorites(); return json(response, 200, { cancelled: true }) }
+                    if (action === 'enrich') return json(response, 200, await options.service.jmEnrichFavorites(async () => { if (response.destroyed) throw new Error('资料补全已取消') }))
+                }
+                return json(response, 404, { error: 'Source action not found' })
+            }
+
+            if (
+                url.pathname === '/api/v1/recommendation-v5/preferences/search' &&
+                request.method === 'GET'
+            ) {
+                const query = url.searchParams.get('q') ?? ''
+                if (query.length > 160)
+                    return json(response, 400, {
+                        error: 'Preference search is limited to 160 characters'
+                    })
+                return json(response, 200, options.service.recommendationV5SearchPreferences(
+                    query, Number(url.searchParams.get('limit') ?? 100)
+                ))
+            }
+
             if (
                 url.pathname ===
                     '/api/v1/recommendation-v5/provider-routes' &&
@@ -2400,6 +2429,8 @@ export async function startLibraryServer(options: {
                 request.method === 'POST'
             ) {
                 const input = await body(request)
+                if (stringList(input.providers).some((source) => !['pica', 'eh', 'exh', 'jm'].includes(source)))
+                    return json(response, 400, { error: 'Unrecognized online source' })
                 options.database.recordUserEvent({
                     eventType: 'search',
                     source: 'search',
@@ -2437,8 +2468,8 @@ export async function startLibraryServer(options: {
                             : 'likes') as SortMode,
                         limit: Number(input.limit ?? 100),
                         providers: stringList(input.providers).filter(
-                            (value): value is 'pica' | 'eh' | 'exh' =>
-                                value === 'pica' || value === 'eh' || value === 'exh'
+                            (value): value is 'pica' | 'eh' | 'exh' | 'jm' =>
+                                value === 'pica' || value === 'eh' || value === 'exh' || value === 'jm'
                         )
                     })
                 )
@@ -2452,6 +2483,16 @@ export async function startLibraryServer(options: {
                     available: Boolean(snapshot),
                     snapshot
                 })
+            }
+            if (
+                url.pathname === '/api/v1/recommendation/profile/view' &&
+                request.method === 'GET'
+            ) {
+                const value = options.service.tasteChronicleView({
+                    hideBlocked: url.searchParams.get('hideBlocked') === 'true',
+                    hideLess: url.searchParams.get('hideLess') === 'true'
+                })
+                return json(response, value.available ? 200 : 404, value)
             }
             if (
                 url.pathname === '/api/v1/recommendation/profile/rebuild' &&
@@ -2784,6 +2825,7 @@ export async function startLibraryServer(options: {
             })
         }
     })
+    server.on('close', () => options.service.closeSources?.())
     await new Promise<void>((resolve, reject) => {
         server.once('error', reject)
         server.listen(port, host, resolve)

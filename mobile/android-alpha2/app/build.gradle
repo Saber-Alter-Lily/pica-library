@@ -12,6 +12,15 @@ def buildVersionName = System.getenv('PICA_ANDROID_VERSION_NAME') ?: '0.5.0'
 android {
     namespace 'com.picalibrary.android'
     compileSdk 35
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.java {
+        srcDir '../../../source-jvm/src/main/java'
+        exclude '**/JmProtocolMain.java'
+    }
 
     defaultConfig {
         applicationId 'com.picalibrary.android'
@@ -87,6 +96,11 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation('io.github.jukomu:jmcomic-core:v1.1.12') {
+        exclude group: 'io.github.darkxanter', module: 'webp-imageio'
+    }
+    implementation 'io.github.jukomu:jmcomic-android-support:v1.1.12'
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.documentfile:documentfile:1.0.1'
     implementation 'androidx.viewpager2:viewpager2:1.1.0'
@@ -99,4 +113,9 @@ dependencies {
     androidTestImplementation 'androidx.test:core:1.7.0'
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+}
+
+// Android uses the SDK's native image processor, not the desktop ImageIO SPI/native binaries.
+configurations.configureEach {
+    exclude group: 'io.github.darkxanter', module: 'webp-imageio'
 }

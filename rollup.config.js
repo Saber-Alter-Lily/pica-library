@@ -72,6 +72,9 @@ function bundledLicenses() {
                     ''
                 )
             }
+            if ([...packages.values()].some(item => item.name === 'opencc-js')) {
+                sections.push(fs.readFileSync('docs/licenses/OPENCC_DATA.txt', 'utf8'))
+            }
             this.emitFile({
                 type: 'asset',
                 fileName: 'licenses/THIRD_PARTY_LICENSES.txt',

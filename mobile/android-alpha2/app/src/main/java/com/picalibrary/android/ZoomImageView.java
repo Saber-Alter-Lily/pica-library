@@ -13,7 +13,10 @@ final class ZoomImageView extends ImageView {
     private final Matrix matrix = new Matrix();
     private final ScaleGestureDetector scaleDetector;
     private final GestureDetector gestureDetector;
+    private final GestureDetector.SimpleOnGestureListener gestureListener;
     private NavigationListener navigationListener;
+    private boolean doubleTapEnabled = true;
+    private float doubleTapScale = 2f;
     private float scale = 1f;
     private float baseScale = 1f;
     private float translateX = 0f;
@@ -27,14 +30,18 @@ final class ZoomImageView extends ImageView {
         scaleDetector = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override public boolean onScale(ScaleGestureDetector detector) {float next=Math.max(1f,Math.min(4f,scale*detector.getScaleFactor()));float factor=next/scale;scale=next;matrix.postScale(factor,factor,detector.getFocusX(),detector.getFocusY());constrain();setImageMatrix(matrix);return true;}
         });
-        gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
+        gestureListener = new GestureDetector.SimpleOnGestureListener() {
             @Override public boolean onDown(MotionEvent e){return true;}
-            @Override public boolean onSingleTapConfirmed(MotionEvent e){if(navigationListener==null)return true;if(scale>1.03f){navigationListener.onCenterTap();return true;}float x=e.getX();if(x<getWidth()*.28f)navigationListener.onPrevious();else if(x>getWidth()*.72f)navigationListener.onNext();else navigationListener.onCenterTap();return true;}
-            @Override public boolean onDoubleTap(MotionEvent e){if(scale>1.05f)resetZoom();else{float factor=2f/scale;scale=2f;matrix.postScale(factor,factor,e.getX(),e.getY());constrain();setImageMatrix(matrix);}return true;}
+            @Override public boolean onSingleTapUp(MotionEvent e){return !doubleTapEnabled && navigateTap(e);}
+            @Override public boolean onSingleTapConfirmed(MotionEvent e){return doubleTapEnabled && navigateTap(e);}
+            @Override public boolean onDoubleTap(MotionEvent e){if(scale>1.05f)resetZoom();else{float factor=doubleTapScale/scale;scale=doubleTapScale;matrix.postScale(factor,factor,e.getX(),e.getY());constrain();setImageMatrix(matrix);}return true;}
             @Override public boolean onScroll(MotionEvent e1,MotionEvent e2,float dx,float dy){if(scale<=1.03f)return false;matrix.postTranslate(-dx,-dy);translateX-=dx;translateY-=dy;constrain();setImageMatrix(matrix);return true;}
             @Override public boolean onFling(MotionEvent e1,MotionEvent e2,float vx,float vy){if(pagerManaged)return false;if(scale>1.03f||navigationListener==null||e1==null||e2==null)return false;float dx=e2.getX()-e1.getX();if(Math.abs(dx)<getWidth()*.18f||Math.abs(vx)<500f)return false;if(dx<0)navigationListener.onNext();else navigationListener.onPrevious();return true;}
-        });
+        };
+        gestureDetector = new GestureDetector(context, gestureListener);
     }
+    void setGestureSettings(ReaderGestureSettings.Snapshot settings){doubleTapEnabled=settings.doubleTapEnabled;doubleTapScale=settings.doubleTapScale();gestureDetector.setOnDoubleTapListener(doubleTapEnabled?gestureListener:null);}
+    private boolean navigateTap(MotionEvent e){if(navigationListener==null)return true;if(scale>1.03f){navigationListener.onCenterTap();return true;}float x=e.getX();if(x<getWidth()*.28f)navigationListener.onPrevious();else if(x>getWidth()*.72f)navigationListener.onNext();else navigationListener.onCenterTap();return true;}
     void setNavigationListener(NavigationListener listener){navigationListener=listener;}
     @Override public void setImageDrawable(Drawable drawable){super.setImageDrawable(drawable);laidOutOnce=false;post(this::fitDrawable);}
     private void fitDrawable(){Drawable d=getDrawable();if(d==null||getWidth()<=0||getHeight()<=0)return;int dw=Math.max(1,d.getIntrinsicWidth()),dh=Math.max(1,d.getIntrinsicHeight());float sx=(float)getWidth()/dw,sy=(float)getHeight()/dh;baseScale=Math.min(sx,sy);float dx=(getWidth()-dw*baseScale)*.5f,dy=(getHeight()-dh*baseScale)*.5f;matrix.reset();matrix.postScale(baseScale,baseScale);matrix.postTranslate(dx,dy);scale=1f;translateX=dx;translateY=dy;setImageMatrix(matrix);laidOutOnce=true;}

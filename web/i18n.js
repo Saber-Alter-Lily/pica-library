@@ -759,7 +759,7 @@ export const translations = {
             'Sync favorites before organizing the collection atlas.',
         'chronicle.building': 'Reading through your collection…',
         'chronicle.ready': 'Your collection chronicle is ready.',
-        'chronicle.universe': 'Your interest universe',
+        'chronicle.universe': 'Collection theme map',
         'chronicle.universeNote':
             'A visual guide to how large and distinct the collection lines are; positions are illustrative, not scientific coordinates.',
         'chronicle.familiar': 'Familiar creators and circles',
@@ -769,13 +769,15 @@ export const translations = {
         'chronicle.lifetimeRecentNote':
             'Purple shows lifetime presence; teal shows the bounded relative-recency signal.',
         'chronicle.heroV2': 'A semantic map of what you have collected.',
+        'chronicle.filteredSummary': 'Display-only filtered collection view. Global totals remain objective; the theme count is the visible count. This is not a new interest profile.',
+        'chronicle.filteredStyleNote': 'Collection-wide summary cards are hidden in this view to avoid implying that the underlying analysis was recalculated. Turn filters off to see them.',
         'chronicle.profileResultFallback': 'Multiple-interest collection',
         'chronicle.localV2':
             'Built from the current favorites snapshot · processed locally · no historical-order recency',
-        'chronicle.canonicalInterests': 'Canonical interests',
+        'chronicle.canonicalInterests': 'Collection semantic items',
         'chronicle.themesMetric': 'Themes',
         'chronicle.keywordsV2': 'Your collection vocabulary',
-        'chronicle.themes': 'Main interest themes',
+        'chronicle.themes': 'Main collection themes',
         'chronicle.theme': 'Theme',
         'chronicle.themesNote':
             'Themes use semantic facets and recurring cross-facet combinations, not publication or event labels.',
@@ -783,7 +785,7 @@ export const translations = {
         'chronicle.association': 'association {value}×',
         'chronicle.universeNoteV2':
             'Node size reflects collection coverage; lines indicate overlap between themes.',
-        'chronicle.preferenceMap': 'Preference map',
+        'chronicle.preferenceMap': 'Collection distribution',
         'chronicle.preferenceMapNote':
             'Each row is one semantic facet; stronger blocks appear in more favorites within that facet.',
         'chronicle.familiarV2': 'Familiar IPs, creators and circles',
@@ -1538,7 +1540,7 @@ export const translations = {
         'chronicle.needSync': '同步收藏后，就可以重新整理收藏图鉴。',
         'chronicle.building': '正在翻阅你的收藏……',
         'chronicle.ready': '收藏图鉴整理好了。',
-        'chronicle.universe': '我的兴趣宇宙',
+        'chronicle.universe': '收藏主题地图',
         'chronicle.universeNote':
             '用大小和距离看看收藏里的几条兴趣线；位置只是关系示意，不是科学坐标。',
         'chronicle.familiar': '熟悉的作者与社团',
@@ -1547,14 +1549,16 @@ export const translations = {
         'chronicle.lifetimeRecent': '一直都很喜欢 / 最近有点上头',
         'chronicle.lifetimeRecentNote':
             '紫色表示长期出现，青绿色表示克制使用的相对近期信号。',
-        'chronicle.heroV2': '把收藏里的长期偏好，整理成一张语义地图。',
+        'chronicle.heroV2': '把收藏的客观构成，整理成一张语义地图。',
+        'chronicle.filteredSummary': '仅做显示过滤的收藏视图：全局总数仍是客观原始计数，主题数为当前可见数量。这不是重新推断的个人兴趣画像。',
+        'chronicle.filteredStyleNote': '此视图不展示全库总结卡，避免误以为底层分析已重算；关闭过滤即可查看。',
         'chronicle.profileResultFallback': '多线收藏型',
         'chronicle.localV2':
             '基于当前收藏快照 · 全部在本地完成 · 不用历史收藏顺序推断近期偏好',
-        'chronicle.canonicalInterests': '语义兴趣',
+        'chronicle.canonicalInterests': '收藏语义项目',
         'chronicle.themesMetric': '主题',
         'chronicle.keywordsV2': '构成收藏口味的语义词汇',
-        'chronicle.themes': '主要兴趣主题',
+        'chronicle.themes': '主要收藏主题',
         'chronicle.theme': '主题',
         'chronicle.themesNote':
             '主题只使用语义标签和稳定的跨维度组合，不让活动、杂志期号或来源标签决定主线。',
@@ -1562,7 +1566,7 @@ export const translations = {
         'chronicle.association': '关联强度 {value}×',
         'chronicle.universeNoteV2':
             '节点大小表示覆盖收藏数，连线表示不同主题之间的收藏重叠。',
-        'chronicle.preferenceMap': '偏好版图',
+        'chronicle.preferenceMap': '收藏分布',
         'chronicle.preferenceMapNote':
             '每一行对应一个语义维度；色块越明显，说明它在该维度里出现得越稳定。',
         'chronicle.familiarV2': '熟悉的 IP、作者与社团',

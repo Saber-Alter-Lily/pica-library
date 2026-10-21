@@ -711,6 +711,7 @@ async function startEngine(preferredPort: number) {
               }
             : null
     )
+    service.setJmCredentials(credentials?.jmUsername, credentials?.jmPassword)
     remoteStorageManager = new RemoteStorageDesktopManager(
         paths.remoteStorageConfig,
         credentialsStore,
@@ -808,6 +809,29 @@ async function startEngine(preferredPort: number) {
             }
         },
         save: async (input) => {
+            const jmAccountAction = String(input.jmAccountAction ?? '')
+            if (jmAccountAction) {
+                if (!service) throw new Error('Library is not ready')
+                if (jmAccountAction === 'login') {
+                    const username = String(input.username ?? '').trim(), password = String(input.password ?? '')
+                    const identity = await service.jmLogin(username, password)
+                    const remember = input.remember === true
+                    const next: StoredCredentials = { ...(credentials ?? { account: '', password: '' }), jmUsername: remember ? username : undefined, jmPassword: remember ? password : undefined }
+                    if (remember || credentials?.jmUsername) {
+                        try { credentialsStore.save(next); credentials = next }
+                        catch { await service.jmClearAccount(); throw new Error('JM 安全凭据保存失败，当前会话已退出，请重试') }
+                    }
+                    service.setJmCredentials(remember ? username : undefined, remember ? password : undefined)
+                    return { ...identity, remembered: remember }
+                }
+                if (jmAccountAction === 'logout') {
+                    const next: StoredCredentials = { ...(credentials ?? { account: '', password: '' }), jmUsername: undefined, jmPassword: undefined }
+                    if (credentials?.jmUsername) { credentialsStore.save(next); credentials = next }
+                    await service.jmClearAccount()
+                    return { configured: false }
+                }
+                throw new Error('Unknown JM account action')
+            }
             const ehAccountAction = String(input.ehAccountAction ?? '')
             if (ehAccountAction) {
                 if (!service) throw new Error('Library is not ready')
@@ -1260,6 +1284,7 @@ async function startEngine(preferredPort: number) {
         database.close()
         database = new LibraryDatabase(path.join(dataDir, 'library.db'))
         service = new LibraryService(database, dataDir)
+        service.setJmCredentials(credentials?.jmUsername, credentials?.jmPassword)
     service.setEhSession(
         credentials?.ehMemberId && credentials?.ehPassHash
             ? {

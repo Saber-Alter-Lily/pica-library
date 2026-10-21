@@ -9,7 +9,7 @@ export type SortMode =
 export interface FavoriteRecord {
     position?: number
     comicId: string
-    providerId?: 'pica' | 'eh'
+    providerId?: 'pica' | 'eh' | 'jm'
     providerRemoteId?: string
     alternateTitles?: string[]
     completionStatus?: 'FINISHED' | 'ONGOING' | 'UNKNOWN'
@@ -76,7 +76,7 @@ export interface LibraryFacetQuery {
     authorIds?: string[]
     tags?: string[]
     tagMode?: TagMatchMode
-    providerIds?: Array<'pica' | 'eh'>
+    providerIds?: Array<'pica' | 'eh' | 'jm'>
     finished?: boolean
     download?: DownloadFacet
     sort?: SortMode

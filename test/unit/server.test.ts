@@ -64,6 +64,26 @@ describe('local web server', () => {
         })
     })
 
+    it('serves bounded preference search and atlas views through read-only GET routes', async () => {
+        const search = vi.spyOn(service, 'recommendationV5SearchPreferences').mockReturnValue({
+            query: '双马尾', items: [], total: 0, truncated: false, limit: 100,
+            registryAvailable: true, source: 'full-local-collection-and-explicit-controls'
+        })
+        const view = vi.spyOn(service, 'tasteChronicleView').mockReturnValue({ available: false, snapshot: null, view: null })
+        try {
+            const response = await fetch(`${url}/api/v1/recommendation-v5/preferences/search?q=${encodeURIComponent('双马尾')}`)
+            expect(response.status).toBe(200)
+            expect(search).toHaveBeenCalledWith('双马尾', 100)
+            expect((await response.json()).source).toBe('full-local-collection-and-explicit-controls')
+            const tooLong = await fetch(`${url}/api/v1/recommendation-v5/preferences/search?q=${'x'.repeat(161)}`)
+            expect(tooLong.status).toBe(400)
+            expect(search).toHaveBeenCalledTimes(1)
+            const absent = await fetch(`${url}/api/v1/recommendation/profile/view?hideBlocked=true&hideLess=false`)
+            expect(absent.status).toBe(404)
+            expect(view).toHaveBeenCalledWith({ hideBlocked: true, hideLess: false })
+        } finally { search.mockRestore(); view.mockRestore() }
+    })
+
     it('imports records through the local API', async () => {
         const response = await fetch(`${url}/api/v1/import`, {
             method: 'POST',

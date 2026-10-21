@@ -6,6 +6,8 @@
 
 Last reconciled: **2026-10-12**
 
+2026-10-21 isolated integration update: see **NEXT-38/39** and its exact-source package evidence. The dated reconciliation below remains historical; it is not a fresh acceptance claim for every backlog item.
+
 Audited repository baseline: `main@095d6910c34e00824e03b08a30af0ce4e708137e` (post-release reconnect fix, PR #198 merged)
 
 Published baseline: **v0.5.0 / Android v55**, source `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`, published 2026-10-01 UTC
@@ -3093,3 +3095,28 @@ Acceptance still required:
 - Documentation is updated on existing Draft PR #203 only. The PR remains unmerged; the current source implementations and private analysis remain local.
 - No application-source upload, version/signing/schema/model change, release/tag/OTA transaction, production-data operation or deployment is authorized.
 - The documentation-only commit skips automatic push/PR CI. Prior checks remain bound to their exact implementation SHA; no new application validation is claimed.
+
+## NEXT-38 — Consolidated issue/source/reader acceptance candidate
+
+**Status: IN_PROGRESS / UNRELEASED — isolated implementation and automated integration; physical/provider acceptance PENDING**
+
+- Authorized on 2026-10-21, including the explicit one-round exception for the DPAPI-blocked Local Memory coordination lock. No coordinator secret/identity is changed.
+- Independent checkout/branch `codex/next-acceptance-sources-jm`; original Reader dirty worktree remains preserved. The latest PR #203 documentation is reconciled without dropping its historical evidence limits.
+- NEXT-34: retain default-off BLOCK/LESS display projection and current automated regressions; no recommendation/data mutation or issue closure.
+- NEXT-35: retain Desktop full-catalog discovery; add Android search-only folding/aliases, explicit staged Save/Undo, rotation retention and collection-vs-interest wording. Taxonomy import, model changes, actual tuning-burden proof and versioned cross-client alias migration remain open.
+- NEXT-37: integrate the phone-local gesture slice into the full app; no borrowed reference-APK code/assets. Device touch/OEM acceptance remains pending even after compilation.
+- [Issue #204](https://github.com/Saber-Alter-Lily/pica-library/issues/204): opt-in JM account favorites using maintained MIT SDK v1.1.12; verified-account bounded preview/confirm, additive import, cancellation, metadata completeness and explicit enrichment; native Android and Desktop search/Reader routes.
+- Source registry preserves Pica/EH IDs, rejects unknown prefixes and exposes capabilities. It is a compiled extension seam, not a completed third-party plugin ecosystem. Automatic JM candidate recall and native JM phone-download/sync are not claimed.
+- Current evidence/limits, upstream licenses, package gates and consolidated device checklist: [NEXT_ACCEPTANCE_EXECUTION.md](docs/NEXT_ACCEPTANCE_EXECUTION.md), [JM_SOURCE_ADAPTER_ACCEPTANCE.md](docs/JM_SOURCE_ADAPTER_ACCEPTANCE.md).
+- Local final automated baseline: Desktop 228 files, 1245 PASS + 1 existing skip; TypeScript and Web 39/39; Edge browser 29/29; Android 34 files / 151 PASS, lint, Dev build and Release R8 build PASS. Android AtomicFile host semantics and upstream R8 warnings are documented; these checks do not establish real-device/provider acceptance.
+- The user separately authorized candidate-branch push, Draft PR and existing-secret CI signing. Remote/package results must still be recorded against their own source SHA; no local debug signature may be supplied as an existing-Dev upgrade substitute.
+- Candidate branch CI/package construction only. No production app/database/credential/Visual/sync operation, local deployment, main merge, formal version/tag/Release/OTA change, automatic issue response or closure.
+
+## NEXT-39 — After consolidated acceptance
+
+**Status: PLANNED, not implemented by NEXT-38**
+
+- Decide source-repository/manifest trust, source enable/disable/update lifecycle and legal/distribution policy before dynamic extensions.
+- Add bounded JM recommendation retrieval only after real metadata/profile evidence and a separate recommendation review; never synthesize Like/style labels from imported favorites.
+- Native JM download/progress/proxy and complete locale parity; further source adapters use the registry and maintained upstreams, not one-off protocol copies.
+- Preserve all unrelated P2/W5/NEXT-28 performance, onboarding, author-progress and device evidence backlog above; this candidate does not declare them complete.

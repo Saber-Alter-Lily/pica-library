@@ -299,7 +299,8 @@ function desiredProviderAllocations(
     // until their own related-work retriever exists.
     if (family === 'RELATED') {
         const seed = anchors[0]?.key ?? ''
-        const picaSeedEligible = !seed.startsWith('eh:')
+        // Only legacy unprefixed Pica identities can enter the Pica-related endpoint.
+        const picaSeedEligible = !seed.includes(':')
         return [
             picaSeedEligible
                 ? allocation('pica', strategy, 1, 40)

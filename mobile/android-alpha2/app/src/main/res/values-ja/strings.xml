@@ -63,4 +63,21 @@
     <string name="tour_visual_strength_body">画風類似度を順位付けにどの程度反映するかを設定します。作者、タグ、最近の行動、今回の嗜好はそのまま維持されます。</string>
     <string name="tour_complete_title">準備完了</string>
     <string name="tour_complete_body">主な機能の説明は以上です。設定からいつでもこのガイドを再表示できます。</string>
+    <string name="jm_download_title">JM 端末ダウンロード</string>
+    <string name="jm_download_preparing">ダウンロードを準備中</string>
+    <string name="jm_download_running">ダウンロード中</string>
+    <string name="jm_download_verifying">保存済みページを検証中</string>
+    <string name="jm_download_complete">ダウンロード完了</string>
+    <string name="jm_download_session_changed">JM のログインが変わりました。現在のアカウントで追加または再開してください。</string>
+    <string name="jm_download_stopped">停止しました。完了したページは再開用に保持されます。</string>
+    <string name="jm_download_invalid">作品または話の識別子が無効です。開始していません。</string>
+    <string name="jm_download_failed">JM のダウンロードが完了しませんでした。通信、ログイン、保存先を確認してください。</string>
+    <string name="jm_download_chapter">この話をダウンロード</string>
+    <string name="jm_download_all">すべての話をダウンロード</string>
+    <string name="jm_download_explicit_help">この作品を端末に保存してオフラインで読みますか？バックグラウンドタスクで一時停止、再開、キャンセルできます。完了した話だけ読めます。ログアウトしても残り、一時キャッシュではありません。</string>
+    <string name="jm_download_queued">JM ダウンロードを要求しました。タスク画面で確認してください。同じ作品の既存タスクが優先されます。</string>
+    <string name="jm_imported_favorite">JM お気に入り · 取込済み</string>
+    <string name="jm_manage_source">JM ソースを管理</string>
+    <string name="phone_download_empty_sources">完了した端末ダウンロードはありません。Pica、E-H、JM の作品詳細から保存できます。未完了の JM の話はタスク画面に残り、オフライン閲覧には表示されません。</string>
+    <string name="phone_download_delete_scope">この端末のダウンロード本文だけ削除します。PC、WebDAV、オンラインの本文、お気に入りは削除しません。</string>
 </resources>

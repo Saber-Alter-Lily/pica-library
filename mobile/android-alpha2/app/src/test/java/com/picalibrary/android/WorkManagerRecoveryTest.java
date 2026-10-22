@@ -226,7 +226,7 @@ public class WorkManagerRecoveryTest {
     ){
         OneTimeWorkRequest.Builder builder = new OneTimeWorkRequest.Builder(RecoveryWorker.class)
             .setInitialDelay(1,TimeUnit.DAYS)
-            .addTag("eh".equals(provider)?"eh-download":"pica-download")
+            .addTag("jm".equals(provider)?"jm-download":"eh".equals(provider)?"eh-download":"pica-download")
             .addTag("comic:"+comic);
         if(!"eh".equals(provider))
             builder.addTag(episode.isEmpty()?"episode:ALL":"episode:"+episode);
@@ -238,6 +238,40 @@ public class WorkManagerRecoveryTest {
             .setInitialDelay(1,TimeUnit.DAYS)
             .addTag(tag)
             .build();
+    }
+
+    @Test public void jmWorkReconstructsAfterRegistryLossAndRemainsVisibleWhenPaused() throws Exception {
+        String comic="jm:812345",episode="jm-chapter:812346";
+        OneTimeWorkRequest request=delayedDownload("jm",comic,episode);
+        manager.enqueueUniqueWork(JmDownloadJobs.name(comic),ExistingWorkPolicy.KEEP,request).getResult().get(5,TimeUnit.SECONDS);
+        ActivityController<TaskCenterActivity> controller=taskCenter();
+        try{
+            List<?> views=reconstructDownloads(controller.get(),manager.getWorkInfosByTag("jm-download").get(5,TimeUnit.SECONDS));
+            assertEquals(1,views.size());assertEquals("jm",viewRef(views.get(0)).provider);
+            assertEquals(request.getId(),viewInfo(views.get(0)).getId());
+            JmDownloadJobs.pause(app,comic);
+            manager.cancelUniqueWork(JmDownloadJobs.name(comic)).getResult().get(5,TimeUnit.SECONDS);
+            views=reconstructDownloads(controller.get(),manager.getWorkInfosByTag("jm-download").get(5,TimeUnit.SECONDS));
+            assertEquals(1,views.size());assertTrue(JmDownloadJobs.paused(app,comic));
+            assertEquals(episode,viewRef(views.get(0)).episodeId);
+            JmDownloadJobs.cancel(app,comic);
+            assertFalse(JmDownloadJobs.paused(app,comic));assertTrue(MobileTaskRegistryStore.downloads(app).isEmpty());
+        }finally{controller.destroy();}
+    }
+
+    @Test public void jmDuplicateKeepDoesNotReplaceOrRelabelActualQueuedChapter() throws Exception {
+        String comic="jm:812347";
+        OneTimeWorkRequest first=delayedDownload("jm",comic,"jm-chapter:812348");
+        manager.enqueueUniqueWork(JmDownloadJobs.name(comic),ExistingWorkPolicy.KEEP,first).getResult().get(5,TimeUnit.SECONDS);
+        JmDownloadJobs.enqueue(app,comic,"");
+        // A queue barrier ensures the KEEP operation has been processed before inspection.
+        manager.enqueue(delayedSingleton("jm-queue-barrier")).getResult().get(5,TimeUnit.SECONDS);
+        ActivityController<TaskCenterActivity> controller=taskCenter();
+        try{
+            List<?> views=reconstructDownloads(controller.get(),manager.getWorkInfosByTag("jm-download").get(5,TimeUnit.SECONDS));
+            assertEquals(1,views.size());assertEquals(first.getId(),viewInfo(views.get(0)).getId());
+            assertEquals("jm-chapter:812348",viewRef(views.get(0)).episodeId);
+        }finally{controller.destroy();}
     }
 
     private ActivityController<TaskCenterActivity> taskCenter(){

@@ -1,6 +1,8 @@
 # Next consolidated acceptance candidate
 
-Status: LOCAL_AUTOMATED_PASS / PACKAGE_AND_REMOTE_CI_PENDING. This is an unpublished integration candidate, not a release or device-acceptance result.
+Status: UNPUBLISHED / NEXT-40 NATIVE JM DOWNLOAD CONTINUATION IN PROGRESS. This is an integration candidate, not a release or device-acceptance result.
+
+The previous frozen source `0549bc5e271d936c656cd9c6bdf6baa7e13b5681` completed its automated/package gates in run `39636750384`. Those results do not validate later changes. The 2026-10-22 continuation is limited to native JM offline downloads and associated UI/tests; its exact-source build results must be recorded separately. See [JM_NATIVE_DOWNLOAD_ACCEPTANCE.md](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md).
 
 ## Authority and baseline
 
@@ -45,7 +47,7 @@ Remote favorites are collection evidence, not implicit explicit Likes. Import mu
 - JM is opt-in. Existing automatic recommendation retrieval remains Pica/EH/ExH; imported JM collection metadata may enter existing local evidence, but there is no JM-specific ranking boost or automatic JM candidate recall.
 - JM summary endpoints omit tags; an explicit cancellable detail-enrichment batch is limited to 20 favorites. Missing tags/authors are not fabricated and a summary refresh cannot erase enriched tags.
 - Desktop inherits an unauthenticated HTTP proxy through private stdin configuration. Unsupported authenticated/HTTPS/SOCKS proxies are rejected rather than silently bypassed; changing the proxy requires restarting this candidate. Native JM uses the device/SDK network path; native proxy parity remains future work.
-- Android JM has native search, details, chapters and online reading without Desktop. A native JM phone-download worker and JM-specific cross-device progress are not implemented; existing LAN/local/WebDAV paths remain available. The new source screen still needs full native localization/device polish.
+- Android JM has native search, details, chapters and online reading without Desktop. NEXT-40 adds explicit phone-download orchestration, task-center controls and complete-chapter offline reading; fresh automated/package and real-device gates apply. JM-specific cross-device progress remains unimplemented; existing LAN/local/WebDAV paths remain available. The source screen still needs full native localization/device polish.
 - New adapter code is independent implementation; no recovered reference-APK code, library, art asset or private analysis payload is imported.
 
 ## Handoff gate

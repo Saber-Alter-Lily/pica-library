@@ -3118,5 +3118,18 @@ Acceptance still required:
 
 - Decide source-repository/manifest trust, source enable/disable/update lifecycle and legal/distribution policy before dynamic extensions.
 - Add bounded JM recommendation retrieval only after real metadata/profile evidence and a separate recommendation review; never synthesize Like/style labels from imported favorites.
-- Native JM download/progress/proxy and complete locale parity; further source adapters use the registry and maintained upstreams, not one-off protocol copies.
+- Native JM progress/proxy and complete locale parity; NEXT-40 separately implements and validates the native download slice. Further source adapters use the registry and maintained upstreams, not one-off protocol copies.
 - Preserve all unrelated P2/W5/NEXT-28 performance, onboarding, author-progress and device evidence backlog above; this candidate does not declare them complete.
+
+## NEXT-40 — Native JM explicit downloads and offline Reader
+
+**Status: IN_PROGRESS / UNRELEASED — source implementation; fresh exact-source automated/package gates and real-device/provider acceptance PENDING**
+
+- Continued on 2026-10-22 after explicit permission to bypass the still-failing DPAPI coordination claim for this isolated development/build round. No memory identity or secret is repaired or replaced.
+- Base: previous frozen NEXT-38 candidate `0549bc5e271d936c656cd9c6bdf6baa7e13b5681`, Draft PR #205. Keep the prior handoff ZIP unchanged.
+- Scope: explicit JM single/all-chapter downloads via the maintained SDK, existing WorkManager resource tags and task center, Wi-Fi constraints, pause/resume/cancel, durable checksum-verified page checkpoints, and the existing phone-download Reader/index.
+- Complete-chapter publication only: interrupted/failed chapters are retained for resume outside the readable index. Invalid source/chapter/page identity, non-image content and changed login binding fail closed. Logout/account switching never deletes previously completed local downloads.
+- Same-comic jobs use unique WorkManager identity and a local write lock; duplicate KEEP requests cannot relabel the actual queued chapter. A job carries only a non-secret session binding, never a password or cookie.
+- JM search results open the common detail screen; JM chapter/all-download controls are added there. JM account/favorites controls must not incorrectly redirect users to Pica login.
+- No database-schema, recommendation-ranker/recall, Visual/embedding, sync-protocol, stable-version/tag/Release/OTA or production-state change. No automatic deployment or manual testing requested now.
+- Remaining acceptance and exact evidence: [JM_NATIVE_DOWNLOAD_ACCEPTANCE.md](docs/JM_NATIVE_DOWNLOAD_ACCEPTANCE.md). NEXT-40 does not complete the rest of NEXT-39 or close #199/#200/#204.

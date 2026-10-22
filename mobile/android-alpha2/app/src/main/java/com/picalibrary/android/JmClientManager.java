@@ -26,14 +26,23 @@ final class JmClientManager {
     }
     synchronized JSONObject status() throws Exception {restore();return object(source.status());}
     synchronized JSONObject login(String username,String password,boolean remember) throws Exception {
-        cancel();restoreAttempted=true;JmAccountStore.clear(context);
+        JmDownloadSession.invalidate(context);cancel();restoreAttempted=true;JmAccountStore.clear(context);
         try {
             JSONObject identity=object(source.login(username,password));
             if(remember)JmAccountStore.save(context,username,password,identity.getString("accountId"));else JmAccountStore.sessionScope(context,identity.getString("accountId"));
             identity.put("remembered",remember);return identity;
         } catch(Exception error) {source.close();JmAccountStore.clear(context);throw error;}
     }
-    synchronized void logout(){cancel();restoreAttempted=true;source.close();JmAccountStore.clear(context);}
+    synchronized void logout(){JmDownloadSession.invalidate(context);cancel();restoreAttempted=true;source.close();JmAccountStore.clear(context);}
+    private void requireDownloadSession(String binding) throws Exception {
+        restore();JmDownloadSession.require(context,binding);Map<String,Object> identity=source.status();
+        String actual=Boolean.TRUE.equals(identity.get("configured"))?ReaderPolicy.hash("jm\n"+identity.get("accountId")):"anonymous";
+        if(!actual.equals(JmAccountStore.scope(context)))throw new JmDownloadSession.Changed();
+    }
+    synchronized JSONObject downloadDetails(String binding,String id) throws Exception {requireDownloadSession(binding);return details(id);}
+    synchronized JSONArray downloadEpisodes(String binding,String id) throws Exception {requireDownloadSession(binding);return episodes(id);}
+    synchronized JSONArray downloadPages(String binding,String id) throws Exception {requireDownloadSession(binding);return pages(id);}
+    synchronized byte[] downloadImage(String binding,String locator) throws Exception {requireDownloadSession(binding);return image(locator);}
     JSONObject search(String query,int page) throws Exception {restore();return object(source.search(query,page));}
     JSONObject details(String comicId) throws Exception {restore();return object(source.details(comicId));}
     JSONArray episodes(String comicId) throws Exception {restore();return array(source.episodes(comicId));}

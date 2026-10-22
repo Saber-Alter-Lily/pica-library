@@ -30,6 +30,7 @@ Transitive redistributed JVM dependencies receive per-JAR SHA-256 and license/no
 - A full favorite summary is not full metadata: upstream summary tags are empty. Explicit detail enrichment is bounded to 20 records per batch; completion status stays UNKNOWN when unavailable.
 - Web Reader validates both comic/chapter identities, checks chapter membership and accounts for worker-session cache changes. Images use SDK-issued locators, bounded bytes and existing local Reader caching. No automatic full-comic download is triggered by opening a detail page.
 - Existing recommendation models/weights, Visual modes, embedding/sampling policies and schema are not changed. JM seeds must never enter Pica's related-comic endpoint.
+- The 2026-10-22 NEXT-40 continuation adds explicit native JM downloads via the same SDK, existing task center and complete-chapter phone Reader. This is an unpublished slice with separate exact-source build/device gates; see [JM_NATIVE_DOWNLOAD_ACCEPTANCE.md](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md). JM progress/proxy parity and dynamic source installation remain open.
 
 ## Next consolidated human acceptance, not requested now
 

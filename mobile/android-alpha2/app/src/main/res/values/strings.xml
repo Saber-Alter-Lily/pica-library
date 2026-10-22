@@ -63,4 +63,21 @@
     <string name="tour_visual_strength_body">Choose how strongly visual similarity affects ranking. This changes the visual contribution without replacing your normal author, tag, recent and session preferences.</string>
     <string name="tour_complete_title">You are ready</string>
     <string name="tour_complete_body">That covers the main features. This tour remains available in Settings.</string>
+    <string name="jm_download_title">JM phone downloads</string>
+    <string name="jm_download_preparing">Preparing download</string>
+    <string name="jm_download_running">Downloading</string>
+    <string name="jm_download_verifying">Verifying saved pages</string>
+    <string name="jm_download_complete">Download complete</string>
+    <string name="jm_download_session_changed">JM login changed. Add or resume this download explicitly with the current account.</string>
+    <string name="jm_download_stopped">Download stopped. Completed pages are retained for resume.</string>
+    <string name="jm_download_invalid">Invalid comic or chapter. Download was not started.</string>
+    <string name="jm_download_failed">JM download could not finish. Check network, login and storage, then retry.</string>
+    <string name="jm_download_chapter">Download chapter</string>
+    <string name="jm_download_all">Download all chapters</string>
+    <string name="jm_download_explicit_help">Download this comic to this phone for offline reading? Background tasks supports pause, resume and cancel. Only complete chapters become readable. Downloads remain after logout and are not disposable reading cache.</string>
+    <string name="jm_download_queued">JM download requested. Check Background tasks; an existing download for this comic takes priority.</string>
+    <string name="jm_imported_favorite">JM favorite · imported</string>
+    <string name="jm_manage_source">Manage JM source</string>
+    <string name="phone_download_empty_sources">No complete phone downloads yet. Download chapters from Pica, E-H or JM comic details. Incomplete JM chapters remain in Background tasks, not the offline Reader.</string>
+    <string name="phone_download_delete_scope">Delete downloaded body pages on this phone only. This does not delete Desktop, WebDAV, online source content or favorites.</string>
 </resources>

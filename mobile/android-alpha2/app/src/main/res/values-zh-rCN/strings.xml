@@ -63,4 +63,21 @@
     <string name="tour_visual_strength_body">这里决定画风相似度对排序影响多大；只改变画风这一部分，不会取代作者、标签、最近行为和本次偏好。</string>
     <string name="tour_complete_title">已经准备好了</string>
     <string name="tour_complete_body">主要功能已经介绍完毕；以后仍可从设置重新查看本引导。</string>
+    <string name="jm_download_title">JM 手机下载</string>
+    <string name="jm_download_preparing">正在准备下载</string>
+    <string name="jm_download_running">正在下载</string>
+    <string name="jm_download_verifying">正在校验已保存页面</string>
+    <string name="jm_download_complete">下载完成</string>
+    <string name="jm_download_session_changed">JM 登录已变化，请用当前账号手动重新添加或继续此下载。</string>
+    <string name="jm_download_stopped">下载已停止，已完成页面保留用于续传。</string>
+    <string name="jm_download_invalid">漫画或章节标识无效，未开始下载。</string>
+    <string name="jm_download_failed">JM 下载未完成，请检查网络、登录和存储后重试。</string>
+    <string name="jm_download_chapter">下载本章</string>
+    <string name="jm_download_all">下载全部章节</string>
+    <string name="jm_download_explicit_help">将这本漫画下载到本机以便离线阅读？后台任务支持暂停、继续和取消；只有完整章节才可阅读。下载在退出账号后保留，不属于会自动清理的阅读缓存。</string>
+    <string name="jm_download_queued">已请求 JM 下载。请在后台任务查看，同一本已有的下载任务优先。</string>
+    <string name="jm_imported_favorite">JM 收藏 · 已导入</string>
+    <string name="jm_manage_source">管理 JM 来源</string>
+    <string name="phone_download_empty_sources">还没有完整的手机下载章节。进入 Pica、E-H 或 JM 漫画详情可下载。未完成的 JM 章节保留在后台任务，不会提前进入离线阅读。</string>
+    <string name="phone_download_delete_scope">只删除手机中的主动下载正文，不删除电脑、WebDAV、在线来源内容或收藏。</string>
 </resources>

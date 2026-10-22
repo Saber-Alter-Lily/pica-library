@@ -61,7 +61,7 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         content.removeAllViews();
         content.addView(Ui.text(this,"主动下载是持久正文，不受阅读/封面缓存上限或 LRU 清理影响。当前约 "+format(state.bytes)+"。",12,Ui.MUTED,false));
         LinearLayout actions=new LinearLayout(this);actions.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));actions.addView(button("后台任务",v->startActivity(new Intent(this,TaskCenterActivity.class))),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,8);actions.addView(button("存储设置",v->startActivity(new Intent(this,StorageSettingsActivity.class))),new LinearLayout.LayoutParams(0,-2,1));content.addView(actions);
-        if(snapshot.comics.isEmpty()){content.addView(Ui.text(this,"还没有完整的手机下载章节。进入 Pica 在线漫画详情可下载单章或全部章节。",14,Ui.MUTED,false));return;}
+        if(snapshot.comics.isEmpty()){content.addView(Ui.text(this,getString(R.string.phone_download_empty_sources),14,Ui.MUTED,false));return;}
         for(PhoneDownloadStore.Comic comic:snapshot.comics.values()){
             LinearLayout card=Ui.card(this);card.addView(Ui.text(this,comic.title,17,Ui.TEXT,true));card.addView(Ui.text(this,comic.author+" · "+comic.chapters.size()+" 章 · "+comic.pages()+" 页",12,Ui.MUTED,false));
             LinearLayout row=new LinearLayout(this);row.setPadding(0,Ui.dp(this,8),0,0);row.addView(button("打开",v->open(comic)),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(row,this,8);row.addView(button("删除",v->confirmDelete(comic)),new LinearLayout.LayoutParams(0,-2,1));card.addView(row);content.addView(card);
@@ -73,7 +73,7 @@ public final class DownloadsActivity extends LocaleAwareActivity {
     private void confirmDelete(PhoneDownloadStore.Comic comic){
         new AlertDialog.Builder(this)
             .setTitle(LocalizedText.ui("删除手机下载？"))
-            .setMessage(LocalizedText.ui("删除手机中的主动下载正文，但不会删除 WebDAV、Desktop、Pica 在线内容或收藏。"))
+            .setMessage(getString(R.string.phone_download_delete_scope))
             .setNegativeButton(LocalizedText.ui("取消"),null)
             .setPositiveButton(LocalizedText.ui("删除"),(d,w)->deleteDownload(comic.id))
             .show();
@@ -84,7 +84,11 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         renderLoading();
         worker.submit(()->{
             try{
-                PhoneDownloadStore.remove(this,comicId);
+                if(comicId.startsWith("jm:")){
+                    JmDownloadJobs.cancel(this,comicId);
+                    androidx.work.WorkManager.getInstance(this).cancelUniqueWork(JmDownloadJobs.name(comicId)).getResult().get(10,TimeUnit.SECONDS);
+                    JmDownloadEngine.removeCompletedDownload(this,comicId);
+                }else PhoneDownloadStore.remove(this,comicId);
                 DownloadState state=readDownloads();
                 runOnUiThread(()->{
                     if(destroyed||generation!=loadGeneration)return;

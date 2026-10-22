@@ -21,7 +21,8 @@ public class JmDownloadEngineTest {
     private Context context;
     private FakeClient source;
     private Probe listener;
-    private static final byte[] PNG=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=");
+    // Generated 1px RGBA PNG, with valid chunk CRCs and a verified zlib stream.
+    private static final byte[] PNG=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==");
 
     private static final class FakeClient implements JmDownloadEngine.Client {
         final String comic="jm:"+(nextId++);

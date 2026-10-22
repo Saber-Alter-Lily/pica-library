@@ -45,7 +45,8 @@ final class JmDownloadStore {
         String extension = extension(bytes), digest = digest(bytes);
         android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
-        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+        try { android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds); }
+        catch (RuntimeException invalid) { throw new IOException("JM image decoding failed", invalid); }
         if (bounds.outWidth < 1 || bounds.outHeight < 1 || (long) bounds.outWidth * bounds.outHeight > 100_000_000L)
             throw new IOException("JM image cannot be decoded safely");
         String filename = String.format(Locale.ROOT, "%06d-%s.%s", position + 1, digest.substring(0, 16), extension);

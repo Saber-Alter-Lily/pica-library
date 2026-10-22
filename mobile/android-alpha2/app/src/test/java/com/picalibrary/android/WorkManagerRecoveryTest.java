@@ -249,13 +249,13 @@ public class WorkManagerRecoveryTest {
             List<?> views=reconstructDownloads(controller.get(),manager.getWorkInfosByTag("jm-download").get(5,TimeUnit.SECONDS));
             assertEquals(1,views.size());assertEquals("jm",viewRef(views.get(0)).provider);
             assertEquals(request.getId(),viewInfo(views.get(0)).getId());
-            JmDownloadJobs.pause(app,comic);
+            JmDownloadJobs.pause(controller.get(),comic);
             manager.cancelUniqueWork(JmDownloadJobs.name(comic)).getResult().get(5,TimeUnit.SECONDS);
             views=reconstructDownloads(controller.get(),manager.getWorkInfosByTag("jm-download").get(5,TimeUnit.SECONDS));
-            assertEquals(1,views.size());assertTrue(JmDownloadJobs.paused(app,comic));
+            assertEquals("Exactly one paused JM work must remain visible",1,views.size());assertTrue(JmDownloadJobs.paused(controller.get(),comic));
             assertEquals(episode,viewRef(views.get(0)).episodeId);
-            JmDownloadJobs.cancel(app,comic);
-            assertFalse(JmDownloadJobs.paused(app,comic));assertTrue(MobileTaskRegistryStore.downloads(app).isEmpty());
+            JmDownloadJobs.cancel(controller.get(),comic);
+            assertFalse(JmDownloadJobs.paused(controller.get(),comic));assertTrue(MobileTaskRegistryStore.downloads(controller.get()).isEmpty());
         }finally{controller.destroy();}
     }
 

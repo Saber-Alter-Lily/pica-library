@@ -104,7 +104,7 @@ export type PreferencePresentationIndex = ReturnType<
 
 export function searchPreferenceSignalsV5(
     catalog: StoredComic[],
-    state: Pick<PortablePolicyStateV5, 'tasteExcludedComicIds' | 'controls'>,
+    state: Pick<PortablePolicyStateV5, 'tasteExcludedComicIds' | 'controls' | 'tagPolicy'>,
     query: string,
     index: PreferencePresentationIndex,
     limit = 100
@@ -115,7 +115,8 @@ export function searchPreferenceSignalsV5(
         : 100
     const signals = collectPortableInferredSignalsV5(
         catalog,
-        state.tasteExcludedComicIds
+        state.tasteExcludedComicIds,
+        state
     )
     const byId = new Map(
         signals.map((item) => [`${item.targetType}:${item.key}`, item])

@@ -6,6 +6,7 @@ import type {
     PreferenceTargetType
 } from './portable-policy'
 import { normalizePreferenceKey } from './portable-policy'
+import { privateTagForSignalV1, privateTagMatchesV1, rawTagParticipatesV1, tagControlParticipatesV1 } from './tag-policy'
 
 export const CANDIDATE_CHANNEL_PLANNER_VERSION =
     'candidate-channel-planner-v2-provider-isolated'
@@ -515,6 +516,7 @@ export function buildCandidateChannelPlanV5(
             .filter((anchor) => anchor.key)
         if (!normalizedAnchors.length && family !== 'REDISCOVERY')
             return
+        if (normalizedAnchors.some(anchor => ['TAG', 'FANDOM'].includes(anchor.targetType) && !tagControlParticipatesV1(input.policy, anchor.key))) return
         if (
             normalizedAnchors.some((anchor) =>
                 blockedTargets.has(
@@ -854,8 +856,15 @@ export function buildCandidateChannelPlanV5(
     const used = { pica: 0, eh: 0, exh: 0 }
     for (const channel of ordered) {
         if (!channel.enabled) continue
+        const privateTags = channel.anchors.flatMap(anchor => { const tag = privateTagForSignalV1(input.policy, anchor.key); return tag ? [tag] : [] })
+        if (privateTags.length) {
+            channel.localCandidateIds = input.catalog.filter(comic => privateTags.every(tag => privateTagMatchesV1(tag, comic))).map(comic => comic.comicId).slice(0, 500)
+            channel.providerAllocations = [{ surface: 'local', eligible: channel.localCandidateIds.length > 0, plannedRequests: 0, targetCandidates: channel.localCandidateIds.length, strategy: 'LOCAL', failureIsolation: true }]
+        }
         channel.providerAllocations =
             channel.providerAllocations.map((allocation) => {
+                const surfaceProvider = allocation.surface === 'pica' ? 'pica' : 'eh'
+                if (allocation.surface !== 'local' && channel.anchors.some(anchor => ['TAG', 'FANDOM'].includes(anchor.targetType) && !rawTagParticipatesV1(input.policy, surfaceProvider, anchor.key))) return { ...allocation, eligible: false, plannedRequests: 0, targetCandidates: 0, disabledReason: 'TAG_PARTICIPATION_DISABLED' }
                 if (
                     allocation.surface === 'local' ||
                     !allocation.eligible ||

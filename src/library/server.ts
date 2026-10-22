@@ -84,13 +84,13 @@ function json(response: ServerResponse, status: number, value: unknown) {
     response.end(JSON.stringify(value))
 }
 
-async function body(request: IncomingMessage) {
+async function body(request: IncomingMessage, limit = 10 * 1024 * 1024) {
     const chunks: Buffer[] = []
     let size = 0
     for await (const chunk of request) {
         const buffer = Buffer.from(chunk)
         size += buffer.byteLength
-        if (size > 10 * 1024 * 1024)
+        if (size > limit)
             throw new Error('Request body is too large')
         chunks.push(buffer)
     }
@@ -407,6 +407,27 @@ export async function startLibraryServer(options: {
                     if (action === 'enrich') return json(response, 200, await options.service.jmEnrichFavorites(async () => { if (response.destroyed) throw new Error('资料补全已取消') }))
                 }
                 return json(response, 404, { error: 'Source action not found' })
+            }
+
+            if (url.pathname === '/api/v1/recommendation-v5/tag-policy') {
+                if (request.method === 'GET') return json(response, 200, options.service.recommendationTagPolicyV1())
+                if (request.method === 'POST') {
+                    const input = await body(request, 160 * 1024)
+                    try {
+                        const result = options.service.updateRecommendationTagPolicyV1(input)
+                        let recommendationRefresh: Record<string, unknown> | null = null
+                        if (input.apply === true) {
+                            try { recommendationRefresh = { requested: true, started: true, status: finalRecommendationCoordinator.forceNew(`tag-policy:${result.revision}`) } }
+                            catch (error) { recommendationRefresh = { requested: true, started: false, error: error instanceof Error ? error.message : String(error) } }
+                        }
+                        // Saving and starting a build are separate outcomes. A busy builder
+                        // must not turn an already committed save into a false HTTP failure.
+                        return json(response, 200, { ...result, recommendationRefresh })
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error)
+                        return json(response, message.startsWith('TAG_POLICY_REVISION_CONFLICT') ? 409 : 400, { error: message })
+                    }
+                }
             }
 
             if (

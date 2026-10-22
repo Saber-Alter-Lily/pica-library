@@ -6,6 +6,8 @@ import {
     type PreferenceTargetType
 } from './portable-policy'
 import { explicitRetrievalIntentsV5 } from './explicit-intents'
+import type { StoredComic } from '../library/types'
+import { expandPrivateTagIntentV1 } from './tag-intents'
 
 function targetTypeForFacet(
     intent: RecommendationIntentV3,
@@ -44,12 +46,13 @@ function suppressedDirectIntent(
 export function applyIntentPolicyV5(
     base: RecommendationIntentV3[],
     state: PortablePolicyStateV5,
-    maxExplicit = 5
+    maxExplicit = 5,
+    catalog: StoredComic[] = []
 ) {
     const retained = base.filter((intent) => !suppressedDirectIntent(intent, state))
     const explicit = explicitRetrievalIntentsV5(state, maxExplicit)
     const seen = new Set<string>()
-    return [...explicit, ...retained].filter((intent) => {
+    return [...explicit, ...retained].flatMap(intent => expandPrivateTagIntentV1(intent, state, catalog)).filter((intent) => {
         const key = `${intent.type}:${intent.anchors
             .map((anchor) => `${anchor.facet}:${normalizePreferenceKey(anchor.canonicalKey)}`)
             .join('|')}`

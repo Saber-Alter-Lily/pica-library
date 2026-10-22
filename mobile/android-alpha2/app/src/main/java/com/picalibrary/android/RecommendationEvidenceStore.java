@@ -187,15 +187,17 @@ final class RecommendationEvidenceStore {
     }
 
     static double recentAdjustment(Context c,PicaClient.Comic comic){
-        return adjustment(c,comic,false);
+        return recentAdjustment(c,comic,RecommendationPolicyStore.snapshot(c));
     }
+    static double recentAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,false,TagParticipation.of(policy));}
     static double sessionAdjustment(Context c,PicaClient.Comic comic){
-        return adjustment(c,comic,true);
+        return sessionAdjustment(c,comic,RecommendationPolicyStore.snapshot(c));
     }
-    private static double adjustment(Context c,PicaClient.Comic comic,boolean sessionOnly){
+    static double sessionAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,true,TagParticipation.of(policy));}
+    private static double adjustment(Context c,PicaClient.Comic comic,boolean sessionOnly,TagParticipation participation){
         if(comic==null)return 0d;double score=0d;long now=System.currentTimeMillis();
         long maxAge=sessionOnly?Long.MAX_VALUE:30L*24L*60L*60L*1000L;
-        String author=MobileTagRegistry.normalize(comic.author);Set<String> tags=normalized(comic.tags),categories=normalized(comic.categories);
+        String author=MobileTagRegistry.normalize(comic.author);Set<String> tags=normalized(participation.tags(comic.id,comic.tags,true)),categories=normalized(comic.categories);
         for(EvidenceRow row:rows(c)){
             if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.sessionId))continue;
             if(!sessionOnly&&ageMillis(row,now)>maxAge)continue;
@@ -204,20 +206,21 @@ final class RecommendationEvidenceStore {
             double weight="reader_complete".equals(type)?0.035:"recommend_detail_open".equals(type)?0.018:0d;
             if(weight<=0)continue;
             if(!author.isEmpty()&&author.equals(MobileTagRegistry.normalize(row.author)))score+=weight;
-            score+=Math.min(weight,overlapNormalized(tags,row.normalizedTags)*weight*0.25);
+            score+=Math.min(weight,overlapNormalized(tags,normalized(participation.tags(row.comicId,row.tags,true)))*weight*0.25);
             score+=Math.min(weight*0.6,overlapNormalized(categories,row.normalizedCategories)*weight*0.2);
         }
         double cap=sessionOnly?0.15:0.10;return Math.max(-cap,Math.min(cap,score));
     }
 
     static List<Signal> topSignals(Context c,boolean sessionOnly,int limit){
+        TagParticipation participation=TagParticipation.of(RecommendationPolicyStore.snapshot(c));
         LinkedHashMap<String,Integer> score=new LinkedHashMap<>(),support=new LinkedHashMap<>();long max=30L*24L*60L*60L*1000L,now=System.currentTimeMillis();
         for(EvidenceRow row:rows(c)){
             if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.sessionId))continue;
             if(!sessionOnly&&ageMillis(row,now)>max)continue;
             String type=row.eventType;int weight="reader_complete".equals(type)?3:"recommend_detail_open".equals(type)?1:0;if(weight<=0)continue;
             addSignal(score,support,"作者",row.author,weight);
-            for(String tag:row.tags)addSignal(score,support,"标签",tag,weight);
+            for(String tag:participation.tags(row.comicId,row.tags,true))addSignal(score,support,"标签",participation.label(tag),weight);
             for(String category:row.categories)addSignal(score,support,"分类",category,weight);
         }
         ArrayList<Signal> rows=new ArrayList<>();for(Map.Entry<String,Integer> item:score.entrySet()){String[] parts=item.getKey().split("\u0000",2);if(parts.length==2)rows.add(new Signal(parts[0],parts[1],item.getValue(),support.getOrDefault(item.getKey(),0)));}

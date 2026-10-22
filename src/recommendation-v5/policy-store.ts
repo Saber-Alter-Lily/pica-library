@@ -1,4 +1,5 @@
 import type { LibraryDatabase } from '../library/database'
+import { normalizeTagPolicyV1, previewTagPolicyMergeV1, tagPoliciesEqualV1 } from './tag-policy'
 import {
     RECOMMENDATION_V5_POLICY_STATE_KEY,
     RECOMMENDATION_V5_POLICY_VERSION,
@@ -46,6 +47,9 @@ export interface MobileRecommendationSyncV5 {
     catalogEvidence?: unknown
     resolutions?: unknown
     syncSchemaVersion?: unknown
+    tagPolicy?: unknown
+    baseTagPolicy?: unknown
+    tagPolicyResolution?: unknown
 }
 
 function stringArray(value: unknown) {
@@ -79,6 +83,11 @@ function validSessionMode(value: unknown): SessionIntentMode {
         : 'DEFAULT'
 }
 
+function tagResolution(input: MobileRecommendationSyncV5) {
+    if (input.tagPolicyResolution !== undefined) return input.tagPolicyResolution
+    return Array.isArray(input.resolutions) ? input.resolutions.find(row => row?.identity === 'TAG_POLICY_V1')?.choice : undefined
+}
+
 export class RecommendationPolicyStoreV5 {
     constructor(private readonly database: LibraryDatabase) {}
 
@@ -94,6 +103,7 @@ export class RecommendationPolicyStoreV5 {
         )
             return {
                 ...stored,
+                tagPolicy: normalizeTagPolicyV1(stored.tagPolicy),
                 controls: stored.controls.map((item) => normalizeControlV5(item)),
                 seenComicIds: Array.isArray(stored.seenComicIds)
                     ? stored.seenComicIds.map(String)
@@ -157,6 +167,22 @@ export class RecommendationPolicyStoreV5 {
             this.state(),
             this.database.listComics({ limit: 10000 })
         )
+    }
+
+    setTagPolicy(input: { tagPolicy: unknown; baseRevision: unknown }) {
+        if (input.tagPolicy === undefined || input.tagPolicy === null) throw new Error('An explicit tag policy is required')
+        // Validate before touching storage; concurrent editors must reload, never last-write-win.
+        const tagPolicy = normalizeTagPolicyV1(input.tagPolicy)
+        if (!Number.isInteger(input.baseRevision)) throw new Error('TAG_POLICY_REVISION_CONFLICT: reload before saving')
+        const stored = this.database.getAppState<PortablePolicyStateV5>(RECOMMENDATION_V5_POLICY_STATE_KEY)
+        if (stored && (stored.schemaVersion !== 1 || stored.policyVersion !== RECOMMENDATION_V5_POLICY_VERSION || !Array.isArray(stored.controls) || !Array.isArray(stored.hardSuppressComicIds))) throw new Error('Unsupported portable policy; tag settings were not written')
+        const previous = stored ? this.state() : defaultPortablePolicyStateV5()
+        if (input.baseRevision !== previous.revision)
+            throw new Error('TAG_POLICY_REVISION_CONFLICT: reload before saving')
+        if (!tagPoliciesEqualV1(previous.tagPolicy, tagPolicy)) this.save({
+            ...previous, tagPolicy, revision: previous.revision + 1, updatedAt: new Date().toISOString()
+        })
+        return this.snapshot()
     }
 
     setControl(input: {
@@ -466,22 +492,13 @@ export class RecommendationPolicyStoreV5 {
 
     previewMobile(input: MobileRecommendationSyncV5) {
         const state = this.state()
+        const tags = previewTagPolicyMergeV1(state.tagPolicy, input.baseTagPolicy, input.tagPolicy, tagResolution(input))
+        const preview = previewMobileRecommendationSyncV1({ ...input, desktopRevision: state.revision, desktopControls: state.controls, androidControls: input.controls })
         return {
-            ...previewMobileRecommendationSyncV1({
-                baseRevision: input.baseRevision,
-                desktopRevision: state.revision,
-                baseControls: input.baseControls,
-                desktopControls: state.controls,
-                androidControls: input.controls,
-                feedback: input.feedback,
-                events: input.events,
-                suppressComicIds: input.suppressComicIds,
-                clearSuppressComicIds: input.clearSuppressComicIds,
-                tasteExcludedComicIds: input.tasteExcludedComicIds,
-                clearTasteExcludedComicIds: input.clearTasteExcludedComicIds,
-                itemDispositions: input.itemDispositions,
-                catalogEvidence: input.catalogEvidence
-            }),
+            ...preview,
+            hasPortableChanges: preview.hasPortableChanges || tags.changed || Boolean(tags.conflict),
+            tagPolicyConflict: tags.conflict,
+            tagPolicyChanged: tags.changed,
             snapshot: this.snapshot()
         }
     }
@@ -492,6 +509,7 @@ export class RecommendationPolicyStoreV5 {
         if (!deviceId || !mutationId)
             throw new Error('deviceId and mutationId are required for recommendation sync')
         let state = this.state()
+        const tags = previewTagPolicyMergeV1(state.tagPolicy, input.baseTagPolicy, input.tagPolicy, tagResolution(input))
         const previousRevision = state.deviceSyncRevisions[deviceId] ?? 0
         const preview = previewMobileRecommendationSyncV1({
             baseRevision: input.baseRevision,
@@ -513,14 +531,16 @@ export class RecommendationPolicyStoreV5 {
             conflicts: preview.conflicts,
             resolutions: input.resolutions
         })
-        if (resolved.unresolved.length)
+        if (resolved.unresolved.length || tags.conflict)
             return {
                 acknowledgedMutationId: null,
                 requiresResolution: true,
                 preview,
                 conflicts: resolved.unresolved,
+                tagPolicyConflict: tags.conflict,
                 snapshot: this.snapshot()
             }
+        state = { ...state, tagPolicy: tags.next }
         const controls = resolved.controls
         for (const row of controls) {
             const targetType = validTargetType(row.targetType)

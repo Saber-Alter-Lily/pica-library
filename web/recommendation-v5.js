@@ -1,4 +1,5 @@
 import { copy as v5t } from './locale-runtime.js'
+import { attachTagParticipation } from './tag-participation.js'
 
 const V5={snapshot:null,timescales:null,channels:null,serving:null,search:'',searchResult:null,searchLoading:false,searchError:'',searchSequence:0,busy:false,signalById:new Map(),quickSignals:new Map(),draftLevels:new Map(),manualSignal:null}
 
@@ -254,6 +255,7 @@ function ensurePanel() {
 
         <div class="v5-heading-inline"><h4>${v5t('你的调整','Your adjustments','あなたの調整')}</h4>${infoButton(v5t('这里仅显示你主动覆盖系统判断的项目。屏蔽偏好和屏蔽具体作品会分别统计。','Only items you explicitly override are shown here. Blocked preferences and blocked works are counted separately.','ここにはシステム判断を明示的に上書きした項目だけを表示します。嗜好のブロックと作品のブロックは別々に集計します。'))}</div>
         <div id="v5-control-list" class="v5-control-list"></div>
+        <p id="v5-tag-serving-status" class="status" role="status"></p>
 
         <details id="v5-tuning-section"><summary>${v5t('查找并调整作者、IP 或标签','Find and adjust an author, IP or tag','作者・IP・タグを検索して調整')}</summary>
         <div class="v5-heading-inline"><h4>${v5t('完整画像与微调 · 0–10 档','Full profile & tuning · 0–10','プロフィール全体と調整 · 0–10')}</h4>${infoButton(v5t('0 = 强烈减少，5 = 中性，10 = 非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好；0 仍是软偏好，不等同于“屏蔽”。','0 = strongly reduce, 5 = neutral, 10 = strongly prefer. Slider changes are staged until you choose Save adjustments; 0 is still a soft preference, not a block.','0 = 強く減らす、5 = 中立、10 = とても好き。スライダー変更は「調整を保存」するまで仮保存されます。0 はソフト嗜好で、ブロックとは異なります。'))}</div>
@@ -286,6 +288,7 @@ function ensurePanel() {
         if (element) advanced.appendChild(element)
     }
     panel.appendChild(advanced)
+    attachTagParticipation(panel)
     anchor.insertAdjacentElement('afterend', panel)
     panel.querySelector('#v5-policy-refresh').addEventListener('click', loadPolicy)
     panel.querySelector('#v5-audit-export').addEventListener('click', async (event) => {
@@ -490,6 +493,8 @@ function renderProfileOverview() {
 }
 
 function renderServingOverview() {
+    const tagStatus = document.querySelector('#v5-tag-serving-status')
+    if (tagStatus) tagStatus.textContent = V5.serving?.tagPolicyStale ? v5t('当前批次仍来自旧标签方案；保存不会冒充重算完成。请在标签设置中重新生成推荐。','The current batch was built with the old tag scheme. Saving is not recomputation; regenerate in tag settings.','現在のバッチは旧タグ設定で生成されています。保存だけでは再計算しません。タグ設定から再生成してください。') : ''
     const target = document.querySelector('#v5-serving-overview')
     const summary = document.querySelector('#v5-serving-summary')
     if (!target) return
@@ -1104,6 +1109,7 @@ if(recommendationRoot)new MutationObserver(mutations=>{
 }).observe(recommendationRoot,{childList:true,subtree:true,attributes:true,attributeFilter:['class']})
 
 ensurePanel()
+document.addEventListener('pica-tag-policy-saved', () => void loadPolicy())
 decorateRecommendationCards()
 decorateLibraryTasteToggles()
 void loadPolicy().then(() => decorateLibraryTasteToggles())

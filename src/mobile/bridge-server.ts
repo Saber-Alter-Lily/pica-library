@@ -893,7 +893,7 @@ export async function startMobileBridge(options: {
                 let recommendationRefresh: Record<string, unknown> = {
                     requested: false
                 }
-                if (input.recompute === true) {
+                if (input.recompute === true && !merged.requiresResolution) {
                     try {
                         const deviceId = String(input.deviceId ?? 'android')
                         const mutationId = String(input.mutationId ?? Date.now())

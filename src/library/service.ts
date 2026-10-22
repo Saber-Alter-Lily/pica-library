@@ -176,6 +176,8 @@ import {
     type ChronicleViewOptions
 } from '../recommendation-v3/taste-chronicle-view'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
+import { buildTagDirectoryV1, normalizeTagPolicyV1, privateTagForSignalV1, projectComicTagSignalsV1, tagPoliciesEqualV1 } from '../recommendation-v5/tag-policy'
+import { inferredPrivateTagIntentsV1, restrictTagIntentsV1 } from '../recommendation-v5/tag-intents'
 import {
     WORK_IDENTITY_V3_RESOLVER_VERSION,
     workIdentityCreatorBucketKeysV3,
@@ -1013,6 +1015,8 @@ export class LibraryService {
             RECOMMENDATION_V5_POLICY_STATE_KEY
         )
         return {
+            revision: state?.revision ?? 0,
+            tagPolicy: normalizeTagPolicyV1(state?.tagPolicy),
             controls: Array.isArray(state?.controls) ? state.controls : [],
             tasteExcludedComicIds: Array.isArray(state?.tasteExcludedComicIds)
                 ? state.tasteExcludedComicIds
@@ -1030,6 +1034,23 @@ export class LibraryService {
             this.preferencePresentation(),
             limit
         )
+    }
+
+    recommendationTagPolicyV1() {
+        const state = this.preferenceViewState(), catalog = this.database.listAllComics()
+        const index = this.preferencePresentation()
+        return {
+            revision: state.revision, tagPolicy: state.tagPolicy,
+            directorySource: 'LOCAL_OBSERVED_METADATA',
+            note: '收藏涉及数量不是喜好强度；未观测的平台标签不冒充全站目录。',
+            rows: buildTagDirectoryV1(catalog, state, (provider, raw) => provider === 'pica' ? index.resolve(raw)?.facet || 'OTHER' : provider === 'eh' && raw.includes(':') ? `EH_${raw.split(':')[0].toUpperCase()}` : 'OTHER'),
+            comics: catalog.map(c => ({ comicId: c.comicId, title: c.title, author: c.canonicalAuthor || c.author, providerId: c.providerId, isFavorite: c.isFavorite }))
+        }
+    }
+
+    updateRecommendationTagPolicyV1(input: { tagPolicy?: unknown; baseRevision?: unknown }) {
+        new RecommendationPolicyStoreV5(this.database).setTagPolicy({ tagPolicy: input.tagPolicy, baseRevision: input.baseRevision })
+        return this.recommendationTagPolicyV1()
     }
 
     tasteChronicleView(options: ChronicleViewOptions = {}) {
@@ -1065,6 +1086,7 @@ export class LibraryService {
                                       : signal.facet || 'OTHER'
                         }
                     ]
+                if (privateTagForSignalV1(snapshot, signal.key)) return [{ ...signal, facet: 'PRIVATE' }]
                 const resolved = resolveTagV3(
                     signal.label || signal.key,
                     registry
@@ -1239,6 +1261,7 @@ export class LibraryService {
         return {
             available: true,
             source: 'final-v3-serving',
+            tagPolicyStale: !tagPoliciesEqualV1((pool.telemetry.recommendationV5 as { portableBaseline?: { tagPolicy?: unknown } } | undefined)?.portableBaseline?.tagPolicy, policy.tagPolicy),
             cycleId,
             poolId: pool.id,
             poolState: String(pool.telemetry?.state ?? ''),
@@ -3424,6 +3447,7 @@ export class LibraryService {
         const portablePolicyGeneration = createHash('sha256')
             .update(
                 JSON.stringify({
+                    tagPolicy: normalizeTagPolicyV1(policy.tagPolicy),
                     controls: policy.controls
                         .filter((control) => control.scope === 'PERSISTENT')
                         .map((control) => ({
@@ -4284,7 +4308,7 @@ export class LibraryService {
             )
             .map((comic) => ({ ...comic, isFavorite: true }))
         const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-        const profile = buildFinalLifetimeProfileV3(favorites, { registry })
+        const profile = buildFinalLifetimeProfileV3(favorites.map(comic => projectComicTagSignalsV1(comic, recommendationV5State, false)), { registry })
         await this.recommendationCheckpoint()
         this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 7 }
         const history: IntentCycleHistory[] = this.database
@@ -4317,10 +4341,10 @@ export class LibraryService {
             favorites,
             history
         })
-        const intents = applyIntentPolicyV5(
-            baseIntents,
-            recommendationV5State
-        )
+        const intents = restrictTagIntentsV1(applyIntentPolicyV5(
+            [...baseIntents, ...inferredPrivateTagIntentsV1(favorites, recommendationV5State)],
+            recommendationV5State, 5, catalog
+        ), recommendationV5State, catalog, raw => resolveTagV3(raw, registry).canonicalKey)
         await this.recommendationCheckpoint()
         this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 7 }
         const routes = translateIntentPlanV3(intents)
@@ -4397,9 +4421,9 @@ export class LibraryService {
         }
         const retrieved = await retrieveCandidatesV3({
             provider: {
-                keyword: async (query, page) => {
+                keyword: async (query, page, route) => {
                     await this.recommendationCheckpoint()
-                    const picaResults = storePica(
+                    const picaResults = route?.allowedProviders && !route.allowedProviders.includes('pica') ? [] : storePica(
                         (
                             await pica.comicsPage(
                                 '',
@@ -4409,8 +4433,9 @@ export class LibraryService {
                             )
                         ).docs
                     )
-                    const ehResults = page === 1 ? await externalSearch(query, 'keyword', 'eh') : []
-                    const exhResults = page === 1 ? await externalSearch(query, 'keyword', 'exh') : []
+                    const ehAllowed = !route?.allowedProviders || route.allowedProviders.includes('eh')
+                    const ehResults = page === 1 && ehAllowed ? await externalSearch(query, 'keyword', 'eh') : []
+                    const exhResults = page === 1 && ehAllowed ? await externalSearch(query, 'keyword', 'exh') : []
                     return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
                 },
                 author: async (query, page) => {
@@ -4441,7 +4466,7 @@ export class LibraryService {
                     )
                 }),
             candidateFandomKeys: (comic) =>
-                comic.tags.flatMap((tag) => {
+                projectComicTagSignalsV1(comic, recommendationV5State, false).tags.flatMap((tag) => {
                     const resolved = resolveTagV3(tag, registry)
                     return resolved.facet === 'FANDOM_IP' &&
                         resolved.resolutionStatus === 'RESOLVED'
@@ -4475,16 +4500,14 @@ export class LibraryService {
                 observationCount: edge.observationCount
             }))
         })
-        const catalogById = new Map(
-            catalog.map((comic) => [comic.comicId, comic])
-        )
+        const tasteCatalogById = new Map(catalog.map(comic => [comic.comicId, projectComicTagSignalsV1(comic, recommendationV5State)]))
         const feedbackAdjusted = ranked
             .filter((candidate) => !latestFeedback.has(candidate.comicId))
             .map((candidate, index) => {
                 const feedbackAdjustment = metadataFeedbackAdjustment({
-                    candidate: candidate.comic,
+                    candidate: projectComicTagSignalsV1(candidate.comic, recommendationV5State),
                     feedback: recommendationFeedback,
-                    catalogById
+                    catalogById: tasteCatalogById
                 })
                 const baselinePercentile =
                     ranked.length <= 1 ? 1 : 1 - index / (ranked.length - 1)
@@ -4573,6 +4596,7 @@ export class LibraryService {
                     tasteExcludedCount:
                         recommendationV5State.tasteExcludedComicIds.length,
                     portableBaseline: {
+                        tagPolicy: normalizeTagPolicyV1(recommendationV5State.tagPolicy),
                         schemaVersion: recommendationV5State.schemaVersion,
                         policyVersion: recommendationV5State.policyVersion,
                         revision: recommendationV5State.revision,
@@ -4972,9 +4996,12 @@ export class LibraryService {
         } = {}
     ) {
         const limit = Math.max(1, Math.min(options.limit ?? 30, 500))
+        const tagState = this.preferenceViewState()
+        const rawInitialCatalog = this.database.listComics({ limit: 5000 })
         const favorites = this.database
             .listComics({ limit: 5000 })
             .filter((comic) => comic.isFavorite)
+            .map(comic => projectComicTagSignalsV1(comic, tagState, false))
         if (favorites.length === 0) return recommendComics([], limit)
 
         const pica = await this.connect()
@@ -4983,7 +5010,7 @@ export class LibraryService {
         const profile = recommendComics(favorites, limit).profile
         const semanticProfile = buildV3Profile(
             favorites,
-            this.database.listComics({ limit: 5000 })
+            rawInitialCatalog.map(comic => projectComicTagSignalsV1(comic, tagState, false))
         )
         const semanticPlans = planSemanticQueries(
             buildRecommendationIntents(semanticProfile, favorites)
@@ -5264,7 +5291,8 @@ export class LibraryService {
             candidates.map((item) => item.comic),
             'pica:recommendations'
         )
-        const catalog = this.database.listComics({ limit: 5000 })
+        const rawCatalog = this.database.listComics({ limit: 5000 })
+        const catalog = rawCatalog.map(comic => projectComicTagSignalsV1(comic, tagState, false))
         try {
             const v3Profile = buildBehaviorProfile(
                 buildV3Profile(favorites, catalog),
@@ -5313,7 +5341,7 @@ export class LibraryService {
                     )
                 }
             )
-            const byId = new Map(catalog.map((comic) => [comic.comicId, comic]))
+            const byId = new Map(rawCatalog.map((comic) => [comic.comicId, comic]))
             const reranked = rerankV3(
                 ranked,
                 byId,
@@ -5414,7 +5442,9 @@ export class LibraryService {
             // V3 is deliberately fail-safe: preserve the V2 contract if a
             // profile, ranking, or schema-8 derived artifact is unavailable.
         }
-        return recommendComics(catalog, limit, candidates)
+        const fallback = recommendComics(catalog, limit, candidates.map(candidate => ({ ...candidate, comic: projectComicTagSignalsV1(candidate.comic, tagState, false) })))
+        const rawById = new Map(rawCatalog.map(comic => [comic.comicId, comic]))
+        return { ...fallback, recommendations: fallback.recommendations.map(row => ({ ...row, comic: rawById.get(row.comic.comicId) ?? row.comic })) }
     }
 
     libraryOrganizeStatus() {

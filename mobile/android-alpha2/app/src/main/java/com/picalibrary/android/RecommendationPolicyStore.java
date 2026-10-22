@@ -20,6 +20,7 @@ final class RecommendationPolicyStore {
     private static final String BASE_SNAPSHOT="lastSyncedBaseSnapshot";
     private static final String LOCAL_SESSION="localSessionIntent";
     private static final String DIRTY_CONTROLS="dirtyControls";
+    private static final String DIRTY_TAG_POLICY="dirtyTagPolicy";
     private static final String DIRTY_SESSION="dirtySessionIntent";
     private static final String DIRTY_SUPPRESS="dirtySuppress";
     private static final String DIRTY_CLEAR_SUPPRESS="dirtyClearSuppress";
@@ -39,11 +40,11 @@ final class RecommendationPolicyStore {
     private static JSONObject remoteSnapshot(Context c){return parseObject(prefs(c).getString(SNAPSHOT,"{}"));}
     private static JSONObject localSessionIntent(Context c){String raw=prefs(c).getString(LOCAL_SESSION,"");if(raw==null||raw.isEmpty()){JSONObject value=new JSONObject();try{value.put("mode","DEFAULT");value.put("source","ANDROID");value.put("updatedAt",now());}catch(Exception ignored){}return value;}return parseObject(raw);}
     static JSONObject snapshot(Context c){JSONObject value=remoteSnapshot(c);try{value.put("sessionIntent",localSessionIntent(c));}catch(Exception ignored){}return value;}
-    static void saveSnapshot(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(SNAPSHOT,value.toString()).apply();}
+    static synchronized void saveSnapshot(Context c,JSONObject value){if(value==null)return;TagParticipation.of(value);JSONObject before=remoteSnapshot(c);SharedPreferences.Editor edit=prefs(c).edit().putString(SNAPSHOT,value.toString());if(prefs(c).getString(CACHE_BASELINE,"").isEmpty()&&!TagParticipation.same(before,value))edit.putString(CACHE_BASELINE,before.toString());edit.apply();}
     static void saveSyncedBase(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(BASE_SNAPSHOT,value.toString()).apply();}
     static JSONObject syncedBase(Context c){String raw=prefs(c).getString(BASE_SNAPSHOT,"");return raw==null||raw.isEmpty()?new JSONObject():parseObject(raw);}
     static int revision(Context c){return remoteSnapshot(c).optInt("revision",0);}
-    static boolean hasPendingPortableChanges(Context c){return parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")).length()>0||RecommendationFeedbackStore.dirtyPayload(c).length()>0||RecommendationEvidenceStore.dirtyPayload(c).length()>0||parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_TASTE,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_CLEAR_TASTE,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]")).length()>0;}
+    static boolean hasPendingPortableChanges(Context c){return prefs(c).getBoolean(DIRTY_TAG_POLICY,false)||parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")).length()>0||RecommendationFeedbackStore.dirtyPayload(c).length()>0||RecommendationEvidenceStore.dirtyPayload(c).length()>0||parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_TASTE,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_CLEAR_TASTE,"[]")).length()>0||parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]")).length()>0;}
     static int pendingControlCount(Context c){return parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")).length();}
     static JSONArray inferred(Context c){JSONArray arr=snapshot(c).optJSONArray("inferred");return arr==null?new JSONArray():arr;}
     static JSONArray controls(Context c){JSONArray arr=snapshot(c).optJSONArray("controls");return arr==null?new JSONArray():arr;}
@@ -51,19 +52,19 @@ final class RecommendationPolicyStore {
     static void saveCacheBaseline(Context c,JSONObject value){if(value==null)return;prefs(c).edit().putString(CACHE_BASELINE,value.toString()).apply();}
     static void markCacheBaseline(Context c){saveCacheBaseline(c,snapshot(c));}
 
-    private static boolean matches(PicaClient.Comic comic,String type,String key){
+    private static boolean matches(PicaClient.Comic comic,String type,String key,JSONObject state){
         String wanted=norm(key);if(wanted.isEmpty()||comic==null)return false;
         if("AUTHOR".equals(type))return norm(comic.author).equals(wanted);
         if("CATEGORY".equals(type))return listContains(comic.categories,wanted);
-        if("TAG".equals(type)||"FANDOM".equals(type))return listContains(comic.tags,wanted);
+        if("TAG".equals(type)||"FANDOM".equals(type))return wanted.startsWith(TagParticipation.PREFIX)?TagParticipation.of(state).matchesPrivate(wanted,comic.id,comic.tags):listContains(comic.tags,wanted);
         return false;
     }
 
-    private static boolean matches(NativeRecommendationStore.Item item,String type,String key){
+    private static boolean matches(NativeRecommendationStore.Item item,String type,String key,JSONObject state){
         String wanted=norm(key);if(wanted.isEmpty()||item==null)return false;
         if("AUTHOR".equals(type))return norm(item.author).equals(wanted);
         if("CATEGORY".equals(type))return listContains(item.categories,wanted);
-        if("TAG".equals(type)||"FANDOM".equals(type))return listContains(item.tags,wanted);
+        if("TAG".equals(type)||"FANDOM".equals(type))return wanted.startsWith(TagParticipation.PREFIX)?TagParticipation.of(state).matchesPrivate(wanted,item.comicId,item.tags):listContains(item.tags,wanted);
         // STYLE_FAMILY is a Visual concept, not recommendation provenance
         // such as CREATOR/RELATED. It requires a portable Visual-family binding.
         if("STYLE_FAMILY".equals(type))return false;
@@ -86,7 +87,7 @@ final class RecommendationPolicyStore {
     static boolean blocked(Context c,PicaClient.Comic comic){return blocked(snapshot(c),comic);}
     static boolean blocked(JSONObject state,PicaClient.Comic comic){
         if(state==null)state=new JSONObject();if(comic==null)return false;if(itemSuppressed(state,comic.id))return true;
-        JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction"))&&matches(comic,row.optString("targetType"),row.optString("key")))return true;}
+        JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction"))&&matches(comic,row.optString("targetType"),row.optString("key"),state))return true;}
         return false;
     }
 
@@ -96,18 +97,18 @@ final class RecommendationPolicyStore {
     }
     static double adjustment(Context c,PicaClient.Comic comic){return adjustment(snapshot(c),comic);}
     static double adjustment(JSONObject state,PicaClient.Comic comic){
-        if(state==null)state=new JSONObject();double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(comic,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
-        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&matches(comic,intent.optString("targetType"),intent.optString("key")))score+=0.16;
+        if(state==null)state=new JSONObject();TagParticipation tags=TagParticipation.of(state);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!tags.controlEnabled(row.optString("targetType"),row.optString("key"),comic.id)||!matches(comic,row.optString("targetType"),row.optString("key"),state))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
+        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&tags.controlEnabled(intent.optString("targetType"),intent.optString("key"),comic.id)&&matches(comic,intent.optString("targetType"),intent.optString("key"),state))score+=0.16;
         return Math.max(-0.30,Math.min(0.30,score));
     }
 
     private static boolean blocked(JSONObject state,NativeRecommendationStore.Item item){
-        if(itemSuppressed(state,item.comicId))return true;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction"))&&matches(item,row.optString("targetType"),row.optString("key")))return true;}return false;
+        if(itemSuppressed(state,item.comicId))return true;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction"))&&matches(item,row.optString("targetType"),row.optString("key"),state))return true;}return false;
     }
 
     private static double adjustment(JSONObject state,NativeRecommendationStore.Item item){
-        double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!matches(item,row.optString("targetType"),row.optString("key")))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
-        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&matches(item,intent.optString("targetType"),intent.optString("key")))score+=0.16;
+        TagParticipation tags=TagParticipation.of(state);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!tags.controlEnabled(row.optString("targetType"),row.optString("key"),item.comicId)||!matches(item,row.optString("targetType"),row.optString("key"),state))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
+        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&tags.controlEnabled(intent.optString("targetType"),intent.optString("key"),item.comicId)&&matches(item,intent.optString("targetType"),intent.optString("key"),state))score+=0.16;
         return Math.max(-0.30,Math.min(0.30,score));
     }
 
@@ -119,11 +120,30 @@ final class RecommendationPolicyStore {
     static NativeRecommendationStore.Snapshot applyLocalPolicy(Context c,NativeRecommendationStore.Snapshot source){
         NativeRecommendationStore.Snapshot out=new NativeRecommendationStore.Snapshot();if(source==null)return out;
         out.cycleId=source.cycleId;out.generatedAt=source.generatedAt;out.favoriteFingerprint=source.favoriteFingerprint;out.registryFingerprint=source.registryFingerprint;out.readiness=source.readiness;out.favoriteCount=source.favoriteCount;out.displayedIds.addAll(source.displayedIds);out.cooldownIds.addAll(source.cooldownIds);
-        JSONObject current=snapshot(c),baseline=cacheBaseline(c);int sourceCount=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)sourceCount+=sourceBatch.size();
+        JSONObject current=snapshot(c),baseline=cacheBaseline(c);boolean rebaseTags=!TagParticipation.same(current,baseline);List<UnifiedCatalogStore.Entry> localFavorites=new ArrayList<>();if(rebaseTags)for(UnifiedCatalogStore.Entry entry:UnifiedCatalogStore.load(c).entries())if(entry.favorite&&!tasteExcluded(current,entry.id))localFavorites.add(entry);int sourceCount=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)sourceCount+=sourceBatch.size();
         final class RankedItem{final NativeRecommendationStore.Item item;final double adjusted;final int order;RankedItem(NativeRecommendationStore.Item item,double adjusted,int order){this.item=item;this.adjusted=adjusted;this.order=order;}}
-        LinkedHashMap<String,RankedItem> unique=new LinkedHashMap<>();int order=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)for(NativeRecommendationStore.Item item:sourceBatch){if(item==null||item.comicId.isEmpty()){order++;continue;}if(blocked(current,item)){order++;continue;}double baked=sourceCount<=1?1d:1d-(double)order/(double)(sourceCount-1);double delta=adjustment(current,item)-adjustment(baseline,item);if(!unique.containsKey(item.comicId))unique.put(item.comicId,new RankedItem(item,baked+delta,order));order++;}
-        List<RankedItem> rows=new ArrayList<>(unique.values());rows.sort((a,b)->{int byScore=Double.compare(b.adjusted,a.adjusted);return byScore!=0?byScore:Integer.compare(a.order,b.order);});
+        LinkedHashMap<String,RankedItem> unique=new LinkedHashMap<>();int order=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)for(NativeRecommendationStore.Item item:sourceBatch){if(item==null||item.comicId.isEmpty()){order++;continue;}if(blocked(current,item)){order++;continue;}double baked=sourceCount<=1?1d:1d-(double)order/(double)(sourceCount-1);double delta=adjustment(current,item)-adjustment(baseline,item);double score=rebaseTags?cacheRebaseScore(c,current,item,localFavorites):baked+delta;NativeRecommendationStore.Item visible=rebaseTags?new NativeRecommendationStore.Item(item.comicId,item.title,item.author,LocalizedText.ui(c,"标签规则已变更 · 本机缓存重排，未重新召回","Tag rules changed · cached candidates reranked; no new retrieval","タグ設定変更 · キャッシュ内を再順位付け・再取得なし"),"CACHE_TAG_REBASE","",score,item.tags,item.categories):item;if(!unique.containsKey(item.comicId))unique.put(item.comicId,new RankedItem(visible,score,order));order++;}
+        List<RankedItem> rows=new ArrayList<>(unique.values());rows.sort((a,b)->{int byScore=Double.compare(b.adjusted,a.adjusted);return byScore!=0?byScore:rebaseTags?a.item.comicId.compareTo(b.item.comicId):Integer.compare(a.order,b.order);});
         List<NativeRecommendationStore.Item> batch=new ArrayList<>();for(RankedItem row:rows){batch.add(row.item);if(batch.size()>=NativeRecommendationPolicy.BATCH_SIZE){out.batches.add(batch);batch=new ArrayList<>();}}if(!batch.isEmpty())out.batches.add(batch);out.candidateCount=rows.size();out.batchIndex=out.batches.isEmpty()?0:Math.floorMod(source.batchIndex,out.batches.size());return out;
+    }
+
+    private static double cacheRebaseScore(Context c,JSONObject state,NativeRecommendationStore.Item item,List<UnifiedCatalogStore.Entry> favorites){
+        double author=0,category=0;Set<String> target=new HashSet<>();for(String value:item.categories)target.add(norm(value));
+        for(UnifiedCatalogStore.Entry entry:favorites){if(!norm(item.author).isEmpty()&&norm(item.author).equals(norm(entry.displayAuthor())))author++;Set<String> other=new HashSet<>();for(String value:entry.categories)other.add(norm(value));int common=0;for(String value:target)if(other.contains(value))common++;category=Math.max(category,common/(double)Math.max(1,Math.max(target.size(),other.size())));}
+        PicaClient.Comic comic=new PicaClient.Comic(item.comicId,item.title,item.author,"","","",item.tags,item.categories,false,false,0,0,0,0);
+        // Missing route/popularity/visual features are neutral, not inferred from old rank.
+        return NativeRecommendationPolicy.frozenNeutralScore(author/Math.max(1,favorites.size()),category,0,0)+adjustment(state,item)+RecommendationEvidenceStore.recentAdjustment(c,comic,state)+RecommendationEvidenceStore.sessionAdjustment(c,comic,state);
+    }
+
+    static synchronized void setLocalTagPolicy(Context c,JSONObject input,JSONObject expected){
+        JSONObject next=TagParticipation.normalize(input),current=snapshot(c);
+        if(expected!=null&&!TagParticipation.same(current,expected))throw new IllegalStateException("TAG_POLICY_REVISION_CONFLICT");
+        try{
+            JSONObject before=new JSONObject(current.toString());current.put("tagPolicy",next);current.put("updatedAt",now());
+            SharedPreferences.Editor edit=prefs(c).edit().putString(SNAPSHOT,current.toString()).putBoolean(DIRTY_TAG_POLICY,true).putString(MUTATION_ID,UUID.randomUUID().toString());
+            if(prefs(c).getString(CACHE_BASELINE,"").isEmpty())edit.putString(CACHE_BASELINE,before.toString());
+            if(prefs(c).getString(BASE_SNAPSHOT,"").isEmpty())edit.putString(BASE_SNAPSHOT,before.toString());edit.apply();
+        }catch(JSONException error){throw new IllegalStateException("Unable to save tag policy",error);}
     }
 
     static void moveVisibleBatch(Context c,int delta){NativeRecommendationStore.Snapshot source=NativeRecommendationStore.load(c),visible=applyLocalPolicy(c,source);int count=visible.batches.size();if(count<=0||delta==0)return;source.batchIndex=Math.floorMod(visible.batchIndex+delta,count);NativeRecommendationStore.save(c,source);}
@@ -232,12 +252,19 @@ final class RecommendationPolicyStore {
         return out;
     }
 
-    static JSONObject syncPayload(Context c){JSONObject body=new JSONObject();try{body.put("syncSchemaVersion",1);body.put("deviceId",DeviceIdentity.id(c));String mutation=prefs(c).getString(MUTATION_ID,"");if(mutation==null||mutation.isEmpty())mutation=UUID.randomUUID().toString();body.put("mutationId",mutation);JSONObject base=syncedBase(c);body.put("baseRevision",base.optInt("revision",0));JSONArray baseControls=base.optJSONArray("controls");body.put("baseControls",baseControls==null?new JSONArray():baseControls);body.put("controls",parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")));body.put("feedback",RecommendationFeedbackStore.dirtyPayload(c));body.put("events",RecommendationEvidenceStore.dirtyPayload(c));body.put("suppressComicIds",parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")));body.put("clearSuppressComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")));body.put("tasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_TASTE,"[]")));body.put("clearTasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_TASTE,"[]")));body.put("itemDispositions",parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]")));body.put("catalogEvidence",catalogEvidencePayload(c));}catch(Exception e){throw new IllegalStateException("无法生成推荐同步载荷",e);}return body;}
+    static JSONObject syncPayload(Context c){
+        JSONObject body=new JSONObject();try{
+            body.put("syncSchemaVersion",1);body.put("deviceId",DeviceIdentity.id(c));String mutation=prefs(c).getString(MUTATION_ID,"");if(mutation==null||mutation.isEmpty())mutation=UUID.randomUUID().toString();body.put("mutationId",mutation);
+            JSONObject base=syncedBase(c);body.put("baseRevision",base.optInt("revision",0));JSONArray baseControls=base.optJSONArray("controls");body.put("baseControls",baseControls==null?new JSONArray():baseControls);body.put("controls",parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]")));
+            if(prefs(c).getBoolean(DIRTY_TAG_POLICY,false)){body.put("tagPolicy",TagParticipation.of(snapshot(c)).json);body.put("baseTagPolicy",TagParticipation.of(base).json);}
+            body.put("feedback",RecommendationFeedbackStore.dirtyPayload(c));body.put("events",RecommendationEvidenceStore.dirtyPayload(c));body.put("suppressComicIds",parseArray(prefs(c).getString(DIRTY_SUPPRESS,"[]")));body.put("clearSuppressComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_SUPPRESS,"[]")));body.put("tasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_TASTE,"[]")));body.put("clearTasteExcludedComicIds",parseArray(prefs(c).getString(DIRTY_CLEAR_TASTE,"[]")));body.put("itemDispositions",parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]")));body.put("catalogEvidence",catalogEvidencePayload(c));
+        }catch(Exception e){throw new IllegalStateException("无法生成推荐同步载荷",e);}return body;
+    }
 
     static JSONObject previewPayload(Context c){return syncPayload(c);}
 
     static void seedRemoteSnapshot(Context c,JSONObject value){if(value==null)return;if(!hasPendingPortableChanges(c)){saveSnapshot(c,value);saveSyncedBase(c,value);}}
 
-    static void acknowledge(Context c,JSONObject response,String expectedMutationId){if(response!=null&&response.optBoolean("requiresResolution",false))throw new IllegalStateException("存在需要人工处理的推荐偏好冲突");String acknowledged=response==null?"":response.optString("acknowledgedMutationId","");if(expectedMutationId!=null&&!expectedMutationId.isEmpty()&&!expectedMutationId.equals(acknowledged))throw new IllegalStateException("电脑未确认本次推荐同步");JSONObject value=response==null?null:response.optJSONObject("snapshot");if(value!=null){saveSnapshot(c,value);saveSyncedBase(c,value);}prefs(c).edit().remove(DIRTY_CONTROLS).remove(DIRTY_SESSION).remove(DIRTY_SUPPRESS).remove(DIRTY_CLEAR_SUPPRESS).remove(DIRTY_TASTE).remove(DIRTY_CLEAR_TASTE).remove(DIRTY_DISPOSITIONS).remove(MUTATION_ID).apply();RecommendationFeedbackStore.clearDirty(c);RecommendationEvidenceStore.clearDirty(c);}
+    static synchronized void acknowledge(Context c,JSONObject response,String expectedMutationId){if(response!=null&&response.optBoolean("requiresResolution",false))throw new IllegalStateException("存在需要人工处理的推荐偏好冲突");String acknowledged=response==null?"":response.optString("acknowledgedMutationId","");if(expectedMutationId!=null&&!expectedMutationId.isEmpty()&&!expectedMutationId.equals(acknowledged))throw new IllegalStateException("电脑未确认本次推荐同步");String pending=prefs(c).getString(MUTATION_ID,"");if(!pending.isEmpty()&&!pending.equals(expectedMutationId))throw new IllegalStateException("本机在同步期间有新修改，已保留待同步内容，请重新检查");JSONObject value=response==null?null:response.optJSONObject("snapshot");if(value!=null){TagParticipation.of(value);saveSnapshot(c,value);saveSyncedBase(c,value);}prefs(c).edit().remove(DIRTY_CONTROLS).remove(DIRTY_TAG_POLICY).remove(DIRTY_SESSION).remove(DIRTY_SUPPRESS).remove(DIRTY_CLEAR_SUPPRESS).remove(DIRTY_TASTE).remove(DIRTY_CLEAR_TASTE).remove(DIRTY_DISPOSITIONS).remove(MUTATION_ID).apply();RecommendationFeedbackStore.clearDirty(c);RecommendationEvidenceStore.clearDirty(c);}
     static void acknowledge(Context c,JSONObject response){acknowledge(c,response,response==null?"":response.optString("acknowledgedMutationId",""));}
 }

@@ -147,7 +147,7 @@ jobs:
           test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
           test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
           export PICA_ANDROID_VERSION_NAME="0.5.0-postrc.${GITHUB_SHA:0:12}"
-          export PICA_ANDROID_VERSION_CODE=58
+          export PICA_ANDROID_VERSION_CODE=59
           umask 077
           signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-next-signing-XXXXXXXX")
           export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
@@ -161,7 +161,7 @@ jobs:
           test "$cert" = "$EXPECTED_CERT"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/next-package.txt"
           grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/next-package.txt"
-          grep -q "versionCode='58'" "$RUNNER_TEMP/next-package.txt"
+          grep -q "versionCode='59'" "$RUNNER_TEMP/next-package.txt"
           grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/next-package.txt"
           mkdir -p candidate-next
           cp "$apk" candidate-next/Pica-Library-Next-Acceptance-Android-Dev.apk

@@ -58,8 +58,10 @@ public final class TagParticipationTest {
         JSONObject before=RecommendationPolicyStore.snapshot(context),policy=off();assertFalse(RecommendationPolicyStore.hasPendingPortableChanges(context));
         RecommendationPolicyStore.setLocalTagPolicy(context,policy,before);JSONObject pending=RecommendationPolicyStore.syncPayload(context);
         assertTrue(RecommendationPolicyStore.hasPendingPortableChanges(context));assertEquals("SELECTED",pending.getJSONObject("tagPolicy").getString("mode"));assertEquals("ALL",pending.getJSONObject("baseTagPolicy").getString("mode"));
-        String stored=RecommendationPolicyStore.snapshot(context).toString();try{RecommendationPolicyStore.setLocalTagPolicy(context,TagParticipation.normalize(null),before);fail();}catch(IllegalStateException expected){}
-        assertEquals(stored,RecommendationPolicyStore.snapshot(context).toString());
+        // snapshot() includes a read-time default SessionIntent timestamp. Compare
+        // persisted policy, base, dirty flag and mutation ID, not that transient view.
+        Map<String,?> stored=new HashMap<>(context.getSharedPreferences("recommendation-policy-v5",0).getAll());try{RecommendationPolicyStore.setLocalTagPolicy(context,TagParticipation.normalize(null),before);fail();}catch(IllegalStateException expected){}
+        assertEquals(stored,context.getSharedPreferences("recommendation-policy-v5",0).getAll());
     }
     @Test public void staleAcknowledgementCannotEraseNewLocalTagEdits() throws Exception {
         JSONObject base=RecommendationPolicyStore.snapshot(context);RecommendationPolicyStore.setLocalTagPolicy(context,off(),base);JSONObject oldPayload=RecommendationPolicyStore.syncPayload(context);

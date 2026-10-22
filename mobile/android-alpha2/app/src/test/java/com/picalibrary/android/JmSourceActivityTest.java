@@ -22,11 +22,13 @@ import org.junit.runner.RunWith;
 import org.robolectric.*;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowAlertDialog;
 
 /** Synthetic UI, scheduler and provider responses only; never accesses a real account. */
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=35)
+@Config(sdk=35,application=android.app.Application.class)
+@LooperMode(LooperMode.Mode.PAUSED)
 public class JmSourceActivityTest {
     private static FakeClient fixture;
     private static ManualExecutor executor;
@@ -72,13 +74,14 @@ public class JmSourceActivityTest {
         public void merge(JSONArray rows){merges++;}
         public void cancel(){cancels++;}
     }
-    @Before public void setup(){fixture=new FakeClient();executor=new ManualExecutor();LocaleStore.set(RuntimeEnvironment.getApplication(),LocaleStore.EN);open(null);}
+    @Before public void setup(){fixture=new FakeClient();executor=new ManualExecutor();RuntimeEnvironment.setQualifiers("en");LocaleStore.set(RuntimeEnvironment.getApplication(),LocaleStore.EN);open(null);}
     private void open(Bundle saved){controller=Robolectric.buildActivity(TestActivity.class).create(saved).start().resume().visible();activity=controller.get();}
     private void ready(){executor.runNext();}
     private View view(String tag){View result=activity.getWindow().getDecorView().findViewWithTag(tag);assertNotNull("Missing view "+tag,result);return result;}
     private String text(String tag){return ((TextView)view(tag)).getText().toString();}
     private EditText query(){return (EditText)view("jm.query");}
-    private void click(String tag){view(tag).performClick();}
+    private void click(String tag){view(tag).performClick();shadowOf(Looper.getMainLooper()).idle();}
+    private void pressDialog(int which){dialog().getButton(which).performClick();shadowOf(Looper.getMainLooper()).idle();}
     private void search(String keyword){query().setText(keyword);click("jm.search");executor.runNext();}
     private String message(int id,Object... args){return activity.getString(id,args);}
     private AlertDialog dialog(){return ShadowAlertDialog.getLatestAlertDialog();}
@@ -98,7 +101,11 @@ public class JmSourceActivityTest {
         String[] languages={LocaleStore.EN,LocaleStore.ZH_CN,LocaleStore.JA};
         String[] labels={"Sign in / switch JM account","登录 / 切换 JM 账号","JM にログイン / アカウント切替"};
         for(int i=0;i<languages.length;i++){
-            LocaleStore.set(RuntimeEnvironment.getApplication(),languages[i]);executor=new ManualExecutor();open(null);ready();
+            LocaleStore.set(RuntimeEnvironment.getApplication(),languages[i]);
+            // ActivityController uses host resource qualifiers; exercise actual resources for each host locale.
+            RuntimeEnvironment.setQualifiers(i==1?"zh-rCN":languages[i]);
+            assertEquals(labels[i],LocaleStore.wrap(RuntimeEnvironment.getApplication()).getString(R.string.jm_source_login));
+            executor=new ManualExecutor();open(null);ready();
             assertEquals(labels[i],text("jm.login"));assertEquals(activity.getString(R.string.jm_source_query_hint),query().getHint().toString());
             fixture.duringScan=()->assertEquals(message(R.string.jm_source_scan_progress,1,2,1,2),text("jm.message"));
             click("jm.scan");executor.runNext();assertEquals(message(R.string.jm_source_confirm_count,2),text("jm.confirm"));
@@ -146,15 +153,15 @@ public class JmSourceActivityTest {
     }
     @Test public void loginValidationNeverSavesPasswordOrStartsDuplicateWork(){
         ready();click("jm.login");AlertDialog dialog=dialog();View decor=dialog.getWindow().getDecorView();EditText username=decor.findViewWithTag("jm.username"),password=decor.findViewWithTag("jm.password");CheckBox remember=decor.findViewWithTag("jm.remember");
-        assertFalse(remember.isChecked());assertFalse(password.isSaveEnabled());assertFalse(password.getFreezesText());dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();assertTrue(dialog.isShowing());assertNotNull(password.getError());assertEquals(0,executor.tasks.size());
+        assertFalse(remember.isChecked());assertFalse(password.isSaveEnabled());pressDialog(AlertDialog.BUTTON_POSITIVE);assertTrue(dialog.isShowing());assertNotNull(password.getError());assertEquals(0,executor.tasks.size());
         username.setText("New account");password.setText("PRIVATE_PASSWORD_FIXTURE");Bundle state=new Bundle();controller.saveInstanceState(state);assertFalse(state.toString().contains("PRIVATE_PASSWORD_FIXTURE"));
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();assertEquals("",password.getText().toString());assertFalse(dialog.isShowing());executor.runNext();assertEquals(1,fixture.logins);assertEquals(message(R.string.jm_source_status_signed_in,"New account"),text("jm.status"));assertEquals(message(R.string.jm_source_login_ephemeral),text("jm.message"));
+        pressDialog(AlertDialog.BUTTON_POSITIVE);assertEquals("",password.getText().toString());assertFalse(dialog.isShowing());executor.runNext();assertEquals(1,fixture.logins);assertEquals(message(R.string.jm_source_status_signed_in,"New account"),text("jm.status"));assertEquals(message(R.string.jm_source_login_ephemeral),text("jm.message"));
     }
     @Test public void failedAccountSwitchDoesNotKeepThePreviousSignedInLabel(){
-        ready();fixture.loginFailure=true;click("jm.login");View decor=dialog().getWindow().getDecorView();((EditText)decor.findViewWithTag("jm.username")).setText("Other");((EditText)decor.findViewWithTag("jm.password")).setText("PRIVATE_PASSWORD_FIXTURE");dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();executor.runNext();
+        ready();fixture.loginFailure=true;click("jm.login");View decor=dialog().getWindow().getDecorView();((EditText)decor.findViewWithTag("jm.username")).setText("Other");((EditText)decor.findViewWithTag("jm.password")).setText("PRIVATE_PASSWORD_FIXTURE");pressDialog(AlertDialog.BUTTON_POSITIVE);executor.runNext();
         assertEquals(message(R.string.jm_source_status_signed_out),text("jm.status"));assertEquals(message(R.string.jm_source_login_failed),text("jm.message"));assertFalse(text("jm.message").contains("PRIVATE_"));
     }
-    @Test public void logoutRequiresConfirmationAndDoesNotImportOrMerge(){ready();click("jm.logout");dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick();assertEquals(0,fixture.logouts);click("jm.logout");dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();executor.runNext();assertEquals(1,fixture.logouts);assertEquals(0,fixture.merges);assertEquals(0,fixture.imports);assertEquals(message(R.string.jm_source_logout_complete),text("jm.message"));}
+    @Test public void logoutRequiresConfirmationAndDoesNotImportOrMerge(){ready();click("jm.logout");pressDialog(AlertDialog.BUTTON_NEGATIVE);assertEquals(0,fixture.logouts);click("jm.logout");pressDialog(AlertDialog.BUTTON_POSITIVE);executor.runNext();assertEquals(1,fixture.logouts);assertEquals(0,fixture.merges);assertEquals(0,fixture.imports);assertEquals(message(R.string.jm_source_logout_complete),text("jm.message"));}
     @Test public void statusFailureIsUnknownNotStaleAndStillAllowsRecovery(){fixture.statusFailure=true;ready();assertEquals(message(R.string.jm_source_status_unknown),text("jm.status"));assertEquals(message(R.string.jm_source_status_failed),text("jm.message"));assertTrue(view("jm.login").isEnabled());assertTrue(view("jm.logout").isEnabled());}
     @Test public void lateDetailsCompletionDoesNotNavigateAfterDestruction(){
         ready();search("details");fixture.duringDetails=()->destroy();click("jm.detail:jm:910");executor.runNext();assertEquals(1,fixture.details);assertNull(shadowOf(activity).getNextStartedActivity());

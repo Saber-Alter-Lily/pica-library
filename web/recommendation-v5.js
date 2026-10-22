@@ -1,6 +1,6 @@
 import { copy as v5t } from './locale-runtime.js'
 
-const V5={snapshot:null,timescales:null,channels:null,serving:null,search:'',busy:false,signalById:new Map(),quickSignals:new Map(),draftLevels:new Map(),manualSignal:null}
+const V5={snapshot:null,timescales:null,channels:null,serving:null,search:'',searchResult:null,searchLoading:false,searchError:'',searchSequence:0,busy:false,signalById:new Map(),quickSignals:new Map(),draftLevels:new Map(),manualSignal:null}
 
 const V5_FACET_LABELS={
     "CREATOR_ENTITY":["作者","Author","作者"],"CATEGORY":["分类","Category","カテゴリ"],"FANDOM_IP":["作品 / IP","Work / IP","作品 / IP"],"FANDOM_CHARACTER":["角色","Character","キャラクター"],
@@ -263,6 +263,8 @@ function ensurePanel() {
             <button id="v5-policy-search-submit" type="button">${v5t('查找','Find','検索')}</button>
             <button id="v5-policy-search-clear" type="button">${v5t('清空','Clear','クリア')}</button>
         </div>
+        <p id="v5-search-status" class="status" role="status" aria-live="polite"></p>
+        <div class="v5-help">${v5t('收藏频次是系统基准，不等于你明确喜欢。查找会检索完整本地收藏及已保存的调整，兼容简繁体和现有别名；不会自动添加新标签。','Collection frequency is a baseline, not an explicit preference. Search covers all local favorites and saved controls, including Chinese variants and existing aliases; it never adds tags automatically.','収集頻度は基準であり、明示的な好みではありません。検索は全ローカルお気に入りと保存済み調整を対象に簡繁体・既存の別名に対応します。タグは自動追加しません。')}</div>
         <div id="v5-inferred-list" class="v5-facet-list"></div>
         <div id="v5-pending-bar" class="v5-pending-bar" hidden>
             <strong id="v5-pending-count">${v5t('已修改 0 项','0 changes','変更 0 件')}</strong>
@@ -314,17 +316,18 @@ function ensurePanel() {
         } catch (error) { showStatus(error.message, true) }
     })
     const searchInput = panel.querySelector('#v5-policy-search')
+    searchInput.maxLength = 160
     const commitSearch = () => {
-        V5.search = String(searchInput.value || '').trim().toLocaleLowerCase()
+        V5.search = String(searchInput.value || '').trim()
         V5.manualSignal = null
-        renderPolicy()
+        void searchPreferences()
     }
     panel.querySelector('#v5-policy-search-submit').addEventListener('click', commitSearch)
     panel.querySelector('#v5-policy-search-clear').addEventListener('click', () => {
         searchInput.value = ''
         V5.search = ''
         V5.manualSignal = null
-        renderPolicy()
+        void searchPreferences()
     })
     searchInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
@@ -643,6 +646,8 @@ async function saveDraftLevels() {
 }
 
 function signalRow(signal) {
+    // A search may return an existing custom control without collection evidence.
+    if (signal.systemUnknown) signal = { ...signal, manual: true }
     const current = controlFor(signal)
     const baseline = baselineLevel(signal)
     const level = currentLevel(signal)
@@ -651,7 +656,8 @@ function signalRow(signal) {
     const delta = Number(current?.levelDelta ?? legacyDelta)
     return `<div class="v5-signal-row" data-v5-signal="${esc(signalId(signal))}">
         <div class="v5-signal-copy"><strong>${esc(signal.label)}</strong>
-        <span class="status">${signal.manual ? v5t('系统尚未形成稳定判断','The system has no stable judgment yet','システムにはまだ安定した判断がありません') : signal.behaviorDerived ? v5t(`长期行为支持 ${Number(signal.supportCount || 0)} 本`,`Long-term behavior supports ${Number(signal.supportCount || 0)} works`,`長期行動による支持 ${Number(signal.supportCount || 0)} 作品`) : v5t(`收藏支持 ${Number(signal.supportCount || 0)} 本`,`Supported by ${Number(signal.supportCount || 0)} favorites`,`お気に入り ${Number(signal.supportCount || 0)} 件の支持`)}</span></div>
+        ${webNorm(signal.label) !== webNorm(signal.key) ? `<small>${v5t('原始标签键','Original tag key','元のタグキー')}: ${esc(signal.key)}</small>` : ''}
+        <span class="status">${signal.manual ? v5t('系统尚未形成稳定判断','The system has no stable judgment yet','システムにはまだ安定した判断がありません') : signal.behaviorDerived ? v5t(`长期行为支持 ${Number(signal.supportCount || 0)} 本`,`Long-term behavior supports ${Number(signal.supportCount || 0)} works`,`長期行動による支持 ${Number(signal.supportCount || 0)} 作品`) : v5t(`出现在 ${Number(signal.supportCount || 0)} 本收藏中`,`Present in ${Number(signal.supportCount || 0)} favorites`,`お気に入り ${Number(signal.supportCount || 0)} 件に出現`)}</span></div>
         <div class="v5-range-wrap">
             <input type="range" min="0" max="10" step="1" value="${level}" data-v5-level="${esc(signalId(signal))}" ${blocked ? 'disabled' : ''} />
             <span class="v5-range-value" data-v5-level-value="${esc(signalId(signal))}">${blocked ? v5t('已屏蔽','Blocked','ブロック済み') : `${level}/10`}</span>
@@ -663,6 +669,29 @@ function signalRow(signal) {
             <button type="button" data-v5-block="${esc(signalId(signal))}">${blocked ? v5t('已屏蔽','Blocked','ブロック済み') : v5t('屏蔽','Block','ブロック')}</button>
         </div>
     </div>`
+}
+
+async function searchPreferences() {
+    const sequence = ++V5.searchSequence
+    const query = V5.search
+    V5.searchResult = null
+    V5.searchError = ''
+    V5.searchLoading = Boolean(query)
+    renderPolicy()
+    if (!query) return
+    try {
+        const result = await request(`/api/v1/recommendation-v5/preferences/search?${new URLSearchParams({ q: query })}`)
+        if (sequence !== V5.searchSequence) return
+        V5.searchResult = result
+    } catch (error) {
+        if (sequence !== V5.searchSequence) return
+        V5.searchError = error.message
+    } finally {
+        if (sequence === V5.searchSequence) {
+            V5.searchLoading = false
+            renderPolicy()
+        }
+    }
 }
 
 function renderPolicy() {
@@ -683,14 +712,25 @@ function renderPolicy() {
             ? v5t(`本次想看：${intent.label || intent.key || ''}`,`Session intent: ${intent.label || intent.key || ''}`,`今回見たいもの：${intent.label || intent.key || ''}`) : v5t('本次想看：默认','Session intent: default','今回見たいもの：既定')
     }
     const inferred = lifetimeSignals()
-    V5.signalById = new Map(inferred.map((item) => [signalId(item), item]))
+    // Keep identities for staged changes when navigating between full-search results.
+    const stagedSignals = [...V5.signalById].filter(([id]) => V5.draftLevels.has(id))
+    V5.signalById = new Map([...inferred.map((item) => [signalId(item), item]), ...stagedSignals])
+    for (const item of V5.searchResult?.items || []) {
+        if (!V5.draftLevels.has(signalId(item))) V5.signalById.set(signalId(item), item)
+    }
     if (V5.manualSignal) V5.signalById.set(signalId(V5.manualSignal), V5.manualSignal)
     renderProfileOverview()
     renderServingOverview()
     renderCompositionOverview()
-    const filtered = inferred.filter((item) =>
-        !V5.search || `${item.label} ${item.key} ${item.targetType} ${item.facet || ''}`.toLocaleLowerCase().includes(V5.search)
-    )
+    const filtered = V5.search ? (V5.searchResult?.items || []) : inferred
+    const searchStatus = document.querySelector('#v5-search-status')
+    if (searchStatus) searchStatus.textContent = V5.searchLoading
+        ? v5t('正在检索完整本地目录……','Searching the full local catalog…','全ローカルカタログを検索中…')
+        : V5.searchError
+          ? v5t(`查找失败，请重试：${V5.searchError}`,`Search failed; retry: ${V5.searchError}`,`検索失敗。再試行してください：${V5.searchError}`)
+          : V5.searchResult
+            ? v5t(`匹配 ${V5.searchResult.total} 项，显示 ${filtered.length} 项${V5.searchResult.truncated ? '；请缩小关键词' : ''}${V5.searchResult.registryAvailable ? '' : '；语义词库不可用，仅按原始文本检索'}`,`${V5.searchResult.total} matches, showing ${filtered.length}${V5.searchResult.truncated ? '; narrow your query' : ''}${V5.searchResult.registryAvailable ? '' : '; registry unavailable, raw text only'}`,`${V5.searchResult.total} 件一致、${filtered.length} 件表示${V5.searchResult.truncated ? '。検索語を絞ってください' : ''}${V5.searchResult.registryAvailable ? '' : '。辞書を利用できないため元の文字列のみで検索'}`)
+            : v5t('默认展示高频项目；低频项目请用“查找”。','High-frequency items are shown by default; use Find for rarer items.','既定では頻出項目を表示します。低頻度項目は検索してください。')
     const groups = new Map()
     for (const item of filtered) {
         const facet = item.facet || (item.targetType === 'AUTHOR' ? 'CREATOR_ENTITY' : item.targetType === 'CATEGORY' ? 'CATEGORY' : 'OTHER')
@@ -740,6 +780,8 @@ function renderPolicy() {
                     <div class="v5-major-body">${facetsHtml}</div>
                 </details>`
             }).join('')
+        } else if (V5.searchLoading || V5.searchError) {
+            inferredTarget.innerHTML = ''
         } else if (manualSignal) {
             inferredTarget.innerHTML =
                 `<div class="v5-help"><strong>${v5t(`已确认把“${esc(V5.search)}”作为自定义标签微调。`,`Using “${esc(V5.search)}” as a custom tag preference.`,`「${esc(V5.search)}」をカスタムタグ嗜好として調整します。`)}</strong> ${v5t('5/10 是中性起点，可调整到 0–10；修改后仍需点击“保存调整”。','5/10 is the neutral starting point. Adjust from 0–10, then choose Save adjustments.','5/10 が中立の開始点です。0–10で調整し、「調整を保存」を選んでください。')}</div><div class="v5-facet-group"><div class="v5-facet-body"><div class="v5-facet-scroll">${signalRow(manualSignal)}</div></div></div>`
@@ -838,7 +880,8 @@ async function loadPolicy() {
         V5.timescales = timescales
         V5.channels = channels
         V5.serving = serving
-        renderPolicy()
+        if (V5.search) await searchPreferences()
+        else renderPolicy()
         decorateRecommendationCards()
     } catch (error) { showStatus(v5t(`推荐控制中心暂不可用：${error.message}`,`Recommendation controls are unavailable: ${error.message}`,`おすすめ調整を利用できません：${error.message}`), true) }
 }

@@ -82,7 +82,7 @@ function recordHistory(input) {
         episodeId,
         title: item.title || input.title || 'Manga',
         author: item.canonicalAuthor || item.author || input.author || '',
-        providerId: item.providerId || (comicId.startsWith('eh:') ? 'eh' : 'pica'),
+        providerId: item.providerId || (comicId.startsWith('eh:') ? 'eh' : comicId.startsWith('jm:') ? 'jm' : 'pica'),
         firstPage: Math.max(0, Number(input.pageIndex || 0)),
         lastPage: Math.max(0, Number(input.pageIndex || 0)),
         startedAt: now,
@@ -164,7 +164,7 @@ function installLibraryParity() {
     if (!$('#v040-library-provider')) {
         const provider = document.createElement('select')
         provider.id = 'v040-library-provider'
-        provider.innerHTML = `<option value="all">${t('来源：全部','Source: All','配信元：すべて')}</option><option value="pica">${t('来源：Pica','Source: Pica','配信元：Pica')}</option><option value="eh">${t('来源：E-H','Source: E-H','配信元：E-H')}</option>`
+        provider.innerHTML = `<option value="all">${t('来源：全部','Source: All','配信元：すべて')}</option><option value="pica">${t('来源：Pica','Source: Pica','配信元：Pica')}</option><option value="eh">${t('来源：E-H','Source: E-H','配信元：E-H')}</option><option value="jm">${t('来源：JM','Source: JM','配信元：JM')}</option>`
         const scope = $('#filter-scope')
         scope?.insertAdjacentElement('afterend', provider)
         provider.onchange = () => $('#apply-filter')?.click()
@@ -356,7 +356,7 @@ async function showAuthorWorks(dialog, authorId, name) {
             dialog.close();
             document.querySelector('nav button[data-view="library"]')?.click()
             const filter=$('#filter-text'); if(filter) filter.value=button.dataset.workTitle
-            const provider=$('#v040-library-provider'); if(provider) provider.value=button.dataset.workProvider==='eh'?'eh':'pica'
+            const provider=$('#v040-library-provider'); if(provider) provider.value=['eh','jm'].includes(button.dataset.workProvider)?button.dataset.workProvider:'pica'
             $('#apply-filter')?.click()
         })
         return result

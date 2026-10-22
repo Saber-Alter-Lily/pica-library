@@ -57,12 +57,11 @@ final class RecommendationLocalProfile {
         List<UnifiedCatalogStore.Entry> positives=new ArrayList<>();
         for(UnifiedCatalogStore.Entry entry:catalog.entries())
             if((entry.favorite||RecommendationFeedbackStore.isLiked(app,entry.id))&&!RecommendationPolicyStore.tasteExcluded(remoteSnapshot,entry.id))positives.add(entry);
-        if(positives.isEmpty())return new JSONArray(merged.values());
 
         MobileTagRegistry registry=null;try{registry=MobileTagRegistry.load(app);}catch(Exception ignored){}
         LinkedHashMap<String,Signal> local=new LinkedHashMap<>();
         for(UnifiedCatalogStore.Entry entry:positives){
-            add(local,"AUTHOR",entry.displayAuthor(),entry.displayAuthor(),"CREATOR_ENTITY",entry.id);
+            String author=entry.displayAuthor();if(!author.isEmpty()&&!"未知作者".equals(author)&&!"Unknown author".equalsIgnoreCase(author))add(local,"AUTHOR",author,author,"CREATOR_ENTITY",entry.id);
             for(String category:entry.categories)add(local,"CATEGORY",category,category,"CATEGORY",entry.id);
             for(String raw:entry.tags){
                 String type="TAG",key=raw,label=raw,facet="RAW_TAG";

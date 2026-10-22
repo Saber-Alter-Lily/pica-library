@@ -371,7 +371,7 @@
                     <div>
                         <p class="eyebrow">我的收藏图鉴</p>
                         <h2>你的收藏，已经走了很远。</h2>
-                        <p>从你的收藏里，看看一路喜欢过什么。</p>
+                        <p>查看收藏的客观构成；收藏频次不等于明确喜欢。</p>
                     </div>
                     <div class="actions">
                         <button id="chronicle-refresh">重新整理</button
@@ -380,6 +380,7 @@
                         </button>
                     </div>
                 </div>
+                <div id="chronicle-view-controls" class="no-print"></div>
                 <p id="chronicle-status" class="status"></p>
                 <div id="chronicle-content" class="chronicle-content">
                     <article class="chronicle-empty">
@@ -529,6 +530,7 @@
                                 <option value="all">全部可用来源</option>
                                 <option value="pica">Pica</option>
                                 <option value="eh">E-H 公共</option>
+                                <option value="jm">JM</option>
                                 <option value="exh">ExH（需 E-H 账号权限）</option>
                             </select></label>
                         </details>
@@ -1034,6 +1036,25 @@
                     </div>
                     <p id="eh-account-message" class="status" role="status"></p>
                 </details>
+                <details id="settings-jm-account" class="panel account-disclosure">
+                    <summary><strong>JM 账号与收藏</strong> · 可选来源</summary>
+                    <p id="jm-account-state" class="status">打开此区域后检查连接状态</p>
+                    <p>导入本人账号的收藏作为收藏构成依据；不会自动创建 Like，也不会修改 JM 云端收藏。</p>
+                    <div class="settings-form">
+                        <label>JM 用户名<input id="jm-username" autocomplete="username" /></label>
+                        <label>密码<input id="jm-password" type="password" autocomplete="current-password" /></label>
+                        <label><input id="jm-remember" type="checkbox" /> 使用本机安全凭据存储记住登录</label>
+                    </div>
+                    <div class="actions">
+                        <button id="jm-login" type="button" class="primary">登录 JM</button>
+                        <button id="jm-preview" type="button">扫描收藏</button>
+                        <button id="jm-enrich" type="button">补全收藏资料 · 每批最多 20 本</button>
+                        <button id="jm-confirm" type="button" hidden>确认导入收藏</button>
+                        <button id="jm-cancel" type="button" hidden>取消扫描</button>
+                        <button id="jm-logout" type="button">退出本机 JM 登录</button>
+                    </div>
+                    <p id="jm-account-message" class="status" role="status"></p>
+                </details>
                 <article id="settings-remote-storage" class="panel">
                     <div class="help-heading"><h3>远程存储 · WebDAV</h3><button type="button" class="info-tip" aria-label="查看 WebDAV 说明" data-info-tip="把电脑已下载的漫画增量同步到 WebDAV。同步完成后，即使电脑关机，手机也可以继续从远程存储读取。默认只做增量同步，不删除云端独有漫画；只有整轮上传成功后才会切换到新版本。">!</button></div>
                     <p id="remote-storage-state" class="status"></p>
@@ -1226,6 +1247,7 @@
         <script type="module" src="./alpha8-connections.js"></script>
         <script type="module" src="./alpha8-star-access.js"></script>
         <script type="module" src="./eh-account.js"></script>
+        <script type="module" src="./jm-account.js"></script>
         <script type="module" src="./recommendation-v5.js"></script>
         <script type="module" src="./ecosystem-pack-v1.js"></script>
         <script type="module" src="./ui-polish-v5.js"></script>

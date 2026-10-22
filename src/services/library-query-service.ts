@@ -11,6 +11,8 @@ export class LibraryQueryService {
     constructor(private readonly database: LibraryDatabase) {}
 
     private normalize(input: LibraryFacetQuery = {}): LibraryFacetQuery {
+        if ((input.providerIds ?? []).some((id) => !['pica', 'eh', 'jm'].includes(id)))
+            throw new Error('Unrecognized library source')
         return {
             scope: input.scope ?? 'library',
             text: input.text?.trim() || undefined,
@@ -20,8 +22,8 @@ export class LibraryQueryService {
             ].filter(Boolean),
             tagMode: input.tagMode ?? 'all',
             providerIds: [...new Set(input.providerIds ?? [])].filter(
-                (value): value is 'pica' | 'eh' =>
-                    value === 'pica' || value === 'eh'
+                (value): value is 'pica' | 'eh' | 'jm' =>
+                    value === 'pica' || value === 'eh' || value === 'jm'
             ),
             finished: input.finished,
             download: input.download,

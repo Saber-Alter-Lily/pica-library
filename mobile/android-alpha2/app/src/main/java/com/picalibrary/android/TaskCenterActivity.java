@@ -29,7 +29,8 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         WorkManager manager=WorkManager.getInstance(this);
         List<WorkInfo> picaDownloads=manager.getWorkInfosByTag("pica-download").get(5,TimeUnit.SECONDS);
         List<WorkInfo> ehDownloads=manager.getWorkInfosByTag("eh-download").get(5,TimeUnit.SECONDS);
-        ArrayList<WorkInfo> downloadInfos=new ArrayList<>();downloadInfos.addAll(picaDownloads);downloadInfos.addAll(ehDownloads);
+        List<WorkInfo> jmDownloads=manager.getWorkInfosByTag("jm-download").get(5,TimeUnit.SECONDS);
+        ArrayList<WorkInfo> downloadInfos=new ArrayList<>();downloadInfos.addAll(picaDownloads);downloadInfos.addAll(ehDownloads);downloadInfos.addAll(jmDownloads);
         List<DownloadView> downloads=reconstructDownloads(downloadInfos);
         WorkInfo favorite=currentWork(manager.getWorkInfosForUniqueWork(FavoriteImportJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"favorite-import",FavoriteImportJobs.UNIQUE_NAME);
         WorkInfo bootstrap=currentWork(manager.getWorkInfosForUniqueWork(PicaBootstrapJobs.UNIQUE_NAME).get(5,TimeUnit.SECONDS),"pica-bootstrap",PicaBootstrapJobs.UNIQUE_NAME);
@@ -99,15 +100,16 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
 
     private MobileTaskRegistryStore.DownloadRef downloadRef(WorkInfo info){
         Set<String> tags=info.getTags();
-        boolean eh=tags.contains("eh-download"),pica=tags.contains("pica-download");
-        if(!eh&&!pica)return null;
+        boolean eh=tags.contains("eh-download"),pica=tags.contains("pica-download"),jm=tags.contains("jm-download");
+        if(!eh&&!pica&&!jm)return null;
         String comic=tag(tags,"comic:"),episode=tag(tags,"episode:");
         if(comic.isEmpty())return null;
         if("ALL".equals(episode))episode="";
-        return new MobileTaskRegistryStore.DownloadRef(eh?"eh":"pica",comic,episode,info.getId().toString());
+        return new MobileTaskRegistryStore.DownloadRef(jm?"jm":eh?"eh":"pica",comic,episode,info.getId().toString());
     }
 
     private boolean paused(MobileTaskRegistryStore.DownloadRef ref){
+        if("jm".equals(ref.provider))return JmDownloadJobs.paused(this,ref.comicId);
         return "eh".equals(ref.provider)
             ?EhDownloadJobs.paused(this,ref.comicId)
             :PicaDownloadJobs.paused(this,ref.comicId,ref.episodeId);
@@ -195,22 +197,26 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
             LinearLayout card=Ui.card(this);
             DataView p=info==null?new DataView("","等待继续"):data(info);
             card.addView(Ui.text(this,p.title.isEmpty()?"漫画 "+shortId(comic):p.title,16,Ui.TEXT,true));
-            String taskLabel=ehDownload?"E-H 画廊":(episodeArg.isEmpty()?"全部章节":"章节 "+shortId(episodeArg));
+            String taskLabel="jm".equals(ref.provider)?"JM · "+(episodeArg.isEmpty()?"全部章节":"章节 "+shortId(episodeArg)):ehDownload?"E-H 画廊":(episodeArg.isEmpty()?"全部章节":"章节 "+shortId(episodeArg));
             card.addView(Ui.text(this,taskLabel+" · "+(paused?"已暂停":info==null?"等待恢复":status(info)),12,Ui.MUTED,false));
             card.addView(Ui.text(this,p.text,12,Ui.PRIMARY,false));
             if(paused){
                 card.addView(Ui.text(this,"继续会从已经完成并校验的页面续传。",12,Ui.MUTED,false));
-                card.addView(ehDownload?actions(button("继续",v->EhDownloadJobs.resume(this,comic)),button("取消下载",v->EhDownloadJobs.cancel(this,comic))):actions(button("继续",v->PicaDownloadJobs.resume(this,comic,episodeArg)),button("取消下载",v->PicaDownloadJobs.cancel(this,comic,episodeArg))));
+                card.addView(actions(button("继续",v->resumeDownload(ref)),button("取消下载",v->cancelDownload(ref))));
             }else if(info!=null&&active(info)){
-                card.addView(ehDownload?actions(button("暂停",v->EhDownloadJobs.pause(this,comic)),button("取消",v->EhDownloadJobs.cancel(this,comic))):actions(button("暂停",v->PicaDownloadJobs.pause(this,comic,episodeArg)),button("取消",v->PicaDownloadJobs.cancel(this,comic,episodeArg))));
+                card.addView(actions(button("暂停",v->pauseDownload(ref)),button("取消",v->cancelDownload(ref))));
             }else if(info!=null&&(info.getState()==WorkInfo.State.FAILED||info.getState()==WorkInfo.State.CANCELLED)){
-                card.addView(button("重新下载",v->{if(ehDownload)EhDownloadJobs.enqueue(this,comic);else PicaDownloadJobs.enqueue(this,comic,episodeArg);}));
+                card.addView(button("重新下载",v->retryDownload(ref)));
             }
             content.addView(card);
             shown++;
         }
         if(shown==0)content.addView(Ui.text(this,"当前没有下载任务。",13,Ui.MUTED,false));
     }
+    private void pauseDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.pause(this,ref.comicId);else if("eh".equals(ref.provider))EhDownloadJobs.pause(this,ref.comicId);else PicaDownloadJobs.pause(this,ref.comicId,ref.episodeId);}
+    private void resumeDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.resume(this,ref.comicId,ref.episodeId);else if("eh".equals(ref.provider))EhDownloadJobs.resume(this,ref.comicId);else PicaDownloadJobs.resume(this,ref.comicId,ref.episodeId);}
+    private void cancelDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.cancel(this,ref.comicId);else if("eh".equals(ref.provider))EhDownloadJobs.cancel(this,ref.comicId);else PicaDownloadJobs.cancel(this,ref.comicId,ref.episodeId);}
+    private void retryDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.enqueue(this,ref.comicId,ref.episodeId);else if("eh".equals(ref.provider))EhDownloadJobs.enqueue(this,ref.comicId);else PicaDownloadJobs.enqueue(this,ref.comicId,ref.episodeId);}
     private static boolean active(WorkInfo i){return i.getState()==WorkInfo.State.RUNNING||i.getState()==WorkInfo.State.ENQUEUED||i.getState()==WorkInfo.State.BLOCKED;}
     private static String status(WorkInfo i){switch(i.getState()){case RUNNING:return "执行中";case ENQUEUED:return "等待网络 / 排队中";case BLOCKED:return "等待前序任务";case SUCCEEDED:return "已完成";case FAILED:return "失败";case CANCELLED:return "已取消";default:return i.getState().name();}}
     private static String tag(Set<String> tags,String prefix){for(String tag:tags)if(tag.startsWith(prefix))return tag.substring(prefix.length());return "";}

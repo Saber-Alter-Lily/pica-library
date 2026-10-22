@@ -52,6 +52,16 @@ Expand-Archive -LiteralPath $runtimeCache -DestinationPath $runtimeExtract
 Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\node.exe") -Destination (Join-Path $stage 'runtime\node.exe')
 Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\LICENSE") -Destination (Join-Path $stage 'licenses\Node.js-LICENSE.txt')
 
+$jmRuntime = Join-Path $root 'runtime\jm'
+if (Test-Path -LiteralPath (Join-Path $jmRuntime 'PICA_JM_RUNTIME.json')) {
+    $jmManifest = Get-Content -Raw -LiteralPath (Join-Path $jmRuntime 'PICA_JM_RUNTIME.json') | ConvertFrom-Json
+    if ($jmManifest.userDataIncluded -or $jmManifest.statusProbe -ne 'PASS' -or $jmManifest.jarSha256 -ne (Get-Sha256 (Join-Path $jmRuntime 'lib\pica-jm-source.jar'))) { throw 'JM runtime integrity gate failed' }
+    Copy-Item -LiteralPath $jmRuntime -Destination (Join-Path $stage 'runtime\jm') -Recurse
+    $jmProbe = '{"id":"package-probe","op":"status"}' | & (Join-Path $stage 'runtime\jm\bin\java.exe') -Xmx128m '-Dfile.encoding=UTF-8' -jar (Join-Path $stage 'runtime\jm\lib\pica-jm-source.jar')
+    $jmStatus = $jmProbe | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or -not $jmStatus.ok -or $jmStatus.value.configured) { throw 'Packaged JM runtime status probe failed' }
+} elseif ($env:PICA_REQUIRE_JM_RUNTIME -eq '1') { throw 'The acceptance candidate requires the bundled JM runtime' }
+
 Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $stage 'app')
 Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $stage 'licenses\THIRD_PARTY_LICENSES.txt')
 Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse

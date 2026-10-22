@@ -3343,3 +3343,7 @@ select:focus {
     .work-variant-card { grid-template-columns: 58px minmax(0, 1fr); }
     .work-variant-cover { width: 58px; }
 }
+/* Browser-local atlas projection controls; no effect on printed objective cards. */
+#chronicle-view-controls fieldset { display:flex; flex-wrap:wrap; gap:12px 24px; border:1px solid var(--line, #ddd); border-radius:12px; padding:12px; }
+#chronicle-view-controls label { display:flex; align-items:center; gap:8px; }
+#chronicle-view-controls input { width:auto; }

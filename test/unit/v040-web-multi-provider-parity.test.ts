@@ -18,7 +18,7 @@ describe('v0.4 Web/Desktop parity', () => {
   })
 
   it('keeps library storage scope and provider scope orthogonal', () => {
-    expect(libraryTypes).toContain("providerIds?: Array<'pica' | 'eh'>")
+    expect(libraryTypes).toContain("providerIds?: Array<'pica' | 'eh' | 'jm'>")
     expect(libraryQuery).toContain('.listComicsForLibraryQueryBase(query)')
     expect(database).toContain('const providers = [...new Set(query.providerIds ?? [])]')
     expect(database).toContain("pm.provider_id")

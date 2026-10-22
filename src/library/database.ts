@@ -182,7 +182,7 @@ function storedComicFromRow(row: SqlRow): StoredComic {
     return {
         comicId: String(row.id),
         providerId: row.provider_id
-            ? (String(row.provider_id) as 'pica' | 'eh')
+            ? (String(row.provider_id) as 'pica' | 'eh' | 'jm')
             : String(row.id).startsWith('eh:')
               ? 'eh'
               : 'pica',
@@ -1560,7 +1560,8 @@ export class LibraryDatabase {
         records: FavoriteRecord[],
         source = 'import',
         completeSnapshot = true,
-        markFavorite = true
+        markFavorite = true,
+        favoriteReason: 'pica-favorite' | 'jm-favorite' = 'pica-favorite'
     ): ImportResult {
         const now = new Date().toISOString()
         const uniqueRecords = [
@@ -1801,7 +1802,7 @@ export class LibraryDatabase {
                 if (markFavorite)
                     membershipUpsert.run(
                         record.comicId,
-                        'pica-favorite',
+                        favoriteReason,
                         now,
                         now
                     )
@@ -2289,7 +2290,7 @@ export class LibraryDatabase {
     }
 
     private recomputeFavoriteState(comicId?: string) {
-        const favoriteReasons = "'pica-favorite','eh-favorite','local-favorite'"
+        const favoriteReasons = "'pica-favorite','eh-favorite','jm-favorite','local-favorite'"
         if (comicId)
             this.db
                 .prepare(
@@ -2313,7 +2314,7 @@ export class LibraryDatabase {
 
     private setFavoriteMembershipState(
         comicId: string,
-        reason: 'pica-favorite' | 'eh-favorite' | 'local-favorite',
+        reason: 'pica-favorite' | 'eh-favorite' | 'jm-favorite' | 'local-favorite',
         isFavorite: boolean
     ) {
         const exists = this.db
@@ -2374,6 +2375,10 @@ export class LibraryDatabase {
             'eh-favorite',
             isFavorite
         )
+    }
+
+    setJmFavoriteState(comicId: string, isFavorite: boolean) {
+        return this.setFavoriteMembershipState(comicId, 'jm-favorite', isFavorite)
     }
 
     syncEhFavorites(records: FavoriteRecord[]) {

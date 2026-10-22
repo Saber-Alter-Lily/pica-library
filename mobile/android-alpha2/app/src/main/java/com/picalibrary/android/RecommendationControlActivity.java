@@ -29,24 +29,49 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
     private final Set<String> expandedFacets=new LinkedHashSet<>();
     private final Map<String,Integer> facetScrollY=new HashMap<>();
     private TextView sessionStatus;
+    private final PreferenceDraft draft=new PreferenceDraft();
+    private LinearLayout pendingBar;
+    private TextView pendingText;
+    private Button saveButton,undoButton;
+    private boolean saving;
+    private volatile PreferenceSearchIndex searchIndex;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private int loadGeneration;
     private boolean destroyed,loadedOnce;
 
     @Override public void onCreate(Bundle state){
-        super.onCreate(state);Ui.applyWindow(this);expanded.add("people");activeQuery=getIntent().getStringExtra("query");if(activeQuery==null)activeQuery="";renderShell();
+        super.onCreate(state);Ui.applyWindow(this);expanded.add("people");activeQuery=getIntent().getStringExtra("query");if(activeQuery==null)activeQuery="";
+        if(state!=null)try{draft.restore(new JSONArray(state.getString("preferenceDraft","[]")));activeQuery=state.getString("activeQuery",activeQuery);}catch(Exception ignored){}
+        renderShell();
     }
     @Override protected void onResume(){super.onResume();loadAsync();}
     @Override protected void onDestroy(){destroyed=true;++loadGeneration;worker.shutdownNow();super.onDestroy();}
+    @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("preferenceDraft",draft.mutations().toString());out.putString("activeQuery",currentQuery());}
+    @Override public void onBackPressed(){requestClose();}
+    private void requestClose(){if(saving)return;if(draft.isEmpty()){finish();return;}new AlertDialog.Builder(this).setTitle("还有尚未保存的调整").setMessage("保存后才会影响推荐和待同步偏好。").setNegativeButton("继续调整",null).setNeutralButton("放弃修改",(d,w)->finish()).setPositiveButton("保存并返回",(d,w)->saveDraft(true)).show();}
 
     private void renderShell(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
         LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,8),Ui.dp(this,6),Ui.dp(this,8),Ui.dp(this,4));
-        bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));
+        bar.addView(Ui.button(this,"‹ 返回",v->requestClose(),true));
         bar.addView(Ui.text(this,"人工调整",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));root.addView(bar);
         ScrollView scroll=new ScrollView(this);outerScroll=scroll;content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,10),Ui.dp(this,14),Ui.dp(this,28));scroll.addView(content);
-        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();showLoading();
+        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        pendingBar=new LinearLayout(this);pendingBar.setOrientation(LinearLayout.VERTICAL);pendingBar.setPadding(Ui.dp(this,14),Ui.dp(this,8),Ui.dp(this,14),Ui.dp(this,8));
+        pendingText=Ui.text(this,"",13,Ui.TEXT,true);pendingBar.addView(pendingText);
+        LinearLayout pendingActions=new LinearLayout(this);
+        undoButton=Ui.button(this,"撤销修改",v->{if(saving)return;draft.clear();updatePending();renderSignals(currentQuery());},true);
+        saveButton=Ui.button(this,"保存调整",v->saveDraft(false),false);
+        pendingActions.addView(undoButton,new LinearLayout.LayoutParams(0,-2,1));pendingActions.addView(saveButton,new LinearLayout.LayoutParams(0,-2,1));pendingBar.addView(pendingActions);root.addView(pendingBar);
+        updatePending();setContentView(root);root.requestApplyInsets();showLoading();
+    }
+
+    private void updatePending(){if(pendingBar==null)return;pendingBar.setVisibility(draft.isEmpty()&&!saving?View.GONE:View.VISIBLE);pendingText.setText(saving?"正在保存调整…":"已修改 "+draft.size()+" 项 · 尚未保存");saveButton.setEnabled(!saving);undoButton.setEnabled(!saving);}
+    private void saveDraft(boolean closeAfter){
+        if(saving||draft.isEmpty()){if(closeAfter&&!saving)finish();return;}
+        final JSONArray mutations=draft.mutations();saving=true;updatePending();
+        worker.submit(()->{try{RecommendationPolicyStore.setLocalControls(getApplicationContext(),mutations);JSONObject state=RecommendationPolicyStore.snapshot(getApplicationContext());JSONArray inferred=RecommendationLocalProfile.inferred(getApplicationContext(),UnifiedCatalogStore.load(getApplicationContext()),state);runOnUiThread(()->{if(destroyed)return;saving=false;draft.clear();loadedState=state;loadedControls=state.optJSONArray("controls");loadedInferred=inferred;updatePending();if(closeAfter)finish();else{renderSignals(currentQuery());Toast.makeText(this,"调整已保存",Toast.LENGTH_SHORT).show();}});}catch(Exception error){runOnUiThread(()->{if(destroyed)return;saving=false;updatePending();Toast.makeText(this,"保存失败，修改仍保留，请重试",Toast.LENGTH_LONG).show();});}});
     }
 
     private void showLoading(){
@@ -70,6 +95,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
                 JSONArray controls=state.optJSONArray("controls");if(controls==null)controls=new JSONArray();
                 UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(app);
                 JSONArray inferred=RecommendationLocalProfile.inferred(app,catalog,state);
+                if(searchIndex==null)searchIndex=PreferenceSearchIndex.load(app);
                 final JSONObject finalState=state;final JSONArray finalControls=controls,finalInferred=inferred;
                 runOnUiThread(()->{if(destroyed||generation!=loadGeneration)return;renderLoaded(finalState,finalControls,finalInferred);loadedOnce=true;restoreOuterScroll(restoreY);});
             }catch(Exception e){
@@ -98,7 +124,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         JSONArray hardSuppressed=state.optJSONArray("hardSuppressComicIds");
         int hardSuppressedCount=hardSuppressed==null?0:hardSuppressed.length();
         LinearLayout intro=SettingsRow.panel(this,null);
-        intro.addView(Ui.headingWithInfo(this,"调整规则",16,"0–10 档与屏蔽会立即影响手机自己的下一次排序；5 是中性起点，0 是最强软减少但不等于屏蔽。没有收藏画像时也可以自行添加标签建立初始推荐。连接后可在“推荐同步”里查看两边差异并决定是否合并。本次想看只属于当前手机 Session。"));
+        intro.addView(Ui.headingWithInfo(this,"调整规则",16,"滑杆和屏蔽会先暂存，点击“保存调整”后才影响推荐。5 是中性起点，0 是最强软减少但不等于屏蔽。收藏覆盖是数据依据，不代表你明确喜欢所有标签；画风、场景等上游缺失的信息仍属于未知。连接后可在“推荐同步”中决定是否合并。本次想看只属于当前手机。"));
         intro.addView(SettingsRow.statusLine(this,"Portable Policy",Ui.text(this,"revision "+state.optInt("revision",0),12,Ui.MUTED,true)));
         intro.addView(SettingsRow.statusLine(this,"待同步人工调整",Ui.text(this,RecommendationPolicyStore.pendingControlCount(this)+" 项",12,RecommendationPolicyStore.pendingControlCount(this)>0?Ui.PRIMARY:Ui.MUTED,true)));
         String session=intent!=null&&"TARGET".equals(intent.optString("mode"))?intent.optString("label",intent.optString("key","")):"默认";
@@ -116,6 +142,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         search=new EditText(this);search.setSingleLine(true);search.setHint(LocalizedText.ui("查找作者、IP、标签或分类"));search.setText(activeQuery);
         find.addView(search,new LinearLayout.LayoutParams(-1,-2));
         find.addView(Ui.button(this,"查找",v->{manualSignal=null;activeQuery=search.getText().toString().trim();renderSignals(activeQuery);},true));
+        search.setOnEditorActionListener((v,action,event)->{if(action==android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH||action==android.view.inputmethod.EditorInfo.IME_ACTION_DONE||(event!=null&&event.getKeyCode()==android.view.KeyEvent.KEYCODE_ENTER&&event.getAction()==android.view.KeyEvent.ACTION_UP)){manualSignal=null;activeQuery=search.getText().toString().trim();renderSignals(activeQuery);return true;}return false;});
         content.addView(find);
 
         renderSignals(activeQuery);
@@ -153,7 +180,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         for(int i=0;i<inferred.length();i++){
             JSONObject row=inferred.optJSONObject(i);if(row==null)continue;
             String label=row.optString("label",row.optString("key",""));
-            if(!q.isEmpty()&&!label.toLowerCase(Locale.ROOT).contains(q))continue;
+            if(!q.isEmpty()&&!(searchIndex!=null?searchIndex.matches(row,q):label.toLowerCase(Locale.ROOT).contains(q)))continue;
             String type=row.optString("targetType","TAG"),facet=row.optString("facet","");
             String groupId=groupFor(facet,type);
             Group group=groups.get(groupId);
@@ -233,20 +260,20 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         heading.addView(Ui.text(this,label,15,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));
         TextView value=Ui.text(this,blocked?"已屏蔽":current+"/10",13,blocked?Ui.BAD:Ui.PRIMARY,true);heading.addView(value);
         card.addView(heading);
-        card.addView(Ui.text(this,typeLabel(type)+" · "+(row.optBoolean("systemUnknown",false)?"系统未判断 · 5/10 中性起点":"系统 "+baseline+"/10 · 证据 "+row.optInt("supportCount",0)+" 本"),11.5f,Ui.MUTED,false));
+        card.addView(Ui.text(this,typeLabel(type)+" · "+(row.optBoolean("systemUnknown",false)?"系统未判断 · 5/10 中性起点":"数据基准 "+baseline+"/10 · 覆盖 "+row.optInt("supportCount",0)+" 本，不等于明确喜欢"),11.5f,Ui.MUTED,false));
 
         SeekBar slider=new SeekBar(this);slider.setMax(10);slider.setProgress(current);slider.setEnabled(!blocked);
         final int base=baseline;final boolean[] blockedState={blocked};
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
             public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){if(fromUser&&!blockedState[0]){value.setText(progress+"/10");value.setTextColor(Ui.PRIMARY);}}
             public void onStartTrackingTouch(SeekBar bar){}
-            public void onStopTrackingTouch(SeekBar bar){if(blockedState[0])return;int desired=bar.getProgress(),delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";RecommendationPolicyStore.setLocalControl(RecommendationControlActivity.this,type,key,label,direction,"PERSISTENT",delta);refreshPolicySnapshotOnly();}
+            public void onStopTrackingTouch(SeekBar bar){if(blockedState[0]||saving)return;int desired=bar.getProgress(),delta=desired-base;String direction=delta>0?"MORE":delta<0?"LESS":"DEFAULT";draft.stage(type,key,label,direction,delta,findPersistedControl(type,key));updatePending();}
         });
         card.addView(slider);
 
         LinearLayout buttons=new LinearLayout(this);buttons.setGravity(Gravity.CENTER_VERTICAL);
         Button blockButton=Ui.button(this,blocked?"取消屏蔽":"屏蔽",null,true);
-        blockButton.setOnClickListener(v->{boolean nextBlocked=!blockedState[0];RecommendationPolicyStore.setLocalControl(this,type,key,label,nextBlocked?"BLOCK":"DEFAULT","PERSISTENT",null);blockedState[0]=nextBlocked;refreshPolicySnapshotOnly();blockButton.setText(nextBlocked?"取消屏蔽":"屏蔽");slider.setEnabled(!nextBlocked);if(nextBlocked){value.setText("已屏蔽");value.setTextColor(Ui.BAD);}else{slider.setProgress(base);value.setText(base+"/10");value.setTextColor(Ui.PRIMARY);}});
+        blockButton.setOnClickListener(v->{if(saving)return;boolean nextBlocked=!blockedState[0];draft.stage(type,key,label,nextBlocked?"BLOCK":"DEFAULT",null,findPersistedControl(type,key));blockedState[0]=nextBlocked;updatePending();blockButton.setText(nextBlocked?"取消屏蔽":"屏蔽");slider.setEnabled(!nextBlocked);if(nextBlocked){value.setText("已屏蔽");value.setTextColor(Ui.BAD);}else{slider.setProgress(base);value.setText(base+"/10");value.setTextColor(Ui.PRIMARY);}});
         buttons.addView(blockButton,new LinearLayout.LayoutParams(0,-2,1));
         Ui.gap(buttons,this,6);
         buttons.addView(Ui.button(this,"本次想看",v->{RecommendationPolicyStore.setLocalSessionIntent(this,type,key,label);refreshPolicySnapshotOnly();updateSessionStatus();},true),new LinearLayout.LayoutParams(0,-2,1));
@@ -265,6 +292,9 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
     }
 
     private JSONObject findControl(String type,String key){
+        return draft.effective(type,key,findPersistedControl(type,key));
+    }
+    private JSONObject findPersistedControl(String type,String key){
         JSONArray controls=loadedControls==null?new JSONArray():loadedControls;
         String normalized=normalize(key);
         for(int i=0;i<controls.length();i++){

@@ -25,6 +25,7 @@ final class MobileTagRegistry {
     private final Map<String,Map<String,String>> semantic=new HashMap<>(),entities=new HashMap<>();
     private final Map<String,String> aliases=new HashMap<>();
     private final Set<String> unresolved=new HashSet<>();
+    private final Map<String,List<String>> presentationAliases=new HashMap<>();
     final String manifestFingerprint;
 
     private MobileTagRegistry(Context context) throws Exception {
@@ -45,6 +46,7 @@ final class MobileTagRegistry {
         JSONObject v3Aliases=new JSONObject(readText(context,"PICA_TAG_ALIAS_MAP_V3_FINAL.json"));
         Iterator<String> keys=v3Aliases.keys();while(keys.hasNext()){String key=keys.next();String target=v3Aliases.optString(key,"").trim();if(!target.isEmpty())aliases.put(normalize(key),target);}
         for(Map<String,String> row:parseCsv(readText(context,"PICA_TAG_UNRESOLVED_V3_FINAL_WATCHLIST.csv"))){String value=normalize(row.getOrDefault("normalized_tag",""));if(!value.isEmpty())unresolved.add(value);}
+        for(String raw:aliases.keySet()){Resolved resolved=resolve(raw);if(resolved.resolved&&!resolved.safetyBlocked())presentationAliases.computeIfAbsent(normalize(resolved.canonicalKey),ignored->new ArrayList<>()).add(raw);}
     }
 
     static MobileTagRegistry load(Context context) throws Exception {
@@ -59,6 +61,8 @@ final class MobileTagRegistry {
         row=entities.get(normalized);if(row!=null)return resolved(raw,normalized,row.getOrDefault("entity_key",""),row,"ENTITY");
         return new Resolved(raw,normalized,"","","","UNRESOLVED","UNRESOLVED",false,"",unresolved.contains(normalized)?"WATCHLIST":"OPEN_WORLD",false);
     }
+
+    List<String> presentationAliases(String raw){Resolved resolved=resolve(raw);String key=normalize(resolved.resolved?resolved.canonicalKey:raw);return presentationAliases.getOrDefault(key,Collections.emptyList());}
 
     private Resolved resolved(String raw,String normalized,String key,Map<String,String> row,String type){
         if(row==null)return new Resolved(raw,normalized,key,key,"","UNRESOLVED","UNRESOLVED",false,"",type,true);

@@ -4,9 +4,39 @@
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.
 
-Last reconciled: **2026-09-26**  
-Authoritative repository baseline after unpublished RC packaging: `main@a6115aa2a9e60bf9e1c8a8f2e0ead9d02099a1de` (P2 RC / PR #195 merged)  
-Current critical-path work: **representative Windows/Android RC manual/physical evidence → K5 variance/budget review**
+Last reconciled: **2026-10-12**
+
+2026-10-21 isolated integration update: see **NEXT-38/39** and its exact-source package evidence. The dated reconciliation below remains historical; it is not a fresh acceptance claim for every backlog item.
+
+Audited repository baseline: `main@095d6910c34e00824e03b08a30af0ce4e708137e` (post-release reconnect fix, PR #198 merged)
+
+Published baseline: **v0.5.0 / Android v55**, source `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`, published 2026-10-01 UTC
+
+Current critical path: **NEXT-33 isolated post-release RC evidence → representative Windows/Android manual/physical evidence → K5 variance/budget review**
+
+## Current reconciliation — 2026-10-12
+
+Historical dated entries below retain their original context. The table below and the current NEXT status lines supersede obsolete "publication pending" or "J1/J2 only" wording; publication does not close the larger engineering backlog.
+
+| Lane | Verified progress | Still open |
+| --- | --- | --- |
+| NEXT-32 release | [v0.5.0 published](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0); [publish run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800) passed released Windows upgrade, Android signing/install and asset verification | No new release authorized by this reconciliation |
+| Post-release reconnect / NEXT-33 | PR #198 merged; [RC run 37492489884](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/37492489884) passed contract, Windows, Android and summary jobs at `454e9fef1a04` | Representative restart/reconnect and device QA remain pending. Artifacts are no longer listed by the run API on 2026-10-12; historical package PASS is not current download availability |
+| P2-J / P2-K | J1–J11 measurement harnesses and K1–K5 collection/reconciliation tooling implemented | Nine representative evidence categories listed in NEXT-33; no performance budget or P2 completion claim |
+| P2-C / P2-G | Desktop and Android G17 resource observation implemented | C3/G20 enforcement remains evidence-blocked; do not invent capacities |
+| H2B | Visual QC / Author Atlas / Style Family timing and synthetic scaling available | Real measurements and foreground/background threshold decision |
+| NEXT-28 | Release-scope corrective work shipped through PR #197 | A3 author-work completion prominence and A5 deeper refresh decomposition; PR #196 is a divergent Draft, not an accepted replacement for main |
+| P4 / P4B / P6 | Automated previews and Windows/Android release paths exist | Real-platform/provider/rollback/performance/trust evidence; Server/Docker deployment and soak acceptance |
+| W5 | W5A/B/C complete | W5D onboarding and W5E weak-network acceptance planned; W5F/G/H remain deferred |
+| Community feedback / NEXT-34–35 | Display-only atlas projection and full-local-catalog preference discovery implemented in local-only `e12d48839d0a`; local automated gates passed | Implementation is not uploaded in this documentation update. Fresh remote CI, Windows package/human acceptance and #200 explanation/taxonomy/Android gaps remain open; neither issue is closed |
+| Reader reference analysis / NEXT-36 | Isolated static analysis and 14-feature inventory completed; 27 analysis-model tests passed | Target APK was not executed; 28 reference-runtime scenarios remain pending. No third-party implementation or assets are imported |
+| Android Reader gestures / NEXT-37 | Phone-local double-tap switch and 1.5×/2×/3× zoom implemented locally; 28/28 targeted tests passed | Uncommitted local source only; full Android build/lint/APK, ReaderActivity integration and device QA are not complete |
+
+### 已推进但未验证 / Unreleased implementation inventory
+
+The local-only work above is **PARTIAL**, not released capability. [Conversation progress and evidence limits](docs/UNVERIFIED_PROGRESS_20261012.md) records NEXT-34–37 with the remaining acceptance gates. This documentation commit uploads no application source, APK, decompiled material or private data. Historical RC checks do not validate the newer local implementations.
+
+P1-E/G follow-ups and P1-F/P3 regression obligations remain open as documented. Old dependency-cleanup Drafts #23/#24 are not evidence of accepted implementation. Do not merge PR #196 wholesale: overlapping changes already shipped through #197, while its remaining author-progress work needs a current-main port and fresh tests.
 
 ---
 
@@ -1137,20 +1167,21 @@ Promote expensive manual/advanced analysis paths to observable background tasks 
 - **C1:** add a tested resource coordinator with shared resource-class vocabulary, atomic multi-resource leases, priority/FIFO admission semantics, cancellation and diagnostics. Production mode remains observe-only and does not impose invented capacities.
 - **C2 first batch implemented:** maintenance update, repair, organize, Recommendation V5 Shadow and Work Identity evidence refresh now declare observe-only resource leases; Desktop-only diagnostics expose current/peak overlap.
 - **C2B Desktop batch implemented:** Recommendation V3, favorites sync, local/GitHub download runners and WebDAV now join the same process-wide observe-only resource graph. Desktop injects one coordinator into LibraryService and RemoteStorageDesktopManager; existing task schedulers remain authoritative.
-- **C2 remaining:** collect overlap/latency evidence, keep Visual under its H2B timing path unless phase/resource observation is useful, and design Android-specific cross-task observation rather than copying the Desktop mechanism.
+- **C2 remaining:** collect overlap/latency evidence and keep Visual under its H2B timing path unless phase/resource observation is useful. Android-specific cross-task observation is already implemented under G17; its physical overlap evidence is still pending.
 - **C3 later:** propose enforceable capacities only after overlap and latency evidence exists; before enforcement, task-lifetime leases must become phase-aware where needed so paused tasks do not reserve enforced capacity.
 
 Use the runtime inventory plus H1/H2 measurements to define resource classes and concurrency policy. Do not invent limits before observing current workloads.
 
 ## NEXT-5 — P2-J/P2-K performance baseline
-**Status: IN_PROGRESS — J1 telemetry + J2 repeatable Desktop scenario windows**
+**Status: PARTIAL — J1–J11 and K1–K5 tooling implemented; representative evidence and budget decisions pending**
 
 - **J1 implemented:** bounded in-memory local HTTP latency telemetry classifies requests into low-cardinality route classes and correlates them with active resource-task types without storing URLs, comic IDs, search terms, bodies, tokens or paths.
 - Desktop-only `/api/v1/desktop/runtime/http-profile` exposes count/p50/p95/max/error summaries for overall, idle, under-load, route class and active task type.
 - **J2 implemented:** `pnpm benchmark:http-latency-scenario` drives repeatable sequential Library/detail/Reader foreground traffic against an already-running loopback Desktop engine, with warm-up, clean telemetry reset and three rounds by default.
 - J2 idle windows are valid only when every foreground sample is idle; load windows are valid only when each requested observed task covers every foreground sample. This validates the measurement window, not the performance result.
 - The J2 harness never starts or controls the measured background workload, never emits discovered comic/chapter IDs, and selects no latency threshold or release budget.
-- **Next:** collect and check in representative Windows x64 idle-vs-download/WebDAV/recommendation/maintenance evidence, then add Android-specific startup/jank/foreground latency measurement before P2-K budgets.
+- **Current reconciliation:** J3–J11, Android G18/G19 and K1–K5 now provide the additional measurement/collection paths; they are no longer future implementation work. The J1/J2 details above describe the original foundation only.
+- **Next:** collect representative Windows x64 idle/load and Android physical startup/jank/overlap evidence using the existing harnesses, reconcile through K5, and only then review variance and budgets. See NEXT-33 for the explicit missing evidence categories.
 
 ## NEXT-6 — P2-D SQLite/query discipline
 **Status: PARTIAL — D1–D8B + D7C merged; evidence collection blocks further production query rewrites**
@@ -2790,12 +2821,14 @@ Stable v0.4.11 Release assets and stable OTA metadata remain untouched.
 
 
 ## NEXT-32 — Next stable release scope / v0.4.11 bridge / support-provider reconciliation
-**Status: RELEASE FREEZE — permanent v0.5.0 / Android v55 stamp committed; final stamped candidate + publish transaction pending; broader project backlog remains open**
+**Status: DONE — v0.5.0 / Android v55 published and release transaction verified; broader project backlog remains open**
+
+Publication authority: [v0.5.0 Release](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0), 2026-10-01 04:46:04 UTC; source `bec7f9f31828e8c57e0a2c103b6b1206c22c37cf`; [publish run 36815096800](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/36815096800). The post-release reconnect commits on main are not included in these immutable published assets.
 
 ### Why this entry exists
 The next stable release must not be treated as equivalent to “finish every open item in this log”.
 
-Repository history confirms three different scopes:
+The original 2026-09-30 pre-release reconciliation recorded three different scopes (historical counts, not current branch distances):
 
 1. public stable `v0.4.11`;
 2. current `main`, which is **1058 commits ahead of v0.4.11** and already contains a large body of unreleased architecture/runtime, evidence tooling and experimental-platform work;
@@ -2856,8 +2889,8 @@ The next stable release may contain already-implemented runtime/internal improve
 - internal runtime/performance hardening;
 - experimental or unsupported platform work that is **not** being promoted to formal support.
 
-### R4 — Current release blockers after this reconciliation
-Before publication:
+### R4 — Historical release gates, completed by the v0.5.0 publication
+The publication transaction completed the following gates; they are retained as the release contract, not listed as current blockers:
 1. AZZ migration passes Web/Android/localization tests and old support endpoints are absent from active surfaces.
 2. v0.4.11 -> target source-scoped incremental package is generated from the real public v0.4.11 Windows ZIP and proves schema 13 -> 14 plus unchanged legacy `app/updater.js`; after the upgraded target starts, the external persistent assistant under `runtime-state/upgrade-assistant` must also be present and hash-bound to that target.
 3. The final version number / Android versionCode are stamped once release scope is frozen.
@@ -2935,3 +2968,182 @@ State update:
 - Client-side hardening for subsequent upgrades: reconnect now probes both target-version capabilities and a no-cache Web shell, requires a 1.5-second continuous stabilization window, and only then reloads.
 - The final reconnect failure copy now tells users to wait briefly and refresh the current page before reopening the application.
 - No v0.5.0 Release asset, tag, OTA pointer, database schema, updater package format or version stamp is changed by this branch. The fix is isolated for the next patch release candidate.
+
+## NEXT-33 — Post-v0.5.0 isolated RC and evidence-ready handoff
+**Status: PARTIAL — automated installable-package gates passed at `454e9fef1a04`; representative physical/manual evidence remains pending; UNRELEASED**
+
+Scope:
+- Keep main's existing reconnect fix; add real-Chromium regression coverage for startup 503, a transient shell failure resetting the stability window, wrong version, non-HTML shell and network loss.
+- Preserve the historical 0.4.11 P2 RC workflow. Its hard-coded baseline cannot build current 0.5.0 metadata; add `post-stable-rc-packages.yml` and a guarded `-PostStable` builder mode instead.
+- Use source-bound `0.5.0-postrc.<12-char-sha>` application metadata, a checksum-pinned public v0.5.0 Windows launcher baseline and a new `%LOCALAPPDATA%\Pica Library Post Stable RC` root. Do not read/copy/migrate stable or historical P2 RC user data.
+- Android remains the fixed-certificate `com.picalibrary.android.dev` side-by-side identity. Stop on signature/version incompatibility; do not uninstall the user's Dev app or copy its data.
+- PR events run the non-secret contract only. Trusted branch/manual runs build and verify both installables. A machine-readable `RC_STATUS.json` distinguishes contract-only from package-ready and always keeps manual/physical QA pending.
+- No stable version bump, release/tag/OTA change, production database operation or local deployment is authorized by this lane.
+
+Acceptance:
+1. Type, Web, unit/integration and Chromium regression checks pass.
+2. Trusted CI uploads source/hash-bound Windows and Android artifacts; skipped jobs do not count as package PASS.
+3. Isolated Windows artifact smoke and released-v0.5.0 full-replacement acceptance preserve the temporary external test data. This does not bypass stable-to-RC OTA validation and is not user-machine evidence.
+4. Representative restart/reconnect behavior and Android device acceptance remain separate manual gates.
+
+Representative evidence still required before K5 variance/budget review:
+- Windows K1;
+- Android K2;
+- Android K3 real download;
+- Android K3 real Reader;
+- Windows K4 manual/recovery;
+- Android K4 manual/OEM;
+- J7B real Provider;
+- J10 real Visual;
+- low-end Windows CPU/jank trace.
+
+Verified historical package evidence: [run 37492489884](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/37492489884), exact source `454e9fef1a04a5fdbc17227af2fe755e52c6fbd7`, completed successfully; contract, Windows RC, Android RC and artifact summary jobs all succeeded. The run's artifact API lists no remaining downloads as of 2026-10-12. Do not relabel an old package as the local NEXT-34/35/37 implementation or claim the documentation-only head was built.
+
+K5 tooling completion permits at most `READY_FOR_HUMAN_VARIANCE_AND_BUDGET_REVIEW` after valid evidence reconciliation, not automatic P2 completion or concurrency enforcement. Detailed operator boundary: [POST_STABLE_RC_READINESS.md](docs/POST_STABLE_RC_READINESS.md).
+
+## NEXT-34 — Optional preference-aware collection-map view (#199)
+**Status: PARTIAL — Desktop/Web display projection implemented and locally tested; Windows package/human acceptance pending; LOCAL ONLY / UNRELEASED**
+
+Source: [issue #199](https://github.com/Saber-Alter-Lily/pica-library/issues/199), opened 2026-10-03 UTC.
+
+- Local implementation selects the reporter's opt-in BLOCK/LESS display alternative, with independent switches and default-off objective view. A separate manual exclusion list is not implemented.
+- Preserve the default objective collection view and clearly expose the selected view/filter.
+- Do not mutate favorites, embeddings, original analysis inputs, recommendation policy, feedback or sync state when toggling the view.
+- Automated synthetic-fixture tests cover original snapshot counts/denominators/IDs, empty/error/legacy states, browser-local refresh persistence, immutable projection and read-only service/GET behavior. Filtered views cannot use the old objective PDF export.
+- Local source: `codex/issue199-200-preference-discovery@e12d48839d0ad1ac86964c14cdc0164a5ebfe0a0`, based on the separate PR #203 readiness candidate; this source is NOT part of the current GitHub documentation commit.
+- Required next gate: fresh frozen dependency installation/remote CI, an isolated Windows package, and human objective → BLOCK → LESS → both → objective acceptance without production mutation. See [evidence and limitations](docs/UNVERIFIED_PROGRESS_20261012.md#next-3435--issues-199200-local-implementation).
+- Registration is not closure of the issue or authorization to change recommendation science.
+
+## NEXT-35 — Sparse-tag and interest-explanation discovery (#200)
+**Status: PARTIAL — full-local-catalog discovery and evidence wording implemented locally; explanation/taxonomy/cross-client work remains open; LOCAL ONLY / UNRELEASED**
+
+Source: [issue #200](https://github.com/Saber-Alter-Lily/pica-library/issues/200), opened 2026-10-03 UTC, including the reporter's taxonomy suggestion.
+
+- Separate sparse/coarse Provider tags, collection-frequency summaries and explicit/inferred personal interest in the UI and audit evidence; a collection count is not an interest label by itself.
+- Reproduce the reported manual-tuning burden with a bounded, user-authorized audit export; do not silently inspect or mutate production databases.
+- Assess explanation, unknown-evidence handling and opt-in taxonomy normalization before any recommendation-weight change.
+- An external taxonomy suggestion is a design input, not permission to scrape/import it. Evaluate licensing, provenance, term mapping, updates and user control before choosing a source.
+- Acceptance must preserve existing explicit preferences, avoid fabricated inferred interest and demonstrate whether the agreed change reduces unnecessary manual adjustments.
+- Local implementation searches the complete local catalog before capping results, uses simplified/traditional and existing-alias matching for discovery only, preserves raw preference keys and retains staged edits across searches. Default/mobile bounded snapshots and ranking/matching semantics remain unchanged.
+- Local automated evidence at `e12d48839d0a`: TypeScript PASS; Web syntax 38/38; unit/integration 226 files / 1231 PASS + 1 existing skip; headless Edge 28/28; Rollup and bundled OpenCC MIT/Apache notices PASS. Frozen lockfile-only check is not a fresh dependency installation.
+- Still unverified/unimplemented: actual tuning-burden reduction, artist/style-vs-tag explanations, missing-evidence/opt-in annotation design, versioned cross-client alias migration, Android full-discovery parity and external taxonomy licensing/mapping. No Moegirl import or neural-model change.
+- Windows packaging, Android native/device acceptance and remote CI for this local implementation were NOT RUN; PR #203's earlier CI must not be reused as their evidence.
+
+## 2026-10-06 — Post-release task reconciliation
+
+- Reconciled the current release state against GitHub Release, workflow jobs/artifacts, open PRs/issues and current-main source. Historical implementation notes remain intact.
+- NEXT-32 publication is DONE; NEXT-33 contains unreleased packaging/reconnect acceptance. NEXT-34/#199 and NEXT-35/#200 are tracked but not claimed fixed.
+- This change does not close PR #196 or import its divergent branch. A3/A5 residual work needs a separately reviewed current-main change.
+- Validation outcomes belong to the exact reviewed source/CI run; no CI success is a substitute for the nine external evidence categories above.
+
+## NEXT-36 — External reader behavior analysis and bounded adaptation design
+
+**Status: PARTIAL — isolated static analysis/inventory completed; reference-runtime validation pending; no feature integration claim**
+
+- Reference: user-provided MH-ARK 0.4.3.3. Complete APK/DEX/Smali/native capture was audited locally; high-level decompilation remains PARTIAL and is not original rebuildable source.
+- Reader analysis verified 5 JNI classes / 27 bindings and 48 configuration fields. Its 27 passing tests are analysis-design-model tests, not Android runtime tests.
+- The feature inventory contains 14 feature cards, 51 evidence groups and 142 source anchors. The 115 selected protected inputs remained unchanged at that phase; this is not a claim that all recovered code was behaviorally verified.
+- Target APK execution, runtime/performance/network/format compatibility and all 28 inventory QA scenarios are still pending.
+- Learning priorities: per-comic reading presets, adjustable gestures and split/spread display; later evaluate local directory/CBZ reading and comic/chapter cache control. These are design candidates, not accepted release scope or completed features.
+- Existing multi-WebDAV, categorized cache, preloading and library filtering should be reused, not rebuilt. Do not copy unsafe original-file deletion semantics or describe a privacy lock as proven encryption.
+- Third-party code, libraries, resources, APKs and decompilation outputs remain local isolated analysis material. Any Pica change must be independently implemented and separately verified; this documentation update uploads none of those materials.
+
+Acceptance still required:
+
+1. Confirm the chosen Pica source baseline against current main before implementation.
+2. Define only a small user-visible slice, original-page progress identity and non-destructive fallback.
+3. Verify target reference behavior where needed; treat unavailable runtime evidence as unknown.
+4. Complete the slice's own build/integration/device/data-preservation gates. NEXT-37 is the only local implementation slice so far.
+
+## NEXT-37 — Android phone-local double-tap and zoom options
+
+**Status: PARTIAL — local implementation + targeted tests PASS; full app/package/device gates PENDING; LOCAL ONLY / UNRELEASED**
+
+Local authority:
+
+- Branch `codex/android-reader-gesture-polish`; base `e12d48839d0ad1ac86964c14cdc0164a5ebfe0a0`, not asserted to be latest main.
+- Seven changed/new source/test files remain uncommitted locally. No implementation push, merge, APK installation or release is performed by this record.
+
+Implemented:
+
+- Reader → 阅读设置 → 手势与放大（仅此手机）.
+- Phone-local double-tap enable/disable, default enabled; selectable 1.5× / 2× / 3×, default 2×.
+- Disabling double-tap removes tap-confirmation waiting; pinch zoom stays available.
+- Existing/rebound page holders use current settings without chapter reload, reading-progress reset or zoom reset.
+- Scrollable Chinese/English/Japanese options; existing ReaderSource, cache, progress, portable settings and sync contracts are unchanged.
+
+Evidence:
+
+- 28/28 targeted tests PASS, zero failures/skips: settings 5, options 4, zoom 9, existing ReaderPolicy regression 10 (**18 new tests**, not 28 new tests).
+- Isolated SDK-free Java/Robolectric 4.17 harness compiles the repository settings/options/zoom classes directly against API 35; JDK 21 / harness Gradle 9.0.0.
+- This is NOT a full Android AGP/CI build, and does not establish ReaderActivity integration. Project build/signing/version settings are unchanged.
+- `git diff --check` PASS; all seven file hashes match the local validation record at this reconciliation. Production data/application, provider, recommendation and sync state are untouched.
+
+Acceptance still required:
+
+1. Review/rebase against current main without losing the local issue work.
+2. Full Android build, lint and Dev APK verification; the earlier local test run lacked an Android SDK.
+3. ReaderActivity integration and physical-device touch QA: immediate single tap when disabled, selected double-tap scale, pinch/pan, gesture cancellation and parent-scroll/page conflicts.
+4. Settings persistence after relaunch, recycling/rebind, active-page updates and orientation; unchanged chapter/progress/cache/source/sync behavior.
+5. Human acceptance before any merge or release. Do not infer package/device PASS from the 28 targeted tests.
+
+## 2026-10-12 — Conversation progress recorded, documentation only
+
+- Reconciled NEXT-33 against the exact successful historical run; kept its manual/physical gates and missing current artifact downloads explicit.
+- Advanced NEXT-34/35 from design registration to **local implementation / PARTIAL**, not issue closure or released behavior.
+- Registered NEXT-36 static reference analysis and NEXT-37 local Reader gesture slice separately, with independent evidence levels and remaining gates.
+- Documentation is updated on existing Draft PR #203 only. The PR remains unmerged; the current source implementations and private analysis remain local.
+- No application-source upload, version/signing/schema/model change, release/tag/OTA transaction, production-data operation or deployment is authorized.
+- The documentation-only commit skips automatic push/PR CI. Prior checks remain bound to their exact implementation SHA; no new application validation is claimed.
+
+## NEXT-38 — Consolidated issue/source/reader acceptance candidate
+
+**Status: IN_PROGRESS / UNRELEASED — isolated implementation and automated integration; physical/provider acceptance PENDING**
+
+- Authorized on 2026-10-21, including the explicit one-round exception for the DPAPI-blocked Local Memory coordination lock. No coordinator secret/identity is changed.
+- Independent checkout/branch `codex/next-acceptance-sources-jm`; original Reader dirty worktree remains preserved. The latest PR #203 documentation is reconciled without dropping its historical evidence limits.
+- NEXT-34: retain default-off BLOCK/LESS display projection and current automated regressions; no recommendation/data mutation or issue closure.
+- NEXT-35: retain Desktop full-catalog discovery; add Android search-only folding/aliases, explicit staged Save/Undo, rotation retention and collection-vs-interest wording. Taxonomy import, model changes, actual tuning-burden proof and versioned cross-client alias migration remain open.
+- NEXT-37: integrate the phone-local gesture slice into the full app; no borrowed reference-APK code/assets. Device touch/OEM acceptance remains pending even after compilation.
+- [Issue #204](https://github.com/Saber-Alter-Lily/pica-library/issues/204): opt-in JM account favorites using maintained MIT SDK v1.1.12; verified-account bounded preview/confirm, additive import, cancellation, metadata completeness and explicit enrichment; native Android and Desktop search/Reader routes.
+- Source registry preserves Pica/EH IDs, rejects unknown prefixes and exposes capabilities. It is a compiled extension seam, not a completed third-party plugin ecosystem. Automatic JM candidate recall and native JM phone-download/sync are not claimed.
+- Current evidence/limits, upstream licenses, package gates and consolidated device checklist: [NEXT_ACCEPTANCE_EXECUTION.md](docs/NEXT_ACCEPTANCE_EXECUTION.md), [JM_SOURCE_ADAPTER_ACCEPTANCE.md](docs/JM_SOURCE_ADAPTER_ACCEPTANCE.md).
+- Local final automated baseline: Desktop 228 files, 1245 PASS + 1 existing skip; TypeScript and Web 39/39; Edge browser 29/29; Android 34 files / 151 PASS, lint, Dev build and Release R8 build PASS. Android AtomicFile host semantics and upstream R8 warnings are documented; these checks do not establish real-device/provider acceptance.
+- The user separately authorized candidate-branch push, Draft PR and existing-secret CI signing. Remote/package results must still be recorded against their own source SHA; no local debug signature may be supplied as an existing-Dev upgrade substitute.
+- Candidate branch CI/package construction only. No production app/database/credential/Visual/sync operation, local deployment, main merge, formal version/tag/Release/OTA change, automatic issue response or closure.
+
+## NEXT-39 — After consolidated acceptance
+
+**Status: PLANNED, not implemented by NEXT-38**
+
+- Decide source-repository/manifest trust, source enable/disable/update lifecycle and legal/distribution policy before dynamic extensions.
+- Add bounded JM recommendation retrieval only after real metadata/profile evidence and a separate recommendation review; never synthesize Like/style labels from imported favorites.
+- Native JM progress/proxy and complete locale parity; NEXT-40 separately implements and validates the native download slice. Further source adapters use the registry and maintained upstreams, not one-off protocol copies.
+- Preserve all unrelated P2/W5/NEXT-28 performance, onboarding, author-progress and device evidence backlog above; this candidate does not declare them complete.
+
+## NEXT-40 — Native JM explicit downloads and offline Reader
+
+**Status: IN_PROGRESS / UNRELEASED — source implementation; fresh exact-source automated/package gates and real-device/provider acceptance PENDING**
+
+- Continued on 2026-10-22 after explicit permission to bypass the still-failing DPAPI coordination claim for this isolated development/build round. No memory identity or secret is repaired or replaced.
+- Base: previous frozen NEXT-38 candidate `0549bc5e271d936c656cd9c6bdf6baa7e13b5681`, Draft PR #205. Keep the prior handoff ZIP unchanged.
+- Scope: explicit JM single/all-chapter downloads via the maintained SDK, existing WorkManager resource tags and task center, Wi-Fi constraints, pause/resume/cancel, durable checksum-verified page checkpoints, and the existing phone-download Reader/index.
+- Complete-chapter publication only: interrupted/failed chapters are retained for resume outside the readable index. Invalid source/chapter/page identity, non-image content and changed login binding fail closed. Logout/account switching never deletes previously completed local downloads.
+- Same-comic jobs use unique WorkManager identity and a local write lock; duplicate KEEP requests cannot relabel the actual queued chapter. A job carries only a non-secret session binding, never a password or cookie.
+- JM search results open the common detail screen; JM chapter/all-download controls are added there. JM account/favorites controls must not incorrectly redirect users to Pica login.
+- No database-schema, recommendation-ranker/recall, Visual/embedding, sync-protocol, stable-version/tag/Release/OTA or production-state change. No automatic deployment or manual testing requested now.
+- Remaining acceptance and exact evidence: [JM_NATIVE_DOWNLOAD_ACCEPTANCE.md](docs/JM_NATIVE_DOWNLOAD_ACCEPTANCE.md). NEXT-40 does not complete the rest of NEXT-39 or close #199/#200/#204.
+
+Post-build evidence for NEXT-40: frozen source `43d9c2bc5a789994973703fe84408e8824962d5c`, candidate run `39759492930`, 3/3 PASS. Actual Android JUnit 35 files / 167 PASS; original fixed-signature Dev code 56 and downloaded Windows isolation/runtime checks verified. Full handoff `PICA_JM_OFFLINE_NEXT_ACCEPTANCE_20261022_43d9c2bc5a78.zip`, SHA-256 `36a20d49e464964562d29a931d22c762f4951f7949bbade7af5c596204b7c382`. These results advance NEXT-40 to AUTOMATED_CANDIDATE_READY / HUMAN_PROVIDER_QA_PENDING, not release or issue closure.
+
+## NEXT-41 — Native JM source-screen locale and operation feedback
+
+**Status: IN_PROGRESS / UNRELEASED — source implementation; fresh exact-source automated/package and human/provider gates PENDING**
+
+- Authorized 2026-10-22 by a new explicit one-round exception to the DPAPI-blocked coordination claim. Base `43d9c2bc5a789994973703fe84408e8824962d5c`; local branch `codex/jm-source-ux-20261022`, existing Draft PR #205 candidate ref only. Prior source/Reader worktrees and frozen packages remain intact.
+- Keep the source UI and SDK architecture. Add 68 semantic source-screen resources in zh-CN/en/ja; source titles/authors remain unmodified content. Distinct status, progress, success, empty, cancellation, failure and recreation messages replace generic failure text.
+- Gate all conflicting buttons/IME actions, including logout/enrichment/detail controls. Only scan/enrichment can be cancelled; cancelled or destroyed requests cannot expose late import previews/navigation. Failed account switch refreshes identity instead of keeping the old label.
+- Search failures retain the last successful page; pagination binds to its submitted query. Recreation stores bounded visible metadata/input only, never passwords or preview tokens, and never auto-replays an import. Incomplete/expired scans require fresh explicit confirmation. Import/enrichment retain the existing additive collection semantics and maximum-20 enrichment bound.
+- Add synthetic Robolectric UI and three-locale resource-format tests; rerun exact-source Android and Desktop/Web/source/browser/package gates. CI-only candidate versionCode becomes 57 under the same Dev identity and fixed certificate; no private key download.
+- No production account/data, database schema, ranker/recall, Visual/embedding, sync protocol, installed app, stable version/tag/Release/OTA or deployment change. No new manual testing requested. Full-app localization, JM native proxy/progress, automatic recall and dynamic extensions remain open.
+- Evidence levels and deferred consolidated checklist: [JM_SOURCE_UI_ACCEPTANCE.md](docs/JM_SOURCE_UI_ACCEPTANCE.md). No #199/#200/#204 closure and no claim that automated UI fixtures establish real-device/provider acceptance.

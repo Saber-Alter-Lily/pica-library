@@ -29,6 +29,9 @@ export interface StoredCredentials {
     ehPassHash?: string
     ehIgneous?: string
     ehCfClearance?: string
+    /** Optional remembered JM login, protected by the existing OS credential backend. */
+    jmUsername?: string
+    jmPassword?: string
 }
 
 export interface SetupInput {

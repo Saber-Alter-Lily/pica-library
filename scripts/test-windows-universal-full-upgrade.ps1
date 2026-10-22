@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)][string]$BaselineZip,
     [Parameter(Mandatory = $true)][string]$CandidateZip,
     [Parameter(Mandatory = $true)][string]$CandidateVersion,
-    [Parameter(Mandatory = $true)][string]$CandidateSourceSha
+    [Parameter(Mandatory = $true)][string]$CandidateSourceSha,
+    [string]$DesktopHomeName = 'Pica Library P2 RC'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,6 +64,9 @@ function Stop-Desktop($Instance) {
 if ($CandidateSourceSha -notmatch '^[0-9a-f]{40}$') {
     throw 'CandidateSourceSha must be a full Git commit SHA'
 }
+if ($DesktopHomeName -notin @('Pica Library P2 RC', 'Pica Library Post Stable RC')) {
+    throw 'Acceptance requires one of the isolated RC home names'
+}
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ("pica-universal-upgrade-" + [guid]::NewGuid().ToString('N'))
 $currentExtract = Join-Path $work 'current'
@@ -70,7 +74,7 @@ $candidateExtract = Join-Path $work 'candidate'
 $local = Join-Path $work 'localappdata'
 $bootstrap = Join-Path $work 'bootstrap'
 $backupRoot = Join-Path $work 'application-backup'
-$progressFile = Join-Path $local 'Pica Library P2 RC\runtime-state\updates\acceptance-progress.json'
+$progressFile = Join-Path (Join-Path $local $DesktopHomeName) 'runtime-state\updates\acceptance-progress.json'
 $instructionFile = Join-Path $bootstrap 'instruction.json'
 $originalLocal = $env:LOCALAPPDATA
 $originalHome = $env:PICA_LIBRARY_DESKTOP_HOME
@@ -104,7 +108,7 @@ try {
     }
 
     $env:LOCALAPPDATA = $local
-    $desktopHome = Join-Path $local 'Pica Library P2 RC'
+    $desktopHome = Join-Path $local $DesktopHomeName
     $env:PICA_LIBRARY_DESKTOP_HOME = $desktopHome
     $instanceFile = Join-Path $desktopHome 'runtime-state\instance.json'
     $libraryDirectory = Join-Path $desktopHome 'data'
@@ -168,6 +172,7 @@ try {
     }
 
     $candidateInstance = Wait-Instance $instanceFile
+    $currentInstance = $candidateInstance
     $candidateCaps = Invoke-RestMethod -Uri ($candidateInstance.url + '/api/v1/capabilities') -TimeoutSec 10
     if ([string]$candidateCaps.appVersion -ne $CandidateVersion) {
         throw "Candidate version mismatch after full replacement: $($candidateCaps.appVersion)"
@@ -222,7 +227,14 @@ try {
         $env:PICA_LIBRARY_DESKTOP_HOME = $originalHome
     }
     if ($success -and (Test-Path -LiteralPath $work)) {
-        Remove-Item -Recurse -Force -LiteralPath $work -ErrorAction SilentlyContinue
+        $resolved = [IO.Path]::GetFullPath($work)
+        $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
+        if (-not $resolved.StartsWith($tempRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or
+            (Split-Path -Leaf $resolved) -notmatch '^pica-universal-upgrade-[0-9a-f]{32}$' -or
+            ((Get-Item -LiteralPath $resolved).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw 'Refusing cleanup outside the task-owned upgrade acceptance directory'
+        }
+        Remove-Item -Recurse -Force -LiteralPath $resolved -ErrorAction SilentlyContinue
     } elseif (-not $success) {
         Write-Warning "Universal full-upgrade acceptance retained for diagnosis: $work"
     }

@@ -12,6 +12,8 @@ button,.button-control{min-height:40px;padding:7px 11px}
 .compact-filter-panel input{min-width:min(260px,100%)}
 .account-primary-action{margin-top:10px}
 #settings-eh-account>.actions{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+#settings-jm-account>.actions{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;min-width:0}
+#settings-jm-account>.actions button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
 #settings-eh-account .account-action-group .compact-action-list{max-width:100%}
 .batch-action-disclosure{display:inline-block}
 .selection-toolbar{align-items:center}

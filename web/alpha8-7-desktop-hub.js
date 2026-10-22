@@ -408,6 +408,8 @@ function buildSettingsHub() {
 
     const ehAccount = hub$('#settings-eh-account')
     if (ehAccount) panels.get('general').appendChild(ehAccount)
+    const jmAccount = hub$('#settings-jm-account')
+    if (jmAccount) panels.get('general').appendChild(jmAccount)
 
     const recommendationV4 = hub$('#settings-recommendation-v4')
     if (recommendationV4) panels.get('recommendations').appendChild(recommendationV4)

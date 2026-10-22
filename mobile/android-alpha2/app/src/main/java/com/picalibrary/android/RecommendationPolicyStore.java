@@ -130,10 +130,35 @@ final class RecommendationPolicyStore {
 
     static void setLocalControl(Context c,String targetType,String key,String label,String direction,String scope){setLocalControl(c,targetType,key,label,direction,scope,null);}
     static void setLocalControl(Context c,String targetType,String key,String label,String direction,String scope,Integer levelDelta){
-        String type=targetType==null?"":targetType.trim().toUpperCase(Locale.ROOT),cleanKey=norm(key),dir=direction==null?"DEFAULT":direction.trim().toUpperCase(Locale.ROOT);if(cleanKey.isEmpty())return;
-        JSONObject state=snapshot(c);JSONArray current=state.optJSONArray("controls");if(current==null)current=new JSONArray();JSONArray next=new JSONArray();String identity=type+":"+cleanKey;for(int i=0;i<current.length();i++){JSONObject row=current.optJSONObject(i);if(row==null)continue;String id=row.optString("targetType")+":"+norm(row.optString("key"));if(!identity.equals(id))next.put(row);}
-        JSONObject mutation=new JSONObject();try{mutation.put("targetType",type);mutation.put("key",cleanKey);mutation.put("label",label==null?key:label);mutation.put("direction",dir);if(levelDelta!=null&&!"BLOCK".equals(dir))mutation.put("levelDelta",Math.max(-10,Math.min(10,levelDelta.intValue())));mutation.put("scope","SESSION".equals(scope)?"SESSION":"PERSISTENT");mutation.put("source","ANDROID");mutation.put("updatedAt",now());if(!"DEFAULT".equals(dir))next.put(new JSONObject(mutation.toString()));state.put("controls",next);state.put("updatedAt",now());}catch(Exception e){throw new IllegalStateException("无法更新本机推荐偏好",e);}saveSnapshot(c,state);
-        JSONArray dirty=parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]"));JSONArray filtered=new JSONArray();for(int i=0;i<dirty.length();i++){JSONObject row=dirty.optJSONObject(i);if(row==null)continue;String id=row.optString("targetType")+":"+norm(row.optString("key"));if(!identity.equals(id))filtered.put(row);}filtered.put(mutation);prefs(c).edit().putString(DIRTY_CONTROLS,filtered.toString()).putString(MUTATION_ID,UUID.randomUUID().toString()).apply();
+        JSONObject mutation=new JSONObject();
+        try{mutation.put("targetType",targetType);mutation.put("key",key);mutation.put("label",label==null?key:label);mutation.put("direction",direction);mutation.put("scope",scope);if(levelDelta!=null)mutation.put("levelDelta",levelDelta);}catch(Exception error){throw new IllegalArgumentException(error);}
+        setLocalControls(c,new JSONArray().put(mutation));
+    }
+
+    /** Commit all editor mutations and the pending-sync queue in one preferences transaction. */
+    static synchronized void setLocalControls(Context c,JSONArray mutations){
+        if(mutations==null||mutations.length()==0)return;
+        JSONObject state=snapshot(c);
+        Map<String,JSONObject> controls=new LinkedHashMap<>(),dirty=new LinkedHashMap<>();
+        JSONArray existing=state.optJSONArray("controls"),pending=parseArray(prefs(c).getString(DIRTY_CONTROLS,"[]"));
+        if(existing!=null)for(int i=0;i<existing.length();i++){JSONObject row=existing.optJSONObject(i);if(row!=null)controls.put(row.optString("targetType")+":"+norm(row.optString("key")),row);}
+        for(int i=0;i<pending.length();i++){JSONObject row=pending.optJSONObject(i);if(row!=null)dirty.put(row.optString("targetType")+":"+norm(row.optString("key")),row);}
+        String timestamp=now();
+        try{
+            for(int i=0;i<mutations.length();i++){
+                JSONObject input=mutations.getJSONObject(i);
+                String type=input.optString("targetType").trim().toUpperCase(Locale.ROOT),key=norm(input.optString("key")),direction=input.optString("direction","DEFAULT").trim().toUpperCase(Locale.ROOT);
+                if(key.isEmpty())continue;
+                if(!Arrays.asList("TAG","AUTHOR","CATEGORY","FANDOM","STYLE_FAMILY").contains(type)||!Arrays.asList("MORE","LESS","BLOCK","DEFAULT").contains(direction))throw new IllegalArgumentException("无效的偏好类型或方向");
+                JSONObject value=new JSONObject();value.put("targetType",type);value.put("key",key);value.put("label",input.optString("label",key));value.put("direction",direction);value.put("scope","SESSION".equals(input.optString("scope"))?"SESSION":"PERSISTENT");value.put("source","ANDROID");value.put("updatedAt",timestamp);
+                if(input.has("levelDelta")&&!"BLOCK".equals(direction))value.put("levelDelta",Math.max(-10,Math.min(10,input.getInt("levelDelta"))));
+                String identity=type+":"+key;
+                if("DEFAULT".equals(direction))controls.remove(identity);else controls.put(identity,value);
+                dirty.put(identity,value);
+            }
+            state.put("controls",new JSONArray(controls.values()));state.put("updatedAt",timestamp);
+        }catch(Exception error){throw new IllegalStateException("无法保存本机推荐偏好，调整尚未写入",error);}
+        prefs(c).edit().putString(SNAPSHOT,state.toString()).putString(DIRTY_CONTROLS,new JSONArray(dirty.values()).toString()).putString(MUTATION_ID,UUID.randomUUID().toString()).apply();
     }
 
     static void setLocalSessionIntent(Context c,String targetType,String key,String label){

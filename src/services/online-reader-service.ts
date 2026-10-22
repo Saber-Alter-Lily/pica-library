@@ -23,27 +23,29 @@ export class OnlineReaderService {
         private readonly provider: Pick<
             ProviderService,
             'getEpisodes' | 'getEpisodePages' | 'fetchPage' | 'cacheScope'
-        >,
+        > & Partial<Pick<ProviderService, 'prepareSource'>>,
         private readonly cache: PreviewCacheManager
     ) {}
 
     private comicId(value: string) {
         if (
             !/^[a-zA-Z0-9_-]{1,128}$/.test(value) &&
-            !/^eh:\d+:[0-9a-f]{10}$/i.test(value)
+            !/^eh:\d+:[0-9a-f]{10}$/i.test(value) &&
+            !/^jm:[1-9]\d{0,14}$/.test(value)
         )
             throw new Error('无效的漫画标识')
         return value
     }
 
     private episodeId(value: string) {
-        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(value))
+        if (!/^[a-zA-Z0-9_-]{1,128}$/.test(value) && !/^jm-chapter:[1-9]\d{0,14}$/.test(value))
             throw new Error('无效的章节标识')
         return value
     }
 
     async chapters(comicId: string) {
         this.comicId(comicId)
+        await this.provider.prepareSource?.(comicId)
         const scope = this.provider.cacheScope(comicId)
         const albumKey = `${scope}\n${comicId}`
         let episodes = this.albums.get(albumKey)
@@ -68,12 +70,12 @@ export class OnlineReaderService {
     private async metadata(comicId: string, episodeId: string) {
         this.comicId(comicId)
         this.episodeId(episodeId)
+        await this.chapters(comicId)
         const scope = this.provider.cacheScope(comicId)
         const albumKey = `${scope}\n${comicId}`
         const key = `${scope}\n${comicId}\n${episodeId}`
         let value = this.chaptersCache.get(key)
         if (!value) {
-            await this.chapters(comicId)
             const episode = this.albums
                 .get(albumKey)
                 ?.find((entry) => entry.id === episodeId)

@@ -129,6 +129,14 @@ jobs:
       - name: Tests, lint and shrinker compatibility before secrets
         working-directory: mobile/android-alpha2
         run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon
+      - name: Retain synthetic unit-test evidence without account or signing secrets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Android-Evidence
+          path: mobile/android-alpha2/app/build/test-results/testDebugUnitTest/TEST-*.xml
+          retention-days: 1
+          if-no-files-found: ignore
       - name: Fixed-signature side-by-side candidate only
         working-directory: mobile/android-alpha2
         env:

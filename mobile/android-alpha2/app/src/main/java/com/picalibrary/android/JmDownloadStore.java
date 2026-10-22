@@ -57,8 +57,10 @@ final class JmDownloadStore {
         FileOutputStream stream = null;
         try {
             stream = checkpoint.startWrite();
-            stream.write(pages.toString().getBytes(StandardCharsets.UTF_8));
+            byte[] serialized = pages.toString().getBytes(StandardCharsets.UTF_8);
+            stream.write(serialized);
             checkpoint.finishWrite(stream);
+            if (!java.util.Arrays.equals(serialized, checkpoint.readFully())) throw new IOException("JM checkpoint was not committed");
         } catch (Exception error) {
             if (stream != null) checkpoint.failWrite(stream);
             throw error;
@@ -80,6 +82,7 @@ final class JmDownloadStore {
         FileOutputStream stream = null;
         try {
             stream = output.startWrite(); stream.write(bytes); output.finishWrite(stream);
+            if (!valid(Uri.fromFile(target).toString(), digest(bytes), bytes.length)) throw new IOException("JM file was not committed");
             return Uri.fromFile(target).toString();
         } catch (Exception error) {
             if (stream != null) output.failWrite(stream);
@@ -102,7 +105,10 @@ final class JmDownloadStore {
                 if (out == null) throw new IOException("Cannot write JM page"); out.write(bytes);
             }
             if (!valid(part.getUri().toString(), digest(bytes), bytes.length)) throw new IOException("JM page verification failed");
-            if (part.renameTo(name)) return part.getUri().toString();
+            if (part.renameTo(name)) {
+                if (!valid(part.getUri().toString(), digest(bytes), bytes.length)) throw new IOException("JM page rename verification failed");
+                return part.getUri().toString();
+            }
             target = directory.createFile("image/" + ("jpg".equals(extension) ? "jpeg" : extension), name);
             if (target == null) throw new IOException("Cannot commit JM page");
             try (InputStream in = context.getContentResolver().openInputStream(part.getUri());

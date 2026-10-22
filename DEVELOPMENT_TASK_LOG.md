@@ -3133,3 +3133,17 @@ Acceptance still required:
 - JM search results open the common detail screen; JM chapter/all-download controls are added there. JM account/favorites controls must not incorrectly redirect users to Pica login.
 - No database-schema, recommendation-ranker/recall, Visual/embedding, sync-protocol, stable-version/tag/Release/OTA or production-state change. No automatic deployment or manual testing requested now.
 - Remaining acceptance and exact evidence: [JM_NATIVE_DOWNLOAD_ACCEPTANCE.md](docs/JM_NATIVE_DOWNLOAD_ACCEPTANCE.md). NEXT-40 does not complete the rest of NEXT-39 or close #199/#200/#204.
+
+Post-build evidence for NEXT-40: frozen source `43d9c2bc5a789994973703fe84408e8824962d5c`, candidate run `39759492930`, 3/3 PASS. Actual Android JUnit 35 files / 167 PASS; original fixed-signature Dev code 56 and downloaded Windows isolation/runtime checks verified. Full handoff `PICA_JM_OFFLINE_NEXT_ACCEPTANCE_20261022_43d9c2bc5a78.zip`, SHA-256 `36a20d49e464964562d29a931d22c762f4951f7949bbade7af5c596204b7c382`. These results advance NEXT-40 to AUTOMATED_CANDIDATE_READY / HUMAN_PROVIDER_QA_PENDING, not release or issue closure.
+
+## NEXT-41 — Native JM source-screen locale and operation feedback
+
+**Status: IN_PROGRESS / UNRELEASED — source implementation; fresh exact-source automated/package and human/provider gates PENDING**
+
+- Authorized 2026-10-22 by a new explicit one-round exception to the DPAPI-blocked coordination claim. Base `43d9c2bc5a789994973703fe84408e8824962d5c`; local branch `codex/jm-source-ux-20261022`, existing Draft PR #205 candidate ref only. Prior source/Reader worktrees and frozen packages remain intact.
+- Keep the source UI and SDK architecture. Add 68 semantic source-screen resources in zh-CN/en/ja; source titles/authors remain unmodified content. Distinct status, progress, success, empty, cancellation, failure and recreation messages replace generic failure text.
+- Gate all conflicting buttons/IME actions, including logout/enrichment/detail controls. Only scan/enrichment can be cancelled; cancelled or destroyed requests cannot expose late import previews/navigation. Failed account switch refreshes identity instead of keeping the old label.
+- Search failures retain the last successful page; pagination binds to its submitted query. Recreation stores bounded visible metadata/input only, never passwords or preview tokens, and never auto-replays an import. Incomplete/expired scans require fresh explicit confirmation. Import/enrichment retain the existing additive collection semantics and maximum-20 enrichment bound.
+- Add synthetic Robolectric UI and three-locale resource-format tests; rerun exact-source Android and Desktop/Web/source/browser/package gates. CI-only candidate versionCode becomes 57 under the same Dev identity and fixed certificate; no private key download.
+- No production account/data, database schema, ranker/recall, Visual/embedding, sync protocol, installed app, stable version/tag/Release/OTA or deployment change. No new manual testing requested. Full-app localization, JM native proxy/progress, automatic recall and dynamic extensions remain open.
+- Evidence levels and deferred consolidated checklist: [JM_SOURCE_UI_ACCEPTANCE.md](docs/JM_SOURCE_UI_ACCEPTANCE.md). No #199/#200/#204 closure and no claim that automated UI fixtures establish real-device/provider acceptance.

@@ -1,8 +1,8 @@
 # Next consolidated acceptance candidate
 
-Status: UNPUBLISHED / NEXT-40 NATIVE JM DOWNLOAD CONTINUATION IN PROGRESS. This is an integration candidate, not a release or device-acceptance result.
+Status: UNPUBLISHED / NEXT-41 NATIVE JM SOURCE-SCREEN UX CONTINUATION IN PROGRESS. This is an integration candidate, not a release or device-acceptance result.
 
-The previous frozen source `0549bc5e271d936c656cd9c6bdf6baa7e13b5681` completed its automated/package gates in run `39636750384`. Those results do not validate later changes. The 2026-10-22 continuation is limited to native JM offline downloads and associated UI/tests; its exact-source build results must be recorded separately. See [JM_NATIVE_DOWNLOAD_ACCEPTANCE.md](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md).
+The prior frozen source `43d9c2bc5a789994973703fe84408e8824962d5c` completed NEXT-40 automated/package gates in run `39759492930`; it did not establish real-provider/device acceptance. This 2026-10-22 round is limited to native JM source-screen localization, operation feedback and duplicate prevention with synthetic tests. Its exact-source build results must be recorded separately. See [JM_SOURCE_UI_ACCEPTANCE.md](JM_SOURCE_UI_ACCEPTANCE.md) and the retained [download boundary](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md).
 
 ## Authority and baseline
 
@@ -47,7 +47,7 @@ Remote favorites are collection evidence, not implicit explicit Likes. Import mu
 - JM is opt-in. Existing automatic recommendation retrieval remains Pica/EH/ExH; imported JM collection metadata may enter existing local evidence, but there is no JM-specific ranking boost or automatic JM candidate recall.
 - JM summary endpoints omit tags; an explicit cancellable detail-enrichment batch is limited to 20 favorites. Missing tags/authors are not fabricated and a summary refresh cannot erase enriched tags.
 - Desktop inherits an unauthenticated HTTP proxy through private stdin configuration. Unsupported authenticated/HTTPS/SOCKS proxies are rejected rather than silently bypassed; changing the proxy requires restarting this candidate. Native JM uses the device/SDK network path; native proxy parity remains future work.
-- Android JM has native search, details, chapters and online reading without Desktop. NEXT-40 adds explicit phone-download orchestration, task-center controls and complete-chapter offline reading; fresh automated/package and real-device gates apply. JM-specific cross-device progress remains unimplemented; existing LAN/local/WebDAV paths remain available. The source screen still needs full native localization/device polish.
+- Android JM has native search, details, chapters and online reading without Desktop. NEXT-40 adds explicit phone downloads, task-center controls and complete-chapter offline reading. NEXT-41 localizes the source screen and improves its operation feedback, cancellation and search-state recovery; this is not full-app locale/device acceptance. JM-specific cross-device progress and native proxy parity remain unimplemented; existing LAN/local/WebDAV paths remain available.
 - New adapter code is independent implementation; no recovered reference-APK code, library, art asset or private analysis payload is imported.
 
 ## Handoff gate

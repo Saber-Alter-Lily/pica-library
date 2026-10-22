@@ -8,6 +8,8 @@ import org.picalibrary.sources.JmSource;
 
 /** Native phone source. It does not depend on Desktop/LAN availability. Call from a worker. */
 final class JmClientManager {
+    interface FavoritesProgress {void onPage(int page,int pages,int count,int total);}
+    interface EnrichmentProgress {void onItem(int done,int total,int updated,int failed);}
     private static JmClientManager instance;
     private final Context context;
     private final JmSource source=new JmSource();
@@ -49,7 +51,8 @@ final class JmClientManager {
     JSONArray pages(String episodeId) throws Exception {restore();return array(source.pages(episodeId));}
     byte[] image(String locator) throws Exception {restore();return source.image(locator,20*1024*1024);}
     void cancel(){generation++;preview=null;}
-    JSONObject previewFavorites() throws Exception {
+    JSONObject previewFavorites() throws Exception {return previewFavorites(null);}
+    JSONObject previewFavorites(FavoritesProgress progress) throws Exception {
         cancel();final int current=generation;restore();JSONObject identity=object(source.status());String accountId=identity.optString("accountId");if(!identity.optBoolean("configured")||accountId.isEmpty())throw new IllegalStateException("请先登录 JM");
         LinkedHashMap<String,JSONObject> items=new LinkedHashMap<>();int total=-1,pages=-1;
         for(int page=1;;page++){
@@ -59,6 +62,8 @@ final class JmClientManager {
             if(total<0||total>10000||pages<0||pages>500||result.getInt("page")!=page||result.getInt("total")!=total||result.getInt("pages")!=pages||!accountId.equals(result.optString("accountId")))throw new IllegalStateException("收藏分页发生变化，请重新扫描");
             JSONArray rows=result.getJSONArray("items");if(total>0&&rows.length()==0)throw new IllegalStateException("收藏分页不完整，尚未导入");
             for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String id=row.getString("comicId");if(!id.matches("jm:[1-9][0-9]{0,14}"))throw new IllegalStateException("收藏标识无效");items.put(id,row);}
+            if(current!=generation)throw new IllegalStateException("收藏扫描已取消");
+            if(progress!=null)progress.onPage(page,Math.max(1,pages),items.size(),total);
             if(page>=Math.max(1,pages))break;
         }
         if(current!=generation||items.size()!=total||!accountId.equals(source.status().get("accountId")))throw new IllegalStateException("收藏扫描失效，尚未导入");
@@ -69,11 +74,12 @@ final class JmClientManager {
         Preview ready=preview;if(ready==null||!ready.token.equals(token)||System.currentTimeMillis()>ready.expires||!ready.accountId.equals(source.status().get("accountId")))throw new IllegalStateException("收藏预览失效，请重新扫描");
         merge(ready.items,true);preview=null;return ready.items.length();
     }
-    JSONObject enrichFavorites() throws Exception {
+    JSONObject enrichFavorites() throws Exception {return enrichFavorites(null);}
+    JSONObject enrichFavorites(EnrichmentProgress progress) throws Exception {
         final int current=++generation;restore();UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(context);List<String> pending=new ArrayList<>();
         for(UnifiedCatalogStore.Entry entry:catalog.entries())if(entry.id.startsWith("jm:")&&entry.favorite&&!entry.jmMetadataComplete)pending.add(entry.id);
         int updated=0,failed=0;
-        for(String id:pending.subList(0,Math.min(20,pending.size()))){if(current!=generation)break;try{JSONObject detail=details(id);if(current!=generation)break;merge(new JSONArray().put(detail),false);updated++;}catch(Exception error){failed++;}}
+        for(String id:pending.subList(0,Math.min(20,pending.size()))){if(current!=generation)break;try{JSONObject detail=details(id);if(current!=generation)break;merge(new JSONArray().put(detail),false);updated++;}catch(Exception error){failed++;}if(progress!=null&&current==generation)progress.onItem(updated+failed,Math.min(20,pending.size()),updated,failed);}
         return new JSONObject().put("updated",updated).put("failed",failed).put("remaining",pending.size()-updated);
     }
     void merge(JSONArray rows,boolean favorite) throws Exception {

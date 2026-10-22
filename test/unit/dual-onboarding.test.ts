@@ -57,9 +57,15 @@ describe('bounded localized feature guides', () => {
             expect(step.body.length).toBeGreaterThan(35)
         }
     })
-    it('does not present proposed tag or visual-reference features as available', () => {
+    it('distinguishes implemented tag controls from unimplemented automatic visual annotation', () => {
         const catalog = guideCatalog(zh => zh)
-        expect(catalog.chapters.find(c => c.id === 'preferences')!.steps.map(s => s.body).join(' ')).toContain('尚未上线')
+        const preferences = catalog.chapters.find(c => c.id === 'preferences')!
+        expect(preferences.steps.some(s => s.selector === '#v5-tag-section > summary')).toBe(true)
+        const text = preferences.steps.map(s => s.body).join(' ')
+        expect(text).toContain('默认全开')
+        expect(text).toContain('私人标签不是自动画风分类')
+        expect(text).toContain('原始事实和冻结向量不改动')
+        expect(text).toContain('手机离线改规则只重排缓存')
         expect(catalog.chapters.find(c => c.id === 'visual')!.steps[0].body).toContain('不等于可靠识别')
     })
     it('has no API, provider, generation or setting side effects in the content catalog', () => {

@@ -12,6 +12,8 @@ Provider metadata, objective collection/Atlas snapshots, registry records and fr
 - A disabled tag contributes no soft tag affinity, inferred tag profile, keyword recall or tag-derived fandom allocation for a newly built cycle. Author/category/related routes remain independent. Original raw tags continue to drive hard BLOCK and safety exclusion. Disabling is not a work filter.
 - Directory is locally observed metadata, not a claim of complete provider-wide vocabulary. Category/facet comes from the existing registry or observed EH namespace; unknown stays OTHER. Coverage counts unique favorite works, not presumed liking.
 
+E-H's legacy display `tags` flatten namespace values. When lossless `providerMetadata.rawTags` exists, it is used for scope/directory/mapping identity, then enabled values are projected to the existing semantic resolver without overwriting display facts. Android reads the existing E-H semantic store plus optional public `providerRawTags` from paired catalog/candidate metadata; missing legacy namespaces remain unknown, never inferred from a flat label. This additive optional JSON field does not reset the catalog or change pairing authentication. Mobile catalog evidence carries only those public tags back, not provider credentials. Raw local E-H semantics take precedence over cache fallback. Read-only derived semantic views do not write provider stores.
+
 ## Private concepts
 
 Stable random `pt_<32 lower-hex>` IDs, separate from names. At most 100 private labels, 4096 total bindings, 4096 entries per scope list, 128 KiB normalized configuration. Names are at most 80 characters; keys at most 200. JSON is validated before persistence.
@@ -24,6 +26,8 @@ No new automatic JM online recommendation-recall adapter is introduced here. JM 
 ## Serving and cache semantics
 
 Final V3 lifetime profile uses a taste-only projection of enabled original tags. Private concepts are a sidecar, never inserted into the frozen registry. Intent/provider routing, explicit soft controls, tag metadata feedback, candidate fandom/diversity, V5 timescale profiles and Shadow ranking use the personal view. Raw metadata returned/stored stays unchanged. Frozen ranker weights are not edited or trained.
+
+Final convergence also gates V5 semantic diversity's raw EH sidecar and the older V3 cluster-allocation input; ranking inputs and return/display metadata are separate maps. Namespace and portable-candidate round-trip fixtures cover the public facts adapter.
 
 Desktop saves use an expected policy revision. Concurrent editors receive 409 and retain their draft. Save alone does not change an existing batch. Save-and-regenerate requests the existing bounded cycle builder; failure preserves the previous usable cycle. Serving composition marks a mismatching tag baseline stale rather than claiming recomputation finished.
 

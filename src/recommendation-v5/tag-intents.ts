@@ -1,6 +1,6 @@
 import type { StoredComic } from '../library/types'
 import type { RecommendationIntentV3 } from '../recommendation-v3/intent-planner-v3'
-import { comicTagProviderV1, effectiveTagPolicyV1, normalizeTagPolicyKey, privateTagMatchesV1, privateTagSignalV1, rawTagParticipatesV1, tagIdentityV1, tagParticipatesV1, type TagPolicyCarrierV1 } from './tag-policy'
+import { comicTagProviderV1, effectiveTagPolicyV1, normalizeTagPolicyKey, privateTagMatchesV1, privateTagSignalV1, providerRawTagFactsV1, semanticTagValueV1, rawTagParticipatesV1, tagIdentityV1, tagParticipatesV1, type TagPolicyCarrierV1 } from './tag-policy'
 
 /** Expand a private concept to its original provider terms. Never search an alias/opaque ID. */
 export function expandPrivateTagIntentV1(intent: RecommendationIntentV3, state: TagPolicyCarrierV1, catalog: StoredComic[] = []) {
@@ -27,7 +27,7 @@ export function restrictTagIntentsV1(intents: RecommendationIntentV3[], state: T
             if (anchor.facet === 'PRIVATE_TAG') return [anchor] // Selected private mapping has its own independent switch.
             const identity = normalizeTagPolicyKey(anchor.canonicalKey)
             const providers = (['pica', 'eh', 'jm'] as const).filter(provider => {
-                const aliases = [...new Set(catalog.filter(c => comicTagProviderV1(c) === provider).flatMap(c => c.tags).filter(raw => normalizeTagPolicyKey(canonical(raw)) === identity || normalizeTagPolicyKey(raw) === identity))]
+                const aliases = [...new Set(catalog.filter(c => comicTagProviderV1(c) === provider).flatMap(providerRawTagFactsV1).filter(raw => normalizeTagPolicyKey(canonical(semanticTagValueV1(provider, raw))) === identity || normalizeTagPolicyKey(raw) === identity))]
                 return aliases.length ? aliases.some(raw => rawTagParticipatesV1(state, provider, raw)) : rawTagParticipatesV1(state, provider, anchor.providerQueryLabel || anchor.canonicalKey)
             })
             return providers.length ? [{ ...anchor, allowedProviders: [...providers] }] : []

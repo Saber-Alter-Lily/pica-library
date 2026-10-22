@@ -69,7 +69,7 @@ function render() {
     root.querySelector('[data-tag-query]').onkeydown = event => { if (event.key === 'Enter') root.querySelector('[data-tag-find]').click() }
     root.querySelector('[data-tag-provider]').onchange = event => { state.provider = event.target.value; state.page = 0; render() }
     root.querySelector('[data-tag-facet]').onchange = event => { state.facet = event.target.value; state.page = 0; render() }
-    root.querySelectorAll('[data-tag-id]').forEach(input => input.onchange = () => { toggle(input.dataset.tagId, input.checked); state.message = ''; render() })
+    root.querySelectorAll('[data-tag-id]').forEach(input => input.onchange = () => { const id = input.dataset.tagId, focused = document.activeElement === input; toggle(id, input.checked); state.message = ''; render(); if (focused) root.querySelector(`[data-tag-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }) })
     root.querySelector('[data-tag-prev]').onclick = () => { state.page--; render() }
     root.querySelector('[data-tag-next]').onclick = () => { state.page++; render() }
     root.querySelector('[data-tag-undo]').onclick = () => { state.draft = clone(state.base.tagPolicy); state.message = ''; render() }

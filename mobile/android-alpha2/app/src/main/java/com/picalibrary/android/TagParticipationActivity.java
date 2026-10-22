@@ -32,8 +32,11 @@ public class TagParticipationActivity extends LocaleAwareActivity {
         Row(String identity,String label,String provider,String facet){this.identity=identity;this.label=label;this.provider=provider;this.facet=facet;}
     }
     static List<Row> directory(UnifiedCatalogStore.Snapshot catalog,MobileTagRegistry registry){
+        return directory(catalog,registry,TagParticipation.of(new JSONObject()));
+    }
+    static List<Row> directory(UnifiedCatalogStore.Snapshot catalog,MobileTagRegistry registry,TagParticipation policy){
         Map<String,Row> rows=new LinkedHashMap<>();
-        for(UnifiedCatalogStore.Entry entry:catalog.entries())for(String raw:entry.tags){
+        for(UnifiedCatalogStore.Entry entry:catalog.entries())for(String raw:policy.facts(entry.id,entry.tags)){
             if(TagParticipation.norm(raw).isEmpty())continue;String provider=TagParticipation.provider(entry.id),identity=TagParticipation.identity(provider,raw),facet="OTHER";
             if("pica".equals(provider)&&registry!=null){MobileTagRegistry.Resolved resolved=registry.resolve(raw);if(resolved.resolved)facet=resolved.facet;}
             else if("eh".equals(provider)&&raw.contains(":"))facet="EH_"+raw.substring(0,raw.indexOf(':'));
@@ -48,7 +51,7 @@ public class TagParticipationActivity extends LocaleAwareActivity {
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);Ui.applyWindow(this);worker=createWorker();
         if(saved!=null)try{draft=TagParticipation.normalize(new JSONObject(saved.getString("tagDraft","{}")));baseState=new JSONObject(saved.getString("tagBase","{}"));query=saved.getString("tagQuery","");provider=saved.getString("tagProvider","");facet=saved.getString("tagFacet","");page=saved.getInt("tagPage",0);}catch(Exception ignored){draft=null;baseState=null;}
-        shell();worker.submit(()->{try{JSONObject current=RecommendationPolicyStore.snapshot(getApplicationContext());TagParticipation initial=TagParticipation.of(current);UnifiedCatalogStore.Snapshot local=UnifiedCatalogStore.load(getApplicationContext());MobileTagRegistry registry=null;try{registry=MobileTagRegistry.load(getApplicationContext());}catch(Exception ignored){}List<Row> rows=directory(local,registry);runOnUiThread(()->{if(destroyed)return;catalog=local;directory=rows;if(draft==null){baseState=copy(current);draft=copy(initial.json);}render();});}catch(Exception e){runOnUiThread(()->{if(destroyed)return;status.setText(tr("读取失败，未修改任何设置。请返回后重试。","Load failed. No settings changed; return and retry.","読込に失敗しました。設定は変更していません。戻って再試行してください。"));});}});
+        shell();worker.submit(()->{try{JSONObject current=RecommendationPolicyStore.snapshot(getApplicationContext());TagParticipation initial=TagParticipation.of(getApplicationContext(),current);UnifiedCatalogStore.Snapshot local=UnifiedCatalogStore.load(getApplicationContext());MobileTagRegistry registry=null;try{registry=MobileTagRegistry.load(getApplicationContext());}catch(Exception ignored){}List<Row> rows=directory(local,registry,initial);runOnUiThread(()->{if(destroyed)return;catalog=local;directory=rows;if(draft==null){baseState=copy(current);draft=copy(initial.json);}render();});}catch(Exception e){runOnUiThread(()->{if(destroyed)return;status.setText(tr("读取失败，未修改任何设置。请返回后重试。","Load failed. No settings changed; return and retry.","読込に失敗しました。設定は変更していません。戻って再試行してください。"));});}});
     }
     @Override protected void onDestroy(){destroyed=true;if(worker!=null)worker.shutdownNow();super.onDestroy();}
     @Override protected void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);if(draft!=null){out.putString("tagDraft",draft.toString());out.putString("tagBase",baseState.toString());}out.putString("tagQuery",query);out.putString("tagProvider",provider);out.putString("tagFacet",facet);out.putInt("tagPage",page);}

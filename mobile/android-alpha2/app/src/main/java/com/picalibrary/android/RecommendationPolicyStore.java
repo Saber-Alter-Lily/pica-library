@@ -57,7 +57,7 @@ final class RecommendationPolicyStore {
         String wanted=norm(key);if(wanted.isEmpty()||comic==null)return false;
         if("AUTHOR".equals(type))return norm(comic.author).equals(wanted);
         if("CATEGORY".equals(type))return listContains(comic.categories,wanted);
-        if("TAG".equals(type)||"FANDOM".equals(type))return wanted.startsWith(TagParticipation.PREFIX)?TagParticipation.of(state).matchesPrivate(wanted,comic.id,comic.tags):listContains(comic.tags,wanted);
+        if("TAG".equals(type)||"FANDOM".equals(type))return wanted.startsWith(TagParticipation.PREFIX)?TagParticipation.of(state).matchesPrivate(wanted,comic.id,comic.tags):listContains(comic.tags,wanted)||listContains(TagParticipation.of(state).facts(comic.id,comic.tags),wanted);
         return false;
     }
 
@@ -65,7 +65,7 @@ final class RecommendationPolicyStore {
         String wanted=norm(key);if(wanted.isEmpty()||item==null)return false;
         if("AUTHOR".equals(type))return norm(item.author).equals(wanted);
         if("CATEGORY".equals(type))return listContains(item.categories,wanted);
-        if("TAG".equals(type)||"FANDOM".equals(type))return wanted.startsWith(TagParticipation.PREFIX)?TagParticipation.of(state).matchesPrivate(wanted,item.comicId,item.tags):listContains(item.tags,wanted);
+        if("TAG".equals(type)||"FANDOM".equals(type))return wanted.startsWith(TagParticipation.PREFIX)?TagParticipation.of(state).matchesPrivate(wanted,item.comicId,item.tags):listContains(item.tags,wanted)||listContains(TagParticipation.of(state).facts(item.comicId,item.tags),wanted);
         // STYLE_FAMILY is a Visual concept, not recommendation provenance
         // such as CREATOR/RELATED. It requires a portable Visual-family binding.
         if("STYLE_FAMILY".equals(type))return false;
@@ -85,7 +85,7 @@ final class RecommendationPolicyStore {
     static boolean tasteExcluded(Context c,String comicId){return tasteExcluded(snapshot(c),comicId);}
     static boolean tasteExcluded(JSONObject state,String comicId){return state!=null&&arrayContains(state,"tasteExcludedComicIds",comicId);}
 
-    static boolean blocked(Context c,PicaClient.Comic comic){return blocked(snapshot(c),comic);}
+    static boolean blocked(Context c,PicaClient.Comic comic){JSONObject state=snapshot(c);TagParticipation.of(c,state);return blocked(state,comic);}
     static boolean blocked(JSONObject state,PicaClient.Comic comic){
         if(state==null)state=new JSONObject();if(comic==null)return false;if(itemSuppressed(state,comic.id))return true;
         JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row!=null&&"BLOCK".equals(row.optString("direction"))&&matches(comic,row.optString("targetType"),row.optString("key"),state))return true;}
@@ -96,7 +96,7 @@ final class RecommendationPolicyStore {
         if(row!=null&&row.has("levelDelta"))return Math.min(0.27,Math.abs(row.optInt("levelDelta",0))*0.03);
         return session?0.12:0.08;
     }
-    static double adjustment(Context c,PicaClient.Comic comic){return adjustment(snapshot(c),comic);}
+    static double adjustment(Context c,PicaClient.Comic comic){JSONObject state=snapshot(c);TagParticipation.of(c,state);return adjustment(state,comic);}
     static double adjustment(JSONObject state,PicaClient.Comic comic){
         if(state==null)state=new JSONObject();TagParticipation tags=TagParticipation.of(state);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!tags.controlEnabled(row.optString("targetType"),row.optString("key"),comic.id)||!matches(comic,row.optString("targetType"),row.optString("key"),state))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
         JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&tags.controlEnabled(intent.optString("targetType"),intent.optString("key"),comic.id)&&matches(comic,intent.optString("targetType"),intent.optString("key"),state))score+=0.16;
@@ -121,7 +121,7 @@ final class RecommendationPolicyStore {
     static NativeRecommendationStore.Snapshot applyLocalPolicy(Context c,NativeRecommendationStore.Snapshot source){
         NativeRecommendationStore.Snapshot out=new NativeRecommendationStore.Snapshot();if(source==null)return out;
         out.cycleId=source.cycleId;out.generatedAt=source.generatedAt;out.favoriteFingerprint=source.favoriteFingerprint;out.registryFingerprint=source.registryFingerprint;out.readiness=source.readiness;out.favoriteCount=source.favoriteCount;out.displayedIds.addAll(source.displayedIds);out.cooldownIds.addAll(source.cooldownIds);
-        JSONObject current=snapshot(c),baseline=cacheBaseline(c);boolean rebaseTags=!TagParticipation.same(current,baseline);List<UnifiedCatalogStore.Entry> localFavorites=new ArrayList<>();if(rebaseTags)for(UnifiedCatalogStore.Entry entry:UnifiedCatalogStore.load(c).entries())if(entry.favorite&&!tasteExcluded(current,entry.id))localFavorites.add(entry);int sourceCount=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)sourceCount+=sourceBatch.size();
+        JSONObject current=snapshot(c),baseline=cacheBaseline(c);TagParticipation.of(c,current);TagParticipation.of(c,baseline);boolean rebaseTags=!TagParticipation.same(current,baseline);List<UnifiedCatalogStore.Entry> localFavorites=new ArrayList<>();if(rebaseTags)for(UnifiedCatalogStore.Entry entry:UnifiedCatalogStore.load(c).entries())if(entry.favorite&&!tasteExcluded(current,entry.id))localFavorites.add(entry);int sourceCount=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)sourceCount+=sourceBatch.size();
         final class RankedItem{final NativeRecommendationStore.Item item;final double adjusted;final int order;RankedItem(NativeRecommendationStore.Item item,double adjusted,int order){this.item=item;this.adjusted=adjusted;this.order=order;}}
         LinkedHashMap<String,RankedItem> unique=new LinkedHashMap<>();int order=0;for(List<NativeRecommendationStore.Item> sourceBatch:source.batches)for(NativeRecommendationStore.Item item:sourceBatch){if(item==null||item.comicId.isEmpty()){order++;continue;}if(blocked(current,item)){order++;continue;}double baked=sourceCount<=1?1d:1d-(double)order/(double)(sourceCount-1);double delta=adjustment(current,item)-adjustment(baseline,item);double score=rebaseTags?cacheRebaseScore(c,current,item,localFavorites):baked+delta;NativeRecommendationStore.Item visible=rebaseTags?new NativeRecommendationStore.Item(item.comicId,item.title,item.author,LocalizedText.ui(c,"标签规则已变更 · 本机缓存重排，未重新召回","Tag rules changed · cached candidates reranked; no new retrieval","タグ設定変更 · キャッシュ内を再順位付け・再取得なし"),"CACHE_TAG_REBASE","",score,item.tags,item.categories):item;if(!unique.containsKey(item.comicId))unique.put(item.comicId,new RankedItem(visible,score,order));order++;}
         List<RankedItem> rows=new ArrayList<>(unique.values());rows.sort((a,b)->{int byScore=Double.compare(b.adjusted,a.adjusted);return byScore!=0?byScore:rebaseTags?a.item.comicId.compareTo(b.item.comicId):Integer.compare(a.order,b.order);});
@@ -239,13 +239,14 @@ final class RecommendationPolicyStore {
         }
         JSONArray dispositions=parseArray(prefs(c).getString(DIRTY_DISPOSITIONS,"[]"));
         for(int i=0;i<dispositions.length();i++){JSONObject row=dispositions.optJSONObject(i);if(row!=null){String id=row.optString("comicId","").trim();if(!id.isEmpty())ids.add(id);}}
-        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(c);JSONArray out=new JSONArray();
+        UnifiedCatalogStore.Snapshot catalog=UnifiedCatalogStore.load(c);TagParticipation tagFacts=TagParticipation.of(c,snapshot(c));JSONArray out=new JSONArray();
         for(String id:ids){
             UnifiedCatalogStore.Entry entry=catalog.byId.get(id);if(entry==null)continue;
             JSONObject row=new JSONObject();try{
                 row.put("comicId",entry.id);row.put("providerId",entry.providerId);row.put("providerRemoteId",entry.providerRemoteId);
                 row.put("title",entry.title);row.put("author",entry.author);row.put("canonicalAuthor",entry.canonicalAuthor);
                 row.put("tags",new JSONArray(entry.tags));row.put("categories",new JSONArray(entry.categories));row.put("finished",entry.finished);
+                if("eh".equals(TagParticipation.provider(entry.id)))row.put("providerRawTags",new JSONArray(tagFacts.facts(entry.id,entry.tags)));
                 row.put("pagesCount",Math.max(entry.knownPictures,Math.max(entry.remotePageCount,entry.desktopDownloadedPictures)));
                 row.put("totalLikes",entry.totalLikes);row.put("totalViews",entry.totalViews);row.put("coverUrl",entry.bestCoverUrl());out.put(row);
             }catch(Exception ignored){}

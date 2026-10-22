@@ -6,7 +6,7 @@ import type {
     PreferenceTargetType
 } from './portable-policy'
 import { normalizePreferenceKey } from './portable-policy'
-import { privateTagForSignalV1, privateTagMatchesV1, rawTagParticipatesV1, tagControlParticipatesV1 } from './tag-policy'
+import { privateTagForSignalV1, privateTagMatchesV1, providerTagSignalParticipatesV1, tagControlParticipatesV1 } from './tag-policy'
 
 export const CANDIDATE_CHANNEL_PLANNER_VERSION =
     'candidate-channel-planner-v2-provider-isolated'
@@ -864,7 +864,7 @@ export function buildCandidateChannelPlanV5(
         channel.providerAllocations =
             channel.providerAllocations.map((allocation) => {
                 const surfaceProvider = allocation.surface === 'pica' ? 'pica' : 'eh'
-                if (allocation.surface !== 'local' && channel.anchors.some(anchor => ['TAG', 'FANDOM'].includes(anchor.targetType) && !rawTagParticipatesV1(input.policy, surfaceProvider, anchor.key))) return { ...allocation, eligible: false, plannedRequests: 0, targetCandidates: 0, disabledReason: 'TAG_PARTICIPATION_DISABLED' }
+                if (allocation.surface !== 'local' && channel.anchors.some(anchor => ['TAG', 'FANDOM'].includes(anchor.targetType) && !providerTagSignalParticipatesV1(input.policy, surfaceProvider, anchor.key, input.catalog))) return { ...allocation, eligible: false, plannedRequests: 0, targetCandidates: 0, disabledReason: 'TAG_PARTICIPATION_DISABLED' }
                 if (
                     allocation.surface === 'local' ||
                     !allocation.eligible ||

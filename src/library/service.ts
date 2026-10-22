@@ -176,7 +176,7 @@ import {
     type ChronicleViewOptions
 } from '../recommendation-v3/taste-chronicle-view'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
-import { buildTagDirectoryV1, normalizeTagPolicyV1, privateTagForSignalV1, projectComicTagSignalsV1, tagPoliciesEqualV1 } from '../recommendation-v5/tag-policy'
+import { buildTagDirectoryV1, normalizeTagPolicyV1, privateTagForSignalV1, projectComicTagSignalsV1, tagPoliciesEqualV1, rawTagParticipatesV1, comicTagProviderV1, providerRawTagFactsV1 } from '../recommendation-v5/tag-policy'
 import { inferredPrivateTagIntentsV1, restrictTagIntentsV1 } from '../recommendation-v5/tag-intents'
 import {
     WORK_IDENTITY_V3_RESOLVER_VERSION,
@@ -1680,7 +1680,7 @@ export class LibraryService {
             const fandomKeys = new Set<string>()
             const tagKeys = new Set<string>()
             if (registry)
-                for (const rawTag of row.comic.tags) {
+                for (const rawTag of projectComicTagSignalsV1(row.comic, state, false).tags) {
                     const resolved = resolveTagV3(
                         rawTag,
                         registry
@@ -1707,6 +1707,7 @@ export class LibraryService {
                 ? row.comic.providerMetadata.rawTags.map(String)
                 : []
             for (const rawTag of rawEhTags) {
+                if (!rawTagParticipatesV1(state, comicTagProviderV1(row.comic), rawTag)) continue
                 const parsed = parseEhTag(rawTag)
                 const value = normalizePreferenceKey(parsed.value)
                 if (!value || !parsed.namespace) continue
@@ -3519,6 +3520,7 @@ export class LibraryService {
             author: comic.author,
             canonicalAuthor: comic.canonicalAuthor ?? null,
             tags: comic.tags,
+            providerRawTags: comicTagProviderV1(comic) === 'eh' ? providerRawTagFactsV1(comic) : [],
             categories: comic.categories,
             pagesCount: comic.pagesCount ?? null,
             totalLikes: comic.totalLikes ?? null,
@@ -5344,7 +5346,7 @@ export class LibraryService {
             const byId = new Map(rawCatalog.map((comic) => [comic.comicId, comic]))
             const reranked = rerankV3(
                 ranked,
-                byId,
+                new Map(catalog.map(comic => [comic.comicId, comic])),
                 limit,
                 v3Profile.historical.clusters
             )

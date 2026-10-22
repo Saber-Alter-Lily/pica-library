@@ -27,6 +27,7 @@ public final class TagParticipationTest {
     @Test public void legacyDefaultsAndUnicodeNormalizationMatchDesktop() throws Exception {
         assertEquals(Arrays.asList("School"),TagParticipation.of(new JSONObject()).tags("pica:1",Arrays.asList("School"),true));
         assertEquals("school tag",TagParticipation.norm("\u2028 ＳＣＨＯＯＬ\u3000TAG\uFEFF"));
+        JSONObject names=privatePolicy();names.getJSONArray("privateTags").getJSONObject(0).put("name","\u2028 My Lines\uFEFF");assertEquals("My Lines",TagParticipation.normalize(names).getJSONArray("privateTags").getJSONObject(0).getString("name"));
         assertTrue(TagParticipation.same(new JSONObject(),state(TagParticipation.normalize(null))));
     }
     @Test public void selectedOnlyIsProviderScopedAndKeepsRawFacts() throws Exception {
@@ -85,5 +86,20 @@ public final class TagParticipationTest {
     @Test public void directoryCountsFavoriteWorksNotDuplicateTagsOrLikingStrength(){
         UnifiedCatalogStore.Snapshot catalog=new UnifiedCatalogStore.Snapshot();UnifiedCatalogStore.Entry first=new UnifiedCatalogStore.Entry("pica:1"),second=new UnifiedCatalogStore.Entry("pica:2");first.favorite=true;first.tags.addAll(Arrays.asList("School","School"));second.tags.add("Other");catalog.byId.put(first.id,first);catalog.byId.put(second.id,second);
         List<TagParticipationActivity.Row> rows=TagParticipationActivity.directory(catalog,null);assertEquals(2,rows.size());assertEquals("School",rows.get(0).label);assertEquals(1,rows.get(0).favoriteIds.size());
+    }
+    @Test public void ehNamespaceFactsRemainDistinctFromDisplayTagsAcrossCatalogRoundTrip() throws Exception {
+        String femaleId="eh:123:1111111111",maleId="eh:124:2222222222";UnifiedCatalogStore.Snapshot catalog=new UnifiedCatalogStore.Snapshot();
+        UnifiedCatalogStore.Entry female=new UnifiedCatalogStore.Entry(femaleId),male=new UnifiedCatalogStore.Entry(maleId);female.favorite=true;male.favorite=true;female.tags.add("schoolgirl");male.tags.add("schoolgirl");female.providerRawTags.add("female:schoolgirl");male.providerRawTags.add("male:schoolgirl");catalog.byId.put(femaleId,female);catalog.byId.put(maleId,male);UnifiedCatalogStore.save(context,catalog);
+        JSONObject selectedState=state(off().put("selected",new JSONArray().put("eh|female:schoolgirl"))).put("controls",new JSONArray().put(new JSONObject().put("targetType","TAG").put("key","schoolgirl").put("direction","MORE")));
+        TagParticipation policy=TagParticipation.of(context,selectedState);assertEquals(Arrays.asList("schoolgirl"),policy.tags(femaleId,female.tags,false));assertTrue(policy.tags(maleId,male.tags,false).isEmpty());assertTrue(RecommendationPolicyStore.adjustment(selectedState,comic(femaleId,female.tags))>0);assertEquals(0,RecommendationPolicyStore.adjustment(selectedState,comic(maleId,male.tags)),0.000001);
+        UnifiedCatalogStore.Snapshot restored=UnifiedCatalogStore.load(context);assertEquals(Arrays.asList("female:schoolgirl"),restored.byId.get(femaleId).providerRawTags);assertEquals(Arrays.asList("schoolgirl"),restored.byId.get(femaleId).tags);
+        List<TagParticipationActivity.Row> rows=TagParticipationActivity.directory(restored,null,policy);assertEquals(2,rows.size());assertTrue(rows.stream().anyMatch(r->r.identity.equals("eh|female:schoolgirl")));assertTrue(rows.stream().anyMatch(r->r.identity.equals("eh|male:schoolgirl")));
+        EhSemanticStore.Snapshot original=new EhSemanticStore.Snapshot(),view=policy.semanticView(original);assertTrue(original.byComicId.isEmpty());assertEquals("female:schoolgirl",view.byComicId.get(femaleId).rawTags.get(0).canonical);
+    }
+    @Test public void portableCandidatesCarryLosslessPublicTagsForOfflinePrivateMatching() throws Exception {
+        String id="eh:125:3333333333";JSONObject candidate=new JSONObject().put("comicId",id).put("providerId","eh").put("tags",new JSONArray().put("schoolgirl")).put("providerRawTags",new JSONArray().put("female:schoolgirl"));
+        PortableRecommendationPackageStore.Snapshot portable=PortableRecommendationPackageStore.save(context,new JSONObject().put("schemaVersion",1).put("reservoir",new JSONObject().put("candidates",new JSONArray().put(candidate))));
+        assertEquals(Arrays.asList("female:schoolgirl"),portable.candidates.get(0).providerRawTags);JSONObject privateState=state(privatePolicy());TagParticipation policy=TagParticipation.of(context,privateState);
+        assertTrue(policy.matchesPrivate(TagParticipation.PREFIX+MAPPED,id,Arrays.asList("schoolgirl")));assertEquals(Arrays.asList(TagParticipation.PREFIX+MAPPED),policy.tags(id,Arrays.asList("schoolgirl"),true));
     }
 }

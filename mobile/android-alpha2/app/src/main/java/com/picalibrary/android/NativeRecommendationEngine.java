@@ -52,7 +52,8 @@ final class NativeRecommendationEngine {
 
         EhSemanticStore.Snapshot ehSemantics=EhSemanticStore.load(app);EhTagTranslationStore translations=EhTagTranslationStore.load(app);EhTagTranslationStore.scheduleUpdate(app,null);
         emit(progress,"正在构建本机 V3 兴趣画像",0,favorites.size());Map<String,Integer> authorCounts=new HashMap<>();Map<String,String> authorLabels=new HashMap<>();Map<String,Interest> interests=new LinkedHashMap<>();int seen=0;
-        TagParticipation participation=TagParticipation.of(policyState);
+        TagParticipation participation=TagParticipation.of(app,policyState);
+        ehSemantics=participation.semanticView(ehSemantics);
         for(PicaClient.Comic comic:favorites){control.checkpoint();String authorKey=MobileTagRegistry.normalize(comic.author);if(!authorKey.isEmpty()){authorCounts.put(authorKey,authorCounts.getOrDefault(authorKey,0)+1);authorLabels.putIfAbsent(authorKey,comic.author);}Set<String> perComic=new HashSet<>();for(UnifiedInterestResolver.Signal signal:UnifiedInterestResolver.resolve(comic,registry,ehSemantics,translations)){String raw=signal.providerCanonical.startsWith("pica:")?signal.observedLabel:signal.providerCanonical.startsWith("eh-flat:")?signal.observedLabel:signal.providerCanonical;if(!signal.eligible||!participation.rawEnabled(comic.id,raw))continue;String key=signal.facet+"\u0000"+signal.key;if(!perComic.add(key))continue;Interest interest=interests.get(key);if(interest==null){interest=new Interest(signal);interests.put(key,interest);}else interest.absorb(signal);interest.comicIds.add(comic.id);}seen++;emit(progress,"正在构建本机 V3 兴趣画像",seen,favorites.size());}
         List<Intent> explicitIntents=buildExplicitIntents(policyState);explicitIntents.addAll(privateTagIntents(participation,favorites,knownFavorites,policyState));
         List<Intent> intents=mergeIntents(explicitIntents,buildIntents(favorites,authorCounts,authorLabels,interests));List<Route> routes=routes(intents);for(Route route:routes){Intent origin=null;for(Intent intent:intents)if(intent.id.equals(route.intentId))origin=intent;if(origin!=null)route.providerScope=origin.providerScope;}if(routes.isEmpty()&&!portable.available())throw new IllegalStateException("当前没有收藏画像或正向初始偏好。请到“推荐与画风 → 人工调整”添加标签，并设置为 6–10 后重新生成推荐。");
@@ -135,7 +136,7 @@ final class NativeRecommendationEngine {
         if(!"KEYWORD".equals(route.type))return true;
         String query="eh".equals(provider)&&!route.ehQuery.isEmpty()?route.ehQuery:route.query;
         query=query.replace("\"","");String canonical=registry.resolve(route.query).canonicalKey;boolean observed=false,enabled=false;
-        for(PicaClient.Comic favorite:favorites)if(provider.equals(TagParticipation.provider(favorite.id)))for(String raw:favorite.tags){MobileTagRegistry.Resolved resolved=registry.resolve(raw);if(TagParticipation.norm(raw).equals(TagParticipation.norm(query))||(!canonical.isEmpty()&&canonical.equals(resolved.canonicalKey))){observed=true;enabled|=policy.rawEnabled(favorite.id,raw);}}
+        for(PicaClient.Comic favorite:favorites)if(provider.equals(TagParticipation.provider(favorite.id)))for(String raw:policy.facts(favorite.id,favorite.tags)){MobileTagRegistry.Resolved resolved=registry.resolve(TagParticipation.semanticValue(favorite.id,raw));if(TagParticipation.norm(raw).equals(TagParticipation.norm(query))||(!canonical.isEmpty()&&canonical.equals(resolved.canonicalKey))){observed=true;enabled|=policy.rawEnabled(favorite.id,raw);}}
         return observed?enabled:policy.rawEnabled(provider.equals("eh")?"eh:query":"query",query);
     }
 

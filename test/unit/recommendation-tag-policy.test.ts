@@ -41,6 +41,14 @@ describe('Personal tag participation: immutable facts and provider-scoped signal
         const rows = buildTagDirectoryV1([comic('pica:1'), comic('pica:1'), comic('pica:2', ['Other'], false)], {}, () => 'TOPIC')
         expect(rows.map(r => [r.key, r.supportCount, r.catalogCount])).toEqual([['school', 1, 1], ['other', 0, 1]])
     })
+    it('uses lossless EH raw namespaces while leaving flat display metadata untouched', () => {
+        const female = { ...comic('eh:1', ['schoolgirl']), providerMetadata: { rawTags: ['female:schoolgirl'] } }, male = { ...comic('eh:2', ['schoolgirl']), providerMetadata: { rawTags: ['male:schoolgirl'] } }
+        const state = { ...defaultPortablePolicyStateV5(), tagPolicy: { ...selected(), selected: ['eh|female:schoolgirl'] }, controls: [normalizeControlV5({ targetType: 'TAG', key: 'schoolgirl', label: 'Schoolgirl', direction: 'MORE', scope: 'PERSISTENT', source: 'DESKTOP', updatedAt: '' })] }
+        expect(buildTagDirectoryV1([female, male], state).map(r => r.identity).sort()).toEqual(['eh|female:schoolgirl', 'eh|male:schoolgirl'])
+        expect(projectComicTagSignalsV1(female, state).tags).toEqual(['schoolgirl']);expect(projectComicTagSignalsV1(male, state).tags).toEqual([])
+        expect(preferenceAdjustmentV5(female, state).adjustment).toBeGreaterThan(0);expect(preferenceAdjustmentV5(male, state).adjustment).toBe(0)
+        expect(female.tags).toEqual(['schoolgirl']);expect(female.providerMetadata.rawTags).toEqual(['female:schoolgirl'])
+    })
     it('gates inferred and explicit taste but never bypasses raw hard BLOCK', () => {
         const state = { ...defaultPortablePolicyStateV5(), tagPolicy: { ...selected(), selected: [] }, controls: [normalizeControlV5({ targetType: 'TAG', key: 'school', label: 'School', direction: 'MORE', scope: 'PERSISTENT', source: 'DESKTOP', updatedAt: '' })] }
         expect(preferenceAdjustmentV5(comic('pica:1'), state).adjustment).toBe(0)

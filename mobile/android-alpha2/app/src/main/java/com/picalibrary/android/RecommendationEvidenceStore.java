@@ -189,11 +189,11 @@ final class RecommendationEvidenceStore {
     static double recentAdjustment(Context c,PicaClient.Comic comic){
         return recentAdjustment(c,comic,RecommendationPolicyStore.snapshot(c));
     }
-    static double recentAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,false,TagParticipation.of(policy));}
+    static double recentAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,false,TagParticipation.of(c,policy));}
     static double sessionAdjustment(Context c,PicaClient.Comic comic){
         return sessionAdjustment(c,comic,RecommendationPolicyStore.snapshot(c));
     }
-    static double sessionAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,true,TagParticipation.of(policy));}
+    static double sessionAdjustment(Context c,PicaClient.Comic comic,JSONObject policy){return adjustment(c,comic,true,TagParticipation.of(c,policy));}
     private static double adjustment(Context c,PicaClient.Comic comic,boolean sessionOnly,TagParticipation participation){
         if(comic==null)return 0d;double score=0d;long now=System.currentTimeMillis();
         long maxAge=sessionOnly?Long.MAX_VALUE:30L*24L*60L*60L*1000L;
@@ -213,7 +213,7 @@ final class RecommendationEvidenceStore {
     }
 
     static List<Signal> topSignals(Context c,boolean sessionOnly,int limit){
-        TagParticipation participation=TagParticipation.of(RecommendationPolicyStore.snapshot(c));
+        TagParticipation participation=TagParticipation.of(c,RecommendationPolicyStore.snapshot(c));
         LinkedHashMap<String,Integer> score=new LinkedHashMap<>(),support=new LinkedHashMap<>();long max=30L*24L*60L*60L*1000L,now=System.currentTimeMillis();
         for(EvidenceRow row:rows(c)){
             if(sessionOnly&&!PROCESS_SESSION_ID.equals(row.sessionId))continue;

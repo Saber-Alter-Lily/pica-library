@@ -641,6 +641,7 @@ export class RecommendationPolicyStoreV5 {
                         ? { providerRemoteId }
                         : {}),
                     tags: stringList(row.tags),
+                    ...(providerId === 'eh' && Array.isArray(row.providerRawTags) ? { providerMetadata: { ...(this.database.getComic(comicId)?.providerMetadata ?? {}), rawTags: stringList(row.providerRawTags) } } : {}),
                     categories: stringList(row.categories),
                     finished: Boolean(row.finished),
                     pagesCount: Math.max(

@@ -21,6 +21,7 @@ import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { ShelfService } from '../services/shelf-service'
 import { PersonalizationService } from '../services/personalization-service'
+import { providerRawTagFactsV1, comicTagProviderV1 } from '../recommendation-v5/tag-policy'
 
 interface PersistedDevice {
     tokenHash: string
@@ -1032,6 +1033,7 @@ export async function startMobileBridge(options: {
                     ...result,
                     items: result.items.map((comic) => ({
                         ...comic,
+                        providerRawTags: comicTagProviderV1(comic) === 'eh' ? providerRawTagFactsV1(comic) : [],
                         coverPath: `/mobile/v1/covers/${encodeURIComponent(
                             comic.comicId
                         )}`

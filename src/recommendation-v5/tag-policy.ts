@@ -20,6 +20,7 @@ export interface TagPolicyV1 {
     privateTags: PrivateTagV1[]
 }
 export type TagPolicyCarrierV1 = { tagPolicy?: TagPolicyV1 }
+export type TagComicV1 = Pick<StoredComic, 'comicId' | 'providerId' | 'tags'> & Partial<Pick<StoredComic, 'providerMetadata'>>
 export const normalizeTagPolicyKey = (value: unknown) => String(value ?? '').normalize('NFKC').trim().toLocaleLowerCase('und').replace(/\s+/g, ' ')
 const providers = new Set(['pica', 'eh', 'jm', 'private'])
 const privateIdPattern = /^pt_[a-f0-9]{32}$/
@@ -30,6 +31,12 @@ export function comicTagProviderV1(comic: Pick<StoredComic, 'comicId' | 'provide
     if (comic.providerId === 'jm' || comic.comicId.startsWith('jm:')) return 'jm'
     return 'pica'
 }
+/** EH's display tags omit namespaces; its rawTags sidecar is the authority when present. */
+export function providerRawTagFactsV1(comic: TagComicV1): string[] {
+    const raw = comicTagProviderV1(comic) === 'eh' ? comic.providerMetadata?.rawTags : undefined
+    return Array.isArray(raw) && raw.some(value => typeof value === 'string' && value.trim()) ? [...new Set(raw.filter((value): value is string => typeof value === 'string' && Boolean(value.trim())))] : comic.tags
+}
+export function semanticTagValueV1(provider: TagProviderV1, raw: string) { const split = raw.indexOf(':'); return provider === 'eh' && split > 0 ? raw.slice(split + 1).trim() : raw }
 export function defaultTagPolicyV1(): TagPolicyV1 { return { schemaVersion: 1, mode: 'ALL', selected: [], disabled: [], privateTags: [] } }
 
 function strings(value: unknown, maximum: number) {
@@ -82,32 +89,43 @@ export function effectiveTagPolicyV1(state: TagPolicyCarrierV1) {
 export function tagParticipatesV1(policy: TagPolicyV1, identity: string) { return policy.mode === 'ALL' ? !policy.disabled.includes(identity) : policy.selected.includes(identity) }
 export function rawTagParticipatesV1(state: TagPolicyCarrierV1, provider: TagProviderV1, tag: string) { return tagParticipatesV1(effectiveTagPolicyV1(state), tagIdentityV1(provider, tag)) }
 const bindingIndex = new WeakMap<PrivateTagV1, { comics: Set<string>; mappings: Set<string> }>()
-export function privateTagMatchesV1(tag: PrivateTagV1, comic: Pick<StoredComic, 'comicId' | 'providerId' | 'tags'>) {
+export function privateTagMatchesV1(tag: PrivateTagV1, comic: TagComicV1) {
     let index = bindingIndex.get(tag)
     if (!index) { index = { comics: new Set(tag.comicIds), mappings: new Set(tag.mappings) }; bindingIndex.set(tag, index) }
     if (tag.kind === 'MANUAL') return index.comics.has(normalizeTagPolicyKey(comic.comicId))
     const provider = comicTagProviderV1(comic)
-    return comic.tags.some(raw => index!.mappings.has(tagIdentityV1(provider, raw)))
+    return providerRawTagFactsV1(comic).some(raw => index!.mappings.has(tagIdentityV1(provider, raw)))
 }
 export function privateTagForSignalV1(state: TagPolicyCarrierV1, key: string) {
     const normalized = normalizeTagPolicyKey(key)
     return normalized.startsWith(PRIVATE_TAG_PREFIX) ? effectiveTagPolicyV1(state).privateTags.find(tag => privateTagSignalV1(tag.id) === normalized) : undefined
 }
 /** Raw safety checks MUST use the original comic, not this taste-only projection. */
-export function projectComicTagSignalsV1<T extends Pick<StoredComic, 'comicId' | 'providerId' | 'tags'>>(comic: T, state: TagPolicyCarrierV1, includePrivate = true): T {
+export function projectComicTagSignalsV1<T extends TagComicV1>(comic: T, state: TagPolicyCarrierV1, includePrivate = true): T {
     const policy = effectiveTagPolicyV1(state), provider = comicTagProviderV1(comic)
-    const tags = comic.tags.filter(raw => !normalizeTagPolicyKey(raw).startsWith(PRIVATE_TAG_PREFIX) && tagParticipatesV1(policy, tagIdentityV1(provider, raw)))
+    const tags = providerRawTagFactsV1(comic).filter(raw => !normalizeTagPolicyKey(raw).startsWith(PRIVATE_TAG_PREFIX) && tagParticipatesV1(policy, tagIdentityV1(provider, raw))).map(raw => semanticTagValueV1(provider, raw))
     if (includePrivate) for (const tag of policy.privateTags) if (tagParticipatesV1(policy, tagIdentityV1('private', tag.id)) && privateTagMatchesV1(tag, comic)) tags.push(privateTagSignalV1(tag.id))
     return { ...comic, tags: [...new Set(tags)] }
 }
 /** Controls without a comic context are eligible only if some selected provider permits the raw key. */
-export function tagControlParticipatesV1(state: TagPolicyCarrierV1, key: string, comic?: Pick<StoredComic, 'comicId' | 'providerId' | 'tags'>) {
+export function tagControlParticipatesV1(state: TagPolicyCarrierV1, key: string, comic?: TagComicV1) {
     const policy = effectiveTagPolicyV1(state), normalized = normalizeTagPolicyKey(key)
     if (normalized.startsWith(PRIVATE_TAG_PREFIX)) {
         const tag = privateTagForSignalV1(state, normalized)
         return Boolean(tag && tagParticipatesV1(policy, tagIdentityV1('private', tag.id)))
     }
-    return comic ? tagParticipatesV1(policy, tagIdentityV1(comicTagProviderV1(comic), normalized)) : (['pica', 'eh', 'jm'] as const).some(provider => tagParticipatesV1(policy, tagIdentityV1(provider, normalized)))
+    if (comic) {
+        const provider = comicTagProviderV1(comic)
+        const facts = providerRawTagFactsV1(comic).filter(raw => normalizeTagPolicyKey(raw) === normalized || normalizeTagPolicyKey(semanticTagValueV1(provider, raw)) === normalized)
+        return facts.length ? facts.some(raw => tagParticipatesV1(policy, tagIdentityV1(provider, raw))) : tagParticipatesV1(policy, tagIdentityV1(provider, normalized))
+    }
+    return (['pica', 'eh', 'jm'] as const).some(provider => tagParticipatesV1(policy, tagIdentityV1(provider, normalized))) || (policy.mode === 'SELECTED' && policy.selected.some(identity => identity.startsWith('eh|') && normalizeTagPolicyKey(semanticTagValueV1('eh', identity.slice(3))) === normalized))
+}
+export function providerTagSignalParticipatesV1(state: TagPolicyCarrierV1, provider: TagProviderV1, key: string, catalog: StoredComic[]) {
+    const normalized = normalizeTagPolicyKey(key)
+    const observed = catalog.filter(comic => comicTagProviderV1(comic) === provider && providerRawTagFactsV1(comic).some(raw => normalizeTagPolicyKey(raw) === normalized || normalizeTagPolicyKey(semanticTagValueV1(provider, raw)) === normalized))
+    if (observed.length) return observed.some(comic => tagControlParticipatesV1(state, key, comic))
+    return rawTagParticipatesV1(state, provider, key)
 }
 
 export interface TagDirectoryRowV1 { identity: string; provider: TagProviderV1 | 'private'; key: string; label: string; facet: string; supportCount: number; catalogCount: number; enabled: boolean; kind: 'PROVIDER_RAW' | 'PRIVATE_MANUAL' | 'PRIVATE_MAPPED' }
@@ -123,7 +141,7 @@ export function buildTagDirectoryV1(catalog: StoredComic[], state: TagPolicyCarr
         rows.set(identity, row)
     }
     for (const raw of extraPicaTags) add('pica', raw)
-    for (const comic of catalog) for (const raw of comic.tags) add(comicTagProviderV1(comic), raw, comic)
+    for (const comic of catalog) for (const raw of providerRawTagFactsV1(comic)) add(comicTagProviderV1(comic), raw, comic)
     const values: TagDirectoryRowV1[] = [...rows.values()].map(({ favorites, catalog: ids, ...row }) => ({ ...row, supportCount: favorites.size, catalogCount: ids.size }))
     for (const tag of policy.privateTags) {
         const matched = catalog.filter(comic => privateTagMatchesV1(tag, comic))

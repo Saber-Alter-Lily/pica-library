@@ -90,4 +90,13 @@ describe('tag policy storage, routes and paired knowledge contract', () => {
         expect(intents[0].type).toBe('RELATED');expect(translateIntentPlanV3(intents)[0]).toMatchObject({ routeType: 'RELATED', comicSeedId: 'pica:1' })
         expect(translateIntentPlanV3(intents)[0].queryTerm).toBeUndefined()
     })
+    it('namespaced EH scope survives channel planning and mobile catalog evidence without guessing from flat tags', () => {
+        const { database, store } = fixture(), raw = { ...comic('eh:1', ['schoolgirl']), providerMetadata: { rawTags: ['female:schoolgirl'] } }
+        const state = { ...defaultPortablePolicyStateV5(), tagPolicy: { ...off(), selected: ['eh|female:schoolgirl'] } }, timescales = buildPreferenceTimescalesV5([], [raw], state)
+        const channels = buildCandidateChannelPlanV5({ catalog: [raw], policy: state, timescales })
+        const tagChannels = channels.channels.filter(c => c.family === 'TAG' || c.family === 'FANDOM')
+        expect(tagChannels.length).toBeGreaterThan(0);expect(tagChannels.some(c => c.providerAllocations.some(a => a.surface === 'eh' && a.eligible))).toBe(true)
+        store.mergeMobile({ deviceId: 'synthetic', mutationId: 'namespace', syncSchemaVersion: 1, catalogEvidence: [{ comicId: 'eh:2', providerId: 'eh', title: 'Synthetic', tags: ['schoolgirl'], providerRawTags: ['female:schoolgirl'] }] })
+        expect(database.getComic('eh:2')?.providerMetadata?.rawTags).toEqual(['female:schoolgirl'])
+    })
 })

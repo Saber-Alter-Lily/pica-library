@@ -40,7 +40,7 @@ final class RecommendationLocalProfile {
         LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
         if(catalog==null)catalog=new UnifiedCatalogStore.Snapshot();
         if(remoteSnapshot==null)remoteSnapshot=new JSONObject();
-        TagParticipation participation=TagParticipation.of(remoteSnapshot);
+        TagParticipation participation=TagParticipation.of(app,remoteSnapshot);
         JSONObject remoteCounts=remoteSnapshot.optJSONObject("counts");
         int remoteFavorites=remoteCounts==null?0:remoteCounts.optInt("favorites",0),localFavorites=0;
         for(UnifiedCatalogStore.Entry entry:catalog.entries())if(entry.favorite)localFavorites++;

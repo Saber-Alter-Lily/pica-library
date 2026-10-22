@@ -11,13 +11,13 @@
     <string name="info_description">%1$s help</string>
 
     <string name="onboarding_settings_title">Help &amp; Onboarding</string>
-    <string name="onboarding_settings_help">Replay the main feature tour at any time. Turning off automatic prompts never disables manual replay.</string>
-    <string name="onboarding_replay">Replay onboarding</string>
-    <string name="onboarding_replay_summary">Library / shelves / recommendations / visual style / connections / settings</string>
-    <string name="onboarding_auto">Show new-feature onboarding automatically</string>
+    <string name="onboarding_settings_help">Daily and advanced guides are separate. Reading progress is not configuration status. Both remain available when automatic prompts are off.</string>
+    <string name="onboarding_replay">Daily-use tour</string>
+    <string name="onboarding_replay_summary">Find / read / shelves / recommendations; advanced chapters are optional</string>
+    <string name="onboarding_auto">Offer the daily guide automatically</string>
     <string name="onboarding_welcome_title">Welcome to the new Pica Library</string>
-    <string name="onboarding_welcome_body">Take a minute to see the library, recommendations, connections and settings. You can skip the tour at any time. Later, replay it from Settings → Help &amp; Onboarding.</string>
-    <string name="onboarding_start">Start tour</string>
+    <string name="onboarding_welcome_body">Daily use covers finding, reading, shelves and light recommendation feedback. Accounts, visual style, connections and diagnostics have optional advanced chapters, never started automatically. Replay either from Settings → Help &amp; Onboarding. Guides do not sync or change settings.</string>
+    <string name="onboarding_start">Daily-use tour</string>
     <string name="onboarding_later">Later</string>
     <string name="onboarding_never">Do not show automatically again</string>
     <string name="onboarding_skip">Skip</string>
@@ -28,7 +28,7 @@
     <string name="tour_library_title">Library</string>
     <string name="tour_library_body">Your Pica, E-H, local downloads and remote copies are organized here.</string>
     <string name="tour_recommend_title">Recommendations</string>
-    <string name="tour_recommend_body">Recommendations use long-term interests, recent behavior, explicit preferences and current-session intent.</string>
+    <string name="tour_recommend_body">Read the existing batch or change batches without recomputing every time. Correct recommendations when needed; full preference setup is not required.</string>
     <string name="tour_online_title">Online</string>
     <string name="tour_online_body">Browse Pica, E-Hentai and ExHentai when the corresponding source is available.</string>
     <string name="tour_settings_title">Settings</string>
@@ -50,7 +50,7 @@
     <string name="tour_generate_recommend_title">Generate recommendations</string>
     <string name="tour_generate_recommend_body">Use this button to generate or intentionally rebuild the phone-local recommendation cycle. Each cycle is split into 12-item batches; switching batches reuses the current cycle instead of rebuilding it.</string>
     <string name="tour_adjust_recommend_title">Profile &amp; adjustment</string>
-    <string name="tour_adjust_recommend_body">Open here to inspect why recommendations are being made, tune explicit preferences, sync portable recommendation state, and control visual-style influence.</string>
+    <string name="tour_adjust_recommend_body">Correct preferences here only when needed. Like, dislike and block are different actions. Full instructions are in the optional advanced guide, not prerequisites for reading.</string>
     <string name="tour_profile_title">Recommendation profile</string>
     <string name="tour_profile_body">See long-term interests, recent behavior, this phone session and the current recommendation composition before changing any controls.</string>
     <string name="tour_manual_adjust_title">Manual 0–10 adjustment</string>
@@ -62,7 +62,7 @@
     <string name="tour_visual_strength_title">Visual influence strength</string>
     <string name="tour_visual_strength_body">Choose how strongly visual similarity affects ranking. This changes the visual contribution without replacing your normal author, tag, recent and session preferences.</string>
     <string name="tour_complete_title">You are ready</string>
-    <string name="tour_complete_body">That covers the main features. This tour remains available in Settings.</string>
+    <string name="tour_complete_body">That is enough for daily use. Accounts, visual style and sync have optional chapters in Settings → Help &amp; Onboarding; none start automatically.</string>
     <string name="jm_download_title">JM phone downloads</string>
     <string name="jm_download_preparing">Preparing download</string>
     <string name="jm_download_running">Downloading</string>

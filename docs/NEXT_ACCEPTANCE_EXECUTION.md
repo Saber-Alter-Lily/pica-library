@@ -1,8 +1,16 @@
 # Next consolidated acceptance candidate
 
-Status: UNPUBLISHED / NEXT-41 NATIVE JM SOURCE-SCREEN UX CONTINUATION IN PROGRESS. This is an integration candidate, not a release or device-acceptance result.
+## 2026-10-22 continuation: daily UX and two separate guides
 
-The prior frozen source `43d9c2bc5a789994973703fe84408e8824962d5c` completed NEXT-40 automated/package gates in run `39759492930`; it did not establish real-provider/device acceptance. This 2026-10-22 round is limited to native JM source-screen localization, operation feedback and duplicate prevention with synthetic tests. Its exact-source build results must be recorded separately. See [JM_SOURCE_UI_ACCEPTANCE.md](JM_SOURCE_UI_ACCEPTANCE.md) and the retained [download boundary](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md).
+Current local slice: `codex/ux-tags-dual-onboarding-20261022`, based on frozen `e3c0ff365153555511f396321be6cdb63c981384`. The user authorized isolated writes despite the DPAPI claim failure, then separately authorized pushing this new branch, a Draft PR and fixed-signature unpublished builds. No main merge, stable release/OTA, private-key download or deployment.
+
+Implemented: short daily onboarding and optional advanced chapters on Web/Android; independent help state and v2 compatibility; opt-in full preference controls and advanced diagnostic tools; two linked Chinese handbooks. Local Desktop unit/integration and real-browser gates are recorded in the slice evidence. Fresh Android/package evidence must bind to its new source SHA; previous candidate results are not reused.
+
+This is the **first UX/onboarding slice**, not completion of tag participation or #200. Whitelist gating, private work tags, provider-tag mappings, visual reference sets and automatic Save-and-apply recomputation remain pending. See [scope and evidence](UX_SIMPLIFICATION_DUAL_ONBOARDING.md), [daily guide](DAILY_USE_GUIDE.zh-CN.md) and [advanced guide](ADVANCED_FEATURES_GUIDE.zh-CN.md).
+
+Status: UNPUBLISHED / NEXT-42 DUAL ONBOARDING FIRST SLICE. Fresh exact-source CI/package results belong in the accompanying post-build validation. This is an integration candidate, not a release or device-acceptance result.
+
+Earlier history: frozen source `43d9c2bc5a789994973703fe84408e8824962d5c` completed NEXT-40 automated/package gates in run `39759492930`; it did not establish real-provider/device acceptance. NEXT-41 subsequently covered native JM source-screen localization, operation feedback and duplicate prevention with synthetic tests, preserved in the current base `e3c0ff365153555511f396321be6cdb63c981384`. See [JM_SOURCE_UI_ACCEPTANCE.md](JM_SOURCE_UI_ACCEPTANCE.md) and the retained [download boundary](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md). This new slice does not reuse those build results as its own.
 
 ## Authority and baseline
 

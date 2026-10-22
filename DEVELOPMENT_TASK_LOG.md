@@ -3147,3 +3147,18 @@ Post-build evidence for NEXT-40: frozen source `43d9c2bc5a789994973703fe84408e88
 - Add synthetic Robolectric UI and three-locale resource-format tests; rerun exact-source Android and Desktop/Web/source/browser/package gates. CI-only candidate versionCode becomes 57 under the same Dev identity and fixed certificate; no private key download.
 - No production account/data, database schema, ranker/recall, Visual/embedding, sync protocol, installed app, stable version/tag/Release/OTA or deployment change. No new manual testing requested. Full-app localization, JM native proxy/progress, automatic recall and dynamic extensions remain open.
 - Evidence levels and deferred consolidated checklist: [JM_SOURCE_UI_ACCEPTANCE.md](docs/JM_SOURCE_UI_ACCEPTANCE.md). No #199/#200/#204 closure and no claim that automated UI fixtures establish real-device/provider acceptance.
+
+## NEXT-42 — Daily UX simplification and separate daily/advanced guides
+
+**Status: FIRST_SLICE_IMPLEMENTED / UNRELEASED — local automated gates; fresh exact-source Android/CI/package and human gates must be recorded separately.**
+
+- New user authorization on 2026-10-22: isolated development/build despite DPAPI claim failure, then a separate authorization for a new Draft branch/PR and Actions using existing signing Secrets. No DPAPI identity or secret repair and no private-key download.
+- Base `e3c0ff365153555511f396321be6cdb63c981384`; branch `codex/ux-tags-dual-onboarding-20261022`. Preserve prior candidate branches, handoffs and installed data.
+- Web daily guide: seven practical steps plus completion; advanced guide: seven independently replayable chapters. Android daily no longer auto-chains into advanced settings; eight offline advanced chapters support explicit navigation/read markers and recreation.
+- zh-CN/en/ja guide text. Reading state is not configuration state. v2 completion/dismissal and automatic-prompt preference are respected. Guides never auto-run account, sync, download, deletion, update or model actions.
+- Browser regressions exposed a real Driver final-animation callback omission and a fast-Skip progress race. Explicit idempotent cleanup restores the original view/settings/disclosures; progress is captured before animation. Android target polling is bounded and stops on destroyed activities.
+- Existing adjustments stay primary; full search/sliders and evidence/recompute/diagnostic tools become opt-in. Policy IDs, weights, current serving behavior, data schema, frozen Visual and sync protocol are unchanged.
+- Two complete user handbooks: [daily](docs/DAILY_USE_GUIDE.zh-CN.md), [advanced](docs/ADVANCED_FEATURES_GUIDE.zh-CN.md). Native guides and actual owner-navigation tests accompany the documentation; this is not docs-only work.
+- **Not implemented here:** selected-tag gating, private per-work tags, provider-tag rule mappings, visual reference sets and automatic Save-and-apply. Do not present proposed controls as available; NEXT-35/#200 remains partial. The next slice must gate profile/recall/ranking/reasons and Android offline semantics together.
+- Candidate-only Actions versionCode 58 under the same Dev identity/fixed certificate. No stable version/tag/Release/OTA, main merge, official database or local installation change. Device/provider acceptance is deferred to the next consolidated test.
+- Final local source: 1,261 Desktop assertions PASS (zero skipped), 29/29 isolated Edge browser tests PASS, 41/41 Web syntax PASS, TypeScript and Rollup PASS. Native advanced Skip/target failure was also separated from daily dismissal during final review. Fresh remote Android/build/package evidence is recorded post-build; this entry does not claim physical acceptance.

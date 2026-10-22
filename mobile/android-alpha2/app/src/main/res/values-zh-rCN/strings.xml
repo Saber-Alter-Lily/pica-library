@@ -11,13 +11,13 @@
     <string name="info_description">%1$s说明</string>
 
     <string name="onboarding_settings_title">帮助与新手引导</string>
-    <string name="onboarding_settings_help">可以随时重新查看主要功能引导。关闭自动提示后，仍然可以手动启动。</string>
-    <string name="onboarding_replay">重新查看新手引导</string>
-    <string name="onboarding_replay_summary">书库 / 书架 / 推荐 / 画风 / 连接 / 设置</string>
-    <string name="onboarding_auto">自动显示新版功能引导</string>
+    <string name="onboarding_settings_help">日常入门与高级功能分开学习。进度不代表实际配置状态；关闭自动提示后，两套指南都可手动打开。</string>
+    <string name="onboarding_replay">日常使用入门</string>
+    <string name="onboarding_replay_summary">找书 / 阅读 / 书架 / 推荐；高级章节按需查看</string>
+    <string name="onboarding_auto">首次自动提示日常引导</string>
     <string name="onboarding_welcome_title">欢迎使用新版 Pica Library</string>
-    <string name="onboarding_welcome_body">花一分钟了解书库、推荐、连接与设置。引导可以随时跳过；之后也可以在“设置 → 帮助与新手引导”重新查看。</string>
-    <string name="onboarding_start">开始引导</string>
+    <string name="onboarding_welcome_body">日常版只介绍找书、阅读、书架与轻量推荐。账号、画风、连接和诊断在高级指南按章节查看，不会自动进入。两套指南都可在“设置 → 帮助与新手引导”重看，引导不会执行同步或修改设置。</string>
+    <string name="onboarding_start">日常使用入门</string>
     <string name="onboarding_later">稍后再看</string>
     <string name="onboarding_never">不再自动提示</string>
     <string name="onboarding_skip">跳过</string>
@@ -28,7 +28,7 @@
     <string name="tour_library_title">书库</string>
     <string name="tour_library_body">Pica、E-H、本地下载和远程副本都在这里统一整理。</string>
     <string name="tour_recommend_title">推荐</string>
-    <string name="tour_recommend_body">推荐会结合长期兴趣、最近行为、显式偏好和本次想看。</string>
+    <string name="tour_recommend_body">已有推荐可以直接看或换一批，不必每次重算。推荐不合口味时再纠正，不要求先配置所有偏好。</string>
     <string name="tour_online_title">在线</string>
     <string name="tour_online_body">可以浏览 Pica、E-Hentai，以及账号可用时的 ExHentai。</string>
     <string name="tour_settings_title">设置</string>
@@ -50,7 +50,7 @@
     <string name="tour_generate_recommend_title">生成推荐</string>
     <string name="tour_generate_recommend_body">点击这里生成或主动重建手机自己的推荐周期。每个周期按 12 本分批；切换上一批/下一批只复用当前周期，不会重新完整生成。</string>
     <string name="tour_adjust_recommend_title">画像与调整</string>
-    <string name="tour_adjust_recommend_body">从这里查看推荐为什么这样组成，调整明确偏好、同步推荐状态，并设置画风对排序的影响。</string>
+    <string name="tour_adjust_recommend_body">需要时从这里纠正偏好。喜欢、不喜欢和屏蔽是不同操作；完整配置方法在高级指南，不是日常阅读的前置步骤。</string>
     <string name="tour_profile_title">推荐画像</string>
     <string name="tour_profile_body">先查看长期兴趣、最近行为、本次手机 Session 和当前推荐构成，再决定需要调整哪些方向。</string>
     <string name="tour_manual_adjust_title">人工 0–10 调整</string>
@@ -62,7 +62,7 @@
     <string name="tour_visual_strength_title">画风影响强度</string>
     <string name="tour_visual_strength_body">这里决定画风相似度对排序影响多大；只改变画风这一部分，不会取代作者、标签、最近行为和本次偏好。</string>
     <string name="tour_complete_title">已经准备好了</string>
-    <string name="tour_complete_body">主要功能已经介绍完毕；以后仍可从设置重新查看本引导。</string>
+    <string name="tour_complete_body">日常入门到这里即可。账号、画风、同步等高级功能可从“设置 → 帮助与新手引导”按章节查看，不会自动启动。</string>
     <string name="jm_download_title">JM 手机下载</string>
     <string name="jm_download_preparing">正在准备下载</string>
     <string name="jm_download_running">正在下载</string>

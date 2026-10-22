@@ -208,7 +208,7 @@ function ensurePanel() {
     panel.className = 'panel'
     panel.innerHTML = `
         <div class="v5-head">
-            <div class="v5-heading-inline"><h3>${v5t('推荐偏好','Recommendation preferences','おすすめ設定')}</h3>${infoButton(v5t('系统会根据收藏和后续真实使用自动学习；只有判断不准确时才需要手动纠正。','The system learns from your collection and later real usage. Manual correction is only needed when its judgment is inaccurate.','システムはコレクションと実際の利用から学習します。判断が合わない場合だけ手動で調整してください。'))}</div>
+            <div class="v5-heading-inline"><h3>${v5t('调整推荐','Adjust recommendations','おすすめを調整')}</h3>${infoButton(v5t('不必先配置完整画像。先保留日常使用，只在推荐不合口味时纠正；屏蔽与少推荐是不同操作。','No full-profile setup is required. Correct recommendations only when needed; blocking is different from recommending less.','全プロフィールの設定は不要です。合わない時だけ調整し、ブロックと少なめのおすすめを区別してください。'))}</div>
             <div class="actions">
                 <button id="v5-policy-refresh" type="button">${v5t('刷新','Refresh','更新')}</button>
                 <button id="v5-audit-export" type="button">${v5t('导出推荐审计数据','Export recommendation audit','おすすめ監査データを書き出す')}</button>
@@ -255,6 +255,7 @@ function ensurePanel() {
         <div class="v5-heading-inline"><h4>${v5t('你的调整','Your adjustments','あなたの調整')}</h4>${infoButton(v5t('这里仅显示你主动覆盖系统判断的项目。屏蔽偏好和屏蔽具体作品会分别统计。','Only items you explicitly override are shown here. Blocked preferences and blocked works are counted separately.','ここにはシステム判断を明示的に上書きした項目だけを表示します。嗜好のブロックと作品のブロックは別々に集計します。'))}</div>
         <div id="v5-control-list" class="v5-control-list"></div>
 
+        <details id="v5-tuning-section"><summary>${v5t('查找并调整作者、IP 或标签','Find and adjust an author, IP or tag','作者・IP・タグを検索して調整')}</summary>
         <div class="v5-heading-inline"><h4>${v5t('完整画像与微调 · 0–10 档','Full profile & tuning · 0–10','プロフィール全体と調整 · 0–10')}</h4>${infoButton(v5t('0 = 强烈减少，5 = 中性，10 = 非常喜欢。滑杆修改会先暂存，只有点击“保存调整”才写入长期偏好；0 仍是软偏好，不等同于“屏蔽”。','0 = strongly reduce, 5 = neutral, 10 = strongly prefer. Slider changes are staged until you choose Save adjustments; 0 is still a soft preference, not a block.','0 = 強く減らす、5 = 中立、10 = とても好き。スライダー変更は「調整を保存」するまで仮保存されます。0 はソフト嗜好で、ブロックとは異なります。'))}</div>
         <div class="v5-search-row">
             <label>${v5t('查找一个具体偏好','Find a specific preference','特定の嗜好を検索')}
@@ -266,6 +267,7 @@ function ensurePanel() {
         <p id="v5-search-status" class="status" role="status" aria-live="polite"></p>
         <div class="v5-help">${v5t('收藏频次是系统基准，不等于你明确喜欢。查找会检索完整本地收藏及已保存的调整，兼容简繁体和现有别名；不会自动添加新标签。','Collection frequency is a baseline, not an explicit preference. Search covers all local favorites and saved controls, including Chinese variants and existing aliases; it never adds tags automatically.','収集頻度は基準であり、明示的な好みではありません。検索は全ローカルお気に入りと保存済み調整を対象に簡繁体・既存の別名に対応します。タグは自動追加しません。')}</div>
         <div id="v5-inferred-list" class="v5-facet-list"></div>
+        </details>
         <div id="v5-pending-bar" class="v5-pending-bar" hidden>
             <strong id="v5-pending-count">${v5t('已修改 0 项','0 changes','変更 0 件')}</strong>
             <div class="actions">
@@ -274,6 +276,16 @@ function ensurePanel() {
             </div>
         </div>
     `
+    const advanced = document.createElement('details')
+    advanced.id = 'v5-advanced-section'
+    const summary = document.createElement('summary')
+    summary.textContent = v5t('查看依据、重算与高级诊断','Evidence, recomputation and advanced diagnostics','根拠・再計算・高度な診断')
+    advanced.appendChild(summary)
+    for (const selector of ['#v5-profile-section', '#v5-serving-section', '#v5-shadow-section', '.v5-policy-tech', '.v5-head > .actions']) {
+        const element = panel.querySelector(selector)
+        if (element) advanced.appendChild(element)
+    }
+    panel.appendChild(advanced)
     anchor.insertAdjacentElement('afterend', panel)
     panel.querySelector('#v5-policy-refresh').addEventListener('click', loadPolicy)
     panel.querySelector('#v5-audit-export').addEventListener('click', async (event) => {

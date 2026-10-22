@@ -1,14 +1,22 @@
-#pica-onboarding-welcome {
+#pica-onboarding-welcome, #pica-advanced-guide {
     border: 0;
     border-radius: 22px;
     width: min(560px, calc(100vw - 28px));
     max-width: 100%;
     padding: 0;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
     background: var(--a83-surface, #fff);
     color: var(--a83-text, #201e24);
     box-shadow: 0 30px 90px rgb(0 0 0 / .28);
 }
 #pica-onboarding-welcome::backdrop { background: rgb(0 0 0 / .58); }
+#pica-advanced-guide::backdrop { background: rgb(0 0 0 / .58); }
+.pica-guide-chapters { display: grid; gap: 10px; }
+.pica-guide-chapters button { text-align: start; display: grid; gap: 5px; white-space: normal; min-height: 64px; }
+.pica-guide-chapters button span { font-size: .88rem; opacity: .8; }
+#v5-tuning-section, #v5-advanced-section { margin-top: 16px; padding: 12px; border: 1px solid var(--a83-line, #ddd7e4); border-radius: 14px; }
+#v5-tuning-section > summary, #v5-advanced-section > summary { cursor: pointer; font-weight: 650; padding: 5px; }
 .pica-onboarding-welcome-shell { padding: 24px; display: grid; gap: 16px; }
 .pica-onboarding-welcome-shell h2 { margin: 0; font-size: 1.5rem; }
 .pica-onboarding-welcome-shell p { margin: 0; line-height: 1.65; }

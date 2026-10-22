@@ -11,13 +11,13 @@
     <string name="info_description">%1$sの説明</string>
 
     <string name="onboarding_settings_title">ヘルプと初回ガイド</string>
-    <string name="onboarding_settings_help">主な機能ガイドはいつでも再表示できます。自動表示をオフにしても手動再生は利用できます。</string>
-    <string name="onboarding_replay">初回ガイドをもう一度見る</string>
-    <string name="onboarding_replay_summary">ライブラリ / 本棚 / おすすめ / 画風 / 接続 / 設定</string>
-    <string name="onboarding_auto">新機能ガイドを自動表示</string>
+    <string name="onboarding_settings_help">日常版と高度な版は別です。読了と設定状態は異なります。自動案内がオフでも両方のガイドを開けます。</string>
+    <string name="onboarding_replay">日常操作ガイド</string>
+    <string name="onboarding_replay_summary">作品探し / 閲覧 / 本棚 / おすすめ・高度な章は任意</string>
+    <string name="onboarding_auto">日常ガイドを自動案内</string>
     <string name="onboarding_welcome_title">新しい Pica Library へようこそ</string>
-    <string name="onboarding_welcome_body">ライブラリ、おすすめ、接続、設定を短時間で確認できます。いつでもスキップでき、後から「設定 → ヘルプと初回ガイド」で再表示できます。</string>
-    <string name="onboarding_start">ガイドを開始</string>
+    <string name="onboarding_welcome_body">日常版は作品探し・閲覧・本棚・軽いおすすめ調整を紹介します。アカウント・画風・接続・診断は高度な版で章ごとに確認でき、自動開始しません。「設定 → ヘルプと初回ガイド」で再表示できます。同期や設定変更は行いません。</string>
+    <string name="onboarding_start">日常操作ガイド</string>
     <string name="onboarding_later">後で見る</string>
     <string name="onboarding_never">今後は自動表示しない</string>
     <string name="onboarding_skip">スキップ</string>
@@ -28,7 +28,7 @@
     <string name="tour_library_title">ライブラリ</string>
     <string name="tour_library_body">Pica、E-H、ローカルダウンロード、リモートコピーをここでまとめて整理します。</string>
     <string name="tour_recommend_title">おすすめ</string>
-    <string name="tour_recommend_body">長期的な興味、最近の行動、明示的な嗜好、今回見たいものを組み合わせておすすめします。</string>
+    <string name="tour_recommend_body">既存のおすすめはそのまま読むかバッチを切り替えます。毎回の再計算や全嗜好の設定は不要です。</string>
     <string name="tour_online_title">オンライン</string>
     <string name="tour_online_body">Pica、E-Hentai、利用可能な場合は ExHentai を閲覧できます。</string>
     <string name="tour_settings_title">設定</string>
@@ -50,7 +50,7 @@
     <string name="tour_generate_recommend_title">おすすめを生成</string>
     <string name="tour_generate_recommend_body">ここからスマートフォン独自のおすすめサイクルを生成または明示的に再生成します。1サイクルは12件ずつのバッチに分かれ、前後のバッチ移動では再生成しません。</string>
     <string name="tour_adjust_recommend_title">プロフィールと調整</string>
-    <string name="tour_adjust_recommend_body">おすすめの構成理由を確認し、明示的な嗜好、同期、画風の影響をここから調整できます。</string>
+    <string name="tour_adjust_recommend_body">必要な時だけ嗜好を訂正します。好き・苦手・ブロックは別です。詳しい手順は任意の高度なガイドで確認でき、読書の前提ではありません。</string>
     <string name="tour_profile_title">おすすめプロフィール</string>
     <string name="tour_profile_body">長期嗜好、最近の行動、この端末の Session、現在のおすすめ構成を確認してから調整できます。</string>
     <string name="tour_manual_adjust_title">0–10 の手動調整</string>
@@ -62,7 +62,7 @@
     <string name="tour_visual_strength_title">画風の影響強度</string>
     <string name="tour_visual_strength_body">画風類似度を順位付けにどの程度反映するかを設定します。作者、タグ、最近の行動、今回の嗜好はそのまま維持されます。</string>
     <string name="tour_complete_title">準備完了</string>
-    <string name="tour_complete_body">主な機能の説明は以上です。設定からいつでもこのガイドを再表示できます。</string>
+    <string name="tour_complete_body">日常操作の説明は以上です。アカウント・画風・同期は「設定 → ヘルプと初回ガイド」で必要な章を確認でき、自動開始しません。</string>
     <string name="jm_download_title">JM 端末ダウンロード</string>
     <string name="jm_download_preparing">ダウンロードを準備中</string>
     <string name="jm_download_running">ダウンロード中</string>

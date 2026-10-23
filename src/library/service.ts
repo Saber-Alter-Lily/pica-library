@@ -5047,7 +5047,8 @@ export class LibraryService {
 
         const pica = await this.connect()
         const seedBudget = Math.max(1, Math.min(options.seedCount ?? 12, 16))
-        const seeds = selectDiversifiedSeeds(favorites, seedBudget)
+        // This legacy route calls Pica's native related endpoint, not a cross-source ID lookup.
+        const seeds = selectDiversifiedSeeds(favorites.filter(comic => !comic.comicId.includes(':') && comic.providerId === 'pica'), seedBudget)
         const profile = recommendComics(favorites, limit).profile
         const semanticProfile = buildV3Profile(
             favorites,

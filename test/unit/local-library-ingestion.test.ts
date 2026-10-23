@@ -46,6 +46,40 @@ afterEach(() => {
 })
 
 describe('local-first owned media ingestion (synthetic, no provider)', () => {
+    it('never sends local IDs to the legacy direct-Pica related fallback', async () => {
+        const f = fixture()
+        f.page('1.png')
+        const preview = await f.importer.preview(f.original, 'folder')
+        await f.importer.confirm(preview.token)
+        f.db.setLocalFavoriteState(preview.comicId, true)
+        const related = vi.fn(async () => [])
+        const sdk = {
+            related,
+            Order: { loved: 'loved' },
+            search: async () => ({ docs: [], pages: 1 }),
+            comicsPage: async () => ({ docs: [], pages: 1 })
+        }
+        const service = new LibraryService(f.db, f.data, sdk as never)
+        await service.recommendations({ limit: 1 })
+        expect(related).not.toHaveBeenCalled()
+        f.db.importFavorites(
+            [
+                {
+                    comicId: 'legacy-pica-seed',
+                    providerId: 'pica',
+                    title: 'Synthetic Pica seed',
+                    author: 'Fixture',
+                    categories: [],
+                    tags: [],
+                    finished: false
+                }
+            ],
+            'test',
+            true
+        )
+        await service.recommendations({ limit: 1 })
+        expect(related.mock.calls).toEqual([['legacy-pica-seed']])
+    })
     it('refuses its own library, ancestors and symlinked source folders', async () => {
         const f = fixture()
         f.page('1.png')

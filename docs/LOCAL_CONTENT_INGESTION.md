@@ -4,7 +4,7 @@
 
 After local-only setup, **Library → Import comic folder / Import CBZ** selects one user-owned comic through the existing native picker. The browser never submits a server path. Preview shows title, counts, bytes, sample names and removed-page count; only explicit confirmation copies pages into Library-owned storage. Cancel does not import. No source account or network is needed. Subfolders form chapters; filenames use numeric-aware ordering.
 
-Supports JPG/JPEG/PNG/GIF/WebP in folders/CBZ, **not CBR/PDF/EPUB**, mass-library watching or Android direct local file import. This copies into owned storage, not direct archive streaming: `archiveReader` stays false; `localFileImport` is a separate interactive-Desktop capability.
+Supports JPG/JPEG/PNG/GIF/WebP in folders/CBZ, **not CBR/PDF/EPUB** or mass-library watching. NEXT-54 additionally provides [direct Android local import](NATIVE_LOCAL_CONTENT_INGESTION.md) through SAF into a separate phone-owned body store; it is not this Desktop API. This copies into owned storage, not direct archive streaming: `archiveReader` stays false; `localFileImport` is a separate interactive-Desktop capability.
 
 The existing local CLI offers `local-import --path PATH --kind folder|cbz --data-dir ROOT --json` (preview) and the same command with **`--confirm`** (rescan/import). CLI initialization may create the normal empty database/schema; preview does not register comics/copy bodies. HTTP/paired/remote clients cannot provide an equivalent arbitrary server path.
 

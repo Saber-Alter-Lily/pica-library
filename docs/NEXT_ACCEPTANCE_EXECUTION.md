@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-54: Android direct local comic import (unpublished)
+
+Continues frozen NEXT-53 `9ff83d2d09fdcb87e3f43e761ac5e09004b5b5f7`, complete handoff SHA256 `19ebe7123f012394a5d27aad79a57b2d82cc531320b3339a74d34b0d77635293`. Phone users can select one folder/CBZ, preview and explicitly import owned copies without Desktop/source login. Existing Reader/catalog/history are reused behind a pure bounded ingestion seam. Device/origin identity and relative-page bookmarks preserve reimport state; originals and private state stay separate from copy removal. [Scope, bounds, reuse, retention and device holds](NATIVE_LOCAL_CONTENT_INGESTION.md).
+
+Dev69 preserves Dev68 identity; no uninstall. Exact-source tests, fixed-certificate installables and existing Windows full-upgrade/rollback evidence must be frozen separately. Real system picker/provider/SD-card/physical upgrade tests remain deferred; pipeline/extension-host work remains open. No production data, merge, release/OTA or deployment.
+
 ## 2026-10-23 NEXT-53: recommendation cycle module and read-only mobile delivery (unpublished)
 
 Continues frozen NEXT-52 `21c94df844f87db7d58aaa9625612b132eaea32f`, handoff SHA256 `a6a33363ad1f96e7f26b19f5118989c9db2b9812c61477f052f8df4fe309a1c8`. V3 cycle commands/result queries now use explicit storage/build/runtime ports, with the existing application constructor preserved. Mobile GET reads persisted results only; explicit recompute prepares a first batch. Local startup stops legacy recall. Warm filtering now honors new blocks/seen/duplicate/temporary facts and canonical ownership without rewriting original scores/batches. [Contract, evidence and limits](RECOMMENDATION_CYCLE_MODULE.md).

@@ -141,3 +141,13 @@ def tagBoundary = tasks.register('compileTagPolicyBoundary', JavaCompile) {
 tasks.configureEach {
     if (name == 'testDebugUnitTest') dependsOn gestureBoundary, tagBoundary
 }
+
+// Local ingestion is a storage boundary, not another provider or Reader implementation.
+def localImportBoundary = tasks.register('compileLocalImportBoundary', JavaCompile) {
+    source fileTree('src/main/java/com/picalibrary/android/local') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('local-import-boundary')
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+tasks.configureEach { if (name == 'testDebugUnitTest') dependsOn localImportBoundary }

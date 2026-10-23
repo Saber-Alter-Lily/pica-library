@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## NEXT-54 — Android direct local folder/CBZ import (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / PHYSICAL_SAF_QA_PENDING.** Full modular-reader objective remains open.
+
+- Continues frozen NEXT-53 `9ff83d2d09fdcb87e3f43e761ac5e09004b5b5f7`; immutable complete handoff SHA256 `19ebe7123f012394a5d27aad79a57b2d82cc531320b3339a74d34b0d77635293`.
+- Adds phone-local folder/CBZ picker → bounded private staging → preview/explicit confirm → existing Reader/catalog/cover/history. Reuses SAF/DocumentFile/Java ZIP, no new dependency or reference APK code. Pure import rules have a no-Android compilation gate.
+- Device/origin/kind-scoped opaque local IDs, no persisted original URI, no provider authentication/transport. Reimport keeps identity and page-ID progress; invalid/cancelled commits preserve previous inventory. Removing a confirmed app-owned copy leaves original/Desktop/cloud files and private metadata/history untouched. Retired generations remain for in-flight Readers; crash-orphan collection is not claimed.
+- Pinned internal body store is separate from disposable caches/data-root preferences. Existing state formats/database schema/public module APIs stay; additive `localImported` is an availability fact, not a provider download. Dev69 retains Dev68 package/signature. No uninstall/reset or automatic deployment.
+- [Scope, byte/path limits, reuse and unverified native/provider boundaries](docs/NATIVE_LOCAL_CONTENT_INGESTION.md). Exact-source Android/Desktop/browser/actual-Windows and upgrade gates are required in the new handoff; prior results are provenance only. Same isolated candidate/Draft/CI + DPAPI exception authority; no production access, main merge, tag/Release, OTA or private-key download.
+
 ## NEXT-53 — recommendation cycle commands, read-only delivery and storage ports (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / DEVICE_QA_PENDING.** Full modular-reader work remains open.

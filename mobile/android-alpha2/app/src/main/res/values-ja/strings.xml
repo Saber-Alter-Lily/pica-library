@@ -148,4 +148,21 @@
     <string name="jm_source_enrich_interrupted">情報補完中に画面を再作成しました。完了分は保持されています。後で続けられます。</string>
     <string name="jm_source_import_interrupted">取込中に画面を再作成しました。蔵書を確認し、必要なら再度スキャンしてください。再取込で重複はしません。</string>
     <string name="jm_source_operation_interrupted">画面を再作成しました。検索結果は保持しています。必要なら中断された操作を再試行してください。</string>
+    <string name="local_import_title">ローカル漫画を取り込む</string>
+    <string name="local_import_back">戻る</string>
+    <string name="local_import_label">端末内の漫画</string>
+    <string name="local_import_help">漫画1冊の画像フォルダまたはCBZ/ZIPを選び、プレビュー後に確定します。画像はアプリ専用領域へコピーされ、元ファイルは変更しません。ログイン不要です。アンインストールするとコピーは削除されます。CBR/PDF/EPUBは未対応です。</string>
+    <string name="local_import_folder">漫画フォルダを選択</string>
+    <string name="local_import_cbz">CBZ/ZIP漫画を選択</string>
+    <string name="local_import_working">端末内で処理中… 大きなファイルには時間がかかります。</string>
+    <string name="local_import_failed">取り込みを完了できませんでした</string>
+    <string name="local_import_catalog_pending">コピーは保存済みです。ライブラリを開き直して一覧を更新してください。</string>
+    <string name="local_import_preview">%1$dページ · %2$d章 · %3$.1f MiB。ライブラリには未登録です。同じ場所を再選択すると、作品IDと読書位置を保ってコピーを更新します。</string>
+    <string name="local_import_confirm">取り込み / コピー更新を確定</string>
+    <string name="local_import_cancel">プレビューを破棄</string>
+    <string name="local_import_owned">この端末の取り込み済み漫画：%1$d</string>
+    <string name="local_import_read">オフラインで読む</string>
+    <string name="local_import_remove">取り込んだコピーを削除</string>
+    <string name="local_import_remove_warning">このアプリのコピーと旧世代だけを削除しますか？元フォルダ/CBZ、履歴、本棚、個人タグは保持します。PCやクラウドのコピーは削除しません。</string>
+    <string name="local_import_no_picker">システムのファイル選択画面を利用できません。</string>
 </resources>

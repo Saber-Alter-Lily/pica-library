@@ -19,6 +19,8 @@ interface ReaderSource {
     String recentChapter(String comicId) throws Exception;
     HttpURLConnection image(String path) throws Exception;
     void saveProgress(String comicId,String episodeId,int pageIndex);
+    default void rememberPosition(String comicId,String episodeId,int pageIndex) { }
+    default int restorePosition(String comicId,String episodeId,int fallback) { return fallback; }
 }
 
 final class DesktopReaderSource implements ReaderSource {

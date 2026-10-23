@@ -40,7 +40,7 @@ final class ReaderProgress {
 
     int position(String comic, String chapter, int fallback) {
         SharedPreferences oneShot=context.getSharedPreferences(ONE_SHOT_PREF,Context.MODE_PRIVATE);String overrideKey=oneShotKey(comic,chapter);if(oneShot.contains(overrideKey)){int value=Math.max(0,oneShot.getInt(overrideKey,fallback));oneShot.edit().remove(overrideKey).apply();return value;}
-        try { return new JSONObject(store.getString(key(comic, chapter), "{}")).optInt("page", fallback); }
+        try { return source.restorePosition(comic,chapter,new JSONObject(store.getString(key(comic, chapter), "{}")).optInt("page", fallback)); }
         catch (Exception e) { return fallback; }
     }
 
@@ -98,6 +98,7 @@ final class ReaderProgress {
         if (comic == null || chapter == null) return;
         try {
             String now=Instant.now().toString();
+            source.rememberPosition(comic,chapter,page);
             String key = key(comic, chapter);
             JSONObject prior = new JSONObject(store.getString(key, "{}"));
             JSONObject value = new JSONObject();

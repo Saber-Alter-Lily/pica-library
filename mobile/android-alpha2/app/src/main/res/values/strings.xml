@@ -148,4 +148,21 @@
     <string name="jm_source_enrich_interrupted">The screen was recreated during metadata update. Completed metadata remains; you may continue later.</string>
     <string name="jm_source_import_interrupted">The screen was recreated during import. Check the library before rescanning; repeating an import does not duplicate favorites.</string>
     <string name="jm_source_operation_interrupted">The screen was recreated. Search results remain; retry the interrupted operation if needed.</string>
+    <string name="local_import_title">Import local comics</string>
+    <string name="local_import_back">Back</string>
+    <string name="local_import_label">Phone import</string>
+    <string name="local_import_help">Choose one comic folder or CBZ/ZIP. Preview, then confirm. Pages are copied into private app storage; originals stay untouched. No source account is needed. App uninstall removes these copies. CBR/PDF/EPUB are not supported.</string>
+    <string name="local_import_folder">Choose comic folder</string>
+    <string name="local_import_cbz">Choose CBZ/ZIP comic</string>
+    <string name="local_import_working">Processing locally… Large comics may take a while.</string>
+    <string name="local_import_failed">Import could not be completed</string>
+    <string name="local_import_catalog_pending">Copy saved. Reopen Library to retry refreshing the catalog.</string>
+    <string name="local_import_preview">%1$d pages · %2$d chapters · %3$.1f MiB. Nothing is in your library yet. Reimporting the same selection updates its owned copy while retaining identity and reading position.</string>
+    <string name="local_import_confirm">Confirm import / update copy</string>
+    <string name="local_import_cancel">Discard preview</string>
+    <string name="local_import_owned">Imported copies on this phone: %1$d</string>
+    <string name="local_import_read">Read offline</string>
+    <string name="local_import_remove">Remove imported copy</string>
+    <string name="local_import_remove_warning">Remove only this app-owned imported copy and retained generations? Your selected original folder/CBZ, history, shelves and private tags stay untouched. This does not delete Desktop or cloud copies.</string>
+    <string name="local_import_no_picker">The system document picker is unavailable on this device.</string>
 </resources>

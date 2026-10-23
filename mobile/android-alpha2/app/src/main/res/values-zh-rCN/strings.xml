@@ -148,4 +148,21 @@
     <string name="jm_source_enrich_interrupted">资料补全时页面已重建，已完成资料保留，可以稍后继续。</string>
     <string name="jm_source_import_interrupted">导入时页面已重建，请先查看书库，必要时重新扫描；重复导入不会重复收藏。</string>
     <string name="jm_source_operation_interrupted">页面已重建，搜索结果保留；需要时请重新执行刚才的操作。</string>
+    <string name="local_import_title">导入本地漫画</string>
+    <string name="local_import_back">返回</string>
+    <string name="local_import_label">手机导入</string>
+    <string name="local_import_help">选择一本漫画的图片文件夹或 CBZ/ZIP，预览后确认导入。页面会复制到应用私有目录，不改动原文件，也不需要来源账号。卸载应用会删除这些副本。暂不支持 CBR/PDF/EPUB。</string>
+    <string name="local_import_folder">选择漫画文件夹</string>
+    <string name="local_import_cbz">选择 CBZ/ZIP 漫画</string>
+    <string name="local_import_working">正在本地处理… 大文件需要一些时间。</string>
+    <string name="local_import_failed">未能完成导入</string>
+    <string name="local_import_catalog_pending">副本已保存。请重新进入书库以重试刷新目录。</string>
+    <string name="local_import_preview">%1$d 页 · %2$d 章 · %3$.1f MiB。尚未加入书库。再次选择同一位置会更新副本，保留作品身份和阅读位置。</string>
+    <string name="local_import_confirm">确认导入 / 更新副本</string>
+    <string name="local_import_cancel">放弃本次预览</string>
+    <string name="local_import_owned">本机已导入副本：%1$d</string>
+    <string name="local_import_read">离线阅读</string>
+    <string name="local_import_remove">移除导入副本</string>
+    <string name="local_import_remove_warning">仅移除此应用保存的导入副本及历史文件代次？原文件夹/CBZ、阅读历史、书架和私人标签不动。不会删除电脑或网盘副本。</string>
+    <string name="local_import_no_picker">当前设备没有可用的系统文件选择器。</string>
 </resources>

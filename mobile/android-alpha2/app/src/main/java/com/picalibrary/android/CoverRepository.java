@@ -41,7 +41,8 @@ final class CoverRepository {
     static Bitmap cacheNow(Context context,UnifiedCatalogStore.Entry entry){
         if(entry==null||entry.id==null||entry.id.isEmpty())return null;String cacheKey=key(entry);Bitmap hit=memory(cacheKey);if(hit!=null)return hit;hit=diskHit(context,cacheKey);if(hit!=null)return hit;
         Bitmap bitmap=null;com.picalibrary.android.sources.SourceAccessPolicy.Permit sourcePermit=null;
-        if(entry.desktopCoverPath!=null&&!entry.desktopCoverPath.isEmpty()&&BridgeStore.paired(context)){
+        if(entry.localImported){File cover=LocalComicStore.cover(context,entry.id);if(cover!=null){BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeFile(cover.getPath(),options);options.inSampleSize=ReaderPolicy.sampleSize(options.outWidth,options.outHeight,512);options.inJustDecodeBounds=false;bitmap=BitmapFactory.decodeFile(cover.getPath(),options);}}
+        if(bitmap==null&&entry.desktopCoverPath!=null&&!entry.desktopCoverPath.isEmpty()&&BridgeStore.paired(context)){
             try{bitmap=BridgeClient.bitmap(context,entry.desktopCoverPath);}catch(Exception ignored){}
         }
         if(bitmap==null&&entry.remoteCoverPath!=null&&!entry.remoteCoverPath.isEmpty()&&RemoteConfigStore.load(context).configured()){

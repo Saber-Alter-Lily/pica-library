@@ -10,6 +10,7 @@
 - Mobile Desktop account status honors source availability; phone-owned source toggles/worker lifecycle remain a separate unfinished step. Existing direct phone sessions are not silently disabled by Desktop. Draft Dev code64 retains package/fixed signing certificate, with no install/OTA action.
 - Local tests: TypeScript, Web45 syntax, 1359 assertions + one platform skip; Edge46 including all three locale source-choice cases. Actual new archives, CI and restart/upgrade proofs are bound in a separate final handoff. [Detailed semantics, failure handling and holds](docs/SOURCE_LIFECYCLE.md).
 - No main merge, tag/Release, production data/credential reads, automatic deployment or new extension host. DPAPI coordination remains unavailable; the user's existing isolated-write exception is reused without changing identities/secrets.
+- Pre-build fixture review found that the earlier packaged media test assumed every fresh local installation could immediately fetch JM covers. The new explicit opt-in contract correctly forbids that. Update the fixture to assert all sources initially off, explicitly enable only JM, and test real in-flight HTTP cancellation, disabled-request rejection, stale-save protection and policy persistence through actual shutdown/relaunch. Do not weaken the production default to preserve an obsolete fixture assumption.
 
 ## NEXT-48 — local folder/CBZ ingestion and cache freshness (2026-10-23, unpublished)
 

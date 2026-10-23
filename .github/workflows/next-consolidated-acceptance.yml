@@ -115,7 +115,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Pica-Library-Next-Acceptance-Upgrade-Diagnostics
+          name: Pica-Library-Next-Acceptance-Upgrade-Diagnostics-${{ github.run_attempt }}
           path: artifacts/upgrade-diagnostics/
           retention-days: 3
           if-no-files-found: ignore

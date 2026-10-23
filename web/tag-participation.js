@@ -1,4 +1,5 @@
 import { copy as t } from './locale-runtime.js'
+import { attachTagProfileExchange } from './tag-profile-exchange.js'
 
 const state = { base: null, draft: null, data: null, loading: false, saving: false, page: 0, query: '', provider: '', facet: '', message: '' }
 const clone = value => JSON.parse(JSON.stringify(value))
@@ -81,6 +82,16 @@ function render() {
     root.querySelectorAll('[data-tag-edit]').forEach(button => button.onclick = () => editPrivate(state.draft.privateTags.find(tag => tag.id === button.dataset.tagEdit)))
     root.querySelectorAll('[data-tag-delete]').forEach(button => button.onclick = async () => { if (await ask(t('只删除私人标签，不删除作品、下载或平台标签；依赖该标签的匹配也会停止。继续？', 'Delete only this private label, not works, downloads or provider tags. Matches relying on it will stop. Continue?', '個人タグのみ削除し、作品・ダウンロード・元タグは残します。このタグによる一致も停止します。続行しますか？'))) { state.draft.privateTags = state.draft.privateTags.filter(tag => tag.id !== button.dataset.tagDelete); toggle('private|' + button.dataset.tagDelete, false); render() } })
     root.querySelectorAll('button,input,select').forEach(control => { if (state.saving) control.disabled = true })
+    attachTagProfileExchange(root, {
+        hasDraft: () => dirty() || state.saving,
+        canUndo: state.data.tagExchange?.canUndo === true,
+        labelOf: id => { const row = state.data.rows.find(row => row.identity === id); return row ? `${row.label} · ${row.provider}` : id },
+        onCommitted: async (message, revision) => {
+            await fetchData()
+            state.message = state.base?.revision === revision ? message : message + ' ' + t('界面未刷新到新版本，请重新读取。', 'View did not refresh to the new revision; reload.', '表示を更新できませんでした。再読込してください。')
+            document.dispatchEvent(new CustomEvent('pica-tag-policy-saved')); render()
+        }
+    })
 }
 async function save(apply) {
     if (state.saving) return

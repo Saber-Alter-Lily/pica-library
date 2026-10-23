@@ -409,6 +409,36 @@ export async function startLibraryServer(options: {
                 return json(response, 404, { error: 'Source action not found' })
             }
 
+            if (url.pathname.startsWith('/api/v1/desktop/recommendation-v5/tag-profile/')) {
+                if (!options.desktop) return json(response, 403, { error: 'Tag-profile exchange requires the local Desktop host' })
+                const action = url.pathname.slice('/api/v1/desktop/recommendation-v5/tag-profile/'.length)
+                if (action === 'status' && request.method === 'GET') return json(response, 200, options.service.tagProfileExchangeV1().status())
+                if (request.method !== 'POST') return json(response, 405, { error: 'POST required' })
+                try {
+                    const input = await body(request, action === 'preview' ? 1100 * 1024 : 4096)
+                    const allowed = action === 'export' ? ['includeFavoriteCounts', 'includeManualBindings'] : action === 'preview' ? ['text'] : action === 'apply' ? ['previewId', 'apply'] : action === 'undo' ? ['apply'] : null
+                    if (!allowed) return json(response, 404, { error: 'Tag-profile action not found' })
+                    if (Object.keys(input).some(key => !allowed.includes(key)) || (input.apply !== undefined && typeof input.apply !== 'boolean')) return json(response, 400, { error: 'TAG_EXCHANGE_UNKNOWN_OR_INVALID_FIELD' })
+                    const exchange = options.service.tagProfileExchangeV1()
+                    if (action === 'export') {
+                        const result = exchange.exportPackage(input)
+                        response.writeHead(200, { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="${result.filename}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
+                        return response.end(result.buffer)
+                    }
+                    if (action === 'preview') return json(response, 200, exchange.preview(input.text))
+                    const result = action === 'apply' ? exchange.apply(input.previewId) : exchange.undo()
+                    let recommendationRefresh: Record<string, unknown> | null = null
+                    if (input.apply === true && !('alreadyApplied' in result && result.alreadyApplied)) {
+                        try { recommendationRefresh = { requested: true, started: true, status: finalRecommendationCoordinator.forceNew(`tag-profile:${result.revision}`) } }
+                        catch (error) { recommendationRefresh = { requested: true, started: false, error: error instanceof Error ? error.message : String(error) } }
+                    }
+                    return json(response, 200, { ...result, recommendationRefresh })
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error)
+                    return json(response, message.startsWith('TAG_EXCHANGE_CONFLICT_') || message.startsWith('TAG_POLICY_REVISION_CONFLICT') ? 409 : 400, { error: message })
+                }
+            }
+
             if (url.pathname === '/api/v1/recommendation-v5/tag-policy') {
                 if (request.method === 'GET') return json(response, 200, options.service.recommendationTagPolicyV1())
                 if (request.method === 'POST') {

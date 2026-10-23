@@ -118,7 +118,7 @@ for (const [language, start] of [['zh-CN','日常使用入门'], ['en','Daily-us
         await page.locator('#pica-onboarding-advanced').click(); await expect(page.locator('#pica-advanced-guide')).toBeVisible()
         const box = await page.locator('#pica-advanced-guide').boundingBox()
         expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(390)
-        await page.screenshot({ path: `_validation/ux-dual-onboarding-20261022/advanced-${language}.png` })
+        await page.screenshot({ path: `${process.env.PICA_WEB_EVIDENCE_DIR || '_validation/ux-dual-onboarding-20261022'}/advanced-${language}.png` })
         expect(evidence.errors).toEqual([])
     })
 }

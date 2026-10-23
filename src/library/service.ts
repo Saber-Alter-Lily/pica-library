@@ -20,6 +20,7 @@ import {
 } from '../providers/types'
 import type { Comic, Episode, Picture } from '../types'
 import { LibraryDatabase } from './database'
+import { TagProfileExchangeV1 } from '../recommendation-v5/tag-profile-exchange'
 import { normalizeAuthorKey } from './author'
 import { safeRasterContentType, trustedCoverUrl } from './cover-url'
 import type {
@@ -473,6 +474,13 @@ function sortCode(pica: Pica, sort: SortMode | undefined) {
 }
 
 export class LibraryService {
+    private tagProfileExchangeInstance?: TagProfileExchangeV1
+
+    tagProfileExchangeV1(): TagProfileExchangeV1 {
+        return this.tagProfileExchangeInstance ??= new TagProfileExchangeV1(
+            this.database, () => this.recommendationTagPolicyV1(), () => this.preferenceViewState()
+        )
+    }
     private pica: Pica | null = null
     private readonly ehProvider: EhProvider
     private readonly jmProvider = new JmProvider()
@@ -1041,6 +1049,7 @@ export class LibraryService {
         const index = this.preferencePresentation()
         return {
             revision: state.revision, tagPolicy: state.tagPolicy,
+            tagExchange: this.tagProfileExchangeV1().status(),
             directorySource: 'LOCAL_OBSERVED_METADATA',
             note: '收藏涉及数量不是喜好强度；未观测的平台标签不冒充全站目录。',
             rows: buildTagDirectoryV1(catalog, state, (provider, raw) => provider === 'pica' ? index.resolve(raw)?.facet || 'OTHER' : provider === 'eh' && raw.includes(':') ? `EH_${raw.split(':')[0].toUpperCase()}` : 'OTHER'),

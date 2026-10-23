@@ -2880,6 +2880,22 @@ export class LibraryDatabase {
         }
     }
 
+    /** Synchronous, nested-safe atomic app-state writes; no schema migration. */
+    withAppStateTransaction<T>(operation: () => T): T {
+        this.db.exec('SAVEPOINT pica_app_state_write')
+        try {
+            const value = operation()
+            if (value && typeof (value as { then?: unknown }).then === 'function')
+                throw new Error('App-state transactions must be synchronous')
+            this.db.exec('RELEASE SAVEPOINT pica_app_state_write')
+            return value
+        } catch (error) {
+            this.db.exec('ROLLBACK TO SAVEPOINT pica_app_state_write')
+            this.db.exec('RELEASE SAVEPOINT pica_app_state_write')
+            throw error
+        }
+    }
+
     setAppState(key: string, value: unknown) {
         const now = new Date().toISOString()
         this.db

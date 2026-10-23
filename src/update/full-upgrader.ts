@@ -13,6 +13,18 @@ function writeProgress(file: string, value: Omit<UpdateProgress, 'updatedAt'>) {
     )
 }
 
+/** Status storage must never prevent recovery of the application or user state. */
+function reportRecoveryProgress(
+    file: string,
+    value: Omit<UpdateProgress, 'updatedAt'>
+) {
+    try {
+        writeProgress(file, value)
+    } catch {
+        console.error('Upgrade recovery continues; status could not be saved.')
+    }
+}
+
 function alive(pid: number) {
     try {
         process.kill(pid, 0)
@@ -164,7 +176,7 @@ function restoreUserState(
     }
 }
 
-function launchApplication(root: string) {
+async function launchApplication(root: string) {
     const launcher = path.join(root, 'Pica Library.exe')
     if (!fs.existsSync(launcher))
         throw new Error('Pica Library launcher is missing after replacement')
@@ -173,6 +185,12 @@ function launchApplication(root: string) {
         stdio: 'ignore',
         windowsHide: true,
         cwd: root
+    })
+    // spawn() returns before CreateProcess/exec has succeeded. Keep its error in
+    // the transaction rather than crashing this helper via an unhandled event.
+    await new Promise<void>((resolve, reject) => {
+        child.once('error', reject)
+        child.once('spawn', resolve)
     })
     child.unref()
 }
@@ -330,23 +348,26 @@ function openBrowserFallback(value: string | null) {
         ['url.dll,FileProtocolHandler', url.origin],
         { detached: true, stdio: 'ignore', windowsHide: true }
     )
+    child.once('error', () => {
+        // Browser opening is a convenience after proven health, not a commit gate.
+    })
     child.unref()
 }
 
-function replaceApplication(instruction: FullApplicationUpdaterInstruction) {
+function replaceApplication(
+    instruction: FullApplicationUpdaterInstruction,
+    backedUp: () => void
+) {
     if (fs.existsSync(instruction.backupRoot))
         throw new Error(
             'Application backup directory already exists: ' +
                 instruction.backupRoot
         )
     fs.renameSync(instruction.applicationRoot, instruction.backupRoot)
-    try {
-        copyTree(instruction.stagedApplicationRoot, instruction.applicationRoot)
-    } catch (error) {
-        removeApplicationTree(instruction.applicationRoot)
-        fs.renameSync(instruction.backupRoot, instruction.applicationRoot)
-        throw error
-    }
+    // Record ownership immediately after the rename. A partial copy must use the
+    // same outer recovery path, including user-state restoration and awaited launch.
+    backedUp()
+    copyTree(instruction.stagedApplicationRoot, instruction.applicationRoot)
 }
 
 function rollbackApplication(instruction: FullApplicationUpdaterInstruction) {
@@ -382,8 +403,7 @@ export async function runFullApplicationUpgrade(
             phase: 'replacing-files',
             targetVersion: instruction.targetVersion
         })
-        replaceApplication(instruction)
-        replaced = true
+        replaceApplication(instruction, () => { replaced = true })
 
         const installedSource = fs
             .readFileSync(
@@ -398,7 +418,7 @@ export async function runFullApplicationUpgrade(
             phase: 'starting',
             targetVersion: instruction.targetVersion
         })
-        launchApplication(instruction.applicationRoot)
+        await launchApplication(instruction.applicationRoot)
 
         writeProgress(instruction.progressFile, {
             phase: 'health-check',
@@ -440,7 +460,7 @@ export async function runFullApplicationUpgrade(
             }
             return
         }
-        writeProgress(instruction.progressFile, {
+        reportRecoveryProgress(instruction.progressFile, {
             phase: 'rollback',
             targetVersion: instruction.targetVersion,
             message: error instanceof Error ? error.message : String(error)
@@ -450,9 +470,9 @@ export async function runFullApplicationUpgrade(
             fs.rmSync(instruction.instanceFile, { force: true })
             if (replaced) rollbackApplication(instruction)
             if (snapshot) restoreUserState(instruction, snapshot)
-            launchApplication(instruction.applicationRoot)
+            await launchApplication(instruction.applicationRoot)
         } catch (rollbackError) {
-            writeProgress(instruction.progressFile, {
+            reportRecoveryProgress(instruction.progressFile, {
                 phase: 'failed',
                 targetVersion: instruction.targetVersion,
                 message:
@@ -463,7 +483,7 @@ export async function runFullApplicationUpgrade(
             })
             throw rollbackError
         }
-        writeProgress(instruction.progressFile, {
+        reportRecoveryProgress(instruction.progressFile, {
             phase: 'failed',
             targetVersion: instruction.targetVersion,
             message: error instanceof Error ? error.message : String(error)

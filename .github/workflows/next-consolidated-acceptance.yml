@@ -97,9 +97,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test-windows-recommendation-module.mjs $zip $version $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC'
+          ./scripts/test-upgrade-diagnostics.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceHealthFailure
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -DiagnosticsDirectory artifacts/upgrade-diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceHealthFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
           Copy-Item -LiteralPath $zip -Destination candidate/windows/
@@ -107,6 +111,14 @@ jobs:
           $env:GITHUB_SHA | Set-Content -Encoding ascii candidate/windows/SOURCE_SHA.txt
           $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
           "$hash  Pica-Library-Next-Acceptance-Windows-x64.zip" | Set-Content -Encoding ascii candidate/windows/SHA256SUMS.txt
+      - name: Retain bounded synthetic upgrade diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Upgrade-Diagnostics
+          path: artifacts/upgrade-diagnostics/
+          retention-days: 3
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: Pica-Library-Next-Acceptance-Windows
@@ -157,7 +169,7 @@ jobs:
           test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
           test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
           export PICA_ANDROID_VERSION_NAME="0.5.0-postrc.${GITHUB_SHA:0:12}"
-          export PICA_ANDROID_VERSION_CODE=69
+          export PICA_ANDROID_VERSION_CODE=70
           umask 077
           signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-next-signing-XXXXXXXX")
           export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
@@ -171,7 +183,7 @@ jobs:
           test "$cert" = "$EXPECTED_CERT"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/next-package.txt"
           grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/next-package.txt"
-          grep -q "versionCode='69'" "$RUNNER_TEMP/next-package.txt"
+          grep -q "versionCode='70'" "$RUNNER_TEMP/next-package.txt"
           grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/next-package.txt"
           mkdir -p candidate-next
           cp "$apk" candidate-next/Pica-Library-Next-Acceptance-Android-Dev.apk

@@ -4,10 +4,18 @@ param(
     [Parameter(Mandatory = $true)][string]$CandidateVersion,
     [Parameter(Mandatory = $true)][string]$CandidateSourceSha,
     [switch]$ForceHealthFailure,
+    [switch]$ForceLaunchFailure,
+    [string]$DiagnosticsDirectory = '',
     [string]$DesktopHomeName = 'Pica Library P2 RC'
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib\windows-upgrade-diagnostics.ps1')
+
+function Quote-UpgradeArgument([string]$Value) {
+    if ($Value.Contains('"')) { throw 'Invalid quoted upgrade argument' }
+    return '"' + $Value + '"'
+}
 
 function Expand-AppPackage([string]$Zip, [string]$Destination) {
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -41,6 +49,11 @@ function Wait-Instance([string]$InstanceFile, [int]$TimeoutSeconds = 30) {
 
 function Stop-Desktop($Instance) {
     if (-not $Instance) { return }
+    $owned = Get-CimInstance Win32_Process -Filter "ProcessId=$([int]$Instance.pid)" -ErrorAction SilentlyContinue
+    if (-not $owned) { return }
+    if (-not $owned.ExecutablePath -or -not $owned.ExecutablePath.StartsWith($work + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Refusing to stop a process outside the exact upgrade acceptance root'
+    }
     try {
         $status = Invoke-RestMethod -Uri ($Instance.url + '/api/v1/desktop/status') -TimeoutSec 5
         Invoke-RestMethod -Method Post -Uri ($Instance.url + '/api/v1/desktop/shutdown') -Headers @{
@@ -65,6 +78,7 @@ function Stop-Desktop($Instance) {
 if ($CandidateSourceSha -notmatch '^[0-9a-f]{40}$') {
     throw 'CandidateSourceSha must be a full Git commit SHA'
 }
+if ($ForceHealthFailure -and $ForceLaunchFailure) { throw 'Select only one synthetic failure mode' }
 if ($DesktopHomeName -notin @('Pica Library P2 RC', 'Pica Library Post Stable RC')) {
     throw 'Acceptance requires one of the isolated RC home names'
 }
@@ -81,6 +95,10 @@ $originalLocal = $env:LOCALAPPDATA
 $originalHome = $env:PICA_LIBRARY_DESKTOP_HOME
 $currentInstance = $null
 $success = $false
+$helperProcess = $null
+$failureMessage = ''
+$scenario = if ($ForceLaunchFailure) { 'launch-failure' } elseif ($ForceHealthFailure) { 'health-failure' } else { 'normal' }
+$expectedFailure = $ForceHealthFailure -or $ForceLaunchFailure
 
 New-Item -ItemType Directory -Force -Path $work,$local,$bootstrap | Out-Null
 
@@ -150,7 +168,14 @@ try {
     }
     $instruction | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 -LiteralPath $instructionFile
 
-    $helperProcess = Start-Process -FilePath $bootstrapRuntime -ArgumentList @($bootstrapHelper,$instructionFile) -WorkingDirectory $bootstrap -WindowStyle Hidden -PassThru
+    $helperArguments = @((Quote-UpgradeArgument $bootstrapHelper),(Quote-UpgradeArgument $instructionFile))
+    if ($ForceLaunchFailure) {
+        # Deterministic asynchronous API fault, not an assertion about a real OS/antivirus fault.
+        $faultLoader = Join-Path $bootstrap 'synthetic-launch-error.cjs'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'fixtures\upgrade-launch-error.cjs') -Destination $faultLoader
+        $helperArguments = @('--require',(Quote-UpgradeArgument $faultLoader)) + $helperArguments
+    }
+    $helperProcess = Start-Process -FilePath $bootstrapRuntime -ArgumentList $helperArguments -WorkingDirectory $bootstrap -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $bootstrap 'helper.stdout.log') -RedirectStandardError (Join-Path $bootstrap 'helper.stderr.log')
     Start-Sleep -Milliseconds 300
     Stop-Desktop $currentInstance
     $currentInstance = $null
@@ -164,14 +189,14 @@ try {
         Stop-Process -Id $helperProcess.Id -Force -ErrorAction SilentlyContinue
         throw 'Universal full-upgrader did not finish within the acceptance timeout'
     }
-    if ($helperProcess.ExitCode -ne 0 -and -not $ForceHealthFailure) {
+    if ($helperProcess.ExitCode -ne 0 -and -not $expectedFailure) {
         throw "Universal full-upgrader exited with code $($helperProcess.ExitCode)"
     }
 
     $progress = Get-Content -Raw -LiteralPath $progressFile | ConvertFrom-Json
-    if ($ForceHealthFailure) {
+    if ($expectedFailure) {
         if ($helperProcess.ExitCode -ne 1 -or $progress.phase -ne 'failed') {
-            throw 'Deliberate health failure did not take the actual rollback path'
+            throw "Deliberate $scenario did not take the actual rollback path"
         }
         $restored = Wait-Instance $instanceFile
         $currentInstance = $restored
@@ -189,6 +214,9 @@ try {
         $currentInstance = $null
         [ordered]@{
             universal_full_rollback = 'PASS'
+            universal_full_launch_rollback = if ($ForceLaunchFailure) { 'PASS' } else { 'NOT_RUN' }
+            injected_failure = $scenario
+            injection_mode = if ($ForceLaunchFailure) { 'TEST_ONLY_FIRST_SPAWN_ASYNC_ERROR' } else { 'TEST_ONLY_TARGET_VERSION_MISMATCH' }
             original_version_restored = $baselineCaps.appVersion
             original_source_restored = $baselineSha
             external_config_preserved = $true
@@ -249,15 +277,35 @@ try {
         pre_migration_backup = if ($candidateSchema -gt $baselineSchema) { 'PASS' } else { 'NOT_REQUIRED' }
     } | ConvertTo-Json
     $success = $true
+} catch {
+    $failureMessage = $_.Exception.Message
+    throw
 } finally {
-    if ($currentInstance) { Stop-Desktop $currentInstance }
+    if ($currentInstance) { try { Stop-Desktop $currentInstance } catch { Write-Warning 'Owned instance cleanup needs inspection' } }
+    # Recover the instance published by a rollback, even if the test threw before assigning it.
+    if (Test-Path -LiteralPath (Join-Path (Join-Path $local $DesktopHomeName) 'runtime-state\instance.json')) {
+        try { Stop-Desktop (Get-Content -Raw -LiteralPath (Join-Path (Join-Path $local $DesktopHomeName) 'runtime-state\instance.json') | ConvertFrom-Json) } catch { Write-Warning 'Published owned process cleanup needs inspection' }
+    }
+    $ownedProcesses = @(Get-CimInstance Win32_Process -Filter "Name='node.exe' OR Name='Pica Library.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($work + '\', [StringComparison]::OrdinalIgnoreCase) })
+    foreach ($ownedProcess in $ownedProcesses) {
+        Stop-Process -Id $ownedProcess.ProcessId -Force -ErrorAction SilentlyContinue
+        Wait-Process -Id $ownedProcess.ProcessId -Timeout 5 -ErrorAction SilentlyContinue
+    }
+    $diagnosticError = $null
+    if ($DiagnosticsDirectory) {
+        try {
+            $exitCode = if ($helperProcess -and $helperProcess.HasExited) { $helperProcess.ExitCode } else { $null }
+            $diagnostic = Write-PicaUpgradeDiagnostics -WorkRoot $work -Destination $DiagnosticsDirectory -CandidateSourceSha $CandidateSourceSha -ProgressFile $progressFile -Scenario $scenario -FailureMessage $failureMessage -GatePassed $success -HelperExitCode $exitCode
+            Write-Host "UPGRADE_DIAGNOSTICS: $diagnostic"
+        } catch { $diagnosticError = $_; Write-Warning 'Could not export bounded upgrade diagnostics; synthetic work directory retained' }
+    }
     $env:LOCALAPPDATA = $originalLocal
     if ($null -eq $originalHome) {
         Remove-Item Env:PICA_LIBRARY_DESKTOP_HOME -ErrorAction SilentlyContinue
     } else {
         $env:PICA_LIBRARY_DESKTOP_HOME = $originalHome
     }
-    if ($success -and (Test-Path -LiteralPath $work)) {
+    if ($success -and -not $diagnosticError -and (Test-Path -LiteralPath $work)) {
         $resolved = [IO.Path]::GetFullPath($work)
         $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
         if (-not $resolved.StartsWith($tempRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or
@@ -266,7 +314,8 @@ try {
             throw 'Refusing cleanup outside the task-owned upgrade acceptance directory'
         }
         Remove-Item -Recurse -Force -LiteralPath $resolved -ErrorAction SilentlyContinue
-    } elseif (-not $success) {
+    } elseif (-not $success -or $diagnosticError) {
         Write-Warning "Universal full-upgrade acceptance retained for diagnosis: $work"
     }
+    if ($success -and $diagnosticError) { throw $diagnosticError }
 }

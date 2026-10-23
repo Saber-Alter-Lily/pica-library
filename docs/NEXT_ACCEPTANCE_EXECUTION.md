@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-55: transactional update recovery and bounded CI diagnostics (unpublished)
+
+Continues frozen NEXT-54 `bb9bdefe53768a421afa9bc7e7428c541e4af75a`, complete handoff SHA256 `08d6f8ff612ddd7863893edf5de8d5933acd5a9d4be3df6c3fc39b3bede9b432`. The existing full updater now awaits asynchronous launch errors, restores state despite status-write errors and records backup ownership before copy. Test-only diagnostics retain bounded/allowlisted progress/stdout/stderr after runner failure; actual async-failure injection verifies baseline relaunch with the old source as a rejecting counterexample. [Recovery/diagnostic contract and limitations](UPGRADE_RECOVERY_MODULE.md).
+
+Dev70 preserves Dev69 identity; native/JVM logic unchanged. Original runner-only code1 remains unexplained, not retroactively "fixed" by a green retry. Exact-source/current installables, stable/prior replacement and failure rollback remain required; physical/OTA acceptance remains held. No merge, release/OTA, production access or deployment.
+
 ## 2026-10-23 NEXT-54: Android direct local comic import (unpublished)
 
 Continues frozen NEXT-53 `9ff83d2d09fdcb87e3f43e761ac5e09004b5b5f7`, complete handoff SHA256 `19ebe7123f012394a5d27aad79a57b2d82cc531320b3339a74d34b0d77635293`. Phone users can select one folder/CBZ, preview and explicitly import owned copies without Desktop/source login. Existing Reader/catalog/history are reused behind a pure bounded ingestion seam. Device/origin identity and relative-page bookmarks preserve reimport state; originals and private state stay separate from copy removal. [Scope, bounds, reuse, retention and device holds](NATIVE_LOCAL_CONTENT_INGESTION.md).

@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-55 — update transaction recovery and bounded failure diagnostics (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / RELEASE_AND_PHYSICAL_QA_HELD.** Full modular-reader objective remains open.
+
+- Continues verified NEXT-54 `bb9bdefe53768a421afa9bc7e7428c541e4af75a`, complete handoff SHA256 `08d6f8ff612ddd7863893edf5de8d5933acd5a9d4be3df6c3fc39b3bede9b432`. That turn completed direct Android local import, actual source-bound installables and synthetic upgrade gates; no production/deployment/release change.
+- Awaits asynchronous launcher failures inside the existing full-update transaction; recovery status-write failures cannot block restoring application/config/database; records backup ownership before partial copy; nonfatal browser fallback errors cannot roll back a healthy installation.
+- Adds source and actual-old-Windows counterexamples, including a work path with spaces. New actual package must restore/start the original application after a deterministic test-only first-spawn error, in addition to ordinary replacement and deliberate health failure. No production fault flag or new updater framework.
+- Extracts a bounded test-diagnostics adapter with progress-field/file allowlists, secret-line omission and byte limits. Windows CI retains only those reports with always-run artifact upload; no profile/database/instruction wildcard. Own-process cleanup verifies its exact synthetic root.
+- Dev70 preserves Dev69 package/certificate; native/JVM logic is unchanged. Exact-source/current CI and actual Windows/Android artifact identity plus stable/prior upgrade/rollback gates are recorded separately. Original runner-only code1 remains **UNDETERMINED**, not attributed to these independently verified defects. [Scope and holds](docs/UPGRADE_RECOVERY_MODULE.md).
+- Same isolated candidate/Draft/CI and prior DPAPI exception authority; no main merge, tag/Release, stable OTA change, private-key download, production access, installation or deployment. Recommendation build-pipeline, trusted extension/runtime decisions and concentrated physical/provider QA remain open.
+
 ## NEXT-54 — Android direct local folder/CBZ import (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / PHYSICAL_SAF_QA_PENDING.** Full modular-reader objective remains open.

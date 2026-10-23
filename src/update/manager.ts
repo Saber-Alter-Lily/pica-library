@@ -71,6 +71,8 @@ function validateFullApplicationArchive(zip: AdmZip) {
     const declared = new Map<string, (typeof entries)[number]>()
     for (const entry of entries) {
         const safe = normalizeFullPackagePath(entry.entryName)
+        if (safe.toLowerCase() === MODULE_CONTRACT_PATH && safe !== MODULE_CONTRACT_PATH)
+            throw new Error('Runtime module payload must use the canonical path case')
         if (forbiddenFullPackageRoot.test(safe))
             throw new Error(
                 `User data is forbidden in full application packages: ${safe}`
@@ -192,6 +194,9 @@ function readManifest(zip: AdmZip): UpdateManifest {
 }
 
 function validateModulePayload(zip: AdmZip, manifest: UpdateManifest) {
+    const moduleEntries = zip.getEntries().filter(entry => !entry.isDirectory && entry.entryName.replaceAll('\\', '/').toLowerCase() === MODULE_CONTRACT_PATH)
+    if (moduleEntries.length > 1 || moduleEntries.some(entry => entry.entryName !== MODULE_CONTRACT_PATH))
+        throw new Error('Runtime module payload must use the canonical path case')
     if (manifest.deletions.some(name => name.replaceAll('\\', '/').toLowerCase() === MODULE_CONTRACT_PATH))
         throw new Error('Module contracts cannot be removed by an incremental update')
     const entry = zip.getEntry(MODULE_CONTRACT_PATH)

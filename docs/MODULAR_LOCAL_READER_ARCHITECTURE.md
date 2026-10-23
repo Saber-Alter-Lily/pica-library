@@ -44,6 +44,8 @@ The Web shell loads existing local state but does not automatically create an on
 - Legacy manifests/packages remain readable. The first contract adoption is additive under the existing App API; it does not retrofit new validation into an old installed updater. Historical direct-upgrade gates must still be tested with the exact released source/binary.
 - For a source archive without metadata, the builder uses a frozen first-adoption compatibility floor, not whatever contracts the future target happens to declare. A later breaking module cannot silently claim compatibility with legacy builds merely by changing the current catalog.
 - Windows x64 is the current one-click self-update target. Other packaged platforms retain their existing capability declarations; metadata packaging is not a promise of supported self-update there.
+- Full-replacement recovery requests authenticated loopback shutdown before a bounded PID fallback, waits for exit, and uses Node's bounded Windows file-removal retries. A missing backup must never cause deletion of the installed tree. Cleanup/report failure after proven health must not roll back a healthy application. The unpublished Windows workflow tests both successful replacement and deliberately failed-health recovery to the original released version.
+- Module metadata paths use canonical case; case-folded duplicate or differently cased declarations reject before extraction, including on case-insensitive Windows hosts.
 - Dev Android keeps its existing package ID and signing certificate and increments versionCode. The Android installer remains the final system-controlled installation step; no uninstall/data reset is proposed.
 
 ## Open-source reuse, not protocol/framework duplication

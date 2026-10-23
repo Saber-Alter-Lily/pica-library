@@ -27,6 +27,11 @@ function sha256(value: Buffer) {
 }
 
 function files(zip: AdmZip) {
+    for (const entry of zip.getEntries()) {
+        const name = entry.entryName.replaceAll('\\', '/')
+        if (!entry.isDirectory && name.toLowerCase() === MODULE_CONTRACT_PATH && name !== MODULE_CONTRACT_PATH)
+            throw new Error('Runtime module payload must use the canonical path case')
+    }
     return new Map(
         zip
             .getEntries()

@@ -2,15 +2,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
-import type {
-    FullApplicationUpdaterInstruction,
-    UpdateProgress
-} from './types'
+import type { FullApplicationUpdaterInstruction, UpdateProgress } from './types'
 
-function writeProgress(
-    file: string,
-    value: Omit<UpdateProgress, 'updatedAt'>
-) {
+function writeProgress(file: string, value: Omit<UpdateProgress, 'updatedAt'>) {
     fs.mkdirSync(path.dirname(file), { recursive: true })
     fs.writeFileSync(
         file,
@@ -130,8 +124,7 @@ function snapshotUserState(instruction: FullApplicationUpdaterInstruction) {
     fs.mkdirSync(snapshot, { recursive: true })
 
     const config = path.join(instruction.desktopHomeRoot, 'config')
-    if (fs.existsSync(config))
-        copyTree(config, path.join(snapshot, 'config'))
+    if (fs.existsSync(config)) copyTree(config, path.join(snapshot, 'config'))
 
     const database = path.join(instruction.libraryDirectory, 'library.db')
     const databaseSnapshot = path.join(snapshot, 'database')
@@ -244,10 +237,47 @@ async function stopPublishedInstance(instanceFile: string) {
     const instance = readInstance(instanceFile)
     const pid = Number(instance?.pid ?? 0)
     if (!Number.isInteger(pid) || pid <= 0 || !alive(pid)) return
+    const url = safeLoopbackUrl(instance?.url)
+    if (url) {
+        try {
+            const status = await fetch(`${url.origin}/api/v1/desktop/status`, {
+                signal: AbortSignal.timeout(1500)
+            })
+            const desktop = (await status.json()) as { csrfToken?: string }
+            if (
+                status.ok &&
+                typeof desktop.csrfToken === 'string' &&
+                desktop.csrfToken.length <= 256
+            ) {
+                const stopped = await fetch(
+                    `${url.origin}/api/v1/desktop/shutdown`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'content-type': 'application/json',
+                            'x-pica-csrf': desktop.csrfToken,
+                            Origin: url.origin
+                        },
+                        body: '{}',
+                        signal: AbortSignal.timeout(3000)
+                    }
+                )
+                if (stopped.ok) {
+                    await waitForExit(pid, 8_000)
+                    return
+                }
+            }
+        } catch {
+            // A partially started/broken replacement may not expose its controller.
+        }
+    }
     try {
         process.kill(pid)
     } catch {
-        return
+        if (!alive(pid)) return
+        throw new Error(
+            'The replacement process could not be stopped for rollback'
+        )
     }
     try {
         await waitForExit(pid, 8_000)
@@ -255,8 +285,39 @@ async function stopPublishedInstance(instanceFile: string) {
         try {
             process.kill(pid, 'SIGKILL')
         } catch {
-            // Best-effort cleanup before rollback.
+            if (alive(pid))
+                throw new Error(
+                    'The replacement process is still running; application backup retained'
+                )
         }
+        await waitForExit(pid, 8_000)
+    }
+}
+
+function removeApplicationTree(root: string) {
+    // Node's bounded retry handles Windows launcher/child/antivirus lock release.
+    fs.rmSync(root, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100
+    })
+}
+
+function cleanupHealthyRecovery(
+    instruction: FullApplicationUpdaterInstruction,
+    snapshot: string
+) {
+    try {
+        removeApplicationTree(instruction.backupRoot)
+        removeApplicationTree(snapshot)
+    } catch {
+        writeProgress(instruction.progressFile, {
+            phase: 'complete',
+            targetVersion: instruction.targetVersion,
+            message:
+                'Update completed; temporary recovery files were retained for later cleanup.'
+        })
     }
 }
 
@@ -272,9 +333,7 @@ function openBrowserFallback(value: string | null) {
     child.unref()
 }
 
-function replaceApplication(
-    instruction: FullApplicationUpdaterInstruction
-) {
+function replaceApplication(instruction: FullApplicationUpdaterInstruction) {
     if (fs.existsSync(instruction.backupRoot))
         throw new Error(
             'Application backup directory already exists: ' +
@@ -282,29 +341,18 @@ function replaceApplication(
         )
     fs.renameSync(instruction.applicationRoot, instruction.backupRoot)
     try {
-        copyTree(
-            instruction.stagedApplicationRoot,
-            instruction.applicationRoot
-        )
+        copyTree(instruction.stagedApplicationRoot, instruction.applicationRoot)
     } catch (error) {
-        fs.rmSync(instruction.applicationRoot, {
-            recursive: true,
-            force: true
-        })
+        removeApplicationTree(instruction.applicationRoot)
         fs.renameSync(instruction.backupRoot, instruction.applicationRoot)
         throw error
     }
 }
 
-function rollbackApplication(
-    instruction: FullApplicationUpdaterInstruction
-) {
-    fs.rmSync(instruction.applicationRoot, {
-        recursive: true,
-        force: true
-    })
+function rollbackApplication(instruction: FullApplicationUpdaterInstruction) {
     if (!fs.existsSync(instruction.backupRoot))
         throw new Error('Application backup is unavailable for rollback')
+    removeApplicationTree(instruction.applicationRoot)
     fs.renameSync(instruction.backupRoot, instruction.applicationRoot)
 }
 
@@ -315,6 +363,7 @@ export async function runFullApplicationUpgrade(
     validateStagedApplication(instruction)
     let snapshot = ''
     let replaced = false
+    let committed = false
     try {
         writeProgress(instruction.progressFile, {
             phase: 'waiting-for-exit',
@@ -361,6 +410,8 @@ export async function runFullApplicationUpgrade(
                 'Updated application failed its startup/migration health check'
             )
 
+        committed = true
+
         writeProgress(instruction.progressFile, {
             phase: 'complete',
             targetVersion: instruction.targetVersion
@@ -373,12 +424,22 @@ export async function runFullApplicationUpgrade(
         )
             openBrowserFallback(healthy.url)
 
-        fs.rmSync(instruction.backupRoot, {
-            recursive: true,
-            force: true
-        })
-        fs.rmSync(snapshot, { recursive: true, force: true })
+        cleanupHealthyRecovery(instruction, snapshot)
     } catch (error) {
+        if (committed) {
+            // Reporting/cleanup failure after proven health must not undo a good installation.
+            try {
+                writeProgress(instruction.progressFile, {
+                    phase: 'complete',
+                    targetVersion: instruction.targetVersion,
+                    message:
+                        'Update completed; recovery/report cleanup is pending.'
+                })
+            } catch {
+                /* Preserve the healthy application and recovery files. */
+            }
+            return
+        }
         writeProgress(instruction.progressFile, {
             phase: 'rollback',
             targetVersion: instruction.targetVersion,
@@ -409,6 +470,13 @@ export async function runFullApplicationUpgrade(
         })
         throw error
     }
+}
+
+export const fullUpgradeInternals = {
+    stopPublishedInstance,
+    removeApplicationTree,
+    rollbackApplication,
+    cleanupHealthyRecovery
 }
 
 async function main() {

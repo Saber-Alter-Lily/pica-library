@@ -51,6 +51,8 @@ describe('local incremental update package builder', () => {
         expect(() => buildLocalUpdatePackage(legacy, target, path.join(directory, 'legacy-incompatible.zip'))).toThrow(/one-click full/)
         const missing = fullPackage(directory, 'Pica-Library-v0.5.0-dev.2-local-test-windows-x64.zip', '3'.repeat(40), 'new')
         expect(() => buildLocalUpdatePackage(source, missing, path.join(directory, 'removed.zip'))).toThrow(/full application/)
+        const wrongCase = fullPackage(directory, 'Pica-Library-v0.5.0-dev.3-local-test-windows-x64.zip', '4'.repeat(40), 'new', { 'app/MODULE-CONTRACTS.json': JSON.stringify(incompatible) })
+        expect(() => buildLocalUpdatePackage(source, wrongCase, path.join(directory, 'wrong-case.zip'))).toThrow(/canonical path case/)
     })
     it('includes only changed allowlisted application files and no runtime', () => {
         const directory = fs.mkdtempSync(

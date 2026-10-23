@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$CandidateZip,
     [Parameter(Mandatory = $true)][string]$CandidateVersion,
     [Parameter(Mandatory = $true)][string]$CandidateSourceSha,
+    [switch]$ForceHealthFailure,
     [string]$DesktopHomeName = 'Pica Library P2 RC'
 )
 
@@ -86,6 +87,7 @@ New-Item -ItemType Directory -Force -Path $work,$local,$bootstrap | Out-Null
 try {
     $currentRoot = Expand-AppPackage $BaselineZip $currentExtract
     $candidateRoot = Expand-AppPackage $CandidateZip $candidateExtract
+    $baselineSha = [IO.File]::ReadAllText((Join-Path $currentRoot 'SOURCE_SHA.txt')).Trim()
 
     foreach ($required in @(
         'Pica Library.exe',
@@ -141,10 +143,10 @@ try {
         libraryDirectory = $libraryDirectory
         instanceFile = $instanceFile
         progressFile = $progressFile
-        targetVersion = $CandidateVersion
+        targetVersion = if ($ForceHealthFailure) { $CandidateVersion + '-deliberate-health-failure' } else { $CandidateVersion }
         targetSourceSha = $CandidateSourceSha
         previousUrl = [string]$currentInstance.url
-        healthTimeoutMs = 60000
+        healthTimeoutMs = if ($ForceHealthFailure) { 5000 } else { 60000 }
     }
     $instruction | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 -LiteralPath $instructionFile
 
@@ -162,11 +164,40 @@ try {
         Stop-Process -Id $helperProcess.Id -Force -ErrorAction SilentlyContinue
         throw 'Universal full-upgrader did not finish within the acceptance timeout'
     }
-    if ($helperProcess.ExitCode -ne 0) {
+    if ($helperProcess.ExitCode -ne 0 -and -not $ForceHealthFailure) {
         throw "Universal full-upgrader exited with code $($helperProcess.ExitCode)"
     }
 
     $progress = Get-Content -Raw -LiteralPath $progressFile | ConvertFrom-Json
+    if ($ForceHealthFailure) {
+        if ($helperProcess.ExitCode -ne 1 -or $progress.phase -ne 'failed') {
+            throw 'Deliberate health failure did not take the actual rollback path'
+        }
+        $restored = Wait-Instance $instanceFile
+        $currentInstance = $restored
+        $restoredCaps = Invoke-RestMethod -Uri ($restored.url + '/api/v1/capabilities') -TimeoutSec 10
+        if ($restoredCaps.appVersion -ne $baselineCaps.appVersion -or
+            [IO.File]::ReadAllText((Join-Path $currentRoot 'SOURCE_SHA.txt')).Trim() -ne $baselineSha) {
+            throw 'Rollback did not restore the original released application'
+        }
+        if (-not (Test-Path -LiteralPath $marker) -or
+            [IO.File]::ReadAllText($marker) -ne 'preserve-me' -or
+            -not (Test-Path -LiteralPath $database)) {
+            throw 'Rollback did not preserve external configuration/database'
+        }
+        Stop-Desktop $restored
+        $currentInstance = $null
+        [ordered]@{
+            universal_full_rollback = 'PASS'
+            original_version_restored = $baselineCaps.appVersion
+            original_source_restored = $baselineSha
+            external_config_preserved = $true
+            external_database_preserved = $true
+            source_sha = $CandidateSourceSha
+        } | ConvertTo-Json
+        $success = $true
+        return
+    }
     if ($progress.phase -ne 'complete') {
         throw "Universal full-upgrader did not report completion: $($progress.phase)"
     }

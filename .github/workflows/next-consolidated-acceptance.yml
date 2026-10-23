@@ -93,6 +93,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceHealthFailure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
           Copy-Item -LiteralPath $zip -Destination candidate/windows/
           Copy-Item -LiteralPath docs/NEXT_ACCEPTANCE_EXECUTION.md -Destination candidate/windows/READ_ME_FIRST.md

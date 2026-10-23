@@ -142,6 +142,7 @@ describe('UpdateManager module payload boundary', () => {
         const mismatch = runtimeModuleContracts(); mismatch.apis.reader++
         await expect(manager().stage('mismatch.zip', packageBuffer({ moduleContracts: runtimeModuleContracts() }, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(mismatch) }).buffer)).rejects.toThrow(/do not match/)
         await expect(manager().stage('undeclared.zip', packageBuffer({}, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) }).buffer)).rejects.toThrow(/not declared/)
+        await expect(manager().stage('wrong-case.zip', packageBuffer({}, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, 'app/MODULE-CONTRACTS.json': JSON.stringify(runtimeModuleContracts()) }).buffer)).rejects.toThrow(/canonical path case/)
         await expect(manager().stage('removed.zip', packageBuffer({ deletions: [MODULE_CONTRACT_PATH] }).buffer)).rejects.toThrow(/cannot be removed/)
         await expect(manager().stage('invalid.zip', packageBuffer({ moduleContracts: { formatVersion: 2, apis: {} } as never }).buffer)).rejects.toThrow(/format/)
     })

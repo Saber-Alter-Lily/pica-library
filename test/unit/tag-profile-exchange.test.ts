@@ -275,7 +275,7 @@ describe('AI tag-profile exchange (synthetic state only)', () => {
         ).toBe(true)
         expect(service.recommendationTagPolicyV1().revision).toBe(0)
     })
-    it('blocks stale exports, apply races and undo over newer paired/local preferences', () => {
+    it('blocks stale exports, apply races and undo over newer paired/local tag schemes', () => {
         const { exchange, store } = fixture(),
             { template } = exported(exchange),
             p = preview(exchange, template, [
@@ -299,6 +299,37 @@ describe('AI tag-profile exchange (synthetic state only)', () => {
         expect(() => exchange.undo()).toThrow('NEWER_EDITS')
         expect(exchange.status().canUndo).toBe(false)
     })
+    it('preserves unrelated controls and feedback across export, preview, apply and undo', () => {
+        const { exchange, store, service } = fixture(),
+            { template } = exported(exchange)
+        const control = (key: string) =>
+            store.setControl({
+                targetType: 'TAG',
+                key,
+                label: key,
+                direction: 'MORE',
+                levelDelta: 2,
+                scope: 'PERSISTENT'
+            })
+        control('school')
+        const p = preview(exchange, template, [
+            { op: 'set_participation', ids: ['pica|school'], enabled: false }
+        ])
+        store.setTasteExclusion('secret-work-id', true)
+        exchange.apply(p.previewId)
+        expect(
+            service.recommendationTagPolicyV1().tagPolicy.disabled
+        ).toContain('pica|school')
+        control('watercolor')
+        expect(exchange.status().canUndo).toBe(true)
+        exchange.undo()
+        expect(store.state().controls).toHaveLength(2)
+        expect(store.state().tasteExcludedComicIds).toContain('secret-work-id')
+        expect(service.recommendationTagPolicyV1().tagPolicy).toEqual(
+            defaultTagPolicyV1()
+        )
+    })
+
     it('rolls back both policy and undo metadata if the second atomic write fails', () => {
         const { exchange, db } = fixture(),
             { template } = exported(exchange),

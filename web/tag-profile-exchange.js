@@ -26,9 +26,9 @@ async function request(action, input) {
         throw new Error(
             (response.status === 409
                 ? t(
-                      '设置已变化或导出/预览已失效。文件和草稿未覆盖；请重新导出或预览。',
-                      'Settings changed or export/preview expired. No overwrite; export or preview again.',
-                      '設定変更または期限切れです。上書きしていません。再エクスポート・プレビューしてください。'
+                      '标签方案已变化或导出/预览已失效。文件和草稿未覆盖；请重新导出或预览。',
+                      'Tag scheme changed or export/preview expired. No overwrite; export or preview again.',
+                      'タグ設定変更または期限切れです。上書きしていません。再エクスポート・プレビューしてください。'
                   ) + ' '
                 : '') + (data.error || `HTTP ${response.status}`)
         )
@@ -475,9 +475,9 @@ export function attachTagProfileExchange(parent, hooks) {
                 !ready() ||
                 !(await confirm(
                     t(
-                        '只恢复上次导入前的标签配置，不回滚收藏、阅读、下载或其他偏好。若已有后续修改，将拒绝覆盖。继续？',
-                        'Restore only the tag configuration before the last import. Favorites, reading, downloads and other preferences are not rolled back. Newer edits prevent undo. Continue?',
-                        '前回取込前のタグ設定のみ復元します。お気に入り・読書・ダウンロード・他の好みは戻しません。後の変更がある場合は拒否します。続行しますか？'
+                        '只恢复上次导入前的标签配置，不回滚收藏、阅读、下载或其他偏好。若标签方案已有后续修改，将拒绝覆盖。继续？',
+                        'Restore only the tag configuration before the last import. Favorites, reading, downloads and other preferences are not rolled back. Newer tag-scheme edits prevent undo. Continue?',
+                        '前回取込前のタグ設定のみ復元します。お気に入り・読書・ダウンロード・他の好みは戻しません。後のタグ変更がある場合は拒否します。続行しますか？'
                     )
                 ))
             )

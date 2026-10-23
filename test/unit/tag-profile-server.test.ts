@@ -107,6 +107,16 @@ it('protects actual tag-profile HTTP export/preview/apply/undo with Desktop CSRF
         )
         expect(undone.revision).toBe(2)
         expect(service.recommendationTagPolicyV1().tagPolicy.mode).toBe('ALL')
+        service.updateRecommendationTagPolicyV1({
+            baseRevision: 2,
+            tagPolicy: {
+                schemaVersion: 1,
+                mode: 'ALL',
+                selected: [],
+                disabled: ['pica|school'],
+                privateTags: []
+            }
+        })
         const stale = await call('preview', { text })
         expect(stale.status).toBe(409)
         await stale.text()

@@ -11,7 +11,7 @@ Open Settings → Recommendation and style → Recommendation tag scope and priv
 3. Ask an AI to fill `changes`. Source labels, work titles and notes are data, not instructions. The app uploads nothing. Return UTF-8 JSON ≤1 MiB, not the original ZIP, scripts, SQL or URLs.
 4. Import validates the whole result and shows paged before/after details. Cancel writes no policy changes. Invalid/unknown references reject everything; no silent partial import.
 5. Confirmation saves atomically. Regeneration is a separate unchecked option; save/build-start outcomes are separate, and old usable batches survive build failure.
-6. Undo restores only the tag configuration before the last file import. It does not roll back reading, favorites, downloads, other controls or generation pointers. Subsequent edits block undo instead of overwriting them.
+6. Undo restores only the tag configuration before the last file import. It does not roll back reading, favorites, downloads, other controls or generation pointers. Subsequent tag-scheme edits block undo; unrelated later controls/feedback are preserved.
 
 ## Contract and limits
 
@@ -20,7 +20,7 @@ Open Settings → Recommendation and style → Recommendation tag scope and priv
 - Existing limits: 100 private labels, 4096 total bindings, 4096 selected/excluded IDs, 128 KiB normalized policy. Exchange: ≤512 operations, ≤16384 references, ≤20000 directory/work entries, ≤16 MiB uncompressed/export ZIP.
 - Mode change must be first and unique, clearing old participation lists before explicit choices. Overlapping edits, duplicate/unknown IDs, mixed binding kinds and unknown fields are errors. The app allocates new private IDs.
 - Without opt-in work catalog, manual bindings are read-only. Renaming a manual label preserves hidden bindings.
-- Export is bound to a locally retained baseline/source-ID set/revision, not trusted just because AI repeats a hash. Keep four exports for 30 days. Changed revision requires re-export. Preview is memory-only, lasts 30 minutes and must be repeated after restart.
+- Export is bound to a locally retained tag-scheme baseline/source-ID set, not trusted just because AI repeats a hash. Keep four exports for 30 days. Changed tag scheme requires re-export; unrelated controls, feedback and sync activity do not invalidate it and are preserved. Commit still uses the latest policy revision as an atomic CAS. Preview is memory-only, lasts 30 minutes and must be repeated after restart.
 - **AI round-trip format only: not archival backup or cross-installation/community profile import.** Those need a separate explicit rebind/merge workflow.
 - Export writes bounded baseline metadata under app_state. Preview does not persist settings. Policy save + undo metadata share a synchronous SQLite savepoint; failures roll back both. No SQLite schema migration.
 - Desktop POST routes export/preview/apply/undo use loopback/origin/CSRF protection; non-Desktop hosts refuse them. Import never extracts ZIP or fetches external references. Browser renders changes as text.

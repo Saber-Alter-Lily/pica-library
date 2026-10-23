@@ -118,6 +118,7 @@ export function normalizeTagPolicyV1(value?: unknown): TagPolicyV1 {
     const raw = value as Record<string, unknown>
     if (
         raw.schemaVersion !== 1 ||
+        typeof raw.mode !== 'string' ||
         !['ALL', 'SELECTED'].includes(String(raw.mode)) ||
         !Array.isArray(raw.privateTags) ||
         raw.privateTags.length > 100
@@ -129,9 +130,11 @@ export function normalizeTagPolicyV1(value?: unknown): TagPolicyV1 {
         .map((input) => {
             if (!input || typeof input !== 'object' || Array.isArray(input))
                 throw new Error('Invalid private tag')
-            const item = input as Record<string, unknown>,
-                id = String(item.id ?? ''),
-                name = String(item.name ?? '')
+            const item = input as Record<string, unknown>
+            if (typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.kind !== 'string')
+                throw new Error('Invalid private-tag text')
+            const id = item.id,
+                name = item.name
                     .normalize('NFKC')
                     .trim()
             if (
@@ -186,7 +189,7 @@ export const tagPoliciesEqualV1 = (a: unknown, b: unknown) =>
 const validated = new WeakMap<TagPolicyV1, TagPolicyV1>()
 const legacyDefault = defaultTagPolicyV1()
 export function effectiveTagPolicyV1(state: TagPolicyCarrierV1) {
-    if (!state.tagPolicy) return legacyDefault
+    if (state.tagPolicy === undefined || state.tagPolicy === null) return legacyDefault
     let policy = validated.get(state.tagPolicy)
     if (!policy) {
         policy = normalizeTagPolicyV1(state.tagPolicy)

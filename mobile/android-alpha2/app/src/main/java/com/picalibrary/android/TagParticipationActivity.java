@@ -9,6 +9,7 @@ import android.widget.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.json.*;
+import com.picalibrary.android.tags.TagPolicyRules;
 
 /** Bounded, staged editor. Loading, counting and persistence never trigger provider calls. */
 public class TagParticipationActivity extends LocaleAwareActivity {
@@ -35,14 +36,17 @@ public class TagParticipationActivity extends LocaleAwareActivity {
         return directory(catalog,registry,TagParticipation.of(new JSONObject()));
     }
     static List<Row> directory(UnifiedCatalogStore.Snapshot catalog,MobileTagRegistry registry,TagParticipation policy){
-        Map<String,Row> rows=new LinkedHashMap<>();
-        for(UnifiedCatalogStore.Entry entry:catalog.entries())for(String raw:policy.facts(entry.id,entry.tags)){
-            if(TagParticipation.norm(raw).isEmpty())continue;String provider=TagParticipation.provider(entry.id),identity=TagParticipation.identity(provider,raw),facet="OTHER";
-            if("pica".equals(provider)&&registry!=null){MobileTagRegistry.Resolved resolved=registry.resolve(raw);if(resolved.resolved)facet=resolved.facet;}
-            else if("eh".equals(provider)&&raw.contains(":"))facet="EH_"+raw.substring(0,raw.indexOf(':'));
-            Row row=rows.get(identity);if(row==null){row=new Row(identity,raw,provider,facet);rows.put(identity,row);}if(entry.favorite)row.favoriteIds.add(entry.id);
+        List<TagPolicyRules.Comic> comics=new ArrayList<>();
+        for(UnifiedCatalogStore.Entry entry:catalog.entries())comics.add(policy.comic(entry.id,entry.tags,entry.favorite));
+        List<Row> out=new ArrayList<>();
+        for(TagPolicyRules.DirectoryRow item:policy.rules.directory(comics,(provider,raw)->{
+            if("pica".equals(provider)&&registry!=null){MobileTagRegistry.Resolved resolved=registry.resolve(raw);if(resolved.resolved)return resolved.facet;}
+            if("eh".equals(provider)&&raw.contains(":"))return "EH_"+raw.substring(0,raw.indexOf(':'));
+            return "OTHER";
+        },false)){
+            Row row=new Row(item.identity,item.label,item.provider,item.facet);row.favoriteIds.addAll(item.favoriteIds);out.add(row);
         }
-        List<Row> out=new ArrayList<>(rows.values());out.sort((a,b)->{int group=a.facet.compareTo(b.facet);if(group!=0)return group;int count=Integer.compare(b.favoriteIds.size(),a.favoriteIds.size());return count!=0?count:a.identity.compareTo(b.identity);});return out;
+        return out;
     }
     private String tr(String zh,String en,String ja){return LocalizedText.ui(this,zh,en,ja);}
     private static JSONObject copy(JSONObject value){try{return new JSONObject(value.toString());}catch(JSONException e){throw new IllegalStateException(e);}}

@@ -21,6 +21,8 @@ android {
         srcDir '../../../source-jvm/src/main/java'
         exclude '**/JmProtocolMain.java'
     }
+    // One tracked fixture is consumed by both Vitest and the Android JSON adapter tests.
+    sourceSets.test.resources.srcDir '../../../test/fixtures/tag-policy'
 
     defaultConfig {
         applicationId 'com.picalibrary.android'
@@ -129,6 +131,13 @@ def gestureBoundary = tasks.register('compileReaderGestureBoundary', JavaCompile
     options.release = 17
     options.encoding = 'UTF-8'
 }
+def tagBoundary = tasks.register('compileTagPolicyBoundary', JavaCompile) {
+    source fileTree('src/main/java/com/picalibrary/android/tags') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('tag-policy-boundary')
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
 tasks.configureEach {
-    if (name == 'testDebugUnitTest') dependsOn gestureBoundary
+    if (name == 'testDebugUnitTest') dependsOn gestureBoundary, tagBoundary
 }

@@ -98,8 +98,8 @@ final class RecommendationPolicyStore {
     }
     static double adjustment(Context c,PicaClient.Comic comic){JSONObject state=snapshot(c);TagParticipation.of(c,state);return adjustment(state,comic);}
     static double adjustment(JSONObject state,PicaClient.Comic comic){
-        if(state==null)state=new JSONObject();TagParticipation tags=TagParticipation.of(state);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!tags.controlEnabled(row.optString("targetType"),row.optString("key"),comic.id)||!matches(comic,row.optString("targetType"),row.optString("key"),state))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
-        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&tags.controlEnabled(intent.optString("targetType"),intent.optString("key"),comic.id)&&matches(comic,intent.optString("targetType"),intent.optString("key"),state))score+=0.16;
+        if(state==null)state=new JSONObject();TagParticipation tags=TagParticipation.of(state);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!tags.controlEnabled(row.optString("targetType"),row.optString("key"),comic.id,comic.tags)||!matches(comic,row.optString("targetType"),row.optString("key"),state))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
+        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&tags.controlEnabled(intent.optString("targetType"),intent.optString("key"),comic.id,comic.tags)&&matches(comic,intent.optString("targetType"),intent.optString("key"),state))score+=0.16;
         return Math.max(-0.30,Math.min(0.30,score));
     }
 
@@ -108,8 +108,8 @@ final class RecommendationPolicyStore {
     }
 
     private static double adjustment(JSONObject state,NativeRecommendationStore.Item item){
-        TagParticipation tags=TagParticipation.of(state);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!tags.controlEnabled(row.optString("targetType"),row.optString("key"),item.comicId)||!matches(item,row.optString("targetType"),row.optString("key"),state))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
-        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&tags.controlEnabled(intent.optString("targetType"),intent.optString("key"),item.comicId)&&matches(item,intent.optString("targetType"),intent.optString("key"),state))score+=0.16;
+        TagParticipation tags=TagParticipation.of(state);double score=0;JSONArray arr=state.optJSONArray("controls");if(arr!=null)for(int i=0;i<arr.length();i++){JSONObject row=arr.optJSONObject(i);if(row==null||!tags.controlEnabled(row.optString("targetType"),row.optString("key"),item.comicId,item.tags)||!matches(item,row.optString("targetType"),row.optString("key"),state))continue;String direction=row.optString("direction");boolean session="SESSION".equals(row.optString("scope"));double magnitude=controlMagnitude(row,session);if("MORE".equals(direction))score+=magnitude;else if("LESS".equals(direction))score-=magnitude;}
+        JSONObject intent=state.optJSONObject("sessionIntent");if(intent!=null&&"TARGET".equals(intent.optString("mode"))&&tags.controlEnabled(intent.optString("targetType"),intent.optString("key"),item.comicId,item.tags)&&matches(item,intent.optString("targetType"),intent.optString("key"),state))score+=0.16;
         return Math.max(-0.30,Math.min(0.30,score));
     }
 

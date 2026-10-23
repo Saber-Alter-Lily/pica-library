@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-52 — native tag domain and cross-client golden contract (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / PHYSICAL_QA_PENDING.** The full modular-reader objective remains open.
+
+- Continues frozen NEXT-51 `b4517ea70519d0266c985e1f67cb48beb393bc2d`; complete immutable handoff SHA256 `2412d0fcadbd5bde549e963cb1d86da230d0139511bd307b13d48ac438670dbd`. Old archives/results are unchanged.
+- Extracts pure Java personal-tag normalization, participation, private matching and unique-work counts. Existing org.json, Android catalog/portable/E-H raw-fact stores and editor remain adapters. No new dependency/protocol or taxonomy framework.
+- Both Desktop and Android read the same 44-case hand-authored synthetic fixture. Empty-classpath compilation plus SDK28/35 domain/adapter tests protect provider isolation, raw namespaces, private binding, explicit save/conflicts and immutable inputs.
+- Corrects Android's missing local namespace in unscoped controls, stale selected-list influence in ALL and missing current-comic facts at score gates. Explicit malformed false/numeric-name state rejects instead of coercing/resetting. Valid schema1/module API2 state, raw BLOCK, pending/cache baseline, ranking weights and Visual remain unchanged.
+- Candidate Dev code67 must preserve code66 identity/signature. Full local tests, exact-source CI, downloaded-artifact inspection and actual Windows update/forced rollback receipts are required in the separate handoff; no previous green result validates this source.
+- [Detailed boundary and device holds](docs/NATIVE_TAG_POLICY_MODULE.md). Recommendation service ports, Android local import, source-runtime/trust decisions and deferred concentrated user tests remain open. No main merge, tag/Release, stable OTA, production access, key download, automatic install or deployment; prior isolated-write/DPAPI exception authorization remains in effect.
+
 ## NEXT-51 — native Reader gesture decision seam (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_RECORDED_IN_HANDOFF / PHYSICAL_TOUCH_QA_PENDING.** The complete modular-reader objective remains open.

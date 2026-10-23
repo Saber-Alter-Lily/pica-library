@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-52: native personal-tag domain and shared contract (unpublished)
+
+Continues frozen NEXT-51 `b4517ea70519d0266c985e1f67cb48beb393bc2d`, complete handoff SHA256 `2412d0fcadbd5bde549e963cb1d86da230d0139511bd307b13d48ac438670dbd`. Separates pure native participation/private matching and directory counts from existing JSON/raw-fact adapters; both clients consume one 44-case synthetic golden fixture. Fixes local/unscoped gating, stale SELECTED leakage in ALL, current-comic fact forwarding and malformed-state coercion. [Contract and limits](NATIVE_TAG_POLICY_MODULE.md).
+
+Schema1/module API2 and valid state formats remain; no source/ranker/Visual change or production access. Dev code67 must retain code66 package/certificate. Exact-head CI, signatures and actual Windows state-retaining upgrade/rollback gates are recorded in the new handoff, not borrowed from NEXT-51. Physical QA remains deferred; no merge, release/OTA or deployment.
+
 ## 2026-10-23 NEXT-51: native Reader gesture module (unpublished)
 
 Continues frozen NEXT-50 `76898ad29c1ac804b7451ac889107511c7532b21`, complete handoff SHA256 `7c2003e35c5a5a48a735da2488821939c57f037a5046f3d31cc833ecf9d6a1e2`. Pure Java decisions/stream ownership are separated from Android recognition/rendering and phone-local storage. Existing platforms/libraries remain in use. SDK28/35 event and preference regressions plus a no-Android compilation gate cover the bounded corrections in [the native gesture contract](NATIVE_READER_GESTURE_MODULE.md).

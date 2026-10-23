@@ -59,6 +59,9 @@ import { desktopRuntimeOptions } from './runtime-mode'
 import { DesktopNativePicker } from './pickers'
 import { findManagedBrowser } from './managed-browser'
 import { assertLibraryChangeAllowed } from './lifecycle'
+import { SourceRuntime } from '../sources/source-policy'
+import { sourcePolicyForConfig } from './config'
+import { saveSourceChoices } from './source-settings'
 import {
     isLoopbackListening,
     knownProxyPorts,
@@ -123,6 +126,7 @@ const platformCapabilities = {
 }
 const instance = new InstanceLock(paths.lock, paths.instance)
 let config = loadConfig(paths.config)
+const sources = new SourceRuntime(sourcePolicyForConfig(config))
 let credentials: StoredCredentials | null = null
 let server: Server | null = null
 let mobileBridge: MobileBridgeController | null = null
@@ -536,7 +540,8 @@ async function testConnection(input: Record<string, unknown>) {
         )
         if (proxyUrl) process.env.PICA_PROXY = proxyUrl
         else delete process.env.PICA_PROXY
-        await new Pica().login(account, password)
+        // First-run account setup is an explicit opt-in; saved choices always win later.
+        await new Pica({ sourceAccess: config ? sources.acquire : undefined }).login(account, password)
         return { success: true }
     } catch (error) {
         throw new Error(friendlyConnectionError(error))
@@ -549,6 +554,7 @@ async function testConnection(input: Record<string, unknown>) {
 let registrationInFlight = false
 let lastRegistrationStarted = 0
 async function registerAccount(input: Record<string, unknown>) {
+    if (config) sources.acquire('pica')
     if (registrationInFlight || Date.now() - lastRegistrationStarted < 30000)
         throw new Error('注册请求正在处理或刚刚提交，请先检查结果，不要重复提交。')
     const proxyUrl = connectionProxy(
@@ -559,7 +565,7 @@ async function registerAccount(input: Record<string, unknown>) {
     registrationInFlight = true
     lastRegistrationStarted = Date.now()
     try {
-        return await new Pica({ proxyUrl: proxyUrl || false }).register(input)
+        return await new Pica({ proxyUrl: proxyUrl || false, sourceAccess: config ? sources.acquire : undefined }).register(input)
     } finally {
         registrationInFlight = false
     }
@@ -645,6 +651,7 @@ function openDirectory(kind: string) {
 }
 
 async function persistEhSession(candidate: EhCapturedSession) {
+    const lease = sources.acquire('eh')
     if (!service) throw new Error('Library is not ready')
     if (!candidate.memberId || !candidate.passHash)
         throw new Error('E-H 登录会话不完整')
@@ -660,6 +667,7 @@ async function persistEhSession(candidate: EhCapturedSession) {
     service.setEhSession(candidate)
     try {
         await service.verifyEhAccount()
+        lease.check()
     } catch (error) {
         service.setEhSession(previousSession)
         throw error
@@ -692,7 +700,8 @@ async function startEngine(preferredPort: number) {
         dataDir,
         undefined,
         undefined,
-        runtimeResources
+        runtimeResources,
+        sources
     )
     ehWebLogin = new DesktopEhWebLogin(
         path.join(paths.runtimeState, 'eh-web-login'),
@@ -726,6 +735,7 @@ async function startEngine(preferredPort: number) {
     const desktop: DesktopServerController = {
         csrfToken,
         startEhWebLogin: async () => {
+            sources.acquire('eh')
             if (!ehWebLogin) throw new Error('E-H 网页登录不可用')
             return await ehWebLogin.start()
         },
@@ -743,6 +753,8 @@ async function startEngine(preferredPort: number) {
             ? nativePicker.chooseFolder('选择一本本地漫画文件夹 / Choose one local comic folder')
             : nativePicker.chooseComicArchive(),
         status: () => ({
+            externalSources: sources.snapshot(),
+            sourcePolicyOrigin: config?.externalSources ? 'explicit' : config ? 'legacy-compatible' : 'new-local',
             startupReady,
             runtime: runtimeOptions,
             platform: platformCapabilities,
@@ -790,11 +802,12 @@ async function startEngine(preferredPort: number) {
                   },
             remoteStorage: remoteStorageManager?.status() ?? { configured: false, kind: 'webdav' },
             ehAccount: {
+                enabled: sources.isEnabled('eh'),
                 configured: Boolean(
                     credentials?.ehMemberId && credentials?.ehPassHash
                 )
             },
-            picaAccount: { configured: Boolean(credentials?.account?.trim() && credentials?.password) },
+            picaAccount: { configured: Boolean(credentials?.account?.trim() && credentials?.password), enabled: sources.isEnabled('pica') },
             personalization: {
                 ...personalization.status(),
                 themePacks: personalization.listThemePacks()
@@ -813,6 +826,16 @@ async function startEngine(preferredPort: number) {
             }
         },
         save: async (input) => {
+            if (input.sourceAction !== undefined) {
+                if (input.sourceAction !== 'save' || !config || !service) throw new Error('Configure a local library before choosing sources')
+                if (Object.keys(input).some(key => !['sourceAction', 'enabled', 'expectedRevision'].includes(key))) throw new Error('Unsupported source settings field')
+                const saved = saveSourceChoices(paths.config, config, sources, input.enabled, input.expectedRevision)
+                config = saved.config
+                service.sourceChoicesApplied(saved.disabled)
+                // Saving the policy is synchronous; no new request can slip through this await.
+                if (saved.disabled.includes('eh')) await ehWebLogin?.cancel()
+                return { success: true, externalSources: sources.snapshot() }
+            }
             const jmAccountAction = String(input.jmAccountAction ?? '')
             if (jmAccountAction) {
                 if (!service) throw new Error('Library is not ready')
@@ -1011,6 +1034,7 @@ async function startEngine(preferredPort: number) {
                 if (service) assertLibraryChangeAllowed(service, config?.libraryDirectory, next.libraryDirectory)
                 saveConfig(paths.config, next)
                 config = next
+                sources.apply(sourcePolicyForConfig(config))
                 // Do not read/write/delete credentials, verify providers or generate recommendations.
                 if (!wasConfigured) desktop.csrfToken = randomBytes(32).toString('base64url')
                 if (dataChanged) void restartEngine()
@@ -1040,6 +1064,7 @@ async function startEngine(preferredPort: number) {
             if (nextCredentials) credentialsStore.save(nextCredentials)
             saveConfig(paths.config, built.config)
             config = built.config
+            sources.apply(sourcePolicyForConfig(config))
             credentials = nextCredentials
             applyCredentials(credentials, config)
             if (picaCredentialsChanged) service?.resetPicaSession()
@@ -1288,7 +1313,7 @@ async function startEngine(preferredPort: number) {
         if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
         database.close()
         database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-        service = new LibraryService(database, dataDir)
+        service = new LibraryService(database, dataDir, undefined, undefined, runtimeResources, sources)
         service.setJmCredentials(credentials?.jmUsername, credentials?.jmPassword)
     service.setEhSession(
         credentials?.ehMemberId && credentials?.ehPassHash
@@ -1348,14 +1373,16 @@ async function startEngine(preferredPort: number) {
                 stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
                 accountStatus: () => ({
                     pica: {
+                        enabled: sources.isEnabled('pica'),
                         configured: Boolean(
-                            credentials?.account?.trim() &&
+                            sources.isEnabled('pica') && credentials?.account?.trim() &&
                                 credentials?.password
                         )
                     },
                     eh: {
+                        enabled: sources.isEnabled('eh'),
                         configured: Boolean(
-                            credentials?.ehMemberId &&
+                            sources.isEnabled('eh') && credentials?.ehMemberId &&
                                 credentials?.ehPassHash
                         )
                     }

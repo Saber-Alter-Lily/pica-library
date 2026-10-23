@@ -1,4 +1,5 @@
 import axios, { type AxiosAdapter, type AxiosResponse } from 'axios'
+import { combineAbortSignals } from './abort-signals'
 import { requireTrustedCoverUrl, safeRasterContentType } from './url-policy'
 
 export const MEDIA_REQUEST_TIMEOUT_MS = 20_000
@@ -42,12 +43,13 @@ export class HttpMediaClient {
         delete this.client.defaults.auth
     }
 
-    async fetchImage(target: string, maxBytes = 5 * 1024 * 1024) {
+    async fetchImage(target: string, maxBytes = 5 * 1024 * 1024, signal?: AbortSignal) {
         if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
             throw new Error('Image size limit must be a positive integer')
         const response = await this.request(target, {
             maxBytes,
-            trustedRaster: true
+            trustedRaster: true,
+            signal
         })
         const data = Buffer.from(response.data)
         if (!data.length || data.byteLength > maxBytes)
@@ -71,11 +73,13 @@ export class HttpMediaClient {
             maxBytes?: number
             trustedRaster?: boolean
             allowInsecureHttp?: boolean
+            signal?: AbortSignal
         } = {}
     ): Promise<AxiosResponse<Buffer>> {
         const deadline = Date.now() + MEDIA_REQUEST_TIMEOUT_MS
         let current = target
         for (let redirects = 0; redirects <= 5; redirects++) {
+            options.signal?.throwIfAborted()
             const url = new URL(
                 options.trustedRaster
                     ? requireTrustedCoverUrl(current)
@@ -100,7 +104,7 @@ export class HttpMediaClient {
                 response = await this.client.get<Buffer>(url.toString(), {
                     responseType: 'arraybuffer',
                     timeout: remaining,
-                    signal: AbortSignal.timeout(remaining),
+                    signal: options.signal ? combineAbortSignals([options.signal, AbortSignal.timeout(remaining)]) : AbortSignal.timeout(remaining),
                     maxContentLength: options.maxBytes,
                     maxBodyLength: options.maxBytes,
                     maxRedirects: 0,
@@ -108,6 +112,7 @@ export class HttpMediaClient {
                     validateStatus: (status) => status >= 200 && status < 400
                 })
             } catch (error) {
+                options.signal?.throwIfAborted()
                 // Axios errors contain request config/proxy credentials. Never expose that object.
                 if (
                     axios.isAxiosError(error) &&
@@ -126,6 +131,7 @@ export class HttpMediaClient {
                 )
             }
             const location = response.headers.location
+            options.signal?.throwIfAborted()
             if (response.status >= 300 && response.status < 400) {
                 if (!location)
                     throw new Error('Provider media redirect has no location')

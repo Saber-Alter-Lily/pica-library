@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { initialSourcePolicy, normalizeSourcePolicy } from '../sources/source-policy'
 import type {
     DesktopConfig,
     DownloadProfile,
@@ -8,6 +9,13 @@ import type {
 } from './types'
 
 const profiles = new Set<DownloadProfile>(['conservative', 'balanced', 'fast'])
+
+/** Absence in an existing config means pre-policy compatibility, not a new install. */
+export function sourcePolicyForConfig(config: DesktopConfig | null | undefined) {
+    return config?.externalSources === undefined
+        ? initialSourcePolicy(Boolean(config))
+        : normalizeSourcePolicy(config.externalSources)
+}
 
 export function safeProxy(input?: string): {
     publicUrl?: string
@@ -56,6 +64,7 @@ export function buildLocalConfig(
         openBrowser: true,
         preferredPort: 4789,
         ...current,
+        externalSources: sourcePolicyForConfig(current),
         libraryDirectory: path.resolve(input.libraryDirectory),
         profile: input.profile
     }
@@ -93,7 +102,8 @@ export function buildConfig(input: SetupInput): {
             profile: input.profile,
             openBrowser: true,
             preferredPort: 4789,
-            proxyUrl: proxy.publicUrl
+            proxyUrl: proxy.publicUrl,
+            externalSources: { schemaVersion: 1, revision: 0, enabled: ['pica'] }
         },
         credentials: {
             account: input.account.trim(),
@@ -109,7 +119,11 @@ export function buildSettingsConfig(
     input: SetupInput,
     current: DesktopConfig | null
 ) {
-    if (input.account || input.password || !current) return buildConfig(input)
+    if (input.account || input.password || !current) {
+        const built = buildConfig(input)
+        if (current) built.config = { ...current, ...built.config, externalSources: sourcePolicyForConfig(current) }
+        return built
+    }
     const proxy = safeProxy(input.proxyUrl)
     return {
         config: {
@@ -145,10 +159,12 @@ export function loadConfig(file: string): DesktopConfig | null {
     )
         throw new Error('The saved configuration is invalid')
     if (value.proxyUrl) safeProxy(value.proxyUrl)
+    if (value.externalSources !== undefined) value.externalSources = normalizeSourcePolicy(value.externalSources)
     return value
 }
 
 export function saveConfig(file: string, config: DesktopConfig) {
+    if (config.externalSources !== undefined) normalizeSourcePolicy(config.externalSources)
     const serialized = JSON.stringify(config, null, 2)
     const hasSecretKey = (value: unknown): boolean => Boolean(value && typeof value === 'object' &&
         Object.entries(value).some(([key,child]) => /password|account|username|authorization|cookie|token/i.test(key) || hasSecretKey(child)))

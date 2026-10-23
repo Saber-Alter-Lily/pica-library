@@ -91,7 +91,7 @@ export class ProviderRegistry {
         return Object.fromEntries(
             [...this.providers].map(([id, provider]) => [
                 id,
-                provider.capabilities
+                { ...provider.capabilities }
             ])
         ) as Record<ProviderId, ComicProvider['capabilities']>
     }

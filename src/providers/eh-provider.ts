@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { combineAbortSignals } from '../media/abort-signals'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { Episode, Picture } from '../types'
 import { safeRasterContentType, trustedCoverUrl } from '../library/cover-url'
@@ -349,6 +350,8 @@ export class EhProvider implements ComicProvider {
     private lastSearchAt = 0
     private searchGate: Promise<void> = Promise.resolve()
     private session: EhSession | null = null
+    private sourceAccess?: import('../sources/source-policy').SourceAccess
+    setSourceAccess(access: import('../sources/source-policy').SourceAccess) { this.sourceAccess = access }
 
     constructor(
         session?: EhSession | null,
@@ -400,6 +403,7 @@ export class EhProvider implements ComicProvider {
             redirect?: RequestRedirect
         } = {}
     ) {
+        const lease = this.sourceAccess?.('eh')
         const target = new URL(url)
         if (target.protocol !== 'https:') throw new Error('E-H requires HTTPS')
         const controller = new AbortController()
@@ -419,9 +423,10 @@ export class EhProvider implements ComicProvider {
             const response = await this.fetchImpl(url, {
                 ...init,
                 redirect: options.redirect ?? 'follow',
-                signal: controller.signal,
+                signal: lease ? combineAbortSignals([controller.signal, lease.signal]) : controller.signal,
                 headers
             })
+            lease?.check()
             if (!response.ok && !options.allowHttpErrors)
                 throw new Error(`E-H request failed with HTTP ${response.status}`)
             const length = Number(response.headers.get('content-length') ?? 0)

@@ -189,12 +189,14 @@ function render(value) {
     const configured = Boolean(value.configured)
     const state = $('#eh-account-state')
     if (state) {
-        state.textContent = configured
+        state.textContent = value.enabled === false
+            ? ehT('来源已关闭 · 账号和本地下载保留','Source disabled · Account and local downloads retained','配信元は無効 · アカウントとローカル保存は保持')
+            : configured
             ? ehT('✓ E-H 已连接 · 会话已加密保存','✓ E-H connected · session encrypted and saved','✓ E-H 接続済み · セッションを暗号化して保存')
             : ehT('○ E-H 未连接 · 公共搜索/阅读仍可使用','○ E-H not connected · public search/reading still works','○ E-H 未接続 · 公開検索/閲覧は利用可能')
-        state.dataset.state = configured ? 'connected' : 'disconnected'
+        state.dataset.state = value.enabled === false ? 'disabled' : configured ? 'connected' : 'disconnected'
     }
-    if ($('#eh-account-message'))
+    if ($('#eh-account-message') && value.enabled !== false)
         $('#eh-account-message').textContent = ehT('ExH 扩展：','ExH extension: ','ExH 拡張：') + exhLabel(value.exHentai, configured)
 }
 
@@ -416,6 +418,7 @@ $('#eh-account-clear')?.addEventListener('click', async (event) => {
 })
 
 void status().then(() => pollWebLogin()).catch(() => {})
+document.addEventListener('pica-source-choices-changed', () => { void status().catch(() => {}) })
 void import('./v040-parity.js').catch(() => {})
 
 

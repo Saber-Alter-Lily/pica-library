@@ -898,6 +898,21 @@
                     </div>
                     <span id="settings-version" class="mode"></span>
                 </div>
+                <section id="settings-source-choices" class="panel" aria-labelledby="source-choices-title">
+                    <h3 id="source-choices-title">外部漫画来源 · 可选</h3>
+                    <p id="source-choices-help">本软件不附带内容。关闭来源会停止对应联网请求，保留本地下载、收藏和账号；E-H / ExH 使用同一个开关。</p>
+                    <form id="source-choices-form">
+                        <fieldset id="source-choices-options" disabled>
+                            <legend id="source-choices-legend">允许此电脑连接哪些来源</legend>
+                            <label><input type="checkbox" name="source" value="pica" /> Pica</label>
+                            <label><input type="checkbox" name="source" value="eh" /> E-H / ExH</label>
+                            <label><input type="checkbox" name="source" value="jm" /> JM</label>
+                            <button id="source-choices-save" type="submit">保存来源选择</button>
+                        </fieldset>
+                        <button id="source-choices-refresh" type="button">读取当前选择</button>
+                        <p id="source-choices-state" role="status" aria-live="polite"></p>
+                    </form>
+                </section>
                 <form id="settings-form" class="settings-form panel">
                                         <details class="wide account-disclosure">
                         <summary><strong>Pica 账号</strong> · 点击展开修改</summary>
@@ -1254,6 +1269,7 @@
         <script type="module" src="./alpha8-star-access.js"></script>
         <script type="module" src="./eh-account.js"></script>
         <script type="module" src="./jm-account.js"></script>
+        <script type="module" src="./source-choices.js"></script>
         <script type="module" src="./recommendation-v5.js"></script>
         <script type="module" src="./ecosystem-pack-v1.js"></script>
         <script type="module" src="./ui-polish-v5.js"></script>

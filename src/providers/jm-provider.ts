@@ -9,6 +9,7 @@ import type {
 } from './types'
 import { JmWorkerTransport, type JmTransport } from './jm-worker'
 import { HttpMediaClient } from '../media/http-media-client'
+import { SourceDisabledError, type SourceAccess } from '../sources/source-policy'
 
 export class JmProvider implements AccountComicProvider {
     readonly id = 'jm' as const
@@ -30,6 +31,19 @@ export class JmProvider implements AccountComicProvider {
     private identity: ProviderAccountIdentity = { configured: false }
     private remembered?: { username: string; password: string }
     private restoreAttempted = false
+    private sourceAccess?: SourceAccess
+    setSourceAccess(access: SourceAccess) { this.sourceAccess = access }
+    private async request<T>(op: string, payload?: Record<string, unknown>): Promise<T> {
+        const lease = this.sourceAccess?.('jm')
+        const abort = () => this.transport.close()
+        lease?.signal.addEventListener('abort', abort, {once:true})
+        try {
+            const value = await this.transport.request<T>(op, payload)
+            lease?.check()
+            return value
+        } catch (error) { lease?.check(); throw error }
+        finally { lease?.signal.removeEventListener('abort', abort) }
+    }
 
     constructor(
         readonly transport: JmTransport = new JmWorkerTransport(),
@@ -51,6 +65,10 @@ export class JmProvider implements AccountComicProvider {
             .digest('hex')
     }
     async accountStatus() {
+        try { this.sourceAccess?.('jm') } catch (error) {
+            if (!(error instanceof SourceDisabledError)) throw error
+            return {configured: Boolean(this.remembered || this.identity.configured), enabled: false}
+        }
         if (!this.available) return { configured: false }
         if (
             this.remembered &&
@@ -64,12 +82,12 @@ export class JmProvider implements AccountComicProvider {
             )
         }
         return (this.identity =
-            await this.transport.request<ProviderAccountIdentity>('status'))
+            await this.request<ProviderAccountIdentity>('status'))
     }
     async login(username: string, password: string) {
         this.identity = { configured: false }
         return (this.identity =
-            await this.transport.request<ProviderAccountIdentity>('login', {
+            await this.request<ProviderAccountIdentity>('login', {
                 username,
                 password
             }))
@@ -77,10 +95,15 @@ export class JmProvider implements AccountComicProvider {
     async clearAccount() {
         this.identity = { configured: false }
         this.remembered = undefined
-        if (this.available) await this.transport.request('logout')
+        try { this.sourceAccess?.('jm') } catch (error) {
+            if (!(error instanceof SourceDisabledError)) throw error
+            this.transport.close()
+            return
+        }
+        if (this.available) await this.request('logout')
     }
     favoritesPage(page: number, folderId = 0) {
-        return this.transport.request<ProviderFavoritesPage>('favorites', {
+        return this.request<ProviderFavoritesPage>('favorites', {
             page,
             folderId
         })
@@ -95,7 +118,7 @@ export class JmProvider implements AccountComicProvider {
     }
     async search(input: SearchRequest) {
         await this.restoreRememberedAccount()
-        const result = await this.transport.request<{ items: ProviderComic[] }>(
+        const result = await this.request<{ items: ProviderComic[] }>(
             'search',
             {
                 keyword: input.keyword || input.tags?.join(' ') || '',
@@ -106,22 +129,22 @@ export class JmProvider implements AccountComicProvider {
     }
     async details(comicId: string) {
         await this.restoreRememberedAccount()
-        return this.transport.request<ProviderComic>('details', { comicId })
+        return this.request<ProviderComic>('details', { comicId })
     }
     async episodes(comicId: string) {
         await this.restoreRememberedAccount()
-        return this.transport.request<Episode[]>('episodes', { comicId })
+        return this.request<Episode[]>('episodes', { comicId })
     }
     async pages(_comicId: string, episode: Episode) {
         await this.restoreRememberedAccount()
-        return this.transport.request<Picture[]>('pages', {
+        return this.request<Picture[]>('pages', {
             episodeId: episode.id
         })
     }
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
         if (!/^jm-page:[1-9]\d{0,14}:[1-9]\d{0,5}$/.test(locator))
             throw new Error('无效的 JM 页面标识')
-        const result = await this.transport.request<{
+        const result = await this.request<{
             base64: string
             contentType: string
         }>('image', { locator, maxBytes })
@@ -132,11 +155,16 @@ export class JmProvider implements AccountComicProvider {
     }
     close() {
         this.transport.close()
+        this.identity = {configured:false}
+        this.restoreAttempted = false
     }
 
     async fetchCover(locator: string, maxBytes = 20 * 1024 * 1024) {
         // Covers are public HTTPS images. No Pica/JM account, cookies, or JVM operation is needed.
         // Read current proxy settings when requested; do not retain a stale configured proxy.
-        return this.coverClient().fetchImage(locator, maxBytes)
+        const lease = this.sourceAccess?.('jm')
+        const value = await this.coverClient().fetchImage(locator, maxBytes, lease?.signal)
+        lease?.check()
+        return value
     }
 }

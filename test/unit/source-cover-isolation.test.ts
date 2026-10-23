@@ -120,7 +120,8 @@ describe('source-owned covers without unrelated accounts', () => {
             expect(image).toHaveBeenCalledTimes(1)
             expect(image).toHaveBeenCalledWith(
                 'https://cdn.example.test/jm.jpg',
-                20 * 1024 * 1024
+                20 * 1024 * 1024,
+                expect.any(AbortSignal)
             )
             expect(connect).not.toHaveBeenCalled()
         } finally {

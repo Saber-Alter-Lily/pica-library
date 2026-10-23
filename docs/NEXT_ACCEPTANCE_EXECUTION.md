@@ -1,5 +1,9 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-49: Desktop source lifecycle (unpublished)
+
+Continues frozen NEXT-48 `963af71c96e55578722f0806e37393b5bfa40c13` and its unchanged complete handoff SHA256 `ec732724f7435eecc8a012008d290f8a9c34252671fffa8f70536a3c28eb0f86`. Adds persisted local source choices, atomic/CAS save, transport-level cancellation and late-result fences while local Reader/LAN stays independent. Legacy upgrades preserve existing adapter behavior; fresh local setup starts all external sources off. Native Android receives the Desktop relay availability contract, not a forced copy of Desktop choices. [Full scope and pending native lifecycle](SOURCE_LIFECYCLE.md). New exact-source gates belong to the new handoff; do not reuse the previous build's green checks.
+
 ## 2026-10-23 NEXT-48: actual local-content ingestion (unpublished)
 
 Continues frozen NEXT-47 `241734856565b09f6bf18dae43b4f2fba6094268`, whose complete source/media handoff SHA256 is `bf344a511dc5ad5abb854f61a5f3629cef06c95e03078741bad88ceca7845798`. Prior artifacts remain unchanged. Adds one-comic folder/CBZ native selection → bounded preview → confirmed owned copy → existing Reader/LAN, stable local namespace, reimport/progress preservation, cover browser revalidation, native foreign-source guards and expanded CSV identity. Library/tag module APIs2 deliberately require full one-click replacement; schema14 remains unchanged. Dev code63 retains package/certificate. [Limits, workflow, failure behavior and holds](LOCAL_CONTENT_INGESTION.md).

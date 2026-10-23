@@ -29,6 +29,7 @@ describe('local import HTTP and paired Reader boundary', () => {
             .spyOn(LibraryService.prototype, 'connect')
             .mockRejectedValue(new Error('No provider allowed'))
         const service = new LibraryService(db, data)
+        service.sources.apply({ schemaVersion: 1, revision: 1, enabled: [] })
         cleanup.push(async () => {
             db.close()
             fs.rmSync(root, { recursive: true, force: true })

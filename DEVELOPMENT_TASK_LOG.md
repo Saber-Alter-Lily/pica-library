@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-49 — persisted Desktop source lifecycle (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / LOCAL_AUTOMATION_PASS / EXACT_SOURCE_PACKAGE_GATES_IN_HANDOFF / NATIVE_LIFECYCLE_AND_DEVICE_QA_PENDING.** Not completion of the full modular-reader objective.
+
+- Continues immutable NEXT-48 `963af71c96e55578722f0806e37393b5bfa40c13`; its complete handoff SHA256 is `ec732724f7435eecc8a012008d290f8a9c34252671fffa8f70536a3c28eb0f86`. Prior artifacts/proofs are not overwritten or relabeled.
+- Adds a pure source-policy/request-lease module and atomic Desktop configuration adapter, explicit three-language Read → draft checkbox → Save UX. Fresh local setup has no online source enabled; existing pre-policy configuration preserves legacy choices. Credentials, library membership, local Reader/LAN and current recommendation batches are not deleted or reset.
+- Low-level Pica/EH/JM transport guards cover retained clients, not just UI/registry entrypoints. Disable aborts requests/closes JM; stale completions cannot import metadata after disable/re-enable. V3 no longer requires Pica when its source is off and EH is selected; capabilities/planning reflect enabled sources. No ranking/Visual re-tuning.
+- Mobile Desktop account status honors source availability; phone-owned source toggles/worker lifecycle remain a separate unfinished step. Existing direct phone sessions are not silently disabled by Desktop. Draft Dev code64 retains package/fixed signing certificate, with no install/OTA action.
+- Local tests: TypeScript, Web45 syntax, 1359 assertions + one platform skip; Edge46 including all three locale source-choice cases. Actual new archives, CI and restart/upgrade proofs are bound in a separate final handoff. [Detailed semantics, failure handling and holds](docs/SOURCE_LIFECYCLE.md).
+- No main merge, tag/Release, production data/credential reads, automatic deployment or new extension host. DPAPI coordination remains unavailable; the user's existing isolated-write exception is reused without changing identities/secrets.
+
 ## NEXT-48 — local folder/CBZ ingestion and cache freshness (2026-10-23, unpublished)
 
 **IMPLEMENTED_IN_ISOLATED_CANDIDATE / EXACT_SOURCE_PACKAGE_GATES_RECORDED_IN_FROZEN_HANDOFF / MANUAL_QA_PENDING.** This does not complete the full local-reader/source lifecycle objective.

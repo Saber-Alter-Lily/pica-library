@@ -123,7 +123,9 @@ async function run(task) {
 }
 async function refresh() {
     const result = await request('status')
-    $('jm-account-state').textContent = !result.available
+    $('jm-account-state').textContent = result.enabled === false
+        ? t('来源已关闭 · 账号和本地下载保留', 'Source disabled · Account and local downloads retained', '配信元は無効 · アカウントとローカル保存は保持')
+        : !result.available
         ? t(
               '此包尚未包含 JM 运行组件',
               'JM is not included in this package',
@@ -144,6 +146,7 @@ async function refresh() {
 panel?.addEventListener('toggle', () => {
     if (panel.open && !busy) void run(refresh)
 })
+document.addEventListener('pica-source-choices-changed', () => { if (panel?.open && !busy) void run(refresh) })
 $('jm-login')?.addEventListener(
     'click',
     () =>

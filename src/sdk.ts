@@ -6,6 +6,8 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { normalizeName, debug, redactSensitive } from './utils'
 import { HttpMediaClient } from './media/http-media-client'
+import type { SourceAccess } from './sources/source-policy'
+import { combineAbortSignals } from './media/abort-signals'
 import {
     Comic,
     Episode,
@@ -36,10 +38,13 @@ export class Pica {
     token: string | undefined
     maxRetry = 3
     retryMap = new Map<string, number>() // <url, retryCount>
+    private sourceAccess?: SourceAccess
+    setSourceAccess(access: SourceAccess) { this.sourceAccess = access }
 
     constructor(
-        options: { apiAdapter?: AxiosAdapter; mediaAdapter?: AxiosAdapter; proxyUrl?: string | false } = {}
+        options: { apiAdapter?: AxiosAdapter; mediaAdapter?: AxiosAdapter; proxyUrl?: string | false; sourceAccess?: SourceAccess } = {}
     ) {
+        this.sourceAccess = options.sourceAccess
         const proxyUrl = options.proxyUrl ?? process.env.PICA_PROXY
         const httpProxy = proxyUrl ? new URL(proxyUrl) : false
         this.api = axios.create({
@@ -56,6 +61,8 @@ export class Pica {
         })
         this.media = new HttpMediaClient({ proxyUrl, adapter: options.mediaAdapter })
         this.api.interceptors.request.use((config) => {
+            const lease = this.sourceAccess?.('pica')
+            if (lease) config.signal = config.signal ? combineAbortSignals([config.signal as AbortSignal, lease.signal]) : lease.signal
             const method = config.method
             const url = config.url?.replace(/^\/|\/$/g, '') // url 首尾不能有 "/"
             const timestamp = String(Date.now()).slice(0, -3)
@@ -73,6 +80,7 @@ export class Pica {
         })
         this.api.interceptors.response.use(
             (res) => {
+                ;(res.config.signal as AbortSignal | undefined)?.throwIfAborted()
                 // 响应成功，从重试表中删除 url
                 const url = res.config.url
                 url && this.retryMap.delete(url)
@@ -102,7 +110,10 @@ export class Pica {
                 return result.data
             },
             (error: AxiosError) => {
+                // Disabled sources must not be retried or mislabeled as account failures.
+                this.sourceAccess?.('pica')
                 const { config, message, response } = error
+                ;(config?.signal as AbortSignal | undefined)?.throwIfAborted()
 
                 if (config?.url === 'auth/sign-in' || config?.url === 'auth/register') {
                     const action = config.url === 'auth/register' ? 'register' : 'login'
@@ -320,13 +331,19 @@ export class Pica {
         target: string,
         maxBytes = 5 * 1024 * 1024
     ): Promise<{ data: Buffer; contentType: string }> {
-        return this.media.fetchImage(target, maxBytes)
+        const lease = this.sourceAccess?.('pica')
+        const value = await this.media.fetchImage(target, maxBytes, lease?.signal)
+        lease?.check()
+        return value
     }
 
     private async mediaRequest(
         target: string
     ): Promise<AxiosResponse<Buffer>> {
-        return this.media.request(target, { allowInsecureHttp: process.env.PICA_ALLOW_INSECURE_HTTP === 'true' })
+        const lease = this.sourceAccess?.('pica')
+        const value = await this.media.request(target, { allowInsecureHttp: process.env.PICA_ALLOW_INSECURE_HTTP === 'true', signal: lease?.signal })
+        lease?.check()
+        return value
     }
 
     async search(

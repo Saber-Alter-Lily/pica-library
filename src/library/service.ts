@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { SourceRuntime, type SourceId } from '../sources/source-policy'
 import { JmProvider } from '../providers/jm-provider'
 import { ProviderFavoritesImport } from '../providers/favorites-import'
 import path from 'node:path'
@@ -3935,10 +3936,14 @@ export class LibraryService {
         readonly dataDir: string,
         provider?: Pica,
         ehProvider?: EhProvider,
-        runtimeResources?: RuntimeResourceCoordinator
+        runtimeResources?: RuntimeResourceCoordinator,
+        readonly sources = new SourceRuntime()
     ) {
         this.pica = provider ?? null
         this.ehProvider = ehProvider ?? new EhProvider()
+        this.pica?.setSourceAccess?.(sources.acquire)
+        this.ehProvider.setSourceAccess?.(sources.acquire)
+        this.jmProvider.setSourceAccess(sources.acquire)
         this.runtimeResources =
             runtimeResources ??
             new RuntimeResourceCoordinator({
@@ -3951,6 +3956,7 @@ export class LibraryService {
     }
 
     async connect() {
+        const lease = this.sources.acquire('pica')
         if (this.pica) return this.pica
         const account = process.env.PICA_ACCOUNT
         const password = process.env.PICA_PASSWORD
@@ -3959,8 +3965,9 @@ export class LibraryService {
                 'PICA_ACCOUNT and PICA_PASSWORD are required for connected mode'
             )
         }
-        const pica = new Pica()
+        const pica = new Pica({ sourceAccess: this.sources.acquire })
         await pica.login(account, password)
+        lease.check()
         this.pica = pica
         return pica
     }
@@ -3974,7 +3981,8 @@ export class LibraryService {
             () => this.connect(),
             this.database,
             this.ehProvider,
-            this.jmProvider
+            this.jmProvider,
+            this.sources
         )
     }
 
@@ -3982,19 +3990,23 @@ export class LibraryService {
     jmRuntimeAvailable() { return this.jmProvider.available }
     setJmCredentials(username?: string, password?: string) { this.jmProvider.setRememberedCredentials(username, password) }
     async jmLogin(username: string, password: string) {
+        this.sources.acquire('jm')
         this.jmMetadataGeneration++
         this.jmFavorites.clear()
         return this.jmProvider.login(username, password)
     }
     async jmClearAccount() { this.jmMetadataGeneration++; this.jmFavorites.clear(); await this.jmProvider.clearAccount() }
     jmPreviewFavorites(folderId = 0, checkpoint?: () => Promise<void>) {
+        this.sources.acquire('jm')
         return this.jmFavorites.scan(this.jmProvider, folderId, checkpoint)
     }
     async jmConfirmFavorites(token: string) {
-        return this.jmFavorites.confirm(token, await this.jmProvider.accountStatus(), this.database)
+        const identity = await this.sources.run('jm', () => this.jmProvider.accountStatus())
+        return this.jmFavorites.confirm(token, identity, this.database)
     }
     jmCancelFavorites() { this.jmMetadataGeneration++; this.jmFavorites.clear() }
     async jmEnrichFavorites(checkpoint?: () => Promise<void>) {
+        const lease = this.sources.acquire('jm')
         if (this.jmMetadataBusy) throw new Error('JM 资料补全正在进行')
         this.jmMetadataBusy = true
         const generation = ++this.jmMetadataGeneration
@@ -4007,6 +4019,7 @@ export class LibraryService {
                 if (generation !== this.jmMetadataGeneration) break
                 try {
                     const details = await this.jmProvider.details(comic.comicId)
+                    lease.check()
                     if (generation !== this.jmMetadataGeneration) break
                     this.database.importCatalog([providerComicToRecord(details)], 'jm:metadata:details')
                     updated++
@@ -4016,6 +4029,11 @@ export class LibraryService {
         } finally { this.jmMetadataBusy = false }
     }
     closeSources() { this.jmMetadataGeneration++; this.jmFavorites.clear(); this.jmProvider.close() }
+
+    sourceChoicesApplied(disabled: SourceId[]) {
+        if (disabled.includes('jm')) this.closeSources()
+        if (disabled.includes('pica')) this.resetPicaSession()
+    }
 
     async refreshAuthorWorks(authorId: string) {
         const author = this.database.listAuthors().find((item) => item.id === authorId)
@@ -4084,7 +4102,7 @@ export class LibraryService {
     }
 
     async mobileEhRelayFavoritesSnapshot() {
-        const snapshot = await this.ehProvider.favoriteSnapshot()
+        const snapshot = await this.sources.run('eh', () => this.ehProvider.favoriteSnapshot())
         const records = snapshot.comics.map((comic) =>
             this.recordForOnlineSource(comic, 'eh')
         )
@@ -4094,14 +4112,14 @@ export class LibraryService {
 
     async mobileEhRelaySearch(input: SearchRequest) {
         const surface: EhSurface = input.surface === 'exh' ? 'exh' : 'eh'
-        const comics = await this.ehProvider.search({
+        const comics = await this.sources.run('eh', () => this.ehProvider.search({
             ...input,
             surface,
             limit: Math.max(
                 1,
                 Math.min(100, Math.floor(Number(input.limit) || 50))
             )
-        })
+        }))
         if (comics.length)
             this.database.importCatalog(
                 comics.map((comic) =>
@@ -4113,10 +4131,10 @@ export class LibraryService {
     }
 
     async mobileEhRelayDetails(comicId: string, surface: EhSurface) {
-        const comic = await this.ehProvider.detailsOnSurface(
+        const comic = await this.sources.run('eh', () => this.ehProvider.detailsOnSurface(
             comicId,
             surface
-        )
+        ))
         this.database.importCatalog(
             [this.recordForOnlineSource(comic, surface)],
             `${surface}:mobile-relay-details`
@@ -4125,7 +4143,7 @@ export class LibraryService {
     }
 
     mobileEhRelayEpisodes(comicId: string, surface: EhSurface) {
-        return this.ehProvider.episodesOnSurface(comicId, surface)
+        return this.sources.run('eh', () => this.ehProvider.episodesOnSurface(comicId, surface))
     }
 
     mobileEhRelayPages(
@@ -4133,18 +4151,18 @@ export class LibraryService {
         episode: Episode,
         surface: EhSurface
     ) {
-        return this.ehProvider.pagesOnSurface(comicId, episode, surface)
+        return this.sources.run('eh', () => this.ehProvider.pagesOnSurface(comicId, episode, surface))
     }
 
     mobileEhRelayFetchPage(
         locator: string,
         maxBytes = 20 * 1024 * 1024
     ) {
-        return this.ehProvider.fetchPage(locator, maxBytes)
+        return this.sources.run('eh', () => this.ehProvider.fetchPage(locator, maxBytes))
     }
 
     mobileEhRelayProbeExH() {
-        return this.ehProvider.probeExHentai()
+        return this.sources.run('eh', () => this.ehProvider.probeExHentai())
     }
 
     async mobileEhRelaySetFavorite(
@@ -4153,6 +4171,7 @@ export class LibraryService {
         category = 0,
         note = ''
     ) {
+        const lease = this.sources.acquire('eh')
         if (!this.ehProvider.hasSession())
             throw new Error('E-H account session is not configured')
         let before = this.database.getComic(comicId)
@@ -4161,6 +4180,7 @@ export class LibraryService {
                 comicId,
                 'eh'
             )
+            lease.check()
             this.database.importCatalog(
                 [this.recordForOnlineSource(comic, 'eh')],
                 'eh:mobile-relay-favorite'
@@ -4187,6 +4207,7 @@ export class LibraryService {
             category,
             note
         )
+        lease.check()
         const after = this.database.setEhFavoriteState(
             comicId,
             desired
@@ -4285,6 +4306,7 @@ export class LibraryService {
     }
 
     async buildFinalRecommendationCycleV3(cycleId: string) {
+        const sourceRevision = this.sources.snapshot().revision
         this.beginRecommendationBuild(cycleId)
         let releaseResources: () => void = () => undefined
         try {
@@ -4301,7 +4323,7 @@ export class LibraryService {
         })
         releaseResources = () => lease.release()
         await this.recommendationCheckpoint()
-        const pica = await this.connect()
+        const pica = this.sources.isEnabled('pica') ? await this.connect() : null
         const providerService = this.providerService()
         const catalog = this.database.listComics({ limit: 10000 })
         const recommendationV5Store = new RecommendationPolicyStoreV5(this.database)
@@ -4385,6 +4407,7 @@ export class LibraryService {
         this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 7 }
         const routes = translateIntentPlanV3(intents)
         const storePica = (comics: Comic[]) => {
+            this.sources.acquire('pica')
             const records = comics.map(comicToRecord)
             this.database.importCatalog(records, 'pica:recommendations')
             return records.flatMap((record) => {
@@ -4424,6 +4447,7 @@ export class LibraryService {
             kind: 'keyword' | 'author',
             source: 'eh' | 'exh'
         ): Promise<StoredComic[]> => {
+            if (!this.sources.isEnabled('eh')) return []
             if (source === 'exh' && !exhAvailable) return []
             const clean = query.trim()
             if (!clean) return []
@@ -4459,7 +4483,7 @@ export class LibraryService {
             provider: {
                 keyword: async (query, page, route) => {
                     await this.recommendationCheckpoint()
-                    const picaResults = route?.allowedProviders && !route.allowedProviders.includes('pica') ? [] : storePica(
+                    const picaResults = !pica || (route?.allowedProviders && !route.allowedProviders.includes('pica')) ? [] : storePica(
                         (
                             await pica.comicsPage(
                                 '',
@@ -4476,7 +4500,7 @@ export class LibraryService {
                 },
                 author: async (query, page) => {
                     await this.recommendationCheckpoint()
-                    const picaResults = storePica(
+                    const picaResults = !pica ? [] : storePica(
                         (await pica.search(query, page, pica.Order.loved)).docs
                     )
                     const ehResults = page === 1 ? await externalSearch(query, 'author', 'eh') : []
@@ -4485,7 +4509,7 @@ export class LibraryService {
                 },
                 related: async (comicId) => {
                     await this.recommendationCheckpoint()
-                    return comicId.startsWith('eh:')
+                    return !pica || comicId.includes(':')
                         ? []
                         : storePica(await pica.related(comicId))
                 }
@@ -4510,6 +4534,8 @@ export class LibraryService {
                         : []
                 })
         })
+        if (this.sources.snapshot().revision !== sourceRevision)
+            throw new Error('Source choices changed during recommendation generation; previous recommendations were kept')
         if (retrieved.readiness === 'FAILED_INSUFFICIENT_POOL')
             throw new Error(
                 'Recommendation generation could not retrieve enough candidates; previous recommendations were kept'
@@ -4608,6 +4634,8 @@ export class LibraryService {
             mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF',
             strength: visualSettings.strength
         })
+        if (this.sources.snapshot().revision !== sourceRevision)
+            throw new Error('Source choices changed during recommendation generation; previous recommendations were kept')
         this.recommendationProgress = {
             state: 'complete',
             phase: 'complete',
@@ -4947,10 +4975,12 @@ export class LibraryService {
     }
 
     async favoritesPage(page: number) {
+        const lease = this.sources.acquire('pica')
         if (!Number.isInteger(page) || page < 1)
             throw new Error('Favorite page must be a positive integer')
         const pica = await this.connect()
         const result = await pica.favorites(page)
+        lease.check()
         const records = result.docs.map(comicToRecord)
         this.database.importFavorites(
             records,

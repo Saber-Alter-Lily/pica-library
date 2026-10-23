@@ -33,6 +33,7 @@ import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { LocalHttpLatencyRegistry } from '../runtime/http-latency'
 import { LocalLibraryIngestion } from '../local-library/ingestion'
+import { SourceDisabledError } from '../sources/source-policy'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -390,7 +391,8 @@ export async function startLibraryServer(options: {
                         desktopStatus
                     ),
                     providers: providerService.providerStatus(),
-                    sourceModules: providerService.sourceModuleStatus()
+                    sourceModules: providerService.sourceModuleStatus(),
+                    externalSources: options.service.sources.snapshot()
                 })
             }
             if (
@@ -2898,8 +2900,9 @@ export async function startLibraryServer(options: {
                 serveAsset(response, root, '/index.html')
             else serveAsset(response, root, url.pathname)
         } catch (error) {
-            json(response, 500, {
-                error: error instanceof Error ? error.message : String(error)
+            json(response, error instanceof SourceDisabledError ? 409 : 500, {
+                error: error instanceof Error ? error.message : String(error),
+                ...(error instanceof SourceDisabledError ? {code:error.code,sourceId:error.sourceId} : {})
             })
         }
     })

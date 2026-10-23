@@ -404,6 +404,8 @@ function buildSettingsHub() {
     const settingsHeading = settings.querySelector(':scope > .page-heading')
     settingsHeading?.remove()
     const settingsForm = hub$('#settings-form')
+    const sourceChoices = hub$('#settings-source-choices')
+    if (sourceChoices) panels.get('general').appendChild(sourceChoices)
     if (settingsForm) panels.get('general').appendChild(settingsForm)
 
     const ehAccount = hub$('#settings-eh-account')

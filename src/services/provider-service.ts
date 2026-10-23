@@ -11,6 +11,7 @@ import {
 import { PicaProvider, picaComic } from '../providers/pica-provider'
 import { JmProvider } from '../providers/jm-provider'
 import { ProviderRegistry } from '../providers/provider-registry'
+import { SourceRuntime } from '../sources/source-policy'
 import {
     providerComicToRecord,
     type ComicProvider,
@@ -60,10 +61,13 @@ export class ProviderService {
         private readonly connectProvider: () => Promise<Pica>,
         private readonly database: LibraryDatabase,
         ehProvider = new EhProvider(),
-        private readonly jmProvider = new JmProvider()
+        private readonly jmProvider = new JmProvider(),
+        readonly sources = new SourceRuntime()
     ) {
         this.picaProvider = new PicaProvider(connectProvider)
         this.ehProvider = ehProvider
+        this.ehProvider.setSourceAccess?.(sources.acquire)
+        this.jmProvider.setSourceAccess?.(sources.acquire)
         this.registry = new ProviderRegistry([this.picaProvider, this.ehProvider, this.jmProvider])
         this.capabilities = {
             favoriteMutation: true,
@@ -72,6 +76,7 @@ export class ProviderService {
     }
 
     private connect() {
+        this.sources.acquire('pica')
         return this.connectProvider()
     }
 
@@ -102,7 +107,9 @@ export class ProviderService {
     }
 
     async prepareSource(comicId: string) {
-        if (this.providerForComic(comicId).id === 'jm') await this.jmProvider.accountStatus()
+        const provider = this.providerForComic(comicId)
+        this.sources.acquire(provider.id)
+        if (provider.id === 'jm') await this.sources.run('jm', () => this.jmProvider.accountStatus())
     }
 
     private recordForOnlineSource(comic: Parameters<typeof providerComicToRecord>[0], source: OnlineSource) {
@@ -123,11 +130,17 @@ export class ProviderService {
     }
 
     providerStatus() {
-        return this.registry.capabilities()
+        const capabilities = this.registry.capabilities()
+        for (const id of ['pica', 'eh', 'jm'] as const) {
+            if (!this.sources.isEnabled(id)) {
+                for (const key of Object.keys(capabilities[id]) as (keyof typeof capabilities[typeof id])[]) capabilities[id][key] = false
+            }
+        }
+        return capabilities
     }
 
     sourceModuleStatus() {
-        return this.registry.manifests()
+        return this.registry.manifests().map(module => ({ ...module, enabled: this.sources.isEnabled(module.id) }))
     }
 
     setEhSession(session?: EhSession | null) {
@@ -135,19 +148,19 @@ export class ProviderService {
     }
 
     ehAccountStatus() {
-        return { configured: this.ehProvider.hasSession() }
+        return { configured: this.ehProvider.hasSession(), enabled: this.sources.isEnabled('eh') }
     }
 
     verifyEhAccount() {
-        return this.ehProvider.verifyAccount()
+        return this.sources.run('eh', () => this.ehProvider.verifyAccount())
     }
 
     probeExHentai(): Promise<ExHentaiCapability> {
-        return this.ehProvider.probeExHentai()
+        return this.sources.run('eh', () => this.ehProvider.probeExHentai())
     }
 
     async syncEhFavorites() {
-        const comics = await this.ehProvider.favoritesAll()
+        const comics = await this.sources.run('eh', () => this.ehProvider.favoritesAll())
         const records = comics.map(providerComicToRecord)
         return this.database.syncEhFavorites(records)
     }
@@ -157,6 +170,9 @@ export class ProviderService {
         onProgress?: (progress: ProviderFavoritesProgress) => void,
         checkpoint?: () => Promise<void>
     ) {
+        const sourceLease = this.sources.acquire('pica')
+        const callerCheckpoint = checkpoint
+        checkpoint = async () => { sourceLease.check(); await callerCheckpoint?.(); sourceLease.check() }
         const provider = await this.connect()
         const previous = this.database.favoritesSyncState()
         const known = new Set(this.database.favoriteIds())
@@ -319,13 +335,17 @@ export class ProviderService {
             typeof input === 'string' ? { keyword: input, limit: 100 } : input
         const uniqueProviders = [...new Set(providers)]
         for (const source of uniqueProviders) this.registry.forSource(source)
+        const leases = new Map<OnlineSource, ReturnType<SourceRuntime['acquire']>>()
         const settled = await Promise.allSettled(
             uniqueProviders.map(async (source) => {
                 const provider = this.registry.forSource(source)
+                const lease = this.sources.acquire(provider.id)
+                leases.set(source, lease)
                 const comics = await provider.search({
                     ...request,
                     ...(source === 'eh' || source === 'exh' ? { surface: source } : {})
                 })
+                lease.check()
                 const records = comics.map((comic) =>
                     this.recordForOnlineSource(comic, source)
                 )
@@ -337,6 +357,7 @@ export class ProviderService {
                 return records
             })
         )
+        for (const lease of leases.values()) lease.check()
         const records = settled.flatMap((result) =>
             result.status === 'fulfilled' ? result.value : []
         )
@@ -403,7 +424,7 @@ export class ProviderService {
         options: { persist?: boolean } = {}
     ) {
         if (this.providerForComic(comicId).id !== 'pica') throw new Error('Pica related lookup requires a Pica comic identity')
-        const records = (await (await this.connect()).related(comicId)).map(
+        const records = (await this.sources.run('pica', async () => (await this.connect()).related(comicId))).map(
             providerComicRecord
         )
         if (options.persist !== false)
@@ -415,21 +436,21 @@ export class ProviderService {
         const provider = this.providerForComic(comicId)
         if (comicId.startsWith('eh:')) {
             const surface = this.ehSurfaceForComic(comicId)
-            const comic = await this.ehProvider.detailsOnSurface(comicId, surface)
+            const comic = await this.sources.run('eh', () => this.ehProvider.detailsOnSurface(comicId, surface))
             const record = this.recordForOnlineSource(comic, surface)
             this.database.importCatalog([record], `${surface}:details`)
             return comic
         }
-        const comic = await provider.details(comicId)
+        const comic = await this.sources.run(provider.id, () => provider.details(comicId))
         this.database.importCatalog([providerComicToRecord(comic)], `${provider.id}:details`)
         return comic
     }
 
     async getEpisodes(comicId: string): Promise<Episode[]> {
         const provider = this.providerForComic(comicId)
-        return comicId.startsWith('eh:')
+        return this.sources.run(provider.id, () => comicId.startsWith('eh:')
             ? this.ehProvider.episodesOnSurface(comicId, this.ehSurfaceForComic(comicId))
-            : provider.episodes(comicId)
+            : provider.episodes(comicId))
     }
 
     async getEpisodePages(
@@ -437,19 +458,20 @@ export class ProviderService {
         episode: Episode
     ): Promise<Picture[]> {
         const provider = this.providerForComic(comicId)
-        return comicId.startsWith('eh:')
+        return this.sources.run(provider.id, () => comicId.startsWith('eh:')
             ? this.ehProvider.pagesOnSurface(comicId, episode, this.ehSurfaceForComic(comicId))
-            : provider.pages(comicId, episode)
+            : provider.pages(comicId, episode))
     }
 
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
-        return this.registry.forPage(locator).fetchPage(locator, maxBytes)
+        const provider = this.registry.forPage(locator)
+        return this.sources.run(provider.id, () => provider.fetchPage(locator, maxBytes))
     }
 
     async fetchCover(comicId: string, locator: string, maxBytes = 20 * 1024 * 1024) {
         const provider = this.providerForComic(comicId)
         if (!provider.fetchCover) throw new Error('Source cover transport is unavailable')
-        return provider.fetchCover(locator, maxBytes)
+        return this.sources.run(provider.id, () => provider.fetchCover!(locator, maxBytes))
     }
 
     async setFavorite(comicId: string, desired: boolean) {
@@ -482,7 +504,7 @@ export class ProviderService {
                         already: true,
                         remote: true
                     }
-                await this.ehProvider.setRemoteFavorite(comicId, desired)
+                await this.sources.run('eh', () => this.ehProvider.setRemoteFavorite(comicId, desired))
                 const after = this.database.setEhFavoriteState(comicId, desired)
                 return {
                     changed: true,
@@ -510,12 +532,16 @@ export class ProviderService {
                 remote: false
             }
         }
+        const lease = this.sources.acquire('pica')
         const provider = await this.connect()
         const before = await provider.comicInfo(comicId)
+        lease.check()
         if (Boolean(before.isFavourite) === desired)
             return { changed: false, isFavorite: desired, already: true }
         await provider.fav(comicId)
+        lease.check()
         const after = await provider.comicInfo(comicId)
+        lease.check()
         if (Boolean(after.isFavourite) !== desired)
             throw new Error('Pica 收藏状态未能得到远端确认')
         this.database.setFavoriteState(comicId, desired)

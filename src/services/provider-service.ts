@@ -446,10 +446,9 @@ export class ProviderService {
     }
 
     async fetchCover(comicId: string, locator: string, maxBytes = 20 * 1024 * 1024) {
-        this.providerForComic(comicId)
-        return comicId.startsWith('eh:')
-            ? this.ehProvider.fetchCover(locator, maxBytes)
-            : this.picaProvider.fetchPage(locator, maxBytes)
+        const provider = this.providerForComic(comicId)
+        if (!provider.fetchCover) throw new Error('Source cover transport is unavailable')
+        return provider.fetchCover(locator, maxBytes)
     }
 
     async setFavorite(comicId: string, desired: boolean) {

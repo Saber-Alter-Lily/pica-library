@@ -1,5 +1,9 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-47: source-owned media continuation
+
+After frozen NEXT-45 source `4230e66c3c86` (complete handoff SHA256 `b736ef3f76b2dcb76a4b2f645cccce147bdf82eaada69c2b33d4aa6717aa58fc`), this isolated continuation extracts credential-free media transport, routes covers through their owning source and removes JM cover dependence on Pica login. Cover cache gains source/session scope, per-comic writer serialization and stale-response rejection. No database migration, recommendation change, source account or production data. Candidate Dev versionCode62 keeps the fixed identity. Exact new source, package hashes and new gates must be recorded separately; previous green checks are not reused. [Scope, safety and local-ingestion continuation](SOURCE_MEDIA_BOUNDARY.md).
+
 ## 2026-10-23 continuation: modular local-first reader foundation
 
 The product authority is now recorded in [MODULAR_LOCAL_READER_ARCHITECTURE.md](MODULAR_LOCAL_READER_ARCHITECTURE.md): a local reader/library, no included comic bodies, optional external sources and independently maintainable functional modules with one application update action. This is the NEXT-45 candidate, not a claim that every module or source ecosystem is finished.

@@ -16,7 +16,7 @@ const manifests: Record<ProviderId, SourceModuleManifest> = {
     pica: {
         apiVersion: 1,
         id: 'pica',
-        adapterVersion: '1.0.0',
+        adapterVersion: '1.0.1',
         comicNamespace: null,
         sourceAliases: ['pica'],
         pageSchemes: ['https', 'http'],
@@ -34,7 +34,7 @@ const manifests: Record<ProviderId, SourceModuleManifest> = {
     jm: {
         apiVersion: 1,
         id: 'jm',
-        adapterVersion: '1.0.0',
+        adapterVersion: '1.0.1',
         comicNamespace: 'jm',
         sourceAliases: ['jm'],
         pageSchemes: ['jm-page'],

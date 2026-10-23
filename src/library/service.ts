@@ -484,6 +484,7 @@ export class LibraryService {
     private pica: Pica | null = null
     private readonly ehProvider: EhProvider
     private readonly jmProvider = new JmProvider()
+    private readonly coverRequests = new Map<string, Promise<{ data: Buffer; contentType: string; cached: boolean }>>()
     private readonly jmFavorites = new ProviderFavoritesImport()
     private jmMetadataGeneration = 0
     private jmMetadataBusy = false
@@ -4201,11 +4202,25 @@ export class LibraryService {
     }
 
     async cover(comicId: string) {
+        // Reuse the existing per-key promise pattern: one writer per comic, including scope changes.
+        const previous = this.coverRequests.get(comicId)
+        const request = (async () => {
+            if (previous) await previous.catch(() => undefined)
+            return this.loadCover(comicId)
+        })()
+        this.coverRequests.set(comicId, request)
+        try { return await request }
+        finally { if (this.coverRequests.get(comicId) === request) this.coverRequests.delete(comicId) }
+    }
+
+    private async loadCover(comicId: string) {
         const comic = this.database.getComic(comicId)
         if (!comic?.coverUrl) throw new Error('Comic cover is unavailable')
 
         const cacheDir = path.join(this.dataDir, 'cover-cache')
         const cacheKey = createHash('sha256').update(comicId).digest('hex')
+        const providerService = this.providerService()
+        const sourceScope = providerService.cacheScope(comicId)
         const sourceFingerprint = createHash('sha256')
             .update(
                 [
@@ -4213,12 +4228,20 @@ export class LibraryService {
                     comic.providerId ?? '',
                     comic.providerRemoteId ?? '',
                     comic.coverUrl,
-                    comic.updatedAt ?? ''
+                    comic.updatedAt ?? '',
+                    sourceScope
                 ].join('\n')
             )
             .digest('hex')
         const imageFile = path.join(cacheDir, `${cacheKey}.bin`)
         const metadataFile = path.join(cacheDir, `${cacheKey}.json`)
+        const assertCurrentSource = () => {
+            const current = this.database.getComic(comicId)
+            if (sourceScope !== providerService.cacheScope(comicId) || current?.coverUrl !== comic.coverUrl ||
+                current?.updatedAt !== comic.updatedAt || current?.providerId !== comic.providerId || current?.providerRemoteId !== comic.providerRemoteId)
+                throw new Error('Cover source changed while loading; please retry')
+        }
+        let cached: { data: Buffer; contentType: string; cached: boolean } | undefined
         try {
             const metadata = JSON.parse(
                 await fs.promises.readFile(metadataFile, 'utf8')
@@ -4232,7 +4255,7 @@ export class LibraryService {
                 String(metadata.sourceFingerprint ?? '') !== sourceFingerprint
             )
                 throw new Error('invalid')
-            return {
+            cached = {
                 data: await fs.promises.readFile(imageFile),
                 contentType,
                 cached: true
@@ -4240,9 +4263,10 @@ export class LibraryService {
         } catch {
             // A partial, legacy, or source-stale cache entry is replaced below.
         }
+        if (cached) { assertCurrentSource(); return cached }
 
-        const providerService = this.providerService()
         const image = await providerService.fetchCover(comicId, comic.coverUrl)
+        assertCurrentSource()
         await fs.promises.mkdir(cacheDir, { recursive: true })
         const imagePartial = `${imageFile}.part`
         const metadataPartial = `${metadataFile}.part`

@@ -51,6 +51,14 @@ function imports(file: string): string[] {
     return found
 }
 describe('enforced first module boundaries', () => {
+    it('keeps neutral media transport independent from provider sessions, library storage and recommendations', () => {
+        const directory = path.join(root, 'src/media')
+        for (const file of files(directory)) for (const specifier of imports(file)) {
+            if (['axios', 'node:net'].includes(specifier)) continue
+            expect(specifier.startsWith('.'), `${file}: ${specifier}`).toBe(true)
+            expect(path.resolve(path.dirname(file), specifier).startsWith(directory + path.sep)).toBe(true)
+        }
+    })
     it('keeps the tag domain and module-contract parser independent from storage, providers, UI and rankers', () => {
         for (const folder of ['src/tags', 'src/modules']) {
             const directory = path.join(root, folder)

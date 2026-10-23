@@ -5,10 +5,7 @@ import { createHash, createHmac } from 'node:crypto'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import { normalizeName, debug, redactSensitive } from './utils'
-import {
-    requireTrustedCoverUrl,
-    safeRasterContentType
-} from './library/cover-url'
+import { HttpMediaClient } from './media/http-media-client'
 import {
     Comic,
     Episode,
@@ -57,16 +54,7 @@ export class Pica {
                 : false,
             adapter: options.apiAdapter
         })
-        this.media = axios.create({
-            proxy: httpProxy
-                ? {
-                      protocol: httpProxy.protocol,
-                      host: httpProxy.hostname,
-                      port: Number(httpProxy.port)
-                  }
-                : false,
-            adapter: options.mediaAdapter
-        })
+        this.media = new HttpMediaClient({ proxyUrl, adapter: options.mediaAdapter })
         this.api.interceptors.request.use((config) => {
             const method = config.method
             const url = config.url?.replace(/^\/|\/$/g, '') // url 首尾不能有 "/"
@@ -332,65 +320,13 @@ export class Pica {
         target: string,
         maxBytes = 5 * 1024 * 1024
     ): Promise<{ data: Buffer; contentType: string }> {
-        if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
-            throw new Error('Image size limit must be a positive integer')
-        }
-        const response = await this.mediaRequest(target, 0, maxBytes, true)
-        const data = Buffer.from(response.data)
-        if (data.byteLength > maxBytes) {
-            throw new Error('Provider image exceeds the configured size limit')
-        }
-        const contentType = safeRasterContentType(
-            response.headers['content-type']
-        )
-        if (!contentType)
-            throw new Error(
-                'Provider cover response is not a safe raster image'
-            )
-        return { data, contentType }
+        return this.media.fetchImage(target, maxBytes)
     }
 
     private async mediaRequest(
-        target: string,
-        redirects = 0,
-        maxBytes?: number,
-        trustedCover = false
+        target: string
     ): Promise<AxiosResponse<Buffer>> {
-        const url = new URL(
-            trustedCover ? requireTrustedCoverUrl(target) : target
-        )
-        const insecureAllowed = process.env.PICA_ALLOW_INSECURE_HTTP === 'true'
-        if (
-            url.protocol !== 'https:' &&
-            !(insecureAllowed && url.protocol === 'http:')
-        ) {
-            throw new Error(
-                'Media downloads require HTTPS unless PICA_ALLOW_INSECURE_HTTP=true'
-            )
-        }
-        if (redirects > 5) throw new Error('Too many media redirects')
-        const response = await this.media.get<Buffer>(url.toString(), {
-            responseType: 'arraybuffer',
-            maxContentLength: maxBytes,
-            maxBodyLength: maxBytes,
-            maxRedirects: 0,
-            headers: { Accept: 'image/*,application/octet-stream' },
-            validateStatus: (status) =>
-                (status >= 200 && status < 304) ||
-                (status >= 300 && status < 400)
-        })
-        const location = response.headers.location
-        if (location) {
-            return this.mediaRequest(
-                trustedCover
-                    ? requireTrustedCoverUrl(new URL(location, url).toString())
-                    : new URL(location, url).toString(),
-                redirects + 1,
-                maxBytes,
-                trustedCover
-            )
-        }
-        return response
+        return this.media.request(target, { allowInsecureHttp: process.env.PICA_ALLOW_INSECURE_HTTP === 'true' })
     }
 
     async search(

@@ -8,6 +8,7 @@ import type {
     SearchRequest
 } from './types'
 import { JmWorkerTransport, type JmTransport } from './jm-worker'
+import { HttpMediaClient } from '../media/http-media-client'
 
 export class JmProvider implements AccountComicProvider {
     readonly id = 'jm' as const
@@ -30,7 +31,10 @@ export class JmProvider implements AccountComicProvider {
     private remembered?: { username: string; password: string }
     private restoreAttempted = false
 
-    constructor(readonly transport: JmTransport = new JmWorkerTransport()) {}
+    constructor(
+        readonly transport: JmTransport = new JmWorkerTransport(),
+        private readonly coverClient = () => new HttpMediaClient({ proxyUrl: process.env.PICA_PROXY || false })
+    ) {}
     get available() {
         return this.transport.available
     }
@@ -128,5 +132,11 @@ export class JmProvider implements AccountComicProvider {
     }
     close() {
         this.transport.close()
+    }
+
+    async fetchCover(locator: string, maxBytes = 20 * 1024 * 1024) {
+        // Covers are public HTTPS images. No Pica/JM account, cookies, or JVM operation is needed.
+        // Read current proxy settings when requested; do not retain a stale configured proxy.
+        return this.coverClient().fetchImage(locator, maxBytes)
     }
 }

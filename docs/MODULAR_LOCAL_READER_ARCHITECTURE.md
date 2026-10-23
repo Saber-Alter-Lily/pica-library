@@ -13,6 +13,7 @@ External-source support is an adapter capability, not permission to redistribute
 | Library | `library`, local SQLite/catalog and Reader inventory | User records and progress, independently located from application files | Provider passwords, algorithm ownership of raw facts |
 | Tags | **Extracted** pure `src/tags/policy.ts`, schema/API 1; old V5 path is a compatibility re-export | Personal participation/mappings and derived signal views; persistence remains an application adapter | Network, database handles, candidate generation, model execution, rewriting provider facts |
 | Sources | `ComicProvider` + compiled manifest API 1 + `ProviderRegistry` | Source aliases, ID namespaces, page schemes and capabilities | Choosing a user's preferences or recommendation ranker |
+| Media | **Extracted** credential-free `src/media` HTTP/URL policy; source-owned optional cover port | Bounded raster transport and redirects; Library adapter owns source-scoped cache | Provider login, cookies, database or recommendation state |
 | Reader | Existing local/remote/native Reader sources, API 1 | Display/navigation/progress interfaces | Source authentication as a prerequisite for local reading |
 | Native gestures | Existing phone-local `ReaderGestureSettings`, separate from portable reading preferences | Double-tap option and zoom level on that phone | Desktop settings, provider sessions, recommendation policy |
 | Recommendation | Existing V3 authority and V5 portable interface | Derived ranking/evidence, explicit user policy | Provider facts or user library identity; ordinary startup cannot force online generation in a source-free install |
@@ -59,6 +60,8 @@ Primary sources inspected 2026-10-23:
 - [TypeScript compiler API](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API): use the already-installed compiler AST for bounded import-direction checks, not a homemade dependency parser or a new framework.
 
 ## Required continuation, not completed by this slice
+
+NEXT-47 resolves the statically identified JM-cover → Pica-login dependency and extracts the shared media transport. See [source/media evidence and local ingestion continuation](SOURCE_MEDIA_BOUNDARY.md). This does not add arbitrary local import or a dynamic extension host.
 
 1. Local-content ingestion: source-independent stable IDs, bounded folder/CBZ import, safe archive extraction, chapter/page inventory, progress preservation and missing-file handling. Keep PDF/CBR declarations false until actually supported and verified.
 2. Source lifecycle: explicit opt-in enable/disable, persisted selection independent of credentials, immutable identity and provenance, optional source-runtime packaging and native parity. Only then decide a trusted repository/extension host based on maintained upstreams.

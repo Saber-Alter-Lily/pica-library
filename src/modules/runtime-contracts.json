@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "apis": {
+    "library": 1,
+    "reader": 1,
+    "sources": 1,
+    "tags": 1,
+    "recommendation": 5,
+    "sync": 1,
+    "update": 1
+  }
+}

@@ -11,6 +11,7 @@ import {
 import { sanitizedChildEnv } from '../desktop/child-process'
 import { applicationFetch } from './application-fetch'
 import { classifyUpdateCompatibility } from './compatibility'
+import { MODULE_CONTRACT_PATH, normalizeModuleContracts, parseModuleContracts, runtimeModuleContracts, sameModuleContracts } from '../modules/contracts'
 import { normalizeUpdatePath, updaterSelfReplacement } from './path-safety'
 import {
     selectReleaseUpdateAsset,
@@ -97,6 +98,8 @@ function validateFullApplicationArchive(zip: AdmZip) {
         .trim()
     if (!/^[0-9a-f]{40}$/.test(sourceSha))
         throw new Error('Full application SOURCE_SHA.txt is invalid')
+    const moduleEntry = declared.get(MODULE_CONTRACT_PATH)
+    if (moduleEntry) parseModuleContracts(moduleEntry.getData().toString('utf8'))
     return { declared, sourceSha }
 }
 
@@ -182,8 +185,23 @@ function readManifest(zip: AdmZip): UpdateManifest {
         throw new Error('Invalid databaseSchemaVersion')
     if (!Array.isArray(manifest.files) || !Array.isArray(manifest.deletions))
         throw new Error('Update manifest file lists are invalid')
+    if (manifest.moduleContracts !== undefined)
+        manifest.moduleContracts = normalizeModuleContracts(manifest.moduleContracts)
     manifestUpdateTarget(manifest)
     return manifest
+}
+
+function validateModulePayload(zip: AdmZip, manifest: UpdateManifest) {
+    if (manifest.deletions.some(name => name.replaceAll('\\', '/').toLowerCase() === MODULE_CONTRACT_PATH))
+        throw new Error('Module contracts cannot be removed by an incremental update')
+    const entry = zip.getEntry(MODULE_CONTRACT_PATH)
+    if (!manifest.moduleContracts) {
+        if (entry) throw new Error('Module contract payload is not declared in the update manifest')
+        return // Legacy manifests remain readable, but cannot silently replace the new metadata.
+    }
+    const target = entry ? parseModuleContracts(entry.getData().toString('utf8')) : runtimeModuleContracts()
+    if (!sameModuleContracts(manifest.moduleContracts, target))
+        throw new Error('Update module contracts do not match the target payload')
 }
 
 function validateFileList(zip: AdmZip, manifest: UpdateManifest) {
@@ -770,6 +788,8 @@ export class UpdateManager {
             currentDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION,
             targetAppApiVersion: manifest.appApiVersion,
             targetDatabaseSchemaVersion: manifest.databaseSchemaVersion,
+            currentModuleContracts: runtimeModuleContracts(),
+            targetModuleContracts: manifest.moduleContracts,
             updaterHelperChanged: updaterSelfReplacement([
                 ...manifest.files.map((item) => String(item.path ?? '')),
                 ...manifest.deletions
@@ -838,6 +858,7 @@ export class UpdateManager {
             }
         }
         const declared = validateFileList(zip, manifest)
+        validateModulePayload(zip, manifest)
         const id = randomUUID()
         const directory = path.join(this.options.stateRoot, `staged-${id}`)
         fs.mkdirSync(directory, { recursive: true })
@@ -1184,5 +1205,6 @@ export const updateInternals = {
     readManifest,
     manifestUpdateTarget,
     validateFileList,
+    validateModulePayload,
     sha256
 }

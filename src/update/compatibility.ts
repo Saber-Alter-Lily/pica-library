@@ -1,3 +1,9 @@
+import {
+    normalizeModuleContracts,
+    sameModuleContracts,
+    type RuntimeModuleContracts
+} from '../modules/contracts'
+
 export type UpdateCompatibilityKind =
     | 'INCREMENTAL'
     | 'FULL_APPLICATION'
@@ -9,6 +15,8 @@ export interface UpdateCompatibilityInput {
     targetAppApiVersion: number
     targetDatabaseSchemaVersion: number
     updaterHelperChanged?: boolean
+    currentModuleContracts?: RuntimeModuleContracts
+    targetModuleContracts?: RuntimeModuleContracts
 }
 
 export interface UpdateCompatibilityDecision {
@@ -19,11 +27,20 @@ export interface UpdateCompatibilityDecision {
         | 'SCHEMA_JUMP'
         | 'SCHEMA_DOWNGRADE'
         | 'UPDATER_HELPER_CHANGED'
+        | 'MODULE_API_CHANGED'
 }
 
 export function classifyUpdateCompatibility(
     input: UpdateCompatibilityInput
 ): UpdateCompatibilityDecision {
+    const currentModules =
+        input.currentModuleContracts === undefined
+            ? undefined
+            : normalizeModuleContracts(input.currentModuleContracts)
+    const targetModules =
+        input.targetModuleContracts === undefined
+            ? undefined
+            : normalizeModuleContracts(input.targetModuleContracts)
     if (
         !Number.isInteger(input.currentAppApiVersion) ||
         !Number.isInteger(input.targetAppApiVersion) ||
@@ -36,10 +53,7 @@ export function classifyUpdateCompatibility(
     )
         throw new Error('Invalid update compatibility versions')
 
-    if (
-        input.targetDatabaseSchemaVersion <
-        input.currentDatabaseSchemaVersion
-    )
+    if (input.targetDatabaseSchemaVersion < input.currentDatabaseSchemaVersion)
         return {
             kind: 'UNSUPPORTED',
             reason: 'SCHEMA_DOWNGRADE'
@@ -56,6 +70,13 @@ export function classifyUpdateCompatibility(
             kind: 'FULL_APPLICATION',
             reason: 'APP_API_CHANGED'
         }
+
+    if (
+        currentModules &&
+        targetModules &&
+        !sameModuleContracts(currentModules, targetModules)
+    )
+        return { kind: 'FULL_APPLICATION', reason: 'MODULE_API_CHANGED' }
 
     if (
         input.targetDatabaseSchemaVersion >

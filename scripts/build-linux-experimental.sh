@@ -107,6 +107,7 @@ cp "$ROOT/scripts/linux-runtime-preflight.sh" "$STAGE/runtime/linux-preflight.sh
 chmod 0755 "$STAGE/runtime/linux-preflight.sh"
 
 cp "$ROOT"/dist/*.js "$STAGE/app/"
+cp "$ROOT/src/modules/runtime-contracts.json" "$STAGE/app/module-contracts.json"
 cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$STAGE/licenses/THIRD_PARTY_LICENSES.txt"
 cp -R "$ROOT/web" "$STAGE/web"
 

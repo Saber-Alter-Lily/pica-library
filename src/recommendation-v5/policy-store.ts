@@ -1,5 +1,5 @@
 import type { LibraryDatabase } from '../library/database'
-import { normalizeTagPolicyV1, previewTagPolicyMergeV1, tagPoliciesEqualV1 } from './tag-policy'
+import { normalizeTagPolicyV1, previewTagPolicyMergeV1, tagPoliciesEqualV1 } from '../tags/policy'
 import {
     RECOMMENDATION_V5_POLICY_STATE_KEY,
     RECOMMENDATION_V5_POLICY_VERSION,

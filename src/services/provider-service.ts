@@ -123,7 +123,11 @@ export class ProviderService {
     }
 
     providerStatus() {
-        return this.capabilities.providers
+        return this.registry.capabilities()
+    }
+
+    sourceModuleStatus() {
+        return this.registry.manifests()
     }
 
     setEhSession(session?: EhSession | null) {
@@ -438,12 +442,7 @@ export class ProviderService {
     }
 
     async fetchPage(locator: string, maxBytes = 20 * 1024 * 1024) {
-        if (locator.startsWith('jm-page:')) return this.jmProvider.fetchPage(locator, maxBytes)
-        if (/^[a-z][a-z0-9-]*:/i.test(locator) && !/^(https?:|eh-page:)/i.test(locator))
-            throw new Error('Unrecognized page source')
-        return locator.startsWith('eh-page:')
-            ? this.ehProvider.fetchPage(locator, maxBytes)
-            : this.picaProvider.fetchPage(locator, maxBytes)
+        return this.registry.forPage(locator).fetchPage(locator, maxBytes)
     }
 
     async fetchCover(comicId: string, locator: string, maxBytes = 20 * 1024 * 1024) {

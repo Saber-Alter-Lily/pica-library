@@ -30,7 +30,10 @@ import { PersonalizationService } from '../services/personalization-service'
 import { GitHubAccountAuthService } from '../services/github-account-auth'
 import { DesktopEhWebLogin, type EhCapturedSession } from './eh-web-login'
 import {
-    buildConfig,
+    buildSettingsConfig,
+    hasStoredCredentials,
+    buildLocalConfig,
+    mergePicaSetupCredentials,
     connectionProxy,
     credentialedProxy,
     loadConfig,
@@ -738,7 +741,7 @@ async function startEngine(preferredPort: number) {
             ehWebLogin
                 ? await ehWebLogin.cancel()
                 : { state: 'cancelled', message: '网页登录已取消' },
-        configured: () => Boolean(config && credentials),
+        configured: () => Boolean(config),
         status: () => ({
             startupReady,
             runtime: runtimeOptions,
@@ -791,6 +794,7 @@ async function startEngine(preferredPort: number) {
                     credentials?.ehMemberId && credentials?.ehPassHash
                 )
             },
+            picaAccount: { configured: Boolean(credentials?.account?.trim() && credentials?.password) },
             personalization: {
                 ...personalization.status(),
                 themePacks: personalization.listThemePacks()
@@ -998,7 +1002,20 @@ async function startEngine(preferredPort: number) {
                     personalization: personalization.installEntitlement(text)
                 }
             }
-            const wasConfigured = Boolean(config && credentials)
+            const wasConfigured = Boolean(config)
+            if (input.setupMode !== undefined && input.setupMode !== 'local')
+                throw new Error('Unsupported setup mode')
+            if (input.setupMode === 'local') {
+                const next = buildLocalConfig({ libraryDirectory: String(input.libraryDirectory ?? config?.libraryDirectory ?? paths.data), profile: String(input.profile ?? config?.profile ?? 'balanced') as SetupInput['profile'] }, config)
+                const dataChanged = config?.libraryDirectory !== next.libraryDirectory
+                if (service) assertLibraryChangeAllowed(service, config?.libraryDirectory, next.libraryDirectory)
+                saveConfig(paths.config, next)
+                config = next
+                // Do not read/write/delete credentials, verify providers or generate recommendations.
+                if (!wasConfigured) desktop.csrfToken = randomBytes(32).toString('base64url')
+                if (dataChanged) void restartEngine()
+                return { success: true, restarting: dataChanged, localOnly: true }
+            }
             const previousCredentials = credentials
             const setup: SetupInput = {
                 account: String(input.account ?? previousCredentials?.account ?? ''),
@@ -1007,7 +1024,7 @@ async function startEngine(preferredPort: number) {
                 profile: String(input.profile ?? config?.profile ?? 'balanced') as SetupInput['profile'],
                 proxyUrl: input.proxyUrl === undefined ? config?.proxyUrl : String(input.proxyUrl)
             }
-            const built = buildConfig(setup)
+            const built = buildSettingsConfig(setup, config)
             const dataChanged = config?.libraryDirectory !== built.config.libraryDirectory
             if (service)
                 assertLibraryChangeAllowed(
@@ -1015,27 +1032,15 @@ async function startEngine(preferredPort: number) {
                     config?.libraryDirectory,
                     built.config.libraryDirectory
                 )
-            if (
-                built.config.proxyUrl === config?.proxyUrl &&
-                !built.credentials.proxyUsername &&
-                !built.credentials.proxyPassword
-            ) {
-                built.credentials.proxyUsername = previousCredentials?.proxyUsername
-                built.credentials.proxyPassword = previousCredentials?.proxyPassword
-            }
-            built.credentials.remoteStorageUsername = previousCredentials?.remoteStorageUsername
-            built.credentials.remoteStoragePassword = previousCredentials?.remoteStoragePassword
-            built.credentials.ehMemberId = previousCredentials?.ehMemberId
-            built.credentials.ehPassHash = previousCredentials?.ehPassHash
-            built.credentials.ehIgneous = previousCredentials?.ehIgneous
-            built.credentials.ehCfClearance = previousCredentials?.ehCfClearance
+            built.credentials = mergePicaSetupCredentials(built.credentials, previousCredentials, built.config.proxyUrl === config?.proxyUrl)
             const picaCredentialsChanged =
                 previousCredentials?.account !== built.credentials.account ||
                 previousCredentials?.password !== built.credentials.password
-            credentialsStore.save(built.credentials)
+            const nextCredentials = previousCredentials || hasStoredCredentials(built.credentials) ? built.credentials : null
+            if (nextCredentials) credentialsStore.save(nextCredentials)
             saveConfig(paths.config, built.config)
             config = built.config
-            credentials = built.credentials
+            credentials = nextCredentials
             applyCredentials(credentials, config)
             if (picaCredentialsChanged) service?.resetPicaSession()
             if (!wasConfigured)
@@ -1423,7 +1428,7 @@ async function main() {
     }
     applyCredentials(credentials, config)
     await startEngine(config?.preferredPort ?? 4789)
-    browser(config && credentials ? currentUrl : `${currentUrl}/setup`)
+    browser(config ? currentUrl : `${currentUrl}/setup`)
     process.on('SIGINT', () => { void stop() })
     process.on('SIGTERM', () => { void stop() })
     process.on('uncaughtException', (error) => {

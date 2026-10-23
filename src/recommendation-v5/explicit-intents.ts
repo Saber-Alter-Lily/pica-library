@@ -1,5 +1,5 @@
 import type { RecommendationIntentV3 } from '../recommendation-v3/intent-planner-v3'
-import { tagControlParticipatesV1 } from './tag-policy'
+import { tagControlParticipatesV1 } from '../tags/policy'
 import type {
     PortablePolicyStateV5,
     PreferenceControlV5,

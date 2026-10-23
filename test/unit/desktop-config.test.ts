@@ -4,6 +4,10 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
     buildConfig,
+    buildLocalConfig,
+    buildSettingsConfig,
+    hasStoredCredentials,
+    mergePicaSetupCredentials,
     connectionProxy,
     credentialedProxy,
     loadConfig,
@@ -23,6 +27,36 @@ afterEach(() =>
 )
 
 describe('desktop configuration security', () => {
+    it('lets existing local libraries change storage and public proxy without synthesizing credentials or weakening Pica login validation', () => {
+        const current = buildLocalConfig({ libraryDirectory: path.resolve('synthetic-library'), profile: 'balanced' })
+        const input = { account: '', password: '', libraryDirectory: current.libraryDirectory, profile: 'fast' as const }
+        const local = buildSettingsConfig(input, current)
+        expect(local.config.profile).toBe('fast')
+        expect(hasStoredCredentials(local.credentials)).toBe(false)
+        expect(hasStoredCredentials(buildSettingsConfig({ ...input, proxyUrl: 'http://127.0.0.1:7890' }, current).credentials)).toBe(false)
+        expect(hasStoredCredentials(buildSettingsConfig({ ...input, proxyUrl: 'http://synthetic-user:synthetic-secret@127.0.0.1:7890' }, current).credentials)).toBe(true)
+        expect(() => buildSettingsConfig({ ...input, account: 'partial-account' }, current)).toThrow(/password/)
+        expect(() => buildSettingsConfig(input, null)).toThrow(/Pica account/)
+    })
+    it('sets up a local library without any source credentials and preserves existing unrelated configuration', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-local-library-')); directories.push(directory)
+        const file = path.join(directory, 'config.json')
+        const config = buildLocalConfig({ libraryDirectory: path.join(directory, 'library'), profile: 'balanced' })
+        saveConfig(file, config)
+        expect(loadConfig(file)).toEqual(config)
+        expect(fs.readdirSync(directory)).toEqual(['config.json'])
+        expect(config).not.toHaveProperty('account')
+        const existing = { ...config, openBrowser: false, preferredPort: 4811, proxyUrl: 'http://127.0.0.1:7890' }
+        expect(buildLocalConfig({ libraryDirectory: config.libraryDirectory, profile: 'fast' }, existing)).toEqual({ ...existing, profile: 'fast' })
+        expect(() => buildLocalConfig({ libraryDirectory: 'relative', profile: 'balanced' })).toThrow(/absolute/)
+        expect(() => buildConfig({ account: '', password: '', libraryDirectory: config.libraryDirectory, profile: 'balanced' })).toThrow(/Pica account/)
+    })
+    it('preserves JM, EH, all WebDAV target credentials and proxy identity when only the Pica account changes', () => {
+        const previous = { account: 'old', password: 'old-secret', ehMemberId: 'fixture-id', ehPassHash: 'fixture-hash', jmUsername: 'fixture-jm', jmPassword: 'fixture-jm-secret', remoteStorageCredentials: { one: { username: 'fixture-one', password: 'fixture-secret' }, two: { password: 'fixture-two' } }, proxyUsername: 'proxy-user', proxyPassword: 'proxy-secret' }
+        expect(mergePicaSetupCredentials({ account: 'new', password: 'new-secret' }, previous, true)).toEqual({ ...previous, account: 'new', password: 'new-secret' })
+        expect(previous.account).toBe('old')
+        expect(mergePicaSetupCredentials({ account: 'new', password: 'new-secret', proxyUsername: undefined, proxyPassword: undefined }, previous, false).proxyPassword).toBeUndefined()
+    })
     it.runIf(process.platform === 'win32')(
         'round-trips credentials through Windows DPAPI',
         () => {

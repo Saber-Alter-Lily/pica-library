@@ -2,10 +2,12 @@ param(
     [Parameter(Mandatory = $true)][string]$Zip,
     [switch]$PortCollision,
     [switch]$SetupPersistence,
+    [switch]$LocalOnlySetup,
     [string]$ExpectedVersion = '',
     [string]$DesktopHomeName = 'Pica Library'
 )
 $ErrorActionPreference = 'Stop'
+if ($LocalOnlySetup -and $SetupPersistence) { throw 'Choose one isolated setup mode per artifact smoke' }
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $expectedVersion = if ([string]::IsNullOrWhiteSpace($ExpectedVersion)) {
     [string]((Get-Content -Raw -LiteralPath (Join-Path $repositoryRoot 'package.json') | ConvertFrom-Json).version)
@@ -143,6 +145,41 @@ try {
     }
 
     $initialCsrfToken = $status.csrfToken
+    $moduleContractGate = 'LEGACY_NOT_DECLARED'
+    $capabilities = Invoke-RestMethod -Uri ($instance.url + '/api/v1/capabilities') -TimeoutSec 10
+    if ($capabilities.moduleContracts) {
+        $moduleFile = Join-Path $rootPath 'app\module-contracts.json'
+        if (-not (Test-Path -LiteralPath $moduleFile)) { throw 'Packaged module contracts are missing' }
+        $moduleFileContent = Get-Content -Raw -LiteralPath $moduleFile | ConvertFrom-Json
+        $moduleKeys = @($moduleFileContent.apis.PSObject.Properties.Name | Sort-Object)
+        $capabilityKeys = @($capabilities.moduleContracts.apis.PSObject.Properties.Name | Sort-Object)
+        if ($moduleFileContent.formatVersion -ne 1 -or $capabilities.moduleContracts.formatVersion -ne 1 -or (Compare-Object $moduleKeys $capabilityKeys)) { throw 'Packaged module contract format/key mismatch' }
+        foreach ($key in $moduleKeys) { if ($moduleFileContent.apis.$key -ne $capabilities.moduleContracts.apis.$key) { throw 'Packaged module API differs from the actual running engine' } }
+        $moduleContractGate = 'PASS'
+    }
+    $localOnlyGate = 'NOT_RUN'
+    if ($LocalOnlySetup) {
+        $initialCsrfToken = $status.csrfToken
+        $localPayload = @{ setupMode='local'; libraryDirectory=[string]$status.libraryDirectory; profile='fast' } | ConvertTo-Json
+        $saved = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/desktop/settings') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body $localPayload -TimeoutSec 15
+        if (-not $saved.localOnly) { throw 'Local-only setup did not use its explicit non-credential path' }
+        $deadline = (Get-Date).AddSeconds(20)
+        do {
+            Start-Sleep -Milliseconds 200
+            try {
+                $instance = Get-Content -Raw -LiteralPath $instanceFile | ConvertFrom-Json
+                $status = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/status') -TimeoutSec 2
+            } catch { $status = $null }
+        } while ((-not $status -or -not $status.configured -or -not $status.startupReady) -and (Get-Date) -lt $deadline)
+        if (-not $status.configured -or $status.picaAccount.configured -or $status.csrfToken -eq $initialCsrfToken) { throw 'Local-only configuration/account/CSRF state is incorrect' }
+        $ordinarySettings = @{ libraryDirectory=[string]$status.libraryDirectory; profile='fast'; proxyUrl='' } | ConvertTo-Json
+        $settingsResult = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/desktop/settings') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body $ordinarySettings -TimeoutSec 15
+        if (-not $settingsResult.success) { throw 'Ordinary local library settings still require a source account' }
+        if (Test-Path -LiteralPath (Join-Path $desktopHome 'config\credentials.dat')) { throw 'Local-only setup unexpectedly persisted source credentials' }
+        $localCatalog = Invoke-RestMethod -Uri ($instance.url + '/api/v1/comics?limit=1') -TimeoutSec 10
+        if ($null -ne $localCatalog -and @($localCatalog).Count -ne 0) { throw 'Fresh local-only install unexpectedly contains comic records' }
+        $localOnlyGate = 'PASS'
+    }
     $credentialEncrypted = $null
     if ($SetupPersistence) {
         $library = [string]$status.libraryDirectory
@@ -178,20 +215,21 @@ try {
     $probe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,$port)
     try { $probe.Start() } finally { $probe.Stop() }
     $relaunch = 'NOT_RUN'
-    if ($SetupPersistence) {
+    if ($SetupPersistence -or $LocalOnlySetup) {
         Start-Process -FilePath $launcher -ArgumentList '--no-open' -WorkingDirectory $rootPath -WindowStyle Hidden
         $deadline = (Get-Date).AddSeconds(20); $second = $null
         do { Start-Sleep -Milliseconds 150; if(Test-Path $instanceFile){try{$second=Get-Content -Raw $instanceFile|ConvertFrom-Json}catch{}} } while(-not $second -and (Get-Date)-lt $deadline)
         if(-not $second){throw 'Configured packaged app did not relaunch'}
         $secondStatus=Invoke-RestMethod -Uri ($second.url+'/api/v1/desktop/status') -TimeoutSec 10
-        if(-not $secondStatus.configured -or $secondStatus.profile -ne 'fast' -or -not $secondStatus.proxyEnabled){throw 'Configured state was not recovered'}
+        if(-not $secondStatus.configured -or $secondStatus.profile -ne 'fast' -or ($SetupPersistence -and -not $secondStatus.proxyEnabled)){throw 'Configured state was not recovered'}
+        if($LocalOnlySetup -and ($secondStatus.picaAccount.configured -or (Test-Path -LiteralPath (Join-Path $desktopHome 'config\credentials.dat')))){throw 'Local-only relaunch required or persisted source credentials'}
         Invoke-RestMethod -Method Post -Uri ($second.url+'/api/v1/desktop/shutdown') -Headers @{'x-pica-csrf'=$secondStatus.csrfToken;Origin=$second.url} -ContentType 'application/json' -Body '{}'|Out-Null
         $secondExit=(Get-Date).AddSeconds(15)
         do { Start-Sleep -Milliseconds 150 } while ((Get-Process -Id $second.pid -ErrorAction SilentlyContinue) -and (Get-Date)-lt $secondExit)
         if (Get-Process -Id $second.pid -ErrorAction SilentlyContinue) { throw 'Relaunched packaged process did not stop' }
         $relaunch='PASS'
     }
-    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; desktop_home_name=$DesktopHomeName; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
+    [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; desktop_home_name=$DesktopHomeName; module_contracts=$moduleContractGate; local_only_setup=$localOnlyGate; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
     $smokePassed = $true
 } finally {
     if ($listener) { $listener.Stop() }

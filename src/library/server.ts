@@ -385,7 +385,8 @@ export async function startLibraryServer(options: {
                         process.arch,
                         desktopStatus
                     ),
-                    providers: providerService.providerStatus()
+                    providers: providerService.providerStatus(),
+                    sourceModules: providerService.sourceModuleStatus()
                 })
             }
             if (

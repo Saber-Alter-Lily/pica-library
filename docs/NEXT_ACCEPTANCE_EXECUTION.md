@@ -1,5 +1,15 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 continuation: modular local-first reader foundation
+
+The product authority is now recorded in [MODULAR_LOCAL_READER_ARCHITECTURE.md](MODULAR_LOCAL_READER_ARCHITECTURE.md): a local reader/library, no included comic bodies, optional external sources and independently maintainable functional modules with one application update action. This is the NEXT-45 candidate, not a claim that every module or source ecosystem is finished.
+
+Implemented source slice: pure standalone tag domain with an old-path compatibility barrel; compiled source routing manifests and capability inspection; public module API declarations bound into incremental packages; incompatible APIs use the existing full-application path; source-free local setup/relaunch and no automatic online generation; preservation of unrelated source credentials when Pica settings change. New module and local-first behavior tests complement the existing update/rollback gates. Actual source-bound results must be recorded after the final build.
+
+Previous NEXT-44 is frozen at `9ff972e50446b40445c9c54e24350f8ce9ef312b`, with its independently verified handoff retained unchanged. It passed automated/package gates but still has real-AI/provider/device holds. Tags/private mappings and AI file exchange are implemented in that previous slice; the older "first UX slice" descriptions below are historical, not the current feature inventory.
+
+The complete objective remains open: arbitrary local-format ingestion, source enable/disable/trust lifecycle, further recommendation/native domain separation and physical gestures/upgrade acceptance. Main, stable OTA and installed data are outside this candidate. No manual test is forced now and no old hold/issue is silently closed.
+
 ## 2026-10-22 continuation: daily UX and two separate guides
 
 Current local slice: `codex/ux-tags-dual-onboarding-20261022`, based on frozen `e3c0ff365153555511f396321be6cdb63c981384`. The user authorized isolated writes despite the DPAPI claim failure, then separately authorized pushing this new branch, a Draft PR and fixed-signature unpublished builds. No main merge, stable release/OTA, private-key download or deployment.

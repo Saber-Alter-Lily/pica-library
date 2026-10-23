@@ -3183,7 +3183,7 @@ Post-build evidence for NEXT-40: frozen source `43d9c2bc5a789994973703fe84408e88
 
 ## NEXT-44 — AI-assisted tag-profile export / preview / apply / undo
 
-**Status: IMPLEMENTED_IN_ISOLATED_CANDIDATE / EXACT_HEAD_AUTOMATED_AND_PACKAGE_GATES_PENDING / HUMAN_AI_PROVIDER_QA_PENDING. Unreleased, undeployed.**
+**Status: PREVIOUS_SLICE_AUTOMATED_AND_PACKAGE_GATES_PASS / HUMAN_AI_PROVIDER_QA_PENDING. Frozen source 9ff972e50446; unreleased, undeployed.**
 
 - User authorized the first AI-assisted file-exchange slice and explicitly allowed isolated development/build despite the continuing DPAPI coordination failure. No memory identity or secret was repaired. Continue the existing Draft #206, not main.
 - Desktop/Web exports a bounded ZIP with instructions, exact source-ID vocabulary, privacy-filtered current scheme, editable JSON result template and SHA manifest. Counts and local titles/work IDs/manual bindings default off. Preferences and private names remain sensitive; no automatic AI upload or account/history/image/embedding export.
@@ -3192,3 +3192,31 @@ Post-build evidence for NEXT-40: frozen source `43d9c2bc5a789994973703fe84408e88
 - First version is a same-installation AI round trip (four retained exports / 30 days; process-local previews / 30 minutes), not archival backup, community-profile installation or cross-installation migration.
 - Android receives the confirmed scheme using unchanged existing tag sync. No Android file parser/picker is introduced; zh/en/ja guides explicitly explain the Desktop path. Candidate-only fixed-signature Dev versionCode 60; private keys remain in Actions.
 - Added synthetic domain and actual loopback/CSRF HTTP tests, browser export/preview/cancel/confirm/undo/XSS/size/draft regressions and privacy instructions. Exact final source/run/installable digests and remaining manual gates belong in the new handoff; prior `f3fe4b95fb02` artifacts remain frozen and are not relabeled.
+
+Post-build NEXT-44 evidence: `9ff972e50446b40445c9c54e24350f8ce9ef312b`, trusted run `39909777945` 3/3 SUCCESS, PR rollup 37 SUCCESS + 4 conditional SKIPPED. Local Windows 1291 PASS + 1 POSIX-only SKIP; Linux 1289 PASS + 3 Windows-only SKIP; the matrix covers all 1292 assertions. Real Edge 39/39, Android JUnit 207/207 and fixed-signature Dev code 60 PASS. Downloaded Windows ZIP verified privacy/preview/apply/replay and restart-persistent undo with synthetic hidden bindings. Handoff `PICA_AI_TAG_PROFILE_EXCHANGE_ACCEPTANCE_20261022_9ff972e50446.zip`, SHA-256 `a950d22b0a925500e867ad8ca9149b5c835be8e47cdcbf8b4d455c43021f1ae8`. Real AI/provider/device acceptance is still pending; no source/metadata write to formal data or deployment.
+
+## NEXT-45 — Modular local-first reader foundation and one-click module compatibility
+
+**Status: IMPLEMENTED_IN_ISOLATED_CANDIDATE / EXACT_HEAD_GATES_RECORDED_SEPARATELY / HUMAN_QA_PENDING. Unreleased, undeployed.**
+
+- User established the long-term product objective: a local reader/library without included comic bodies, optional external sources, maintainable modules (tags, gestures, recommendation and others), maintained open-source reuse and a single update action. Full requirements and remaining work are authoritative in [MODULAR_LOCAL_READER_ARCHITECTURE.md](docs/MODULAR_LOCAL_READER_ARCHITECTURE.md); this first foundation does not redefine the complete objective as done.
+- Explicit isolated development/build/Draft continuation permission despite the DPAPI-blocked claim. No identity/secret change, official data, main merge, tag/Release, stable OTA or installation/deployment.
+- Extracted `src/tags/policy.ts` as a pure domain independent of storage, sources and recommendation. Existing schema/IDs/matching behavior stay unchanged; the V5 path is a compatibility re-export. Consumers use the neutral path. Installed TypeScript compiler AST checks enforce this first boundary and pure source-routing metadata; no new architecture framework/parser was built.
+- `ProviderRegistry` owns compiled source aliases, namespaces and page schemes from versioned adapter descriptors; inspection is I/O-free, duplicate/incompatible registrations are atomic failures and unknown IDs/pages cannot fall through to an unrelated account. This is not a downloadable extension loader or completed arbitrary-provider/storage support.
+- Added bounded public module API metadata to capabilities and all Desktop package builders. Incremental builders/staging bind metadata to the actual target; malformed/false/undeclared/removal cases reject. API mismatches require the existing one-click full-application route. Existing global API/schema, official SHA verification, backup/health/rollback, legacy updater and protected-data boundaries remain intact; the updater helper itself is unchanged.
+- Audit found that "configured" still depended on Pica credentials, although E-H access could bypass the setup page. Added explicit zh-CN/en/ja local-only setup, credential-backend-free config save, source-free relaunch and no automatic online recommendation cycle. Active-download library-folder guard is retained. Editing Pica now preserves JM/EH/all WebDAV-target credentials, not just a partial hand-maintained list.
+- Ordinary storage/profile/public-proxy settings after local setup no longer require Pica credentials either. Partial Pica logins still fail validation; authenticated proxies use the existing secure backend. Empty local settings do not create a synthetic credential file. The real artifact gate exercises both initial local setup and subsequent ordinary settings before restart.
+- Three-language real Edge local-only setup tests PASS with empty account/password and no source login/search/sync/recommendation-generation request. Added synthetic module contract/routing/payload tests and an actual Windows local-only save/relaunch/no-credential artifact gate. Candidate-only fixed-signature Dev versionCode 61; signing keys stay in Actions.
+- The first complete local suite correctly caught a real CLI startup regression: an extensionless `modules/contracts` import resolved same-basename JSON instead of TypeScript in the existing TSX CLI runtime. Renamed the JSON to `runtime-contracts.json`; retained the CLI tests unchanged and verified their actual child-process startup. A new full suite is required, not a waived failure. Added a frozen legacy contract floor so future target declarations cannot redefine old-package compatibility.
+- Maintained primary references: Suwayomi source host/client boundary, Mihon content-free reader position, Komga separate config/content, already-pinned MIT JM SDK, installed TypeScript compiler API. No competitor/reference-APK code/assets or new arbitrary loader is imported.
+- Existing arbitrary archive import declaration remains false. Physical gestures, real providers, AI-returned files, native parity and published upgrade acceptance remain open. Exact source/run/hash evidence belongs in the post-build handoff, not an old green CI.
+
+## NEXT-46 — Continue toward the complete modular reader objective
+
+**Status: REQUIRED / NOT IMPLEMENTED BY NEXT-45.**
+
+- Source-independent local identity and safe folder/CBZ ingestion, page/chapter inventory, progress retention, missing-media handling; do not advertise CBR/PDF until implemented and verified.
+- Source enable/disable/remove and trust/update lifecycle, optional source-runtime packaging, stable arbitrary-source namespaces and native parity; review maintained extension hosts before adopting one.
+- Recommendation retrieval/policy/ranking/generation/delivery ports; native pure tag and gesture domains separated from persistence/UI; cross-client golden/event-level tests and physical gesture evidence.
+- Re-run the exact prior accepted Windows/Dev upgrade and rollback matrix as each module changes. Keep independent data roots and fixed Android signing continuity; no automatic uninstall/data migration or stable OTA operation.
+- Consolidated real-device/provider/AI UX acceptance after integration. Keep #199/#200/#204 and all earlier P2/W5/NEXT evidence holds open until their actual criteria are met.

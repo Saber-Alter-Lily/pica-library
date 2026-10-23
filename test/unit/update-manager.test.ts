@@ -12,6 +12,7 @@ import {
 } from '../../src/app-capabilities'
 import type { UpdateManifest } from '../../src/update/types'
 import type { UpdateTarget } from '../../src/update/target'
+import { MODULE_CONTRACT_PATH, runtimeModuleContracts } from '../../src/modules/contracts'
 
 const tempDirs: string[] = []
 const sourceSha = '1'.repeat(40)
@@ -118,6 +119,32 @@ afterEach(() => {
     vi.restoreAllMocks()
     for (const directory of tempDirs.splice(0))
         fs.rmSync(directory, { recursive: true, force: true })
+})
+
+describe('UpdateManager module payload boundary', () => {
+    it('stages an adopted or unchanged module contract while retaining legacy update support', async () => {
+        for (const includeFile of [true, false]) {
+            const payload = { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, ...(includeFile ? { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) } : {}) }
+            const update = packageBuffer({ moduleContracts: runtimeModuleContracts() }, payload)
+            await expect(manager().stage('module-update.zip', update.buffer)).resolves.toMatchObject({ requiresFullInstall: false })
+        }
+    })
+    it('rejects a module API change as incremental, but clearly identifies a full-upgrade handoff', async () => {
+        const target = runtimeModuleContracts(); target.apis.tags++
+        const payload = { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(target) }
+        await expect(manager().stage('bad-incremental.zip', packageBuffer({ moduleContracts: target }, payload).buffer)).rejects.toThrow(/full application install/)
+        const updater = manager()
+        const staged = await updater.stage('full-required.zip', packageBuffer({ moduleContracts: target, requiresFullInstall: true }, payload).buffer)
+        expect(staged.requiresFullInstall).toBe(true)
+        expect(() => updater.apply(staged.id)).toThrow(/full application upgrade path/)
+    })
+    it('rejects false, undeclared or removed module metadata rather than presenting a mixed application as updated', async () => {
+        const mismatch = runtimeModuleContracts(); mismatch.apis.reader++
+        await expect(manager().stage('mismatch.zip', packageBuffer({ moduleContracts: runtimeModuleContracts() }, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(mismatch) }).buffer)).rejects.toThrow(/do not match/)
+        await expect(manager().stage('undeclared.zip', packageBuffer({}, { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) }).buffer)).rejects.toThrow(/not declared/)
+        await expect(manager().stage('removed.zip', packageBuffer({ deletions: [MODULE_CONTRACT_PATH] }).buffer)).rejects.toThrow(/cannot be removed/)
+        await expect(manager().stage('invalid.zip', packageBuffer({ moduleContracts: { formatVersion: 2, apis: {} } as never }).buffer)).rejects.toThrow(/format/)
+    })
 })
 
 describe('UpdateManager', () => {

@@ -177,7 +177,7 @@ import {
     type ChronicleViewOptions
 } from '../recommendation-v3/taste-chronicle-view'
 import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
-import { buildTagDirectoryV1, normalizeTagPolicyV1, privateTagForSignalV1, projectComicTagSignalsV1, tagPoliciesEqualV1, rawTagParticipatesV1, comicTagProviderV1, providerRawTagFactsV1 } from '../recommendation-v5/tag-policy'
+import { buildTagDirectoryV1, normalizeTagPolicyV1, privateTagForSignalV1, projectComicTagSignalsV1, tagPoliciesEqualV1, rawTagParticipatesV1, comicTagProviderV1, providerRawTagFactsV1 } from '../tags/policy'
 import { inferredPrivateTagIntentsV1, restrictTagIntentsV1 } from '../recommendation-v5/tag-intents'
 import {
     WORK_IDENTITY_V3_RESOLVER_VERSION,

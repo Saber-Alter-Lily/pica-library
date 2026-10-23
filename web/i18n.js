@@ -27,6 +27,9 @@ export const translations = {
         'setup.subtitle':
             'Complete this basic setup once. After that, just double-click the app to open your library.',
         'setup.account': 'Pica account',
+        'setup.localHelp': 'No comics are included. Choose the local library folder below to start without a source account; external sources can be connected later.',
+        'setup.localStart': 'Set up local library only',
+        'setup.localSaved': 'Local library saved. Opening without a source login…',
         'setup.password': 'Pica password',
         'setup.folder': 'Library folder',
         'setup.chooseFolder': 'Choose Folder',
@@ -858,6 +861,9 @@ export const translations = {
         'setup.subtitle':
             '完成一次基础配置后，以后只需双击程序即可进入漫画库。',
         'setup.account': 'Pica 账号',
+        'setup.localHelp': '本软件不附带漫画内容。先选择下方本地书库目录，即可不登录任何漫画源开始使用；外部来源稍后再接入。',
+        'setup.localStart': '只配置本地书库',
+        'setup.localSaved': '本地书库已保存，正在进入；不登录漫画源。',
         'setup.password': 'Pica 密码',
         'setup.folder': '漫画保存目录',
         'setup.chooseFolder': '选择文件夹',
@@ -1742,6 +1748,8 @@ export const domTranslations = [
     ['#setup .setup-heading h2', 'setup.title'],
     ['#setup .setup-heading p', 'setup.subtitle'],
     ['#setup-account', 'setup.account', 'data-label'],
+    ['#setup-local-help', 'setup.localHelp'],
+    ['#setup-local', 'setup.localStart'],
     ['#setup-password', 'setup.password', 'data-label'],
     ['#setup-directory', 'setup.folder', 'data-label'],
     ['#setup-folder', 'setup.chooseFolder'],

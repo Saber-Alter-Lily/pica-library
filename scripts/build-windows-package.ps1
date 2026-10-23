@@ -63,6 +63,7 @@ if (Test-Path -LiteralPath (Join-Path $jmRuntime 'PICA_JM_RUNTIME.json')) {
 } elseif ($env:PICA_REQUIRE_JM_RUNTIME -eq '1') { throw 'The acceptance candidate requires the bundled JM runtime' }
 
 Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $stage 'app')
+Copy-Item -LiteralPath (Join-Path $root 'src\modules\runtime-contracts.json') -Destination (Join-Path $stage 'app\module-contracts.json')
 Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $stage 'licenses\THIRD_PARTY_LICENSES.txt')
 Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse
 $registrySource = Join-Path $root 'src\data\registry-v3-final'

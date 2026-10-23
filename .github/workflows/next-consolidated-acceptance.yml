@@ -89,6 +89,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -PortCollision -SetupPersistence
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -LocalOnlySetup
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
@@ -147,7 +149,7 @@ jobs:
           test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
           test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
           export PICA_ANDROID_VERSION_NAME="0.5.0-postrc.${GITHUB_SHA:0:12}"
-          export PICA_ANDROID_VERSION_CODE=60
+          export PICA_ANDROID_VERSION_CODE=61
           umask 077
           signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-next-signing-XXXXXXXX")
           export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
@@ -161,7 +163,7 @@ jobs:
           test "$cert" = "$EXPECTED_CERT"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/next-package.txt"
           grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/next-package.txt"
-          grep -q "versionCode='60'" "$RUNNER_TEMP/next-package.txt"
+          grep -q "versionCode='61'" "$RUNNER_TEMP/next-package.txt"
           grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/next-package.txt"
           mkdir -p candidate-next
           cp "$apk" candidate-next/Pica-Library-Next-Acceptance-Android-Dev.apk

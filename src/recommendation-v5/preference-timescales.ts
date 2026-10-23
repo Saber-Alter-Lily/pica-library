@@ -1,5 +1,5 @@
 import type { StoredComic } from '../library/types'
-import { projectComicTagSignalsV1, tagControlParticipatesV1 } from './tag-policy'
+import { projectComicTagSignalsV1, tagControlParticipatesV1 } from '../tags/policy'
 import type { UserEvent } from '../recommendation-v3/types'
 import {
     buildBehaviorEvidenceLedgerV5,

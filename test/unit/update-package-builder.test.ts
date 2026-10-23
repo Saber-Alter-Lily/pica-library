@@ -4,6 +4,7 @@ import path from 'node:path'
 import AdmZip from 'adm-zip'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildLocalUpdatePackage } from '../../scripts/build-local-update-package'
+import { MODULE_CONTRACT_PATH, runtimeModuleContracts } from '../../src/modules/contracts'
 
 const directories: string[] = []
 
@@ -31,6 +32,26 @@ afterEach(() => {
 })
 
 describe('local incremental update package builder', () => {
+    it('adopts module metadata from the real target and binds it into the incremental manifest', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-module-adoption-')); directories.push(directory)
+        const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'old')
+        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'new', { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) })
+        const result = buildLocalUpdatePackage(source, target, path.join(directory, 'update.zip'))
+        expect(result.manifest.moduleContracts).toEqual(runtimeModuleContracts())
+        expect(result.manifest.files.map(file => file.path)).toContain(MODULE_CONTRACT_PATH)
+        expect(result.manifest.requiresFullInstall).toBe(false)
+    })
+    it('refuses a module API mismatch or contract removal and directs it to the full one-click path', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-module-break-')); directories.push(directory)
+        const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'old', { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) })
+        const incompatible = runtimeModuleContracts(); incompatible.apis.sources++
+        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'new', { [MODULE_CONTRACT_PATH]: JSON.stringify(incompatible) })
+        expect(() => buildLocalUpdatePackage(source, target, path.join(directory, 'update.zip'))).toThrow(/one-click full/)
+        const legacy = fullPackage(directory, 'Pica-Library-v0.5.0-dev.legacy-update-base-windows-x64.zip', '1'.repeat(40), 'old')
+        expect(() => buildLocalUpdatePackage(legacy, target, path.join(directory, 'legacy-incompatible.zip'))).toThrow(/one-click full/)
+        const missing = fullPackage(directory, 'Pica-Library-v0.5.0-dev.2-local-test-windows-x64.zip', '3'.repeat(40), 'new')
+        expect(() => buildLocalUpdatePackage(source, missing, path.join(directory, 'removed.zip'))).toThrow(/full application/)
+    })
     it('includes only changed allowlisted application files and no runtime', () => {
         const directory = fs.mkdtempSync(
             path.join(os.tmpdir(), 'pica-update-build-')

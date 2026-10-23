@@ -8,7 +8,7 @@ import {
     tagParticipatesV1,
     type TagDirectoryRowV1,
     type TagPolicyV1
-} from './tag-policy'
+} from '../tags/policy'
 
 const EXPORT_KEY = 'recommendation_tag_profile_exports_v1'
 const UNDO_KEY = 'recommendation_tag_profile_undo_v1'

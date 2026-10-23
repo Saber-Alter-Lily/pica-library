@@ -1,6 +1,6 @@
 import type { StoredComic } from '../library/types'
 import type { RecommendationIntentV3 } from '../recommendation-v3/intent-planner-v3'
-import { comicTagProviderV1, effectiveTagPolicyV1, normalizeTagPolicyKey, privateTagMatchesV1, privateTagSignalV1, providerRawTagFactsV1, semanticTagValueV1, rawTagParticipatesV1, tagIdentityV1, tagParticipatesV1, type TagPolicyCarrierV1 } from './tag-policy'
+import { comicTagProviderV1, effectiveTagPolicyV1, normalizeTagPolicyKey, privateTagMatchesV1, privateTagSignalV1, providerRawTagFactsV1, semanticTagValueV1, rawTagParticipatesV1, tagIdentityV1, tagParticipatesV1, type TagPolicyCarrierV1 } from '../tags/policy'
 
 /** Expand a private concept to its original provider terms. Never search an alias/opaque ID. */
 export function expandPrivateTagIntentV1(intent: RecommendationIntentV3, state: TagPolicyCarrierV1, catalog: StoredComic[] = []) {

@@ -6,7 +6,7 @@ import type {
     PreferenceTargetType
 } from './portable-policy'
 import { normalizePreferenceKey } from './portable-policy'
-import { privateTagForSignalV1, privateTagMatchesV1, providerTagSignalParticipatesV1, tagControlParticipatesV1 } from './tag-policy'
+import { privateTagForSignalV1, privateTagMatchesV1, providerTagSignalParticipatesV1, tagControlParticipatesV1 } from '../tags/policy'
 
 export const CANDIDATE_CHANNEL_PLANNER_VERSION =
     'candidate-channel-planner-v2-provider-isolated'

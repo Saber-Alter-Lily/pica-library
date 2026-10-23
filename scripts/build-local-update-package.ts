@@ -12,6 +12,7 @@ import {
     updaterSelfReplacement
 } from '../src/update/path-safety'
 import { classifyUpdateCompatibility } from '../src/update/compatibility'
+import { MODULE_CONTRACT_PATH, parseModuleContracts, legacyModuleContracts } from '../src/modules/contracts'
 import { releasedUpdateBaseline } from '../src/update/released-baselines'
 import type { UpdateManifest } from '../src/update/types'
 import {
@@ -117,6 +118,15 @@ export function buildLocalUpdatePackage(
     const targetVersion = target.version
     const sourceEntries = files(new AdmZip(sourceZipFile))
     const targetEntries = files(new AdmZip(targetZipFile))
+    const sourceModules = sourceEntries.get(MODULE_CONTRACT_PATH)
+    const targetModules = targetEntries.get(MODULE_CONTRACT_PATH)
+    if (sourceModules && !targetModules)
+        throw new Error('Removing runtime module contracts requires a full application upgrade')
+    const sourceModuleContracts = sourceModules ? parseModuleContracts(sourceModules.toString('utf8')) : legacyModuleContracts()
+    const targetModuleContracts = targetModules ? parseModuleContracts(targetModules.toString('utf8')) : undefined
+    const moduleCompatibility = classifyUpdateCompatibility({ currentAppApiVersion: APP_API_VERSION, targetAppApiVersion: APP_API_VERSION, currentDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION, targetDatabaseSchemaVersion: DATABASE_SCHEMA_VERSION, currentModuleContracts: sourceModuleContracts, targetModuleContracts: targetModuleContracts })
+    if (moduleCompatibility.kind !== 'INCREMENTAL')
+        throw new Error('Runtime module API changed; use the one-click full application upgrade path')
     const changed = incrementalChanges(sourceEntries, targetEntries)
     const deleted = [...sourceEntries.keys()].filter(
         (name) =>
@@ -185,6 +195,7 @@ export function buildLocalUpdatePackage(
         appApiVersion: APP_API_VERSION,
         databaseSchemaVersion: DATABASE_SCHEMA_VERSION,
         requiresFullInstall: false,
+        ...(targetModuleContracts ? { moduleContracts: targetModuleContracts } : {}),
         files: changed.map(([name, value]) => ({
             path: normalizeUpdatePath(name),
             sha256: sha256(value),

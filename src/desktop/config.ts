@@ -32,11 +32,52 @@ export function safeProxy(input?: string): {
 export function validateSetup(input: SetupInput) {
     if (!input.account.trim()) throw new Error('Enter your Pica account')
     if (!input.password) throw new Error('Enter your Pica password')
+    validateLocalLibrarySetup(input)
+    safeProxy(input.proxyUrl)
+}
+
+function validateLocalLibrarySetup(
+    input: Pick<SetupInput, 'libraryDirectory' | 'profile'>
+) {
     if (!path.isAbsolute(input.libraryDirectory))
         throw new Error('Choose an absolute library folder')
     if (!profiles.has(input.profile))
         throw new Error('Choose a supported download profile')
-    safeProxy(input.proxyUrl)
+}
+
+/** Local reading never requires a provider login or a secure credential backend. */
+export function buildLocalConfig(
+    input: Pick<SetupInput, 'libraryDirectory' | 'profile'>,
+    current?: DesktopConfig | null
+): DesktopConfig {
+    validateLocalLibrarySetup(input)
+    return {
+        schemaVersion: 1,
+        openBrowser: true,
+        preferredPort: 4789,
+        ...current,
+        libraryDirectory: path.resolve(input.libraryDirectory),
+        profile: input.profile
+    }
+}
+
+/** Editing one adapter must not erase another adapter's secure session. */
+export function mergePicaSetupCredentials(
+    next: StoredCredentials,
+    previous: StoredCredentials | null,
+    sameProxy: boolean
+): StoredCredentials {
+    const merged = {
+        ...previous,
+        ...next,
+        proxyUsername: next.proxyUsername,
+        proxyPassword: next.proxyPassword
+    }
+    if (sameProxy && !next.proxyUsername && !next.proxyPassword) {
+        merged.proxyUsername = previous?.proxyUsername
+        merged.proxyPassword = previous?.proxyPassword
+    }
+    return merged
 }
 
 export function buildConfig(input: SetupInput): {
@@ -61,6 +102,37 @@ export function buildConfig(input: SetupInput): {
             proxyPassword: proxy.password
         }
     }
+}
+
+/** Existing local libraries can edit storage/proxy settings without creating a Pica account. */
+export function buildSettingsConfig(
+    input: SetupInput,
+    current: DesktopConfig | null
+) {
+    if (input.account || input.password || !current) return buildConfig(input)
+    const proxy = safeProxy(input.proxyUrl)
+    return {
+        config: {
+            ...buildLocalConfig(input, current),
+            proxyUrl: proxy.publicUrl
+        },
+        credentials: {
+            account: '',
+            password: '',
+            proxyUsername: proxy.username,
+            proxyPassword: proxy.password
+        } as StoredCredentials
+    }
+}
+
+export function hasStoredCredentials(value: StoredCredentials) {
+    return Object.values(value).some((item) =>
+        typeof item === 'string'
+            ? Boolean(item)
+            : Boolean(
+                  item && typeof item === 'object' && Object.keys(item).length
+              )
+    )
 }
 
 export function loadConfig(file: string): DesktopConfig | null {

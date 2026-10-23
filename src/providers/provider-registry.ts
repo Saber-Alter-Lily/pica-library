@@ -1,17 +1,47 @@
 import type { ComicProvider, OnlineSource, ProviderId } from './types'
+import {
+    normalizeSourceModuleManifest,
+    sourceModuleManifest,
+    type SourceModuleManifest
+} from './module-manifests'
 
 /** Routing authority. Legacy unprefixed Pica IDs are preserved; unknown namespaces fail closed. */
 export class ProviderRegistry {
     private readonly providers = new Map<ProviderId, ComicProvider>()
+    private readonly modules = new Map<ProviderId, SourceModuleManifest>()
+    private readonly namespaces = new Map<string, ProviderId>()
+    private readonly aliases = new Map<string, ProviderId>()
+    private readonly pageSchemes = new Map<string, ProviderId>()
+    private legacyProvider?: ProviderId
 
     constructor(providers: ComicProvider[] = []) {
         for (const provider of providers) this.register(provider)
     }
 
-    register(provider: ComicProvider) {
+    register(
+        provider: ComicProvider,
+        manifest = sourceModuleManifest(provider.id)
+    ) {
         if (this.providers.has(provider.id))
             throw new Error(`Provider already registered: ${provider.id}`)
+        const module = normalizeSourceModuleManifest(manifest, provider.id)
+        if (
+            (module.comicNamespace &&
+                this.namespaces.has(module.comicNamespace)) ||
+            module.sourceAliases.some((alias) => this.aliases.has(alias)) ||
+            module.pageSchemes.some((scheme) => this.pageSchemes.has(scheme)) ||
+            (module.legacyUnprefixedIds && this.legacyProvider)
+        )
+            throw new Error('Source module route already registered')
         this.providers.set(provider.id, provider)
+        this.modules.set(provider.id, module)
+        if (module.comicNamespace)
+            this.namespaces.set(module.comicNamespace, provider.id)
+        for (const alias of module.sourceAliases)
+            this.aliases.set(alias, provider.id)
+        for (const scheme of module.pageSchemes)
+            this.pageSchemes.set(scheme, provider.id)
+        if (module.legacyUnprefixedIds) this.legacyProvider = provider.id
     }
 
     get(id: ProviderId): ComicProvider {
@@ -21,18 +51,40 @@ export class ProviderRegistry {
     }
 
     forSource(source: OnlineSource): ComicProvider {
-        return this.get(source === 'exh' ? 'eh' : source)
+        const id = this.aliases.get(source)
+        if (!id) throw new Error('Source is not available')
+        return this.get(id)
     }
 
     forComic(comicId: string): ComicProvider {
         if (typeof comicId !== 'string' || !comicId.trim())
             throw new Error('Comic identity is empty')
         const colon = comicId.indexOf(':')
-        if (colon < 0) return this.get('pica')
-        const id = comicId.slice(0, colon)
-        if (id !== 'eh' && id !== 'jm')
+        if (colon < 0) {
+            if (this.legacyProvider) return this.get(this.legacyProvider)
+            throw new Error('Unrecognized comic source')
+        }
+        const id = this.namespaces.get(comicId.slice(0, colon))
+        if (!id || colon === comicId.length - 1)
             throw new Error('Unrecognized comic source')
         return this.get(id)
+    }
+
+    forPage(locator: string): ComicProvider {
+        if (typeof locator !== 'string')
+            throw new Error('Unrecognized page source')
+        const scheme = /^([a-z][a-z0-9-]*):/i.exec(locator)?.[1]
+        const id = scheme
+            ? this.pageSchemes.get(scheme.toLowerCase())
+            : undefined
+        if (!id) throw new Error('Unrecognized page source')
+        return this.get(id)
+    }
+
+    manifests(): SourceModuleManifest[] {
+        return [...this.modules.values()].map((module) =>
+            normalizeSourceModuleManifest(module, module.id)
+        )
     }
 
     capabilities() {

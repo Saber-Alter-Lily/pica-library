@@ -1,5 +1,6 @@
 import { PRODUCT_VERSION } from './version'
 import { latestMigrationVersion } from './storage/sqlite/migrations'
+import { runtimeModuleContracts, type RuntimeModuleContracts } from './modules/contracts'
 
 export const APP_API_VERSION = 2
 export const DATABASE_SCHEMA_VERSION = latestMigrationVersion
@@ -31,6 +32,7 @@ export interface AppCapabilities {
     bundleFormatVersion: number
     updateManifestVersion: number
     readerApiVersion: number
+    moduleContracts: RuntimeModuleContracts
     features: {
         providerFavoriteMutation: boolean
         browserLite: boolean
@@ -286,6 +288,7 @@ export function appCapabilities(
         bundleFormatVersion: BUNDLE_FORMAT_VERSION,
         updateManifestVersion: UPDATE_MANIFEST_VERSION,
         readerApiVersion: READER_API_VERSION,
+        moduleContracts: runtimeModuleContracts(),
         features: {
             providerFavoriteMutation,
             browserLite: true,

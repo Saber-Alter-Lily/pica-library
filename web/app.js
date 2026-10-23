@@ -1220,6 +1220,17 @@ $('#setup-open-eh').onclick = () => {
 const downloadedCloud = createDownloadedCloud({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
 $('#setup-test').onclick = () => testDesktop('setup')
 $('#settings-test').onclick = () => testDesktop('settings')
+$('#setup-local').onclick = async () => {
+    const message = $('#setup-message')
+    await withBusyButton($('#setup-local'), async () => {
+        try {
+            await desktopPost('/api/v1/desktop/settings', { setupMode: 'local', libraryDirectory: $('#setup-directory').value, profile: $('#setup-profile').value })
+            message.textContent = t('setup.localSaved')
+            await waitForDesktopHealth()
+            location.assign('/')
+        } catch (error) { message.textContent = localizeError(language, error) }
+    })
+}
 $('#setup-form').onsubmit = async (event) => {
     event.preventDefault()
     const button =
@@ -5252,7 +5263,8 @@ async function detect() {
         let recommendation = await api(
             '/api/v1/recommendation-sessions/status?mode=final'
         )
-        if (!recommendation.activeCycleId && !recommendation.buildingCycleId) {
+        const autoOnlineRecommendation = !desktop || desktop.picaAccount?.configured !== false || desktop.ehAccount?.configured === true
+        if (!recommendation.activeCycleId && !recommendation.buildingCycleId && autoOnlineRecommendation) {
             recommendation = await post('/api/v1/recommendation-sessions', {
                 engine: 'v3',
                 action: 'resume_or_create',

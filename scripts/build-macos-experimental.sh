@@ -95,6 +95,7 @@ then
 fi
 
 cp "$ROOT"/dist/*.js "$RESOURCES/app/"
+cp "$ROOT/src/modules/runtime-contracts.json" "$RESOURCES/app/module-contracts.json"
 cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$RESOURCES/licenses/THIRD_PARTY_LICENSES.txt"
 cp -R "$ROOT/web" "$RESOURCES/web"
 

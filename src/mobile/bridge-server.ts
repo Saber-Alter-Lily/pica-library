@@ -21,7 +21,7 @@ import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { ShelfService } from '../services/shelf-service'
 import { PersonalizationService } from '../services/personalization-service'
-import { providerRawTagFactsV1, comicTagProviderV1 } from '../recommendation-v5/tag-policy'
+import { providerRawTagFactsV1, comicTagProviderV1 } from '../tags/policy'
 
 interface PersistedDevice {
     tokenHash: string

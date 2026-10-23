@@ -1,5 +1,5 @@
 import type { StoredComic } from '../library/types'
-import { projectComicTagSignalsV1 } from './tag-policy'
+import { projectComicTagSignalsV1 } from '../tags/policy'
 import type { ShadowRetrievedCandidateV5 } from './shadow-retrieval'
 import {
     projectShadowCandidateV5

@@ -1,5 +1,5 @@
 import type { StoredComic } from '../library/types'
-import { defaultTagPolicyV1, privateTagForSignalV1, privateTagMatchesV1, projectComicTagSignalsV1, providerRawTagFactsV1, tagControlParticipatesV1, type TagPolicyV1, type TagPolicyCarrierV1 } from './tag-policy'
+import { defaultTagPolicyV1, privateTagForSignalV1, privateTagMatchesV1, projectComicTagSignalsV1, providerRawTagFactsV1, tagControlParticipatesV1, type TagPolicyV1, type TagPolicyCarrierV1 } from '../tags/policy'
 
 export const RECOMMENDATION_V5_POLICY_VERSION = '5.0.0-portable-policy-beta'
 export const RECOMMENDATION_V5_POLICY_STATE_KEY = 'recommendation.v5.portablePolicy.v1'

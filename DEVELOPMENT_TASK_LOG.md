@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+## NEXT-50 — phone-local native source lifecycle (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / LOCAL_REGRESSION_PASS / EXACT_SOURCE_CI_AND_PACKAGE_EVIDENCE_IN_HANDOFF / REAL_DEVICE_QA_PENDING.** The full modular-reader objective remains open.
+
+- Continues immutable NEXT-49 `81f8b5665c6ba456a64b6660049727182d3ff4d1`; its complete handoff SHA256 is `9385440668d86fdb96e682eaeded5fba9fc54e56b61c8fbfe0be01f9f3f0246f`. Previous archives/evidence remain unchanged.
+- Adds phone-local Pica/E-H/JM choices with explicit draft/save, stale-revision protection, retained rotation draft and Chinese/English/Japanese UI. New installations start source-free; existing installs adopt legacy availability once, without decoding credentials. Desktop pairing does not overwrite phone choices.
+- Pure Java source authorization is separate from Android storage/UI. Existing direct and Desktop-relay provider transports, workers, metadata/favorite imports and image caches receive cancellation/late-result guards. JM uses the existing pinned SDK with non-blocking request-monitor revocation. Local/LAN/WebDAV reads and stored data remain independent.
+- Synthetic tests cover source policy, real AtomicFile persistence/restart, locales, task cancellation/data retention, stale results and already-cached/local Reader pages. Windows SDK35 AtomicFile persistence cases are explicitly skipped only on that host and must execute on Linux CI; SDK28 counterparts pass locally. Final counts and exact-source CI/installable evidence are in the separate handoff.
+- Existing task registries are preserved even when a historical identity is malformed; re-enabling does not automatically resume paused downloads/bootstrap. Dev code65 retains the existing package/certificate; current Windows artifacts and upgrade/rollback gates must cover the shared JVM change.
+- [Implementation, migration and remaining device limitations](docs/NATIVE_SOURCE_LIFECYCLE.md). Native WebView/SAF/OEM behavior, real provider accounts, gesture acceptance and the remaining architecture work are not certified by synthetic tests.
+- Existing authorization covers isolated edits, this Draft PR and unpublished CI builds. No main merge, tag/Release, stable OTA change, production data/credentials, private-key download or deployment; the previously authorized DPAPI coordination exception remains in effect.
+
 ## NEXT-49 — persisted Desktop source lifecycle (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / LOCAL_AUTOMATION_PASS / EXACT_SOURCE_PACKAGE_GATES_IN_HANDOFF / NATIVE_LIFECYCLE_AND_DEVICE_QA_PENDING.** Not completion of the full modular-reader objective.

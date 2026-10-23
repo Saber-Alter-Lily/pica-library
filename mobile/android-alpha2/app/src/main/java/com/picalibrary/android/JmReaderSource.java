@@ -13,6 +13,7 @@ final class JmReaderSource implements ReaderSource {
     private final Map<String,BridgeClient.ChapterItem> knownChapters=new HashMap<>();
     JmReaderSource(Context context){this.context=context.getApplicationContext();client=JmClientManager.get(this.context);}
     public String kind(){return "jm";}
+    public com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return client.access;}
     public String scope(){return ReaderPolicy.hash("jm\n"+JmAccountStore.scope(context));}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
         JSONArray rows=client.episodes(comicId);List<BridgeClient.ChapterItem> out=new ArrayList<>();
@@ -26,11 +27,11 @@ final class JmReaderSource implements ReaderSource {
     public String recentChapter(String comicId){return "";}
     public HttpURLConnection image(String locator) throws Exception {
         final byte[] bytes=client.image(locator);
-        return new HttpURLConnection(new URL("https://jm-source.invalid/reader")){
+        return SourceHttpConnection.guard(new HttpURLConnection(new URL("https://jm-source.invalid/reader")){
             public void disconnect(){}public boolean usingProxy(){return false;}public void connect(){}
             public InputStream getInputStream(){return new ByteArrayInputStream(bytes);}
             public int getResponseCode(){return 200;}public String getContentType(){return org.picalibrary.sources.JmSource.imageContentType(bytes);}public int getContentLength(){return bytes.length;}
-        };
+        },client.access);
     }
     public void saveProgress(String comicId,String episodeId,int pageIndex){}
 }

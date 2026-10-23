@@ -6,9 +6,20 @@ import io.github.jukomu.jmcomic.api.client.JmClient;
 import io.github.jukomu.jmcomic.api.model.*;
 import java.lang.reflect.Proxy;
 import java.util.*;
+import java.util.concurrent.*;
 import org.junit.Test;
 
 public class JmSourceTest {
+    @Test public void revokeClosesTheSdkWithoutWaitingForAnInFlightSynchronizedRequest() throws Exception {
+        CountDownLatch started=new CountDownLatch(1),closed=new CountDownLatch(1);
+        JmClient fake=(JmClient)Proxy.newProxyInstance(JmClient.class.getClassLoader(),new Class[]{JmClient.class,AutoCloseable.class},(proxy,method,args)->{
+            if(method.getName().equals("getAlbum")){started.countDown();if(!closed.await(3,TimeUnit.SECONDS))throw new AssertionError("revoke waited on request lock");throw new CancellationException();}
+            if(method.getName().equals("close")){closed.countDown();return null;}
+            throw new UnsupportedOperationException(method.getName());
+        });
+        JmSource source=new JmSource(fake);ExecutorService pool=Executors.newFixedThreadPool(2);
+        try{Future<?> request=pool.submit(()->{try{source.details("jm:123");fail();}catch(CancellationException expected){}catch(Exception error){throw new AssertionError(error);}});assertTrue(started.await(1,TimeUnit.SECONDS));pool.submit(source::revoke).get(1,TimeUnit.SECONDS);request.get(1,TimeUnit.SECONDS);assertThrows(CancellationException.class,()->source.details("jm:123"));}finally{closed.countDown();pool.shutdownNow();source.close();}
+    }
     private JmClient client(boolean validIdentity){
         Gson json=new Gson();
         return (JmClient)Proxy.newProxyInstance(JmClient.class.getClassLoader(),new Class[]{JmClient.class},(proxy,method,args)->{

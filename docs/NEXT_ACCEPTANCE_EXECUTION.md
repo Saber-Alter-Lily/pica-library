@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-50: native source lifecycle (unpublished)
+
+Continues frozen NEXT-49 `81f8b5665c6ba456a64b6660049727182d3ff4d1`, complete handoff SHA256 `9385440668d86fdb96e682eaeded5fba9fc54e56b61c8fbfe0be01f9f3f0246f`. Phone-local explicit source choices now gate direct/relayed provider requests, native workers and late metadata/image-cache commits. Existing data and ordinary local/LAN/WebDAV access remain independent. New installs start source-free; legacy adoption is one-time and does not decrypt secrets. [Native contract and device holds](NATIVE_SOURCE_LIFECYCLE.md).
+
+Local synthetic Android regression: 240 passed, 13 Windows-only SDK35 AtomicFile skips, zero failures/errors; those SDK35 cases must run on Linux CI. Shared JVM regression has five tests, including active-request revocation. Candidate Dev code65 must retain code64's package/signature; physical installation remains pending. Exact new source, CI/installable hashes and Windows upgrade/rollback evidence are recorded in this slice's separate immutable handoff. No main merge, Release/OTA change, installation or production-profile access.
+
 ## 2026-10-23 NEXT-49: Desktop source lifecycle (unpublished)
 
 Continues frozen NEXT-48 `963af71c96e55578722f0806e37393b5bfa40c13` and its unchanged complete handoff SHA256 `ec732724f7435eecc8a012008d290f8a9c34252671fffa8f70536a3c28eb0f86`. Adds persisted local source choices, atomic/CAS save, transport-level cancellation and late-result fences while local Reader/LAN stays independent. Legacy upgrades preserve existing adapter behavior; fresh local setup starts all external sources off. Native Android receives the Desktop relay availability contract, not a forced copy of Desktop choices. [Full scope and pending native lifecycle](SOURCE_LIFECYCLE.md). New exact-source gates belong to the new handoff; do not reuse the previous build's green checks.

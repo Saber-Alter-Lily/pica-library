@@ -40,7 +40,7 @@ final class CoverRepository {
 
     static Bitmap cacheNow(Context context,UnifiedCatalogStore.Entry entry){
         if(entry==null||entry.id==null||entry.id.isEmpty())return null;String cacheKey=key(entry);Bitmap hit=memory(cacheKey);if(hit!=null)return hit;hit=diskHit(context,cacheKey);if(hit!=null)return hit;
-        Bitmap bitmap=null;
+        Bitmap bitmap=null;com.picalibrary.android.sources.SourceAccessPolicy.Permit sourcePermit=null;
         if(entry.desktopCoverPath!=null&&!entry.desktopCoverPath.isEmpty()&&BridgeStore.paired(context)){
             try{bitmap=BridgeClient.bitmap(context,entry.desktopCoverPath);}catch(Exception ignored){}
         }
@@ -48,18 +48,18 @@ final class CoverRepository {
             HttpURLConnection c=null;try{c=new RemoteLibraryClient(context).open(entry.remoteCoverPath,"image/*");bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
         if(bitmap==null&&entry.ehCoverUrl!=null&&!entry.ehCoverUrl.isEmpty()){
-            HttpURLConnection c=null;try{c=new EhClient(context).thumbnail(entry.ehCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
+            HttpURLConnection c=null;try{EhClient client=new EhClient(context);sourcePermit=client.access;c=client.thumbnail(entry.ehCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
         if(bitmap==null&&entry.picaCoverUrl!=null&&!entry.picaCoverUrl.isEmpty()){
-            HttpURLConnection c=null;try{c=new PicaClient(context).media(entry.picaCoverUrl);bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
+            HttpURLConnection c=null;try{if(entry.id.startsWith("jm:")){sourcePermit=SourceAccess.bind(context,"jm");c=SourceMedia.thumbnail(entry.picaCoverUrl,sourcePermit);}else{PicaClient client=new PicaClient(context);sourcePermit=client.access;c=client.media(entry.picaCoverUrl);}bitmap=decode(c,32L*1024*1024);}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}
         }
         if(bitmap==null&&EhClient.isEhId(entry.id)){
-            try{EhClient client=new EhClient(context);EhClient.Comic comic=client.comic(entry.id);UnifiedCatalogStore.Entry refreshed=UnifiedEhCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.thumbnail(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}catch(Exception ignored){}
+            try{EhClient client=new EhClient(context);sourcePermit=client.access;EhClient.Comic comic=client.comic(entry.id);UnifiedCatalogStore.Entry refreshed=UnifiedEhCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.thumbnail(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}catch(Exception ignored){}
         }
         if(bitmap==null&&!entry.id.contains(":")&&PicaClient.available(context)){
-            try{PicaClient client=new PicaClient(context);PicaClient.Comic comic=client.comic(entry.id);if(comic!=null&&!comic.id.isEmpty()){UnifiedCatalogStore.Entry refreshed=UnifiedPicaCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.media(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}}catch(Exception ignored){}
+            try{PicaClient client=new PicaClient(context);sourcePermit=client.access;PicaClient.Comic comic=client.comic(entry.id);if(comic!=null&&!comic.id.isEmpty()){UnifiedCatalogStore.Entry refreshed=UnifiedPicaCatalogSync.merge(context,comic);if(!comic.coverUrl.isEmpty()){HttpURLConnection c=null;try{c=client.media(comic.coverUrl);bitmap=decode(c,32L*1024*1024);}finally{if(c!=null)c.disconnect();}}if(refreshed!=null)cacheKey=key(refreshed);}}catch(Exception ignored){}
         }
-        if(bitmap!=null){remember(cacheKey,bitmap);save(context,cacheKey,bitmap);}return bitmap;
+        if(bitmap!=null){final String readyKey=cacheKey;final Bitmap ready=bitmap;try{SourceAccess.commit(sourcePermit,()->{remember(readyKey,ready);save(context,readyKey,ready);return null;});}catch(com.picalibrary.android.sources.SourceAccessPolicy.Disabled stopped){return null;}}return bitmap;
     }
 
     static boolean prefetchDesktop(Context context,String comicId,String path){

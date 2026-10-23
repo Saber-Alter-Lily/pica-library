@@ -74,7 +74,7 @@ public class JmSourceActivityTest {
         public void merge(JSONArray rows){merges++;}
         public void cancel(){cancels++;}
     }
-    @Before public void setup(){fixture=new FakeClient();executor=new ManualExecutor();RuntimeEnvironment.setQualifiers("en");LocaleStore.set(RuntimeEnvironment.getApplication(),LocaleStore.EN);open(null);}
+    @Before public void setup() throws Exception {SourceAccess.resetForTests();SourceAccess access=SourceAccess.get(RuntimeEnvironment.getApplication());access.policy.save(access.snapshot().revision,Collections.singleton("jm"),snapshot->{});fixture=new FakeClient();executor=new ManualExecutor();RuntimeEnvironment.setQualifiers("en");LocaleStore.set(RuntimeEnvironment.getApplication(),LocaleStore.EN);open(null);}
     private void open(Bundle saved){controller=Robolectric.buildActivity(TestActivity.class).create(saved).start().resume().visible();activity=controller.get();}
     private void ready(){executor.runNext();}
     private View view(String tag){View result=activity.getWindow().getDecorView().findViewWithTag(tag);assertNotNull("Missing view "+tag,result);return result;}

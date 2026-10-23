@@ -47,7 +47,7 @@ final class PicaFavoriteQuickSync {
         int pagesFetched=1;
 
         if(!periodic&&!priorIds.isEmpty()&&first.total==priorIds.size()&&prefixMatches(first.comics,priorIds,0)){
-            persist(app,prior,priorIds,first.comics);
+            client.access.commit(()->{persist(app,prior,priorIds,first.comics);return null;});
             if(progress!=null)progress.update("Pica 收藏无变化 · 已检查最新页",1,1);
             return new Result(observed,new ArrayList<>(priorIds),false,pagesFetched,first.total);
         }
@@ -66,7 +66,7 @@ final class PicaFavoriteQuickSync {
                 for(int i=0;i<delta;i++)nextIds.add(quick.get(i).id);
                 nextIds.addAll(priorIds);
                 if(nextIds.size()==first.total){
-                    persist(app,prior,nextIds,quick);
+                    client.access.commit(()->{persist(app,prior,nextIds,quick);return null;});
                     if(progress!=null)progress.update("Pica 收藏已增量更新 · 新增 "+delta+" 本",1,1);
                     return new Result(observed,nextIds,false,pagesFetched,first.total);
                 }
@@ -81,8 +81,7 @@ final class PicaFavoriteQuickSync {
             if(progress!=null)progress.update("正在完整读取 Pica 收藏 · 第 "+page+" / "+first.pages+" 页",page,first.pages);
         }
         List<String> ids=new ArrayList<>();for(PicaClient.Comic comic:full)if(comic!=null&&!comic.id.isEmpty())ids.add(comic.id);
-        persist(app,prior,ids,full);
-        prefs.edit().putLong(KEY_LAST_FULL,System.currentTimeMillis()).apply();
+        client.access.commit(()->{persist(app,prior,ids,full);prefs.edit().putLong(KEY_LAST_FULL,System.currentTimeMillis()).apply();return null;});
         if(progress!=null)progress.update("Pica 收藏完整校验完成 · "+ids.size()+" 本",1,1);
         return new Result(full,ids,true,pagesFetched,ids.size());
     }

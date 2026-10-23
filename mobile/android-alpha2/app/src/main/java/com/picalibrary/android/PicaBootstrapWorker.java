@@ -23,15 +23,15 @@ public final class PicaBootstrapWorker extends Worker {
 
     @NonNull @Override public Result doWork(){
         try{
-            Context app=getApplicationContext();if(isStopped()||!PicaAccountStore.load(app).configured())return Result.failure();
+            Context app=getApplicationContext();SourceAccess.require(app,"pica");if(isStopped()||!PicaAccountStore.load(app).configured())return Result.failure();
             setForegroundAsync(foreground("正在导入 Pica 收藏元数据",0,0));
             setProgressAsync(new Data.Builder().putString(KEY_PHASE,"正在导入 Pica 收藏元数据").build());
             PicaClient client=new PicaClient(app);List<PicaClient.Comic> favorites=client.favoritesAll((page,pages,fetched,total)->{if(isStopped())throw new InterruptedException("Pica 收藏同步已停止");String phase="正在读取 Pica 收藏 · 第 "+page+" / "+pages+" 页";setProgressAsync(new Data.Builder().putString(KEY_PHASE,phase).putInt(KEY_DONE,fetched).putInt(KEY_TOTAL,total).build());setForegroundAsync(foreground(phase,fetched,total));});
             if(isStopped()||!PicaAccountStore.load(app).configured())return Result.failure(new Data.Builder().putString(KEY_PHASE,PicaBootstrapJobs.paused(app)?"Pica 收藏同步已暂停":"Pica 收藏同步已取消").build());
-            UnifiedPicaCatalogSync.mergeAll(app,favorites);EhFavoriteStore.migrateLegacyEhLocals(app);List<BridgeClient.ComicItem> items=new ArrayList<>();for(PicaClient.Comic comic:favorites)items.add(new BridgeClient.ComicItem(comic.id,comic.title,comic.author,"",0));FavoriteCacheStore.save(app,items,false);UnifiedCatalogStore.reconcileLocalReferences(app);NativeRecommendationStore.invalidateIfFavoriteFingerprintChanged(app,favoriteFingerprint(favorites));
-            PicaBootstrapJobs.complete(app);
+            client.access.commit(()->{UnifiedPicaCatalogSync.mergeAll(app,favorites);EhFavoriteStore.migrateLegacyEhLocals(app);List<BridgeClient.ComicItem> items=new ArrayList<>();for(PicaClient.Comic comic:favorites)items.add(new BridgeClient.ComicItem(comic.id,comic.title,comic.author,"",0));FavoriteCacheStore.save(app,items,false);UnifiedCatalogStore.reconcileLocalReferences(app);NativeRecommendationStore.invalidateIfFavoriteFingerprintChanged(app,favoriteFingerprint(favorites));
+            PicaBootstrapJobs.complete(app);return null;});
             return Result.success(new Data.Builder().putString(KEY_PHASE,"Pica 收藏元数据已导入").putInt(KEY_DONE,favorites.size()).putInt(KEY_TOTAL,favorites.size()).build());
-        }catch(Exception e){if(isStopped()||!PicaAccountStore.load(getApplicationContext()).configured())return Result.failure(new Data.Builder().putString(KEY_PHASE,PicaBootstrapJobs.paused(getApplicationContext())?"Pica 收藏同步已暂停":"Pica 收藏同步已取消").build());if(getRunAttemptCount()<2)return Result.retry();return Result.failure(new Data.Builder().putString(KEY_PHASE,e.getMessage()==null?"Pica 收藏导入失败":e.getMessage()).build());}
+        }catch(Exception e){if(e instanceof com.picalibrary.android.sources.SourceAccessPolicy.Disabled||!SourceAccess.enabled(getApplicationContext(),"pica"))return Result.failure(new Data.Builder().putString(KEY_PHASE,getApplicationContext().getString(R.string.source_disabled)).build());if(isStopped()||!PicaAccountStore.load(getApplicationContext()).configured())return Result.failure(new Data.Builder().putString(KEY_PHASE,PicaBootstrapJobs.paused(getApplicationContext())?"Pica 收藏同步已暂停":"Pica 收藏同步已取消").build());if(getRunAttemptCount()<2)return Result.retry();return Result.failure(new Data.Builder().putString(KEY_PHASE,e.getMessage()==null?"Pica 收藏导入失败":e.getMessage()).build());}
     }
 
     private ForegroundInfo foreground(String text,int done,int total){

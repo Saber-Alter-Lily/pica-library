@@ -919,7 +919,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain('relay: true')
         expect(server).not.toContain('pica_password')
         expect(client).toContain(
-            'private boolean useDesktopRelay(){return !localConfigured()&&desktopRelayConfigured();}'
+            'private boolean useDesktopRelay(){access.check();return !localConfigured()&&desktopRelayConfigured();}'
         )
         expect(client).toContain(
             'static boolean available(Context context)'

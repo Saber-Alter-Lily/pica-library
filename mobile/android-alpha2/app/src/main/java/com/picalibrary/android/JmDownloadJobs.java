@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
 final class JmDownloadJobs {
     private JmDownloadJobs() {}
     static String name(String comicId) { JmDownloadStore.remote(comicId, "jm:"); return "jm-download-" + ReaderPolicy.hash(comicId); }
-    private static void enqueue(Context context, String comicId, String episodeId, ExistingWorkPolicy policy) {
+    private static void enqueue(Context context, String comicId, String episodeId, ExistingWorkPolicy policy) {SourceAccess.require(context,"jm");
         JmDownloadStore.remote(comicId, "jm:");
         String chapter = episodeId == null ? "" : episodeId;
         if (!chapter.isEmpty()) JmDownloadStore.remote(chapter, "jm-chapter:");
@@ -25,7 +25,7 @@ final class JmDownloadJobs {
         WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(name(comicId), policy, request);
         // TaskCenter reconstructs the ACTUAL persisted work ID from tags. KEEP may discard this request.
     }
-    static void enqueue(Context context, String comicId, String episodeId) {
+    static void enqueue(Context context, String comicId, String episodeId) {SourceAccess.require(context,"jm");
         MobileTaskPauseStore.setPaused(context, "download", name(comicId), false);
         enqueue(context, comicId, episodeId, ExistingWorkPolicy.KEEP);
     }
@@ -33,7 +33,7 @@ final class JmDownloadJobs {
         MobileTaskPauseStore.setPaused(context, "download", name(comicId), true);
         WorkManager.getInstance(context).cancelUniqueWork(name(comicId));
     }
-    static void resume(Context context, String comicId, String episodeId) {
+    static void resume(Context context, String comicId, String episodeId) {SourceAccess.require(context,"jm");
         MobileTaskPauseStore.setPaused(context, "download", name(comicId), false);
         enqueue(context, comicId, episodeId, ExistingWorkPolicy.REPLACE);
     }

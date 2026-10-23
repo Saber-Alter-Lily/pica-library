@@ -48,16 +48,23 @@ final class BridgeClient {
     private static HttpURLConnection open(String host, String path, String token, String method) throws Exception {
         URL url = new URL(host.replaceAll("/$", "") + path);HttpURLConnection con = (HttpURLConnection) url.openConnection();con.setConnectTimeout(2500);con.setReadTimeout(12000);con.setRequestMethod(method);con.setRequestProperty("Accept", "application/json");con.setUseCaches(false);if (token != null && !token.isEmpty()) con.setRequestProperty("Authorization", "Bearer " + token);return con;
     }
+    private static HttpURLConnection open(Context context,String path,String method) throws Exception {
+        String source=SourceAccess.relaySource(path);
+        com.picalibrary.android.sources.SourceAccessPolicy.Permit permit=source.isEmpty()?null:SourceAccess.bind(context,source);
+        if(permit!=null)permit.check();
+        HttpURLConnection connection=open(BridgeStore.host(context),path,BridgeStore.token(context),method);
+        return permit==null?connection:SourceHttpConnection.guard(connection,permit);
+    }
     private static String read(HttpURLConnection con) throws Exception {
         try {int status=con.getResponseCode();InputStream stream=status>=400?con.getErrorStream():con.getInputStream();if(stream==null) throw new IllegalStateException("HTTP " + status);BufferedReader r=new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));StringBuilder b=new StringBuilder(); String line;while((line=r.readLine())!=null)b.append(line);if(status>=400) throw new IllegalStateException("HTTP " + status + ": " + b);return b.toString();} catch (SocketTimeoutException e) {throw new IllegalStateException("Desktop 响应超时");} finally {con.disconnect();}
     }
-    static String get(Context c, String path) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty()) throw new IllegalStateException("尚未配对 Desktop");return read(open(host,path,BridgeStore.token(c),"GET"));}
+    static String get(Context c, String path) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty()) throw new IllegalStateException("尚未配对 Desktop");return read(open(c,path,"GET"));}
     static JSONObject device(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/device"));}
     static JSONObject accountStatus(Context c) throws Exception {return new JSONObject(get(c,"/mobile/v1/accounts/status"));}
     static JSONObject workVariants(Context c,String comicId) throws Exception {return new JSONObject(get(c,"/mobile/v1/comics/"+enc(comicId)+"/work-variants?limit=24"));}
 
     static String post(Context c,String path,JSONObject value) throws Exception{return post(c,path,value,12000);}
-    static String post(Context c,String path,JSONObject value,int readTimeoutMs) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");HttpURLConnection con=open(host,path,BridgeStore.token(c),"POST");con.setReadTimeout(Math.max(12000,readTimeoutMs));con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json; charset=utf-8");try(OutputStream out=con.getOutputStream()){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}return read(con);}
+    static String post(Context c,String path,JSONObject value,int readTimeoutMs) throws Exception {String host=BridgeStore.host(c);if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");HttpURLConnection con=open(c,path,"POST");try{con.setReadTimeout(Math.max(12000,readTimeoutMs));con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json; charset=utf-8");try(OutputStream out=con.getOutputStream()){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}return read(con);}finally{con.disconnect();}}
     static JSONObject pair(Context c,String host,String code) throws Exception {HttpURLConnection con=open(host,"/mobile/v1/pair","","POST");con.setDoOutput(true);con.setRequestProperty("Content-Type","application/json; charset=utf-8");JSONObject body=new JSONObject();body.put("code",code);body.put("deviceId",DeviceIdentity.id(c));body.put("deviceName",Build.MANUFACTURER+" "+Build.MODEL);try(OutputStream out=con.getOutputStream()){out.write(body.toString().getBytes(StandardCharsets.UTF_8));}return new JSONObject(read(con));}
 
     static JSONObject picaRelaySearch(Context c,String keyword,int page,String sort,List<String> categories) throws Exception {
@@ -163,12 +170,7 @@ final class BridgeClient {
     static HttpURLConnection ehRelayImage(Context c,String locator) throws Exception {
         String host=BridgeStore.host(c);
         if(host.isEmpty())throw new IllegalStateException("尚未配对 Desktop");
-        HttpURLConnection con=open(
-            host,
-            "/mobile/v1/provider/eh/page-image?locator="+enc(locator),
-            BridgeStore.token(c),
-            "GET"
-        );
+        HttpURLConnection con=open(c,"/mobile/v1/provider/eh/page-image?locator="+enc(locator),"GET");
         con.setReadTimeout(30000);
         con.setRequestProperty("Accept","image/*");
         return con;

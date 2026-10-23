@@ -21,6 +21,7 @@ _validation/
 /cache/
 /source-jvm/.gradle/
 /mobile/android-alpha2/.gradle/
+/mobile/android-alpha2/**/build/
 /source-jvm/build/
 /runtime/jm/
 /runtime/.jm-build-*/

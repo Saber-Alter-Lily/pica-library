@@ -14,28 +14,30 @@ final class EhHttpSession {
     private static final String IMAGE_ACCEPT="image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
     private static final String ACCEPT_LANGUAGE="en-US,en;q=0.9";
     private final Context context;
+    private final com.picalibrary.android.sources.SourceAccessPolicy.Permit access;
     private final String userAgent;
 
-    EhHttpSession(Context context){this.context=context.getApplicationContext();String ua="";try{ua=WebSettings.getDefaultUserAgent(this.context);}catch(Throwable ignored){}userAgent=ua==null||ua.trim().isEmpty()?FALLBACK_UA:ua;}
+    EhHttpSession(Context context){this.context=context.getApplicationContext();this.access=SourceAccess.bind(this.context,"eh");String ua="";try{ua=WebSettings.getDefaultUserAgent(this.context);}catch(Throwable ignored){}userAgent=ua==null||ua.trim().isEmpty()?FALLBACK_UA:ua;}
 
     HttpURLConnection openPage(String raw,String referer) throws Exception {return open(raw,"GET",HTML_ACCEPT,referer,true);}
     HttpURLConnection openMedia(String raw,String referer) throws Exception {return open(raw,"GET",IMAGE_ACCEPT,referer,false);}
 
     private HttpURLConnection open(String raw,String method,String accept,String referer,boolean page) throws Exception {
-        URL url=safePublicHttps(raw);HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setConnectTimeout(10000);c.setReadTimeout(page?15000:25000);c.setInstanceFollowRedirects(true);c.setRequestMethod(method);c.setRequestProperty("User-Agent",userAgent);c.setRequestProperty("Accept",accept);c.setRequestProperty("Accept-Language",ACCEPT_LANGUAGE);c.setRequestProperty("Cache-Control","no-cache");c.setRequestProperty("Pragma","no-cache");if(referer!=null&&!referer.trim().isEmpty())c.setRequestProperty("Referer",referer);String cookie=cookieHeader(url.getHost());if(!cookie.isEmpty())c.setRequestProperty("Cookie",cookie);c.setUseCaches(false);return c;
+        access.check();URL url=safePublicHttps(raw);HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setConnectTimeout(10000);c.setReadTimeout(page?15000:25000);c.setInstanceFollowRedirects(true);c.setRequestMethod(method);c.setRequestProperty("User-Agent",userAgent);c.setRequestProperty("Accept",accept);c.setRequestProperty("Accept-Language",ACCEPT_LANGUAGE);c.setRequestProperty("Cache-Control","no-cache");c.setRequestProperty("Pragma","no-cache");if(referer!=null&&!referer.trim().isEmpty())c.setRequestProperty("Referer",referer);String cookie=cookieHeader(url.getHost());if(!cookie.isEmpty())c.setRequestProperty("Cookie",cookie);c.setUseCaches(false);return SourceHttpConnection.guard(c,access);
     }
 
     String cookieHeader(String host){
+        access.check();
         LinkedHashMap<String,String> values=parseCookies(EhAccountStore.cookieJar(context,host));merge(values,webViewCookies(host));String h=host==null?"":host.toLowerCase(Locale.ROOT);
         if(isGalleryHost(h)){EhAccountStore.Session s=EhAccountStore.load(context);values.put("nw","1");if(s.configured()){values.put("ipb_member_id",s.memberId);values.put("ipb_pass_hash",s.passHash);}if(!s.igneous.isEmpty())values.put("igneous",s.igneous);if(!s.cfClearance.isEmpty())values.put("cf_clearance",s.cfClearance);}
-        String joined=joinCookies(values);if(isEhFamily(h)&&!joined.isEmpty())try{EhAccountStore.saveCookieJar(context,h,joined);}catch(Exception ignored){}return joined;
+        String joined=joinCookies(values);if(isEhFamily(h)&&!joined.isEmpty())try{access.commit(()->{EhAccountStore.saveCookieJar(context,h,joined);return null;});}catch(Exception ignored){}return joined;
     }
     int cookieCount(String host){return parseCookies(cookieHeader(host)).size();}
     boolean hasIdentity(){return EhAccountStore.load(context).configured();}
 
     private String webViewCookies(String host){if(!isEhFamily(host))return "";String h=host==null?"":host.toLowerCase(Locale.ROOT),url=h.startsWith("forums.")?"https://forums.e-hentai.org/":h.contains("exhentai.org")?"https://exhentai.org/":"https://e-hentai.org/";try{String value=CookieManager.getInstance().getCookie(url);return value==null?"":value;}catch(Throwable ignored){return "";}}
 
-    void absorbResponseCookies(HttpURLConnection c){if(c==null)return;try{URL url=c.getURL();String host=url==null?"":url.getHost();if(!isEhFamily(host))return;LinkedHashMap<String,String> values=parseCookies(EhAccountStore.cookieJar(context,host));merge(values,webViewCookies(host));Map<String,List<String>> headers=c.getHeaderFields();if(headers!=null)for(Map.Entry<String,List<String>> entry:headers.entrySet()){if(entry.getKey()==null||!"set-cookie".equalsIgnoreCase(entry.getKey())||entry.getValue()==null)continue;for(String raw:entry.getValue()){if(raw==null)continue;String first=raw.split(";",2)[0].trim();int at=first.indexOf('=');if(at<=0)continue;String name=first.substring(0,at).trim(),value=first.substring(at+1).trim();if(name.isEmpty())continue;if(value.isEmpty())values.remove(name);else values.put(name,value);}}EhAccountStore.saveCookieJar(context,host,joinCookies(values));}catch(Exception ignored){}
+    void absorbResponseCookies(HttpURLConnection c){if(c==null)return;try{URL url=c.getURL();String host=url==null?"":url.getHost();if(!isEhFamily(host))return;LinkedHashMap<String,String> values=parseCookies(EhAccountStore.cookieJar(context,host));merge(values,webViewCookies(host));Map<String,List<String>> headers=c.getHeaderFields();if(headers!=null)for(Map.Entry<String,List<String>> entry:headers.entrySet()){if(entry.getKey()==null||!"set-cookie".equalsIgnoreCase(entry.getKey())||entry.getValue()==null)continue;for(String raw:entry.getValue()){if(raw==null)continue;String first=raw.split(";",2)[0].trim();int at=first.indexOf('=');if(at<=0)continue;String name=first.substring(0,at).trim(),value=first.substring(at+1).trim();if(name.isEmpty())continue;if(value.isEmpty())values.remove(name);else values.put(name,value);}}access.commit(()->{EhAccountStore.saveCookieJar(context,host,joinCookies(values));return null;});}catch(Exception ignored){}
     }
 
     static LinkedHashMap<String,String> parseCookies(String raw){LinkedHashMap<String,String> out=new LinkedHashMap<>();if(raw==null)return out;for(String part:raw.split(";")){String item=part.trim();int at=item.indexOf('=');if(at<=0)continue;String name=item.substring(0,at).trim(),value=item.substring(at+1).trim();if(!name.isEmpty()&&!value.isEmpty()&&!containsCtl(name)&&!containsCtl(value))out.put(name,value);}return out;}

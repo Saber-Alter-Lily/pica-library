@@ -20,14 +20,15 @@ public final class JmDownloadWorker extends Worker {
         String comic = getInputData().getString(KEY_COMIC), episode = getInputData().getString(KEY_EPISODE);
         String binding = getInputData().getString(KEY_SESSION);
         try {
-            JmDownloadStore.remote(comic, "jm:");
+            SourceAccess.require(context,"jm");JmDownloadStore.remote(comic, "jm:");
             if (episode != null && !episode.isEmpty()) JmDownloadStore.remote(episode, "jm-chapter:");
             JmDownloadSession.require(context, binding);
             setForegroundAsync(foreground(comic, context.getString(R.string.jm_download_title), context.getString(R.string.jm_download_preparing), 0, 0));
             JmClientManager client = JmClientManager.get(context);
             client.status(); JmDownloadSession.require(context, binding);
             JmDownloadEngine.Client bound = new JmDownloadEngine.Client() {
-                public void check() throws Exception { JmDownloadSession.require(context, binding); }
+                public void check() throws Exception { client.access.check();JmDownloadSession.require(context, binding); }
+                public <T>T commit(com.picalibrary.android.sources.SourceAccessPolicy.Commit<T> action) throws Exception {return client.access.commit(action);}
                 public JSONObject details(String id) throws Exception { return client.downloadDetails(binding, id); }
                 public JSONArray episodes(String id) throws Exception { return client.downloadEpisodes(binding, id); }
                 public JSONArray pages(String id) throws Exception { return client.downloadPages(binding, id); }
@@ -46,6 +47,8 @@ public final class JmDownloadWorker extends Worker {
             });
             JmDownloadJobs.complete(context, comic, getId());
             return Result.success(new Data.Builder().putString("phase", context.getString(R.string.jm_download_complete)).build());
+        } catch (com.picalibrary.android.sources.SourceAccessPolicy.Disabled disabled) {
+            return failure(R.string.source_disabled);
         } catch (JmDownloadSession.Changed changed) {
             return failure(R.string.jm_download_session_changed);
         } catch (JmDownloadEngine.Stopped stopped) {
@@ -53,6 +56,7 @@ public final class JmDownloadWorker extends Worker {
         } catch (IllegalArgumentException invalid) {
             return failure(R.string.jm_download_invalid);
         } catch (Exception error) {
+            if (!SourceAccess.enabled(context,"jm"))return failure(R.string.source_disabled);
             if (isStopped()) return failure(R.string.jm_download_stopped);
             if (getRunAttemptCount() < 3) return Result.retry();
             return failure(R.string.jm_download_failed);

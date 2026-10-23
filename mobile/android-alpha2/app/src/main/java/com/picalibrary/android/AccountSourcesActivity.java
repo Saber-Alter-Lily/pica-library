@@ -65,6 +65,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         if(content==null)return;
         probeSerial++;
         content.removeAllViews();
+        content.addView(SettingsRow.row(this,getString(R.string.source_choices_title),getString(R.string.source_choices_summary),v->startActivity(new Intent(this,SourceChoicesActivity.class))));
 
         boolean paired=BridgeStore.paired(this);
         boolean localPica=PicaAccountStore.load(this).configured();
@@ -76,7 +77,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         content.addView(SettingsRow.row(
             this,
             "Pica",
-            status(localPica,desktop.picaConfigured),
+            SourceAccessUi.status(this,"pica",status(localPica,desktop.picaConfigured)),
             v->startActivity(new Intent(this,PicaAccountActivity.class))
         ));
 
@@ -89,11 +90,11 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         card.addView(SettingsRow.statusLine(
             this,
             "E-H 账号",
-            status(localEh,desktop.ehConfigured)
+            SourceAccessUi.status(this,"eh",status(localEh,desktop.ehConfigured))
         ));
 
         EhCapabilityStore.Snapshot capability=EhCapabilityStore.load(this);
-        String exhLabel=localEh
+        String exhLabel=!SourceAccess.enabled(this,"eh")?getString(R.string.source_disabled):localEh
             ? capability.label()
             : desktop.ehConfigured
                 ? "由 Desktop 提供"
@@ -110,7 +111,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         card.addView(SettingsRow.statusLine(this,"ExH 扩展",exhState));
         content.addView(card);
 
-        content.addView(SettingsRow.row(this,"JM","本机登录、收藏导入与在线阅读",v->startActivity(new Intent(this,JmSourceActivity.class))));
+        content.addView(SettingsRow.row(this,"JM",SourceAccessUi.status(this,"jm","本机登录、收藏导入与在线阅读"),v->startActivity(new Intent(this,JmSourceActivity.class))));
         if(paired&&(desktop.picaConfigured||desktop.ehConfigured)){
             TextView note=Ui.text(
                 this,
@@ -123,7 +124,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
             content.addView(note);
         }
 
-        if(localEh)refreshExh();
+        if(localEh&&SourceAccess.enabled(this,"eh"))refreshExh();
     }
 
     private void refreshDesktopAccountState(){

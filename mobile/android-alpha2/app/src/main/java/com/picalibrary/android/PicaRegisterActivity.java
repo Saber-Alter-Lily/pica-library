@@ -27,6 +27,7 @@ public final class PicaRegisterActivity extends LocaleAwareActivity {
         LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,18),Ui.dp(this,16),Ui.dp(this,18),Ui.dp(this,24));scroll.addView(content);
         back=Ui.button(this,"‹ 返回登录",v->finish(),true);content.addView(back);
         content.addView(Ui.text(this,"注册 Pica 账号",24,Ui.TEXT,true));
+        SourceAccessUi.entry(this,content);
         field(content,"name","昵称（2–50 字）",false);
         field(content,"email","登录账号（小写字母 / 数字 / _）",false);
         field(content,"password","密码（至少 8 位）",true);
@@ -58,15 +59,15 @@ public final class PicaRegisterActivity extends LocaleAwareActivity {
     }
 
     private void register(){
-        if(busy)return;clearErrors();
+        if(busy||!SourceAccessUi.require(this,"pica"))return;clearErrors();
         final Map<String,String> payload;
         try{payload=PicaRegistrationInput.validate(snapshot(),consent.isChecked(),LocalDate.now(java.time.ZoneOffset.UTC));}
         catch(PicaRegistrationInput.ValidationException error){showFieldError(error.field,error.getMessage());return;}
         catch(IllegalArgumentException error){showStatus(error.getMessage()==null?"请检查注册信息":error.getMessage(),Ui.BAD);return;}
         busy=true;submit.setEnabled(false);back.setEnabled(false);showStatus("正在提交…",Ui.MUTED);
-        new Thread(()->{
+        final PicaClient client=new PicaClient(this);new Thread(()->{
             String message="";String field="";boolean success=false;boolean retrySafe=false;
-            try{new PicaClient(this).register(payload);success=true;message="注册成功，请返回登录";}
+            try{client.register(payload);success=true;message="注册成功，请返回登录";}
             catch(Exception error){retrySafe=PicaAccountErrors.retrySafe(error);field=PicaAccountErrors.field(error);message=PicaAccountErrors.message(error);}
             finally{payload.clear();}
             final String result=message,failedField=field;final boolean registered=success,canRetry=retrySafe;

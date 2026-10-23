@@ -1,4 +1,5 @@
 import axios, { AxiosError, type AxiosAdapter, type AxiosResponse } from 'axios'
+import http from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
     HttpMediaClient,
@@ -19,6 +20,32 @@ afterEach(() => {
 })
 
 describe('credential-free shared media transport', () => {
+    it('uses the real Axios HTTP adapter through an explicit loopback proxy without target DNS or provider auth', async () => {
+        const seen: string[] = []
+        const fixture = http.createServer((request, response) => {
+            seen.push(String(request.url))
+            expect(request.headers.authorization).toBeUndefined()
+            expect(request.headers.cookie).toBeUndefined()
+            response.writeHead(200, { 'content-type': 'image/png' })
+            response.end(Buffer.from('synthetic-wire-image'))
+        })
+        await new Promise<void>((resolve) =>
+            fixture.listen(0, '127.0.0.1', resolve)
+        )
+        try {
+            const port = (fixture.address() as { port: number }).port
+            const image = await new HttpMediaClient({
+                proxyUrl: `http://127.0.0.1:${port}`
+            }).fetchImage('https://cdn.pica-acceptance.invalid/cover.png')
+            expect(image.contentType).toBe('image/png')
+            expect(image.data.toString()).toBe('synthetic-wire-image')
+            expect(seen).toEqual([
+                'https://cdn.pica-acceptance.invalid/cover.png'
+            ])
+        } finally {
+            await new Promise<void>((resolve) => fixture.close(() => resolve()))
+        }
+    })
     it('does not inherit global API credentials or follow redirects automatically', async () => {
         const previous = axios.defaults.headers.common.Authorization
         axios.defaults.headers.common.Authorization = 'synthetic-api-token'

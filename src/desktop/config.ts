@@ -171,6 +171,18 @@ export function credentialedProxy(
     return value.toString().replace(/\/$/, '')
 }
 
+/** Public network settings are independent from the existence of a provider credential file. */
+export function connectionEnvironment(config: DesktopConfig | null, credentials: StoredCredentials | null): Partial<Record<'PICA_ACCOUNT' | 'PICA_PASSWORD' | 'PICA_PROXY', string>> {
+    const environment: Partial<Record<'PICA_ACCOUNT' | 'PICA_PASSWORD' | 'PICA_PROXY', string>> = {}
+    if (credentials?.account && credentials.password) {
+        environment.PICA_ACCOUNT = credentials.account
+        environment.PICA_PASSWORD = credentials.password
+    }
+    const proxy = credentialedProxy(config?.proxyUrl, credentials ?? { account: '', password: '' })
+    if (proxy) environment.PICA_PROXY = proxy
+    return environment
+}
+
 export function connectionProxy(
     input: string | undefined,
     current: string | undefined,

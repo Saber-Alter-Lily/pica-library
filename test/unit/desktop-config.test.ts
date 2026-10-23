@@ -10,6 +10,7 @@ import {
     mergePicaSetupCredentials,
     connectionProxy,
     credentialedProxy,
+    connectionEnvironment,
     loadConfig,
     saveConfig
 } from '../../src/desktop/config'
@@ -27,6 +28,20 @@ afterEach(() =>
 )
 
 describe('desktop configuration security', () => {
+    it('applies a saved public proxy without a Pica account or credential file', () => {
+        const config = { ...buildLocalConfig({ libraryDirectory: path.resolve('synthetic-library'), profile: 'balanced' }), proxyUrl: 'http://127.0.0.1:7890' }
+        expect(connectionEnvironment(config, null)).toEqual({ PICA_PROXY: 'http://127.0.0.1:7890' })
+        expect(connectionEnvironment(null, null)).toEqual({})
+        expect(config.proxyUrl).toBe('http://127.0.0.1:7890')
+    })
+    it('keeps proxy authentication separate from source identities and omits incomplete Pica credentials', () => {
+        const config = { ...buildLocalConfig({ libraryDirectory: path.resolve('synthetic-library'), profile: 'balanced' }), proxyUrl: 'http://127.0.0.1:7890' }
+        const stored = { account: '', password: '', jmUsername: 'fixture-jm', jmPassword: 'fixture-jm-secret', proxyUsername: 'proxy-user', proxyPassword: 'proxy-secret' }
+        expect(connectionEnvironment(config, stored)).toEqual({ PICA_PROXY: 'http://proxy-user:proxy-secret@127.0.0.1:7890' })
+        expect(connectionEnvironment(config, { account: 'partial', password: '' })).not.toHaveProperty('PICA_ACCOUNT')
+        expect(connectionEnvironment(config, { account: 'fixture-pica', password: 'fixture-password' })).toMatchObject({ PICA_ACCOUNT: 'fixture-pica', PICA_PASSWORD: 'fixture-password' })
+        expect(stored.account).toBe('')
+    })
     it('lets existing local libraries change storage and public proxy without synthesizing credentials or weakening Pica login validation', () => {
         const current = buildLocalConfig({ libraryDirectory: path.resolve('synthetic-library'), profile: 'balanced' })
         const input = { account: '', password: '', libraryDirectory: current.libraryDirectory, profile: 'fast' as const }

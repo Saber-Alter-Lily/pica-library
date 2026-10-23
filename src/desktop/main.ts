@@ -36,6 +36,7 @@ import {
     mergePicaSetupCredentials,
     connectionProxy,
     credentialedProxy,
+    connectionEnvironment,
     loadConfig,
     saveConfig
 } from './config'
@@ -485,11 +486,7 @@ function applyCredentials(
     delete process.env.PICA_ACCOUNT
     delete process.env.PICA_PASSWORD
     delete process.env.PICA_PROXY
-    if (!value) return
-    process.env.PICA_ACCOUNT = value.account
-    process.env.PICA_PASSWORD = value.password
-    const proxy = credentialedProxy(valueConfig?.proxyUrl, value)
-    if (proxy) process.env.PICA_PROXY = proxy
+    Object.assign(process.env, connectionEnvironment(valueConfig, value))
 }
 
 function friendlyConnectionError(error: unknown) {

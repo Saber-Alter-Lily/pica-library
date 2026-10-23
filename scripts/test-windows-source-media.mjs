@@ -13,7 +13,9 @@ const app = path.join(root, 'application'), home = path.join(root, 'localappdata
 const data = path.join(home, 'data'), instanceFile = path.join(home, 'runtime-state', 'instance.json')
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5WsAAAAASUVORK5CYII=', 'base64')
 let requests = 0, slowRequests = 0, forbidden = 0, instance, success = false
+const proxyObservations = []
 const proxy = http.createServer((request, response) => {
+    proxyObservations.push({ method: request.method, url: String(request.url).includes('pica-acceptance.invalid') ? request.url : 'unexpected target', headerNames: Object.keys(request.headers) })
     if (request.method === 'GET' && request.url === 'https://cdn.pica-acceptance.invalid/slow.png' &&
         !['authorization', 'cookie', 'signature', 'api-key', 'nonce'].some(name => request.headers[name])) {
         slowRequests++
@@ -78,7 +80,8 @@ try {
     await post('/api/v1/import', { records: [{ comicId: 'jm:123', providerId: 'jm', providerRemoteId: '123', title: 'Synthetic packaged JM cover', author: 'Fixture', tags: [], categories: [], finished: false, coverUrl: 'https://cdn.pica-acceptance.invalid/cover.png' }] })
     const responses = await Promise.all(Array.from({ length: 3 }, () => fetch(instance.url + '/api/v1/covers/jm%3A123?url=https://127.0.0.1/not-allowed', { signal: AbortSignal.timeout(15000) })))
     for (const response of responses) {
-        if (!response.ok || response.headers.get('content-type') !== 'image/png' || !Buffer.from(await response.arrayBuffer()).equals(png)) throw new Error('Actual packaged JM cover response invalid')
+        const bytes = Buffer.from(await response.arrayBuffer())
+        if (!response.ok || response.headers.get('content-type') !== 'image/png' || !bytes.equals(png)) throw new Error('Actual packaged JM cover response invalid: ' + JSON.stringify({ status: response.status, type: response.headers.get('content-type'), bytes: bytes.length, error: response.ok ? null : bytes.toString('utf8').slice(0, 300), proxyObservations }))
     }
     current = await status()
     if (!current.configured || current.picaAccount?.configured || requests !== 1 || forbidden || fs.existsSync(path.join(home, 'config', 'credentials.dat'))) throw new Error('Source-free/cache/credential boundary failed')

@@ -739,6 +739,9 @@ async function startEngine(preferredPort: number) {
                 ? await ehWebLogin.cancel()
                 : { state: 'cancelled', message: '网页登录已取消' },
         configured: () => Boolean(config),
+        chooseLocalComic: async (kind) => kind === 'folder'
+            ? nativePicker.chooseFolder('选择一本本地漫画文件夹 / Choose one local comic folder')
+            : nativePicker.chooseComicArchive(),
         status: () => ({
             startupReady,
             runtime: runtimeOptions,

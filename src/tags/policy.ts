@@ -1,7 +1,7 @@
 /** Personal configuration only. Provider metadata and the frozen registry stay immutable. */
 export const TAG_POLICY_SCHEMA_VERSION = 1
 export const PRIVATE_TAG_PREFIX = '@private/'
-export type TagProviderV1 = 'pica' | 'eh' | 'jm'
+export type TagProviderV1 = 'pica' | 'eh' | 'jm' | 'local'
 export interface PrivateTagV1 {
     id: string
     name: string
@@ -33,7 +33,7 @@ export const normalizeTagPolicyKey = (value: unknown) =>
         .trim()
         .toLocaleLowerCase('und')
         .replace(/\s+/g, ' ')
-const providers = new Set(['pica', 'eh', 'jm', 'private'])
+const providers = new Set(['pica', 'eh', 'jm', 'local', 'private'])
 const privateIdPattern = /^pt_[a-f0-9]{32}$/
 export const privateTagSignalV1 = (id: string) => PRIVATE_TAG_PREFIX + id
 export const tagIdentityV1 = (
@@ -43,6 +43,7 @@ export const tagIdentityV1 = (
 export function comicTagProviderV1(
     comic: Pick<TagComicV1, 'comicId' | 'providerId'>
 ): TagProviderV1 {
+    if (comic.providerId === 'local' || comic.comicId.startsWith('local:')) return 'local'
     if (comic.providerId === 'eh' || comic.comicId.startsWith('eh:'))
         return 'eh'
     if (comic.providerId === 'jm' || comic.comicId.startsWith('jm:'))
@@ -289,7 +290,7 @@ export function tagControlParticipatesV1(
             : tagParticipatesV1(policy, tagIdentityV1(provider, normalized))
     }
     return (
-        (['pica', 'eh', 'jm'] as const).some((provider) =>
+        (['pica', 'eh', 'jm', 'local'] as const).some((provider) =>
             tagParticipatesV1(policy, tagIdentityV1(provider, normalized))
         ) ||
         (policy.mode === 'SELECTED' &&

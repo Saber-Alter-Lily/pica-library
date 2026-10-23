@@ -4,7 +4,7 @@ import path from 'node:path'
 import AdmZip from 'adm-zip'
 import { afterEach, describe, expect, it } from 'vitest'
 import { buildLocalUpdatePackage } from '../../scripts/build-local-update-package'
-import { MODULE_CONTRACT_PATH, runtimeModuleContracts } from '../../src/modules/contracts'
+import { MODULE_CONTRACT_PATH, runtimeModuleContracts, legacyModuleContracts } from '../../src/modules/contracts'
 
 const directories: string[] = []
 
@@ -35,11 +35,13 @@ describe('local incremental update package builder', () => {
     it('adopts module metadata from the real target and binds it into the incremental manifest', () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-module-adoption-')); directories.push(directory)
         const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'old')
-        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'new', { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) })
+        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'new', { [MODULE_CONTRACT_PATH]: JSON.stringify(legacyModuleContracts()) })
         const result = buildLocalUpdatePackage(source, target, path.join(directory, 'update.zip'))
-        expect(result.manifest.moduleContracts).toEqual(runtimeModuleContracts())
+        expect(result.manifest.moduleContracts).toEqual(legacyModuleContracts())
         expect(result.manifest.files.map(file => file.path)).toContain(MODULE_CONTRACT_PATH)
         expect(result.manifest.requiresFullInstall).toBe(false)
+        const current = fullPackage(directory, 'Pica-Library-v0.5.0-dev.2-local-test-windows-x64.zip', '3'.repeat(40), 'current', { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) })
+        expect(() => buildLocalUpdatePackage(source,current,path.join(directory,'current.zip'))).toThrow(/one-click full/)
     })
     it('refuses a module API mismatch or contract removal and directs it to the full one-click path', () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-module-break-')); directories.push(directory)

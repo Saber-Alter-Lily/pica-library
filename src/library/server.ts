@@ -32,6 +32,7 @@ import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
 import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { LocalHttpLatencyRegistry } from '../runtime/http-latency'
+import { LocalLibraryIngestion } from '../local-library/ingestion'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -50,6 +51,7 @@ export interface DesktopServerController {
         input: Record<string, unknown>
     ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
+    chooseLocalComic?: (kind: 'folder' | 'cbz') => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
     exportRecommendationAudit?: (
         input?: Record<string, unknown>
@@ -236,6 +238,8 @@ export async function startLibraryServer(options: {
     cacheDir?: string
 }) {
     const root = webRoot()
+    const localIngestion = new LocalLibraryIngestion(options.database, options.service.dataDir)
+    let localPickerBusy = false
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
     const providerService = options.service.providerService()
@@ -1697,6 +1701,28 @@ export async function startLibraryServer(options: {
                     await options.desktop.detectProxy(await body(request))
                 )
             }
+            if (url.pathname.startsWith('/api/v1/desktop/local-import/') && request.method === 'POST') {
+                const status = options.desktop?.status()
+                if (!options.desktop?.chooseLocalComic || status?.runtime &&
+                    (status.runtime as Record<string, unknown>).mode === 'headless')
+                    return json(response, 409, { error: 'Local import requires the interactive Desktop file picker' })
+                const input = await body(request, 4096)
+                if (Object.keys(input).some(k => !['kind', 'token'].includes(k)))
+                    return json(response, 400, { error: 'Local paths cannot be submitted through HTTP' })
+                if (url.pathname.endsWith('/preview')) {
+                    if (input.kind !== 'folder' && input.kind !== 'cbz') return json(response, 400, { error: 'Unsupported local import kind' })
+                    if (!options.desktop.configured()) return json(response, 409, { error: 'Set up the local library directory first' })
+                    if (localPickerBusy) return json(response, 409, { error: 'Another local import picker is open' })
+                    localPickerBusy = true
+                    try {
+                        const selected = await options.desktop.chooseLocalComic(input.kind)
+                        return json(response, 200, selected ? await localIngestion.preview(selected, input.kind) : { cancelled: true })
+                    } finally { localPickerBusy = false }
+                }
+                if (url.pathname.endsWith('/confirm')) return json(response, 200, await localIngestion.confirm(String(input.token ?? '')))
+                if (url.pathname.endsWith('/cancel')) { localIngestion.cancel(String(input.token ?? '')); return json(response, 200, { cancelled: true }) }
+                return json(response, 404, { error: 'Unknown local import operation' })
+            }
             if (
                 url.pathname === '/api/v1/desktop/choose-folder' &&
                 request.method === 'POST' &&
@@ -2202,7 +2228,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': image.contentType,
                     'content-length': String(image.data.byteLength),
-                    'cache-control': 'private, max-age=3600',
+                    'cache-control': decodeURIComponent(readerPicture[1]).startsWith('local:') ? 'private, no-store' : 'private, max-age=3600',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(image.data)
@@ -2337,7 +2363,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)
@@ -2353,7 +2379,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)

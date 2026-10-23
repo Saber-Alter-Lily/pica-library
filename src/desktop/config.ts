@@ -150,10 +150,14 @@ export function loadConfig(file: string): DesktopConfig | null {
 
 export function saveConfig(file: string, config: DesktopConfig) {
     const serialized = JSON.stringify(config, null, 2)
-    if (
-        /password|account|username|authorization|cookie|token/i.test(serialized)
-    )
+    const hasSecretKey = (value: unknown): boolean => Boolean(value && typeof value === 'object' &&
+        Object.entries(value).some(([key,child]) => /password|account|username|authorization|cookie|token/i.test(key) || hasSecretKey(child)))
+    if (hasSecretKey(config))
         throw new Error('Refusing to write sensitive fields to config')
+    if (config.proxyUrl) {
+        const proxy = new URL(config.proxyUrl)
+        if (proxy.username || proxy.password) throw new Error('Refusing to write proxy credentials to config')
+    }
     fs.mkdirSync(path.dirname(file), { recursive: true })
     const temporary = `${file}.tmp`
     fs.writeFileSync(temporary, serialized, { encoding: 'utf8', mode: 0o600 })

@@ -10,8 +10,8 @@ External-source support is an adapter capability, not permission to redistribute
 
 | Module | Current implementation and interface | What it owns | Must not own |
 | --- | --- | --- | --- |
-| Library | `library`, local SQLite/catalog and Reader inventory | User records and progress, independently located from application files | Provider passwords, algorithm ownership of raw facts |
-| Tags | **Extracted** pure `src/tags/policy.ts`, schema/API 1; old V5 path is a compatibility re-export | Personal participation/mappings and derived signal views; persistence remains an application adapter | Network, database handles, candidate generation, model execution, rewriting provider facts |
+| Library | `library`, module API2; local SQLite/catalog and Reader inventory, bounded local ingestion port | User records and progress, independently located from application files | Provider passwords, algorithm ownership of raw facts |
+| Tags | **Extracted** pure `src/tags/policy.ts`, JSON schema1/module API2 (adds local namespace); old V5 path is a compatibility re-export | Personal participation/mappings and derived signal views; persistence remains an application adapter | Network, database handles, candidate generation, model execution, rewriting provider facts |
 | Sources | `ComicProvider` + compiled manifest API 1 + `ProviderRegistry` | Source aliases, ID namespaces, page schemes and capabilities | Choosing a user's preferences or recommendation ranker |
 | Media | **Extracted** credential-free `src/media` HTTP/URL policy; source-owned optional cover port | Bounded raster transport and redirects; Library adapter owns source-scoped cache | Provider login, cookies, database or recommendation state |
 | Reader | Existing local/remote/native Reader sources, API 1 | Display/navigation/progress interfaces | Source authentication as a prerequisite for local reading |
@@ -34,7 +34,7 @@ The initial setup offers **Set up local library only** in zh-CN/en/ja. It valida
 
 Subsequent ordinary local storage/profile/public-proxy changes also work without a Pica account. A partial Pica login is still rejected, never treated as a successful local-mode login. Empty local settings do not synthesize an empty credential file; an authenticated proxy or another real source secret continues to use the existing secure credential backend.
 
-The Web shell loads existing local state but does not automatically create an online recommendation cycle when the Desktop explicitly reports no Pica/EH account. Explicit discovery/recommendation operations remain separate. This does not yet add arbitrary CBZ/CBR/PDF import or assert that every source-independent UX path is complete; the existing `archiveReader: false` declaration remains honest.
+The Web shell loads existing local state but does not automatically create an online recommendation cycle when the Desktop explicitly reports no Pica/EH account. Explicit discovery/recommendation operations remain separate. NEXT-48 adds bounded folder/CBZ import-to-owned-storage, not direct archive streaming, CBR/PDF or complete source-independent UX; `archiveReader: false` remains honest alongside the separate local-import capability.
 
 ## One-click upgrade contract
 
@@ -61,9 +61,9 @@ Primary sources inspected 2026-10-23:
 
 ## Required continuation, not completed by this slice
 
-NEXT-47 resolves the statically identified JM-cover → Pica-login dependency and extracts the shared media transport. See [source/media evidence and local ingestion continuation](SOURCE_MEDIA_BOUNDARY.md). This does not add arbitrary local import or a dynamic extension host.
+NEXT-47 resolves the JM-cover → Pica-login dependency and extracts shared media transport; NEXT-48 adds bounded local folder/CBZ ingestion. See [source/media evidence](SOURCE_MEDIA_BOUNDARY.md) and [current local ingestion contract](LOCAL_CONTENT_INGESTION.md). Neither provides a dynamic executable extension host.
 
-1. Local-content ingestion: source-independent stable IDs, bounded folder/CBZ import, safe archive extraction, chapter/page inventory, progress preservation and missing-file handling. Keep PDF/CBR declarations false until actually supported and verified.
+1. Local-content ingestion: NEXT-48 implements one-comic folder/CBZ preview/copy, `local:` IDs, atomic inventory and progress-preserving reimport through Reader/LAN. See [scope, safety and holds](LOCAL_CONTENT_INGESTION.md). Cross-path relocation/deduplication, watchers, Android direct import and PDF/CBR remain open. Library/tag APIs advance to 2 and require full one-click replacement; schema stays 14.
 2. Source lifecycle: explicit opt-in enable/disable, persisted selection independent of credentials, immutable identity and provenance, optional source-runtime packaging and native parity. Only then decide a trusted repository/extension host based on maintained upstreams.
 3. Recommendation service seam: separate retrieval ports, pure policy/ranking, generation persistence and delivery; retain V3 cycles and cached mobile results. The interface version declaration alone does not accomplish this split.
 4. Native tag/gesture seams: isolate pure matching/gesture interpretation from Android persistence/UI; add deterministic cross-client golden contracts and event-level gesture tests. Physical touch/OEM behavior remains unverified until device evidence exists.

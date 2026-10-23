@@ -39,6 +39,7 @@ export interface AppCapabilities {
         shelves: boolean
         reader: boolean
         archiveReader: boolean
+        localFileImport: boolean
         updatePackages: boolean
         recommendationSessions: boolean
         previewPages: boolean
@@ -295,6 +296,8 @@ export function appCapabilities(
             shelves: true,
             reader: true,
             archiveReader: false,
+            // Import-to-owned-storage, not direct archive streaming. No server-path input API.
+            localFileImport: nativeFolderPicker.available && mode === 'interactive',
             updatePackages: selfUpdate.available,
             recommendationSessions: true,
             previewPages: true,

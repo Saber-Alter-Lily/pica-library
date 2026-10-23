@@ -13,6 +13,22 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=35)
 public final class TagParticipationTest {
+    @Test public void localIdentityIsNotAnOnlineFallback() {
+        assertEquals("local",new UnifiedCatalogStore.Entry("local:abc").providerId);
+        PicaClient.requirePicaComic("legacy-pica-id");
+        for(String id:Arrays.asList("local:abc","eh:abc","jm:123","future:123")){
+            try { PicaClient.requirePicaComic(id);fail("accepted a foreign comic identity"); }
+            catch(IllegalArgumentException expected) { assertTrue(expected.getMessage().contains("Pica")); }
+        }
+    }
+    @Test public void localComicTagsNeverBecomePicaTags() throws Exception {
+        assertEquals("local",TagParticipation.provider("local:abc"));
+        JSONObject policy=TagParticipation.normalize(null);
+        policy.put("mode","SELECTED").put("selected",new JSONArray(Arrays.asList("local|line")));
+        assertEquals("local|line",TagParticipation.normalize(policy).getJSONArray("selected").getString(0));
+        assertTrue(TagParticipation.of(new JSONObject().put("tagPolicy",policy)).tags("local:abc",Arrays.asList("line"),true).contains("line"));
+        assertFalse(TagParticipation.of(new JSONObject().put("tagPolicy",policy)).tags("pica:abc",Arrays.asList("line"),true).contains("line"));
+    }
     private Context context;
     private static final String MANUAL="pt_11111111111111111111111111111111",MAPPED="pt_22222222222222222222222222222222";
     @Before public void reset(){context=RuntimeEnvironment.getApplication();context.getSharedPreferences("recommendation-policy-v5",0).edit().clear().commit();context.getSharedPreferences("recommendation-evidence-v1",0).edit().clear().commit();}

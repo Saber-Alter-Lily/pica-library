@@ -24,7 +24,7 @@ final class TagParticipation {
         JSONArray tags=json.optJSONArray("privateTags");for(int i=0;i<tags.length();i++){JSONObject tag=tags.optJSONObject(i);privateTags.add(tag);comicBindings.put(tag.optString("id"),set(tag.optJSONArray("comicIds")));mappingBindings.put(tag.optString("id"),set(tag.optJSONArray("mappings")));}
     }
     static String norm(String raw){return Normalizer.normalize(raw==null?"":raw,Normalizer.Form.NFKC).replaceAll("[\\p{Z}\\s\\uFEFF]+"," ").trim().toLowerCase(Locale.ROOT);}
-    static String provider(String id){return id!=null&&id.startsWith("eh:")?"eh":id!=null&&id.startsWith("jm:")?"jm":"pica";}
+    static String provider(String id){return id!=null&&id.startsWith("local:")?"local":id!=null&&id.startsWith("eh:")?"eh":id!=null&&id.startsWith("jm:")?"jm":"pica";}
     static String identity(String provider,String raw){return provider+"|"+norm(raw);}
     static TagParticipation of(JSONObject state){
         Object value=state==null?null:state.opt("tagPolicy");if(value==null||value==JSONObject.NULL){if(state==null)return LEGACY;TagParticipation cached=LEGACY_STATES.get(state);if(cached==null){cached=new TagParticipation(normalize(null));LEGACY_STATES.put(state,cached);}return cached;}
@@ -49,7 +49,7 @@ final class TagParticipation {
         JSONArray raw=source.optJSONArray(field);if(raw==null||raw.length()>4096)throw new IllegalArgumentException("Invalid or oversized tag-policy list");
         TreeSet<String> sorted=new TreeSet<>();for(int i=0;i<raw.length();i++){
             Object value=raw.opt(i);if(!(value instanceof String))throw new IllegalArgumentException("Invalid tag-policy string");String clean=norm((String)value);if(clean.isEmpty())continue;
-            if(identities){int split=clean.indexOf('|');String provider=split<0?"":clean.substring(0,split),key=split<0?"":clean.substring(split+1);if(!Arrays.asList("pica","eh","jm","private").contains(provider)||key.isEmpty()||key.length()>200||("private".equals(provider)&&!key.matches("pt_[a-f0-9]{32}")))throw new IllegalArgumentException("Invalid provider-scoped tag identity");}
+            if(identities){int split=clean.indexOf('|');String provider=split<0?"":clean.substring(0,split),key=split<0?"":clean.substring(split+1);if(!Arrays.asList("pica","eh","jm","local","private").contains(provider)||key.isEmpty()||key.length()>200||("private".equals(provider)&&!key.matches("pt_[a-f0-9]{32}")))throw new IllegalArgumentException("Invalid provider-scoped tag identity");}
             else if(clean.length()>200)throw new IllegalArgumentException("Invalid comic identity");sorted.add(clean);
         }return new JSONArray(sorted);
     }

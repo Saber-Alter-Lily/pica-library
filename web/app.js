@@ -9,6 +9,7 @@ import {
 import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
+import { installLocalImport } from './local-import.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
 import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
@@ -732,6 +733,7 @@ async function loadDesktop() {
     try {
         desktop = await api('/api/v1/desktop/status')
         state.capabilities = await api('/api/v1/capabilities')
+        document.dispatchEvent(new Event('pica-local-import-refresh'))
         $('#settings-nav').hidden = false
         $('#settings-version').textContent = `Pica Library ${desktop.version}`
         $('#update-current-version').textContent = `v${desktop.version}`
@@ -1584,7 +1586,7 @@ function mountOnlineReadButtons(container) {
         const button = document.createElement('button')
         button.type = 'button'
         button.dataset.onlineComic = selector.dataset.comicId
-        button.textContent = t('reader.online')
+        button.textContent = selector.dataset.comicId.startsWith('local:') ? t('downloaded.read') : t('reader.online')
         target.append(button)
     }
 }
@@ -1623,6 +1625,7 @@ document.addEventListener('pica-open-comic-detail', (event) => {
 })
 
 function librarySourceBindings(comic) {
+    if (providerIdForComic(comic) === 'local') return []
     const values = []
     if (providerIdForComic(comic) === 'jm') values.push('JM')
     if ((comic?.providerId || '').toLowerCase() === 'pica' || (!comic?.providerId && !String(comic?.comicId || '').startsWith('eh:'))) values.push('Pica')
@@ -1783,6 +1786,7 @@ function renderAuthors() {
 }
 
 function providerIdForComic(comic) {
+    if (String(comic?.comicId || '').startsWith('local:')) return 'local'
     return comic?.providerId ||
         (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : String(comic?.comicId || '').startsWith('jm:') ? 'jm' : 'pica')
 }
@@ -2710,10 +2714,14 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
         : ''
     $('#recommend-detail-content').innerHTML =
         `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${favoriteButton}<button data-detail-download="true">${t('action.download')}</button></div><details id="work-variants-panel" class="work-variants-panel"><summary>${escapeHtml(t('workVariants.loading'))}</summary><div data-work-variants-list></div></details>`
+    if (comicId.startsWith('local:')) {
+        $('#recommend-detail-content [data-detail-download]')?.remove()
+        $('#recommend-detail-content [data-detail-preview]')?.remove()
+    }
     if (state.mode === 'connected') {
         const button = document.createElement('button')
         button.dataset.detailOnline = 'true'
-        button.textContent = t('reader.online')
+        button.textContent = comicId.startsWith('local:') ? t('downloaded.read') : t('reader.online')
         $('#recommend-detail-content .detail-actions').prepend(button)
     }
     if (state.mode === 'connected') {
@@ -3119,6 +3127,7 @@ function renderReaderChapterHeading() {
 }
 
 async function openReaderComic(comicId, online = false) {
+    online = online && !String(comicId).startsWith('local:')
     const requestId = ++readerComicRequest
     readerChapterRequest++
     try {
@@ -5310,6 +5319,15 @@ async function detect() {
     }
 }
 
+installLocalImport({
+    available: () => state.mode === 'connected' && state.capabilities?.features?.localFileImport === true,
+    language: () => language,
+    request: (operation, input) => desktopPost('/api/v1/desktop/local-import' + operation, input),
+    refresh: async () => { state.records = await api('/api/v1/comics?limit=5000'); await loadLibraryQuery() },
+    read: comicId => openReaderComic(comicId)
+})
+
 void detect().then(() => {
+    document.dispatchEvent(new Event('pica-local-import-refresh'))
     setTimeout(() => void maybePromptForUpdate(), 1400)
 })

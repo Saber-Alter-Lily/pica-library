@@ -16,10 +16,10 @@ describe('local-first runtime module contracts', () => {
         expect(contract).toEqual({
             formatVersion: 1,
             apis: {
-                library: 1,
+                library: 2,
                 reader: 1,
                 sources: 1,
-                tags: 1,
+                tags: 2,
                 recommendation: 5,
                 sync: 1,
                 update: 1
@@ -27,7 +27,7 @@ describe('local-first runtime module contracts', () => {
         })
         expect(appCapabilities().moduleContracts).toEqual(contract)
         contract.apis.tags = 99
-        expect(runtimeModuleContracts().apis.tags).toBe(1)
+        expect(runtimeModuleContracts().apis.tags).toBe(2)
     })
     it('keeps tag entry points byte-schema and function compatible without owning recommendation state', () => {
         expect(legacy.normalizeTagPolicyV1).toBe(tags.normalizeTagPolicyV1)

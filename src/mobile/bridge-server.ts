@@ -1141,7 +1141,7 @@ export async function startMobileBridge(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)
@@ -1191,9 +1191,7 @@ export async function startMobileBridge(options: {
                     ...value,
                     pages: value.pages.map((page) => ({
                         ...page,
-                        url: `/mobile/v1/reader/pictures/${encodeURIComponent(
-                            page.id
-                        )}`
+                        url: page.url.replace('/api/v1/reader/', '/mobile/v1/reader/')
                     }))
                 })
             }
@@ -1208,7 +1206,7 @@ export async function startMobileBridge(options: {
                 response.writeHead(200, {
                     'content-type': image.contentType,
                     'content-length': String(image.data.byteLength),
-                    'cache-control': 'private, max-age=3600',
+                    'cache-control': decodeURIComponent(pictureRoute[1]).startsWith('local:') ? 'private, no-store' : 'private, max-age=3600',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(image.data)

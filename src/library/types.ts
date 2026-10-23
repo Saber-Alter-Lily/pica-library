@@ -1,3 +1,5 @@
+import type { CatalogSourceId } from './content-identity'
+
 export type SortMode =
     | 'latest'
     | 'oldest'
@@ -9,7 +11,7 @@ export type SortMode =
 export interface FavoriteRecord {
     position?: number
     comicId: string
-    providerId?: 'pica' | 'eh' | 'jm'
+    providerId?: CatalogSourceId
     providerRemoteId?: string
     alternateTitles?: string[]
     completionStatus?: 'FINISHED' | 'ONGOING' | 'UNKNOWN'
@@ -76,7 +78,7 @@ export interface LibraryFacetQuery {
     authorIds?: string[]
     tags?: string[]
     tagMode?: TagMatchMode
-    providerIds?: Array<'pica' | 'eh' | 'jm'>
+    providerIds?: CatalogSourceId[]
     finished?: boolean
     download?: DownloadFacet
     sort?: SortMode

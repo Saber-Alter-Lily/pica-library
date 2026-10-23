@@ -4,6 +4,7 @@ import AdmZip from 'adm-zip'
 import type { LibraryDatabase } from '../library/database'
 import { safePathSegment } from '../library/path-template'
 import { ExternalReaderAdapter } from './external-reader-adapter'
+import { localInventoryKey, type LocalInventoryV1 } from '../local-library/types'
 
 const contentTypes: Record<string, string> = {
     '.jpg': 'image/jpeg',
@@ -44,6 +45,8 @@ export class ReaderService {
                 }
             })
         if (!pictures.length) throw new Error('该章节尚未下载。')
+        const local = comicId.startsWith('local:') ? this.database.getAppState<LocalInventoryV1>(localInventoryKey(comicId)) : undefined
+        const revision = local && /^[a-f0-9]{64}$/.test(local.revision) ? `?v=${local.revision}` : ''
         const progress = this.database
             .readingProgress(comicId)
             .find((item) => item.episodeId === episodeId)
@@ -52,7 +55,7 @@ export class ReaderService {
             pages: pictures.map((picture) => ({
                 id: picture.id,
                 position: picture.position,
-                url: `/api/v1/reader/pictures/${encodeURIComponent(picture.id)}`
+                url: `/api/v1/reader/pictures/${encodeURIComponent(picture.id)}${revision}`
             })),
             progress: progress
                 ? {

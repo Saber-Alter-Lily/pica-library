@@ -4214,6 +4214,7 @@ export class LibraryService {
     }
 
     private async loadCover(comicId: string) {
+        if (comicId.startsWith('local:')) return { ...await this.downloadedCover(comicId), cached: true }
         const comic = this.database.getComic(comicId)
         if (!comic?.coverUrl) throw new Error('Comic cover is unavailable')
 
@@ -4752,7 +4753,12 @@ export class LibraryService {
             contentTypes[path.extname(file).toLowerCase()]
         )
         if (!contentType) throw new Error('Downloaded cover type is unsafe')
-        return { data: await fs.promises.readFile(file), contentType }
+        // Reuse Reader's realpath/root checks, including imported local pages.
+        const realRoot = await fs.promises.realpath(this.dataDir)
+        const realFile = await fs.promises.realpath(file)
+        const relative = path.relative(realRoot, realFile)
+        if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Cover file escaped the Library root')
+        return { data: await fs.promises.readFile(realFile), contentType }
     }
 
     favoritesSyncProgress() {

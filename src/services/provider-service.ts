@@ -402,6 +402,7 @@ export class ProviderService {
         provenance: 'discover' | 'recommendations' = 'recommendations',
         options: { persist?: boolean } = {}
     ) {
+        if (this.providerForComic(comicId).id !== 'pica') throw new Error('Pica related lookup requires a Pica comic identity')
         const records = (await (await this.connect()).related(comicId)).map(
             providerComicRecord
         )
@@ -452,6 +453,12 @@ export class ProviderService {
     }
 
     async setFavorite(comicId: string, desired: boolean) {
+        if (comicId.startsWith('local:')) {
+            const before = this.database.getComic(comicId)
+            if (!before || before.providerId !== 'local') throw new Error('Local comic is not in the library')
+            const after = this.database.setLocalFavoriteState(comicId, desired)
+            return { changed: before.isFavorite !== Boolean(after?.isFavorite), isFavorite: Boolean(after?.isFavorite), remote: false }
+        }
         const comicProvider = this.providerForComic(comicId)
         if (comicProvider.id === 'jm') {
             const before = this.database.getComic(comicId)

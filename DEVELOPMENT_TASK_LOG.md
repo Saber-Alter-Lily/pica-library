@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+## NEXT-48 — local folder/CBZ ingestion and cache freshness (2026-10-23, unpublished)
+
+**IMPLEMENTED_IN_ISOLATED_CANDIDATE / EXACT_SOURCE_PACKAGE_GATES_RECORDED_IN_FROZEN_HANDOFF / MANUAL_QA_PENDING.** This does not complete the full local-reader/source lifecycle objective.
+
+- Continues frozen NEXT-47 `241734856565b09f6bf18dae43b4f2fba6094268`; actual source/media Windows + fixed-signature Dev gates passed in run39944017468, with complete unchanged handoff SHA256 `bf344a511dc5ad5abb854f61a5f3629cef06c95e03078741bad88ceca7845798`. Prior evidence is provenance, not acceptance of new source.
+- Adds independent catalog `local:` identity (not an online adapter); existing native folder/CBZ open picker → bounded preview → explicit copied import → existing Reader and authenticated LAN. A narrow inventory storage port separates ingestion from SQLite/source auth/recommendation. Originals are untouched; no disk-wide scan or credential transfer.
+- Reimport preserves origin-based comic IDs, relative chapter/page IDs, logical reading position, favorites/private state; missing pages leave the readable inventory, missing chapters retain unavailable identities/history. Input changes/SQL failure preserve the old committed inventory. Limits, cleanup/crash-orphan holds and unsupported CBR/PDF/Android direct import are explicit in `docs/LOCAL_CONTENT_INGESTION.md`.
+- Fixes browser cover freshness (`private, no-store`) and revisioned imported-body URLs preserved by the paired bridge. Corrects source labels/CSV inference, local tag namespace on both clients, native foreign-source fallbacks and local detail's inappropriate Pica-login action. Local-only storage can now contain ordinary words such as “account/token”; config still rejects secret keys and credentialed proxy URLs.
+- Library/tag module APIs2 intentionally require the existing one-click full replacement, not a forced incompatible delta; schema14/Reader/source APIs unchanged. Dev code63 must retain the fixed package/certificate. Real Windows-archive CLI/import/Reader/reimport/restart is added to CI, alongside full successful/failed-health recovery and native tests.
+- First browser attempt stopped at the ordinary welcome guide, then used the existing completed-v2 fixture contract (disclaimer still handled normally). First full suite found two historical test assumptions: first-adoption module floor and the old three-provider catalog type. Tests now preserve the old compatibility-floor case, explicitly reject the new module break as incremental, and cover the local catalog identity rather than weakening production guards. Failures remain in task evidence.
+- Exact new source/hash and applicable-platform counts are frozen after build; no previous artifact is renamed. Native dialogs/OEM gestures, real devices/accounts, AI semantic usefulness, source opt-in/trust lifecycle and further recommendation/native decomposition remain pending. No issue closure, main merge, tag/Release, stable OTA, production data, key download or deployment.
+
 > **Purpose:** authoritative engineering task log for the architecture/runtime/multi-platform expansion.
 >
 > This file is intentionally different from `PROJECT_LOG.md`: `PROJECT_LOG.md` records released/versioned product evolution; this file records **what still needs to be done, why, in what order, and what evidence is required before a task is considered complete**.

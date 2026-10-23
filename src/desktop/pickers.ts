@@ -90,7 +90,7 @@ function windowsPowerShell() {
 
 function pickerCommand(input: {
     backend: DesktopPickerBackend
-    kind: 'folder' | 'save'
+    kind: 'folder' | 'save' | 'open'
     title: string
     defaultName?: string
     extension?: string
@@ -114,7 +114,7 @@ function pickerCommand(input: {
                       const filter = extension
                           ? `${extension.toUpperCase()} files (*.${extension})|*.${extension}`
                           : 'All files (*.*)|*.*'
-                      return `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.SaveFileDialog;$d.FileName='${name}';$d.Filter='${filter}';${extension ? `$d.DefaultExt='${extension}';` : ''}$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
+                      return `[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');$d=New-Object Windows.Forms.${input.kind === 'open' ? 'OpenFileDialog' : 'SaveFileDialog'};$d.Title='${title}';$d.FileName='${input.kind === 'open' ? '' : name}';$d.Filter='${filter}';${extension ? `$d.DefaultExt='${extension}';` : ''}$d.AddExtension=$true;if($d.ShowDialog() -eq 'OK'){[Console]::Out.Write($d.FileName)}`
                   })()
         return {
             command: windowsPowerShell(),
@@ -134,6 +134,7 @@ function pickerCommand(input: {
         const script =
             input.kind === 'folder'
                 ? `POSIX path of (choose folder with prompt "${title}")`
+                : input.kind === 'open' ? `POSIX path of (choose file with prompt "${title}")`
                 : `POSIX path of (choose file name with prompt "${title}" default name "${applescriptString(
                       input.defaultName ?? 'pica-library-export'
                   )}")`
@@ -151,7 +152,7 @@ function pickerCommand(input: {
         ]
         if (input.kind === 'folder') args.push('--directory')
         else {
-            args.push('--save', '--confirm-overwrite')
+            if (input.kind === 'save') args.push('--save', '--confirm-overwrite')
             if (input.defaultName)
                 args.push(
                     `--filename=${path.join(os.homedir(), input.defaultName)}`
@@ -186,7 +187,7 @@ function pickerCommand(input: {
         const args = [
             '--title',
             input.title,
-            '--getsavefilename',
+            input.kind === 'open' ? '--getopenfilename' : '--getsavefilename',
             start
         ]
         if (extension) args.push(`*.${extension}`)
@@ -279,5 +280,10 @@ export class DesktopNativePicker {
             }),
             this.spawnProcess
         )
+    }
+
+    chooseComicArchive() {
+        return runPicker(pickerCommand({ backend: this.status.backend, kind: 'open',
+            title: '选择本地 CBZ 漫画 / Choose a local CBZ comic', extension: 'cbz' }), this.spawnProcess)
     }
 }

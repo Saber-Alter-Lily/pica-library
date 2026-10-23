@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-48: actual local-content ingestion (unpublished)
+
+Continues frozen NEXT-47 `241734856565b09f6bf18dae43b4f2fba6094268`, whose complete source/media handoff SHA256 is `bf344a511dc5ad5abb854f61a5f3629cef06c95e03078741bad88ceca7845798`. Prior artifacts remain unchanged. Adds one-comic folder/CBZ native selection → bounded preview → confirmed owned copy → existing Reader/LAN, stable local namespace, reimport/progress preservation, cover browser revalidation, native foreign-source guards and expanded CSV identity. Library/tag module APIs2 deliberately require full one-click replacement; schema14 remains unchanged. Dev code63 retains package/certificate. [Limits, workflow, failure behavior and holds](LOCAL_CONTENT_INGESTION.md).
+
+Local automation and exact-archive gates must bind to the newly frozen source in its final handoff; previous green packages are not reused. Native file dialogs, OEM gestures, physical installs, real accounts/AI and published OTA are still unverified; no user test is forced now. Main/Release/OTA, installed applications and production data are untouched.
+
 ## 2026-10-23 NEXT-47: source-owned media continuation
 
 After frozen NEXT-45 source `4230e66c3c86` (complete handoff SHA256 `b736ef3f76b2dcb76a4b2f645cccce147bdf82eaada69c2b33d4aa6717aa58fc`), this isolated continuation extracts credential-free media transport, routes covers through their owning source and removes JM cover dependence on Pica login. Cover cache gains source/session scope, per-comic writer serialization and stale-response rejection. No database migration, recommendation change, source account or production data. Candidate Dev versionCode62 keeps the fixed identity. Exact new source, package hashes and new gates must be recorded separately; previous green checks are not reused. [Scope, safety and local-ingestion continuation](SOURCE_MEDIA_BOUNDARY.md).
@@ -12,7 +18,7 @@ Implemented source slice: pure standalone tag domain with an old-path compatibil
 
 Previous NEXT-44 is frozen at `9ff972e50446b40445c9c54e24350f8ce9ef312b`, with its independently verified handoff retained unchanged. It passed automated/package gates but still has real-AI/provider/device holds. Tags/private mappings and AI file exchange are implemented in that previous slice; the older "first UX slice" descriptions below are historical, not the current feature inventory.
 
-The complete objective remains open: arbitrary local-format ingestion, source enable/disable/trust lifecycle, further recommendation/native domain separation and physical gestures/upgrade acceptance. Main, stable OTA and installed data are outside this candidate. No manual test is forced now and no old hold/issue is silently closed.
+The complete objective remains open: NEXT-48 adds the bounded folder/CBZ slice, not all local formats. Source enable/disable/trust lifecycle, further recommendation/native separation, relocation/watchers/native direct import and physical gestures/upgrade acceptance remain. No old hold/issue is silently closed.
 
 ## 2026-10-22 continuation: daily UX and two separate guides
 

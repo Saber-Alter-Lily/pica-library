@@ -117,6 +117,17 @@ describe('desktop configuration security', () => {
         ).toContain('proxy-user:proxy-password@')
     })
 
+    it('permits ordinary folder names containing account/token without allowing secret keys or proxy credentials', () => {
+        const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pica-config-folder-'));directories.push(dir)
+        const file=path.join(dir,'config.json')
+        const built=buildLocalConfig({libraryDirectory:path.join(dir,'account-token-comics'),profile:'balanced'})
+        saveConfig(file,built)
+        expect(loadConfig(file)?.libraryDirectory).toBe(built.libraryDirectory)
+        expect(()=>saveConfig(file,{...built,password:'fixture-secret'} as never)).toThrow(/sensitive/)
+        expect(()=>saveConfig(file,{...built,nested:{authorization:'fixture-secret'}} as never)).toThrow(/sensitive/)
+        expect(()=>saveConfig(file,{...built,proxyUrl:'http://alice:secret@127.0.0.1:7890'})).toThrow(/proxy credentials/)
+    })
+
     it('does not fall back to a plaintext credential file', () => {
         const store = new MemoryCredentialStore()
         store.save({ account: 'a', password: 'b' })

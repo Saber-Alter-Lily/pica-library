@@ -75,7 +75,7 @@ public class TagParticipationActivity extends LocaleAwareActivity {
         button(content,tr("全开","Enable all","全て有効"),v->setMode("ALL")).setTag("tag-all");button(content,tr("全关","Disable all","全て無効"),v->setMode("SELECTED")).setTag("tag-none");
         search=new EditText(this);search.setSingleLine(true);search.setFilters(new InputFilter[]{new InputFilter.LengthFilter(160)});search.setHint(tr("查找标签","Find tags","タグを検索"));search.setText(query);content.addView(search);
         button(content,tr("查找","Find","検索"),v->{query=search.getText().toString().trim();page=0;render();});search.setOnEditorActionListener((v,a,event)->{query=search.getText().toString().trim();page=0;render();return true;});
-        addFilter(content,Arrays.asList("","pica","eh","jm","private"),provider,value->{if(!provider.equals(value)){provider=value;page=0;render();}},true);
+        addFilter(content,Arrays.asList("","pica","eh","jm","local","private"),provider,value->{if(!provider.equals(value)){provider=value;page=0;render();}},true);
         List<String> facets=new ArrayList<>();facets.add("");for(Row row:directory)if(!facets.contains(row.facet))facets.add(row.facet);facets.add("PRIVATE");addFilter(content,facets,facet,value->{if(!facet.equals(value)){facet=value;page=0;render();}},false);
         list=new LinearLayout(this);list.setOrientation(LinearLayout.VERTICAL);content.addView(list);List<Row> rows=new ArrayList<>(directory);
         for(JSONObject tag:policy.privateTags)rows.add(new Row("private|"+tag.optString("id"),tag.optString("name"),"private","PRIVATE"));

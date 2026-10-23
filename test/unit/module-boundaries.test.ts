@@ -51,6 +51,13 @@ function imports(file: string): string[] {
     return found
 }
 describe('enforced first module boundaries', () => {
+    it('keeps local ingestion behind a narrow storage port without online/login/ranking ownership', () => {
+        const directory=path.join(root,'src/local-library')
+        for(const file of files(directory)) for(const specifier of imports(file)) {
+            if(['node:fs','node:path','node:crypto','node:zlib','adm-zip'].includes(specifier))continue
+            expect(path.resolve(path.dirname(file),specifier).startsWith(directory+path.sep)).toBe(true)
+        }
+    })
     it('keeps neutral media transport independent from provider sessions, library storage and recommendations', () => {
         const directory = path.join(root, 'src/media')
         for (const file of files(directory)) for (const specifier of imports(file)) {

@@ -9,7 +9,7 @@ export function expandPrivateTagIntentV1(intent: RecommendationIntentV3, state: 
     const tag = policy.privateTags.find(tag => privateTagSignalV1(tag.id) === key)
     if (!key.startsWith('@private/')) return [intent]
     if (!tag || !tagParticipatesV1(policy, tagIdentityV1('private', tag.id))) return []
-    if (tag.kind === 'MAPPED') return [{ ...intent, anchors: tag.mappings.map(mapping => {
+    if (tag.kind === 'MAPPED') return [{ ...intent, anchors: tag.mappings.filter(mapping => !mapping.startsWith('local|')).map(mapping => {
         const split = mapping.indexOf('|'), provider = mapping.slice(0, split) as 'pica' | 'eh' | 'jm'
         return { ...intent.anchors[0], facet: 'PRIVATE_TAG', providerQueryLabel: mapping.slice(split + 1), allowedProviders: [provider] }
     }) }].filter(value => value.anchors.length)

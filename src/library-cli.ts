@@ -23,6 +23,7 @@ import type {
 } from './core/downloads/profiles'
 import type { DownloadRunner } from './core/downloads/types'
 import { PRODUCT_VERSION } from './version'
+import { LocalLibraryIngestion } from './local-library/ingestion'
 
 loadEnv()
 
@@ -47,7 +48,9 @@ const flagsWithValues = new Set([
     'host',
     'port',
     'page',
-    'output'
+    'output',
+    'path',
+    'kind'
 ])
 
 function flag(name: string, fallback?: string) {
@@ -97,6 +100,7 @@ function help() {
 
 Usage:
   pica-library init
+  pica-library local-import --path PATH --kind folder|cbz [--confirm] [--json]
   pica-library library <sync|list|import|export>
   pica-library discover <search|recommend>
   pica-library download <add|list|run|pause|resume|retry|cancel>
@@ -179,6 +183,15 @@ async function main() {
     const service = new LibraryService(database, dataDir)
     let keepOpen = false
     try {
+        if (command === 'local-import') {
+            const source = flag('path'), kind = flag('kind')
+            if (!source || !['folder', 'cbz'].includes(kind ?? '')) throw new Error('Explicit --path and --kind folder|cbz required')
+            const ingestion = new LocalLibraryIngestion(database, dataDir)
+            const preview = await ingestion.preview(path.resolve(source), kind as 'folder' | 'cbz')
+            // No persistence unless this local terminal invocation explicitly confirms.
+            print(hasFlag('confirm') ? await ingestion.confirm(preview.token) : { ...preview, token: undefined, confirmationRequired: true })
+            return
+        }
         if (command === 'init') {
             print({
                 dataDir,

@@ -46,6 +46,10 @@ export function sqliteDiskFilename(
             '数据库路径超过 Windows/SQLite 文件系统限制，请选择较短的数据目录；现有数据不会自动移动或清空。 / Database path exceeds the Windows/SQLite filesystem limit; choose a shorter data folder. Existing data is not moved or cleared.'
         )
 
+    // Preserve the exact prior VFS/normalization for ordinary legacy profiles.
+    // Extend only names that need it, including the journal and terminating NUL.
+    if (!file.startsWith('\\\\?\\') && file.length + 8 < 260) return file
+
     if (!uriFilenamesAvailable(nodeVersion)) {
         // Preserve short-path compatibility for the originally supported Node22.5.
         // Never let an older runtime interpret a SQLite URI as a literal filename.

@@ -36,6 +36,8 @@ The candidate workflow uploads only `artifacts/upgrade-diagnostics/` with `if: a
 
 ## Remaining gates and work
 
+NEXT-56 adds the [SQLite filename/deep-path seam and detached build closure](SQLITE_PATH_ADAPTER.md). Shared application modules must be inlined into each external helper, because the existing bootstrap copies a single JS file. A real Rollup/empty-directory startup gate now enforces that contract rather than relying on source-level unit imports or the installed application tree.
+
 Exact-source unit/real-browser, actual installable identity/signature, current diagnostic artifacts and full success/health/async-launch rollback must be verified in this slice's immutable handoff. v0.5.0 and prior NEXT-54 state-retaining application replacement/rollback remain required; a blocked nonallowlisted incremental package must still select full replacement.
 
 The original runner-only failure is not retroactively resolved. Real Android overwrite install/OEM/picker/SD-card/source/gesture/tag/offline-sync acceptance remains deferred. Complete recommendation build-pipeline/V5/legacy separation, optional source runtime/trusted extension policy, native body export and orphan/retired-generation collection remain open. No main merge, tag/Release, stable OTA, key download, deployment or production access is authorized by these engineering gates.

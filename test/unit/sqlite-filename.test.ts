@@ -49,20 +49,28 @@ describe('SQLite disk filename adapter', () => {
         '\\\\server\\share\\data\\library.db',
         '\\\\?\\C:\\already namespaced\\library.db'
     ])(
-        'encodes the physical filename without exposing URI controls: %s',
+        'encodes a deep physical filename without exposing URI controls: %s',
         (file) => {
-            const value = sqliteDiskFilename(file, 'win32', '24.15.0')
+            const physical = path.win32.join(
+                path.win32.dirname(file),
+                ...Array.from({ length: 50 }, () => 'nested'),
+                path.win32.basename(file)
+            )
+            const value = sqliteDiskFilename(physical, 'win32', '24.15.0')
             const uri = new URL(value)
             expect([...uri.searchParams]).toEqual([['vfs', 'win32-longpath']])
             expect(decodeURIComponent(value.slice(5, value.indexOf('?')))).toBe(
-                path.win32.toNamespacedPath(file)
+                path.win32.toNamespacedPath(physical)
             )
             expect(value).not.toContain('win32-longpath-none')
         }
     )
 
     it('does not interpret user filename characters as immutable/nolock options', () => {
-        const file = 'C:\\data\\literal%3Fimmutable=1#nolock=1\\library.db'
+        const file =
+            'C:\\data\\literal%3Fimmutable=1#nolock=1\\' +
+            'nested\\'.repeat(50) +
+            'library.db'
         const value = sqliteDiskFilename(file, 'win32', '24.15.0')
         expect([...new URL(value).searchParams]).toEqual([
             ['vfs', 'win32-longpath']
@@ -75,7 +83,14 @@ describe('SQLite disk filename adapter', () => {
     it('preserves old Node short-path compatibility and rejects only unsupported deep paths there', () => {
         expect(
             sqliteDiskFilename('C:\\data\\library.db', 'win32', '22.5.0')
-        ).toBe('\\\\?\\C:\\data\\library.db')
+        ).toBe('C:\\data\\library.db')
+        expect(
+            sqliteDiskFilename(
+                'C:\\old folder. \\library.db',
+                'win32',
+                '24.15.0'
+            )
+        ).toBe('C:\\old folder. \\library.db')
         const file = 'C:\\' + 'long\\'.repeat(250) + 'library.db'
         expect(() => sqliteDiskFilename(file, 'win32', '22.5.0')).toThrow(
             /bundled runtime/
@@ -145,7 +160,9 @@ describe('SQLite disk filename adapter', () => {
             roots.push(root)
             const file = path.join(root, 'library.db')
             const ordinary = new DatabaseSync(file)
-            const adapted = new DatabaseSync(sqliteDiskFilename(file))
+            const adapted = new DatabaseSync(
+                sqliteDiskFilename(path.toNamespacedPath(file))
+            )
             try {
                 ordinary.exec(
                     "PRAGMA journal_mode=WAL; CREATE TABLE retained(value TEXT); BEGIN IMMEDIATE; INSERT INTO retained VALUES ('held');"

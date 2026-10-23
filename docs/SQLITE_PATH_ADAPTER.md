@@ -4,7 +4,7 @@
 
 `src/storage/sqlite/filename.ts` converts an already resolved logical disk filename to the existing SQLite runtime's location string. `LibraryDatabase.file`, configuration, imports, manifests, backups and updater instructions keep their original ordinary absolute paths. No database is relocated, renamed, recreated on failure or migrated to another engine. Schema14/public module APIs are unchanged. No app/user content is added to the distribution.
 
-On Windows with the bundled Node24.15.0, the adapter percent-encodes the complete namespace-prefixed path into a SQLite URI and selects **`win32-longpath`**, not either `*-none` VFS. Other platforms keep the existing location unchanged. No new dependency/native extension, custom SQLite, global registry setting, administrator step, junction or drive mapping is introduced.
+On Windows with the bundled Node24.15.0, paths needing extended Win32 access (or already explicitly namespaced) are fully percent-encoded into a SQLite URI selecting **`win32-longpath`**, not either `*-none` VFS. Ordinary short profiles keep their exact prior location/VFS normalization behavior, including legacy trailing-dot/space spellings; this is not an implicit relocation to a differently normalized directory. Other platforms keep the existing location unchanged. No new dependency/native extension, custom SQLite, global registry setting, administrator step, junction or drive mapping is introduced.
 
 Reuse authorities:
 
@@ -29,6 +29,12 @@ The adapter checks native character/UTF-8/component budgets with room for the ex
 - Complete path encoding prevents literal percent/hash/query-like filename text from adding SQLite URI options. No URI is serialized into saved user state.
 
 ## Required evidence and unproven boundaries
+
+### Detached build closure
+
+The first local exact-source package in this slice (`4c507125ff1f`) passed deep CLI/Reader/restart but failed the real full-upgrade gate **before progress**: Rollup had split the newly shared filename adapter into an extra chunk while the existing external-helper contract copies only one JS file. The bounded `ERR_MODULE_NOT_FOUND` report is retained as an iteration failure, not attributed to the old runner incident or relabeled as a path success.
+
+CLI/Desktop may still share in-tree chunks. Each detached updater now gets its own Rollup entry with [inline dynamic imports](https://rollupjs.org/configuration-options/#output-inlinedynamicimports), and a [generateBundle](https://rollupjs.org/plugin-development/#generatebundle) guard rejects non-built-in external imports, extra chunks or referenced files. Helpers currently use only our code/Node; introducing a third-party helper dependency requires explicit license-notice handling rather than silently dropping notices. The application's existing third-party notice generation is retained. Real Rollup unit tests copy only each generated helper into a fresh empty directory, start it and require its own instruction-error boundary rather than a missing-module error; a split-chunk fixture rejects at the guard. No duplicated path policy or parallel update protocol is introduced.
 
 New pure/native tests cover platform mapping, URI option confinement, old-runtime behavior, native limits, real deep LibraryDatabase use, ordinary-client WAL locks, setup/update preflight, and closing a failed startup connection. Windows-only native assertions are explicitly skipped on Linux and must run on Windows; no previous test results are relabeled.
 

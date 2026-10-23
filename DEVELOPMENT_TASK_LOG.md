@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+## NEXT-51 — native Reader gesture decision seam (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_RECORDED_IN_HANDOFF / PHYSICAL_TOUCH_QA_PENDING.** The complete modular-reader objective remains open.
+
+- Continues frozen NEXT-50 `76898ad29c1ac804b7451ac889107511c7532b21`; immutable complete handoff SHA256 `7c2003e35c5a5a48a735da2488821939c57f037a5046f3d31cc833ecf9d6a1e2`. No old archive/evidence is overwritten.
+- Extracts pure Java gesture decisions and per-touch ownership from the image widget. Reuses Android GestureDetector/ScaleGestureDetector and existing AndroidX containers, not a new recognition stack. A no-Android compilation gate and plain JUnit protect the seam.
+- Adds SDK28/35 event regression for cancelled/pending taps, recycled/detached views, vertical-dominant flings, parent interception, pinch/pan and pager-managed suppression. Disabling double-tap also disables Android quick-scale; pinch remains independent.
+- Local Desktop: 1359 passed + one existing POSIX-host skip. Android: 285 passed + 13 existing Windows/SDK35 AtomicFile skips (298 total, required to execute on Linux CI); lint and release shrinker passed. Running the old widget against the new 36-case SDK28/35 event suite produced eight expected failures across four defect scenarios; restoring the candidate must pass again before freezing evidence.
+- Preserves phone-local preference file/keys/defaults and existing zoom levels; portable reading settings, progress, sources, accounts, schema and production data are not migrated or reset. Candidate Dev code66 must retain code65's package/certificate.
+- [Detailed contract and remaining physical-device limits](docs/NATIVE_READER_GESTURE_MODULE.md). Automated counts, exact-source CI, actual installable hashes and Windows update/rollback evidence belong in the separate handoff. No issue/device acceptance is inferred from CI, and no user test is forced now.
+- Existing isolated-development/Draft-PR/CI and DPAPI coordination exception authorization continues. No main merge, tag/Release, stable OTA, production-profile access, key download, automatic install or deployment.
+
 ## NEXT-50 — phone-local native source lifecycle (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / LOCAL_REGRESSION_PASS / EXACT_SOURCE_CI_AND_PACKAGE_EVIDENCE_IN_HANDOFF / REAL_DEVICE_QA_PENDING.** The full modular-reader objective remains open.

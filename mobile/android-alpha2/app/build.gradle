@@ -119,3 +119,16 @@ dependencies {
 configurations.configureEach {
     exclude group: 'io.github.darkxanter', module: 'webp-imageio'
 }
+
+// Compile the decision seam without Android, SDKs or any other application classes.
+// Recognition remains in GestureDetector / ScaleGestureDetector; this is not a new touch framework.
+def gestureBoundary = tasks.register('compileReaderGestureBoundary', JavaCompile) {
+    source fileTree('src/main/java/com/picalibrary/android/reader/gestures') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('reader-gesture-boundary')
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+tasks.configureEach {
+    if (name == 'testDebugUnitTest') dependsOn gestureBoundary
+}

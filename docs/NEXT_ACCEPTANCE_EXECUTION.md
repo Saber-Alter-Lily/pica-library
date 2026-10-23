@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-51: native Reader gesture module (unpublished)
+
+Continues frozen NEXT-50 `76898ad29c1ac804b7451ac889107511c7532b21`, complete handoff SHA256 `7c2003e35c5a5a48a735da2488821939c57f037a5046f3d31cc833ecf9d6a1e2`. Pure Java decisions/stream ownership are separated from Android recognition/rendering and phone-local storage. Existing platforms/libraries remain in use. SDK28/35 event and preference regressions plus a no-Android compilation gate cover the bounded corrections in [the native gesture contract](NATIVE_READER_GESTURE_MODULE.md).
+
+Dev code66 preserves code65 package/signature; preference keys/defaults, portable state and all production data remain unchanged. Exact-source tests, installables and upgrade/rollback receipts are frozen separately after the new build. Physical installation, real pager/continuous-scroll feel, OEM touch, native tag matching, recommendation seams and other previously listed holds remain open. No main merge, Release/OTA change, automatic install or deployment.
+
 ## 2026-10-23 NEXT-50: native source lifecycle (unpublished)
 
 Continues frozen NEXT-49 `81f8b5665c6ba456a64b6660049727182d3ff4d1`, complete handoff SHA256 `9385440668d86fdb96e682eaeded5fba9fc54e56b61c8fbfe0be01f9f3f0246f`. Phone-local explicit source choices now gate direct/relayed provider requests, native workers and late metadata/image-cache commits. Existing data and ordinary local/LAN/WebDAV access remain independent. New installs start source-free; legacy adoption is one-time and does not decrypt secrets. [Native contract and device holds](NATIVE_SOURCE_LIFECYCLE.md).

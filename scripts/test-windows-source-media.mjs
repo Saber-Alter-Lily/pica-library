@@ -12,8 +12,14 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-source-media-'))
 const app = path.join(root, 'application'), home = path.join(root, 'localappdata', 'Pica Library Post Stable RC')
 const data = path.join(home, 'data'), instanceFile = path.join(home, 'runtime-state', 'instance.json')
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5WsAAAAASUVORK5CYII=', 'base64')
-let requests = 0, forbidden = 0, instance, success = false
+let requests = 0, slowRequests = 0, forbidden = 0, instance, success = false
 const proxy = http.createServer((request, response) => {
+    if (request.method === 'GET' && request.url === 'https://cdn.pica-acceptance.invalid/slow.png' &&
+        !['authorization', 'cookie', 'signature', 'api-key', 'nonce'].some(name => request.headers[name])) {
+        slowRequests++
+        // Intentionally never send headers/body; only the production client's deadline ends this.
+        return
+    }
     if (request.method !== 'GET' || request.url !== 'https://cdn.pica-acceptance.invalid/cover.png' ||
         ['authorization', 'cookie', 'signature', 'api-key', 'nonce'].some(name => request.headers[name])) {
         forbidden++; response.writeHead(502); response.end(); return
@@ -78,8 +84,11 @@ try {
     if (!current.configured || current.picaAccount?.configured || requests !== 1 || forbidden || fs.existsSync(path.join(home, 'config', 'credentials.dat'))) throw new Error('Source-free/cache/credential boundary failed')
     const modules = await fetch(instance.url + '/api/v1/capabilities').then(response => response.json())
     if (modules.sourceModules.find(module => module.id === 'jm')?.adapterVersion !== '1.0.1') throw new Error('New compiled adapter declaration missing')
+    await post('/api/v1/import', { records: [{ comicId: 'jm:124', providerId: 'jm', providerRemoteId: '124', title: 'Synthetic timeout', author: 'Fixture', tags: [], categories: [], finished: false, coverUrl: 'https://cdn.pica-acceptance.invalid/slow.png' }] })
+    const timed = await fetch(instance.url + '/api/v1/covers/jm%3A124', { signal: AbortSignal.timeout(30000) })
+    if (timed.ok || !(await timed.text()).includes('timed out') || slowRequests !== 1 || forbidden) throw new Error('Actual packaged media deadline did not terminate the stalled fixture')
     success = true
-    process.stdout.write(JSON.stringify({ packaged_source_media: 'PASS', source_sha: sourceSha, version, pica_account_configured: false, pica_or_other_remote_requests: forbidden, cover_http_requests: requests, concurrent_cover_readers: responses.length, caller_url_ignored: true, configured_proxy_used: true, cached_image_bytes_match: true, credentials_file_created: false, synthetic_only: true, production_accessed: false }) + '\n')
+    process.stdout.write(JSON.stringify({ packaged_source_media: 'PASS', source_sha: sourceSha, version, pica_account_configured: false, pica_or_other_remote_requests: forbidden, cover_http_requests: requests, slow_fixture_requests: slowRequests, bounded_timeout_response: true, concurrent_cover_readers: responses.length, caller_url_ignored: true, configured_proxy_used: true, cached_image_bytes_match: true, credentials_file_created: false, synthetic_only: true, production_accessed: false }) + '\n')
 } finally {
     if (instance) {
         try { await post('/api/v1/desktop/shutdown', {}) } catch {}

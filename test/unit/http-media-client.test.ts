@@ -30,6 +30,7 @@ describe('credential-free shared media transport', () => {
                     /authorization|cookie|signature|api-key|nonce|synthetic-api-token/
                 )
                 expect(config.maxRedirects).toBe(0)
+                expect(config.signal).toBeDefined()
                 expect(config.timeout).toBeGreaterThan(0)
                 expect(config.timeout).toBeLessThanOrEqual(
                     MEDIA_REQUEST_TIMEOUT_MS

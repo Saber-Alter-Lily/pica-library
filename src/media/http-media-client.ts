@@ -100,6 +100,7 @@ export class HttpMediaClient {
                 response = await this.client.get<Buffer>(url.toString(), {
                     responseType: 'arraybuffer',
                     timeout: remaining,
+                    signal: AbortSignal.timeout(remaining),
                     maxContentLength: options.maxBytes,
                     maxBodyLength: options.maxBytes,
                     maxRedirects: 0,
@@ -110,7 +111,9 @@ export class HttpMediaClient {
                 // Axios errors contain request config/proxy credentials. Never expose that object.
                 if (
                     axios.isAxiosError(error) &&
-                    ['ECONNABORTED', 'ETIMEDOUT'].includes(error.code ?? '')
+                    ['ECONNABORTED', 'ETIMEDOUT', 'ERR_CANCELED'].includes(
+                        error.code ?? ''
+                    )
                 )
                     throw new Error('Provider media request timed out')
                 const status = axios.isAxiosError(error)

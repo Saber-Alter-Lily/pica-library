@@ -142,10 +142,21 @@ try {
     )
     if (imported.status !== 0)
         throw new Error('Packaged fixture import failed: ' + imported.stderr)
-    packagedNode(
-        `const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync(process.argv[1]);d.prepare("UPDATE comics SET is_favorite=0 WHERE id IN ('fixture-a','fixture-b')").run();d.close();console.log('{}');`,
+    const candidates = packagedNode(
+        `const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync(process.argv[1]);
+// CSV import intentionally creates both favorites and library membership. Candidates must be neither.
+d.prepare("UPDATE comics SET is_favorite=0 WHERE id IN ('fixture-a','fixture-b')").run();
+d.prepare("DELETE FROM library_membership WHERE comic_id IN ('fixture-a','fixture-b')").run();
+const rows=d.prepare("SELECT c.id,c.is_favorite,EXISTS(SELECT 1 FROM library_membership m WHERE m.comic_id=c.id) AS in_library FROM comics c WHERE c.id IN ('fixture-a','fixture-b') ORDER BY c.id").all();d.close();console.log(JSON.stringify(rows));`,
         databaseFile
     )
+    if (
+        candidates.length !== 2 ||
+        candidates.some((row) => row.is_favorite || row.in_library)
+    )
+        throw new Error(
+            'Synthetic candidates must be outside favorites and owned library'
+        )
     launch()
     let state = await status()
     if (state.version !== version || state.configured)
@@ -236,7 +247,16 @@ d.exec('COMMIT');d.close();console.log('{}');`,
         JSON.stringify(current.recommendations.map((r) => r.comicId)) !==
             JSON.stringify(['fixture-a', 'fixture-b'])
     )
-        throw new Error('Packaged current result changed')
+        throw new Error(
+            'Packaged current result changed: ' +
+                JSON.stringify({
+                    batchId: current.batchId,
+                    source: current.source,
+                    cached: current.cached,
+                    ids: current.recommendations?.map((r) => r.comicId),
+                    filter: current.servingFilterTelemetry
+                })
+        )
     if (
         cache.source !== 'final-v3-portable-cache' ||
         !cache.cached ||

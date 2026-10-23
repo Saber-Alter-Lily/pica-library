@@ -176,13 +176,16 @@ try {
             chapters = await fetch(
                 instance.url + '/api/v1/reader/comics/' + encoded + '/chapters'
             ).then((r) => r.json())
-        const chapter = await fetch(
+        const chapterResponse = await fetch(
             instance.url +
                 '/api/v1/reader/comics/' +
                 encoded +
                 '/chapters/' +
                 encodeURIComponent(chapters[0].id)
-        ).then((r) => r.json())
+        )
+        const chapter = await chapterResponse.json()
+        if (!chapterResponse.ok || !Array.isArray(chapter.pages) || !chapter.pages.length)
+            throw new Error('Actual packaged Reader chapter failed: '+JSON.stringify({status:chapterResponse.status,body:chapter}))
         const bytes = Buffer.from(
             await fetch(instance.url + chapter.pages[0].url).then((r) =>
                 r.arrayBuffer()

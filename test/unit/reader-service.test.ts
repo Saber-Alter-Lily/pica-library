@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import AdmZip from 'adm-zip'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { ReaderService } from '../../src/services/reader-service'
 
@@ -52,11 +52,24 @@ function fixture(pages = 3) {
 }
 
 afterEach(() => {
+    vi.restoreAllMocks()
     for (const directory of directories.splice(0))
         fs.rmSync(directory, { recursive: true, force: true })
 })
 
 describe('ReaderService', () => {
+    it('uses native canonical roots so Windows 8.3 aliases do not reject owned imported pages', () => {
+        const {root,database,reader}=fixture(1)
+        const original=fs.realpathSync,native=vi.fn(original.native)
+        const legacy=vi.spyOn(fs,'realpathSync').mockImplementation(((file:fs.PathLike)=>
+            String(file)===root ? path.join(root,'SHORT~1') : original(file)) as typeof fs.realpathSync)
+        Object.assign(legacy,{native})
+        expect(reader.chapter('reader-comic','episode-1').pages).toHaveLength(1)
+        expect(reader.picture('picture-0').data.toString()).toBe('page-1')
+        expect(legacy).not.toHaveBeenCalled()
+        expect(native).toHaveBeenCalledWith(root)
+        database.close()
+    })
     it('reads downloaded chapters and persists resume position', () => {
         const { database, reader } = fixture()
         expect(reader.chapters('reader-comic')[0]).toMatchObject({

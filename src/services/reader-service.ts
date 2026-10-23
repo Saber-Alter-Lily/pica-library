@@ -73,8 +73,10 @@ export class ReaderService {
         const resolved = path.resolve(file)
         if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile())
             throw new Error('Downloaded page is unavailable')
-        const realRoot = fs.realpathSync(this.root)
-        const realFile = fs.realpathSync(resolved)
+        // Match the native canonicalization used by async ingestion: Windows 8.3
+        // aliases (RUNNER~1 vs runneradmin) otherwise look like different roots.
+        const realRoot = fs.realpathSync.native(this.root)
+        const realFile = fs.realpathSync.native(resolved)
         const relative = path.relative(realRoot, realFile)
         if (relative.startsWith('..') || path.isAbsolute(relative))
             throw new Error('Reader file escaped the Library root')

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { translate } from '../../web/i18n.js'
 
 for (const [language, label] of [
     ['zh-CN', '只配置本地书库'],
@@ -110,7 +111,13 @@ for (const [language, label] of [
         await expect(page.locator('#setup-local')).toHaveText(label)
         expect(await page.locator('#setup-account').inputValue()).toBe('')
         expect(await page.locator('#setup-password').inputValue()).toBe('')
-        await page.locator('#setup-local').click()
+        await Promise.all([
+            page.waitForEvent('domcontentloaded'),
+            page.locator('#setup-local').click()
+        ])
+        await expect(page.locator('#mode')).toHaveText(
+            translate(language, 'mode.connected')
+        )
         await expect.poll(() => settings.length).toBe(1)
         expect(settings[0]).toEqual({
             setupMode: 'local',

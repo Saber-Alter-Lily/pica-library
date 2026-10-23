@@ -15,6 +15,8 @@ import { desktopPaths } from '../desktop/paths'
 import { LibraryQueryService } from '../services/library-query-service'
 import { ReaderService } from '../services/reader-service'
 import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
+import { RecommendationCycleQueriesV3 } from '../recommendation/queries'
+import { recommendationCycleReadStoreV3 } from '../services/recommendation-cycle-store'
 import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
 import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
 import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
@@ -243,16 +245,21 @@ export async function startMobileBridge(options: {
     const requestedPort = options.port ?? 7788
     const library = new LibraryQueryService(options.database)
     const reader = new ReaderService(options.database, options.service.dataDir)
+    const finalRecommendationVersions = {
+        profileVersion: FINAL_PROFILE_VERSION,
+        registryVersion: 'PICA Registry V3',
+        rankerModelVersion: RANKER_ADAPTER_VERSION,
+        candidatePoolVersion: RETRIEVER_VERSION,
+        allocatorVersion: BATCH_ALLOCATOR_VERSION
+    }
+    const finalRecommendationQueries = new RecommendationCycleQueriesV3(
+        recommendationCycleReadStoreV3(options.database),
+        finalRecommendationVersions
+    )
     const finalRecommendationCoordinator = new CycleCoordinatorV3(
         options.database,
         (cycleId) => options.service.buildFinalRecommendationCycleV3(cycleId),
-        {
-            profileVersion: FINAL_PROFILE_VERSION,
-            registryVersion: 'PICA Registry V3',
-            rankerModelVersion: RANKER_ADAPTER_VERSION,
-            candidatePoolVersion: RETRIEVER_VERSION,
-            allocatorVersion: BATCH_ALLOCATOR_VERSION
-        }
+        finalRecommendationVersions
     )
     const shelves = new ShelfService(options.database, library)
     const personalization = new PersonalizationService(
@@ -902,6 +909,9 @@ export async function startMobileBridge(options: {
                             `mobile-pair:${deviceId}:${mutationId}`
                         )
                         await finalRecommendationCoordinator.waitForBuild()
+                        // This POST explicitly requested recomputation. Prepare its
+                        // first batch here; subsequent GETs are strictly read-only.
+                        finalRecommendationCoordinator.current()
                         recommendationRefresh = {
                             requested: true,
                             completed: true,
@@ -937,7 +947,7 @@ export async function startMobileBridge(options: {
                 return json(
                     response,
                     200,
-                    finalRecommendationCoordinator.portable(limit)
+                    finalRecommendationQueries.portable(limit)
                 )
             }
 
@@ -1253,7 +1263,7 @@ export async function startMobileBridge(options: {
                 // The desktop web UI already owns the authoritative Final V3
                 // cycle/batch. Mobile must read that persisted batch instead of
                 // starting the expensive provider recall pipeline again.
-                const current = finalRecommendationCoordinator.current()
+                const current = finalRecommendationQueries.current()
                 const recommendations = current.recommendations.slice(0, limit)
                 return json(response, 200, {
                     ...current,

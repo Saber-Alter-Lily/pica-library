@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-53: recommendation cycle module and read-only mobile delivery (unpublished)
+
+Continues frozen NEXT-52 `21c94df844f87db7d58aaa9625612b132eaea32f`, handoff SHA256 `a6a33363ad1f96e7f26b19f5118989c9db2b9812c61477f052f8df4fe309a1c8`. V3 cycle commands/result queries now use explicit storage/build/runtime ports, with the existing application constructor preserved. Mobile GET reads persisted results only; explicit recompute prepares a first batch. Local startup stops legacy recall. Warm filtering now honors new blocks/seen/duplicate/temporary facts and canonical ownership without rewriting original scores/batches. [Contract, evidence and limits](RECOMMENDATION_CYCLE_MODULE.md).
+
+State keys/schema14/public module APIs remain. Dev code68 preserves code67 identity. Native/JVM logic remains unchanged; current CI still validates the installables. Full build-pipeline decomposition and deferred physical/provider acceptance remain open. No merge, release/OTA or deployment.
+
 ## 2026-10-23 NEXT-52: native personal-tag domain and shared contract (unpublished)
 
 Continues frozen NEXT-51 `b4517ea70519d0266c985e1f67cb48beb393bc2d`, complete handoff SHA256 `2412d0fcadbd5bde549e963cb1d86da230d0139511bd307b13d48ac438670dbd`. Separates pure native participation/private matching and directory counts from existing JSON/raw-fact adapters; both clients consume one 44-case synthetic golden fixture. Fixes local/unscoped gating, stale SELECTED leakage in ALL, current-comic fact forwarding and malformed-state coercion. [Contract and limits](NATIVE_TAG_POLICY_MODULE.md).

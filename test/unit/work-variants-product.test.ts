@@ -8,7 +8,7 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 describe('owned-work exclusion and work-variant detail UX', () => {
     it('keeps Final V3 serving behind an ownership-aware work gate', () => {
         const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
+            'src/recommendation/queries.ts'
         )
         const database = read('src/library/database.ts')
         expect(coordinator).toContain('recommendationOwnershipState()')

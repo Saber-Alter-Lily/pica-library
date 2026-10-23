@@ -111,7 +111,7 @@ describe('P2 D5A authoritative Work Identity domains', () => {
     it('routes authoritative materialization and Final V3 ownership through full-domain readers', () => {
         const service = fs.readFileSync('src/library/service.ts', 'utf8')
         const coordinator = fs.readFileSync(
-            'src/recommendation-v3/cycle-coordinator-v3.ts',
+            'src/recommendation/queries.ts',
             'utf8'
         )
 

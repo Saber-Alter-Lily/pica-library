@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-53 — recommendation cycle commands, read-only delivery and storage ports (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / DEVICE_QA_PENDING.** Full modular-reader work remains open.
+
+- Continues frozen NEXT-52 `21c94df844f87db7d58aaa9625612b132eaea32f`; immutable complete handoff SHA256 `a6a33363ad1f96e7f26b19f5118989c9db2b9812c61477f052f8df4fe309a1c8`.
+- Moves V3 cycle orchestration and result queries into a domain with explicit read/write/build/clock/identity capabilities. Reuses existing ranker, allocator, ownership/block and tag algorithms; SQLite methods/transactions and the old constructor remain application adapters. Browser-platform compilation checks actual runtime imports.
+- Mobile GET current/cache can only read persisted data; no state initialization, first-batch allocation, seen advancement or recall. Explicit recompute POST prepares the first batch. Local server startup stops legacy automatic recall. Existing Desktop command and portable formats remain.
+- Invalidates warm eligibility for newly seen/duplicate/blocked/temporarily suppressed items, and uses reviewed canonical ownership in both batch and portable views. Stored scores, batches and pool evidence are unchanged. New SQLite/paired-HTTP tests cover these flows; old static guards follow the moved implementation instead of a compatibility facade.
+- Dev code68 retains code67 identity/signature; native logic and shared JVM sources are unchanged. Exact-source CI, actual Windows package checks and stable/prior full replacement/forced rollback must be recorded in the new handoff. Prior green results are provenance only.
+- [Module contract and remaining build-pipeline work](docs/RECOMMENDATION_CYCLE_MODULE.md). Existing isolated candidate/Draft/CI and DPAPI exception authority continues. No production data, main merge, tag/Release, stable OTA change, private-key download, installation or deployment.
+
 ## NEXT-52 — native tag domain and cross-client golden contract (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / PHYSICAL_QA_PENDING.** The full modular-reader objective remains open.

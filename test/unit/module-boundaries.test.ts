@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { build } from 'esbuild'
 import { describe, expect, it } from 'vitest'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -51,6 +52,17 @@ function imports(file: string): string[] {
     return found
 }
 describe('enforced first module boundaries', () => {
+    it('bundles recommendation queries and commands without Node, SQL, provider clients or model execution', async () => {
+        const result = await build({ entryPoints: ['src/recommendation/queries.ts','src/recommendation/cycle-commands.ts'],
+            bundle:true, platform:'browser',format:'esm',write:false,outdir:'_validation/recommendation-boundary-memory',metafile:true,logLevel:'silent' })
+        const allowed = new Set(['src/recommendation/ports.ts','src/recommendation/queries.ts','src/recommendation/cycle-commands.ts',
+            'src/recommendation-v3/batch-allocator-v3.ts','src/recommendation-v5/portable-policy.ts','src/tags/policy.ts'])
+        for(const file of Object.keys(result.metafile!.inputs))
+            expect(allowed.has(file.replaceAll('\\','/')),file).toBe(true)
+        expect(result.outputFiles).toHaveLength(2)
+        const query=fs.readFileSync(path.join(root,'src/recommendation/queries.ts'),'utf8')
+        for(const forbidden of ['buildCycle','createId','writeState','saveV3BatchAndAllocate','fetch(']) expect(query).not.toContain(forbidden)
+    })
     it('keeps local ingestion behind a narrow storage port without online/login/ranking ownership', () => {
         const directory=path.join(root,'src/local-library')
         for(const file of files(directory)) for(const specifier of imports(file)) {

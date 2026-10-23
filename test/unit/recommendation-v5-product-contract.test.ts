@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
+const readCycleImplementation = () => read('src/recommendation/cycle-commands.ts') + read('src/recommendation/queries.ts')
+
 describe('Recommendation V5 portable product contract', () => {
     it('keeps Desktop heavy compute portable without replacing Android runtime cycles', () => {
         const bridge = read('src/mobile/bridge-server.ts')
@@ -212,9 +214,7 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(evidence).toContain(
             "BEHAVIOR_EVIDENCE_VERSION = 'behavior-evidence-v1'"
         )
@@ -239,9 +239,7 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(timescales).toContain(
             "PREFERENCE_TIMESCALE_VERSION ="
         )
@@ -273,9 +271,7 @@ describe('Recommendation V5 portable product contract', () => {
         const retriever = read(
             'src/recommendation-v3/retriever-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(channels).toContain(
             "CANDIDATE_CHANNEL_PLANNER_VERSION ="
         )
@@ -303,9 +299,7 @@ describe('Recommendation V5 portable product contract', () => {
         const retriever = read(
             'src/recommendation-v3/retriever-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(compiler).toContain(
             "PROVIDER_QUERY_COMPILER_V5_VERSION ="
         )
@@ -341,9 +335,7 @@ describe('Recommendation V5 portable product contract', () => {
         const retriever = read(
             'src/recommendation-v3/retriever-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(shadow).toContain(
             "SHADOW_RETRIEVAL_V5_VERSION ="
         )
@@ -403,9 +395,7 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(hygiene).toContain(
             "CANDIDATE_HYGIENE_V5_VERSION ="
         )
@@ -431,9 +421,7 @@ describe('Recommendation V5 portable product contract', () => {
         const v3Ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(ranker).toContain(
             "RELEVANCE_RANKER_V5_VERSION ="
         )
@@ -458,9 +446,7 @@ describe('Recommendation V5 portable product contract', () => {
             'src/recommendation-v5/batch-diversity.ts'
         )
         const service = read('src/library/service.ts')
-        const coordinator = read(
-            'src/recommendation-v3/cycle-coordinator-v3.ts'
-        )
+        const coordinator = readCycleImplementation()
         expect(diversity).toContain(
             "BATCH_DIVERSITY_V5_VERSION ="
         )
@@ -545,7 +531,7 @@ describe('Recommendation V5 portable product contract', () => {
 
     it('applies work-level duplicate/owned suppression at ranking and serving', () => {
         const service = read('src/library/service.ts')
-        const coordinator = read('src/recommendation-v3/cycle-coordinator-v3.ts')
+        const coordinator = readCycleImplementation()
         expect(service).toContain('filterCandidatesAgainstOwnedV5')
         expect(coordinator).toContain('filterCandidatesAgainstOwnedV5')
         expect(coordinator).toContain('servingFilteredCount')

@@ -266,10 +266,8 @@ export async function startLibraryServer(options: {
             allocatorVersion: BATCH_ALLOCATOR_VERSION
         }
     )
-    void recommendationService.ensureInitialPrepared().catch(() => {
-        // Connected startup must remain available while provider preparation
-        // waits for credentials/network. The status endpoint exposes preparing.
-    })
+    // Recommendation preparation belongs to explicit commands. Opening a local
+    // library/server must not start the legacy provider recall pipeline.
     const previewCache = new PreviewCacheManager(
         path.join(options.cacheDir ?? options.service.dataDir, 'previews')
     )

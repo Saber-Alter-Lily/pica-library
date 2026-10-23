@@ -91,7 +91,7 @@ function tagResolution(input: MobileRecommendationSyncV5) {
 export class RecommendationPolicyStoreV5 {
     constructor(private readonly database: LibraryDatabase) {}
 
-    state(): PortablePolicyStateV5 {
+    state(options: { initialize?: boolean } = {}): PortablePolicyStateV5 {
         const stored = this.database.getAppState<PortablePolicyStateV5>(
             RECOMMENDATION_V5_POLICY_STATE_KEY
         )
@@ -153,7 +153,8 @@ export class RecommendationPolicyStoreV5 {
                         : {}
             }
         const initial = defaultPortablePolicyStateV5()
-        this.database.setAppState(RECOMMENDATION_V5_POLICY_STATE_KEY, initial)
+        if (options.initialize !== false)
+            this.database.setAppState(RECOMMENDATION_V5_POLICY_STATE_KEY, initial)
         return initial
     }
 

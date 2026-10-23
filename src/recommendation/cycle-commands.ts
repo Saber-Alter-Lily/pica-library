@@ -40,6 +40,11 @@ export class RecommendationCycleCommandsV3 {
         return this.store.writeState(state)
     }
 
+    private notifyBuild(cycleId: string, state: 'persisting' | 'committed' | 'failed' | 'discarded', error?: unknown) {
+        // A presentation observer must not roll back or mask a storage result.
+        try { this.runtime.onBuildState?.(cycleId, state, error) } catch { /* non-authoritative observer */ }
+    }
+
     private async completeBuild(
         cycleId: string,
         requestId: string,
@@ -51,6 +56,7 @@ export class RecommendationCycleCommandsV3 {
                 throw new Error(
                     'Recommendation generation did not produce a usable pool; previous recommendations were kept'
                 )
+            this.notifyBuild(cycleId, 'persisting')
             const identity = [
                 built.profile.favoriteFingerprint,
                 built.profile.registryVersion,
@@ -92,7 +98,10 @@ export class RecommendationCycleCommandsV3 {
                 }
             })
             const current = this.state()
-            if (current.buildingCycleId !== cycleId) return
+            if (current.buildingCycleId !== cycleId) {
+                this.notifyBuild(cycleId, 'discarded')
+                return
+            }
             if (previousActive)
                 this.store.updateV3CandidatePoolState(
                     previousActive,
@@ -108,7 +117,9 @@ export class RecommendationCycleCommandsV3 {
                 buildingRequestId: null,
                 versions: built.versions
             })
+            this.notifyBuild(cycleId, 'committed')
         } catch (error) {
+            this.notifyBuild(cycleId, 'failed', error)
             const current = this.state()
             if (current.buildingCycleId === cycleId)
                 this.saveState({

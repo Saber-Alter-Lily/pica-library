@@ -124,6 +124,8 @@ export interface RecommendationCycleWritePortV3
 export interface RecommendationCycleRuntimeV3 {
     createId(): string
     now(): string
+    /** Optional UI observer. It cannot veto persistence or change stored state. */
+    onBuildState?(cycleId: string, state: 'persisting' | 'committed' | 'failed' | 'discarded', error?: unknown): void
 }
 
 /** Existing retrieval/ranking is supplied by the application; queries never receive this port. */

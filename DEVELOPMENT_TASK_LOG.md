@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-57 — recommendation build ports, actual pipeline and commit-status truth (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_AND_PHYSICAL_QA_OPEN.**
+
+- Continues frozen NEXT-56 `2167576eea14e2c02f4d143e2097f4ca24da8856`, immutable handoff SHA256 `593c0b28eadebbe89acb4758e587c5fee22de4896bf46eb1b6d0db9af8e61874`. Keeps all previous packages and failed evidence unchanged.
+- Extracts the real Final V3 ordered build from LibraryService behind explicit evidence/semantics/provider/checkpoint/progress/version/revision capabilities. SQLite/account/Registry I/O remains in application adapters; existing algorithms, budgets, result format and observation timing are retained. Pure author normalizers are shared without crypto; the old API re-exports them.
+- Adds browser-platform actual dependency-closure enforcement and a hash-frozen old-method oracle. Synthetic old/new comparisons check full scores/ranks/evidence/versions/telemetry and I/O order across Visual modes, provider restrictions/failure, private tags, limited pools, both source fences and cancellation. No DINO inference/training, real account or body data.
+- Reproduces false-complete UI after candidate-pool save failure. Optional commit-state observation now distinguishes persistence from successful activation, fences obsolete status updates and cannot veto storage; failure/retry and old-batch preservation tests complement unchanged read-only delivery gates. [Contract and limitations](docs/RECOMMENDATION_BUILD_PIPELINE.md).
+- Native/JVM logic remains unchanged; Dev72 must preserve Dev71 identity/certificate. Exact-source full suites, CI, actual Windows/Android packages and state-retaining stable/prior/deep update gates belong to the new handoff, not borrowed green results.
+- V5 audit/export/legacy separation, source-extension trust/runtime, native export/orphan collection and concentrated physical/provider/gesture/tag/AI/offline QA remain open. Legacy incremental asynchronous-launch error parity is a separately tracked follow-up, not covered by full-update recovery. Same candidate/Draft/CI + prior DPAPI exception; no production access, main merge, tag/Release, OTA, private-key download, installation or deployment.
+
 ## NEXT-56 — SQLite physical-path adapter and deep-path upgrade recovery (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_AND_PHYSICAL_QA_OPEN.**

@@ -26,7 +26,7 @@ afterEach(() => {
         fs.rmSync(row.root, { recursive: true, force: true })
     }
 })
-function fixture() {
+function fixture(onBuildState?: import('../../src/recommendation/ports').RecommendationCycleRuntimeV3['onBuildState']) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-cycle-module-')),
         database = new LibraryDatabase(path.join(root, 'library.db'))
     opened.push({ root, database })
@@ -42,7 +42,7 @@ function fixture() {
         recommendationCycleWriteStoreV3(database),
         build,
         cycleVersions,
-        { createId, now: () => '2026-10-23T00:00:00.000Z' }
+        { createId, now: () => '2026-10-23T00:00:00.000Z', onBuildState }
     )
     const readPort = recommendationCycleReadStoreV3(database),
         queries = new RecommendationCycleQueriesV3(readPort, cycleVersions)
@@ -70,6 +70,14 @@ async function ready(f: ReturnType<typeof fixture>) {
 }
 
 describe('recommendation domain and read/write capabilities', () => {
+    it('cannot change a committed transaction when an optional presentation observer throws',async()=>{
+        const observer=vi.fn(()=>{throw new Error('Synthetic UI observer failure')})
+        const f=fixture(observer)
+        await ready(f)
+        expect(f.commands.status().activeCycleId).toBeTruthy()
+        expect(f.commands.current().recommendations).toHaveLength(12)
+        expect(observer.mock.calls.map(args=>(args as unknown[])[1])).toEqual(['persisting','committed'])
+    })
     it('reads an empty installation without creating cycle/policy state, IDs or calling the builder', () => {
         const f = fixture(),
             writes = writeSpies(f.database)

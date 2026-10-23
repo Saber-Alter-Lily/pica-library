@@ -3,6 +3,7 @@ import type { LibraryDatabase } from '../library/database'
 import { RecommendationCycleCommandsV3 } from '../recommendation/cycle-commands'
 import type {
     RecommendationCycleBuildPortV3,
+    RecommendationCycleRuntimeV3,
     V3CycleVersions
 } from '../recommendation/ports'
 import { recommendationCycleWriteStoreV3 } from '../services/recommendation-cycle-store'
@@ -22,11 +23,13 @@ export class CycleCoordinatorV3 extends RecommendationCycleCommandsV3 {
     constructor(
         database: LibraryDatabase,
         buildCycle: RecommendationCycleBuildPortV3,
-        versions: V3CycleVersions
+        versions: V3CycleVersions,
+        onBuildState?: RecommendationCycleRuntimeV3['onBuildState']
     ) {
         super(recommendationCycleWriteStoreV3(database), buildCycle, versions, {
             createId: randomUUID,
-            now: () => new Date().toISOString()
+            now: () => new Date().toISOString(),
+            onBuildState
         })
     }
 }

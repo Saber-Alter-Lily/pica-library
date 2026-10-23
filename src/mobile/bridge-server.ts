@@ -259,7 +259,8 @@ export async function startMobileBridge(options: {
     const finalRecommendationCoordinator = new CycleCoordinatorV3(
         options.database,
         (cycleId) => options.service.buildFinalRecommendationCycleV3(cycleId),
-        finalRecommendationVersions
+        finalRecommendationVersions,
+        (cycleId,state,error) => options.service.recommendationBuildCommitState(cycleId,state,error)
     )
     const shelves = new ShelfService(options.database, library)
     const personalization = new PersonalizationService(

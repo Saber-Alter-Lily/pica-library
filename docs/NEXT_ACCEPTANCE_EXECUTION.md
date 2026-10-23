@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-57: actual recommendation build pipeline and commit-status boundary (unpublished)
+
+Continues frozen NEXT-56 `2167576eea14e2c02f4d143e2097f4ca24da8856`; complete handoff SHA256 `593c0b28eadebbe89acb4758e587c5fee22de4896bf46eb1b6d0db9af8e61874`. Separates ordered generation from account/Registry/SQLite/provider I/O through explicit ports, reusing all existing algorithms and stage observation timing. A frozen old-method differential oracle and actual browser-platform import graph guard the behavior and boundary. Commit progress now reports save failure instead of false success. [Exact scope and holds](RECOMMENDATION_BUILD_PIPELINE.md).
+
+Current-source CI and downloaded-Windows synthetic gates plus signed Dev71→72 packaging continuity are required in the new handoff. No user testing is forced now; native/JVM app logic unchanged. V5/legacy/extension/native-export work, generic incremental launch failure, physical QA and released OTA remain open. No production access, merge/release/OTA, private key download or deployment.
+
 ## 2026-10-23 NEXT-56: long physical SQLite paths and deep recovery (unpublished)
 
 Continues frozen NEXT-55 `acab174c7b01f3ee32883b2bb89cfbf717ac0bf7`, complete handoff SHA256 `4d2a819a0325cebe118fc6c1fe3dd7dcfd359a30f14dceceb73212b15691b8e3`. Reuses built-in SQLite long-path locking and Node namespaces behind one storage adapter, keeping logical files/schema/config unchanged. Current source-free import/Reader/restart/backup/locking gates and same-source deep replacement/health/async recovery are required separately from historical normal-path upgrades. [Exact boundaries](SQLITE_PATH_ADAPTER.md).

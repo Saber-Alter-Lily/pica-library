@@ -1,4 +1,6 @@
 import fs from 'node:fs'
+import { buildRecommendationCycleV3 } from '../recommendation/build-pipeline'
+import { recommendationBuildPortsV3 } from '../services/recommendation-build-adapter'
 import { SourceRuntime, type SourceId } from '../sources/source-policy'
 import { JmProvider } from '../providers/jm-provider'
 import { ProviderFavoritesImport } from '../providers/favorites-import'
@@ -80,34 +82,10 @@ import {
 } from '../recommendation-v3/taste-chronicle'
 import { runtimeRegistryDirectory } from '../recommendation-v3/runtime-registry-path'
 import {
-    buildFinalLifetimeProfileV3,
-    FINAL_PROFILE_VERSION
-} from '../recommendation-v3/final-profile'
-import {
-    buildRecommendationIntentsV3,
-    INTENT_PLANNER_VERSION,
-    type IntentCycleHistory
-} from '../recommendation-v3/intent-planner-v3'
-import {
-    translateIntentPlanV3,
-    QUERY_TRANSLATOR_VERSION
-} from '../recommendation-v3/provider-query-translator'
-import {
-    retrieveCandidatesV3,
-    RETRIEVER_VERSION
-} from '../recommendation-v3/retriever-v3'
-import {
-    rankCandidatesWithFrozenRankerV3,
-    RANKER_ADAPTER_VERSION
-} from '../recommendation-v3/ranker-adapter-v3'
-import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
-import {
     buildVisualPreferenceProfile,
     cosineSimilarity,
-    metadataFeedbackAdjustment,
     selectPreferredVisualEmbeddings,
     visualAffinity,
-    rerankWithVisualStyle,
     VISUAL_MODEL_ID,
     VISUAL_MODEL_VERSION,
     VISUAL_PROFILE_VERSION,
@@ -164,8 +142,6 @@ import {
     RECOMMENDATION_V5_POLICY_STATE_KEY,
     type PortablePolicyStateV5,
     normalizePreferenceKey,
-    preferenceAdjustmentV5,
-    workIdentityEvidenceV5,
     workIdentitySignalsV2
 } from '../recommendation-v5/portable-policy'
 import {
@@ -177,9 +153,7 @@ import {
     projectTasteChronicleView,
     type ChronicleViewOptions
 } from '../recommendation-v3/taste-chronicle-view'
-import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
 import { buildTagDirectoryV1, normalizeTagPolicyV1, privateTagForSignalV1, projectComicTagSignalsV1, tagPoliciesEqualV1, rawTagParticipatesV1, comicTagProviderV1, providerRawTagFactsV1 } from '../tags/policy'
-import { inferredPrivateTagIntentsV1, restrictTagIntentsV1 } from '../recommendation-v5/tag-intents'
 import {
     WORK_IDENTITY_V3_RESOLVER_VERSION,
     workIdentityCreatorBucketKeysV3,
@@ -532,6 +506,7 @@ export class LibraryService {
     private recommendationCancelRequested = false
     private readonly recommendationResumeWaiters = new Set<() => void>()
     private recommendationBuildCycleId: string | null = null
+    private latestRecommendationBuildCycleId: string | null = null
 
     private maintenanceUpdateProgress: MaintenanceUpdateProgress = {
         state: 'idle',
@@ -879,19 +854,20 @@ export class LibraryService {
         return {
             ...this.recommendationProgress,
             canPause:
-                this.recommendationProgress.state === 'running' ||
-                this.recommendationProgress.state === 'pausing',
+                this.recommendationProgress.phase !== 'persist' &&
+                (this.recommendationProgress.state === 'running' ||
+                    this.recommendationProgress.state === 'pausing'),
             canResume: this.recommendationProgress.state === 'paused',
-            canCancel: [
-                'running',
-                'pausing',
-                'paused',
-                'cancelling'
-            ].includes(this.recommendationProgress.state)
+            canCancel:
+                this.recommendationProgress.phase !== 'persist' &&
+                ['running', 'pausing', 'paused', 'cancelling'].includes(
+                    this.recommendationProgress.state
+                )
         }
     }
 
     recommendationBuildControl(action: 'pause' | 'resume' | 'cancel') {
+        if (this.recommendationProgress.phase === 'persist') return this.recommendationBuildProgress()
         if (action === 'pause') {
             if (this.recommendationProgress.state === 'running') {
                 this.recommendationPauseRequested = true
@@ -934,6 +910,7 @@ export class LibraryService {
 
     private beginRecommendationBuild(cycleId: string) {
         this.recommendationBuildCycleId = cycleId
+        this.latestRecommendationBuildCycleId = cycleId
         this.recommendationPauseRequested = false
         this.recommendationCancelRequested = false
         this.recommendationResumeWaiters.clear()
@@ -970,6 +947,41 @@ export class LibraryService {
         this.recommendationCancelRequested = false
         for (const resolve of this.recommendationResumeWaiters) resolve()
         this.recommendationResumeWaiters.clear()
+    }
+
+    /** A completed computation is not a persisted/promoted recommendation cycle. */
+    recommendationBuildCommitState(
+        cycleId: string,
+        state: 'persisting' | 'committed' | 'failed' | 'discarded',
+        error?: unknown
+    ) {
+        if (cycleId !== this.latestRecommendationBuildCycleId) return
+        if (state === 'persisting') {
+            this.recommendationProgress = {
+                state: 'running',
+                phase: 'persist',
+                done: 6,
+                total: 7
+            }
+        } else if (state === 'committed') {
+            this.recommendationProgress = {
+                state: 'complete',
+                phase: 'complete',
+                done: 7,
+                total: 7
+            }
+        } else if (state === 'discarded') {
+            this.recommendationProgress = {
+                ...this.recommendationProgress,
+                state: 'cancelled'
+            }
+        } else if (this.recommendationProgress.state !== 'cancelled') {
+            this.recommendationProgress = {
+                ...this.recommendationProgress,
+                state: 'failed',
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
     }
 
     private recoverInterruptedRecommendationBuild() {
@@ -4310,443 +4322,54 @@ export class LibraryService {
         this.beginRecommendationBuild(cycleId)
         let releaseResources: () => void = () => undefined
         try {
-        const lease = await this.runtimeResources.acquire({
-            ownerId: 'recommendation-v3',
-            taskType: 'recommendation-v3-build',
-            priority: 'background',
-            resources: {
-                'provider-network': 1,
-                'cpu-analysis': 1,
-                'sqlite-read-heavy': 1,
-                'sqlite-write-heavy': 1
-            }
-        })
-        releaseResources = () => lease.release()
-        await this.recommendationCheckpoint()
-        const pica = this.sources.isEnabled('pica') ? await this.connect() : null
-        const providerService = this.providerService()
-        const catalog = this.database.listComics({ limit: 10000 })
-        const recommendationV5Store = new RecommendationPolicyStoreV5(this.database)
-        const recommendationV5State = recommendationV5Store.state()
-        const tasteExcludedIds = new Set(
-            recommendationV5State.tasteExcludedComicIds
-        )
-        const readingIds = new Set(
-            this.database.readingProgress().map((item) => item.comicId)
-        )
-        const explicitFavoriteIds = new Set(
-            catalog
-                .filter(
-                    (comic) =>
-                        comic.isFavorite &&
-                        !tasteExcludedIds.has(comic.comicId)
-                )
-                .map((comic) => comic.comicId)
-        )
-        const recommendationFeedback = this.database.recommendationFeedback()
-        const latestFeedback = new Map(
-            recommendationFeedback.map((item) => [item.comicId, item])
-        )
-        const dislikedIds = new Set(
-            recommendationFeedback
-                .filter((item) => item.sentiment === 'dislike')
-                .map((item) => item.comicId)
-        )
-        const likedIds = new Set(
-            recommendationFeedback
-                .filter((item) => item.sentiment === 'like')
-                .map((item) => item.comicId)
-        )
-        const favorites = catalog
-            .filter(
-                (comic) =>
-                    !tasteExcludedIds.has(comic.comicId) &&
-                    !dislikedIds.has(comic.comicId) &&
-                    (comic.isFavorite || likedIds.has(comic.comicId))
-            )
-            .map((comic) => ({ ...comic, isFavorite: true }))
-        const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-        const profile = buildFinalLifetimeProfileV3(favorites.map(comic => projectComicTagSignalsV1(comic, recommendationV5State, false)), { registry })
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 7 }
-        const history: IntentCycleHistory[] = this.database
-            .listV3CandidatePools(50)
-            .flatMap((pool) => {
-                const state = String(pool.telemetry.state ?? '')
-                const completedAt = String(pool.telemetry.completedAt ?? '')
-                const plan = Array.isArray(pool.telemetry.intentPlan)
-                    ? (pool.telemetry.intentPlan as Array<{
-                          intentId?: unknown
-                      }>)
-                    : []
-                return completedAt &&
-                    (state === 'EXHAUSTED' || state === 'SUPERSEDED')
-                    ? [
-                          {
-                              state,
-                              completedAt,
-                              intentIds: plan
-                                  .map((intent) =>
-                                      String(intent.intentId ?? '')
-                                  )
-                                  .filter(Boolean)
-                          } as IntentCycleHistory
-                      ]
-                    : []
-            })
-        const baseIntents = buildRecommendationIntentsV3({
-            profile,
-            favorites,
-            history
-        })
-        const intents = restrictTagIntentsV1(applyIntentPolicyV5(
-            [...baseIntents, ...inferredPrivateTagIntentsV1(favorites, recommendationV5State)],
-            recommendationV5State, 5, catalog
-        ), recommendationV5State, catalog, raw => resolveTagV3(raw, registry).canonicalKey)
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 7 }
-        const routes = translateIntentPlanV3(intents)
-        const storePica = (comics: Comic[]) => {
-            this.sources.acquire('pica')
-            const records = comics.map(comicToRecord)
-            this.database.importCatalog(records, 'pica:recommendations')
-            return records.flatMap((record) => {
-                const stored = this.database.getComic(record.comicId)
-                return stored ? [stored] : []
-            })
-        }
-        const storedRecords = (records: FavoriteRecord[]): StoredComic[] =>
-            records.flatMap((record) => {
-                const stored = this.database.getComic(record.comicId)
-                return stored ? [stored] : []
-            })
-        const mergeProviderResults = (
-            primary: StoredComic[],
-            secondary: StoredComic[]
-        ) => [
-            ...new Map(
-                [...primary, ...secondary].map((comic) => [comic.comicId, comic])
-            ).values()
-        ]
-        const externalCache = new Map<string, StoredComic[]>()
-        const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }
-        const sourceRequests: Record<'eh' | 'exh', number> = { eh: 0, exh: 0 }
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'providers',
-            done: 3,
-            total: 7
-        }
-        const exhAvailable =
-            (await providerService
-                .probeExHentai()
-                .catch(() => 'UNAVAILABLE')) === 'AVAILABLE'
-        const externalSearch = async (
-            query: string,
-            kind: 'keyword' | 'author',
-            source: 'eh' | 'exh'
-        ): Promise<StoredComic[]> => {
-            if (!this.sources.isEnabled('eh')) return []
-            if (source === 'exh' && !exhAvailable) return []
-            const clean = query.trim()
-            if (!clean) return []
-            const key = `${source}:${kind}:${clean.toLocaleLowerCase("und")}`
-            const cached = externalCache.get(key)
-            if (cached) return cached
-            if (sourceRequests[source] >= sourceBudget[source]) return []
-            sourceRequests[source] += 1
-            const providerQuery = kind === 'author' ? `artist:"${clean.replaceAll("\"", "")}"` : clean
-            try {
-                await this.recommendationCheckpoint()
-                const records = await providerService.search(
-                    { keyword: providerQuery, limit: 40 },
-                    [source],
-                    'recommendations'
-                )
-                const stored = storedRecords(records)
-                externalCache.set(key, stored)
-                return stored
-            } catch {
-                externalCache.set(key, [])
-                return []
-            }
-        }
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'retrieve',
-            done: 4,
-            total: 7
-        }
-        const retrieved = await retrieveCandidatesV3({
-            provider: {
-                keyword: async (query, page, route) => {
-                    await this.recommendationCheckpoint()
-                    const picaResults = !pica || (route?.allowedProviders && !route.allowedProviders.includes('pica')) ? [] : storePica(
-                        (
-                            await pica.comicsPage(
-                                '',
-                                query,
-                                pica.Order.loved,
-                                page
-                            )
-                        ).docs
-                    )
-                    const ehAllowed = !route?.allowedProviders || route.allowedProviders.includes('eh')
-                    const ehResults = page === 1 && ehAllowed ? await externalSearch(query, 'keyword', 'eh') : []
-                    const exhResults = page === 1 && ehAllowed ? await externalSearch(query, 'keyword', 'exh') : []
-                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
-                },
-                author: async (query, page) => {
-                    await this.recommendationCheckpoint()
-                    const picaResults = !pica ? [] : storePica(
-                        (await pica.search(query, page, pica.Order.loved)).docs
-                    )
-                    const ehResults = page === 1 ? await externalSearch(query, 'author', 'eh') : []
-                    const exhResults = page === 1 ? await externalSearch(query, 'author', 'exh') : []
-                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
-                },
-                related: async (comicId) => {
-                    await this.recommendationCheckpoint()
-                    return !pica || comicId.includes(':')
-                        ? []
-                        : storePica(await pica.related(comicId))
-                }
-            },
-            routes,
-            intents,
-            favoriteIds: new Set(favorites.map((comic) => comic.comicId)),
-            isSafetyExcluded: (comic) =>
-                comic.tags.some((tag) => {
-                    const resolved = resolveTagV3(tag, registry)
-                    return (
-                        resolved.resolutionType === 'SAFETY' ||
-                        resolved.recommendationRole === 'SAFETY_EXCLUDE'
-                    )
-                }),
-            candidateFandomKeys: (comic) =>
-                projectComicTagSignalsV1(comic, recommendationV5State, false).tags.flatMap((tag) => {
-                    const resolved = resolveTagV3(tag, registry)
-                    return resolved.facet === 'FANDOM_IP' &&
-                        resolved.resolutionStatus === 'RESOLVED'
-                        ? [resolved.canonicalKey]
-                        : []
-                })
-        })
-        if (this.sources.snapshot().revision !== sourceRevision)
-            throw new Error('Source choices changed during recommendation generation; previous recommendations were kept')
-        if (retrieved.readiness === 'FAILED_INSUFFICIENT_POOL')
-            throw new Error(
-                'Recommendation generation could not retrieve enough candidates; previous recommendations were kept'
-            )
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'rank',
-            done: 5,
-            total: 7
-        }
-        const v5Filtered = filterCandidatesAgainstOwnedV5(
-            retrieved.candidates,
-            catalog,
-            recommendationV5State
-        )
-        const ranked = rankCandidatesWithFrozenRankerV3({
-            candidates: v5Filtered.rows,
-            favorites,
-            graphEdges: this.database.listRecommendationEdges().map((edge) => ({
-                sourceComicId: edge.sourceComicId,
-                targetComicId: edge.targetComicId,
-                confidence: edge.confidence,
-                observationCount: edge.observationCount
-            }))
-        })
-        const tasteCatalogById = new Map(catalog.map(comic => [comic.comicId, projectComicTagSignalsV1(comic, recommendationV5State)]))
-        const feedbackAdjusted = ranked
-            .filter((candidate) => !latestFeedback.has(candidate.comicId))
-            .map((candidate, index) => {
-                const feedbackAdjustment = metadataFeedbackAdjustment({
-                    candidate: projectComicTagSignalsV1(candidate.comic, recommendationV5State),
-                    feedback: recommendationFeedback,
-                    catalogById: tasteCatalogById
-                })
-                const baselinePercentile =
-                    ranked.length <= 1 ? 1 : 1 - index / (ranked.length - 1)
-                return {
-                    ...candidate,
-                    feedbackAdjustment,
-                    __feedbackRankScore:
-                        baselinePercentile + feedbackAdjustment
+            const lease = await this.runtimeResources.acquire({
+                ownerId: 'recommendation-v3',
+                taskType: 'recommendation-v3-build',
+                priority: 'background',
+                resources: {
+                    'provider-network': 1,
+                    'cpu-analysis': 1,
+                    'sqlite-read-heavy': 1,
+                    'sqlite-write-heavy': 1
                 }
             })
-            .sort(
-                (a, b) =>
-                    b.__feedbackRankScore - a.__feedbackRankScore ||
-                    a.rawRank - b.rawRank ||
-                    a.comicId.localeCompare(b.comicId)
-            )
-            .map(({ __feedbackRankScore: _score, ...candidate }) => candidate)
-        const policyAdjusted = feedbackAdjusted
-            .map((candidate, index) => {
-                const policy = preferenceAdjustmentV5(
-                    candidate.comic,
-                    recommendationV5State
-                )
-                const baselinePercentile =
-                    feedbackAdjusted.length <= 1
-                        ? 1
-                        : 1 - index / (feedbackAdjusted.length - 1)
-                return {
-                    ...candidate,
-                    v5Adjustment: policy.adjustment,
-                    v5Reasons: policy.reasons,
-                    __v5RankScore: baselinePercentile + policy.adjustment
-                }
-            })
-            .filter((candidate) => !preferenceAdjustmentV5(candidate.comic, recommendationV5State).blocked)
-            .sort(
-                (a, b) =>
-                    b.__v5RankScore - a.__v5RankScore ||
-                    a.rawRank - b.rawRank ||
-                    a.comicId.localeCompare(b.comicId)
-            )
-            .map(({ __v5RankScore: _score, ...candidate }) => candidate)
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'visual',
-            done: 6,
-            total: 7
-        }
-        const visualSettings = this.visualSettings()
-        const visualEmbeddings = this.database.listVisualEmbeddings()
-        const visualProfile = buildVisualPreferenceProfile({
-            embeddings: visualEmbeddings,
-            favoriteComicIds: explicitFavoriteIds,
-            feedback: recommendationFeedback,
-            catalogSize: Math.max(1, explicitFavoriteIds.size + likedIds.size)
-        })
-        const reranked = rerankWithVisualStyle({
-            ranked: policyAdjusted,
-            embeddings: visualEmbeddings,
-            profile: visualProfile,
-            mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF',
-            strength: visualSettings.strength
-        })
-        if (this.sources.snapshot().revision !== sourceRevision)
-            throw new Error('Source choices changed during recommendation generation; previous recommendations were kept')
-        this.recommendationProgress = {
-            state: 'complete',
-            phase: 'complete',
-            done: 7,
-            total: 7
-        }
-        return {
-            profile,
-            intents,
-            routes,
-            ranked: reranked,
-            readiness: retrieved.readiness,
-            telemetry: {
-                ...retrieved.telemetry,
+            releaseResources = () => lease.release()
+            return await buildRecommendationCycleV3(
                 cycleId,
-                recommendationV5: {
-                    policyVersion: recommendationV5State.policyVersion,
-                    revision: recommendationV5State.revision,
-                    controlCount: recommendationV5State.controls.length,
-                    hardSuppressCount:
-                        recommendationV5State.hardSuppressComicIds.length,
-                    tasteExcludedCount:
-                        recommendationV5State.tasteExcludedComicIds.length,
-                    portableBaseline: {
-                        tagPolicy: normalizeTagPolicyV1(recommendationV5State.tagPolicy),
-                        schemaVersion: recommendationV5State.schemaVersion,
-                        policyVersion: recommendationV5State.policyVersion,
-                        revision: recommendationV5State.revision,
-                        controls: recommendationV5State.controls,
-                        sessionIntent: recommendationV5State.sessionIntent,
-                        hardSuppressComicIds:
-                            recommendationV5State.hardSuppressComicIds
+                recommendationBuildPortsV3({
+                    database: this.database,
+                    sources: this.sources,
+                    connectPica: () => this.connect(),
+                    externalProvider: () => this.providerService(),
+                    convertPica: comicToRecord,
+                    visualSettings: () => this.visualSettings(),
+                    checkpoint: () => this.recommendationCheckpoint(),
+                    progress: (phase) => {
+                        this.recommendationProgress = {
+                            state:
+                                phase === 'complete' ? 'complete' : 'running',
+                            phase,
+                            done:
+                                [
+                                    'intents',
+                                    'routes',
+                                    'providers',
+                                    'retrieve',
+                                    'rank',
+                                    'visual',
+                                    'complete'
+                                ].indexOf(phase) + 1,
+                            total: 7
+                        }
                     },
-                    ownedOrDuplicateRemoved:
-                        v5Filtered.telemetry.exactOrOwnedRemoved +
-                        v5Filtered.telemetry.workDuplicateRemoved,
-                    workDuplicateRemoved:
-                        v5Filtered.telemetry.workDuplicateRemoved,
-                    hardBlockedRemoved:
-                        v5Filtered.telemetry.hardBlockedRemoved,
-                    policyAdjustedCount: policyAdjusted.filter(
-                        (item) =>
-                            Number(
-                                (item as { v5Adjustment?: number })
-                                    .v5Adjustment ?? 0
-                            ) !== 0
-                    ).length
-                },
-                recommendationV4: {
-                    feedbackCount: recommendationFeedback.length,
-                    likedCount: likedIds.size,
-                    dislikedCount: dislikedIds.size,
-                    exactFeedbackItemsSuppressed:
-                        ranked.length - feedbackAdjusted.length,
-                    visual: {
-                        settings: visualSettings,
-                        profileAvailable: Boolean(visualProfile),
-                        profileCoverage: visualProfile?.coverage ?? 0,
-                        positivePrototypeCount:
-                            visualProfile?.positivePrototypes.length ?? 0,
-                        negativePrototypeCount:
-                            visualProfile?.negativePrototypes.length ?? 0,
-                        candidateEmbeddingCount: reranked.filter((item) =>
-                            Boolean(
-                                item.visual &&
-                                    typeof item.visual === 'object' &&
-                                    (item.visual as { available?: boolean })
-                                        .available
+                    assertSourcesCurrent: () => {
+                        if (this.sources.snapshot().revision !== sourceRevision)
+                            throw new Error(
+                                'Source choices changed during recommendation generation; previous recommendations were kept'
                             )
-                        ).length,
-                        shadowMoveCount: reranked.filter((item) => {
-                            const visual = item.visual as
-                                | { shadowRank?: number | null }
-                                | undefined
-                            return Boolean(
-                                visual?.shadowRank &&
-                                    visual.shadowRank !== item.rawRank
-                            )
-                        }).length
                     }
-                },
-                providerSources: {
-                    ehRequests: sourceRequests.eh,
-                    exhRequests: sourceRequests.exh,
-                    exhAvailable,
-                    ehCandidates: retrieved.candidates.filter(
-                        (item) =>
-                            item.comic.providerId === 'eh' ||
-                            item.comic.comicId.startsWith('eh:')
-                    ).length,
-                    preferenceSignals: {
-                        explicitFavorites: explicitFavoriteIds.size,
-                        collectionSeeds: favorites.length,
-                        readingSeeds: readingIds.size,
-                        downloadedSeeds: favorites.filter((comic) => comic.downloadedPictures > 0).length
-                    },
-                    picaCandidates: retrieved.candidates.filter(
-                        (item) =>
-                            item.comic.providerId !== 'eh' &&
-                            !item.comic.comicId.startsWith('eh:')
-                    ).length
-                }
-            },
-            versions: {
-                profileVersion: FINAL_PROFILE_VERSION,
-                registryVersion: profile.registryVersion,
-                rankerModelVersion: `${RANKER_ADAPTER_VERSION}/${VISUAL_RERANK_VERSION}`,
-                candidatePoolVersion: `${INTENT_PLANNER_VERSION}/${QUERY_TRANSLATOR_VERSION}/${RETRIEVER_VERSION}`,
-                allocatorVersion: BATCH_ALLOCATOR_VERSION
-            }
-        }
+                })
+            )
         } catch (error) {
             const cancelled = error instanceof RecommendationBuildCancelledError
             this.recommendationProgress = {

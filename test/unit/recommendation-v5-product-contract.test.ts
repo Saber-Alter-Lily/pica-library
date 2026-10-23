@@ -59,7 +59,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('已记录不喜欢')
         expect(web).toContain('v5-feedback-dislike')
         expect(service).toContain('resolveTagV3(')
-        expect(service).toContain("phase: 'providers'")
+        expect(service).toContain('recommendationBuildPortsV3(')
+        expect(read('src/recommendation/build-pipeline.ts')).toContain("ports.progress('providers')")
         expect(theme).toContain('下方仍显示上一轮结果')
         expect(theme).toContain('新一轮推荐已更新')
     })
@@ -85,7 +86,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain(
             '/api/v1/recommendation-v5/taste-exclusion'
         )
-        expect(service).toContain('tasteExcludedIds')
+        expect(read('src/recommendation/build-pipeline.ts')).toContain('tasteExcludedIds')
         expect(service).toContain('tasteExcluded.has(comicId)')
         expect(service).toContain('.favoriteIds()')
         expect(portable).toContain('tasteExcludedComicIds')

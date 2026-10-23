@@ -264,7 +264,8 @@ export async function startLibraryServer(options: {
             rankerModelVersion: RANKER_ADAPTER_VERSION,
             candidatePoolVersion: RETRIEVER_VERSION,
             allocatorVersion: BATCH_ALLOCATOR_VERSION
-        }
+        },
+        (cycleId,state,error) => options.service.recommendationBuildCommitState(cycleId,state,error)
     )
     // Recommendation preparation belongs to explicit commands. Opening a local
     // library/server must not start the legacy provider recall pipeline.

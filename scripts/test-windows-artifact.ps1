@@ -222,6 +222,7 @@ try {
         if(-not $second){throw 'Configured packaged app did not relaunch'}
         $secondStatus=Invoke-RestMethod -Uri ($second.url+'/api/v1/desktop/status') -TimeoutSec 10
         if(-not $secondStatus.configured -or $secondStatus.profile -ne 'fast' -or ($SetupPersistence -and -not $secondStatus.proxyEnabled)){throw 'Configured state was not recovered'}
+        if($SetupPersistence -and $moduleContractGate -eq 'PASS' -and -not $secondStatus.picaAccount.configured){throw 'DPAPI-backed Pica session was not recovered'}
         if($LocalOnlySetup -and ($secondStatus.picaAccount.configured -or (Test-Path -LiteralPath (Join-Path $desktopHome 'config\credentials.dat')))){throw 'Local-only relaunch required or persisted source credentials'}
         Invoke-RestMethod -Method Post -Uri ($second.url+'/api/v1/desktop/shutdown') -Headers @{'x-pica-csrf'=$secondStatus.csrfToken;Origin=$second.url} -ContentType 'application/json' -Body '{}'|Out-Null
         $secondExit=(Get-Date).AddSeconds(15)

@@ -77,6 +77,7 @@ const checks={
   },
   configured(v){
     assert(v.configured===true,'Keychain-backed credentials did not configure the process')
+    assert(v.picaAccount?.configured===true,'Keychain-backed Pica session was not restored')
     assert(v.credentialBackend?.kind==='macos-keychain','credential backend changed after save')
   },
   query(v){

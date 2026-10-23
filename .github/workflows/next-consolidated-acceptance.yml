@@ -95,6 +95,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test-windows-local-ingestion.mjs $zip $version $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-sqlite-paths.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test-windows-recommendation-module.mjs $zip $version $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-upgrade-diagnostics.ps1
@@ -104,6 +106,15 @@ jobs:
           ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceHealthFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # A pre-fix baseline cannot start with this deep database path. These
+          # exercise the actual transaction with two current application copies;
+          # they are not a claim that an old release supported long paths.
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $zip -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -LibraryPathLength 1200 -DiagnosticsDirectory artifacts/upgrade-diagnostics/deep-1200
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $zip -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -LibraryPathLength 1200 -ForceHealthFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/deep-1200
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $zip -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -LibraryPathLength 1200 -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/deep-1200
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
           Copy-Item -LiteralPath $zip -Destination candidate/windows/
@@ -169,7 +180,7 @@ jobs:
           test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
           test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
           export PICA_ANDROID_VERSION_NAME="0.5.0-postrc.${GITHUB_SHA:0:12}"
-          export PICA_ANDROID_VERSION_CODE=70
+          export PICA_ANDROID_VERSION_CODE=71
           umask 077
           signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-next-signing-XXXXXXXX")
           export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"

@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory = $true)][string]$CandidateSourceSha,
     [switch]$ForceHealthFailure,
     [switch]$ForceLaunchFailure,
+    [ValidateRange(0,4096)][int]$LibraryPathLength = 0,
     [string]$DiagnosticsDirectory = '',
     [string]$DesktopHomeName = 'Pica Library P2 RC'
 )
@@ -75,6 +76,13 @@ function Stop-Desktop($Instance) {
     }
 }
 
+function Assert-DeepDatabaseCanary([string]$Runtime,[string]$Database) {
+    if (-not $LibraryPathLength) { return }
+    $code = 'const {DatabaseSync}=require("node:sqlite"),path=require("node:path");const db=new DatabaseSync("file:"+encodeURIComponent(path.toNamespacedPath(process.argv[1]))+"?vfs=win32-longpath",{readOnly:true});const value=db.prepare("SELECT value FROM synthetic_upgrade_path").get().value;db.close();if(String(value)!=="12345")process.exit(2);'
+    & $Runtime -e $code $Database
+    if ($LASTEXITCODE -ne 0) { throw 'Deep-path upgrade lost the original synthetic database row' }
+}
+
 if ($CandidateSourceSha -notmatch '^[0-9a-f]{40}$') {
     throw 'CandidateSourceSha must be a full Git commit SHA'
 }
@@ -132,6 +140,22 @@ try {
     $env:PICA_LIBRARY_DESKTOP_HOME = $desktopHome
     $instanceFile = Join-Path $desktopHome 'runtime-state\instance.json'
     $libraryDirectory = Join-Path $desktopHome 'data'
+    if ($LibraryPathLength) {
+        # Only the task-owned data directory becomes deep; the launcher/profile
+        # paths stay short so this gate isolates SQLite and its real sidecars.
+        $libraryDirectory = Join-Path $work 'deep data with spaces'
+        while ($libraryDirectory.Length + 11 -lt $LibraryPathLength) {
+            $remaining = $LibraryPathLength - $libraryDirectory.Length - 11
+            if ($remaining -eq 1) { $libraryDirectory += 'x' }
+            else { $libraryDirectory = Join-Path $libraryDirectory ('x' * [Math]::Min($remaining - 1,60)) }
+        }
+        if ((Join-Path $libraryDirectory 'library.db').Length -ne $LibraryPathLength) { throw 'Exact synthetic database length could not be constructed' }
+        New-Item -ItemType Directory -Force -Path (Join-Path $desktopHome 'config'),$libraryDirectory | Out-Null
+        [ordered]@{ schemaVersion=1; libraryDirectory=$libraryDirectory; profile='balanced'; openBrowser=$false; preferredPort=4789; externalSources=@{ schemaVersion=1; revision=0; enabled=@() } } | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 -LiteralPath (Join-Path $desktopHome 'config\config.json')
+        $seedCode = 'const {DatabaseSync}=require("node:sqlite"),path=require("node:path");const db=new DatabaseSync("file:"+encodeURIComponent(path.toNamespacedPath(process.argv[1]))+"?vfs=win32-longpath");db.exec("CREATE TABLE synthetic_upgrade_path(value TEXT); INSERT INTO synthetic_upgrade_path VALUES (12345)");db.close();'
+        & (Join-Path $candidateRoot 'runtime\node.exe') -e $seedCode (Join-Path $libraryDirectory 'library.db')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not seed the isolated deep-path database' }
+    }
 
     Start-Process -FilePath (Join-Path $currentRoot 'Pica Library.exe') -ArgumentList '--no-open' -WorkingDirectory $currentRoot -WindowStyle Hidden
     $currentInstance = Wait-Instance $instanceFile
@@ -210,6 +234,7 @@ try {
             -not (Test-Path -LiteralPath $database)) {
             throw 'Rollback did not preserve external configuration/database'
         }
+        Assert-DeepDatabaseCanary (Join-Path $candidateRoot 'runtime\node.exe') $database
         Stop-Desktop $restored
         $currentInstance = $null
         [ordered]@{
@@ -221,6 +246,8 @@ try {
             original_source_restored = $baselineSha
             external_config_preserved = $true
             external_database_preserved = $true
+            library_database_path_characters = $database.Length
+            same_source_recovery_fixture = $baselineSha -eq $CandidateSourceSha
             source_sha = $CandidateSourceSha
         } | ConvertTo-Json
         $success = $true
@@ -253,6 +280,7 @@ try {
     if (-not (Test-Path -LiteralPath $database)) {
         throw 'External Library database was not preserved'
     }
+    Assert-DeepDatabaseCanary (Join-Path $candidateRoot 'runtime\node.exe') $database
     if ($candidateSchema -gt $baselineSchema) {
         $migrationBackup = "$database.pre-migration-v$candidateSchema.bak"
         if (-not (Test-Path -LiteralPath $migrationBackup)) {
@@ -274,6 +302,8 @@ try {
         source_sha = $CandidateSourceSha
         external_config_preserved = $true
         external_database_preserved = $true
+        library_database_path_characters = $database.Length
+        same_source_recovery_fixture = $baselineSha -eq $CandidateSourceSha
         pre_migration_backup = if ($candidateSchema -gt $baselineSchema) { 'PASS' } else { 'NOT_REQUIRED' }
     } | ConvertTo-Json
     $success = $true

@@ -9,6 +9,7 @@ import {
     UPDATE_MANIFEST_VERSION
 } from '../app-capabilities'
 import { sanitizedChildEnv } from '../desktop/child-process'
+import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import { applicationFetch } from './application-fetch'
 import { classifyUpdateCompatibility } from './compatibility'
 import { MODULE_CONTRACT_PATH, normalizeModuleContracts, parseModuleContracts, runtimeModuleContracts, sameModuleContracts } from '../modules/contracts'
@@ -1038,6 +1039,8 @@ export class UpdateManager {
                 throw new Error(
                     'Full application upgrade context is unavailable'
                 )
+            // Fail before preparing a helper or asking the live app to exit.
+            sqliteDiskFilename(path.resolve(context.libraryDirectory, 'library.db'))
             const full = this.stagedFull
             const persistentAssistant =
                 this.preparePersistentUpgradeAssistant({

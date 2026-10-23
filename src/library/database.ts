@@ -41,6 +41,7 @@ import type { UpdateFinding } from '../maintenance/updates'
 import { trustedCoverUrl } from './cover-url'
 import { catalogSourceId, type CatalogSourceId } from './content-identity'
 import { localInventoryKey, type LocalInventoryV1 } from '../local-library/types'
+import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import type { UserEvent, UserEventInput } from '../recommendation-v3/types'
 import type {
     RecommendationFeedbackState,
@@ -246,19 +247,27 @@ export class LibraryDatabase {
 
     constructor(file: string) {
         this.file = path.resolve(file)
+        const sqliteFilename = sqliteDiskFilename(this.file)
         fs.mkdirSync(path.dirname(this.file), { recursive: true })
-        this.db = new DatabaseSync(this.file)
-        this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
-        if (needsUnreleasedMigrationReconciliation(this.db)) {
-            this.db.exec('PRAGMA wal_checkpoint(FULL)')
-            fs.copyFileSync(
-                this.file,
-                `${this.file}.pre-unreleased-schema-reconcile.bak`
-            )
-            reconcileUnreleasedMigrationHistory(this.db)
+        this.db = new DatabaseSync(sqliteFilename)
+        try {
+            this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
+            if (needsUnreleasedMigrationReconciliation(this.db)) {
+                this.db.exec('PRAGMA wal_checkpoint(FULL)')
+                fs.copyFileSync(
+                    this.file,
+                    `${this.file}.pre-unreleased-schema-reconcile.bak`
+                )
+                reconcileUnreleasedMigrationHistory(this.db)
+            }
+            this.backupBeforeMigration()
+            this.migrate()
+        } catch (error) {
+            // Failed startup must not hold an inaccessible SQLite handle while
+            // the external updater attempts to restore the same files.
+            try { this.db.close() } catch { /* Keep the original startup error. */ }
+            throw error
         }
-        this.backupBeforeMigration()
-        this.migrate()
     }
 
     close() {

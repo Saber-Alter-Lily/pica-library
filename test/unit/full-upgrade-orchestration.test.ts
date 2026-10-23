@@ -81,6 +81,17 @@ afterEach(() => {
 })
 
 describe('actual full-upgrade orchestration with synthetic I/O faults', () => {
+    it('preflights impossible database paths before waiting, snapshotting or replacing files', async () => {
+        const value=fixture()
+        value.libraryDirectory=path.resolve(value.libraryDirectory, ...Array.from({length:6000},()=> 'nested'))
+        const current=fs.readFileSync(path.join(value.applicationRoot,'Pica Library.exe'))
+        const copy=vi.spyOn(fs,'cpSync')
+        await expect(runFullApplicationUpgrade(value)).rejects.toThrow(/filesystem limit/)
+        expect(fs.readFileSync(path.join(value.applicationRoot,'Pica Library.exe'))).toEqual(current)
+        expect(copy).not.toHaveBeenCalled()
+        expect(spawn).not.toHaveBeenCalled()
+        expect(fs.existsSync(value.progressFile)).toBe(false)
+    })
     it('awaits an asynchronous launch error and restores old application/config/database', async () => {
         const value = fixture()
         fakeLaunch(value, n => n === 1 ? new Error('synthetic CreateProcess EACCES') : null)

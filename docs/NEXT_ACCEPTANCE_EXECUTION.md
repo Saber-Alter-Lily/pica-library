@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-56: long physical SQLite paths and deep recovery (unpublished)
+
+Continues frozen NEXT-55 `acab174c7b01f3ee32883b2bb89cfbf717ac0bf7`, complete handoff SHA256 `4d2a819a0325cebe118fc6c1fe3dd7dcfd359a30f14dceceb73212b15691b8e3`. Reuses built-in SQLite long-path locking and Node namespaces behind one storage adapter, keeping logical files/schema/config unchanged. Current source-free import/Reader/restart/backup/locking gates and same-source deep replacement/health/async recovery are required separately from historical normal-path upgrades. [Exact boundaries](SQLITE_PATH_ADAPTER.md).
+
+Native/JVM logic is unchanged; current-source CI and fixed-signed Dev70→71 identity plus actual Windows/stable/prior upgrade evidence must be captured in the new handoff. No production access, main/Release/OTA change or deployment. UNC/OEM/physical provider/gesture/tag/offline acceptance stays deferred; the full modular-reader objective remains open.
+
 ## 2026-10-23 NEXT-55: transactional update recovery and bounded CI diagnostics (unpublished)
 
 Continues frozen NEXT-54 `bb9bdefe53768a421afa9bc7e7428c541e4af75a`, complete handoff SHA256 `08d6f8ff612ddd7863893edf5de8d5933acd5a9d4be3df6c3fc39b3bede9b432`. The existing full updater now awaits asynchronous launch errors, restores state despite status-write errors and records backup ownership before copy. Test-only diagnostics retain bounded/allowlisted progress/stdout/stderr after runner failure; actual async-failure injection verifies baseline relaunch with the old source as a rejecting counterexample. [Recovery/diagnostic contract and limitations](UPGRADE_RECOVERY_MODULE.md).

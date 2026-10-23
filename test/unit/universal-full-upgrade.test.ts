@@ -309,6 +309,16 @@ describe('universal full application upgrade', () => {
         ).rejects.toThrow(/User data is forbidden/i)
     })
 
+    it.runIf(process.platform === 'win32')('rejects an impossible data path before bootstrap preparation or app exit', async () => {
+        const archive=fullPackage()
+        const updateManager=manager(verifiedFullFetch(archive))
+        const staged=await updateManager.stageFullApplication('0.5.0','Pica-Library-v0.5.0-windows-x64.zip',archive)
+        const assistant=vi.spyOn(updateManager,'preparePersistentUpgradeAssistant')
+        expect(()=>updateManager.apply(staged.id,{desktopHomeRoot:path.resolve('synthetic-home'),libraryDirectory:'C:\\'+('nested\\'.repeat(6000))})).toThrow(/filesystem limit/)
+        expect(assistant).not.toHaveBeenCalled()
+        expect(updateManager.progress().phase).toBe('staged')
+    })
+
     it('locks external bootstrap, rollback and automatic browser refresh contracts', () => {
         const managerSource = fs.readFileSync(
             'src/update/manager.ts',

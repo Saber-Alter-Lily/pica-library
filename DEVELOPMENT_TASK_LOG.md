@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-56 — SQLite physical-path adapter and deep-path upgrade recovery (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_AND_PHYSICAL_QA_OPEN.**
+
+- Continues verified NEXT-55 `acab174c7b01f3ee32883b2bb89cfbf717ac0bf7`, complete handoff SHA256 `4d2a819a0325cebe118fc6c1fe3dd7dcfd359a30f14dceceb73212b15691b8e3`. Preserves that archive and its separately recorded deep-profile failure.
+- Uses the same actual packaged Node/SQLite to isolate two path limits: Win32 journal paths and the default SQLite VFS byte ceiling. Reuses Node's namespace conversion plus SQLite's built-in locking `win32-longpath`; no custom database engine/extension, registry changes, new dependency or data relocation.
+- Extracts a pure filename adapter; logical filenames/config/schema stay unchanged. Checks unsupported native limits before setup save, database mkdir/open, full-update apply and helper replacement. Closes a constructed SQLite connection when subsequent startup fails, retaining the original error.
+- Adds real deep LibraryDatabase/ordinary-VFS lock tests and actual source-free CLI/Desktop import→Reader→restart/backup gates at253/1200/4096. Extends current-candidate replacement/health/async recovery fixtures to1200 characters, while retaining public/prior baseline ordinary-path gates and minimal diagnostic retention. [Scope, reuse, evidence and limits](docs/SQLITE_PATH_ADAPTER.md).
+- Native/JVM app logic is unchanged; Dev71 retains Dev70 identity/certificate. Exact-source package/CI results are recorded in the new handoff. UNC/network/removable storage, maximum endpoints, physical device/provider/gesture/tag/offline-sync and released OTA acceptance remain unverified. The older runner-only failure is still UNDETERMINED, not conflated with the reproduced path defect.
+- Same independent candidate/Draft/CI and prior DPAPI exception authority. No production access, main merge, tag/Release, stable OTA change, key download, installation or deployment. Recommendation build-pipeline/V5/legacy, source-host trust decisions and native export/orphan collection remain open.
+
 ## NEXT-55 — update transaction recovery and bounded failure diagnostics (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / RELEASE_AND_PHYSICAL_QA_HELD.** Full modular-reader objective remains open.

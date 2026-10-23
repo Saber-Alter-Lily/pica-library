@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
+import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import type { FullApplicationUpdaterInstruction, UpdateProgress } from './types'
 
 function writeProgress(file: string, value: Omit<UpdateProgress, 'updatedAt'>) {
@@ -78,6 +79,7 @@ function validateStagedApplication(
         throw new Error(
             'Universal full-application upgrade is currently supported on Windows only'
         )
+    sqliteDiskFilename(path.resolve(instruction.libraryDirectory, 'library.db'))
     assertOutside(
         instruction.bootstrapRoot,
         instruction.applicationRoot,

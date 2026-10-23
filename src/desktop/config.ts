@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import { initialSourcePolicy, normalizeSourcePolicy } from '../sources/source-policy'
 import type {
     DesktopConfig,
@@ -49,6 +50,7 @@ function validateLocalLibrarySetup(
 ) {
     if (!path.isAbsolute(input.libraryDirectory))
         throw new Error('Choose an absolute library folder')
+    sqliteDiskFilename(path.join(path.resolve(input.libraryDirectory), 'library.db'))
     if (!profiles.has(input.profile))
         throw new Error('Choose a supported download profile')
 }

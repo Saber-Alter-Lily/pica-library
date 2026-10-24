@@ -16,6 +16,12 @@ import type { StoredComic } from '../../src/library/types'
 
 const directories: string[] = []
 const create = () => { const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-tag-assets-')); directories.push(directory); return directory }
+const createStage = () => {
+    const directory = create(); fs.mkdirSync(path.join(directory, 'app'))
+    fs.writeFileSync(path.join(directory, 'app/desktop.js'), '/* synthetic engine marker */')
+    fs.writeFileSync(path.join(directory, 'app/module-contracts.json'), '{}')
+    return directory
+}
 afterEach(() => { for (const directory of directories.splice(0)) { const resolved = path.resolve(directory); if (!resolved.startsWith(path.resolve(os.tmpdir()) + path.sep) || !path.basename(resolved).startsWith('pica-tag-assets-')) throw Error('Unsafe fixture cleanup'); fs.rmSync(resolved, { recursive: true, force: true }) } })
 const readManifest = () => JSON.parse(fs.readFileSync(path.join(TAG_RUNTIME_SOURCE, TAG_RUNTIME_MANIFEST), 'utf8'))
 const fixture = () => { const directory = path.join(create(), 'tag-runtime-v1'); fs.cpSync(TAG_RUNTIME_SOURCE, directory, { recursive: true }); return directory }
@@ -93,7 +99,7 @@ describe('minimal semantic runtime versus frozen review authority', () => {
     })
 
     it('stages the exact same seven assets once under app, independent of the source checkout', () => {
-        const stage = create(), result = stageTagRuntime(stage)
+        const stage = createStage(), result = stageTagRuntime(stage)
         expect(result).toMatchObject({ files: 7, reviewedEvidenceStaged: false, semanticAuthoritySha256: LEGACY_TAG_AUTHORITY_SHA256 })
         const loaded = loadTagRegistryV3(path.join(stage, TAG_RUNTIME_PACKAGED))
         expect(loaded.semantic).toStrictEqual(old.semantic)
@@ -102,11 +108,17 @@ describe('minimal semantic runtime versus frozen review authority', () => {
     })
 
     it('rejects merging a legacy application tree without deleting its contents', () => {
-        const stage = create(), legacy = path.join(stage, 'src/data/registry-v3-final')
+        const stage = createStage(), legacy = path.join(stage, 'src/data/registry-v3-final')
         fs.mkdirSync(legacy, { recursive: true }); fs.writeFileSync(path.join(legacy, 'canary.txt'), 'retain-original')
         expect(() => stageTagRuntime(stage)).toThrow(/Legacy review evidence/)
         expect(fs.readFileSync(path.join(legacy, 'canary.txt'), 'utf8')).toBe('retain-original')
         expect(fs.existsSync(path.join(stage, TAG_RUNTIME_PACKAGED))).toBe(false)
+    })
+
+    it('rejects an outer distribution directory before creating a shadow app tree', () => {
+        const outer = create()
+        expect(() => stageTagRuntime(outer)).toThrow(/application engine root/)
+        expect(fs.existsSync(path.join(outer, 'app'))).toBe(false)
     })
 
     it('fails closed on extra review evidence even if every listed hash is valid', () => {
@@ -164,6 +176,9 @@ describe('minimal semantic runtime versus frozen review authority', () => {
             expect(source).toContain('pnpm exec tsx scripts/stage-tag-runtime.ts')
             expect(source).not.toMatch(/(?:registrySource|REGISTRY_SOURCE).*registry-v3-final/)
         }
+        expect(fs.readFileSync('scripts/build-macos-experimental.sh', 'utf8')).toContain('scripts/stage-tag-runtime.ts "$RESOURCES"')
+        expect(fs.readFileSync('scripts/build-macos-experimental.sh', 'utf8')).not.toContain('for item in app runtime web src ')
+        expect(fs.readFileSync('scripts/build-linux-experimental.sh', 'utf8')).toContain('scripts/stage-tag-runtime.ts "$STAGE"')
         expect(fs.readFileSync('src/tag-assets/registry-v3.ts', 'utf8')).not.toMatch(/from ['"].*(?:recommendation|library|providers|database|sync)/)
     })
 

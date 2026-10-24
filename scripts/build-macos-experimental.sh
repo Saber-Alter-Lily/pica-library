@@ -100,7 +100,7 @@ cp "$ROOT/dist/licenses/THIRD_PARTY_LICENSES.txt" "$RESOURCES/licenses/THIRD_PAR
 cp -R "$ROOT/web" "$RESOURCES/web"
 
 # One exact allowlist for every platform; reviewed examples are not runtime assets.
-(cd "$ROOT" && pnpm exec tsx scripts/stage-tag-runtime.ts "$STAGE")
+(cd "$ROOT" && pnpm exec tsx scripts/stage-tag-runtime.ts "$RESOURCES")
 
 cp "$ROOT/LICENSE" "$RESOURCES/LICENSE"
 for notice in NOTICE.md UPSTREAM.md DISCLAIMER.md; do
@@ -195,7 +195,7 @@ cat > "$RESOURCES/PLATFORM_REQUIREMENTS.json" <<EOF
 EOF
 
 # Keep the existing CLI/debug surface without duplicating the canonical app payload.
-for item in app runtime web src licenses LICENSE NOTICE.md UPSTREAM.md DISCLAIMER.md SOURCE_SHA.txt PLATFORM_REQUIREMENTS.json; do
+for item in app runtime web licenses LICENSE NOTICE.md UPSTREAM.md DISCLAIMER.md SOURCE_SHA.txt PLATFORM_REQUIREMENTS.json; do
   ln -s "Pica Library.app/Contents/Resources/$item" "$STAGE/$item"
 done
 

@@ -10,7 +10,6 @@ import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { installLocalImport } from './local-import.js'
-import { copy } from './locale-runtime.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
 import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
@@ -3110,7 +3109,7 @@ async function openReaderChapter(episodeId) {
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
         requestAnimationFrame(() => scrollReaderViewportToTop())
-    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.hostedSessionId ? copy('内容来自你选择的外部宿主；本机进度独立保存。宿主可运行其自身的缓存与同步。', 'Content comes from your chosen external host. Local progress is separate; the host may run its own caching and sync.', '利用者が選択した外部ホストの内容です。ローカル進捗は別保存し、ホスト独自のキャッシュ・同期が動作する場合があります。') : state.reader.online ? t('reader.onlineNotice') : ''
+    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.hostedSessionId ? t('reader.hostedNotice') : state.reader.online ? t('reader.onlineNotice') : ''
     } catch (error) {
         if (requestId === readerChapterRequest)
             $('#reader-message').textContent = localizeError(language, error)
@@ -3494,11 +3493,17 @@ $('#cover-toggle').onchange = (event) => {
     localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
     renderAll()
 }
+function setRecommendationPending(pending) {
+    state.recommendationPending = pending
+    for (const id of ['#recommend-button', '#recommend-next-batch', '#recommend-restart']) {
+        const button = $(id)
+        if (button) button.disabled = pending
+    }
+}
 $('#recommend-next-batch').onclick = async () => {
     if (state.mode === 'connected' && state.recommendationManagedV3) {
         if (state.recommendationPending) return
-        state.recommendationPending = true
-        $('#recommend-next-batch').disabled = true
+        setRecommendationPending(true)
         try {
             const value = await post('/api/v1/recommendations', {
                 action: 'next',
@@ -3512,8 +3517,7 @@ $('#recommend-next-batch').onclick = async () => {
         } catch (error) {
             $('#recommend-message').textContent = localizeError(language, error)
         } finally {
-            state.recommendationPending = false
-            $('#recommend-next-batch').disabled = false
+            setRecommendationPending(false)
         }
         return
     }
@@ -4009,10 +4013,10 @@ $('#search-button').onclick = async () => {
     }
 }
 $('#recommend-button').onclick = async () => {
+    if (state.recommendationPending) return
     try {
         if (state.mode === 'connected') {
-            state.recommendationPending = true
-            $('#recommend-button').disabled = true
+            setRecommendationPending(true)
             const started = await post('/api/v1/recommendation-sessions', {
                 engine: 'v3',
                 action: 'resume_or_create',
@@ -4040,16 +4044,14 @@ $('#recommend-button').onclick = async () => {
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
     } finally {
-        state.recommendationPending = false
-        $('#recommend-button').disabled = false
+        setRecommendationPending(false)
     }
 }
 $('#recommend-restart').onclick = async () => {
     if (!(await askConfirm(t('recommend.restartConfirm')))) return
     try {
         if (state.recommendationPending) return
-        state.recommendationPending = true
-        $('#recommend-restart').disabled = true
+        setRecommendationPending(true)
         const previousCycleId = state.recommendationCycleId
         await post('/api/v1/recommendation-sessions', {
             action: 'force_new',
@@ -4069,8 +4071,7 @@ $('#recommend-restart').onclick = async () => {
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
     } finally {
-        state.recommendationPending = false
-        $('#recommend-restart').disabled = false
+        setRecommendationPending(false)
     }
 }
 ;['#search-results', '#recommend-results'].forEach((selector) => {

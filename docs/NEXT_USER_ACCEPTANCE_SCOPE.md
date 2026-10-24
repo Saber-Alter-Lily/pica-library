@@ -6,6 +6,10 @@ Observed 2026-10-24 while NEXT-67 source is being closed. This is not a release 
 
 Frozen prior NEXT-66 source91b62d0 passed exact candidate3/3,39 successful+6 conditional skipped PR checks,57 Chromium and402 native tests. The current NEXT-67 has real host-library/shared-Reader/private-progress code and126 local source assertions/typecheck/Web48/48 passing, but needs its own clean-source CI/browser/compiled-Windows/signature/installable evidence. Prior greens are not current-source proof. User/device/provider acceptance remains deferred.
 
+The first NEXT-67 push15c56be was **not accepted**: full CI found ordinary-app localization text outside dictionaries, and the separate J7 benchmark timed out. Dictionary ownership and a source-oracle-reproduced busy-controls/lost-click mechanism are being corrected without relaxing gates. This is precisely why current-source CI/compiled/browser proof is required before giving the user a test package; timing below is conditional, not an assertion that the failed build is ready.
+
+The repaired source has148/148 inspected local assertions across10 files, types and Web48/48 passing. The old/new real handler reproduction is a pure fake-port test, not a local browser run or proof of the unique cause of that historical timeout. Current CI needs to establish actual browser and packaged behavior before the estimate becomes a readiness statement.
+
 ## Not fully built versus built but not accepted
 
 | Area | Implemented foundation | Still unfinished development / distinct acceptance |

@@ -4,14 +4,24 @@ import { spawn } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import type { FullApplicationUpdaterInstruction, UpdateProgress } from './types'
-import { writeProgress, reportRecoveryProgress, waitForExit, launchApplication, readInstance, safeLoopbackUrl, health, stopPublishedInstance } from './process-lifecycle'
-import { copyTree, snapshotUserState, restoreUserState } from './user-state-snapshot'
+import {
+    writeProgress,
+    reportRecoveryProgress,
+    waitForExit,
+    launchApplication,
+    readInstance,
+    safeLoopbackUrl,
+    health,
+    stopPublishedInstance
+} from './process-lifecycle'
+import {
+    copyTree,
+    snapshotUserState,
+    restoreUserState
+} from './user-state-snapshot'
 import { prepareHelperStartup } from './helper-startup'
 
-
 /** Status storage must never prevent recovery of the application or user state. */
-
-
 
 function normalized(value: string) {
     return path.resolve(value)
@@ -74,7 +84,11 @@ function validateStagedApplication(
         instruction.applicationRoot,
         'Application backup directory'
     )
-    if(fs.existsSync(instruction.backupRoot))throw new Error('Application backup directory already exists: '+instruction.backupRoot)
+    if (fs.existsSync(instruction.backupRoot))
+        throw new Error(
+            'Application backup directory already exists: ' +
+                instruction.backupRoot
+        )
     for (const file of requiredApplicationFiles(
         instruction.stagedApplicationRoot
     ))
@@ -92,14 +106,6 @@ function validateStagedApplication(
     if (sourceSha !== instruction.targetSourceSha)
         throw new Error('Staged full application source SHA does not match')
 }
-
-
-
-
-
-
-
-
 
 function removeApplicationTree(root: string) {
     // Node's bounded retry handles Windows launcher/child/antivirus lock release.
@@ -175,12 +181,13 @@ export async function runFullApplicationUpgrade(
     let replaced = false
     let committed = false
     let parentExited = false
+    let replacementStarted = false
     try {
         writeProgress(instruction.progressFile, {
             phase: 'waiting-for-exit',
             targetVersion: instruction.targetVersion
         })
-        await prepareHelperStartup(instruction,'full-application')
+        await prepareHelperStartup(instruction, 'full-application')
         await waitForExit(instruction.parentPid)
         parentExited = true
         fs.rmSync(instruction.instanceFile, { force: true })
@@ -195,7 +202,9 @@ export async function runFullApplicationUpgrade(
             phase: 'replacing-files',
             targetVersion: instruction.targetVersion
         })
-        replaceApplication(instruction, () => { replaced = true })
+        replaceApplication(instruction, () => {
+            replaced = true
+        })
 
         const installedSource = fs
             .readFileSync(
@@ -211,6 +220,7 @@ export async function runFullApplicationUpgrade(
             targetVersion: instruction.targetVersion
         })
         await launchApplication(instruction.applicationRoot)
+        replacementStarted = true
 
         writeProgress(instruction.progressFile, {
             phase: 'health-check',
@@ -252,8 +262,12 @@ export async function runFullApplicationUpgrade(
             }
             return
         }
-        if(!parentExited){
-            reportRecoveryProgress(instruction.progressFile,{phase:'failed',targetVersion:instruction.targetVersion,message:error instanceof Error?error.message:String(error)})
+        if (!parentExited) {
+            reportRecoveryProgress(instruction.progressFile, {
+                phase: 'failed',
+                targetVersion: instruction.targetVersion,
+                message: error instanceof Error ? error.message : String(error)
+            })
             throw error
         }
         reportRecoveryProgress(instruction.progressFile, {
@@ -262,7 +276,13 @@ export async function runFullApplicationUpgrade(
             message: error instanceof Error ? error.message : String(error)
         })
         try {
-            if(replaced)await stopPublishedInstance(instruction.instanceFile)
+            if (
+                replacementStarted &&
+                !(await stopPublishedInstance(instruction.instanceFile))
+            )
+                throw new Error(
+                    'Replacement exit cannot be verified; application and user-state backups retained'
+                )
             fs.rmSync(instruction.instanceFile, { force: true })
             if (replaced) rollbackApplication(instruction)
             if (snapshot) restoreUserState(instruction, snapshot)

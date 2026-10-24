@@ -131,10 +131,14 @@ export async function health(instruction: UpgradeHealthInput) {
     return { ok: false as const, url: null }
 }
 
-export async function stopPublishedInstance(instanceFile: string) {
+/** False means ownership/exit is unknown, never permission to overwrite live files. */
+export async function stopPublishedInstance(
+    instanceFile: string
+): Promise<boolean> {
     const instance = readInstance(instanceFile)
     const pid = Number(instance?.pid ?? 0)
-    if (!Number.isInteger(pid) || pid <= 0 || !alive(pid)) return
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false
+    if (!alive(pid)) return true
     const url = safeLoopbackUrl(instance?.url)
     if (url) {
         try {
@@ -162,7 +166,7 @@ export async function stopPublishedInstance(instanceFile: string) {
                 )
                 if (stopped.ok) {
                     await waitForExit(pid, 8_000)
-                    return
+                    return true
                 }
             }
         } catch {
@@ -172,7 +176,7 @@ export async function stopPublishedInstance(instanceFile: string) {
     try {
         process.kill(pid)
     } catch {
-        if (!alive(pid)) return
+        if (!alive(pid)) return true
         throw new Error(
             'The replacement process could not be stopped for rollback'
         )
@@ -190,4 +194,5 @@ export async function stopPublishedInstance(instanceFile: string) {
         }
         await waitForExit(pid, 8_000)
     }
+    return true
 }

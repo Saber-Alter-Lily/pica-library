@@ -23,6 +23,7 @@ const scenarios = [
     'staged-tamper',
     'application-launch-error',
     'health-failure',
+    'unpublished-instance',
     'recovery-status-error'
 ]
 if (selected !== 'all' && !scenarios.includes(selected))
@@ -288,7 +289,8 @@ async function scenario(kind) {
             `
 import fs from 'node:fs';import path from 'node:path';import cp from 'node:child_process';import {EventEmitter} from 'node:events';import {syncBuiltinESMExports} from 'node:module';import {DatabaseSync} from 'node:sqlite';
 const context=${JSON.stringify(fixtureContext)},instruction=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
-let uncaught=null;process.on('uncaughtExceptionMonitor',error=>{uncaught=error.message});process.once('exit',code=>{fs.writeFileSync(context.workerReceipt,JSON.stringify({code,uncaught,kind:context.kind,pid:process.pid}))});
+let uncaught=null;process.on('uncaughtExceptionMonitor',error=>{uncaught=error.message});process.once('exit',code=>{fs.writeFileSync(context.workerReceipt,JSON.stringify({code,uncaught,kind:context.kind,pid:process.pid,backupRoot:instruction.backupRoot}))});
+if(context.kind==='unpublished-instance'){instruction.healthTimeoutMs=1500;fs.writeFileSync(process.argv[2],JSON.stringify(instruction));const original=cp.spawn;let launches=0;cp.spawn=(executable,args,options)=>{if(path.basename(executable)==='Pica Library.exe'&&++launches===1){const child=original(path.join(instruction.applicationRoot,'runtime','node.exe'),['-e','setTimeout(()=>{},60000)'],options);child.once('spawn',()=>fs.writeFileSync(path.join(context.root,'unpublished-pid.json'),JSON.stringify({pid:child.pid})));return child}throw new Error('Unidentified replacement must not trigger another launch')}}
 if(context.kind==='health-failure'){instruction.healthTimeoutMs=3000;fs.writeFileSync(process.argv[2],JSON.stringify(instruction));const original=globalThis.fetch;let mutated=false;globalThis.fetch=async(input,options)=>{if(String(input).endsWith('/api/v1/capabilities')){if(!mutated&&fs.existsSync(instruction.instanceFile)){const d=new DatabaseSync(path.join(context.data,'library.db'));d.prepare('UPDATE app_state SET value_json=? WHERE key=?').run('{"synthetic":"replacement write"}','acceptance.synthetic.private-state');d.close();fs.writeFileSync(path.join(context.home,'config','upgrade-preservation.txt'),'replacement configuration');mutated=true}return Response.json({appVersion:'synthetic-unhealthy'})}return original(input,options)}}
 if(['application-launch-error','recovery-status-error'].includes(context.kind)){const original=cp.spawn;let launches=0;cp.spawn=(executable,args,options)=>{if(path.basename(executable)==='Pica Library.exe'&&++launches===1){const child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>child.emit('error',Object.assign(new Error('synthetic asynchronous application EACCES'),{code:'EACCES'})));return child}return original(executable,args,options)}}
 if(context.kind==='recovery-status-error'){const original=fs.writeFileSync;fs.writeFileSync=(file,bytes,...options)=>{if(file===instruction.progressFile&&/"phase":"(?:rollback|failed)"/.test(String(bytes)))throw new Error('synthetic recovery status EACCES');return original(file,bytes,...options)}}
@@ -370,7 +372,9 @@ syncBuiltinESMExports();
         if (!stagedResponse.ok)
             throw new Error(
                 'Actual incremental staging failed: HTTP ' +
-                    stagedResponse.status
+                    stagedResponse.status +
+                    ' ' +
+                    (await stagedResponse.text()).slice(0, 1200)
             )
         const staged = await stagedResponse.json()
         if (
@@ -450,8 +454,9 @@ syncBuiltinESMExports();
                 outcome.uncaught
             )
                 throw new Error('Actual helper exit/recovery outcome mismatch')
-            await status(true)
-            const old = kind !== 'success'
+            const retained = kind === 'unpublished-instance'
+            if (!retained) await status(true)
+            const old = kind !== 'success' && !retained
             if (
                 fs.readFileSync(
                     path.join(app, 'web', 'scoped-update-fixture.txt'),
@@ -475,9 +480,42 @@ syncBuiltinESMExports();
             )
             if (
                 kind !== 'recovery-status-error' &&
-                progress.phase !== (old ? 'failed' : 'complete')
+                progress.phase !== (kind === 'success' ? 'complete' : 'failed')
             )
                 throw new Error('Actual helper final progress mismatch')
+            if (retained) {
+                const unpublished = JSON.parse(
+                    fs.readFileSync(
+                        path.join(root, 'unpublished-pid.json'),
+                        'utf8'
+                    )
+                )
+                if (
+                    !assertOwnedPid(unpublished.pid) ||
+                    fs.existsSync(instanceFile) ||
+                    !progress.message?.includes('exit cannot be verified') ||
+                    !outcome.backupRoot.startsWith(stateRoot + path.sep)
+                )
+                    throw new Error('Unknown replacement did not fail closed')
+                if (
+                    fs.readFileSync(
+                        path.join(
+                            outcome.backupRoot,
+                            'web',
+                            'scoped-update-fixture.txt'
+                        ),
+                        'utf8'
+                    ) !== 'old fixture' ||
+                    !fs.existsSync(
+                        path.join(
+                            outcome.backupRoot,
+                            'user-state-snapshot',
+                            'snapshot.json'
+                        )
+                    )
+                )
+                    throw new Error('Unknown replacement lost recovery copies')
+            }
         }
         state('verify')
         const readyFiles = fs
@@ -542,8 +580,15 @@ syncBuiltinESMExports();
             originalHelperRetained: true,
             syntheticFavoritesProgressPrivateStateBehaviorConfigAndDownloadsPreserved: true,
             helperExit: outcome?.code ?? null,
+            unknownInstanceRetainedWithoutOverwrite:
+                kind === 'unpublished-instance',
             uncaughtHelperError: false,
-            healthTimeoutOverrideMs: kind === 'health-failure' ? 3000 : null,
+            healthTimeoutOverrideMs:
+                kind === 'health-failure'
+                    ? 3000
+                    : kind === 'unpublished-instance'
+                      ? 1500
+                      : null,
             publishedOtaTested: false,
             productionAccessed: false
         }

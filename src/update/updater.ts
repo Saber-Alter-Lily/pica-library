@@ -288,6 +288,7 @@ export async function runIncrementalUpgrade(input: UpdaterInstruction) {
     let parentExited = false,
         snapshot = '',
         mutated = false,
+        replacementStarted = false,
         committed = false
     try {
         writeProgress(input.progressFile, {
@@ -331,6 +332,7 @@ export async function runIncrementalUpgrade(input: UpdaterInstruction) {
             targetVersion: input.manifest.targetVersion
         })
         await launch(input)
+        replacementStarted = true
         writeProgress(input.progressFile, {
             phase: 'health-check',
             targetVersion: input.manifest.targetVersion
@@ -375,7 +377,13 @@ export async function runIncrementalUpgrade(input: UpdaterInstruction) {
         })
         try {
             if (mutated) {
-                await stopPublishedInstance(input.instanceFile)
+                if (
+                    replacementStarted &&
+                    !(await stopPublishedInstance(input.instanceFile))
+                )
+                    throw new Error(
+                        'Replacement exit cannot be verified; application and user-state backups retained'
+                    )
                 fs.rmSync(input.instanceFile, { force: true })
                 rollback(input)
                 if (snapshot) restoreUserState(context, snapshot)

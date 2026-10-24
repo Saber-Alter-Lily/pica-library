@@ -110,7 +110,7 @@ function sha256(value: Buffer | string) {
 }
 
 function prerelease(version: string) {
-    return /(?:^|[-.])(dev|alpha|beta|rc)(?:[.-]|\d|$)/i.test(version)
+    return /(?:^|[-.])(dev|alpha|beta|rc|postrc)(?:[.-]|\d|$)/i.test(version)
 }
 
 function stableVersionParts(version: string) {

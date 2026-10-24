@@ -154,6 +154,13 @@ describe('UpdateManager module payload boundary', () => {
 })
 
 describe('UpdateManager', () => {
+    it('accepts the shipped isolated postrc version for local-test assets, never a stable installation',async()=>{
+        const version='0.5.0-postrc.0123456789ab'
+        const update=packageBuffer({sourceVersionRange:'='+version,targetVersion:version})
+        await expect(manager(version).stage('scoped-fixture.zip',update.buffer)).resolves.toMatchObject({requiresFullInstall:false,packageType:'local-test'})
+        await expect(manager('0.5.0').stage('scoped-fixture.zip',packageBuffer({sourceVersionRange:'=0.5.0',targetVersion:version}).buffer)).rejects.toThrow('Stable builds reject local-test')
+        await expect(manager(version).stage('scoped-fixture.zip',packageBuffer({sourceVersionRange:'='+version,targetVersion:'0.5.1'}).buffer)).rejects.toThrow('Stable builds reject local-test')
+    })
     it('rejects absolute, traversal and ADS paths', () => {
         for (const value of [
             'C:\\Windows\\system32\\bad.dll',

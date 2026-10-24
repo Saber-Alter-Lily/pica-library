@@ -126,6 +126,7 @@ function fakeLaunch(
         mutateState?: boolean
         healthy?: boolean
         refuseStop?: boolean
+        omitInstance?: boolean
     } = {}
 ) {
     let attempts = 0,
@@ -150,13 +151,14 @@ function fakeLaunch(
                 return
             }
             running = true
-            write(
-                input.instanceFile,
-                JSON.stringify({
-                    pid: replacementPid,
-                    url: 'http://127.0.0.1:54123'
-                })
-            )
+            if (!options.omitInstance)
+                write(
+                    input.instanceFile,
+                    JSON.stringify({
+                        pid: replacementPid,
+                        url: 'http://127.0.0.1:54123'
+                    })
+                )
             if (attempt === 1 && options.mutateState) {
                 write(
                     path.join(input.desktopHomeRoot, 'config/fixture.json'),
@@ -206,6 +208,50 @@ afterEach(() => {
 })
 
 describe('actual incremental transaction with synthetic I/O failures', () => {
+    it.each(['missing', 'invalid'] as const)(
+        'retains backups and never overwrites an unidentifiable %s replacement',
+        async (kind) => {
+            const f = fixture()
+            fakeLaunch(f, { omitInstance: true, mutateState: true })
+            if (kind === 'invalid')
+                vi.spyOn(lifecycle, 'health').mockImplementationOnce(
+                    async () => {
+                        write(
+                            f.instanceFile,
+                            JSON.stringify({
+                                pid: -1,
+                                url: 'http://127.0.0.1:54123'
+                            })
+                        )
+                        return { ok: false as const, url: null }
+                    }
+                )
+            await expect(runIncrementalUpgrade(f)).rejects.toThrow(
+                'exit cannot be verified'
+            )
+            expect(
+                fs.readFileSync(
+                    path.join(f.applicationRoot, 'web/page.js'),
+                    'utf8'
+                )
+            ).toBe('new application')
+            expect(
+                fs.readFileSync(path.join(f.backupRoot, 'web/page.js'), 'utf8')
+            ).toBe('old application')
+            expect(
+                fs.readFileSync(
+                    path.join(f.desktopHomeRoot, 'config/fixture.json'),
+                    'utf8'
+                )
+            ).toBe('replacement config')
+            expect(
+                fs.existsSync(
+                    path.join(f.backupRoot, 'user-state-snapshot/snapshot.json')
+                )
+            ).toBe(true)
+            expect(spawn).toHaveBeenCalledTimes(1)
+        }
+    )
     it('awaits async launch failure, restores replacements/deletions/new files and relaunches the old application', async () => {
         const f = fixture()
         fakeLaunch(f, { failFirst: true })

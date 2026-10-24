@@ -1,5 +1,17 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-61: identity view/command/task separation and atomic human decisions (unpublished)
+
+Continues frozen NEXT-60 `2c3f7d647100441398b28fbdc0cc41a5e8ffd0cc`, complete handoff SHA256 `da40f5b62e7370ec4b304eb7b5c91abe5f94f097a04de0048c1f893251876c99`. Extracts actual stored-identity views, explicit commands and cooperative evidence task. Read/evidence defaults no longer create policy; decision/clear + distinct policy + returned review reuse one existing synchronous savepoint. No matching/threshold/schema/API change or binding apply. [Scope and exact holds](WORK_IDENTITY_MODULE.md).
+
+Current-source CI, compiled Windows post-SQL fault/prepare-only gates and fixed-certificate Dev75→76 metadata continuity are required in the new handoff. No local Java/application/LAN/update runtime under the user's [security-prompt restriction](LOCAL_VALIDATION_SAFETY.md). Physical/provider/gesture/tag/AI/offline acceptance remains deferred; no production data, main/Release/OTA or deployment.
+
+## 2026-10-23 NEXT-60 / NEXT-59: actual shadow control and read-only audit/export modules (unpublished)
+
+NEXT-59 `f4e2c2ba8cb147292e4c344c59ca1619766a4380` extracted13 actual audit/planning reads and native-picked schema2 export assembly, with no implicit policy initialization and no report acquisition after cancelled Save. NEXT-60 `2c3f7d647100441398b28fbdc0cc41a5e8ffd0cc` extracted the real manual shadow pipeline/task, adding source revision fences and audit-only save. [Audit/export](RECOMMENDATION_AUDIT_READ_MODULE.md), [shadow](RECOMMENDATION_SHADOW_MODULE.md). Their exact-source CI/artifact handoffs are frozen separately; they do not validate a later identity change or complete the entire objective.
+
+The full/native/runtime validation location is now CI, not the user's PC. Signatures and package hashes are retained separately from physical installation. No merge/release/OTA, key download or deployment.
+
 ## 2026-10-23 NEXT-58: acknowledged helper startup and shared incremental/full recovery (unpublished)
 
 Continues frozen NEXT-57 `7f9fdb772feadf40fdf24906ea553df677f0fe3b`, complete handoff SHA256 `48086613a54936fd365c615d9b4831a4b8ed3ba9bf9b64d02f40950e456d77c0`. Reuses full-helper lifecycle/state recovery, adds ready/parent-ack before app exit, and applies owned-backup/state/health recovery to incremental commands. A narrow async host port prevents exit on pending/failed activation. [Scope and limits](INCREMENTAL_UPDATE_RUNTIME.md).

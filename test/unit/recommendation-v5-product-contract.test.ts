@@ -109,7 +109,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(server).toContain(
             '/api/v1/recommendation-v5/work-identity/audit'
         )
-        expect(service).toContain('automaticBinding: false')
+        expect(read('src/identity/queries-v5.ts')).toContain('automaticBinding: false')
     })
 
     it('persists work-identity evidence without promoting work bindings', () => {
@@ -118,8 +118,9 @@ describe('Recommendation V5 portable product contract', () => {
         const server = read('src/library/server.ts')
         expect(database).toContain('saveWorkIdentityEvidence')
         expect(database).toContain('listWorkIdentityEvidence')
-        expect(service).toContain("'EVIDENCE_ONLY' as const")
-        expect(service).toContain('automaticBinding: false')
+        const commands = read('src/identity/commands-v5.ts')
+        expect(commands).toContain("'EVIDENCE_ONLY' as const")
+        expect(commands).toContain('automaticBinding: false')
         expect(server).toContain(
             '/api/v1/recommendation-v5/work-identity/evidence/refresh'
         )
@@ -136,7 +137,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(database).toContain('clearWorkIdentityDecision')
         expect(policy).toContain('setExplicitDistinctPair')
         expect(service).toContain('recommendationV5WorkIdentityReview')
-        expect(service).toContain('decision === \'KEEP_SEPARATE\'')
+        expect(read('src/identity/commands-v5.ts')).toContain('decision === \'KEEP_SEPARATE\'')
         expect(server).toContain(
             '/api/v1/recommendation-v5/work-identity/decision'
         )
@@ -144,7 +145,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(web).toContain('不同版本')
         expect(web).toContain('保持分离')
         expect(web).toContain('不会自动创建 Work/Edition 绑定')
-        expect(service).toContain('materializationPreview')
+        expect(read('src/identity/queries-v5.ts')).toContain('materializationPreview')
         expect(web).toContain('Work 物化预览')
         expect(web).toContain('仅预览，不写入 Work/Edition binding')
     })
@@ -193,10 +194,11 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain(
             'WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION'
         )
-        expect(service).toContain("createHash('sha256')")
-        expect(service).toContain("mode: 'PREPARED_ONLY'")
-        expect(service).toContain('executionEnabled: false')
-        expect(service).toContain('applyEndpoint: null')
+        expect(read('src/services/work-identity-adapter.ts')).toContain("createHash('sha256')")
+        const commands = read('src/identity/commands-v5.ts')
+        expect(commands).toContain("mode: 'PREPARED_ONLY'")
+        expect(commands).toContain('executionEnabled: false')
+        expect(commands).toContain('applyEndpoint: null')
         expect(server).toContain(
             '/api/v1/desktop/recommendation-v5/work-identity/materialization/prepare'
         )

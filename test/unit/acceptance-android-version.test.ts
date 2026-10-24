@@ -9,7 +9,7 @@ function versionContract(workflow: string) {
     ]
     return (
         authorities.length === 1 &&
-        Number(authorities[0][1]) > 74 &&
+        Number(authorities[0][1]) > 75 &&
         workflow.includes(
             'export PICA_ANDROID_VERSION_CODE="$PICA_ANDROID_CANDIDATE_VERSION_CODE"'
         ) &&
@@ -22,7 +22,7 @@ function versionContract(workflow: string) {
 }
 
 describe('unpublished Android build and manifest version authority', () => {
-    it('builds and verifies Dev75 from one public authority without weakening package/certificate gates', () => {
+    it('builds and verifies Dev76 from one public authority without weakening package/certificate gates', () => {
         const workflow = fs.readFileSync(
             '.github/workflows/next-consolidated-acceptance.yml',
             'utf8'

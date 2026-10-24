@@ -135,7 +135,7 @@ try {
     const csv = path.join(root, 'synthetic.csv')
     fs.writeFileSync(
         csv,
-        'comic_id,title,author,categories,tags,finished,total_likes,total_views,pages_count,eps_count\nlocal:fixture,Audit Fixture,Fixture Creator,Fixture,fixture,true,1,1,12,1\n'
+        'comic_id,title,author,categories,tags,finished,total_likes,total_views,pages_count,eps_count\nlocal:fixture,Audit Fixture,Fixture Creator,Fixture,fixture,true,1,1,12,1\nlocal:other,Audit Fixture,Fixture Creator,Fixture,fixture,true,1,1,12,1\n'
     )
     const imported = spawnSync(
         path.join(app, 'runtime', 'node.exe'),
@@ -161,7 +161,7 @@ const control=${JSON.stringify(control)},trace=${JSON.stringify(trace)},output=$
 const read=fs.readFileSync.bind(fs),spawn=cp.spawn;
 const state=()=>{try{return JSON.parse(read(control,'utf8'))}catch{return {trace:false}}};
 const record=kind=>{if(state().trace)fs.appendFileSync(trace,JSON.stringify({kind})+'\\n')};
-for(const method of ['prepare','exec']){const original=DatabaseSync.prototype[method];DatabaseSync.prototype[method]=function(...args){record('sqlite-'+method);return original.apply(this,args)}}
+for(const method of ['prepare','exec']){const original=DatabaseSync.prototype[method];DatabaseSync.prototype[method]=function(...args){record('sqlite-'+method);const result=original.apply(this,args);if(method==='prepare'&&/INSERT\\s+INTO\\s+app_state/i.test(String(args[0])))return new Proxy(result,{get(target,key){if(key==='run')return function(...values){const saved=target.run(...values);if(state().mode==='identity-policy-fail'&&values[0]==='recommendation.v5.portablePolicy.v1'){record('identity-policy-after-write-fault');throw Error('Synthetic identity policy write fault')}return saved};const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value}});return result}}
 fs.readFileSync=function(file,...args){if(state().trace&&typeof file==='string'&&forbidden.includes(path.resolve(file).toLowerCase())){record('forbidden-fixture-read');throw Error('Audit must not read credential/body fixture')}return read(file,...args)};
 cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowerCase()==='powershell.exe'&&Array.isArray(args)&&args.some(a=>String(a).includes('SaveFileDialog')&&String(a).includes('Pica-Library-Recommendation-Audit-'))){record('audit-native-picker');const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();process.nextTick(()=>{if(state().mode==='accept')child.stdout.write(output);child.stdout.end();child.stderr.end();child.emit('exit',0)});return child}return spawn.call(this,command,args,...rest)};syncBuiltinESMExports();
 `
@@ -233,7 +233,11 @@ cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowe
         ].map((name) => '/api/v1/desktop/recommendation-v5/evaluation/' + name),
         '/api/v1/desktop/recommendation-v5/shadow-runs',
         '/api/v1/desktop/recommendation-v5/visual-activation-gate',
-        '/api/v1/desktop/recommendation-v5/promotion-gate'
+        '/api/v1/desktop/recommendation-v5/promotion-gate',
+        ...['audit', 'evidence', 'review', 'materialization-plan', 'evidence/refresh/status']
+            .map(name => '/api/v1/recommendation-v5/work-identity/' + name),
+        '/api/v1/desktop/recommendation-v5/work-identity/materialization/runs',
+        '/api/v1/comics/local%3Afixture/work-variants'
     ]
     for (const route of routes) {
         const response = await fetch(instance.url + route, {
@@ -315,9 +319,9 @@ cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowe
         'lastSeenAt'
     ].sort()
     if (
-        catalog.length !== 1 ||
-        JSON.stringify(Object.keys(catalog[0]).sort()) !==
-            JSON.stringify(expectedFields)
+        catalog.length !== 2 ||
+        catalog.some(row => JSON.stringify(Object.keys(row).sort()) !==
+            JSON.stringify(expectedFields))
     )
         throw new Error(
             'Actual export did not retain minimal catalog field projection'
@@ -402,6 +406,87 @@ cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowe
         source_revision_fault_injection: 'UNIT_SYNTHETIC_ONLY',
         provider_runtime_acceptance: 'NOT_RUN', synthetic_only: true,
         production_accessed: false, execution_location: 'GITHUB_WINDOWS_CI'
+    }))
+    // Actual compiled local-only identity task, then explicit human commands.
+    // The external preload throws AFTER the real SQLite policy run, not before
+    // the command or in a shipped fault endpoint. Only the transaction can erase it.
+    const get = async route => {
+        const response = await fetch(instance.url + route, { signal: AbortSignal.timeout(15000) })
+        if (!response.ok) throw new Error('Compiled identity GET failed HTTP ' + response.status)
+        return response.json()
+    }
+    const nonIdentityEqual = (previous, allowed) => {
+        const current = snapshot()
+        for (const table of previous) if (!allowed.includes(table.name) &&
+            JSON.stringify(current.find(row => row.name === table.name)?.rows) !== JSON.stringify(table.rows))
+            throw new Error('Compiled identity modified unrelated table: ' + table.name)
+        return current
+    }
+    await post('/api/v1/recommendation-v5/work-identity/evidence/refresh', { limit: 50 }, state)
+    let identityState
+    for (let attempt = 0; attempt < 200; attempt++) {
+        identityState = await get('/api/v1/recommendation-v5/work-identity/evidence/refresh/status')
+        if (!identityState.active) break
+        await sleep(50)
+    }
+    if (identityState?.state !== 'complete' || identityState.savedCount < 1)
+        throw new Error('Actual compiled identity evidence task did not save its synthetic pair')
+    const afterEvidence = nonIdentityEqual(afterShadow, ['work_identity_evidence'])
+    const decisionRoute = '/api/v1/recommendation-v5/work-identity/decision'
+    const pair = { leftComicId: 'local:fixture', rightComicId: 'local:other' }
+    async function rejectedPolicyWrite(decision, baseline) {
+        mode('identity-policy-fail')
+        const failed = await fetch(instance.url + decisionRoute, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-pica-csrf': state.csrfToken, Origin: instance.url },
+            body: JSON.stringify({ ...pair, decision }), signal: AbortSignal.timeout(15000)
+        })
+        await failed.text()
+        mode('cancel', false)
+        if (failed.ok) throw new Error('Compiled identity accepted a post-policy-write fault')
+        requireUnchanged(baseline)
+    }
+    await rejectedPolicyWrite('KEEP_SEPARATE', afterEvidence)
+    const separated = await post(decisionRoute, { ...pair, decision: 'KEEP_SEPARATE' }, state)
+    if (!separated.decisions.some(row => row.decision === 'KEEP_SEPARATE'))
+        throw new Error('Compiled human decision did not persist')
+    const afterSeparate = snapshot()
+    await rejectedPolicyWrite('CLEAR', afterSeparate)
+    await post(decisionRoute, { ...pair, decision: 'SAME_WORK' }, state)
+    const identityPlan = await get('/api/v1/recommendation-v5/work-identity/materialization-plan')
+    if (identityPlan.summary.fullBindingReadyCount !== 1 || identityPlan.writeEnabled !== false)
+        throw new Error('Compiled explicit local pair plan was not ready and dry-run only')
+    const prepareInput = {
+        requestKey: 'synthetic-compiled-plan', confirmation: 'PREPARE_CANONICAL_WORK_BINDING',
+        planVersion: identityPlan.planVersion, planDigest: identityPlan.planDigest
+    }
+    const prepareRoute = '/api/v1/desktop/recommendation-v5/work-identity/materialization/prepare'
+    for (let attempt = 0; attempt < 2; attempt++) {
+        const prepared = await post(prepareRoute, prepareInput, state)
+        if (prepared.mode !== 'PREPARED_ONLY' || prepared.executionEnabled !== false || prepared.applyEndpoint !== null ||
+            prepared.run.status !== 'PREPARED' || prepared.run.idempotentReplay !== (attempt > 0))
+            throw new Error('Compiled materialization escaped prepare-only/idempotent authority')
+    }
+    await post(decisionRoute, { ...pair, decision: 'CLEAR' }, state)
+    const afterIdentity = nonIdentityEqual(afterEvidence, ['work_identity_decisions', 'app_state', 'work_identity_materialization_runs'])
+    const tableRows = name => afterIdentity.find(row => row.name === name).rows
+    const policyRow = tableRows('app_state').map(row => JSON.parse(row)).find(row => row.key === 'recommendation.v5.portablePolicy.v1')
+    if (!policyRow || JSON.parse(policyRow.value_json).explicitDistinctPairs.length || tableRows('work_identity_decisions').length ||
+        tableRows('work_identity_materialization_runs').length !== 1 || tableRows('canonical_works').length ||
+        tableRows('work_editions').length || tableRows('work_upload_bindings').length ||
+        rows().filter(row => row.kind === 'identity-policy-after-write-fault').length !== 2 ||
+        rows().some(row => row.kind === 'forbidden-fixture-read'))
+        throw new Error('Compiled identity transaction/clear/preparation state is inconsistent')
+    console.log(JSON.stringify({
+        packaged_work_identity_module: 'PASS', source_sha: sourceSha, version,
+        identity_read_only_gets: 7, read_views_missing_policy_preserved: true,
+        actual_background_evidence_task: true, background_missing_policy_preserved: true,
+        observed_post_sql_policy_faults: 2, both_faults_all_tables_rolled_back: true,
+        explicit_save_change_clear: true, prepared_only_idempotent: true,
+        canonical_work_edition_binding_created: false,
+        unrelated_user_tables_preserved: true, external_preload_only: true,
+        real_provider_acceptance: 'NOT_RUN', production_accessed: false,
+        execution_location: 'GITHUB_WINDOWS_CI'
     }))
     // Remove only the two exact synthetic canaries before normal shutdown/startup handling.
     fs.unlinkSync(credentialCanary)

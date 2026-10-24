@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import http from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
+import { assertPackagedHostedLibraryReader } from './assert-hosted-library-reader.mjs'
 
 /** Reuses the caller's exact isolated application/profile; never spawns a second app or a JVM. */
 export async function assertPackagedSourceHostInspection({ status, home, data, sourceSha, version }) {
@@ -92,5 +93,6 @@ export async function assertPackagedSourceHostInspection({ status, home, data, s
         assert.deepEqual((await status()).externalSources, choices); assert.equal(fs.existsSync(path.join(home, 'config/credentials.dat')), false)
         assert.equal(unexpected, 0); assert.equal(observations.some(row => row.ambientAuth || row.cookie), false)
         process.stdout.write(JSON.stringify({ packaged_source_host_inspection: 'PASS', saved_host_lifecycle: 'PASS', saved_disabled_by_default: true, settings_changes_do_not_contact_host: true, per_request_only_credentials: true, stale_permission_rejected: true, saved_metadata_excludes_secrets: true, source_sha: sourceSha, version, execution_location: 'GITHUB_WINDOWS_CI', actual_http_adapter: true, lossless_long_source_id: true, get_and_csrf_and_origin_and_consent_rejected_before_host: true, source_choices_unchanged: true, all_tables_unchanged: true, config_bytes_unchanged: true, credentials_file_created: false, basic_scoped_to_explicit_host: true, redirects_refused: true, size_and_graphql_errors_sanitized: true, explicit_cancel_closed_remote_stream: true, actual_deadline_closed_remote_stream: true, successful_retry: true, reader_or_library_import_advertised: false, extension_or_host_installed: false, unexpected_fixture_requests: unexpected, host_requests: observations.length, production_accessed: false }) + '\n')
+        await assertPackagedHostedLibraryReader({ status, home, data, sourceSha, version })
     } finally { fixture.closeAllConnections(); await new Promise(resolve => fixture.close(resolve)) }
 }

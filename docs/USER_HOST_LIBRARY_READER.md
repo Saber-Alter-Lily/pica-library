@@ -1,0 +1,44 @@
+# User-hosted library → shared Reader — NEXT-67 (unpublished)
+
+## Actual reader, not a content platform
+
+This connects a user's **existing Suwayomi 2.4 library** to the existing Desktop/Web Reader. It is not our content catalogue, source marketplace or mandatory backend. No default host/repository/content, host/extension deployment, provider-account inheritance, favourite/library/source/settings mutation or automatic catalogue import is introduced. Local-only reading remains independent. Historical compiled providers and vocabulary are not declared fully neutral or removed destructively. Product positioning is not blanket legal immunity; adapter safety remains our responsibility.
+
+The NEXT-66 saved connection remains `inspect-only` with `reader=false`. A new, separate **15-minute in-memory library-read session** requires that enabled connection, its current revision, explicit credentials (if Basic) and explicit acceptance of host fetch/cache/sync side effects. Merely saving/enabling/viewing settings never grants or starts reading. Only the user's existing host library is paged25 at a time, offsets≤5000; provider-wide search, host catalogue creation, library import, downloads/native and extension installation remain unsupported.
+
+## User path
+
+Settings → Basic → My external host settings → enable your saved host → **Authorize hosted-library reading separately**. Confirm the scope in the new panel. Enter host credentials for this session, start it, choose a book and Read. The same main Reader provides chapters, vertical/single/double modes, fit, direction, navigation and independent local progress. Closing the library panel hides it; **End session**, page exit, expiration, connection changes/removal, engine restart and app exit revoke it. Browser cancellation can race a completed session response; the server still enforces its fixed15-minute expiration. JavaScript memory clearing is not forensic erasure.
+
+The host may fetch/cache body pages and execute its configured KOReader synchronization while fetching. This is explicitly disclosed and **not** mislabeled read-only. The adapter does not call host progress-write, favourite, library-membership, account, source, settings or extension mutations. It ignores returned host progress rather than silently importing it into local personal state.
+
+## Reuse and ownership
+
+- `services/online-reader-service.ts` is the actual shared engine. State, source, cache, identity, URL and access are narrow application-owned ports. The emitted engine graph excludes SQL, filesystem, credential stores and concrete providers. Legacy3-argument construction retains the old accepted IDs, page root and progress key. No second Reader, downloader or cache scheduler is introduced.
+- `source-hosts/reader-protocol.ts` is a platform-neutral reviewed fixed GraphQL subset, canonical signed64-bit source strings and Int row IDs, complete/partial-error checks, bound chapter ownership and exact same-host page route validation. Official fixed authority remains Suwayomi v2.4.2366, commit40bc5da57820324ed0ae724cbbc020cc4673b594. No upstream/recovered APK implementation is copied or executed.
+- `http-body.ts` extracts the existing bounded stream/Basic/redirect/abort/UTF8 mechanics for reuse by inspection and reader adapters. Inspection still has exactly its original two-operation allowlist. New operations are fixed internally, not browser-supplied GraphQL or arbitrary URL proxies. Metadata≤1MiB, body≤20MiB/raster with MIME/signature checks; same endpoint/base path, no cookie/global-account/proxy reuse, no redirects or TLS bypass. Normal TLS/endpoint policy still applies.
+- `HostedLibraryReader` owns ephemeral credentials, bounded sessions3/network4/queued32/15-second calls, actual shared engine integration and only source-owned personal reference/progress keys. Lazy cache initialization cannot break local-only setup. No host request or personal-state query is performed by its constructor.
+
+## Identity, state and revocation
+
+Comic identity is connection UUID + digest of principal scope, exact signed source ID and remote source-URL digest. Basic usernames are domain-scoped hashed principal inputs, not persisted plaintext; passwords never enter the identity or storage. Different usernames get separate book/progress identities. This supports the pinned anonymous/BASIC_AUTH surface, not general authenticated multi-user account attestation. A host replacement needs a new connection UUID, and future authentication kinds need their own reviewed principal model.
+
+Numeric host manga rows are only lookup hints. Before serving even cached media, fresh metadata must match original source ID and URL digest. Reused/reset IDs reject rather than assigning another work's progress/tags. Chapters are bound to manga and exact source-owned chapter URL; returned pages must match reviewed host API route grammar. No raw provider page URL is fetched or used to replay credentials elsewhere. This trusts the user's chosen host's metadata, not cryptographic content authorship.
+
+Browsing does not persist/import a catalogue. Explicitly selecting a book saves a minimal reference under `host-reader-book-references-v1` (recent500). Progress uses the same engine's recent100-per-principal state under `host-reader-progress-v1:<scope>`; the legacy key, catalogue, user events, recommendations/Visual/favourites/sync/native remain untouched. Existing recent host references/progress survive session end/removal, but cannot be read through another principal/host. A corrupt reference list rejects without reset. These bounded recent records are not a complete hosted-library backup or permanent archive.
+
+Connection invalidation cancels active sessions before publishing permission changes, and post-await/queued/cache/progress guards reject late writes. Failed permission persistence is not falsely reported as durable revocation success. No credentials are saved in metadata, OS vault, browser storage, URLs, exports or sync. Ending a session overwrites its active auth fields and removes its timer/map authority; pending memory/GC and the external host's own behavior are separate limits.
+
+## Local API and UI security
+
+All commands require configured, ready, loopback Desktop, exact local Origin/CSRF and bounded JSON/body deadline. Metadata/media GETs require same-origin fetch metadata plus matching referrer, or explicit same-origin CSRF authority. Cross-site image/navigation GETs cannot use a leaked locator as an ambient-credential host proxy. Responses use no-store/nosniff/same-origin resource policy. No untrusted title/source name is inserted as markup or an external link.
+
+The main Reader receives only a fixed hosted-session root and namespaced ID; caller-supplied API roots are never accepted. Unknown hosted IDs cannot fall through legacy Pica routing. Existing legacy browser history is not populated with unsupported hosted IDs. Recent hosted reading is shown in its authorized library panel and resumes through the shared Reader; fully unified history/catalogue/tag/Android/sync and credential persistence remain future work.
+
+## Evidence and boundaries
+
+Current local126/126 assertions across8 inspected source/temp/fake-fetch files, types/Web48/48 and graph checks must bind to final source before acceptance. First type attempts retained the concrete database return-type coupling, an unknown captured index and a synthetic headers inference error. Narrow structural Reader ports and explicit validated values fixed the actual interface; no test or limit was relaxed. Existing HTTP cancellation/stream/credential tests remain.
+
+Real Desktop HTTP integration, three-language browser Reader journeys and a compiled Windows host-library fixture (session, chapters, body/cache, progress/resume, stale row, cross-site denial and revocation, with exactly two owned app_state keys and every other table/setting preserved) are authored for **CI only**, not run locally. Existing full/incremental/deep upgrade gates, minimal7-file runtime and native regressions remain required on current source. Dev81→82 changes candidate version authority only; no new Android host feature or physical installation is implied.
+
+No production profile/account/body/vector/database was accessed by this development/validation task. No local Java/Gradle/JM/app/browser/listener/full-update runtime, protection exception, main merge, tag/Release, stable OTA, signing-key download, installation or deployment. Full reader objective and deferred real-host/provider/device/guide/tag/AI/gesture/offline/performance/backup acceptance remain OPEN. Do not ask the user to test this partial integration now.

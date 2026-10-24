@@ -11,6 +11,8 @@ import { SourceHostInspector } from '../../src/source-hosts/inspector'
 import { sourceHostHttp } from '../../src/source-hosts/http-transport'
 import { SourceHostConnections } from '../../src/source-hosts/connections'
 import { sourceHostStore } from '../../src/desktop/source-host-store'
+import { HostedLibraryReader } from '../../src/source-hosts/library-reader'
+import { PreviewCacheManager } from '../../src/services/preview-cache-manager'
 import { shadowDatabaseState } from '../fixtures/recommendation-shadow-fixture'
 
 const cleanup: (() => Promise<void>)[] = []
@@ -18,6 +20,8 @@ const route = '/api/v1/desktop/source-hosts/inspect'
 const input = { kind: 'suwayomi', endpoint: 'http://127.0.0.1:4567/', consent: true }
 const info = { data: { aboutServer: { name: 'Suwayomi-Server', version: '2.4.2366' } } }
 const sources = { data: { sources: { nodes: [{ id: '9223372036854775807', name: 'Synthetic', lang: 'zh', supportsLatest: true }], pageInfo: { hasNextPage: false, hasPreviousPage: false }, totalCount: 1 } } }
+const hostBook = { id: 1, sourceId: '9223372036854775807', url: '/own-book', title: 'Synthetic own book' }
+const hostChapter = { id: 2, mangaId: 1, url: '/own-book/chapter', name: 'One', sourceOrder: 0, chapterNumber: 1, pageCount: 1 }
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.restoreAllMocks() })
 
 async function fixture(options: { configured?: boolean; desktop?: boolean } = {}) {
@@ -31,13 +35,17 @@ async function fixture(options: { configured?: boolean; desktop?: boolean } = {}
         resolveEntered()
         if (behavior === 'throw') throw new Error('https://name:remote-secret@host.invalid/ Authorization: private')
         if (behavior === 'stall') await late
-        const operation = JSON.parse(String(init?.body)).operationName
-        return new Response(JSON.stringify(operation === 'PicaSourceHostInfo' ? info : sources), { headers: { 'content-type': 'application/json' } })
+        if (!init?.body) return new Response(Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), Buffer.alloc(16)]), { headers: { 'content-type': 'image/png' } })
+        const operation = JSON.parse(String(init.body)).operationName
+        const value = operation === 'PicaSourceHostInfo' ? info : operation === 'PicaHostLibrary' ? { data: { mangas: { nodes: [hostBook], pageInfo: { hasNextPage: false } } } } : operation === 'PicaHostManga' ? { data: { manga: { ...hostBook, chapters: { nodes: [hostChapter] } } } } : operation === 'PicaHostChapter' ? { data: { chapter: hostChapter } } : operation === 'PicaHostChapterPages' ? { data: { fetchChapterPages: { chapter: hostChapter, pages: ['/api/v1/manga/1/chapter/0/page/0'] } } } : sources
+        return new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } })
     })
     const inspector = new SourceHostInspector(connection => sourceHostHttp(connection, wire))
     const connections = new SourceHostConnections(sourceHostStore(path.join(root, 'source-hosts.json')), inspector, () => '64d223e0-5d29-4320-babb-5a2da654d345')
+    const hostedReader = new HostedLibraryReader(connections, db, () => new PreviewCacheManager(path.join(root, 'host-reader-cache')), wire)
+    cleanup.push(async () => { hostedReader.close() })
     const inspect = vi.fn((value: Record<string, unknown>, abort: AbortSignal) => { signal = abort; return inspector.inspect(value, abort) })
-    const desktop: DesktopServerController = { csrfToken: 'synthetic-host-csrf', configured: () => options.configured !== false, status: () => ({ sourceHostInspection: { available: true } }), inspectSourceHost: inspect, sourceHostConnections: value => connections.command(value), inspectSavedSourceHost: (value, signal) => connections.inspect(value, signal), save: async () => ({}), testConnection: async () => ({}), chooseFolder: async () => null, exportBrowserLitePackage: async () => ({}), openDirectory: async () => {}, shutdown: () => {} }
+    const desktop: DesktopServerController = { csrfToken: 'synthetic-host-csrf', hostedReader, configured: () => options.configured !== false, status: () => ({ sourceHostInspection: { available: true } }), inspectSourceHost: inspect, sourceHostConnections: value => connections.command(value), inspectSavedSourceHost: (value, signal) => connections.inspect(value, signal), save: async () => ({}), testConnection: async () => ({}), chooseFolder: async () => null, exportBrowserLitePackage: async () => ({}), openDirectory: async () => {}, shutdown: () => {} }
     const server = await startLibraryServer({ database: db, service, port: 0, desktop: options.desktop === false ? undefined : desktop })
     cleanup.push(async () => { inspector.close(); resolveLate(); server.server.closeAllConnections(); await new Promise<void>(resolve => server.server.close(() => resolve())); db.close(); const resolved = fs.realpathSync(root); if (path.dirname(resolved) !== fs.realpathSync(os.tmpdir()) || !path.basename(resolved).startsWith('pica-host-api-') || fs.lstatSync(root).isSymbolicLink()) throw Error('Unsafe synthetic cleanup'); fs.rmSync(resolved, { recursive: true, force: true }) })
     const headers = { 'content-type': 'application/json', Origin: server.url, 'x-pica-csrf': desktop.csrfToken }
@@ -135,5 +143,33 @@ describe('actual local host-inspection HTTP boundary — synthetic CI listener o
         }
         expect(f.connections.snapshot().hosts).toEqual([]); expect(f.wire).not.toHaveBeenCalled()
         expect(fs.existsSync(path.join(f.root, 'source-hosts.json'))).toBe(false)
+    })
+    it('uses actual Reader endpoints with independent progress and denies cross-site ambient credential/media GETs', async () => {
+        const f = await fixture(), endpoint = f.server.url + '/api/v1/desktop/host-reader'
+        const hostId = '64d223e0-5d29-4320-babb-5a2da654d345'
+        f.connections.command({ action: 'save', kind: 'suwayomi', label: 'Mine', endpoint: 'https://synthetic.example/', authMode: 'none', allowInsecureLan: false, consent: true, scope: 'inspect-only' })
+        f.connections.command({ action: 'set-enabled', id: hostId, expectedRevision: 0, enabled: true, consent: true })
+        const command = async (input: unknown) => { const response = await fetch(endpoint, { method: 'POST', headers: f.headers, body: JSON.stringify(input) }); expect(response.status).toBe(200); return response.json() }
+        const session = await command({ action: 'start', id: hostId, expectedRevision: 1, consent: true, scope: 'library-read', acceptHostFetchSideEffects: true })
+        const page = await command({ action: 'list', sessionId: session.sessionId, offset: 0 }), comicId = page.books[0].comicId
+        await command({ action: 'select', sessionId: session.sessionId, comicId })
+        const root = endpoint + '/' + session.sessionId, chaptersPath = root + '/comics/' + encodeURIComponent(comicId) + '/chapters'
+        const before = f.wire.mock.calls.length
+        const foreignHeaders: Array<Record<string, string>> = [{}, { Origin: 'https://outside.example' }, { 'sec-fetch-site': 'cross-site', referer: f.server.url, 'sec-fetch-dest': 'image' }]
+        for (const headers of foreignHeaders) expect((await fetch(chaptersPath, { headers })).status).toBe(403)
+        expect(f.wire).toHaveBeenCalledTimes(before)
+        const ownHeaders = { 'sec-fetch-site': 'same-origin', referer: f.server.url + '/', 'sec-fetch-dest': 'empty' }
+        const chaptersResponse = await fetch(chaptersPath, { headers: ownHeaders }); expect(chaptersResponse.status).toBe(200)
+        const chapterId = (await chaptersResponse.json())[0].id
+        const chapterResponse = await fetch(chaptersPath + '/' + encodeURIComponent(chapterId), { headers: ownHeaders }); expect(chapterResponse.status).toBe(200)
+        const chapter = await chapterResponse.json(), image = await fetch(f.server.url + chapter.pages[0].url, { headers: { ...ownHeaders, 'sec-fetch-dest': 'image' } })
+        expect(image.status).toBe(200); expect(image.headers.get('cross-origin-resource-policy')).toBe('same-origin'); expect(image.headers.get('content-type')).toBe('image/png')
+        const saved = await fetch(root + '/progress', { method: 'POST', headers: f.headers, body: JSON.stringify({ comicId, episodeId: chapterId, pageIndex: 0 }) })
+        expect(saved.status).toBe(200); expect(f.db.getAppState('online-reader-progress-v1')).toBeUndefined()
+        const progress = await fetch(root + '/progress', { headers: ownHeaders }); expect((await progress.json())[0]).toMatchObject({ comicId, episodeId: chapterId, pageIndex: 0 })
+        expect(f.db.getAppState('synthetic.source-host.private-canary')).toEqual({ password: 'not-for-host-export', tags: ['private'], preserved: true })
+        expect(f.service.sources.snapshot().enabled).toEqual([])
+        await command({ action: 'close', sessionId: session.sessionId })
+        expect((await fetch(chaptersPath, { headers: ownHeaders })).status).toBe(409)
     })
 })

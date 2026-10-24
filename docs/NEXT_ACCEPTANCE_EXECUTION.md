@@ -1,5 +1,13 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-24 NEXT-67: actual user-host library → shared Reader (unpublished)
+
+Continues frozen NEXT-66 `91b62d0fcccd552e4a6af1609283598f75022080`,159-entry complete handoff SHA256 `f82d331443e0ea78c8d31661c737181c8bc458a62aee03cba9fbaa7edb524406`. Its candidate3/3,39success+6conditional skips/45,57 Chromium and402 native results are historical proof, not current-source validation.
+
+Actual optional Desktop reading of a user's existing Suwayomi library now reuses the main Reader/state/cache/identity ports. Separate explicit session credentials/scope, user-host fetch/sync disclosure, canonical source/comic/principal/URL identity, fresh row/chapter checks before cache, scoped private progress/resume, cancellation/late guards, same-origin media protection and no source/catalogue/default-service import. [Scope and exact limits](USER_HOST_LIBRARY_READER.md). Source search/downloads/native/trust/secure remembered sessions remain open; do not relabel all external-source work complete.
+
+Inspected local source126 assertions/types/Web48/48 require a final clean-source run. Real HTTP/three-language Reader browser/compiled-Windows private state/cache/resume/stale-row/cross-site/revocation plus existing upgrade/native/signature gates require fresh CI. No local Java/app/browser/listener/update runtime, production data, main merge, tag/Release, stable OTA,key download,install/deployment. Dev81→82 only advances candidate build identity. User acceptance remains deferred; full objective OPEN.
+
 ## 2026-10-24 NEXT-66: user-owned external-host configuration (unpublished)
 
 Continues frozen NEXT-65 `e0265086584340ef19fbf7106170f0542bdffcb2`, complete183-entry handoff SHA256 `29f6685722c6c44d715a4eb9342f175f3cfe69b7d60a669e079d34f259e7b592`. Its exact candidate3/3, standard/macOS/Linux/recovery and broader39success+6conditional skips/45 are historical proof, not current-source proof. Recovery passed on that source; prior timeout/J7 internal cause remains undetermined.

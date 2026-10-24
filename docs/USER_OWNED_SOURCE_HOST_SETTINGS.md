@@ -1,5 +1,7 @@
 # User-owned host settings — NEXT-66 (unpublished)
 
+NEXT-67 continuation: this document's configuration/inspection authority remains unchanged. A separately authorized short-lived [user-host library Reader](USER_HOST_LIBRARY_READER.md) now implements Desktop reading; it does not inherit this inspect-only consent. Statements below describing NEXT-66's missing Reader are historical scope, not a claim that all current adapters remain diagnostic-only. Provider-wide search/import/native/trust remain open.
+
 ## Product boundary
 
 The application is a local manga reader/personal library, **not a manga content platform**. The user chooses and manages external hosts/content access. There is no app-operated content service, official content catalogue, source marketplace, prefilled/default host, installed extension repository, required source account or required Suwayomi backend. Local reading remains independent.

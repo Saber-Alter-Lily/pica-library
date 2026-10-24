@@ -5,7 +5,7 @@ const panel = $('panel')
 let registry = null, active = null, generation = 0
 const labels = [
     ['summary', '我的外部宿主配置（实验）', 'My external host settings (experimental)', '外部ホスト設定（実験）'],
-    ['boundary', '这是本地阅读器，不经营漫画内容平台。外部宿主由你自行选择和管理；本软件不会提供默认内容目录、源仓库或托管服务。此配置目前只授权检查，尚不能阅读或导入。', 'This is a local reader, not a manga content platform. You choose and manage external hosts. No default content catalogue, source repository or hosted content service is provided. These settings authorize inspection only, not reading or import.', '本アプリはローカルリーダーであり、漫画配信プラットフォームではありません。外部ホストは利用者が選択・管理します。既定の作品カタログ・配信元リポジトリ・コンテンツホスティングは提供しません。この設定は確認専用で、読書・取り込みは未対応です。'],
+    ['boundary', '这是本地阅读器，不经营漫画内容平台。外部宿主由你自行选择和管理，不提供默认内容目录、源仓库或托管服务。此配置仅授权检查；读取用户宿主书库需另行授权短期会话，尚不支持导入。', 'This is a local reader, not a content platform. You choose and manage external hosts; no default catalogue, repository or hosted content service is provided. These settings authorize inspection only. Reading your hosted library requires a separate short-lived session; import is unsupported.', '本アプリはローカルリーダーであり配信プラットフォームではありません。外部ホストは利用者が選択・管理し、既定カタログ・リポジトリ・コンテンツサービスは提供しません。この設定は確認専用です。ホスト上のライブラリを読むには別の短期セッション許可が必要で、取り込みは未対応です。'],
     ['privacy', '只在本机保存名称、地址和检查权限，不保存账号密码、不上传或同步。保存后默认停用；允许检查也不会自动连接。停用或移除只影响该连接，不删除漫画或阅读数据。', 'Only the name, endpoint and inspection permission are saved locally. Credentials are not saved, uploaded or synced. Saved hosts start disabled; enabling inspection never connects automatically. Disabling/removing affects only this connection, not comics or reading data.', '名称・接続先・確認権限のみローカル保存します。認証情報は保存・アップロード・同期しません。保存直後は無効で、有効化しても自動接続しません。無効化・削除は接続設定のみを対象とし、漫画や閲覧データは削除しません。'],
     ['refresh', '查看 / 刷新我的配置', 'View / refresh my settings', '自分の設定を表示・更新'],
     ['label-label', '自定义名称', 'Your label', '自分で付ける名称'],
@@ -89,6 +89,10 @@ function render() {
         const confirm = document.createElement('div'); confirm.hidden = true
         confirm.append(text('p', t('仅移除此连接，不会删除本地或宿主上的漫画、账号或阅读数据。确认？', 'Remove only this connection, not local or hosted comics, accounts or reading data. Confirm?', 'この接続設定のみ削除し、ローカル・ホスト上の漫画・アカウント・閲覧データは削除しません。確認しますか？')), button(t('确认移除', 'Confirm removal', '削除を確認'), () => void request('connections', { action: 'remove', id: host.id, expectedRevision: host.revision, consent: true })), button(t('取消', 'Cancel', '取消'), () => { remove.hidden = false; confirm.hidden = true }))
         card.append(remove, confirm)
+        const library = button(t('另行授权读取宿主书库', 'Authorize hosted-library reading separately', 'ホスト書庫の読書を別途許可'), () => document.dispatchEvent(new CustomEvent('pica-host-library-config', { detail: { ...host } })))
+        library.dataset.hostLibrary = host.id
+        library.disabled ||= !host.enabled
+        card.append(library)
         let username, password
         if (host.enabled && host.authMode === 'basic') {
             username = document.createElement('input'); password = document.createElement('input'); password.type = 'password'

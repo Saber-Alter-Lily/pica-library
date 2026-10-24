@@ -69,6 +69,8 @@ import { sourceHostHttp } from '../source-hosts/http-transport'
 import { SourceHostError } from '../source-hosts/contract'
 import { SourceHostConnections } from '../source-hosts/connections'
 import { sourceHostStore } from './source-host-store'
+import { HostedLibraryReader } from '../source-hosts/library-reader'
+import { PreviewCacheManager } from '../services/preview-cache-manager'
 import {
     isLoopbackListening,
     knownProxyPorts,
@@ -142,6 +144,7 @@ const sourceHostConnections = new SourceHostConnections(
     () => randomUUID()
 )
 let credentials: StoredCredentials | null = null
+let hostedReader: HostedLibraryReader | null = null
 let server: Server | null = null
 let mobileBridge: MobileBridgeController | null = null
 let remoteApiGateway: RemoteApiGateway | null = null
@@ -184,6 +187,7 @@ function activeDesktopWorkLeases() {
     const leases: string[] = []
     if (sourceHostInspector.busy) leases.push('source-host-inspection')
     if (sourceHostConnections.busy) leases.push('saved-source-host-inspection')
+    if (hostedReader?.busy) leases.push('host-library-reader')
     if (
         database?.hasActiveDownloadJobs('LOCAL') ||
         service?.localDownloadRuntime().running
@@ -352,6 +356,7 @@ async function closeEngine() {
     const errors: string[] = []
     sourceHostInspector.cancel()
     sourceHostConnections.cancel()
+    hostedReader?.close(); hostedReader = null
 
     log.write('Shutdown: closing Remote API gateway')
     await shutdownStep(
@@ -751,9 +756,11 @@ async function startEngine(preferredPort: number) {
         runtimeResources
     )
     const csrfToken = randomBytes(32).toString('base64url')
+    hostedReader = new HostedLibraryReader(sourceHostConnections, database, () => new PreviewCacheManager(path.join(paths.cache, 'host-reader'), { maxBytes: 256 * 1024 * 1024, ttlMs: 24 * 60 * 60 * 1000 }))
     let startupReady = false
     const desktop: DesktopServerController = {
         csrfToken,
+        hostedReader,
         inspectSourceHost: async (input, signal) => {
             if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
             return sourceHostInspector.inspect(input, signal)
@@ -787,6 +794,7 @@ async function startEngine(preferredPort: number) {
         status: () => ({
             sourceHostInspection: { available: true, reader: false, libraryImport: false, extensionInstall: false, persisted: false },
             sourceHostConnections: { available: true, storage: sourceHostConnections.snapshot().storage, scope: 'inspect-only', reader: false },
+            hostedLibraryReader: { available: true, scope: 'explicit-session-library-read', providerSearch: false, libraryImport: false, extensionInstall: false, native: false },
             externalSources: sources.snapshot(),
             sourcePolicyOrigin: config?.externalSources ? 'explicit' : config ? 'legacy-compatible' : 'new-local',
             startupReady,

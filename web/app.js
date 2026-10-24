@@ -10,6 +10,7 @@ import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { installLocalImport } from './local-import.js'
+import { copy } from './locale-runtime.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
 import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
@@ -2885,6 +2886,7 @@ let readerPageObserver = null
 let readerChapterRequest = 0
 let readerComicRequest = 0
 function readerApiRoot() {
+    if (state.reader.hostedSessionId) return '/api/v1/desktop/host-reader/' + state.reader.hostedSessionId
     return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
 }
 
@@ -3064,12 +3066,13 @@ async function flushReaderProgress(keepalive = false) {
         if (keepalive) {
             const response = await fetch(`${root}/progress`, {
                 method: 'POST',
-                headers: { 'content-type': 'application/json' },
+                headers: { 'content-type': 'application/json', ...(reader.hostedSessionId ? { 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' } : {}) },
                 body: JSON.stringify(payload),
                 keepalive: true
             })
             if (!response.ok) throw new Error('Progress not saved')
         }
+        else if (reader.hostedSessionId) await api(`${root}/progress`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' }, body: JSON.stringify(payload) })
         else await post(`${root}/progress`, payload)
         if (state.reader === reader && reader.episodeId === payload.episodeId && reader.pageIndex === payload.pageIndex) {
             reader.progressSaved = payload.pageIndex
@@ -3087,6 +3090,7 @@ async function openReaderChapter(episodeId) {
     resetReaderViewportTracking()
     if (state.reader.episodeId && state.reader.episodeId !== episodeId)
         await flushReaderProgress()
+    if (requestId !== readerChapterRequest) return
     $('#reader-message').textContent = t('reader.loadingChapter')
     try {
     const chapter = await api(
@@ -3106,7 +3110,7 @@ async function openReaderChapter(episodeId) {
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
         requestAnimationFrame(() => scrollReaderViewportToTop())
-    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
+    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.hostedSessionId ? copy('内容来自你选择的外部宿主；本机进度独立保存。宿主可运行其自身的缓存与同步。', 'Content comes from your chosen external host. Local progress is separate; the host may run its own caching and sync.', '利用者が選択した外部ホストの内容です。ローカル進捗は別保存し、ホスト独自のキャッシュ・同期が動作する場合があります。') : state.reader.online ? t('reader.onlineNotice') : ''
     } catch (error) {
         if (requestId === readerChapterRequest)
             $('#reader-message').textContent = localizeError(language, error)
@@ -3126,7 +3130,12 @@ function renderReaderChapterHeading() {
             : '')
 }
 
-async function openReaderComic(comicId, online = false) {
+async function openReaderComic(comicId, online = false, hosted = null) {
+    if (hosted && (!/^[0-9a-f-]{36}$/.test(hosted.sessionId || '') || !/^hosted:[0-9a-f-]{36}:[0-9a-f]{64}$/.test(comicId))) return
+    if (!hosted && String(comicId).startsWith('hosted:')) return
+    const hostedSessionId = hosted?.sessionId || null
+    const hostedCsrfToken = hosted?.csrfToken || null
+    if (hostedSessionId) online = true
     online = online && !String(comicId).startsWith('local:')
     const requestId = ++readerComicRequest
     readerChapterRequest++
@@ -3135,7 +3144,7 @@ async function openReaderComic(comicId, online = false) {
         if (requestId !== readerComicRequest) return
         resetReaderViewportTracking()
         const originView = activeView === 'reader' ? state.reader.originView : activeView
-        state.reader = { comicId, online, episodeId: null, dirty: false, originView }
+        state.reader = { comicId, online, hostedSessionId, hostedCsrfToken, episodeId: null, dirty: false, originView }
         const root = readerApiRoot()
         activateView('reader')
         document.body.classList.add('reader-active')
@@ -3162,6 +3171,8 @@ async function openReaderComic(comicId, online = false) {
         state.reader = {
             comicId,
             online,
+            hostedSessionId,
+            hostedCsrfToken,
             episodeId: null,
             pageIndex: 0,
             chapters,
@@ -3170,7 +3181,7 @@ async function openReaderComic(comicId, online = false) {
             dirty: false
         }
         const comic = state.records.find((item) => item.comicId === comicId)
-        $('#reader-title').textContent = comic?.title || t('reader.title')
+        $('#reader-title').textContent = hosted?.title || comic?.title || t('reader.title')
         $('#reader-chapters').innerHTML = chapters
             .map(
                 (chapter) =>
@@ -3190,6 +3201,10 @@ document.addEventListener('pica-open-reader', (event) => {
     const comicId = String(detail?.comicId || '').trim()
     if (!comicId) return
     void openReaderComic(comicId, detail?.online !== false)
+})
+document.addEventListener('pica-open-hosted-reader', event => {
+    const detail = event instanceof CustomEvent ? event.detail : null
+    if (detail) void openReaderComic(String(detail.comicId || ''), true, { sessionId: String(detail.sessionId || ''), title: String(detail.title || ''), csrfToken: String(detail.csrfToken || '') })
 })
 
 function moveReader(delta) {

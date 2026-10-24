@@ -35,9 +35,11 @@ import { LocalHttpLatencyRegistry } from '../runtime/http-latency'
 import { LocalLibraryIngestion } from '../local-library/ingestion'
 import { SourceDisabledError } from '../sources/source-policy'
 import { SourceHostError, type SourceHostInspection } from '../source-hosts/contract'
+import type { HostedLibraryReader } from '../source-hosts/library-reader'
 
 export interface DesktopServerController {
     csrfToken: string
+    hostedReader?: HostedLibraryReader
     inspectSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
     sourceHostConnections?: (input: Record<string, unknown>) => unknown
     inspectSavedSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
@@ -375,6 +377,44 @@ export async function startLibraryServer(options: {
                     csrfToken: options.desktop.csrfToken,
                     ...options.desktop.status()
                 })
+            }
+            if (url.pathname === '/api/v1/desktop/host-reader' || url.pathname.startsWith('/api/v1/desktop/host-reader/')) {
+                const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`
+                let referrerOrigin = ''; try { referrerOrigin = new URL(String(request.headers.referer ?? '')).origin } catch { /* absent/invalid means no same-origin proof */ }
+                const sameOriginRead = request.headers['sec-fetch-site'] === 'same-origin' && referrerOrigin === expectedOrigin && ['empty', 'image'].includes(String(request.headers['sec-fetch-dest']))
+                const verifiedCommand = origin === expectedOrigin && request.headers['x-pica-csrf'] === options.desktop?.csrfToken
+                if (!options.desktop?.hostedReader || !options.desktop.configured() || options.desktop.status().startupReady === false || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) || (request.method === 'GET' ? !sameOriginRead && !verifiedCommand : !verifiedCommand)) return json(response, 403, { error: 'Local Desktop Reader authority required' })
+                if (url.search || !['GET', 'POST'].includes(request.method ?? '')) return json(response, 400, { error: 'INVALID_SOURCE_HOST' })
+                const abort = new AbortController(), disconnected = () => { if (!response.writableEnded) abort.abort() }
+                response.once('close', disconnected)
+                try {
+                    let input: Record<string, unknown> = {}
+                    if (request.method === 'POST') {
+                        if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) throw new SourceHostError('INVALID_SOURCE_HOST')
+                        const deadline = setTimeout(() => request.destroy(), 5000)
+                        try { input = await body(request, 16384) } catch { throw new SourceHostError('INVALID_SOURCE_HOST') } finally { clearTimeout(deadline) }
+                    }
+                    if (url.pathname === '/api/v1/desktop/host-reader' && request.method === 'POST') return json(response, 200, await options.desktop.hostedReader.command(input, abort.signal))
+                    const match = url.pathname.match(/^\/api\/v1\/desktop\/host-reader\/([0-9a-f-]{36})\/(?:progress|comics\/([^/]+)\/chapters(?:\/([^/]+)(?:\/pages\/(\d+))?)?)$/)
+                    if (!match) throw new SourceHostError('INVALID_SOURCE_HOST')
+                    const [, sessionId, rawComic, rawEpisode, page] = match
+                    const comicId = rawComic ? decodeURIComponent(rawComic) : undefined, episodeId = rawEpisode ? decodeURIComponent(rawEpisode) : undefined
+                    if (!rawComic) {
+                        if (request.method === 'POST' && Object.keys(input).some(key => !['comicId', 'episodeId', 'pageIndex'].includes(key))) throw new SourceHostError('INVALID_SOURCE_HOST')
+                        return json(response, 200, await options.desktop.hostedReader.read(sessionId, request.method === 'GET' ? 'progress' : 'save-progress', input, abort.signal))
+                    }
+                    if (request.method !== 'GET') throw new SourceHostError('INVALID_SOURCE_HOST')
+                    if (page !== undefined) {
+                        const image = await options.desktop.hostedReader.picture(sessionId, comicId!, episodeId!, Number(page), abort.signal)
+                        if (!response.destroyed) { response.writeHead(200, { 'content-type': image.contentType, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'cross-origin-resource-policy': 'same-origin', 'referrer-policy': 'no-referrer' }); response.end(image.data) }
+                        return
+                    }
+                    return json(response, 200, await options.desktop.hostedReader.read(sessionId, episodeId ? 'chapter' : 'chapters', { comicId, episodeId }, abort.signal))
+                } catch (error) {
+                    const code = error instanceof SourceHostError ? error.code : 'SOURCE_HOST_UNAVAILABLE'
+                    if (!response.destroyed) json(response, code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : ['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED', 'SOURCE_HOST_BUSY'].includes(code) ? 409 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : ['INVALID_SOURCE_HOST', 'SOURCE_HOST_READER_CONSENT_REQUIRED'].includes(code) ? 400 : 502, { error: code, code })
+                } finally { response.removeListener('close', disconnected) }
+                return
             }
             if (['/api/v1/desktop/source-hosts/inspect', '/api/v1/desktop/source-hosts/connections', '/api/v1/desktop/source-hosts/inspect-saved'].includes(url.pathname)) {
                 const peer = request.socket.remoteAddress ?? ''

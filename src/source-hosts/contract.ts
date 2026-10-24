@@ -21,6 +21,7 @@ export type SourceHostErrorCode =
     | 'SOURCE_HOST_DUPLICATE'
     | 'SOURCE_HOST_STALE'
     | 'SOURCE_HOST_DISABLED'
+    | 'SOURCE_HOST_READER_CONSENT_REQUIRED'
 
 export class SourceHostError extends Error {
     constructor(readonly code: SourceHostErrorCode) {

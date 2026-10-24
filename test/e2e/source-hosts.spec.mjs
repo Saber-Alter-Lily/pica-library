@@ -159,3 +159,49 @@ for (const language of ['zh-CN', 'en', 'ja']) test(`saved hosts have no default 
     expect(reads).toHaveLength(1); expect(state.requests).toHaveLength(0); expect(state.errors).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
 })
+
+for (const language of ['zh-CN', 'en', 'ja']) test(`hosted library uses the actual shared Reader and independent progress (${language})`, async ({ page }) => {
+    const state = await setup(page, language), requests = [], progress = []
+    const hostId = '64d223e0-5d29-4320-babb-5a2da654d345', sessionId = '64d223e0-5d29-4320-babb-5a2da654d346', comicId = 'hosted:' + hostId + ':' + 'b'.repeat(64), episodeId = 'host-chapter:' + 'c'.repeat(64)
+    const root = '/api/v1/desktop/host-reader/' + sessionId, chapterPath = `${root}/comics/${encodeURIComponent(comicId)}/chapters/${encodeURIComponent(episodeId)}`
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XFoAAAAASUVORK5CYII=', 'base64')
+    await page.route('**/api/v1/desktop/status', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, startupReady: true, csrfToken: 'host-test-csrf', sourceHostConnections: { available: true }, hostedLibraryReader: { available: true } }) }))
+    await page.route('**/api/v1/desktop/source-hosts/connections', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ schemaVersion: 1, revision: 2, scope: 'inspect-only', credentials: 'per-request-not-stored', storage: 'available', capabilities: { sourceInspection: true, reader: false, libraryImport: false, extensionInstall: false }, hosts: [{ id: hostId, label: 'My host', endpoint, authMode: 'basic', enabled: true, revision: 1 }] }) }))
+    await page.route('**/api/v1/desktop/host-reader**', async route => {
+        const req = route.request(), path = new URL(req.url()).pathname, input = req.postData() ? req.postDataJSON() : null
+        requests.push({ path, input, method: req.method() })
+        if (req.method() === 'POST') expect(req.headers()['x-pica-csrf']).toBe('host-test-csrf')
+        let value
+        if (path === '/api/v1/desktop/host-reader') {
+            if (input.action === 'start') { expect(input).toMatchObject({ scope: 'library-read', consent: true, acceptHostFetchSideEffects: true }); value = { sessionId, history: [], capabilities: { libraryRead: true, libraryImport: false } } }
+            else if (input.action === 'list') value = { offset: 0, hasNext: false, books: [{ comicId, title: hostileName, sourceId: '9007199254740993' }] }
+            else if (input.action === 'select') value = { sessionId, comicId, title: hostileName }
+            else value = { closed: true }
+        } else if (path.endsWith('/progress')) {
+            if (input) { progress.splice(0, progress.length, input); value = input } else value = progress
+        } else if (path.endsWith('/chapters')) value = [{ id: episodeId, title: 'Synthetic chapter', order: 1, source: 'provider' }]
+        else if (path === chapterPath) value = { episode: { id: episodeId, title: 'Synthetic chapter' }, progress: progress[0], pages: [0,1].map(index => ({ index, url: chapterPath + '/pages/' + index })) }
+        else { await route.fulfill({ status: 200, contentType: 'image/png', body: png }); return }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) })
+    })
+    await page.locator('#saved-host-summary').click(); await page.locator('#saved-host-refresh').click()
+    await page.locator('[data-host-library]').click()
+    await expect(page.locator('#host-library-dialog')).toBeVisible(); expect(requests).toHaveLength(0)
+    await page.locator('#host-library-username').fill('this-host-only'); await page.locator('#host-library-password').fill(secret)
+    await page.locator('#host-library-consent').check(); await page.locator('#host-library-start').click()
+    await expect(page.locator('#host-library-books article strong')).toHaveText(hostileName)
+    expect(await page.locator('#host-library-books img').count()).toBe(0)
+    await page.locator('#host-library-books article button').click()
+    await expect(page.locator('#reader')).toHaveClass(/active/)
+    await expect(page.locator('#reader-title')).toHaveText(hostileName)
+    await expect(page.locator('#reader-pages img')).toHaveCount(2)
+    await page.locator('#reader-mode').selectOption('single'); await page.locator('#reader-title').click(); await page.keyboard.press('ArrowRight')
+    await expect.poll(() => progress.at(-1)?.pageIndex).toBe(1)
+    expect(progress[0].comicId).toBe(comicId)
+    expect(requests.some(row => row.path.startsWith('/api/v1/online-reader'))).toBe(false)
+    expect(await page.evaluate(secret => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }).includes(secret), secret)).toBe(false)
+    await page.locator('#reader-exit').click()
+    await page.locator('[data-host-library]').click(); await page.locator('#host-library-end').click()
+    await expect.poll(() => requests.some(row => row.input?.action === 'close')).toBe(true)
+    expect(state.errors).toEqual([])
+})

@@ -26,11 +26,11 @@ describe('optional source-host ownership and application safety contracts',()=>{
         expect(authority.upstream.sourceFiles.some((row:{file:string})=>row.file.endsWith('TachideskGraphQLSchema.kt'))).toBe(true)
     })
     it('keeps provider/account/database/file/process capabilities out of every host module',()=>{
-        for(const name of ['contract','suwayomi','inspector','http-transport']){
+        for(const name of ['contract','suwayomi','inspector','http-transport','http-body']){
             const code=read('src/source-hosts/'+name+'.ts')
             expect(code).not.toMatch(/LibraryDatabase|LibraryService|ProviderRegistry|PicaClient|JmWorker|credentialsStore|node:fs|node:child_process|node:net|\.listen\(|\.spawn\(/)
         }
-        expect(read('src/source-hosts/http-transport.ts')).toContain("import { Buffer } from 'node:buffer'")
+        expect(read('src/source-hosts/http-body.ts')).toContain("import { Buffer } from 'node:buffer'")
     })
     it('wires the real Desktop command, shutdown cancellation and active-work lease',()=>{
         const app=read('src/desktop/main.ts')
@@ -71,5 +71,17 @@ describe('optional source-host ownership and application safety contracts',()=>{
         expect(ui).not.toMatch(/localStorage|sessionStorage|indexedDB|\.innerHTML|insertAdjacentHTML|setInterval|\/api\/v1\/comics|\.src\s*=/)
         expect(main).toContain('sourceHostConnections.cancel()');expect(main).toContain('sourceHostConnections.close()')
         expect(main).toContain("sourceHostStore(path.join(path.dirname(paths.config), 'source-hosts.json'))")
+    })
+    it('shares the real Reader via narrow state/source/cache/identity ports without pulling SQL/accounts/filesystem into its emitted graph',async()=>{
+        const result=await build({entryPoints:['src/services/online-reader-service.ts'],bundle:true,platform:'node',format:'esm',write:false,metafile:true,logLevel:'silent'})
+        expect(Object.keys(result.metafile!.inputs).map(file=>file.replaceAll('\\','/')).filter(file=>file.startsWith('src/')).sort()).toEqual(['src/services/online-reader-service.ts'])
+        expect(read('src/services/online-reader-service.ts')).not.toMatch(/LibraryDatabase|ProviderService|PreviewCacheManager|node:fs|credentialsStore/)
+        const protocol=await build({entryPoints:['src/source-hosts/reader-protocol.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
+        expect(Object.keys(protocol.metafile!.inputs).map(file=>file.replaceAll('\\','/')).sort()).toEqual(['src/source-hosts/contract.ts','src/source-hosts/reader-protocol.ts','src/source-hosts/suwayomi.ts'])
+        const ui=read('web/host-library.js'),server=read('src/library/server.ts')
+        expect(ui).not.toMatch(/localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|setInterval/)
+        expect(server).toContain("request.headers['sec-fetch-site'] === 'same-origin'")
+        expect(server).toContain("'cross-origin-resource-policy': 'same-origin'")
+        expect(read('scripts/lib/assert-hosted-library-reader.mjs')).toContain("packaged_host_library_reader:'PASS'")
     })
 })

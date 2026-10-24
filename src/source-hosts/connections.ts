@@ -64,12 +64,14 @@ export class SourceHostConnections {
     private active?: { id: string; controller: AbortController }
     private closed = false
     private unreadable = false
+    private readonly invalidations = new Set<(id: string) => void>()
     constructor(private readonly store: SourceHostRegistryStore, private readonly inspector: Pick<SourceHostInspector, 'inspect'>, private readonly newId: () => string) {
         this.registry = sourceHostRegistry(null)
         try { this.registry = sourceHostRegistry(store.load()) }
         catch { this.unreadable = true }
     }
     get busy() { return Boolean(this.active) }
+    onInvalidate(listener: (id: string) => void) { this.invalidations.add(listener); return () => { this.invalidations.delete(listener) } }
     cancel() { this.active?.controller.abort() }
     close() { this.closed = true; this.cancel() }
     snapshot() {
@@ -120,6 +122,7 @@ export class SourceHostConnections {
             if (input.action === 'set-enabled' && typeof input.enabled !== 'boolean') throw new SourceHostError('INVALID_SOURCE_HOST')
             // Revocation wins over late results, even if the following disk write fails.
             if (this.active?.id === host.id) this.active.controller.abort()
+            for (const invalidate of this.invalidations) invalidate(host.id)
             if (input.action === 'remove') return this.commit(this.registry.hosts.filter(row => row.id !== host.id))
             return this.commit(this.registry.hosts.map(row => row.id === host.id ? { ...row, enabled: Boolean(input.enabled), revision: row.revision + 1 } : row))
         }

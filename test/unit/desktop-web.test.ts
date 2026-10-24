@@ -99,8 +99,9 @@ describe('desktop setup and settings UI contract', () => {
         expect(build).toContain(
             'PICA_WINDOWS_LAUNCHER_BASE_VERSION'
         )
-        expect(build).toContain("'src\\data\\registry-v3-final'")
-        expect(build).toContain('Required Registry V3 runtime asset is missing')
+        expect(build).toContain('pnpm exec tsx scripts/stage-tag-runtime.ts $stage')
+        expect(build).toContain('Minimal tag runtime staging failed')
+        expect(build).not.toContain("Join-Path $registrySource '*'")
         expect(build).toContain('git -C $root diff --quiet')
         expect(build).toContain(
             'Launcher source changed; a full install is required'

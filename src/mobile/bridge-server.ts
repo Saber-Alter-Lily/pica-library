@@ -15,12 +15,15 @@ import { desktopPaths } from '../desktop/paths'
 import { LibraryQueryService } from '../services/library-query-service'
 import { ReaderService } from '../services/reader-service'
 import { CycleCoordinatorV3 } from '../recommendation-v3/cycle-coordinator-v3'
+import { RecommendationCycleQueriesV3 } from '../recommendation/queries'
+import { recommendationCycleReadStoreV3 } from '../services/recommendation-cycle-store'
 import { FINAL_PROFILE_VERSION } from '../recommendation-v3/final-profile'
 import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
 import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { ShelfService } from '../services/shelf-service'
 import { PersonalizationService } from '../services/personalization-service'
+import { providerRawTagFactsV1, comicTagProviderV1 } from '../tags/policy'
 
 interface PersistedDevice {
     tokenHash: string
@@ -242,16 +245,22 @@ export async function startMobileBridge(options: {
     const requestedPort = options.port ?? 7788
     const library = new LibraryQueryService(options.database)
     const reader = new ReaderService(options.database, options.service.dataDir)
+    const finalRecommendationVersions = {
+        profileVersion: FINAL_PROFILE_VERSION,
+        registryVersion: 'PICA Registry V3',
+        rankerModelVersion: RANKER_ADAPTER_VERSION,
+        candidatePoolVersion: RETRIEVER_VERSION,
+        allocatorVersion: BATCH_ALLOCATOR_VERSION
+    }
+    const finalRecommendationQueries = new RecommendationCycleQueriesV3(
+        recommendationCycleReadStoreV3(options.database),
+        finalRecommendationVersions
+    )
     const finalRecommendationCoordinator = new CycleCoordinatorV3(
         options.database,
         (cycleId) => options.service.buildFinalRecommendationCycleV3(cycleId),
-        {
-            profileVersion: FINAL_PROFILE_VERSION,
-            registryVersion: 'PICA Registry V3',
-            rankerModelVersion: RANKER_ADAPTER_VERSION,
-            candidatePoolVersion: RETRIEVER_VERSION,
-            allocatorVersion: BATCH_ALLOCATOR_VERSION
-        }
+        finalRecommendationVersions,
+        (cycleId,state,error) => options.service.recommendationBuildCommitState(cycleId,state,error)
     )
     const shelves = new ShelfService(options.database, library)
     const personalization = new PersonalizationService(
@@ -893,7 +902,7 @@ export async function startMobileBridge(options: {
                 let recommendationRefresh: Record<string, unknown> = {
                     requested: false
                 }
-                if (input.recompute === true) {
+                if (input.recompute === true && !merged.requiresResolution) {
                     try {
                         const deviceId = String(input.deviceId ?? 'android')
                         const mutationId = String(input.mutationId ?? Date.now())
@@ -901,6 +910,9 @@ export async function startMobileBridge(options: {
                             `mobile-pair:${deviceId}:${mutationId}`
                         )
                         await finalRecommendationCoordinator.waitForBuild()
+                        // This POST explicitly requested recomputation. Prepare its
+                        // first batch here; subsequent GETs are strictly read-only.
+                        finalRecommendationCoordinator.current()
                         recommendationRefresh = {
                             requested: true,
                             completed: true,
@@ -936,7 +948,7 @@ export async function startMobileBridge(options: {
                 return json(
                     response,
                     200,
-                    finalRecommendationCoordinator.portable(limit)
+                    finalRecommendationQueries.portable(limit)
                 )
             }
 
@@ -1032,6 +1044,7 @@ export async function startMobileBridge(options: {
                     ...result,
                     items: result.items.map((comic) => ({
                         ...comic,
+                        providerRawTags: comicTagProviderV1(comic) === 'eh' ? providerRawTagFactsV1(comic) : [],
                         coverPath: `/mobile/v1/covers/${encodeURIComponent(
                             comic.comicId
                         )}`
@@ -1139,7 +1152,7 @@ export async function startMobileBridge(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)
@@ -1189,9 +1202,7 @@ export async function startMobileBridge(options: {
                     ...value,
                     pages: value.pages.map((page) => ({
                         ...page,
-                        url: `/mobile/v1/reader/pictures/${encodeURIComponent(
-                            page.id
-                        )}`
+                        url: page.url.replace('/api/v1/reader/', '/mobile/v1/reader/')
                     }))
                 })
             }
@@ -1206,7 +1217,7 @@ export async function startMobileBridge(options: {
                 response.writeHead(200, {
                     'content-type': image.contentType,
                     'content-length': String(image.data.byteLength),
-                    'cache-control': 'private, max-age=3600',
+                    'cache-control': decodeURIComponent(pictureRoute[1]).startsWith('local:') ? 'private, no-store' : 'private, max-age=3600',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(image.data)
@@ -1253,7 +1264,7 @@ export async function startMobileBridge(options: {
                 // The desktop web UI already owns the authoritative Final V3
                 // cycle/batch. Mobile must read that persisted batch instead of
                 // starting the expensive provider recall pipeline again.
-                const current = finalRecommendationCoordinator.current()
+                const current = finalRecommendationQueries.current()
                 const recommendations = current.recommendations.slice(0, limit)
                 return json(response, 200, {
                     ...current,

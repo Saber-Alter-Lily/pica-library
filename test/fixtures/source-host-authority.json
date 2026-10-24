@@ -1,0 +1,74 @@
+{
+  "baselineSource": "cbbf3432efb2ead4517cebeafc44ac1901ac9fdb",
+  "protectedTextHashes": {
+    "src/providers/provider-registry.ts": "6f05107567c0f336f7a5a0f2d24fbb667b63757eb07da2673e0a406450d2bd3d",
+    "src/providers/module-manifests.ts": "8073c72682ebca63795df287a898f9f9890327a6ba050900568d28262e63a937",
+    "src/sources/source-policy.ts": "911e66766739e15df229bc26ad4db24981bf7b7c3d29a3faf86aa8eb9cffbf2f",
+    "src/library/content-identity.ts": "134cc019c4b9dba2d4b544a72a2c5578c19a94ad5ec39ca98bcb77c216dc76cf",
+    "src/modules/contracts.ts": "4d759d061c00c54d2db23e7b6d46f22e8ac0cd23b97e6a93fba94986be93d15b"
+  },
+  "upstream": {
+    "repository": "Suwayomi/Suwayomi-Server",
+    "tag": "v2.4.2366",
+    "commit": "40bc5da57820324ed0ae724cbbc020cc4673b594",
+    "sourceFiles": [
+      {
+        "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/queries/InfoQuery.kt",
+        "gitBlobSha": "5b227f79ff098ad9d619a74bb6bef950c771154d",
+        "sha256": "7662a37f17bcfa4a5275bd2ba5e45f688cb1a0eca4a7f786477dcc8d45813271",
+        "bytes": 2778,
+        "fact": "aboutServer.name/version, no update operation requested",
+        "url": "https://github.com/Suwayomi/Suwayomi-Server/blob/40bc5da57820324ed0ae724cbbc020cc4673b594/server/src/main/kotlin/suwayomi/tachidesk/graphql/queries/InfoQuery.kt"
+      },
+      {
+        "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/queries/SourceQuery.kt",
+        "gitBlobSha": "4811ef341abc3f30140647c125f9ccf7eb4b9c79",
+        "sha256": "ef81162c1bd11692d9a9269d258ee6f59628b834171ec9117534b8b24820a8eb",
+        "bytes": 9569,
+        "fact": "sources(first,offset), nodes/pageInfo/totalCount",
+        "url": "https://github.com/Suwayomi/Suwayomi-Server/blob/40bc5da57820324ed0ae724cbbc020cc4673b594/server/src/main/kotlin/suwayomi/tachidesk/graphql/queries/SourceQuery.kt"
+      },
+      {
+        "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/types/SourceType.kt",
+        "gitBlobSha": "5bf813dc431666945a7f55b783de8de55568374b",
+        "sha256": "27af926e1fb8ad4d6773dedbe5cc93c0389309647164c2560ac07934281ac7c5",
+        "bytes": 16042,
+        "fact": "SourceType.id Long and listing fields",
+        "url": "https://github.com/Suwayomi/Suwayomi-Server/blob/40bc5da57820324ed0ae724cbbc020cc4673b594/server/src/main/kotlin/suwayomi/tachidesk/graphql/types/SourceType.kt"
+      },
+      {
+        "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/server/primitives/LongAsString.kt",
+        "gitBlobSha": "6563c08f61f558363a9688190619d490d296b756",
+        "sha256": "4cb88a844d4fe042109ff8b30e1b56c15e4fbee47e9d83851456d8184b4aff89",
+        "bytes": 3142,
+        "fact": "LongString serializes to String and accepts String input",
+        "url": "https://github.com/Suwayomi/Suwayomi-Server/blob/40bc5da57820324ed0ae724cbbc020cc4673b594/server/src/main/kotlin/suwayomi/tachidesk/graphql/server/primitives/LongAsString.kt"
+      },
+      {
+        "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/server/TachideskGraphQLSchema.kt",
+        "gitBlobSha": "88ccd51400abb44d8be5d28102465be57fed464d",
+        "sha256": "e5fe978bdc8a3291ed02a868f42f43b8f0f729fa2181e3dd7498e852f8f340d0",
+        "bytes": 7325,
+        "fact": "Long class actually wired to GraphQLLongAsString",
+        "url": "https://github.com/Suwayomi/Suwayomi-Server/blob/40bc5da57820324ed0ae724cbbc020cc4673b594/server/src/main/kotlin/suwayomi/tachidesk/graphql/server/TachideskGraphQLSchema.kt"
+      },
+      {
+        "file": "server/server-config/src/main/kotlin/suwayomi/tachidesk/graphql/types/AuthMode.kt",
+        "gitBlobSha": "9fa104b159e4942ef00677d154e364590091ce44",
+        "sha256": "520ec90fc17441c03ec0eede85f9ad173d5abac102ea165add5e76f492b05418",
+        "bytes": 304,
+        "fact": "NONE/BASIC_AUTH/SIMPLE_LOGIN/UI_LOGIN; no assumption of later master multi-user API",
+        "url": "https://github.com/Suwayomi/Suwayomi-Server/blob/40bc5da57820324ed0ae724cbbc020cc4673b594/server/server-config/src/main/kotlin/suwayomi/tachidesk/graphql/types/AuthMode.kt"
+      },
+      {
+        "file": "server/src/main/kotlin/suwayomi/tachidesk/graphql/GraphQL.kt",
+        "gitBlobSha": "bfafc960822545847efc62030dd5f03a76011f15",
+        "sha256": "fd8423f34f00eb24b712c69a65abaa6e8035e01f8a0a106f3af601942ee12e83",
+        "bytes": 895,
+        "fact": "GraphQL POST routing, no extension/manga mutation requested",
+        "url": "https://github.com/Suwayomi/Suwayomi-Server/blob/40bc5da57820324ed0ae724cbbc020cc4673b594/server/src/main/kotlin/suwayomi/tachidesk/graphql/GraphQL.kt"
+      }
+    ]
+  },
+  "notFullProviderIntegration": true
+}

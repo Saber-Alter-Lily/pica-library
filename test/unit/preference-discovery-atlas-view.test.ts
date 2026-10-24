@@ -126,7 +126,7 @@ describe('preference discovery: presentation equivalence, stable policy identiti
 
     it('uses actual packaged registry variants without changing registry assets', () => {
         const index = createPreferencePresentationIndex(
-            loadTagRegistryV3(path.resolve('src/data/registry-v3-final'))
+            loadTagRegistryV3(path.resolve('src/data/tag-runtime-v1'))
         )
         const result = searchPreferenceSignalsV5(
             [comic('a', ['雙馬尾', '眼鏡', '黑長直', '傲嬌'])],

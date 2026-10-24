@@ -110,32 +110,37 @@ describe('P2 D5A authoritative Work Identity domains', () => {
 
     it('routes authoritative materialization and Final V3 ownership through full-domain readers', () => {
         const service = fs.readFileSync('src/library/service.ts', 'utf8')
+        const identity = fs.readFileSync('src/identity/queries-v5.ts', 'utf8')
+        const adapter = fs.readFileSync('src/services/work-identity-adapter.ts', 'utf8')
         const coordinator = fs.readFileSync(
-            'src/recommendation-v3/cycle-coordinator-v3.ts',
+            'src/recommendation/queries.ts',
             'utf8'
         )
 
-        const planStart = service.indexOf(
+        expect(service).toContain('this.workIdentityQueriesV5().recommendationV5WorkIdentityMaterializationPlan()')
+        expect(adapter).toMatch(/listAllWorkIdentityDecisions:\s*database\.listAllWorkIdentityDecisions\.bind\(database\)/)
+        expect(adapter).toMatch(/listAllWorkIdentityBindings:\s*database\.listAllWorkIdentityBindings\.bind\(database\)/)
+        const planStart = identity.indexOf(
             'recommendationV5WorkIdentityMaterializationPlan()'
         )
-        const planEnd = service.indexOf(
-            '\n    prepareRecommendationV5WorkIdentityMaterialization(',
+        const planEnd = identity.indexOf(
+            '\n    recommendationV5WorkIdentityMaterializationRuns(',
             planStart
         )
-        const plan = service.slice(planStart, planEnd)
+        const plan = identity.slice(planStart, planEnd)
         expect(plan).toContain('listAllWorkIdentityDecisions()')
         expect(plan).toContain('listAllWorkIdentityBindings()')
         expect(plan).not.toContain('listWorkIdentityDecisions(5000)')
         expect(plan).not.toContain('listWorkIdentityBindings(10000)')
 
-        const reviewStart = service.indexOf(
+        const reviewStart = identity.indexOf(
             'recommendationV5WorkIdentityReview('
         )
-        const reviewEnd = service.indexOf(
+        const reviewEnd = identity.indexOf(
             '\n    recommendationV5WorkIdentityMaterializationPlan()',
             reviewStart
         )
-        const review = service.slice(reviewStart, reviewEnd)
+        const review = identity.slice(reviewStart, reviewEnd)
         expect(review).toContain('listWorkIdentityDecisions(5000)')
         expect(review).toContain('listAllWorkIdentityDecisions()')
         expect(review).toContain('authoritativeDecisions')

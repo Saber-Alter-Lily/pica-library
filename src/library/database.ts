@@ -39,6 +39,9 @@ import {
 } from '../storage/sqlite/migrations'
 import type { UpdateFinding } from '../maintenance/updates'
 import { trustedCoverUrl } from './cover-url'
+import { catalogSourceId, type CatalogSourceId } from './content-identity'
+import { localInventoryKey, type LocalInventoryV1 } from '../local-library/types'
+import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import type { UserEvent, UserEventInput } from '../recommendation-v3/types'
 import type {
     RecommendationFeedbackState,
@@ -182,7 +185,7 @@ function storedComicFromRow(row: SqlRow): StoredComic {
     return {
         comicId: String(row.id),
         providerId: row.provider_id
-            ? (String(row.provider_id) as 'pica' | 'eh' | 'jm')
+            ? (String(row.provider_id) as CatalogSourceId)
             : String(row.id).startsWith('eh:')
               ? 'eh'
               : 'pica',
@@ -244,19 +247,27 @@ export class LibraryDatabase {
 
     constructor(file: string) {
         this.file = path.resolve(file)
+        const sqliteFilename = sqliteDiskFilename(this.file)
         fs.mkdirSync(path.dirname(this.file), { recursive: true })
-        this.db = new DatabaseSync(this.file)
-        this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
-        if (needsUnreleasedMigrationReconciliation(this.db)) {
-            this.db.exec('PRAGMA wal_checkpoint(FULL)')
-            fs.copyFileSync(
-                this.file,
-                `${this.file}.pre-unreleased-schema-reconcile.bak`
-            )
-            reconcileUnreleasedMigrationHistory(this.db)
+        this.db = new DatabaseSync(sqliteFilename)
+        try {
+            this.db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
+            if (needsUnreleasedMigrationReconciliation(this.db)) {
+                this.db.exec('PRAGMA wal_checkpoint(FULL)')
+                fs.copyFileSync(
+                    this.file,
+                    `${this.file}.pre-unreleased-schema-reconcile.bak`
+                )
+                reconcileUnreleasedMigrationHistory(this.db)
+            }
+            this.backupBeforeMigration()
+            this.migrate()
+        } catch (error) {
+            // Failed startup must not hold an inaccessible SQLite handle while
+            // the external updater attempts to restore the same files.
+            try { this.db.close() } catch { /* Keep the original startup error. */ }
+            throw error
         }
-        this.backupBeforeMigration()
-        this.migrate()
     }
 
     close() {
@@ -1765,14 +1776,10 @@ export class LibraryDatabase {
                     now,
                     now
                 )
-                const providerId =
-                    record.providerId ??
-                    (record.comicId.startsWith('eh:') ? 'eh' : 'pica')
+                const providerId = catalogSourceId(record.comicId, record.providerId)
                 const providerRemoteId =
                     record.providerRemoteId ??
-                    (providerId === 'eh'
-                        ? record.comicId.slice(3)
-                        : record.comicId)
+                    (record.comicId.includes(':') ? record.comicId.slice(record.comicId.indexOf(':') + 1) : record.comicId)
                 providerMetaUpsert.run(
                     record.comicId,
                     providerId,
@@ -2207,7 +2214,8 @@ export class LibraryDatabase {
             where.push(
                 `COALESCE(
                     pm.provider_id,
-                    CASE WHEN c.id LIKE 'eh:%' THEN 'eh' ELSE 'pica' END
+                    CASE WHEN c.id LIKE 'eh:%' THEN 'eh' WHEN c.id LIKE 'jm:%' THEN 'jm'
+                         WHEN c.id LIKE 'local:%' THEN 'local' ELSE 'pica' END
                 ) IN (${providers.map(() => '?').join(', ')})`
             )
             values.push(...providers)
@@ -2877,6 +2885,67 @@ export class LibraryDatabase {
             return JSON.parse(String(row.value_json)) as T
         } catch {
             return undefined
+        }
+    }
+
+    /** Local-media adapter only. A copied generation is complete before this atomic inventory switch. */
+    commitLocalInventory(inventory: LocalInventoryV1) {
+        if (!/^local:[a-f0-9]{64}$/.test(inventory.comicId) || !inventory.pages.length ||
+            inventory.pages.some(p => !p.id.startsWith(inventory.comicId + ':page:') ||
+                !inventory.chapters.some(c => c.id === p.episodeId))) throw new Error('Invalid local inventory')
+        const previous = this.getAppState<LocalInventoryV1>(localInventoryKey(inventory.comicId))
+        const now = new Date().toISOString()
+        this.withAppStateTransaction(() => {
+            this.db.prepare(`INSERT INTO comics(id,title,raw_author,categories_json,tags_json,pages_count,eps_count,
+                first_seen_at,last_seen_at,updated_at_source) VALUES (?,?,'','[]','[]',?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET pages_count=excluded.pages_count,eps_count=excluded.eps_count,
+                last_seen_at=excluded.last_seen_at,updated_at_source=excluded.updated_at_source`)
+                .run(inventory.comicId, inventory.title, inventory.pages.length, inventory.chapters.length, now, now, now)
+            // Never overwrite favorites, raw/private tags, shelves, feedback, or a user-edited title/author.
+            this.db.prepare(`INSERT INTO comic_provider_metadata(comic_id,provider_id,provider_remote_id,
+                provider_metadata_json,first_seen_at,last_seen_at) VALUES (?,'local',?,?,?,?)
+                ON CONFLICT(comic_id) DO UPDATE SET provider_id='local',provider_remote_id=excluded.provider_remote_id,
+                provider_metadata_json=excluded.provider_metadata_json,last_seen_at=excluded.last_seen_at`)
+                .run(inventory.comicId, inventory.comicId.slice(6), JSON.stringify({ localFormat: inventory.kind, revision: inventory.revision }), now, now)
+            for (const chapter of inventory.chapters)
+                this.upsertEpisode({ id: chapter.id, comicId: inventory.comicId, title: chapter.title, order: chapter.order })
+            // Retain vanished chapter identities/progress, but no stale readable pages. Reappearance restores the same IDs.
+            this.db.prepare('DELETE FROM pictures WHERE comic_id = ?').run(inventory.comicId)
+            for (const page of inventory.pages) {
+                this.upsertPicture({ id: page.id, comicId: inventory.comicId, episodeId: page.episodeId, position: page.position,
+                    originalName: path.posix.basename(page.name), mediaPath: '', fileServer: '' })
+                this.markPictureDownloaded(page.id, page.localPath, page.bytes, page.sha256)
+            }
+            for (const progress of this.readingProgress(inventory.comicId)) {
+                const pages = inventory.pages.filter(p => p.episodeId === progress.episodeId)
+                if (!pages.length) continue
+                const priorPage = previous?.pages.find(p => p.episodeId === progress.episodeId && p.position === progress.pageIndex + 1)
+                const mapped = pages.findIndex(p => p.id === priorPage?.id)
+                const index = mapped < 0 ? Math.min(progress.pageIndex, pages.length - 1) : mapped
+                this.db.prepare('UPDATE reading_progress SET page_index = ? WHERE comic_id = ? AND episode_id = ?')
+                    .run(index, inventory.comicId, progress.episodeId)
+            }
+            this.db.prepare(`INSERT INTO library_membership(comic_id,reason,created_at,updated_at) VALUES (?,'explicit-import',?,?)
+                ON CONFLICT(comic_id,reason) DO UPDATE SET updated_at=excluded.updated_at`).run(inventory.comicId, now, now)
+            this.db.prepare(`INSERT INTO comic_provenance(comic_id,source,first_seen_at,last_seen_at) VALUES (?,'local:import',?,?)
+                ON CONFLICT(comic_id,source) DO UPDATE SET last_seen_at=excluded.last_seen_at`).run(inventory.comicId, now, now)
+            this.setAppState(localInventoryKey(inventory.comicId), inventory)
+        })
+    }
+
+    /** Synchronous, nested-safe atomic app-state writes; no schema migration. */
+    withAppStateTransaction<T>(operation: () => T): T {
+        this.db.exec('SAVEPOINT pica_app_state_write')
+        try {
+            const value = operation()
+            if (value && typeof (value as { then?: unknown }).then === 'function')
+                throw new Error('App-state transactions must be synchronous')
+            this.db.exec('RELEASE SAVEPOINT pica_app_state_write')
+            return value
+        } catch (error) {
+            this.db.exec('ROLLBACK TO SAVEPOINT pica_app_state_write')
+            this.db.exec('RELEASE SAVEPOINT pica_app_state_write')
+            throw error
         }
     }
 

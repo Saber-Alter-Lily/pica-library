@@ -82,6 +82,8 @@ describe('experimental Linux x64 package P5A', () => {
         )
         expect(preview).toContain('credentialSessionConfigured')
         expect(preview).toContain('credentialSessionCleared')
+        expect(preview).toContain("v.picaAccount?.configured === false, 'session-only credentials survived a process restart'")
+        expect(preview).toContain("v.configured === true, 'local library configuration did not survive a process restart'")
         expect(preview).toContain('session-only Linux credential was written to disk')
         expect(preview).toContain('linux-preview-session-secret')
     })

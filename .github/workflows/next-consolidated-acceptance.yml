@@ -2,7 +2,7 @@ name: Next consolidated acceptance (unpublished)
 
 on:
   push:
-    branches: [codex/next-acceptance-sources-jm]
+    branches: [codex/next-acceptance-sources-jm, codex/ux-tags-dual-onboarding-20261022]
   pull_request:
     paths:
       - '.github/workflows/next-consolidated-acceptance.yml'
@@ -20,6 +20,7 @@ concurrency:
 env:
   STABLE_VERSION: '0.5.0'
   BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+  PICA_ANDROID_CANDIDATE_VERSION_CODE: '82'
 
 jobs:
   web-and-source:
@@ -42,13 +43,21 @@ jobs:
         with:
           gradle-version: '8.9'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm type:check && pnpm web:check && pnpm test && pnpm build
+      - run: pnpm type:check && pnpm web:check && pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/linux-unit.json && pnpm build
       - run: gradle -p source-jvm test bundle dependencyNotices --no-daemon
       - run: bash scripts/run-web-browser-smoke.sh
+      - name: Retain source-side synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Source-Evidence
+          path: artifacts/linux-unit.json
+          retention-days: 3
+          if-no-files-found: ignore
 
   windows:
     needs: web-and-source
-    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/next-acceptance-sources-jm'
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022')
     runs-on: windows-latest
     timeout-minutes: 50
     env:
@@ -77,6 +86,9 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Full Windows tests moved from the user's PC to this disposable runner.
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/windows-unit.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/build-windows-jm-runtime.ps1 -JdkDirectory $env:JAVA_HOME -GradleExecutable (Get-Command gradle.bat).Source
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
@@ -89,7 +101,36 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -PortCollision -SetupPersistence
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC'
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -LocalOnlySetup
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-source-media.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-local-ingestion.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-sqlite-paths.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-recommendation-module.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-recommendation-audit.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-incremental-update.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-upgrade-diagnostics.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -DiagnosticsDirectory artifacts/upgrade-diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceHealthFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $base -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # A pre-fix baseline cannot start with this deep database path. These
+          # exercise the actual transaction with two current application copies;
+          # they are not a claim that an old release supported long paths.
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $zip -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -LibraryPathLength 1200 -DiagnosticsDirectory artifacts/upgrade-diagnostics/deep-1200
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $zip -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -LibraryPathLength 1200 -ForceHealthFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/deep-1200
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $zip -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -LibraryPathLength 1200 -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/deep-1200
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
           Copy-Item -LiteralPath $zip -Destination candidate/windows/
@@ -97,6 +138,22 @@ jobs:
           $env:GITHUB_SHA | Set-Content -Encoding ascii candidate/windows/SOURCE_SHA.txt
           $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
           "$hash  Pica-Library-Next-Acceptance-Windows-x64.zip" | Set-Content -Encoding ascii candidate/windows/SHA256SUMS.txt
+      - name: Retain Windows synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Windows-Unit-Evidence
+          path: artifacts/windows-unit.json
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Retain bounded synthetic upgrade diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Upgrade-Diagnostics-${{ github.run_attempt }}
+          path: artifacts/upgrade-diagnostics/
+          retention-days: 3
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: Pica-Library-Next-Acceptance-Windows
@@ -106,7 +163,7 @@ jobs:
 
   android:
     needs: web-and-source
-    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/next-acceptance-sources-jm'
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -147,7 +204,7 @@ jobs:
           test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
           test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
           export PICA_ANDROID_VERSION_NAME="0.5.0-postrc.${GITHUB_SHA:0:12}"
-          export PICA_ANDROID_VERSION_CODE=57
+          export PICA_ANDROID_VERSION_CODE="$PICA_ANDROID_CANDIDATE_VERSION_CODE"
           umask 077
           signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-next-signing-XXXXXXXX")
           export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
@@ -161,7 +218,11 @@ jobs:
           test "$cert" = "$EXPECTED_CERT"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/next-package.txt"
           grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/next-package.txt"
-          grep -q "versionCode='57'" "$RUNNER_TEMP/next-package.txt"
+          grep -q "versionCode='$PICA_ANDROID_CANDIDATE_VERSION_CODE'" "$RUNNER_TEMP/next-package.txt" || {
+            echo "::error::Dev manifest versionCode does not match expected $PICA_ANDROID_CANDIDATE_VERSION_CODE"
+            sed -n '/^package: /p' "$RUNNER_TEMP/next-package.txt"
+            exit 1
+          }
           grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/next-package.txt"
           mkdir -p candidate-next
           cp "$apk" candidate-next/Pica-Library-Next-Acceptance-Android-Dev.apk

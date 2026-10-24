@@ -30,6 +30,8 @@ export interface IntentAnchorV3 {
     providerQueryLabel: string | null
     recommendationEligible: boolean
     retrievalUtility: string
+    /** Optional personal participation boundary, not provider metadata. */
+    allowedProviders?: Array<'pica' | 'eh' | 'jm'>
 }
 
 export interface RecommendationIntentV3 {

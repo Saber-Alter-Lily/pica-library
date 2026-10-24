@@ -3,3 +3,6 @@
 # Windows launchers and scripts remain executable by their native hosts with LF.
 *.ps1 text eol=lf
 *.cs text eol=lf
+
+# Integrity-pinned serialized assets must retain exact bytes on every checkout.
+src/data/tag-runtime-v1/* -text

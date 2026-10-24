@@ -71,6 +71,7 @@ public class WorkManagerRecoveryTest {
     }
 
     @Before public void resetDurableState() throws Exception {
+        SourceAccess sourceAccess=SourceAccess.get(app);sourceAccess.policy.save(sourceAccess.snapshot().revision,com.picalibrary.android.sources.SourceAccessPolicy.IDS,snapshot->{});
         manager.cancelAllWork().getResult().get(5,TimeUnit.SECONDS);
         app.getSharedPreferences("background-task-registry-v1",Context.MODE_PRIVATE)
             .edit().clear().commit();

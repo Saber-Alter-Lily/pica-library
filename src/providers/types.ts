@@ -90,6 +90,8 @@ export interface ComicProvider {
     episodes(comicId: string): Promise<Episode[]>
     pages(comicId: string, episode: Episode): Promise<Picture[]>
     fetchPage(locator: string, maxBytes?: number): Promise<{ data: Buffer; contentType: string }>
+    /** Optional separate cover transport; never route a different source through Pica login. */
+    fetchCover?(locator: string, maxBytes?: number): Promise<{ data: Buffer; contentType: string }>
 }
 
 export interface ProviderAccountIdentity {

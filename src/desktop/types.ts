@@ -7,6 +7,7 @@ export interface DesktopConfig {
     openBrowser: boolean
     preferredPort: number
     proxyUrl?: string
+    externalSources?: import('../sources/source-policy').SourcePolicyV1
 }
 
 export interface RemoteTargetStoredCredentials {

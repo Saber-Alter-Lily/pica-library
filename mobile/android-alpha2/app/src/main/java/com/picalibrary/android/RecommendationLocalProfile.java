@@ -40,6 +40,7 @@ final class RecommendationLocalProfile {
         LinkedHashMap<String,JSONObject> merged=new LinkedHashMap<>();
         if(catalog==null)catalog=new UnifiedCatalogStore.Snapshot();
         if(remoteSnapshot==null)remoteSnapshot=new JSONObject();
+        TagParticipation participation=TagParticipation.of(app,remoteSnapshot);
         JSONObject remoteCounts=remoteSnapshot.optJSONObject("counts");
         int remoteFavorites=remoteCounts==null?0:remoteCounts.optInt("favorites",0),localFavorites=0;
         for(UnifiedCatalogStore.Entry entry:catalog.entries())if(entry.favorite)localFavorites++;
@@ -50,6 +51,7 @@ final class RecommendationLocalProfile {
             for(int i=0;i<remote.length();i++){
                 JSONObject row=remote.optJSONObject(i);if(row==null)continue;
                 String type=row.optString("targetType","TAG"),key=row.optString("key","");
+                if(!participation.controlEnabled(type,key,null))continue;
                 if(!key.isEmpty())try{merged.put(id(type,key),new JSONObject(row.toString()));}catch(Exception ignored){}
             }
         }
@@ -63,8 +65,9 @@ final class RecommendationLocalProfile {
         for(UnifiedCatalogStore.Entry entry:positives){
             String author=entry.displayAuthor();if(!author.isEmpty()&&!"未知作者".equals(author)&&!"Unknown author".equalsIgnoreCase(author))add(local,"AUTHOR",author,author,"CREATOR_ENTITY",entry.id);
             for(String category:entry.categories)add(local,"CATEGORY",category,category,"CATEGORY",entry.id);
-            for(String raw:entry.tags){
+            for(String raw:participation.tags(entry.id,entry.tags,true)){
                 String type="TAG",key=raw,label=raw,facet="RAW_TAG";
+                if(raw.startsWith(TagParticipation.PREFIX)){label=participation.label(raw);facet="PRIVATE";add(local,type,key,label,facet,entry.id);continue;}
                 if(registry!=null){
                     MobileTagRegistry.Resolved resolved=registry.resolve(raw);
                     if(resolved.safetyBlocked())continue;

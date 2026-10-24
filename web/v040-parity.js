@@ -164,7 +164,7 @@ function installLibraryParity() {
     if (!$('#v040-library-provider')) {
         const provider = document.createElement('select')
         provider.id = 'v040-library-provider'
-        provider.innerHTML = `<option value="all">${t('来源：全部','Source: All','配信元：すべて')}</option><option value="pica">${t('来源：Pica','Source: Pica','配信元：Pica')}</option><option value="eh">${t('来源：E-H','Source: E-H','配信元：E-H')}</option><option value="jm">${t('来源：JM','Source: JM','配信元：JM')}</option>`
+        provider.innerHTML = `<option value="all">${t('来源：全部','Source: All','配信元：すべて')}</option><option value="pica">${t('来源：Pica','Source: Pica','配信元：Pica')}</option><option value="eh">${t('来源：E-H','Source: E-H','配信元：E-H')}</option><option value="jm">${t('来源：JM','Source: JM','配信元：JM')}</option><option value="local">${t('来源：本地','Source: Local','配信元：ローカル')}</option>`
         const scope = $('#filter-scope')
         scope?.insertAdjacentElement('afterend', provider)
         provider.onchange = () => $('#apply-filter')?.click()
@@ -356,7 +356,7 @@ async function showAuthorWorks(dialog, authorId, name) {
             dialog.close();
             document.querySelector('nav button[data-view="library"]')?.click()
             const filter=$('#filter-text'); if(filter) filter.value=button.dataset.workTitle
-            const provider=$('#v040-library-provider'); if(provider) provider.value=['eh','jm'].includes(button.dataset.workProvider)?button.dataset.workProvider:'pica'
+            const provider=$('#v040-library-provider'); if(provider) provider.value=['eh','jm','local'].includes(button.dataset.workProvider)?button.dataset.workProvider:'pica'
             $('#apply-filter')?.click()
         })
         return result

@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto'
+import { parseEhTag } from './eh-tags'
+export { parseEhTag } from './eh-tags'
+import { combineAbortSignals } from '../media/abort-signals'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { Episode, Picture } from '../types'
 import { safeRasterContentType, trustedCoverUrl } from '../library/cover-url'
@@ -102,30 +105,7 @@ export function parseEhComicId(comicId: string): GalleryRef {
     return { gid: Number(match[1]), token: match[2].toLowerCase() }
 }
 
-function tagFacet(namespace: string | null): CanonicalTag['facet'] {
-    if (namespace === 'artist' || namespace === 'cosplayer') return 'CREATOR'
-    if (namespace === 'group') return 'CIRCLE'
-    if (namespace === 'parody') return 'FANDOM_IP'
-    if (namespace === 'character') return 'CHARACTER'
-    if (namespace === 'language') return 'LANGUAGE'
-    if (namespace === 'location') return 'LOCATION'
-    if (
-        namespace === 'female' ||
-        namespace === 'male' ||
-        namespace === 'mixed' ||
-        namespace === 'other' ||
-        namespace === 'reclass'
-    )
-        return 'CONTENT_TRAIT'
-    return 'OTHER'
-}
 
-export function parseEhTag(raw: string): CanonicalTag {
-    const index = raw.indexOf(':')
-    const namespace = index > 0 ? raw.slice(0, index).toLowerCase() : null
-    const value = (index > 0 ? raw.slice(index + 1) : raw).trim()
-    return { raw, namespace, value, facet: tagFacet(namespace) }
-}
 
 function unique(values: string[]) {
     return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
@@ -349,6 +329,8 @@ export class EhProvider implements ComicProvider {
     private lastSearchAt = 0
     private searchGate: Promise<void> = Promise.resolve()
     private session: EhSession | null = null
+    private sourceAccess?: import('../sources/source-policy').SourceAccess
+    setSourceAccess(access: import('../sources/source-policy').SourceAccess) { this.sourceAccess = access }
 
     constructor(
         session?: EhSession | null,
@@ -400,6 +382,7 @@ export class EhProvider implements ComicProvider {
             redirect?: RequestRedirect
         } = {}
     ) {
+        const lease = this.sourceAccess?.('eh')
         const target = new URL(url)
         if (target.protocol !== 'https:') throw new Error('E-H requires HTTPS')
         const controller = new AbortController()
@@ -419,9 +402,10 @@ export class EhProvider implements ComicProvider {
             const response = await this.fetchImpl(url, {
                 ...init,
                 redirect: options.redirect ?? 'follow',
-                signal: controller.signal,
+                signal: lease ? combineAbortSignals([controller.signal, lease.signal]) : controller.signal,
                 headers
             })
+            lease?.check()
             if (!response.ok && !options.allowHttpErrors)
                 throw new Error(`E-H request failed with HTTP ${response.status}`)
             const length = Number(response.headers.get('content-length') ?? 0)

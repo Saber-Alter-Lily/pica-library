@@ -1,0 +1,13 @@
+{
+  "sourceSha": "7203626e1cb324e6ca9601872e561950234f7231",
+  "importerSha256": "49c255901ae015513b0c8e776c38f5e8ba38547848eedb4f1472804586512816",
+  "normalization": "LF text; restore exactly the two extension/signature helper private modifiers before hashing",
+  "permissions": [
+    "<uses-permission android:name=\"android.permission.CAMERA\" />",
+    "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />",
+    "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_DATA_SYNC\" />",
+    "<uses-permission android:name=\"android.permission.INTERNET\" />",
+    "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />",
+    "<uses-permission android:name=\"android.permission.REQUEST_INSTALL_PACKAGES\" />"
+  ]
+}

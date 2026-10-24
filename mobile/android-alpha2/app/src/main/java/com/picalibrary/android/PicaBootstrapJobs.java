@@ -19,10 +19,10 @@ final class PicaBootstrapJobs {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,15,TimeUnit.SECONDS)
             .addTag("pica-bootstrap").build();
     }
-    private static void enqueue(Context context,ExistingWorkPolicy policy){OneTimeWorkRequest request=request();WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,policy,request);MobileTaskRegistryStore.setWorkId(context,"pica-bootstrap",UNIQUE_NAME,request.getId());}
-    static void enqueue(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);enqueue(context,ExistingWorkPolicy.REPLACE);}
+    private static void enqueue(Context context,ExistingWorkPolicy policy){SourceAccess.require(context,"pica");OneTimeWorkRequest request=request();WorkManager.getInstance(context.getApplicationContext()).enqueueUniqueWork(UNIQUE_NAME,policy,request);MobileTaskRegistryStore.setWorkId(context,"pica-bootstrap",UNIQUE_NAME,request.getId());}
+    static void enqueue(Context context){SourceAccess.require(context,"pica");MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);enqueue(context,ExistingWorkPolicy.REPLACE);}
     static void pause(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,true);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
-    static void resume(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);enqueue(context,ExistingWorkPolicy.REPLACE);}
+    static void resume(Context context){SourceAccess.require(context,"pica");MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);enqueue(context,ExistingWorkPolicy.REPLACE);}
     static void cancel(Context context){MobileTaskPauseStore.setPaused(context,"pica-bootstrap",UNIQUE_NAME,false);MobileTaskRegistryStore.clearWorkId(context,"pica-bootstrap",UNIQUE_NAME);WorkManager.getInstance(context.getApplicationContext()).cancelUniqueWork(UNIQUE_NAME);}
     static void complete(Context context){MobileTaskRegistryStore.clearWorkId(context,"pica-bootstrap",UNIQUE_NAME);}
     static boolean paused(Context context){return MobileTaskPauseStore.isPaused(context,"pica-bootstrap",UNIQUE_NAME);}

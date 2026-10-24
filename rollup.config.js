@@ -3,7 +3,7 @@ import json from '@rollup/plugin-json'
 import { nodeResolve } from '@rollup/plugin-node-resolve'
 import commonjs from '@rollup/plugin-commonjs'
 import esbuild from 'rollup-plugin-esbuild'
-import { builtinModules } from 'node:module'
+import { builtinModules, isBuiltin } from 'node:module'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -84,29 +84,52 @@ function bundledLicenses() {
     }
 }
 
-export default defineConfig({
-    input: {
-        'pica-library': 'src/library-cli.ts',
-        desktop: 'src/desktop/main.ts',
-        updater: 'src/update/updater.ts',
-        'full-upgrader': 'src/update/full-upgrader.ts'
-    },
-    output: {
-        dir: 'dist',
-        entryFileNames: '[name].js',
-        format: 'es'
-    },
-    // Windows distribution carries no node_modules. Bundle all JavaScript
-    // dependencies and leave only the official Node runtime built-ins external.
-    external: [...builtinModules, /node:/],
-    plugins: [
+function transforms() {
+    return [
         json(),
         esbuild({
             platform: 'node',
             minify: true
         }),
         nodeResolve(),
-        commonjs(),
-        bundledLicenses()
+        commonjs()
     ]
-})
+}
+
+function standaloneHelperGuard() {
+    return {
+        name: 'detached-helper-must-be-standalone',
+        generateBundle(_options, bundle) {
+            const chunks = Object.values(bundle).filter(item => item.type === 'chunk')
+            if (chunks.length !== 1 || chunks[0].imports.some(id => !isBuiltin(id)) || chunks[0].dynamicImports.length || chunks[0].referencedFiles.length)
+                this.error('Detached upgrade helper must be one self-contained JavaScript file with only Node built-ins external')
+            // Helpers currently use only our MIT modules + Node. A future new
+            // third-party helper dependency needs an explicit notices design.
+            if ([...this.getModuleIds()].some(id => id.includes('node_modules')))
+                this.error('Detached helper third-party dependencies require an explicit license-notice review')
+        }
+    }
+}
+
+const external = [...builtinModules, /node:/]
+export default defineConfig([
+    {
+        input: {
+            'pica-library': 'src/library-cli.ts',
+            desktop: 'src/desktop/main.ts'
+        },
+        output: { dir: 'dist', entryFileNames: '[name].js', format: 'es' },
+        // The app carries no node_modules; its shared chunks stay in app/.
+        external,
+        plugins: [...transforms(), bundledLicenses()]
+    },
+    ...Object.entries({
+        updater: 'src/update/updater.ts',
+        'full-upgrader': 'src/update/full-upgrader.ts'
+    }).map(([name, entry]) => ({
+        input: { [name]: entry },
+        output: { dir: 'dist', entryFileNames: '[name].js', format: 'es', inlineDynamicImports: true },
+        external,
+        plugins: [...transforms(), standaloneHelperGuard()]
+    }))
+])

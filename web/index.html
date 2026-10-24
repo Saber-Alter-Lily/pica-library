@@ -69,6 +69,7 @@
                             <p>Your library stays on this computer.</p>
                         </div>
                     </div>
+                    <p id="setup-local-help" class="notice">本软件不附带漫画内容。先选择下方本地书库目录，即可不登录任何漫画源开始使用；外部来源稍后再接入。</p>
                     <article class="notice setup-provider-entry">
                         <strong>多来源模式 / Multi-provider</strong>
                         <p>Pica 可以稍后配置。E-H 公共搜索、阅读和下载无需登录；如需同步 E-H 云收藏或访问 ExH，可直接配置 E-H / ExH 会话。</p>
@@ -133,6 +134,7 @@
                             role="status"
                         ></p>
                         <div class="actions wide">
+                            <button id="setup-local" type="button" class="primary">只配置本地书库</button>
                             <button id="setup-test" type="button">
                                 Test Connection</button
                             ><button class="primary" type="submit">
@@ -246,6 +248,10 @@
                     </div>
                 </div>
                 <p id="import-result" class="status"></p>
+                <div id="local-comic-import" class="notice" hidden>
+                    <div class="actions"><button type="button" data-local-kind="folder"></button><button type="button" data-local-kind="cbz"></button></div>
+                    <p data-local-help></p><p data-local-status class="status" role="status"></p>
+                </div>
                 <div id="library-operation" class="operation-progress" hidden>
                     <span id="library-operation-phase"></span>
                     <progress id="library-operation-bar" max="1"></progress>
@@ -892,6 +898,60 @@
                     </div>
                     <span id="settings-version" class="mode"></span>
                 </div>
+                <section id="settings-source-choices" class="panel" aria-labelledby="source-choices-title">
+                    <h3 id="source-choices-title">外部漫画来源 · 可选</h3>
+                    <p id="source-choices-help">本软件不附带内容。关闭来源会停止对应联网请求，保留本地下载、收藏和账号；E-H / ExH 使用同一个开关。</p>
+                    <form id="source-choices-form">
+                        <fieldset id="source-choices-options" disabled>
+                            <legend id="source-choices-legend">允许此电脑连接哪些来源</legend>
+                            <label><input type="checkbox" name="source" value="pica" /> Pica</label>
+                            <label><input type="checkbox" name="source" value="eh" /> E-H / ExH</label>
+                            <label><input type="checkbox" name="source" value="jm" /> JM</label>
+                            <button id="source-choices-save" type="submit">保存来源选择</button>
+                        </fieldset>
+                        <button id="source-choices-refresh" type="button">读取当前选择</button>
+                        <p id="source-choices-state" role="status" aria-live="polite"></p>
+                    </form>
+                    <details id="saved-host-panel">
+                        <summary id="saved-host-summary">我的外部宿主配置（实验）</summary>
+                        <p id="saved-host-boundary">这是本地阅读器，不经营漫画内容平台。外部宿主由你自行选择和管理；本软件不会提供默认内容目录、源仓库或托管服务。此配置目前只授权检查，尚不能阅读或导入。</p>
+                        <p id="saved-host-privacy">只在本机保存名称、地址和检查权限，不保存账号密码、不上传或同步。保存后默认停用；允许检查也不会自动连接。停用或移除只影响该连接，不删除漫画或阅读数据。</p>
+                        <button id="saved-host-refresh" type="button">查看 / 刷新我的配置</button>
+                        <form id="saved-host-form" class="settings-form" method="post">
+                            <fieldset id="saved-host-fields" class="wide settings-form">
+                                <label><span id="saved-host-label-label">自定义名称</span><input id="saved-host-label" maxlength="100" autocomplete="off" required /></label>
+                                <label class="wide"><span id="saved-host-endpoint-label">你自行运行的 Suwayomi 2.4 宿主地址</span><input id="saved-host-endpoint" type="url" maxlength="2048" autocomplete="off" required /></label>
+                                <label><span id="saved-host-auth-label">宿主认证方式</span><select id="saved-host-auth"><option value="none" id="saved-host-anonymous">匿名</option><option value="basic" id="saved-host-basic">Basic（每次检查单独输入）</option></select></label>
+                                <label class="wide"><input id="saved-host-lan" type="checkbox" /><span id="saved-host-lan-label">允许该明确的局域网 IP 使用 HTTP；不能携带 Basic 密码</span></label>
+                                <label class="wide"><input id="saved-host-consent" type="checkbox" required /><span id="saved-host-consent-label">我选择并管理该宿主，仅保存本机检查配置，不授权其他能力</span></label>
+                                <button id="saved-host-save" type="submit" disabled>保存配置（默认停用）</button>
+                            </fieldset>
+                        </form>
+                        <button id="saved-host-cancel" type="button" disabled>取消当前请求</button>
+                        <p id="saved-host-state" role="status" aria-live="polite"></p>
+                        <div id="saved-host-list"></div>
+                    </details>
+                    <details id="source-host-panel">
+                        <summary id="source-host-summary">外部宿主诊断（实验）</summary>
+                        <p id="source-host-help">连接你已自行运行的 Suwayomi 2.4 宿主，只检查版本和已安装来源。不会下载、安装或启动宿主/扩展；本软件内阅读和导入尚未接通。</p>
+                        <p id="source-host-privacy">仅使用你在这里输入的宿主凭据，临时保留在当前面板；关闭即停止使用，不保存或同步。不会使用或转发 Pica、E-H、JM、GitHub 或网盘凭据。</p>
+                        <form id="source-host-form" class="settings-form" method="post">
+                            <fieldset id="source-host-fields" class="wide settings-form">
+                                <label class="wide"><span id="source-host-endpoint-label">宿主地址</span><input id="source-host-endpoint" type="url" maxlength="2048" autocomplete="off" placeholder="http://127.0.0.1:4567/" required /></label>
+                                <label><span id="source-host-auth-label">宿主认证</span><select id="source-host-auth"><option value="none" id="source-host-auth-none">匿名</option><option value="basic" id="source-host-auth-basic">Basic 账号</option></select></label>
+                                <label><span id="source-host-username-label">宿主用户名（非 Pica 账号）</span><input id="source-host-username" maxlength="256" autocomplete="off" disabled /></label>
+                                <label><span id="source-host-password-label">宿主密码</span><input id="source-host-password" type="password" maxlength="4096" autocomplete="new-password" disabled /></label>
+                                <label class="wide"><input id="source-host-lan" type="checkbox" /><span id="source-host-lan-label">仅本次允许明确输入的局域网 IP 使用 HTTP（不能携带 Basic 密码）</span></label>
+                                <label class="wide"><input id="source-host-consent" type="checkbox" required /><span id="source-host-consent-label">我确认该宿主及请求范围，允许本次只读连接</span></label>
+                                <button id="source-host-submit" type="submit" disabled>检查宿主与来源</button>
+                            </fieldset>
+                            <button id="source-host-cancel" type="button" disabled>取消检查</button>
+                            <p id="source-host-state" class="wide" role="status" aria-live="polite"></p>
+                        </form>
+                        <div id="source-host-results" class="wide" style="max-width:100%;overflow-x:auto" hidden></div>
+                        <div class="actions"><button id="source-host-previous" type="button" disabled>上一页</button><button id="source-host-next" type="button" disabled>下一页</button></div>
+                    </details>
+                </section>
                 <form id="settings-form" class="settings-form panel">
                                         <details class="wide account-disclosure">
                         <summary><strong>Pica 账号</strong> · 点击展开修改</summary>
@@ -1248,6 +1308,10 @@
         <script type="module" src="./alpha8-star-access.js"></script>
         <script type="module" src="./eh-account.js"></script>
         <script type="module" src="./jm-account.js"></script>
+        <script type="module" src="./source-choices.js"></script>
+        <script type="module" src="./source-hosts.js"></script>
+        <script type="module" src="./saved-source-hosts.js"></script>
+        <script type="module" src="./host-library.js"></script>
         <script type="module" src="./recommendation-v5.js"></script>
         <script type="module" src="./ecosystem-pack-v1.js"></script>
         <script type="module" src="./ui-polish-v5.js"></script>

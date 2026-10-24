@@ -70,7 +70,7 @@ public final class PicaAccountActivity extends LocaleAwareActivity {
 
     private void renderContent(){
         if(content==null)return;
-        content.removeAllViews();
+        content.removeAllViews();SourceAccessUi.entry(this,content);
         PicaAccountStore.Session session=PicaAccountStore.load(this);
         boolean signed=session.signedIn();
         boolean desktop=desktopBacked();
@@ -178,7 +178,7 @@ public final class PicaAccountActivity extends LocaleAwareActivity {
             .show();
     }
 
-    private void login(){
+    private void login(){if(!SourceAccessUi.require(this,"pica"))return;
         if(busy)return;
         String a=account.getText().toString().trim();
         String entered=password.getText().toString();

@@ -21,6 +21,8 @@ android {
         srcDir '../../../source-jvm/src/main/java'
         exclude '**/JmProtocolMain.java'
     }
+    // One tracked fixture is consumed by both Vitest and the Android JSON adapter tests.
+    sourceSets.test.resources.srcDir '../../../test/fixtures/tag-policy'
 
     defaultConfig {
         applicationId 'com.picalibrary.android'
@@ -119,3 +121,33 @@ dependencies {
 configurations.configureEach {
     exclude group: 'io.github.darkxanter', module: 'webp-imageio'
 }
+
+// Compile the decision seam without Android, SDKs or any other application classes.
+// Recognition remains in GestureDetector / ScaleGestureDetector; this is not a new touch framework.
+def gestureBoundary = tasks.register('compileReaderGestureBoundary', JavaCompile) {
+    source fileTree('src/main/java/com/picalibrary/android/reader/gestures') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('reader-gesture-boundary')
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+def tagBoundary = tasks.register('compileTagPolicyBoundary', JavaCompile) {
+    source fileTree('src/main/java/com/picalibrary/android/tags') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('tag-policy-boundary')
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+tasks.configureEach {
+    if (name == 'testDebugUnitTest') dependsOn gestureBoundary, tagBoundary
+}
+
+// Local ingestion is a storage boundary, not another provider or Reader implementation.
+def localImportBoundary = tasks.register('compileLocalImportBoundary', JavaCompile) {
+    source fileTree('src/main/java/com/picalibrary/android/local') { include '**/*.java' }
+    classpath = files()
+    destinationDirectory = layout.buildDirectory.dir('local-import-boundary')
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+tasks.configureEach { if (name == 'testDebugUnitTest') dependsOn localImportBoundary }

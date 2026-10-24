@@ -67,11 +67,16 @@ describe('P2-L runtime hardening promotion gate', () => {
         )
         expect(workflow).toContain('Prepare previous accepted Windows package')
         expect(workflow).toContain(
-            "$releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'"
+            '$batch = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=30&page=$page"'
         )
         expect(workflow).not.toContain(
             "$releases = @(Invoke-RestMethod"
         )
+        expect(workflow).toContain('$releases += $batch')
+        expect(workflow).toContain('for ($page = 1; $page -le 20; $page++)')
+        expect(workflow).toContain('if ($batch.Count -lt 30) { break }')
+        expect(workflow).toContain("throw 'Accepted release enumeration exceeded the safe page limit'")
+        expect(workflow).toContain('-not $_.draft -and -not $_.prerelease')
         expect(workflow).toContain("'artifacts\\release-base'")
         expect(workflow).toContain('Previous accepted Windows asset missing')
         expect(workflow).toContain('pnpm build:windows')

@@ -130,11 +130,11 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
             if(total>0)picaCard.addView(Ui.text(this,done+" / "+total,12,Ui.PRIMARY,false));
             if(picaPaused){
                 picaCard.addView(Ui.text(this,"继续后会从头重新读取远端收藏页；已保存的本地缓存保持可用。",12,Ui.MUTED,false));
-                picaCard.addView(actions(button("继续",v->PicaBootstrapJobs.resume(this)),button("取消任务",v->PicaBootstrapJobs.cancel(this))));
+                picaCard.addView(actions(button("继续",v->SourceAccessUi.run(this,"pica",()->PicaBootstrapJobs.resume(this))),button("取消任务",v->PicaBootstrapJobs.cancel(this))));
             }else if(picaSync!=null&&active(picaSync)){
                 picaCard.addView(actions(button("暂停",v->PicaBootstrapJobs.pause(this)),button("取消同步",v->PicaBootstrapJobs.cancel(this))));
             }else if(picaSync!=null&&(picaSync.getState()==WorkInfo.State.FAILED||picaSync.getState()==WorkInfo.State.CANCELLED)){
-                picaCard.addView(button("重新同步",v->PicaBootstrapJobs.enqueue(this)));
+                picaCard.addView(button("重新同步",v->SourceAccessUi.run(this,"pica",()->PicaBootstrapJobs.enqueue(this))));
             }
         }
         content.addView(picaCard);
@@ -214,9 +214,9 @@ public final class TaskCenterActivity extends LocaleAwareActivity {
         if(shown==0)content.addView(Ui.text(this,"当前没有下载任务。",13,Ui.MUTED,false));
     }
     private void pauseDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.pause(this,ref.comicId);else if("eh".equals(ref.provider))EhDownloadJobs.pause(this,ref.comicId);else PicaDownloadJobs.pause(this,ref.comicId,ref.episodeId);}
-    private void resumeDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.resume(this,ref.comicId,ref.episodeId);else if("eh".equals(ref.provider))EhDownloadJobs.resume(this,ref.comicId);else PicaDownloadJobs.resume(this,ref.comicId,ref.episodeId);}
+    private void resumeDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))SourceAccessUi.run(this,"jm",()->JmDownloadJobs.resume(this,ref.comicId,ref.episodeId));else if("eh".equals(ref.provider))SourceAccessUi.run(this,"eh",()->EhDownloadJobs.resume(this,ref.comicId));else SourceAccessUi.run(this,"pica",()->PicaDownloadJobs.resume(this,ref.comicId,ref.episodeId));}
     private void cancelDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.cancel(this,ref.comicId);else if("eh".equals(ref.provider))EhDownloadJobs.cancel(this,ref.comicId);else PicaDownloadJobs.cancel(this,ref.comicId,ref.episodeId);}
-    private void retryDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))JmDownloadJobs.enqueue(this,ref.comicId,ref.episodeId);else if("eh".equals(ref.provider))EhDownloadJobs.enqueue(this,ref.comicId);else PicaDownloadJobs.enqueue(this,ref.comicId,ref.episodeId);}
+    private void retryDownload(MobileTaskRegistryStore.DownloadRef ref){if("jm".equals(ref.provider))SourceAccessUi.run(this,"jm",()->JmDownloadJobs.enqueue(this,ref.comicId,ref.episodeId));else if("eh".equals(ref.provider))SourceAccessUi.run(this,"eh",()->EhDownloadJobs.enqueue(this,ref.comicId));else SourceAccessUi.run(this,"pica",()->PicaDownloadJobs.enqueue(this,ref.comicId,ref.episodeId));}
     private static boolean active(WorkInfo i){return i.getState()==WorkInfo.State.RUNNING||i.getState()==WorkInfo.State.ENQUEUED||i.getState()==WorkInfo.State.BLOCKED;}
     private static String status(WorkInfo i){switch(i.getState()){case RUNNING:return "执行中";case ENQUEUED:return "等待网络 / 排队中";case BLOCKED:return "等待前序任务";case SUCCEEDED:return "已完成";case FAILED:return "失败";case CANCELLED:return "已取消";default:return i.getState().name();}}
     private static String tag(Set<String> tags,String prefix){for(String tag:tags)if(tag.startsWith(prefix))return tag.substring(prefix.length());return "";}

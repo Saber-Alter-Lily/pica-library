@@ -14,6 +14,7 @@ final class EhReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     EhReaderSource(Context context){this.context=context.getApplicationContext();this.client=new EhClient(this.context);this.resolver=new EhReaderResolver(this.context);}
     public String kind(){return "eh";}
+    public com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return client.access;}
     public String scope(){return ReaderPolicy.hash("eh-public-v5-mutable-chapters");}
 
     private static String episodeId(String comicId){String[] parts=comicId==null?new String[0]:comicId.split(":",3);return parts.length>=2?"eh-"+parts[1]:"eh-gallery";}

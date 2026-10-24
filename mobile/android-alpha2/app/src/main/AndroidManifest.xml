@@ -19,6 +19,8 @@
         </provider>
         <service android:name="androidx.work.impl.foreground.SystemForegroundService" android:foregroundServiceType="dataSync" tools:node="merge" />
         <activity android:name=".ReaderActivity" android:screenOrientation="unspecified" />
+        <activity android:name=".LocalComicImportActivity" android:exported="false" />
+        <activity android:name=".LocalComicExportActivity" android:exported="false" />
         <activity android:name=".UnifiedComicDetailActivity" android:exported="false" />
         <activity android:name=".AuthorDirectoryActivity" android:exported="false" />
         <activity android:name=".AuthorWorksActivity" android:exported="false" />
@@ -27,10 +29,12 @@
         <activity android:name=".AppearanceActivity" android:exported="false" />
         <activity android:name=".LanguageActivity" android:exported="false" />
         <activity android:name=".OnboardingSettingsActivity" android:exported="false" />
+        <activity android:name=".AdvancedGuideActivity" android:exported="false" />
         <activity android:name=".ThemePackActivity" android:exported="false" />
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".RecommendationStyleActivity" android:exported="false" />
         <activity android:name=".RecommendationControlActivity" android:exported="false" />
+        <activity android:name=".TagParticipationActivity" android:exported="false" />
         <activity android:name=".RecommendationProfileActivity" android:exported="false" />
         <activity android:name=".RecommendationSyncActivity" android:exported="false" />
         <activity android:name=".StorageHubActivity" android:exported="false" />
@@ -40,6 +44,7 @@
         <activity android:name=".UpdateActivity" android:exported="false" />
         <activity android:name=".PicaBrowseActivity" android:exported="false" />
         <activity android:name=".AccountSourcesActivity" android:exported="false" />
+        <activity android:name=".SourceChoicesActivity" android:exported="false" />
         <activity android:name=".JmSourceActivity" android:exported="false" />
         <activity android:name=".PicaAccountActivity" android:exported="false" />
         <activity android:name=".EhAccountActivity" android:exported="false" />

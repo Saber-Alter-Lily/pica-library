@@ -32,9 +32,17 @@ import { RANKER_ADAPTER_VERSION } from '../recommendation-v3/ranker-adapter-v3'
 import { RETRIEVER_VERSION } from '../recommendation-v3/retriever-v3'
 import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
 import { LocalHttpLatencyRegistry } from '../runtime/http-latency'
+import { LocalLibraryIngestion } from '../local-library/ingestion'
+import { SourceDisabledError } from '../sources/source-policy'
+import { SourceHostError, type SourceHostInspection } from '../source-hosts/contract'
+import type { HostedLibraryReader } from '../source-hosts/library-reader'
 
 export interface DesktopServerController {
     csrfToken: string
+    hostedReader?: HostedLibraryReader
+    inspectSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
+    sourceHostConnections?: (input: Record<string, unknown>) => unknown
+    inspectSavedSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
     registerAccount?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     configured: () => boolean
     status: () => Record<string, unknown>
@@ -50,6 +58,7 @@ export interface DesktopServerController {
         input: Record<string, unknown>
     ) => Promise<Record<string, unknown>>
     chooseFolder: () => Promise<string | null>
+    chooseLocalComic?: (kind: 'folder' | 'cbz') => Promise<string | null>
     exportBrowserLitePackage: () => Promise<Record<string, unknown>>
     exportRecommendationAudit?: (
         input?: Record<string, unknown>
@@ -84,13 +93,13 @@ function json(response: ServerResponse, status: number, value: unknown) {
     response.end(JSON.stringify(value))
 }
 
-async function body(request: IncomingMessage) {
+async function body(request: IncomingMessage, limit = 10 * 1024 * 1024) {
     const chunks: Buffer[] = []
     let size = 0
     for await (const chunk of request) {
         const buffer = Buffer.from(chunk)
         size += buffer.byteLength
-        if (size > 10 * 1024 * 1024)
+        if (size > limit)
             throw new Error('Request body is too large')
         chunks.push(buffer)
     }
@@ -236,6 +245,8 @@ export async function startLibraryServer(options: {
     cacheDir?: string
 }) {
     const root = webRoot()
+    const localIngestion = new LocalLibraryIngestion(options.database, options.service.dataDir)
+    let localPickerBusy = false
     const host = options.host ?? '127.0.0.1'
     const port = options.port ?? 4789
     const providerService = options.service.providerService()
@@ -259,12 +270,11 @@ export async function startLibraryServer(options: {
             rankerModelVersion: RANKER_ADAPTER_VERSION,
             candidatePoolVersion: RETRIEVER_VERSION,
             allocatorVersion: BATCH_ALLOCATOR_VERSION
-        }
+        },
+        (cycleId,state,error) => options.service.recommendationBuildCommitState(cycleId,state,error)
     )
-    void recommendationService.ensureInitialPrepared().catch(() => {
-        // Connected startup must remain available while provider preparation
-        // waits for credentials/network. The status endpoint exposes preparing.
-    })
+    // Recommendation preparation belongs to explicit commands. Opening a local
+    // library/server must not start the legacy provider recall pipeline.
     const previewCache = new PreviewCacheManager(
         path.join(options.cacheDir ?? options.service.dataDir, 'previews')
     )
@@ -368,6 +378,70 @@ export async function startLibraryServer(options: {
                     ...options.desktop.status()
                 })
             }
+            if (url.pathname === '/api/v1/desktop/host-reader' || url.pathname.startsWith('/api/v1/desktop/host-reader/')) {
+                const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`
+                let referrerOrigin = ''; try { referrerOrigin = new URL(String(request.headers.referer ?? '')).origin } catch { /* absent/invalid means no same-origin proof */ }
+                const sameOriginRead = request.headers['sec-fetch-site'] === 'same-origin' && referrerOrigin === expectedOrigin && ['empty', 'image'].includes(String(request.headers['sec-fetch-dest']))
+                const verifiedCommand = origin === expectedOrigin && request.headers['x-pica-csrf'] === options.desktop?.csrfToken
+                if (!options.desktop?.hostedReader || !options.desktop.configured() || options.desktop.status().startupReady === false || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) || (request.method === 'GET' ? !sameOriginRead && !verifiedCommand : !verifiedCommand)) return json(response, 403, { error: 'Local Desktop Reader authority required' })
+                if (url.search || !['GET', 'POST'].includes(request.method ?? '')) return json(response, 400, { error: 'INVALID_SOURCE_HOST' })
+                const abort = new AbortController(), disconnected = () => { if (!response.writableEnded) abort.abort() }
+                response.once('close', disconnected)
+                try {
+                    let input: Record<string, unknown> = {}
+                    if (request.method === 'POST') {
+                        if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) throw new SourceHostError('INVALID_SOURCE_HOST')
+                        const deadline = setTimeout(() => request.destroy(), 5000)
+                        try { input = await body(request, 16384) } catch { throw new SourceHostError('INVALID_SOURCE_HOST') } finally { clearTimeout(deadline) }
+                    }
+                    if (url.pathname === '/api/v1/desktop/host-reader' && request.method === 'POST') return json(response, 200, await options.desktop.hostedReader.command(input, abort.signal))
+                    const match = url.pathname.match(/^\/api\/v1\/desktop\/host-reader\/([0-9a-f-]{36})\/(?:progress|comics\/([^/]+)\/chapters(?:\/([^/]+)(?:\/pages\/(\d+))?)?)$/)
+                    if (!match) throw new SourceHostError('INVALID_SOURCE_HOST')
+                    const [, sessionId, rawComic, rawEpisode, page] = match
+                    const comicId = rawComic ? decodeURIComponent(rawComic) : undefined, episodeId = rawEpisode ? decodeURIComponent(rawEpisode) : undefined
+                    if (!rawComic) {
+                        if (request.method === 'POST' && Object.keys(input).some(key => !['comicId', 'episodeId', 'pageIndex'].includes(key))) throw new SourceHostError('INVALID_SOURCE_HOST')
+                        return json(response, 200, await options.desktop.hostedReader.read(sessionId, request.method === 'GET' ? 'progress' : 'save-progress', input, abort.signal))
+                    }
+                    if (request.method !== 'GET') throw new SourceHostError('INVALID_SOURCE_HOST')
+                    if (page !== undefined) {
+                        const image = await options.desktop.hostedReader.picture(sessionId, comicId!, episodeId!, Number(page), abort.signal)
+                        if (!response.destroyed) { response.writeHead(200, { 'content-type': image.contentType, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'cross-origin-resource-policy': 'same-origin', 'referrer-policy': 'no-referrer' }); response.end(image.data) }
+                        return
+                    }
+                    return json(response, 200, await options.desktop.hostedReader.read(sessionId, episodeId ? 'chapter' : 'chapters', { comicId, episodeId }, abort.signal))
+                } catch (error) {
+                    const code = error instanceof SourceHostError ? error.code : 'SOURCE_HOST_UNAVAILABLE'
+                    if (!response.destroyed) json(response, code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : ['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED', 'SOURCE_HOST_BUSY'].includes(code) ? 409 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : ['INVALID_SOURCE_HOST', 'SOURCE_HOST_READER_CONSENT_REQUIRED'].includes(code) ? 400 : 502, { error: code, code })
+                } finally { response.removeListener('close', disconnected) }
+                return
+            }
+            if (['/api/v1/desktop/source-hosts/inspect', '/api/v1/desktop/source-hosts/connections', '/api/v1/desktop/source-hosts/inspect-saved'].includes(url.pathname)) {
+                const peer = request.socket.remoteAddress ?? ''
+                if (request.method !== 'POST') return json(response, 405, { error: 'Source-host inspection requires an explicit local POST' })
+                const sourceHostAction = url.pathname.endsWith('/connections') ? options.desktop?.sourceHostConnections : url.pathname.endsWith('/inspect-saved') ? options.desktop?.inspectSavedSourceHost : options.desktop?.inspectSourceHost
+                if (!sourceHostAction || !options.desktop?.configured() || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) || !origin || request.headers['x-pica-csrf'] !== options.desktop.csrfToken)
+                    return json(response, 403, { error: 'Source-host inspection requires the configured local Desktop UI' })
+                if (url.search || !/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? ''))
+                    return json(response, 400, { error: 'INVALID_SOURCE_HOST', code: 'INVALID_SOURCE_HOST' })
+                const abort = new AbortController()
+                const disconnected = () => { if (!response.writableEnded) abort.abort() }
+                response.once('close', disconnected)
+                try {
+                    let input: Record<string, unknown>
+                    const bodyDeadline = setTimeout(() => request.destroy(), 5000)
+                    try { input = await body(request, 16384) }
+                    catch { if (!response.destroyed) json(response, 400, { error: 'INVALID_SOURCE_HOST', code: 'INVALID_SOURCE_HOST' }); return }
+                    finally { clearTimeout(bodyDeadline) }
+                    const result = await sourceHostAction(input, abort.signal)
+                    if (!response.destroyed) json(response, 200, result)
+                } catch (error) {
+                    const code = error instanceof SourceHostError ? error.code : 'SOURCE_HOST_UNAVAILABLE'
+                    const status = ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED', 'SOURCE_HOST_INSECURE'].includes(code) ? 400 : ['SOURCE_HOST_BUSY', 'SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DUPLICATE', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED'].includes(code) ? 409 : code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : code === 'SOURCE_HOST_UNSUPPORTED' ? 422 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : code === 'SOURCE_HOST_STORAGE' ? 503 : 502
+                    if (!response.destroyed) json(response, status, { error: code, code })
+                } finally { response.removeListener('close', disconnected) }
+                return
+            }
             if (
                 url.pathname === '/api/v1/capabilities' &&
                 request.method === 'GET'
@@ -385,7 +459,9 @@ export async function startLibraryServer(options: {
                         process.arch,
                         desktopStatus
                     ),
-                    providers: providerService.providerStatus()
+                    providers: providerService.providerStatus(),
+                    sourceModules: providerService.sourceModuleStatus(),
+                    externalSources: options.service.sources.snapshot()
                 })
             }
             if (
@@ -407,6 +483,57 @@ export async function startLibraryServer(options: {
                     if (action === 'enrich') return json(response, 200, await options.service.jmEnrichFavorites(async () => { if (response.destroyed) throw new Error('资料补全已取消') }))
                 }
                 return json(response, 404, { error: 'Source action not found' })
+            }
+
+            if (url.pathname.startsWith('/api/v1/desktop/recommendation-v5/tag-profile/')) {
+                if (!options.desktop) return json(response, 403, { error: 'Tag-profile exchange requires the local Desktop host' })
+                const action = url.pathname.slice('/api/v1/desktop/recommendation-v5/tag-profile/'.length)
+                if (action === 'status' && request.method === 'GET') return json(response, 200, options.service.tagProfileExchangeV1().status())
+                if (request.method !== 'POST') return json(response, 405, { error: 'POST required' })
+                try {
+                    const input = await body(request, action === 'preview' ? 1100 * 1024 : 4096)
+                    const allowed = action === 'export' ? ['includeFavoriteCounts', 'includeManualBindings'] : action === 'preview' ? ['text'] : action === 'apply' ? ['previewId', 'apply'] : action === 'undo' ? ['apply'] : null
+                    if (!allowed) return json(response, 404, { error: 'Tag-profile action not found' })
+                    if (Object.keys(input).some(key => !allowed.includes(key)) || (input.apply !== undefined && typeof input.apply !== 'boolean')) return json(response, 400, { error: 'TAG_EXCHANGE_UNKNOWN_OR_INVALID_FIELD' })
+                    const exchange = options.service.tagProfileExchangeV1()
+                    if (action === 'export') {
+                        const result = exchange.exportPackage(input)
+                        response.writeHead(200, { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="${result.filename}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
+                        return response.end(result.buffer)
+                    }
+                    if (action === 'preview') return json(response, 200, exchange.preview(input.text))
+                    const result = action === 'apply' ? exchange.apply(input.previewId) : exchange.undo()
+                    let recommendationRefresh: Record<string, unknown> | null = null
+                    if (input.apply === true && !('alreadyApplied' in result && result.alreadyApplied)) {
+                        try { recommendationRefresh = { requested: true, started: true, status: finalRecommendationCoordinator.forceNew(`tag-profile:${result.revision}`) } }
+                        catch (error) { recommendationRefresh = { requested: true, started: false, error: error instanceof Error ? error.message : String(error) } }
+                    }
+                    return json(response, 200, { ...result, recommendationRefresh })
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error)
+                    return json(response, message.startsWith('TAG_EXCHANGE_CONFLICT_') || message.startsWith('TAG_POLICY_REVISION_CONFLICT') ? 409 : 400, { error: message })
+                }
+            }
+
+            if (url.pathname === '/api/v1/recommendation-v5/tag-policy') {
+                if (request.method === 'GET') return json(response, 200, options.service.recommendationTagPolicyV1())
+                if (request.method === 'POST') {
+                    const input = await body(request, 160 * 1024)
+                    try {
+                        const result = options.service.updateRecommendationTagPolicyV1(input)
+                        let recommendationRefresh: Record<string, unknown> | null = null
+                        if (input.apply === true) {
+                            try { recommendationRefresh = { requested: true, started: true, status: finalRecommendationCoordinator.forceNew(`tag-policy:${result.revision}`) } }
+                            catch (error) { recommendationRefresh = { requested: true, started: false, error: error instanceof Error ? error.message : String(error) } }
+                        }
+                        // Saving and starting a build are separate outcomes. A busy builder
+                        // must not turn an already committed save into a false HTTP failure.
+                        return json(response, 200, { ...result, recommendationRefresh })
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error)
+                        return json(response, message.startsWith('TAG_POLICY_REVISION_CONFLICT') ? 409 : 400, { error: message })
+                    }
+                }
             }
 
             if (
@@ -1645,6 +1772,28 @@ export async function startLibraryServer(options: {
                     await options.desktop.detectProxy(await body(request))
                 )
             }
+            if (url.pathname.startsWith('/api/v1/desktop/local-import/') && request.method === 'POST') {
+                const status = options.desktop?.status()
+                if (!options.desktop?.chooseLocalComic || status?.runtime &&
+                    (status.runtime as Record<string, unknown>).mode === 'headless')
+                    return json(response, 409, { error: 'Local import requires the interactive Desktop file picker' })
+                const input = await body(request, 4096)
+                if (Object.keys(input).some(k => !['kind', 'token'].includes(k)))
+                    return json(response, 400, { error: 'Local paths cannot be submitted through HTTP' })
+                if (url.pathname.endsWith('/preview')) {
+                    if (input.kind !== 'folder' && input.kind !== 'cbz') return json(response, 400, { error: 'Unsupported local import kind' })
+                    if (!options.desktop.configured()) return json(response, 409, { error: 'Set up the local library directory first' })
+                    if (localPickerBusy) return json(response, 409, { error: 'Another local import picker is open' })
+                    localPickerBusy = true
+                    try {
+                        const selected = await options.desktop.chooseLocalComic(input.kind)
+                        return json(response, 200, selected ? await localIngestion.preview(selected, input.kind) : { cancelled: true })
+                    } finally { localPickerBusy = false }
+                }
+                if (url.pathname.endsWith('/confirm')) return json(response, 200, await localIngestion.confirm(String(input.token ?? '')))
+                if (url.pathname.endsWith('/cancel')) { localIngestion.cancel(String(input.token ?? '')); return json(response, 200, { cancelled: true }) }
+                return json(response, 404, { error: 'Unknown local import operation' })
+            }
             if (
                 url.pathname === '/api/v1/desktop/choose-folder' &&
                 request.method === 'POST' &&
@@ -2150,7 +2299,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': image.contentType,
                     'content-length': String(image.data.byteLength),
-                    'cache-control': 'private, max-age=3600',
+                    'cache-control': decodeURIComponent(readerPicture[1]).startsWith('local:') ? 'private, no-store' : 'private, max-age=3600',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(image.data)
@@ -2285,7 +2434,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)
@@ -2301,7 +2450,7 @@ export async function startLibraryServer(options: {
                 response.writeHead(200, {
                     'content-type': cover.contentType,
                     'content-length': String(cover.data.byteLength),
-                    'cache-control': 'private, max-age=86400',
+                    'cache-control': 'private, no-store',
                     'x-content-type-options': 'nosniff'
                 })
                 response.end(cover.data)
@@ -2820,8 +2969,9 @@ export async function startLibraryServer(options: {
                 serveAsset(response, root, '/index.html')
             else serveAsset(response, root, url.pathname)
         } catch (error) {
-            json(response, 500, {
-                error: error instanceof Error ? error.message : String(error)
+            json(response, error instanceof SourceDisabledError ? 409 : 500, {
+                error: error instanceof Error ? error.message : String(error),
+                ...(error instanceof SourceDisabledError ? {code:error.code,sourceId:error.sourceId} : {})
             })
         }
     })

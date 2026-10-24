@@ -2,6 +2,7 @@ package com.picalibrary.android;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import com.picalibrary.android.reader.gestures.ReaderGesturePolicy;
 
 /** Phone-local gestures, deliberately separate from portable reader settings. */
 final class ReaderGestureSettings {
@@ -22,7 +23,7 @@ final class ReaderGestureSettings {
     private ReaderGestureSettings() {}
 
     static int normalizeZoomPercent(int value) {
-        return value == 150 || value == 200 || value == 300 ? value : 200;
+        return ReaderGesturePolicy.normalizeZoomPercent(value);
     }
 
     static Snapshot local(Context context) {

@@ -7,12 +7,13 @@ final class ReaderSourceFactory {
     static String kind(String value) {
         if (value == null || value.isEmpty()) return "desktop";
         switch (value) {
-            case "desktop": case "phone": case "remote": case "pica": case "eh": case "jm": return value;
+            case "desktop": case "phone": case "remote": case "pica": case "eh": case "jm": case "local": return value;
             default: throw new IllegalArgumentException("不支持的阅读来源 / Unsupported reader source");
         }
     }
     static ReaderSource create(Context context, String value) {
         switch (kind(value)) {
+            case "local": return new LocalComicReaderSource(context);
             case "phone": return new PhoneDownloadReaderSource(context);
             case "remote": return new RemoteReaderSource(context);
             case "pica": return new PicaReaderSource(context);

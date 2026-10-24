@@ -9,6 +9,7 @@ import {
 import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
+import { installLocalImport } from './local-import.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
 import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
@@ -732,6 +733,7 @@ async function loadDesktop() {
     try {
         desktop = await api('/api/v1/desktop/status')
         state.capabilities = await api('/api/v1/capabilities')
+        document.dispatchEvent(new Event('pica-local-import-refresh'))
         $('#settings-nav').hidden = false
         $('#settings-version').textContent = `Pica Library ${desktop.version}`
         $('#update-current-version').textContent = `v${desktop.version}`
@@ -1220,6 +1222,17 @@ $('#setup-open-eh').onclick = () => {
 const downloadedCloud = createDownloadedCloud({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
 $('#setup-test').onclick = () => testDesktop('setup')
 $('#settings-test').onclick = () => testDesktop('settings')
+$('#setup-local').onclick = async () => {
+    const message = $('#setup-message')
+    await withBusyButton($('#setup-local'), async () => {
+        try {
+            await desktopPost('/api/v1/desktop/settings', { setupMode: 'local', libraryDirectory: $('#setup-directory').value, profile: $('#setup-profile').value })
+            message.textContent = t('setup.localSaved')
+            await waitForDesktopHealth()
+            location.assign('/')
+        } catch (error) { message.textContent = localizeError(language, error) }
+    })
+}
 $('#setup-form').onsubmit = async (event) => {
     event.preventDefault()
     const button =
@@ -1573,7 +1586,7 @@ function mountOnlineReadButtons(container) {
         const button = document.createElement('button')
         button.type = 'button'
         button.dataset.onlineComic = selector.dataset.comicId
-        button.textContent = t('reader.online')
+        button.textContent = selector.dataset.comicId.startsWith('local:') ? t('downloaded.read') : t('reader.online')
         target.append(button)
     }
 }
@@ -1612,6 +1625,7 @@ document.addEventListener('pica-open-comic-detail', (event) => {
 })
 
 function librarySourceBindings(comic) {
+    if (providerIdForComic(comic) === 'local') return []
     const values = []
     if (providerIdForComic(comic) === 'jm') values.push('JM')
     if ((comic?.providerId || '').toLowerCase() === 'pica' || (!comic?.providerId && !String(comic?.comicId || '').startsWith('eh:'))) values.push('Pica')
@@ -1772,6 +1786,7 @@ function renderAuthors() {
 }
 
 function providerIdForComic(comic) {
+    if (String(comic?.comicId || '').startsWith('local:')) return 'local'
     return comic?.providerId ||
         (String(comic?.comicId || '').startsWith('eh:') ? 'eh' : String(comic?.comicId || '').startsWith('jm:') ? 'jm' : 'pica')
 }
@@ -2699,10 +2714,14 @@ function openRecommendationDetail(comicId, context = 'recommendation', comicOver
         : ''
     $('#recommend-detail-content').innerHTML =
         `<h2>${escapeHtml(comic.title)}</h2><p><strong>${escapeHtml(comic.canonicalAuthor || comic.author || t('common.unknownAuthor'))}</strong></p><p>${escapeHtml(comic.description || '')}</p><div>${(comic.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div><p>${comic.finished ? t('comic.finished') : t('comic.ongoing')} · ${t('comic.likes', { count: Number(comic.totalLikes || 0).toLocaleString() })}</p><div class="detail-actions"><button data-detail-preview="true" class="primary">${t('preview.action')}</button><button data-detail-shelf="true">${t('library.addShelf')}</button>${favoriteButton}<button data-detail-download="true">${t('action.download')}</button></div><details id="work-variants-panel" class="work-variants-panel"><summary>${escapeHtml(t('workVariants.loading'))}</summary><div data-work-variants-list></div></details>`
+    if (comicId.startsWith('local:')) {
+        $('#recommend-detail-content [data-detail-download]')?.remove()
+        $('#recommend-detail-content [data-detail-preview]')?.remove()
+    }
     if (state.mode === 'connected') {
         const button = document.createElement('button')
         button.dataset.detailOnline = 'true'
-        button.textContent = t('reader.online')
+        button.textContent = comicId.startsWith('local:') ? t('downloaded.read') : t('reader.online')
         $('#recommend-detail-content .detail-actions').prepend(button)
     }
     if (state.mode === 'connected') {
@@ -2866,6 +2885,7 @@ let readerPageObserver = null
 let readerChapterRequest = 0
 let readerComicRequest = 0
 function readerApiRoot() {
+    if (state.reader.hostedSessionId) return '/api/v1/desktop/host-reader/' + state.reader.hostedSessionId
     return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
 }
 
@@ -3045,12 +3065,13 @@ async function flushReaderProgress(keepalive = false) {
         if (keepalive) {
             const response = await fetch(`${root}/progress`, {
                 method: 'POST',
-                headers: { 'content-type': 'application/json' },
+                headers: { 'content-type': 'application/json', ...(reader.hostedSessionId ? { 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' } : {}) },
                 body: JSON.stringify(payload),
                 keepalive: true
             })
             if (!response.ok) throw new Error('Progress not saved')
         }
+        else if (reader.hostedSessionId) await api(`${root}/progress`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' }, body: JSON.stringify(payload) })
         else await post(`${root}/progress`, payload)
         if (state.reader === reader && reader.episodeId === payload.episodeId && reader.pageIndex === payload.pageIndex) {
             reader.progressSaved = payload.pageIndex
@@ -3068,6 +3089,7 @@ async function openReaderChapter(episodeId) {
     resetReaderViewportTracking()
     if (state.reader.episodeId && state.reader.episodeId !== episodeId)
         await flushReaderProgress()
+    if (requestId !== readerChapterRequest) return
     $('#reader-message').textContent = t('reader.loadingChapter')
     try {
     const chapter = await api(
@@ -3087,7 +3109,7 @@ async function openReaderChapter(episodeId) {
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
         requestAnimationFrame(() => scrollReaderViewportToTop())
-    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.online ? t('reader.onlineNotice') : ''
+    $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.hostedSessionId ? t('reader.hostedNotice') : state.reader.online ? t('reader.onlineNotice') : ''
     } catch (error) {
         if (requestId === readerChapterRequest)
             $('#reader-message').textContent = localizeError(language, error)
@@ -3107,7 +3129,13 @@ function renderReaderChapterHeading() {
             : '')
 }
 
-async function openReaderComic(comicId, online = false) {
+async function openReaderComic(comicId, online = false, hosted = null) {
+    if (hosted && (!/^[0-9a-f-]{36}$/.test(hosted.sessionId || '') || !/^hosted:[0-9a-f-]{36}:[0-9a-f]{64}$/.test(comicId))) return
+    if (!hosted && String(comicId).startsWith('hosted:')) return
+    const hostedSessionId = hosted?.sessionId || null
+    const hostedCsrfToken = hosted?.csrfToken || null
+    if (hostedSessionId) online = true
+    online = online && !String(comicId).startsWith('local:')
     const requestId = ++readerComicRequest
     readerChapterRequest++
     try {
@@ -3115,7 +3143,7 @@ async function openReaderComic(comicId, online = false) {
         if (requestId !== readerComicRequest) return
         resetReaderViewportTracking()
         const originView = activeView === 'reader' ? state.reader.originView : activeView
-        state.reader = { comicId, online, episodeId: null, dirty: false, originView }
+        state.reader = { comicId, online, hostedSessionId, hostedCsrfToken, episodeId: null, dirty: false, originView }
         const root = readerApiRoot()
         activateView('reader')
         document.body.classList.add('reader-active')
@@ -3142,6 +3170,8 @@ async function openReaderComic(comicId, online = false) {
         state.reader = {
             comicId,
             online,
+            hostedSessionId,
+            hostedCsrfToken,
             episodeId: null,
             pageIndex: 0,
             chapters,
@@ -3150,7 +3180,7 @@ async function openReaderComic(comicId, online = false) {
             dirty: false
         }
         const comic = state.records.find((item) => item.comicId === comicId)
-        $('#reader-title').textContent = comic?.title || t('reader.title')
+        $('#reader-title').textContent = hosted?.title || comic?.title || t('reader.title')
         $('#reader-chapters').innerHTML = chapters
             .map(
                 (chapter) =>
@@ -3170,6 +3200,10 @@ document.addEventListener('pica-open-reader', (event) => {
     const comicId = String(detail?.comicId || '').trim()
     if (!comicId) return
     void openReaderComic(comicId, detail?.online !== false)
+})
+document.addEventListener('pica-open-hosted-reader', event => {
+    const detail = event instanceof CustomEvent ? event.detail : null
+    if (detail) void openReaderComic(String(detail.comicId || ''), true, { sessionId: String(detail.sessionId || ''), title: String(detail.title || ''), csrfToken: String(detail.csrfToken || '') })
 })
 
 function moveReader(delta) {
@@ -3459,11 +3493,17 @@ $('#cover-toggle').onchange = (event) => {
     localStorage.setItem('pica-covers-enabled', String(state.coversEnabled))
     renderAll()
 }
+function setRecommendationPending(pending) {
+    state.recommendationPending = pending
+    for (const id of ['#recommend-button', '#recommend-next-batch', '#recommend-restart']) {
+        const button = $(id)
+        if (button) button.disabled = pending
+    }
+}
 $('#recommend-next-batch').onclick = async () => {
     if (state.mode === 'connected' && state.recommendationManagedV3) {
         if (state.recommendationPending) return
-        state.recommendationPending = true
-        $('#recommend-next-batch').disabled = true
+        setRecommendationPending(true)
         try {
             const value = await post('/api/v1/recommendations', {
                 action: 'next',
@@ -3477,8 +3517,7 @@ $('#recommend-next-batch').onclick = async () => {
         } catch (error) {
             $('#recommend-message').textContent = localizeError(language, error)
         } finally {
-            state.recommendationPending = false
-            $('#recommend-next-batch').disabled = false
+            setRecommendationPending(false)
         }
         return
     }
@@ -3974,10 +4013,10 @@ $('#search-button').onclick = async () => {
     }
 }
 $('#recommend-button').onclick = async () => {
+    if (state.recommendationPending) return
     try {
         if (state.mode === 'connected') {
-            state.recommendationPending = true
-            $('#recommend-button').disabled = true
+            setRecommendationPending(true)
             const started = await post('/api/v1/recommendation-sessions', {
                 engine: 'v3',
                 action: 'resume_or_create',
@@ -4005,16 +4044,14 @@ $('#recommend-button').onclick = async () => {
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
     } finally {
-        state.recommendationPending = false
-        $('#recommend-button').disabled = false
+        setRecommendationPending(false)
     }
 }
 $('#recommend-restart').onclick = async () => {
     if (!(await askConfirm(t('recommend.restartConfirm')))) return
     try {
         if (state.recommendationPending) return
-        state.recommendationPending = true
-        $('#recommend-restart').disabled = true
+        setRecommendationPending(true)
         const previousCycleId = state.recommendationCycleId
         await post('/api/v1/recommendation-sessions', {
             action: 'force_new',
@@ -4034,8 +4071,7 @@ $('#recommend-restart').onclick = async () => {
     } catch (error) {
         $('#recommend-message').textContent = localizeError(language, error)
     } finally {
-        state.recommendationPending = false
-        $('#recommend-restart').disabled = false
+        setRecommendationPending(false)
     }
 }
 ;['#search-results', '#recommend-results'].forEach((selector) => {
@@ -5252,7 +5288,8 @@ async function detect() {
         let recommendation = await api(
             '/api/v1/recommendation-sessions/status?mode=final'
         )
-        if (!recommendation.activeCycleId && !recommendation.buildingCycleId) {
+        const autoOnlineRecommendation = !desktop || desktop.picaAccount?.configured !== false || desktop.ehAccount?.configured === true
+        if (!recommendation.activeCycleId && !recommendation.buildingCycleId && autoOnlineRecommendation) {
             recommendation = await post('/api/v1/recommendation-sessions', {
                 engine: 'v3',
                 action: 'resume_or_create',
@@ -5298,6 +5335,15 @@ async function detect() {
     }
 }
 
+installLocalImport({
+    available: () => state.mode === 'connected' && state.capabilities?.features?.localFileImport === true,
+    language: () => language,
+    request: (operation, input) => desktopPost('/api/v1/desktop/local-import' + operation, input),
+    refresh: async () => { state.records = await api('/api/v1/comics?limit=5000'); await loadLibraryQuery() },
+    read: comicId => openReaderComic(comicId)
+})
+
 void detect().then(() => {
+    document.dispatchEvent(new Event('pica-local-import-refresh'))
     setTimeout(() => void maybePromptForUpdate(), 1400)
 })

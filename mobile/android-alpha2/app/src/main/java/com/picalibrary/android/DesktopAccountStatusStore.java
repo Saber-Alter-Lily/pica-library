@@ -36,8 +36,8 @@ final class DesktopAccountStatusStore {
         JSONObject pica=value==null?null:value.optJSONObject("pica");
         JSONObject eh=value==null?null:value.optJSONObject("eh");
         prefs(c).edit()
-            .putBoolean("picaConfigured",pica!=null&&pica.optBoolean("configured",false))
-            .putBoolean("ehConfigured",eh!=null&&eh.optBoolean("configured",false))
+            .putBoolean("picaConfigured",pica!=null&&pica.optBoolean("enabled",true)&&pica.optBoolean("configured",false))
+            .putBoolean("ehConfigured",eh!=null&&eh.optBoolean("enabled",true)&&eh.optBoolean("configured",false))
             .putLong("updatedAt",System.currentTimeMillis())
             .apply();
     }

@@ -56,7 +56,7 @@ export interface RouteTelemetryV3 {
 }
 
 export interface RetrieverProviderV3 {
-    keyword(query: string, page: number): Promise<StoredComic[]>
+    keyword(query: string, page: number, route?: RetrievalRouteV3): Promise<StoredComic[]>
     author(query: string, page: number): Promise<StoredComic[]>
     related(comicId: string): Promise<StoredComic[]>
 }
@@ -146,7 +146,7 @@ export async function retrieveCandidatesV3(input: {
             return input.provider.related(route.comicSeedId ?? '')
         if (route.routeType === 'AUTHOR')
             return input.provider.author(route.queryTerm ?? '', page)
-        return input.provider.keyword(route.queryTerm ?? '', page)
+        return input.provider.keyword(route.queryTerm ?? '', page, route)
     }
     const run = async (route: RetrievalRouteV3, page: number) => {
         const stat =

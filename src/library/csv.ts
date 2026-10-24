@@ -1,4 +1,5 @@
 import type { FavoriteRecord } from './types'
+import { catalogSourceId } from './content-identity'
 
 function csvCell(value: unknown) {
     const text = String(value ?? '')
@@ -93,6 +94,10 @@ export function favoritesFromCsv(text: string): FavoriteRecord[] {
                 position:
                     asOptionalNumber(get(row, 'position')) ?? rowIndex + 1,
                 comicId,
+                providerId: catalogSourceId(comicId, asOptionalString(get(row, 'provider_id')) as FavoriteRecord['providerId']),
+                providerRemoteId: asOptionalString(get(row, 'provider_remote_id')),
+                coverUrl: asOptionalString(get(row, 'cover_url')),
+                completionStatus: (asOptionalString(get(row, 'completion_status')) as FavoriteRecord['completionStatus']),
                 title,
                 author: String(get(row, 'author', 'author_raw') ?? '').trim(),
                 description: asOptionalString(get(row, 'description')),
@@ -132,7 +137,11 @@ export function favoritesToCsv(records: FavoriteRecord[]): string {
         'total_likes',
         'total_views',
         'pages_count',
-        'eps_count'
+        'eps_count',
+        'provider_id',
+        'provider_remote_id',
+        'cover_url',
+        'completion_status'
     ]
     const rows = records.map((record) => [
         record.comicId,
@@ -146,7 +155,11 @@ export function favoritesToCsv(records: FavoriteRecord[]): string {
         record.totalLikes,
         record.totalViews,
         record.pagesCount,
-        record.epsCount
+        record.epsCount,
+        catalogSourceId(record.comicId, record.providerId),
+        record.providerRemoteId,
+        record.coverUrl,
+        record.completionStatus
     ])
     return [headers, ...rows]
         .map((row) => row.map(csvCell).join(','))

@@ -11,6 +11,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 interface ReaderSource {
+    default com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return null;}
     String kind();
     String scope();
     List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception;
@@ -18,6 +19,8 @@ interface ReaderSource {
     String recentChapter(String comicId) throws Exception;
     HttpURLConnection image(String path) throws Exception;
     void saveProgress(String comicId,String episodeId,int pageIndex);
+    default void rememberPosition(String comicId,String episodeId,int pageIndex) { }
+    default int restorePosition(String comicId,String episodeId,int fallback) { return fallback; }
 }
 
 final class DesktopReaderSource implements ReaderSource {
@@ -73,6 +76,7 @@ final class PicaReaderSource implements ReaderSource {
     private String comicTitle="",author="";
     PicaReaderSource(Context context){this.context=context.getApplicationContext();this.client=new PicaClient(this.context);}
     public String kind(){return "pica";}
+    public com.picalibrary.android.sources.SourceAccessPolicy.Permit sourceAccess(){return client.access;}
     public String scope(){PicaAccountStore.Session session=PicaAccountStore.load(context);String identity=!session.account.isEmpty()?session.account:BridgeStore.paired(context)&&DesktopAccountStatusStore.load(context).picaConfigured?"desktop-relay:"+BridgeStore.host(context):"anonymous";return ReaderPolicy.hash("pica\n"+identity);}
     public List<BridgeClient.ChapterItem> chapters(String comicId) throws Exception {
         PicaClient.Comic comic=client.comic(comicId);comicTitle=comic.title;author=comic.author;List<PicaClient.Episode> remote=client.episodes(comicId);List<BridgeClient.ChapterItem> out=new ArrayList<>();episodes.clear();knownChapters.clear();

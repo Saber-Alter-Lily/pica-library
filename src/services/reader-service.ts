@@ -4,6 +4,7 @@ import AdmZip from 'adm-zip'
 import type { LibraryDatabase } from '../library/database'
 import { safePathSegment } from '../library/path-template'
 import { ExternalReaderAdapter } from './external-reader-adapter'
+import { localInventoryKey, type LocalInventoryV1 } from '../local-library/types'
 
 const contentTypes: Record<string, string> = {
     '.jpg': 'image/jpeg',
@@ -44,6 +45,8 @@ export class ReaderService {
                 }
             })
         if (!pictures.length) throw new Error('该章节尚未下载。')
+        const local = comicId.startsWith('local:') ? this.database.getAppState<LocalInventoryV1>(localInventoryKey(comicId)) : undefined
+        const revision = local && /^[a-f0-9]{64}$/.test(local.revision) ? `?v=${local.revision}` : ''
         const progress = this.database
             .readingProgress(comicId)
             .find((item) => item.episodeId === episodeId)
@@ -52,7 +55,7 @@ export class ReaderService {
             pages: pictures.map((picture) => ({
                 id: picture.id,
                 position: picture.position,
-                url: `/api/v1/reader/pictures/${encodeURIComponent(picture.id)}`
+                url: `/api/v1/reader/pictures/${encodeURIComponent(picture.id)}${revision}`
             })),
             progress: progress
                 ? {
@@ -70,8 +73,10 @@ export class ReaderService {
         const resolved = path.resolve(file)
         if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile())
             throw new Error('Downloaded page is unavailable')
-        const realRoot = fs.realpathSync(this.root)
-        const realFile = fs.realpathSync(resolved)
+        // Match the native canonicalization used by async ingestion: Windows 8.3
+        // aliases (RUNNER~1 vs runneradmin) otherwise look like different roots.
+        const realRoot = fs.realpathSync.native(this.root)
+        const realFile = fs.realpathSync.native(resolved)
         const relative = path.relative(realRoot, realFile)
         if (relative.startsWith('..') || path.isAbsolute(relative))
             throw new Error('Reader file escaped the Library root')

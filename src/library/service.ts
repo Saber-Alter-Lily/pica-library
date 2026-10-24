@@ -1,4 +1,19 @@
+import { LegacyRecommendationRetrieval } from '../recommendation/legacy-retrieval'
+import { legacyRecallPorts } from '../services/legacy-recommendation-adapter'
 import fs from 'node:fs'
+import { WorkIdentityQueriesV5 } from '../identity/queries-v5'
+import { WorkIdentityCommandsV5 } from '../identity/commands-v5'
+import { WorkIdentityTaskV5 } from '../identity/task-v5'
+import { workIdentityReadPortV5, workIdentityWritePortV5, workIdentityTaskPortsV5 } from '../services/work-identity-adapter'
+import { executeRecommendationShadowV5 } from '../recommendation/shadow-execution-v5'
+import { RecommendationShadowTaskV5 } from '../recommendation/shadow-task-v5'
+import { recommendationShadowPortsV5 } from '../services/recommendation-shadow-adapter'
+import type { RecommendationShadowRuntimeV5 } from '../recommendation/shadow-ports-v5'
+import { buildRecommendationCycleV3 } from '../recommendation/build-pipeline'
+import { recommendationBuildPortsV3 } from '../services/recommendation-build-adapter'
+import { RecommendationAuditQueriesV5 } from '../recommendation/audit-queries-v5'
+import { recommendationAuditReadPortV5, recommendationAuditSnapshotV5 } from '../services/recommendation-audit-adapter'
+import { SourceRuntime, type SourceId } from '../sources/source-policy'
 import { JmProvider } from '../providers/jm-provider'
 import { ProviderFavoritesImport } from '../providers/favorites-import'
 import path from 'node:path'
@@ -20,20 +35,14 @@ import {
 } from '../providers/types'
 import type { Comic, Episode, Picture } from '../types'
 import { LibraryDatabase } from './database'
+import { TagProfileExchangeV1 } from '../recommendation-v5/tag-profile-exchange'
 import { normalizeAuthorKey } from './author'
 import { safeRasterContentType, trustedCoverUrl } from './cover-url'
 import type {
     FavoriteRecord,
-    RecommendationCandidate,
-    RecallRoute,
     SortMode,
     StoredComic
 } from './types'
-import {
-    mergeRecallCandidates,
-    recommendComics,
-    selectDiversifiedSeeds
-} from './recommendation'
 import { DownloadScheduler } from '../core/downloads/scheduler'
 import { MediaRequestGate } from '../core/downloads/media-gate'
 import {
@@ -61,16 +70,6 @@ import {
     ProviderService,
     type FavoritesSyncMode
 } from '../services/provider-service'
-import { buildV3Profile } from '../recommendation-v3/taste-model'
-import {
-    buildRecommendationIntents,
-    planSemanticQueries
-} from '../recommendation-v3/query-planner'
-import { normalizeTag } from '../recommendation-v3/semantic-core'
-import { buildBehaviorProfile } from '../recommendation-v3/behavior-profile'
-import { mineTagCombinations } from '../recommendation-v3/tag-combinations'
-import { rankV3 } from '../recommendation-v3/ranker'
-import { rerankV3 } from '../recommendation-v3/reranker'
 import type { UserEventInput } from '../recommendation-v3/types'
 import {
     buildHistoricalTasteSnapshot,
@@ -78,34 +77,10 @@ import {
 } from '../recommendation-v3/taste-chronicle'
 import { runtimeRegistryDirectory } from '../recommendation-v3/runtime-registry-path'
 import {
-    buildFinalLifetimeProfileV3,
-    FINAL_PROFILE_VERSION
-} from '../recommendation-v3/final-profile'
-import {
-    buildRecommendationIntentsV3,
-    INTENT_PLANNER_VERSION,
-    type IntentCycleHistory
-} from '../recommendation-v3/intent-planner-v3'
-import {
-    translateIntentPlanV3,
-    QUERY_TRANSLATOR_VERSION
-} from '../recommendation-v3/provider-query-translator'
-import {
-    retrieveCandidatesV3,
-    RETRIEVER_VERSION
-} from '../recommendation-v3/retriever-v3'
-import {
-    rankCandidatesWithFrozenRankerV3,
-    RANKER_ADAPTER_VERSION
-} from '../recommendation-v3/ranker-adapter-v3'
-import { BATCH_ALLOCATOR_VERSION } from '../recommendation-v3/batch-allocator-v3'
-import {
     buildVisualPreferenceProfile,
     cosineSimilarity,
-    metadataFeedbackAdjustment,
     selectPreferredVisualEmbeddings,
     visualAffinity,
-    rerankWithVisualStyle,
     VISUAL_MODEL_ID,
     VISUAL_MODEL_VERSION,
     VISUAL_PROFILE_VERSION,
@@ -126,29 +101,16 @@ import {
 } from '../recommendation-v5/policy-store'
 import { buildBehaviorEvidenceLedgerV5 } from '../recommendation-v5/behavior-evidence'
 import { buildCandidateChannelPlanV5 } from '../recommendation-v5/candidate-channels'
-import { applyCandidateHygieneV5 } from '../recommendation-v5/candidate-hygiene'
 import {
     compileCandidateProviderRoutesV5,
     deriveObservedEhCanonicalBindingsV5
 } from '../recommendation-v5/provider-query-compiler'
 import { buildPreferenceTimescalesV5 } from '../recommendation-v5/preference-timescales'
-import { executeShadowRetrievalV5 } from '../recommendation-v5/shadow-retrieval'
-import { rankShadowCandidatesV5 } from '../recommendation-v5/relevance-ranker'
-import {
-    diversifyShadowBatchV5,
-    type CandidateSemanticDiversityV5
-} from '../recommendation-v5/batch-diversity'
-import {
-    shadowPipelineModelVersionV5,
-    shadowPipelineVersionsV5
-} from '../recommendation-v5/shadow-pipeline'
 import { evaluateP3PromotionGateV5 } from '../recommendation-v5/promotion-gate'
 import { buildVisualRepresentationQcV5 } from '../recommendation-v5/visual-representation-qc'
 import { buildVisualAuthorAtlasV5 } from '../recommendation-v5/visual-author-atlas'
 import { buildVisualStyleFamiliesV5 } from '../recommendation-v5/visual-style-families'
-import { buildVisualCandidateCoverageV5 } from '../recommendation-v5/visual-candidate-coverage'
 import { evaluateVisualActivationGateV5 } from '../recommendation-v5/visual-activation-gate'
-import { auditShadowCorrectnessV5 } from '../recommendation-v5/correctness-audit'
 import { buildRetrospectiveBenchmarkV5 } from '../recommendation-v5/retrospective-benchmark'
 import { evaluateSteerabilityV5 } from '../recommendation-v5/steerability-audit'
 import { buildEvaluationFrameworkV5 } from '../recommendation-v5/evaluation-framework'
@@ -162,8 +124,6 @@ import {
     RECOMMENDATION_V5_POLICY_STATE_KEY,
     type PortablePolicyStateV5,
     normalizePreferenceKey,
-    preferenceAdjustmentV5,
-    workIdentityEvidenceV5,
     workIdentitySignalsV2
 } from '../recommendation-v5/portable-policy'
 import {
@@ -175,27 +135,16 @@ import {
     projectTasteChronicleView,
     type ChronicleViewOptions
 } from '../recommendation-v3/taste-chronicle-view'
-import { applyIntentPolicyV5 } from '../recommendation-v5/intent-policy'
+import { buildTagDirectoryV1, normalizeTagPolicyV1, privateTagForSignalV1, projectComicTagSignalsV1, tagPoliciesEqualV1, rawTagParticipatesV1, comicTagProviderV1, providerRawTagFactsV1 } from '../tags/policy'
 import {
-    WORK_IDENTITY_V3_RESOLVER_VERSION,
-    workIdentityCreatorBucketKeysV3,
-    workIdentityDetailEvidenceV3
-} from '../recommendation-v5/work-identity-v3'
-import {
-    buildWorkIdentityAuditAsyncV5,
-    buildWorkIdentityAuditV5,
-    buildWorkIdentityMaterializationPlanV5,
-    buildWorkIdentityMaterializationPreviewV5,
     WORK_IDENTITY_RESOLVER_VERSION
 } from '../recommendation-v5/work-identity-foundation'
 import { AnalysisTimingRegistry } from '../runtime/analysis-timing'
 import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 import { runtimeTaskDiagnosticSnapshot } from '../runtime/task-diagnostics'
 
-export const WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION =
-    'PREPARE_CANONICAL_WORK_BINDING'
-export const RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION =
-    'RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL'
+export { WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION } from '../identity/ports-v5'
+export { RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION } from '../recommendation/shadow-ports-v5'
 
 const DOWNLOAD_PROGRESS_PERSIST_INTERVAL_MS = 250
 
@@ -313,88 +262,11 @@ export interface LibraryOrganizeTaskProgress {
     error?: string
 }
 
-class RecommendationV5ShadowCancelledError extends Error {
-    constructor() {
-        super('Recommendation V5 shadow retrieval was cancelled')
-        this.name = 'RecommendationV5ShadowCancelledError'
-    }
-}
 
-class WorkIdentityEvidenceRefreshCancelledError extends Error {
-    constructor() {
-        super('Work Identity evidence refresh was cancelled')
-        this.name = 'WorkIdentityEvidenceRefreshCancelledError'
-    }
-}
 
-export interface WorkIdentityEvidenceRefreshTaskProgress {
-    state:
-        | 'idle'
-        | 'running'
-        | 'pausing'
-        | 'paused'
-        | 'cancelling'
-        | 'complete'
-        | 'failed'
-        | 'cancelled'
-    phase:
-        | 'idle'
-        | 'loading'
-        | 'bucketing'
-        | 'comparing'
-        | 'persisting'
-        | 'paused'
-        | 'complete'
-        | 'failed'
-        | 'cancelled'
-    done: number
-    total: number
-    candidateCount: number
-    pairChecks: number
-    savedCount: number
-    startedAt?: string
-    updatedAt?: string
-    error?: string
-}
+export type { WorkIdentityEvidenceRefreshTaskProgress } from '../identity/ports-v5'
 
-export interface RecommendationV5ShadowTaskProgress {
-    state:
-        | 'idle'
-        | 'running'
-        | 'pausing'
-        | 'paused'
-        | 'cancelling'
-        | 'complete'
-        | 'failed'
-        | 'cancelled'
-    phase:
-        | 'idle'
-        | 'planning'
-        | 'retrieving'
-        | 'hygiene'
-        | 'ranking'
-        | 'diversity'
-        | 'audit'
-        | 'persisting'
-        | 'paused'
-        | 'complete'
-        | 'failed'
-        | 'cancelled'
-    done: number
-    total: number
-    retrievalDone: number
-    retrievalTotal: number
-    rawCandidateCount: number
-    candidateCount: number
-    rankedCandidateCount: number
-    selectedCount: number
-    startedAt?: string
-    updatedAt?: string
-    error?: string
-    poolId?: string
-    cycleId?: string
-    modelVersion?: string
-}
+export type { RecommendationV5ShadowTaskProgress } from '../recommendation/shadow-ports-v5'
 
 export interface MaintenanceUpdateProgress {
     state:
@@ -471,9 +343,17 @@ function sortCode(pica: Pica, sort: SortMode | undefined) {
 }
 
 export class LibraryService {
+    private tagProfileExchangeInstance?: TagProfileExchangeV1
+
+    tagProfileExchangeV1(): TagProfileExchangeV1 {
+        return this.tagProfileExchangeInstance ??= new TagProfileExchangeV1(
+            this.database, () => this.recommendationTagPolicyV1(), () => this.preferenceViewState()
+        )
+    }
     private pica: Pica | null = null
     private readonly ehProvider: EhProvider
     private readonly jmProvider = new JmProvider()
+    private readonly coverRequests = new Map<string, Promise<{ data: Buffer; contentType: string; cached: boolean }>>()
     private readonly jmFavorites = new ProviderFavoritesImport()
     private jmMetadataGeneration = 0
     private jmMetadataBusy = false
@@ -520,6 +400,7 @@ export class LibraryService {
     private recommendationCancelRequested = false
     private readonly recommendationResumeWaiters = new Set<() => void>()
     private recommendationBuildCycleId: string | null = null
+    private latestRecommendationBuildCycleId: string | null = null
 
     private maintenanceUpdateProgress: MaintenanceUpdateProgress = {
         state: 'idle',
@@ -566,68 +447,25 @@ export class LibraryService {
         | Awaited<ReturnType<typeof organizeLibraryViews>>
         | null = null
 
-    private recommendationV5ShadowProgress: RecommendationV5ShadowTaskProgress = {
-        state: 'idle',
-        phase: 'idle',
-        done: 0,
-        total: 7,
-        retrievalDone: 0,
-        retrievalTotal: 0,
-        rawCandidateCount: 0,
-        candidateCount: 0,
-        rankedCandidateCount: 0,
-        selectedCount: 0
-    }
-    private recommendationV5ShadowPauseRequested = false
-    private recommendationV5ShadowCancelRequested = false
-    private recommendationV5ShadowResumePhase: RecommendationV5ShadowTaskProgress['phase'] =
-        'retrieving'
-    private readonly recommendationV5ShadowResumeWaiters = new Set<() => void>()
-    private recommendationV5ShadowRun: Promise<void> | null = null
-    private recommendationV5ShadowResult:
-        | {
-              rawCandidateCount: number
-              candidateCount: number
-              rankedCandidateCount: number
-              selectedCount: number
-              audit: {
-                  poolId: string
-                  cycleId: string
-                  modelVersion: string
-                  generatedAt: string
-                  candidateIdCount: number
-              }
-          }
-        | null = null
+    private readonly recommendationShadowTaskV5 =
+        new RecommendationShadowTaskV5({
+            acquire: () => this.runtimeResources.acquire({
+                ownerId: 'recommendation-v5-shadow',
+                taskType: 'recommendation-v5-shadow',
+                priority: 'background',
+                resources: {
+                    'provider-network': 1,
+                    'cpu-analysis': 1,
+                    'sqlite-write-heavy': 1
+                }
+            }),
+            run: (input, runtime) =>
+                this.runRecommendationV5ShadowRetrieval(input, runtime)
+        })
     private readonly visualAnalysisTimings = new AnalysisTimingRegistry()
     private readonly runtimeResources: RuntimeResourceCoordinator
 
-    private workIdentityEvidenceRefreshProgress: WorkIdentityEvidenceRefreshTaskProgress =
-        {
-            state: 'idle',
-            phase: 'idle',
-            done: 0,
-            total: 0,
-            candidateCount: 0,
-            pairChecks: 0,
-            savedCount: 0
-        }
-    private workIdentityEvidenceRefreshPauseRequested = false
-    private workIdentityEvidenceRefreshCancelRequested = false
-    private workIdentityEvidenceRefreshResumePhase: WorkIdentityEvidenceRefreshTaskProgress['phase'] =
-        'loading'
-    private readonly workIdentityEvidenceRefreshResumeWaiters = new Set<
-        () => void
-    >()
-    private workIdentityEvidenceRefreshRun: Promise<void> | null = null
-    private workIdentityEvidenceRefreshResult:
-        | {
-              scannedComicCount: number
-              candidateCount: number
-              crossProviderCandidateCount: number
-              savedCount: number
-          }
-        | null = null
+    private readonly workIdentityTaskV5: WorkIdentityTaskV5
 
     runtimeResourceProfile() {
         return this.runtimeResources.snapshot()
@@ -867,19 +705,20 @@ export class LibraryService {
         return {
             ...this.recommendationProgress,
             canPause:
-                this.recommendationProgress.state === 'running' ||
-                this.recommendationProgress.state === 'pausing',
+                this.recommendationProgress.phase !== 'persist' &&
+                (this.recommendationProgress.state === 'running' ||
+                    this.recommendationProgress.state === 'pausing'),
             canResume: this.recommendationProgress.state === 'paused',
-            canCancel: [
-                'running',
-                'pausing',
-                'paused',
-                'cancelling'
-            ].includes(this.recommendationProgress.state)
+            canCancel:
+                this.recommendationProgress.phase !== 'persist' &&
+                ['running', 'pausing', 'paused', 'cancelling'].includes(
+                    this.recommendationProgress.state
+                )
         }
     }
 
     recommendationBuildControl(action: 'pause' | 'resume' | 'cancel') {
+        if (this.recommendationProgress.phase === 'persist') return this.recommendationBuildProgress()
         if (action === 'pause') {
             if (this.recommendationProgress.state === 'running') {
                 this.recommendationPauseRequested = true
@@ -922,6 +761,7 @@ export class LibraryService {
 
     private beginRecommendationBuild(cycleId: string) {
         this.recommendationBuildCycleId = cycleId
+        this.latestRecommendationBuildCycleId = cycleId
         this.recommendationPauseRequested = false
         this.recommendationCancelRequested = false
         this.recommendationResumeWaiters.clear()
@@ -958,6 +798,41 @@ export class LibraryService {
         this.recommendationCancelRequested = false
         for (const resolve of this.recommendationResumeWaiters) resolve()
         this.recommendationResumeWaiters.clear()
+    }
+
+    /** A completed computation is not a persisted/promoted recommendation cycle. */
+    recommendationBuildCommitState(
+        cycleId: string,
+        state: 'persisting' | 'committed' | 'failed' | 'discarded',
+        error?: unknown
+    ) {
+        if (cycleId !== this.latestRecommendationBuildCycleId) return
+        if (state === 'persisting') {
+            this.recommendationProgress = {
+                state: 'running',
+                phase: 'persist',
+                done: 6,
+                total: 7
+            }
+        } else if (state === 'committed') {
+            this.recommendationProgress = {
+                state: 'complete',
+                phase: 'complete',
+                done: 7,
+                total: 7
+            }
+        } else if (state === 'discarded') {
+            this.recommendationProgress = {
+                ...this.recommendationProgress,
+                state: 'cancelled'
+            }
+        } else if (this.recommendationProgress.state !== 'cancelled') {
+            this.recommendationProgress = {
+                ...this.recommendationProgress,
+                state: 'failed',
+                error: error instanceof Error ? error.message : String(error)
+            }
+        }
     }
 
     private recoverInterruptedRecommendationBuild() {
@@ -1013,6 +888,8 @@ export class LibraryService {
             RECOMMENDATION_V5_POLICY_STATE_KEY
         )
         return {
+            revision: state?.revision ?? 0,
+            tagPolicy: normalizeTagPolicyV1(state?.tagPolicy),
             controls: Array.isArray(state?.controls) ? state.controls : [],
             tasteExcludedComicIds: Array.isArray(state?.tasteExcludedComicIds)
                 ? state.tasteExcludedComicIds
@@ -1032,6 +909,24 @@ export class LibraryService {
         )
     }
 
+    recommendationTagPolicyV1() {
+        const state = this.preferenceViewState(), catalog = this.database.listAllComics()
+        const index = this.preferencePresentation()
+        return {
+            revision: state.revision, tagPolicy: state.tagPolicy,
+            tagExchange: this.tagProfileExchangeV1().status(),
+            directorySource: 'LOCAL_OBSERVED_METADATA',
+            note: '收藏涉及数量不是喜好强度；未观测的平台标签不冒充全站目录。',
+            rows: buildTagDirectoryV1(catalog, state, (provider, raw) => provider === 'pica' ? index.resolve(raw)?.facet || 'OTHER' : provider === 'eh' && raw.includes(':') ? `EH_${raw.split(':')[0].toUpperCase()}` : 'OTHER'),
+            comics: catalog.map(c => ({ comicId: c.comicId, title: c.title, author: c.canonicalAuthor || c.author, providerId: c.providerId, isFavorite: c.isFavorite }))
+        }
+    }
+
+    updateRecommendationTagPolicyV1(input: { tagPolicy?: unknown; baseRevision?: unknown }) {
+        new RecommendationPolicyStoreV5(this.database).setTagPolicy({ tagPolicy: input.tagPolicy, baseRevision: input.baseRevision })
+        return this.recommendationTagPolicyV1()
+    }
+
     tasteChronicleView(options: ChronicleViewOptions = {}) {
         const snapshot = this.tasteChronicle()
         if (!snapshot) return { available: false, snapshot: null, view: null }
@@ -1047,55 +942,7 @@ export class LibraryService {
     }
 
     recommendationV5Snapshot() {
-        const snapshot = new RecommendationPolicyStoreV5(
-            this.database
-        ).snapshot()
-        try {
-            const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-            const inferred = snapshot.inferred.flatMap((signal) => {
-                if (signal.targetType !== 'TAG')
-                    return [
-                        {
-                            ...signal,
-                            facet:
-                                signal.targetType === 'AUTHOR'
-                                    ? 'CREATOR_ENTITY'
-                                    : signal.targetType === 'CATEGORY'
-                                      ? 'CATEGORY'
-                                      : signal.facet || 'OTHER'
-                        }
-                    ]
-                const resolved = resolveTagV3(
-                    signal.label || signal.key,
-                    registry
-                )
-                if (
-                    resolved.resolutionType === 'SAFETY' ||
-                    ['SAFETY_EXCLUDE', 'IGNORE', 'EXCLUDE'].includes(
-                        resolved.recommendationRole
-                    )
-                )
-                    return []
-                return [
-                    {
-                        ...signal,
-                        label:
-                            resolved.resolutionStatus === 'RESOLVED'
-                                ? resolved.canonicalLabel
-                                : signal.label,
-                        facet:
-                            resolved.resolutionStatus === 'RESOLVED'
-                                ? resolved.facet
-                                : 'OTHER'
-                    }
-                ]
-            })
-            return { ...snapshot, inferred }
-        } catch {
-            // V5 controls remain usable when a packaged registry asset is
-            // unavailable; the portable snapshot has a raw-tag fallback.
-            return snapshot
-        }
+        return recommendationAuditSnapshotV5(this.database)
     }
 
     recommendationServingCompositionV3() {
@@ -1239,6 +1086,7 @@ export class LibraryService {
         return {
             available: true,
             source: 'final-v3-serving',
+            tagPolicyStale: !tagPoliciesEqualV1((pool.telemetry.recommendationV5 as { portableBaseline?: { tagPolicy?: unknown } } | undefined)?.portableBaseline?.tagPolicy, policy.tagPolicy),
             cycleId,
             poolId: pool.id,
             poolState: String(pool.telemetry?.state ?? ''),
@@ -1268,591 +1116,54 @@ export class LibraryService {
     }
 
     recommendationV5ShadowStatus() {
-        const active = [
-            'running',
-            'pausing',
-            'paused',
-            'cancelling'
-        ].includes(this.recommendationV5ShadowProgress.state)
-        const terminal = [
-            'complete',
-            'failed',
-            'cancelled'
-        ].includes(this.recommendationV5ShadowProgress.state)
-        return {
-            ...this.recommendationV5ShadowProgress,
-            active,
-            canPause:
-                this.recommendationV5ShadowProgress.state === 'running' ||
-                this.recommendationV5ShadowProgress.state === 'pausing',
-            canResume:
-                this.recommendationV5ShadowProgress.state === 'paused',
-            canCancel: active,
-            result: terminal ? this.recommendationV5ShadowResult : undefined
-        }
+        return this.recommendationShadowTaskV5.status()
     }
 
     recommendationV5ShadowControl(
         action: 'pause' | 'resume' | 'cancel'
     ) {
-        if (action === 'pause') {
-            if (this.recommendationV5ShadowProgress.state === 'running') {
-                this.recommendationV5ShadowPauseRequested = true
-                this.recommendationV5ShadowProgress = {
-                    ...this.recommendationV5ShadowProgress,
-                    state: 'pausing',
-                    updatedAt: new Date().toISOString()
-                }
-            }
-            return this.recommendationV5ShadowStatus()
-        }
-        if (action === 'resume') {
-            this.recommendationV5ShadowPauseRequested = false
-            if (
-                this.recommendationV5ShadowProgress.state === 'paused' ||
-                this.recommendationV5ShadowProgress.state === 'pausing'
-            )
-                this.recommendationV5ShadowProgress = {
-                    ...this.recommendationV5ShadowProgress,
-                    state: 'running',
-                    phase: this.recommendationV5ShadowResumePhase,
-                    updatedAt: new Date().toISOString()
-                }
-            for (const resolve of this.recommendationV5ShadowResumeWaiters)
-                resolve()
-            this.recommendationV5ShadowResumeWaiters.clear()
-            return this.recommendationV5ShadowStatus()
-        }
-        this.recommendationV5ShadowCancelRequested = true
-        this.recommendationV5ShadowPauseRequested = false
-        for (const resolve of this.recommendationV5ShadowResumeWaiters)
-            resolve()
-        this.recommendationV5ShadowResumeWaiters.clear()
-        if (
-            this.recommendationV5ShadowProgress.state === 'running' ||
-            this.recommendationV5ShadowProgress.state === 'pausing' ||
-            this.recommendationV5ShadowProgress.state === 'paused'
-        )
-            this.recommendationV5ShadowProgress = {
-                ...this.recommendationV5ShadowProgress,
-                state: 'cancelling',
-                updatedAt: new Date().toISOString()
-            }
-        return this.recommendationV5ShadowStatus()
+        return this.recommendationShadowTaskV5.control(action)
     }
 
-    private async recommendationV5ShadowCheckpoint() {
-        if (this.recommendationV5ShadowCancelRequested)
-            throw new RecommendationV5ShadowCancelledError()
-        if (!this.recommendationV5ShadowPauseRequested) return
-        this.recommendationV5ShadowResumePhase =
-            this.recommendationV5ShadowProgress.phase === 'paused'
-                ? this.recommendationV5ShadowResumePhase
-                : this.recommendationV5ShadowProgress.phase
-        this.recommendationV5ShadowProgress = {
-            ...this.recommendationV5ShadowProgress,
-            state: 'paused',
-            phase: 'paused',
-            updatedAt: new Date().toISOString()
-        }
-        await new Promise<void>((resolve) =>
-            this.recommendationV5ShadowResumeWaiters.add(resolve)
-        )
-        if (this.recommendationV5ShadowCancelRequested)
-            throw new RecommendationV5ShadowCancelledError()
-        this.recommendationV5ShadowProgress = {
-            ...this.recommendationV5ShadowProgress,
-            state: 'running',
-            phase: this.recommendationV5ShadowResumePhase,
-            updatedAt: new Date().toISOString()
-        }
-    }
-
-    private finishRecommendationV5ShadowControl() {
-        this.recommendationV5ShadowPauseRequested = false
-        this.recommendationV5ShadowCancelRequested = false
-        for (const resolve of this.recommendationV5ShadowResumeWaiters)
-            resolve()
-        this.recommendationV5ShadowResumeWaiters.clear()
-        this.recommendationV5ShadowRun = null
-    }
-
-    startRecommendationV5ShadowRetrieval(
-        input: Record<string, unknown>
-    ) {
-        if (
-            String(input.confirmation ?? '').trim() !==
-            RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION
-        )
-            throw new Error(
-                'Explicit shadow retrieval confirmation is required'
-            )
-        if (
-            this.recommendationV5ShadowRun &&
-            [
-                'running',
-                'pausing',
-                'paused',
-                'cancelling'
-            ].includes(this.recommendationV5ShadowProgress.state)
-        )
-            return {
-                started: false,
-                ...this.recommendationV5ShadowStatus()
-            }
-
-        const now = new Date().toISOString()
-        this.recommendationV5ShadowPauseRequested = false
-        this.recommendationV5ShadowCancelRequested = false
-        this.recommendationV5ShadowResumePhase = 'planning'
-        this.recommendationV5ShadowResumeWaiters.clear()
-        this.recommendationV5ShadowResult = null
-        this.recommendationV5ShadowProgress = {
-            state: 'running',
-            phase: 'planning',
-            done: 0,
-            total: 7,
-            retrievalDone: 0,
-            retrievalTotal: 0,
-            rawCandidateCount: 0,
-            candidateCount: 0,
-            rankedCandidateCount: 0,
-            selectedCount: 0,
-            startedAt: now,
-            updatedAt: now
-        }
-
-        const run = (async () => {
-            let releaseResources: () => void = () => undefined
-            try {
-                const lease = await this.runtimeResources.acquire({
-                    ownerId: 'recommendation-v5-shadow',
-                    taskType: 'recommendation-v5-shadow',
-                    priority: 'background',
-                    resources: {
-                        'provider-network': 1,
-                        'cpu-analysis': 1,
-                        'sqlite-write-heavy': 1
-                    }
-                })
-                releaseResources = () => lease.release()
-                const result =
-                    await this.runRecommendationV5ShadowRetrieval(
-                        input,
-                        {
-                            checkpoint: () =>
-                                this.recommendationV5ShadowCheckpoint(),
-                            onProgress: (progress) => {
-                                const controlState =
-                                    this.recommendationV5ShadowProgress.state
-                                this.recommendationV5ShadowProgress = {
-                                    ...this.recommendationV5ShadowProgress,
-                                    ...progress,
-                                    state:
-                                        controlState === 'pausing' ||
-                                        controlState === 'cancelling'
-                                            ? controlState
-                                            : 'running',
-                                    updatedAt: new Date().toISOString()
-                                }
-                            }
-                        }
-                    )
-                this.recommendationV5ShadowResult = {
-                    rawCandidateCount: result.rawCandidateCount,
-                    candidateCount: result.candidateCount,
-                    rankedCandidateCount: result.ranking.candidateCount,
-                    selectedCount: result.diversity.selectedCount,
-                    audit: result.audit
-                }
-                this.recommendationV5ShadowProgress = {
-                    ...this.recommendationV5ShadowProgress,
-                    state: 'complete',
-                    phase: 'complete',
-                    done: 7,
-                    total: 7,
-                    rawCandidateCount: result.rawCandidateCount,
-                    candidateCount: result.candidateCount,
-                    rankedCandidateCount: result.ranking.candidateCount,
-                    selectedCount: result.diversity.selectedCount,
-                    poolId: result.audit.poolId,
-                    cycleId: result.audit.cycleId,
-                    modelVersion: result.audit.modelVersion,
-                    updatedAt: new Date().toISOString()
-                }
-            } catch (error) {
-                if (error instanceof RecommendationV5ShadowCancelledError)
-                    this.recommendationV5ShadowProgress = {
-                        ...this.recommendationV5ShadowProgress,
-                        state: 'cancelled',
-                        phase: 'cancelled',
-                        updatedAt: new Date().toISOString()
-                    }
-                else
-                    this.recommendationV5ShadowProgress = {
-                        ...this.recommendationV5ShadowProgress,
-                        state: 'failed',
-                        phase: 'failed',
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : String(error),
-                        updatedAt: new Date().toISOString()
-                    }
-            } finally {
-                releaseResources()
-                this.finishRecommendationV5ShadowControl()
-            }
-        })()
-        this.recommendationV5ShadowRun = run
-        void run.catch(() => {
-            // The task records its authoritative terminal state above.
-        })
-        return {
-            started: true,
-            ...this.recommendationV5ShadowStatus()
-        }
+    startRecommendationV5ShadowRetrieval(input: Record<string, unknown>) {
+        return this.recommendationShadowTaskV5.start(input)
     }
 
     async runRecommendationV5ShadowRetrieval(
         input: Record<string, unknown>,
-        runtime: {
-            checkpoint?: () => Promise<void> | void
-            onProgress?: (
-                progress: Partial<RecommendationV5ShadowTaskProgress>
-            ) => void
-        } = {}
+        runtime: RecommendationShadowRuntimeV5 = {}
     ) {
-        if (
-            String(input.confirmation ?? '').trim() !==
-            RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION
-        )
-            throw new Error(
-                'Explicit shadow retrieval confirmation is required'
-            )
-        runtime.onProgress?.({
-            phase: 'planning',
-            done: 0,
-            total: 7
-        })
-        await runtime.checkpoint?.()
-        const appSessionId = input.appSessionId
-            ? String(input.appSessionId)
-            : null
-        const eventLimit = Math.max(
-            1,
-            Math.min(5000, Math.floor(Number(input.limit) || 5000))
-        )
-        const maxCandidates = Math.max(
-            12,
-            Math.min(
-                1000,
-                Math.floor(Number(input.maxCandidates) || 500)
-            )
-        )
-        const plan = this.recommendationV5ProviderRoutes(
-            appSessionId,
-            eventLimit
-        )
-        const catalog = this.database.listComics({ limit: 10000 })
-        const provider = this.providerService()
-        runtime.onProgress?.({
-            phase: 'retrieving',
-            done: 1,
-            total: 7
-        })
-        await runtime.checkpoint?.()
-        const result = await executeShadowRetrievalV5(
-            plan,
-            {
-                search: (surface, request) =>
-                    provider.search(
-                        request,
-                        [surface],
-                        'recommendations',
-                        { persist: false }
-                    ),
-                relatedPica: (comicId) =>
-                    provider.relatedPica(
-                        comicId,
-                        'recommendations',
-                        { persist: false }
-                    )
-            },
-            catalog,
-            {
-                maxCandidates,
-                checkpoint: runtime.checkpoint,
-                onProgress: (progress) =>
-                    runtime.onProgress?.({
-                        phase: 'retrieving',
-                        done: 1,
-                        total: 7,
-                        retrievalDone: progress.done,
-                        retrievalTotal: progress.total,
-                        rawCandidateCount: progress.candidateCount
-                    })
-            }
-        )
-        await runtime.checkpoint?.()
-        runtime.onProgress?.({
-            phase: 'hygiene',
-            done: 2,
-            total: 7,
-            rawCandidateCount: result.candidateCount
-        })
-        const state = new RecommendationPolicyStoreV5(
-            this.database
-        ).state()
-        const hygiene = applyCandidateHygieneV5(
-            result.candidates,
-            catalog,
-            state
-        )
-        await runtime.checkpoint?.()
-        runtime.onProgress?.({
-            phase: 'ranking',
-            done: 3,
-            total: 7,
-            rawCandidateCount: result.candidateCount,
-            candidateCount: hygiene.outputCandidateCount
-        })
-        const timescales =
-            this.recommendationV5PreferenceTimescales(
-                appSessionId,
-                eventLimit
-            )
-        const ranking = rankShadowCandidatesV5(
-            hygiene.candidates,
-            timescales,
-            state,
-            catalog
-        )
-        await runtime.checkpoint?.()
-        runtime.onProgress?.({
-            phase: 'diversity',
-            done: 4,
-            total: 7,
-            rawCandidateCount: result.candidateCount,
-            candidateCount: hygiene.outputCandidateCount,
-            rankedCandidateCount: ranking.candidateCount
-        })
-        const semanticDiversity: Record<
-            string,
-            CandidateSemanticDiversityV5
-        > = {}
-        let registry:
-            | ReturnType<typeof loadTagRegistryV3>
-            | null = null
-        try {
-            registry = loadTagRegistryV3(
-                runtimeRegistryDirectory()
-            )
-        } catch {
-            registry = null
-        }
-        for (let rowIndex = 0; rowIndex < ranking.rows.length; rowIndex += 1) {
-            if (rowIndex % 25 === 0) await runtime.checkpoint?.()
-            const row = ranking.rows[rowIndex]
-            const fandomKeys = new Set<string>()
-            const tagKeys = new Set<string>()
-            if (registry)
-                for (const rawTag of row.comic.tags) {
-                    const resolved = resolveTagV3(
-                        rawTag,
-                        registry
-                    )
-                    if (
-                        resolved.resolutionStatus !== 'RESOLVED' ||
-                        resolved.resolutionType === 'SAFETY' ||
-                        !resolved.recommendationEligible
-                    )
-                        continue
-                    if (resolved.facet === 'FANDOM_IP')
-                        fandomKeys.add(resolved.canonicalKey)
-                    else if (
-                        resolved.facet &&
-                        resolved.facet !== 'CREATOR_ENTITY'
-                    )
-                        tagKeys.add(
-                            `${resolved.facet}:${resolved.canonicalKey}`
+        const sourceRevision = this.sources.snapshot().revision
+        return executeRecommendationShadowV5(
+            input,
+            recommendationShadowPortsV5({
+                database: this.database,
+                provider: () => this.providerService(),
+                plan: (session, limit) =>
+                    this.recommendationV5ProviderRoutes(session, limit),
+                timescales: (session, limit) =>
+                    this.recommendationV5PreferenceTimescales(session, limit),
+                createCycleId: () => `v5-shadow:${randomUUID()}`,
+                assertSourcesCurrent: () => {
+                    if (this.sources.snapshot().revision !== sourceRevision)
+                        throw new Error(
+                            'Source choices changed during shadow retrieval; no shadow audit was saved'
                         )
                 }
-            const rawEhTags = Array.isArray(
-                row.comic.providerMetadata?.rawTags
-            )
-                ? row.comic.providerMetadata.rawTags.map(String)
-                : []
-            for (const rawTag of rawEhTags) {
-                const parsed = parseEhTag(rawTag)
-                const value = normalizePreferenceKey(parsed.value)
-                if (!value || !parsed.namespace) continue
-                if (parsed.facet === 'FANDOM_IP')
-                    fandomKeys.add(value)
-                else if (
-                    parsed.facet &&
-                    ![
-                        'CREATOR_ENTITY',
-                        'LANGUAGE',
-                        'FANDOM_IP'
-                    ].includes(parsed.facet)
-                )
-                    tagKeys.add(
-                        `${parsed.facet}:${value}`
-                    )
-            }
-            semanticDiversity[
-                normalizePreferenceKey(row.comic.comicId)
-            ] = {
-                fandomKeys: [...fandomKeys].sort(),
-                tagKeys: [...tagKeys].sort()
-            }
-        }
-        const diversity = diversifyShadowBatchV5(
-            ranking.rows,
-            semanticDiversity,
-            Math.max(
-                1,
-                Math.min(
-                    50,
-                    Math.floor(Number(input.batchSize) || 12)
-                )
-            )
+            }),
+            runtime
         )
-        await runtime.checkpoint?.()
-        runtime.onProgress?.({
-            phase: 'audit',
-            done: 5,
-            total: 7,
-            rawCandidateCount: result.candidateCount,
-            candidateCount: hygiene.outputCandidateCount,
-            rankedCandidateCount: ranking.candidateCount,
-            selectedCount: diversity.selectedCount
-        })
-        const correctnessAudit = auditShadowCorrectnessV5({
-            candidates: hygiene.candidates,
-            diversified: diversity.rows,
-            catalog,
-            state
-        })
-        const visualCoverage = buildVisualCandidateCoverageV5({
-            ranked: ranking.rows,
-            diversified: diversity.rows,
-            embeddings: this.database.listVisualEmbeddings(),
-            catalog,
-            analysisBudget: (() => {
-                const requested = Number(input.visualAnalysisBudget)
-                return Math.max(
-                    0,
-                    Math.min(
-                        100,
-                        Number.isFinite(requested)
-                            ? Math.floor(requested)
-                            : 24
-                    )
-                )
-            })()
-        })
-        await runtime.checkpoint?.()
-        runtime.onProgress?.({
-            phase: 'persisting',
-            done: 6,
-            total: 7,
-            rawCandidateCount: result.candidateCount,
-            candidateCount: hygiene.outputCandidateCount,
-            rankedCandidateCount: ranking.candidateCount,
-            selectedCount: diversity.selectedCount
-        })
-        const cycleId = `v5-shadow:${randomUUID()}`
-        const modelVersion = shadowPipelineModelVersionV5()
-        await runtime.checkpoint?.()
-        const audit = this.database.saveV3CandidatePool({
-            appSessionId,
-            cycleId,
-            candidateIds: ranking.rows.map(
-                (item) => item.comic.comicId
-            ),
-            modelVersion,
-            telemetry: {
-                mode: result.mode,
-                pipelineVersions: shadowPipelineVersionsV5(),
-                servingImpact: result.servingImpact,
-                persistCandidates: result.persistCandidates,
-                providerFailureIsolation:
-                    result.providerFailureIsolation,
-                readiness: result.readiness,
-                rawCandidateCount: result.candidateCount,
-                hygienicCandidateCount: hygiene.outputCandidateCount,
-                rankedCandidateCount: ranking.candidateCount,
-                providerRouteSummary: plan.summary,
-                sessionMode: plan.sourceSessionMode,
-                sessionModePolicy:
-                    plan.sourceSessionModePolicy,
-                providerBudgets: plan.sourceProviderBudgets,
-                retrievalTelemetry: result.telemetry,
-                hygieneTelemetry: hygiene.telemetry,
-                rankingTelemetry: ranking.telemetry,
-                diversityTelemetry: diversity.telemetry,
-                correctnessAudit,
-                visualCandidateCoverage: visualCoverage,
-                diversifiedBatch: diversity.rows.map(
-                    (row) => ({
-                        comicId: row.comic.comicId,
-                        batchRank: row.batchRank,
-                        relevanceRank: row.relevanceRank,
-                        score: row.score,
-                        allocationPass: row.allocationPass,
-                        diversityPenalty: row.diversityPenalty,
-                        providerBalanceBonus:
-                            row.providerBalanceBonus,
-                        diversityReasons:
-                            row.diversityReasons
-                    })
-                ),
-                rankedEvidence: ranking.rows
-                    .slice(0, 100)
-                    .map((row) => ({
-                        comicId: row.comic.comicId,
-                        rank: row.rank,
-                        score: row.score,
-                        reasons: row.reasons,
-                        features: row.features
-                    }))
+    }
+
+    private recommendationAuditQueriesV5() {
+        return new RecommendationAuditQueriesV5(recommendationAuditReadPortV5(this.database, {
+            visualRepresentationQc: () => this.visualRepresentationQc(),
+            visualAuthorAtlas: () => this.visualAuthorAtlas(),
+            providerEligibility: () => {
+                const status = this.providerService().providerStatus()
+                return {pica:Boolean(status.pica.search),eh:Boolean(status.eh.search),exh:Boolean(status.eh.search && status.eh.exHentai && this.ehProvider.hasSession())}
             }
-        })
-        runtime.onProgress?.({
-            phase: 'complete',
-            done: 7,
-            total: 7,
-            rawCandidateCount: result.candidateCount,
-            candidateCount: hygiene.outputCandidateCount,
-            rankedCandidateCount: ranking.candidateCount,
-            selectedCount: diversity.selectedCount,
-            poolId: audit.id,
-            cycleId,
-            modelVersion
-        })
-        return {
-            ...result,
-            candidates: hygiene.candidates,
-            candidateCount: hygiene.outputCandidateCount,
-            rawCandidateCount: result.candidateCount,
-            hygiene,
-            ranking,
-            diversity,
-            correctnessAudit,
-            visualCoverage,
-            executionAuthority: 'MANUAL_DESKTOP_ONLY' as const,
-            trigger: 'EXPLICIT_CONFIRMATION' as const,
-            providerRouteSummary: plan.summary,
-            audit: {
-                poolId: audit.id,
-                cycleId,
-                modelVersion,
-                generatedAt: audit.generatedAt,
-                candidateIdCount: audit.candidateIds.length
-            }
-        }
+        }))
     }
 
     recommendationV5AdvancedLearningGate(
@@ -1862,107 +1173,11 @@ export class LibraryService {
         limit = 1000,
         horizonDays = 30
     ) {
-        const directionText = String(directionInput ?? '')
-            .trim()
-            .toUpperCase()
-        const direction = [
-            'LEARNING_TO_RANK',
-            'CONTEXTUAL_BANDIT',
-            'ACTIVE_LEARNING'
-        ].includes(directionText)
-            ? (directionText as AdvancedLearningDirectionV5)
-            : null
-        const evaluation = this.recommendationV5EvaluationSummary(
-            Math.max(1, Math.min(1000, Math.floor(limit))),
-            horizonDays,
-            3,
-            30
-        )
-        const baseline = String(baselineVersion ?? '').trim()
-        const candidate = String(candidateVersion ?? '').trim()
-        const comparison =
-            baseline && candidate
-                ? this.recommendationV5BenchmarkComparison(
-                      baseline,
-                      candidate,
-                      limit,
-                      horizonDays
-                  )
-                : null
-        return {
-            ...evaluateAdvancedLearningGateV5({
-                evaluation,
-                comparison,
-                direction
-            }),
-            evidence: {
-                evaluationStatus: evaluation.status,
-                evaluationFrameworkVersion:
-                    evaluation.frameworkVersion,
-                comparisonStatus:
-                    comparison?.status ?? null,
-                comparisonVersion:
-                    comparison?.comparisonVersion ?? null,
-                baselineVersion: baseline || null,
-                candidateVersion: candidate || null
-            }
-        }
+        return this.recommendationAuditQueriesV5().recommendationV5AdvancedLearningGate(directionInput, baselineVersion, candidateVersion, limit, horizonDays)
     }
 
     recommendationV5BenchmarkVersions(limit = 1000) {
-        const bounded = Math.max(
-            1,
-            Math.min(5000, Math.floor(limit))
-        )
-        const currentModelVersion = shadowPipelineModelVersionV5()
-        const pools = this.database.listCandidatePoolsByModelVersionPrefix(
-            'v5-shadow/',
-            bounded
-        )
-        const grouped = new Map<
-            string,
-            {
-                runCount: number
-                firstGeneratedAt: string
-                lastGeneratedAt: string
-            }
-        >()
-        for (const pool of pools) {
-            const version = String(pool.modelVersion || '').trim()
-            if (!version) continue
-            const current = grouped.get(version)
-            if (!current) {
-                grouped.set(version, {
-                    runCount: 1,
-                    firstGeneratedAt: pool.generatedAt,
-                    lastGeneratedAt: pool.generatedAt
-                })
-                continue
-            }
-            current.runCount += 1
-            if (pool.generatedAt < current.firstGeneratedAt)
-                current.firstGeneratedAt = pool.generatedAt
-            if (pool.generatedAt > current.lastGeneratedAt)
-                current.lastGeneratedAt = pool.generatedAt
-        }
-        return {
-            mode: 'READ_ONLY' as const,
-            currentModelVersion,
-            versions: [...grouped.entries()]
-                .map(([modelVersion, value]) => ({
-                    modelVersion,
-                    current: modelVersion === currentModelVersion,
-                    ...value
-                }))
-                .sort(
-                    (a, b) =>
-                        Number(b.current) - Number(a.current) ||
-                        b.lastGeneratedAt.localeCompare(
-                            a.lastGeneratedAt
-                        ) ||
-                        a.modelVersion.localeCompare(b.modelVersion)
-                )
-        }
+        return this.recommendationAuditQueriesV5().recommendationV5BenchmarkVersions(limit)
     }
 
     recommendationV5BenchmarkComparison(
@@ -1971,53 +1186,7 @@ export class LibraryService {
         limit = 1000,
         horizonDays = 30
     ) {
-        const baseline = String(baselineVersion ?? '').trim()
-        const candidate = String(candidateVersion ?? '').trim()
-        if (!baseline || !candidate)
-            throw new Error(
-                'Both baselineVersion and candidateVersion are required'
-            )
-        if (
-            baseline.length > 240 ||
-            candidate.length > 240 ||
-            !baseline.startsWith('v5-shadow/') ||
-            !candidate.startsWith('v5-shadow/')
-        )
-            throw new Error('Invalid shadow model version')
-
-        const bounded = Math.max(
-            1,
-            Math.min(5000, Math.floor(limit))
-        )
-        const pools = this.database
-            .listCandidatePoolsByModelVersionPrefix(
-                'v5-shadow/',
-                bounded
-            )
-            .map((pool) => ({
-                modelVersion: pool.modelVersion,
-                generatedAt: pool.generatedAt,
-                candidateIds: pool.candidateIds,
-                telemetry: pool.telemetry
-            }))
-        const events = this.database.listUserEvents({
-            limit: 5000
-        })
-        const catalogSize = this.database.listComics({
-            limit: 10000
-        }).length
-        const build = (modelVersion: string) =>
-            buildRetrospectiveBenchmarkV5({
-                runs: pools,
-                events,
-                currentModelVersion: modelVersion,
-                catalogSize,
-                horizonDays
-            })
-        return compareRetrospectiveBenchmarksV5({
-            baseline: build(baseline),
-            candidate: build(candidate)
-        })
+        return this.recommendationAuditQueriesV5().recommendationV5BenchmarkComparison(baselineVersion, candidateVersion, limit, horizonDays)
     }
 
     recommendationV5EvaluationSummary(
@@ -2026,1207 +1195,126 @@ export class LibraryService {
         steerabilityStep = 3,
         steerabilityTargetLimit = 30
     ) {
-        return buildEvaluationFrameworkV5({
-            p3Gate: this.recommendationV5P3PromotionGate(
-                limit
-            ),
-            visualGate:
-                this.recommendationV5VisualActivationGate(
-                    limit
-                ),
-            retrospective:
-                this.recommendationV5RetrospectiveBenchmark(
-                    limit,
-                    horizonDays
-                ),
-            steerability:
-                this.recommendationV5SteerabilityAudit(
-                    steerabilityStep,
-                    steerabilityTargetLimit
-                )
-        })
+        return this.recommendationAuditQueriesV5().recommendationV5EvaluationSummary(limit, horizonDays, steerabilityStep, steerabilityTargetLimit)
     }
 
     recommendationV5SteerabilityAudit(
         requestedStep = 3,
         targetLimit = 30
     ) {
-        const store = new RecommendationPolicyStoreV5(
-            this.database
-        )
-        const state = store.state()
-        const snapshot = this.recommendationV5Snapshot()
-        const targets = snapshot.inferred
-            .filter(
-                (signal) =>
-                    signal.targetType === 'TAG' ||
-                    signal.targetType === 'AUTHOR' ||
-                    signal.targetType === 'CATEGORY' ||
-                    signal.targetType === 'FANDOM'
-            )
-            .slice(
-                0,
-                Math.max(
-                    1,
-                    Math.min(100, Math.floor(targetLimit))
-                )
-            )
-            .map((signal) => ({
-                targetType: signal.targetType as
-                    | 'TAG'
-                    | 'AUTHOR'
-                    | 'CATEGORY'
-                    | 'FANDOM',
-                key: signal.key,
-                label: signal.label,
-                baselineLevel: signal.baselineLevel
-            }))
-        return evaluateSteerabilityV5({
-            catalog: this.database.listComics({
-                limit: 10000
-            }),
-            state,
-            targets,
-            requestedStep
-        })
+        return this.recommendationAuditQueriesV5().recommendationV5SteerabilityAudit(requestedStep, targetLimit)
     }
 
     recommendationV5RetrospectiveBenchmark(
         limit = 200,
         horizonDays = 30
     ) {
-        const modelVersion = shadowPipelineModelVersionV5()
-        const runs = this.database
-            .listCandidatePoolsByModelVersionPrefix(
-                modelVersion,
-                Math.max(1, Math.min(1000, Math.floor(limit)))
-            )
-            .filter((pool) => pool.modelVersion === modelVersion)
-            .map((pool) => ({
-                modelVersion: pool.modelVersion,
-                generatedAt: pool.generatedAt,
-                candidateIds: pool.candidateIds,
-                telemetry: pool.telemetry
-            }))
-        const events = this.database.listUserEvents({
-            limit: 5000
-        })
-        const catalogSize = this.database.listComics({
-            limit: 10000
-        }).length
-        return buildRetrospectiveBenchmarkV5({
-            runs,
-            events,
-            currentModelVersion: modelVersion,
-            catalogSize,
-            horizonDays
-        })
+        return this.recommendationAuditQueriesV5().recommendationV5RetrospectiveBenchmark(limit, horizonDays)
     }
 
     recommendationV5VisualActivationGate(limit = 100) {
-        const modelVersion = shadowPipelineModelVersionV5()
-        const runs = this.database
-            .listCandidatePoolsByModelVersionPrefix(
-                modelVersion,
-                Math.max(1, Math.min(500, Math.floor(limit)))
-            )
-            .filter((pool) => pool.modelVersion === modelVersion)
-            .map((pool) => ({
-                modelVersion: pool.modelVersion,
-                generatedAt: pool.generatedAt,
-                telemetry: pool.telemetry
-            }))
-        const representationQc =
-            this.visualRepresentationQc()
-        const authorAtlas = this.visualAuthorAtlas()
-        const styleFamilies = buildVisualStyleFamiliesV5({
-            atlas: authorAtlas
-        })
-        return {
-            ...evaluateVisualActivationGateV5({
-                representationQc,
-                authorAtlas,
-                styleFamilies,
-                shadowRuns: runs,
-                currentShadowModelVersion: modelVersion
-            }),
-            pipelineVersions: shadowPipelineVersionsV5(),
-            visualEvidenceVersions: {
-                representationQc:
-                    representationQc.qcVersion,
-                authorAtlas: authorAtlas.atlasVersion,
-                styleFamilies: styleFamilies.familyVersion
-            }
-        }
+        return this.recommendationAuditQueriesV5().recommendationV5VisualActivationGate(limit)
     }
 
     recommendationV5P3PromotionGate(limit = 100) {
-        const modelVersion = shadowPipelineModelVersionV5()
-        const runs = this.database
-            .listCandidatePoolsByModelVersionPrefix(
-                modelVersion,
-                Math.max(1, Math.min(500, Math.floor(limit)))
-            )
-            .filter((pool) => pool.modelVersion === modelVersion)
-            .map((pool) => ({
-                modelVersion: pool.modelVersion,
-                generatedAt: pool.generatedAt,
-                candidateIds: pool.candidateIds,
-                telemetry: pool.telemetry
-            }))
-        return {
-            ...evaluateP3PromotionGateV5(
-                runs,
-                modelVersion
-            ),
-            pipelineVersions: shadowPipelineVersionsV5()
-        }
+        return this.recommendationAuditQueriesV5().recommendationV5P3PromotionGate(limit)
     }
 
     recommendationV5ShadowRuns(limit = 50) {
-        return {
-            modelPrefix: 'v5-shadow/',
-            runs: this.database
-                .listCandidatePoolsByModelVersionPrefix(
-                    'v5-shadow/',
-                    limit
-                )
-                .map((pool) => ({
-                    poolId: pool.id,
-                    appSessionId: pool.appSessionId,
-                    cycleId: pool.cycleId,
-                    generatedAt: pool.generatedAt,
-                    expiresAt: pool.expiresAt,
-                    modelVersion: pool.modelVersion,
-                    candidateCount: pool.candidateIds.length,
-                    candidateIds: pool.candidateIds,
-                    telemetry: pool.telemetry
-                }))
-        }
+        return this.recommendationAuditQueriesV5().recommendationV5ShadowRuns(limit)
     }
 
     recommendationV5ProviderRoutes(
         appSessionId?: string | null,
         limit = 5000
     ) {
-        return compileCandidateProviderRoutesV5(
-            this.recommendationV5CandidateChannels(
-                appSessionId,
-                limit
-            )
-        )
+        return this.recommendationAuditQueriesV5().recommendationV5ProviderRoutes(appSessionId, limit)
     }
 
     recommendationV5CandidateChannels(
         appSessionId?: string | null,
         limit = 5000
     ) {
-        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
-        const events = this.database.listUserEvents({ limit: bounded })
-        const catalog = this.database.listComics({ limit: 10000 })
-        const store = new RecommendationPolicyStoreV5(this.database)
-        const state = store.state()
-        const timescales = buildPreferenceTimescalesV5(
-            events,
-            catalog,
-            state,
-            { appSessionId: appSessionId ?? null }
-        )
-        const observedBindings =
-            deriveObservedEhCanonicalBindingsV5(catalog)
-        const tagFacets: Record<string, string> = {
-            ...observedBindings.facets
-        }
-        const tagProviderCanonicals: Record<string, string> = {
-            ...observedBindings.canonicals
-        }
-
-        try {
-            const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-            const tagRows = [
-                ...timescales.layers.inferred.lifetime.positive.tags,
-                ...timescales.layers.inferred.days30.positive.tags,
-                ...timescales.layers.inferred.days7.positive.tags,
-                ...timescales.layers.inferred.session.positive.tags,
-                ...state.controls
-                    .filter((control) => control.targetType === 'TAG')
-                    .map((control) => ({
-                        key: control.key,
-                        label: control.label
-                    })),
-                ...(state.sessionIntent.targetType === 'TAG' &&
-                state.sessionIntent.key
-                    ? [
-                          {
-                              key: state.sessionIntent.key,
-                              label:
-                                  state.sessionIntent.label ??
-                                  state.sessionIntent.key
-                          }
-                      ]
-                    : [])
-            ]
-            for (const item of tagRows) {
-                const resolved = resolveTagV3(
-                    item.label || item.key,
-                    registry
-                )
-                if (
-                    resolved.resolutionType !== 'SAFETY' &&
-                    resolved.resolutionStatus === 'RESOLVED'
-                )
-                    tagFacets[normalizePreferenceKey(item.key)] =
-                        resolved.facet
-            }
-        } catch {
-            // Raw tags remain valid retrieval anchors when the packaged
-            // registry is unavailable. They simply stay in the TAG family.
-        }
-
-        const provider = this.providerService()
-        const status = provider.providerStatus()
-        return buildCandidateChannelPlanV5({
-            timescales,
-            policy: state,
-            catalog,
-            tagFacets,
-            tagProviderCanonicals,
-            providerEligibility: {
-                pica: Boolean(status.pica.search),
-                eh: Boolean(status.eh.search),
-                exh: Boolean(
-                    status.eh.search &&
-                        status.eh.exHentai &&
-                        this.ehProvider.hasSession()
-                )
-            },
-            // Visual stays planning-only until the dedicated P4 activation
-            // gate. Existing embeddings do not silently enable a recall path.
-            visualEligible: false
-        })
+        return this.recommendationAuditQueriesV5().recommendationV5CandidateChannels(appSessionId, limit)
     }
 
     recommendationV5PreferenceTimescales(
         appSessionId?: string | null,
         limit = 5000
     ) {
-        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
-        const events = this.database.listUserEvents({ limit: bounded })
-        const catalog = this.database.listComics({ limit: 10000 })
-        const state = new RecommendationPolicyStoreV5(this.database).state()
-        return buildPreferenceTimescalesV5(events, catalog, state, {
-            appSessionId: appSessionId ?? null
-        })
+        return this.recommendationAuditQueriesV5().recommendationV5PreferenceTimescales(appSessionId, limit)
     }
 
     recommendationV5BehaviorEvidence(limit = 5000) {
-        const bounded = Math.max(1, Math.min(5000, Math.floor(limit)))
-        const events = this.database.listUserEvents({ limit: bounded })
-        const catalog = this.database.listComics({ limit: 10000 })
-        const state = new RecommendationPolicyStoreV5(this.database).state()
-        return buildBehaviorEvidenceLedgerV5(events, catalog, state)
+        return this.recommendationAuditQueriesV5().recommendationV5BehaviorEvidence(limit)
+    }
+
+    private workIdentityQueriesV5() {
+        return new WorkIdentityQueriesV5(
+            workIdentityReadPortV5(this.database, () => this.allComicsForIdentity())
+        )
+    }
+
+    private workIdentityCommandsV5() {
+        return new WorkIdentityCommandsV5(
+            this.workIdentityQueriesV5(),
+            workIdentityWritePortV5(this.database)
+        )
     }
 
     workVariantsForComic(comicId: string, limit = 24) {
-        const id = String(comicId ?? '').trim()
-        const bounded = Math.max(1, Math.min(48, Math.floor(limit)))
-        const catalog = this.allComicsForIdentity()
-        const catalogById = new Map(
-            catalog.map((comic) => [comic.comicId, comic] as const)
-        )
-        const current = catalogById.get(id)
-        if (!id || !current)
-            return {
-                comicId: id,
-                count: 0,
-                confirmedCount: 0,
-                probableCount: 0,
-                workId: null,
-                editionId: null,
-                favoriteCount: 0,
-                downloadedCount: 0,
-                items: []
-            }
-
-        const currentBinding = this.database.getWorkIdentityBinding(id)
-        const workBindings = currentBinding
-            ? this.database.listWorkIdentityBindingsForWork(
-                  currentBinding.workId
-              )
-            : []
-        const decisions =
-            this.database.listWorkIdentityDecisionsForComic(id)
-        const probableEvidence =
-            this.database.listWorkIdentityProbableEvidenceForComic(id, 0.94)
-        const relationshipComicIds = new Set<string>([
-            id,
-            ...workBindings.map((binding) => binding.comicId),
-            ...decisions.flatMap((item) => [
-                item.leftComicId,
-                item.rightComicId
-            ]),
-            ...probableEvidence.flatMap((item) => [
-                item.leftComicId,
-                item.rightComicId
-            ])
-        ])
-        const relatedBindings =
-            this.database.listWorkIdentityBindingsByComicIds([
-                ...relationshipComicIds
-            ])
-        const bindingByComic = new Map(
-            relatedBindings.map(
-                (binding) => [binding.comicId, binding] as const
-            )
-        )
-        const decisionByPair = new Map(
-            decisions.map((item) => [
-                [item.leftComicId, item.rightComicId].sort().join('\u0000'),
-                item
-            ] as const)
-        )
-        const rows = new Map<string, Record<string, unknown>>()
-        const relationPriority: Record<string, number> = {
-            CONFIRMED_SAME_EDITION: 0,
-            CONFIRMED_WORK_VARIANT: 1,
-            ADJUDICATED_EDITION_VARIANT: 2,
-            ADJUDICATED_SAME_WORK: 3,
-            PROBABLE_SAME_WORK: 4
-        }
-        const add = (
-            otherId: string,
-            relation: string,
-            confidence: number,
-            binding = bindingByComic.get(otherId) ?? null,
-            extraEvidence: Record<string, unknown> = {}
-        ) => {
-            if (!otherId || otherId === id) return
-            const comic = catalogById.get(otherId)
-            if (!comic) return
-            const pairKey = [id, otherId].sort().join('\u0000')
-            const decision = decisionByPair.get(pairKey)
-            if (decision?.decision === 'KEEP_SEPARATE') return
-            const existing = rows.get(otherId)
-            const existingPriority = existing
-                ? relationPriority[String(existing.relation)] ?? 99
-                : 99
-            const nextPriority = relationPriority[relation] ?? 99
-            if (existing && existingPriority <= nextPriority) return
-            rows.set(otherId, {
-                comicId: comic.comicId,
-                relation,
-                confidence,
-                workId: binding?.workId ?? null,
-                editionId: binding?.editionId ?? null,
-                editionLabel: binding?.editionLabel ?? '',
-                editionLanguage: binding?.editionLanguage ?? null,
-                editionKind: binding?.editionKind ?? null,
-                title: comic.title,
-                alternateTitles: comic.alternateTitles ?? [],
-                author: comic.author,
-                canonicalAuthor: comic.canonicalAuthor,
-                description: comic.description ?? '',
-                tags: comic.tags ?? [],
-                categories: comic.categories ?? [],
-                finished: Boolean(comic.finished),
-                completionStatus: comic.completionStatus ?? 'UNKNOWN',
-                totalLikes: Number(comic.totalLikes || 0),
-                totalViews: Number(comic.totalViews || 0),
-                pagesCount:
-                    Number(comic.pagesCount || 0) ||
-                    Number(comic.knownPictures || 0),
-                providerId:
-                    comic.providerId ||
-                    (comic.comicId.startsWith('eh:') ? 'eh' : 'pica'),
-                rating:
-                    Number.isFinite(Number(comic.rating))
-                        ? Number(comic.rating)
-                        : null,
-                chineseTeam: comic.chineseTeam ?? '',
-                isFavorite: Boolean(comic.isFavorite),
-                downloadedPictures: Number(comic.downloadedPictures || 0),
-                knownPictures: Number(comic.knownPictures || 0),
-                inLibrary: Boolean(comic.inLibrary),
-                coverPath: `/api/v1/covers/${encodeURIComponent(comic.comicId)}`,
-                identityEvidence: extraEvidence
-            })
-        }
-
-        if (currentBinding) {
-            for (const binding of workBindings) {
-                if (binding.comicId === id) continue
-                add(
-                    binding.comicId,
-                    binding.editionId &&
-                        currentBinding.editionId &&
-                        binding.editionId === currentBinding.editionId
-                        ? 'CONFIRMED_SAME_EDITION'
-                        : 'CONFIRMED_WORK_VARIANT',
-                    Math.max(
-                        Number(binding.confidence || 0),
-                        Number(currentBinding.confidence || 0)
-                    ),
-                    binding
-                )
-            }
-        }
-
-        for (const decision of decisions) {
-            if (decision.decision === 'KEEP_SEPARATE') continue
-            const otherId =
-                decision.leftComicId === id
-                    ? decision.rightComicId
-                    : decision.leftComicId
-            add(
-                otherId,
-                decision.decision === 'EDITION_VARIANT'
-                    ? 'ADJUDICATED_EDITION_VARIANT'
-                    : 'ADJUDICATED_SAME_WORK',
-                1
-            )
-        }
-
-        for (const evidence of probableEvidence) {
-            const otherId =
-                evidence.leftComicId === id
-                    ? evidence.rightComicId
-                    : evidence.leftComicId
-            add(
-                otherId,
-                'PROBABLE_SAME_WORK',
-                Number(evidence.confidence || 0)
-            )
-        }
-
-        // Work Identity V3 detail funnel:
-        // 1) resolve creator buckets first;
-        // 2) compare titles only inside creator buckets;
-        // 3) use exact-title fallback when creator metadata is incomplete;
-        // 4) use cover identity only for unresolved metadata candidates.
-        const policy = new RecommendationPolicyStoreV5(this.database).state()
-        const explicitDistinct = new Set(policy.explicitDistinctPairs)
-        const currentCreatorKeys = new Set(
-            workIdentityCreatorBucketKeysV3(current)
-        )
-        const creatorCandidates: StoredComic[] = []
-        const titleFallbackCandidates: StoredComic[] = []
-
-        for (const other of catalog) {
-            if (other.comicId === id || rows.has(other.comicId)) continue
-            const pairKey = [id, other.comicId].sort().join('\u0000')
-            const portablePairKey = [id, other.comicId]
-                .map(normalizePreferenceKey)
-                .sort()
-                .join('\u0000')
-            if (
-                decisionByPair.get(pairKey)?.decision === 'KEEP_SEPARATE' ||
-                explicitDistinct.has(portablePairKey)
-            )
-                continue
-
-            const creatorKeys = workIdentityCreatorBucketKeysV3(other)
-            if (
-                creatorKeys.some((key) => currentCreatorKeys.has(key))
-            ) {
-                creatorCandidates.push(other)
-                continue
-            }
-
-            // Author identity is the primary funnel. When it is missing or uses
-            // an unresolved cross-language alias, only exact/core title overlap
-            // is allowed into the fallback pool. We deliberately do not run a
-            // full-catalog fuzzy title search.
-            const signals = workIdentitySignalsV2(current, other)
-            if (
-                signals.strictTitleMatch ||
-                signals.trustedCoreTitleMatch ||
-                signals.looseTitleMatch
-            )
-                titleFallbackCandidates.push(other)
-        }
-
-        const reviewCandidates: Array<{
-            comic: StoredComic
-            evidence: ReturnType<typeof workIdentityDetailEvidenceV3>
-            source: 'CREATOR_BUCKET' | 'TITLE_FALLBACK'
-        }> = []
-        const evaluate = (
-            other: StoredComic,
-            source: 'CREATOR_BUCKET' | 'TITLE_FALLBACK'
-        ) => {
-            const evidence = workIdentityDetailEvidenceV3(current, other)
-            const detailEvidence = {
-                resolverVersion: WORK_IDENTITY_V3_RESOLVER_VERSION,
-                funnelSource: source,
-                ...evidence
-            }
-            if (evidence.relation === 'HIGH_CONFIDENCE_WORK') {
-                add(
-                    other.comicId,
-                    'PROBABLE_SAME_WORK',
-                    evidence.confidence,
-                    undefined,
-                    detailEvidence
-                )
-                return
-            }
-            if (evidence.relation === 'REVIEW_CANDIDATE')
-                reviewCandidates.push({ comic: other, evidence, source })
-        }
-
-        for (const other of creatorCandidates)
-            evaluate(other, 'CREATOR_BUCKET')
-        for (const other of titleFallbackCandidates)
-            if (!rows.has(other.comicId)) evaluate(other, 'TITLE_FALLBACK')
-
-        // Stage 3 only touches covers for metadata candidates that remain
-        // ambiguous. This keeps the normal path cheap while allowing a near-
-        // duplicate cover to rescue translated/retitled editions.
-        const rankedReviews = reviewCandidates
-            .sort(
-                (a, b) =>
-                    b.evidence.confidence - a.evidence.confidence ||
-                    b.evidence.titleSimilarity -
-                        a.evidence.titleSimilarity ||
-                    a.comic.comicId.localeCompare(b.comic.comicId)
-            )
-            .slice(0, 96)
-
-        if (rankedReviews.length) {
-            const requestedIds = [
-                id,
-                ...rankedReviews.map((item) => item.comic.comicId)
-            ]
-            const coverEmbeddings = this.database
-                .listVisualEmbeddings(requestedIds)
-                .filter((embedding) => embedding.embeddingKind === 'cover')
-            const latestCover = new Map<
-                string,
-                (typeof coverEmbeddings)[number]
-            >()
-            for (const embedding of coverEmbeddings) {
-                const existing = latestCover.get(embedding.comicId)
-                if (
-                    !existing ||
-                    String(embedding.generatedAt) >
-                        String(existing.generatedAt)
-                )
-                    latestCover.set(embedding.comicId, embedding)
-            }
-
-            const currentCover = latestCover.get(id)
-            for (const item of rankedReviews) {
-                if (rows.has(item.comic.comicId)) continue
-                const otherCover = latestCover.get(item.comic.comicId)
-                let comparableCover = false
-                let similarity: number | null = null
-                if (
-                    currentCover &&
-                    otherCover &&
-                    otherCover.modelId === currentCover.modelId &&
-                    otherCover.modelVersion === currentCover.modelVersion &&
-                    otherCover.dimension === currentCover.dimension
-                ) {
-                    comparableCover = true
-                    const value = cosineSimilarity(
-                        currentCover.vector,
-                        otherCover.vector
-                    )
-                    if (Number.isFinite(value)) similarity = value
-                }
-
-                if (similarity !== null && similarity >= 0.992) {
-                    add(
-                        item.comic.comicId,
-                        'PROBABLE_SAME_WORK',
-                        Math.max(
-                            item.evidence.confidence,
-                            Math.min(
-                                0.985,
-                                0.94 +
-                                    (similarity - 0.992) * 4 +
-                                    (item.evidence.creatorMatch ? 0.015 : 0) +
-                                    (item.evidence.pageCountCompatible
-                                        ? 0.01
-                                        : 0)
-                            )
-                        ),
-                        undefined,
-                        {
-                            resolverVersion: WORK_IDENTITY_V3_RESOLVER_VERSION,
-                            funnelSource: item.source,
-                            ...item.evidence,
-                            coverIdentitySimilarity: similarity,
-                            coverIdentityModel:
-                                currentCover!.modelId +
-                                '@' +
-                                currentCover!.modelVersion,
-                            coverIdentityStage: 'REVIEW_CONFIRMATION'
-                        }
-                    )
-                    continue
-                }
-
-                // If no comparable cover exists, keep only stronger creator-
-                // scoped metadata candidates visible as "possibly same work".
-                // If a comparable cover exists and disagrees, do not surface it.
-                const minimumWithoutCover = 0.8
-                if (
-                    !comparableCover &&
-                    item.evidence.creatorMatch &&
-                    item.evidence.confidence >= minimumWithoutCover
-                )
-                    add(
-                        item.comic.comicId,
-                        'PROBABLE_SAME_WORK',
-                        item.evidence.confidence,
-                        undefined,
-                        {
-                            resolverVersion: WORK_IDENTITY_V3_RESOLVER_VERSION,
-                            funnelSource: item.source,
-                            ...item.evidence,
-                            coverIdentityStage: 'UNAVAILABLE'
-                        }
-                    )
-            }
-        }
-
-        const rankedItems = [...rows.values()].sort(
-            (a, b) =>
-                (relationPriority[String(a.relation)] ?? 99) -
-                    (relationPriority[String(b.relation)] ?? 99) ||
-                Number(Boolean(b.isFavorite)) -
-                    Number(Boolean(a.isFavorite)) ||
-                Number(b.downloadedPictures || 0) -
-                    Number(a.downloadedPictures || 0) ||
-                String(a.title || '').localeCompare(String(b.title || ''))
-        )
-        const confirmedCount = rankedItems.filter((item) => {
-            const relation = String(item.relation)
-            return (
-                relation.startsWith('CONFIRMED_') ||
-                relation.startsWith('ADJUDICATED_')
-            )
-        }).length
-        const favoriteCount = rankedItems.filter((item) =>
-            Boolean(item.isFavorite)
-        ).length
-        const downloadedCount = rankedItems.filter(
-            (item) => Number(item.downloadedPictures || 0) > 0
-        ).length
-        const items = rankedItems.slice(0, bounded)
-        return {
-            comicId: id,
-            count: rankedItems.length,
-            shownCount: items.length,
-            confirmedCount,
-            probableCount: rankedItems.length - confirmedCount,
-            favoriteCount,
-            downloadedCount,
-            workId: currentBinding?.workId ?? null,
-            editionId: currentBinding?.editionId ?? null,
-            items
-        }
+        return this.workIdentityQueriesV5().workVariantsForComic(comicId, limit)
     }
 
     recommendationV5WorkIdentityEvidenceRefreshStatus() {
-        const active = [
-            'running',
-            'pausing',
-            'paused',
-            'cancelling'
-        ].includes(this.workIdentityEvidenceRefreshProgress.state)
-        const terminal = [
-            'complete',
-            'failed',
-            'cancelled'
-        ].includes(this.workIdentityEvidenceRefreshProgress.state)
-        return {
-            ...this.workIdentityEvidenceRefreshProgress,
-            active,
-            canPause:
-                this.workIdentityEvidenceRefreshProgress.state === 'running' ||
-                this.workIdentityEvidenceRefreshProgress.state === 'pausing',
-            canResume:
-                this.workIdentityEvidenceRefreshProgress.state === 'paused',
-            canCancel: active,
-            result: terminal
-                ? this.workIdentityEvidenceRefreshResult
-                : undefined
-        }
+        return this.workIdentityTaskV5.status()
     }
 
     recommendationV5WorkIdentityEvidenceRefreshControl(
         action: 'pause' | 'resume' | 'cancel'
     ) {
-        if (action === 'pause') {
-            if (this.workIdentityEvidenceRefreshProgress.state === 'running') {
-                this.workIdentityEvidenceRefreshPauseRequested = true
-                this.workIdentityEvidenceRefreshProgress = {
-                    ...this.workIdentityEvidenceRefreshProgress,
-                    state: 'pausing',
-                    updatedAt: new Date().toISOString()
-                }
-            }
-            return this.recommendationV5WorkIdentityEvidenceRefreshStatus()
-        }
-        if (action === 'resume') {
-            this.workIdentityEvidenceRefreshPauseRequested = false
-            if (
-                this.workIdentityEvidenceRefreshProgress.state === 'paused' ||
-                this.workIdentityEvidenceRefreshProgress.state === 'pausing'
-            )
-                this.workIdentityEvidenceRefreshProgress = {
-                    ...this.workIdentityEvidenceRefreshProgress,
-                    state: 'running',
-                    phase: this.workIdentityEvidenceRefreshResumePhase,
-                    updatedAt: new Date().toISOString()
-                }
-            for (const resolve of this.workIdentityEvidenceRefreshResumeWaiters)
-                resolve()
-            this.workIdentityEvidenceRefreshResumeWaiters.clear()
-            return this.recommendationV5WorkIdentityEvidenceRefreshStatus()
-        }
-        this.workIdentityEvidenceRefreshCancelRequested = true
-        this.workIdentityEvidenceRefreshPauseRequested = false
-        for (const resolve of this.workIdentityEvidenceRefreshResumeWaiters)
-            resolve()
-        this.workIdentityEvidenceRefreshResumeWaiters.clear()
-        if (
-            this.workIdentityEvidenceRefreshProgress.state === 'running' ||
-            this.workIdentityEvidenceRefreshProgress.state === 'pausing' ||
-            this.workIdentityEvidenceRefreshProgress.state === 'paused'
-        )
-            this.workIdentityEvidenceRefreshProgress = {
-                ...this.workIdentityEvidenceRefreshProgress,
-                state: 'cancelling',
-                updatedAt: new Date().toISOString()
-            }
-        return this.recommendationV5WorkIdentityEvidenceRefreshStatus()
-    }
-
-    private async workIdentityEvidenceRefreshCheckpoint() {
-        if (this.workIdentityEvidenceRefreshCancelRequested)
-            throw new WorkIdentityEvidenceRefreshCancelledError()
-        if (!this.workIdentityEvidenceRefreshPauseRequested) return
-        this.workIdentityEvidenceRefreshResumePhase =
-            this.workIdentityEvidenceRefreshProgress.phase === 'paused'
-                ? this.workIdentityEvidenceRefreshResumePhase
-                : this.workIdentityEvidenceRefreshProgress.phase
-        this.workIdentityEvidenceRefreshProgress = {
-            ...this.workIdentityEvidenceRefreshProgress,
-            state: 'paused',
-            phase: 'paused',
-            updatedAt: new Date().toISOString()
-        }
-        await new Promise<void>((resolve) =>
-            this.workIdentityEvidenceRefreshResumeWaiters.add(resolve)
-        )
-        if (this.workIdentityEvidenceRefreshCancelRequested)
-            throw new WorkIdentityEvidenceRefreshCancelledError()
-        this.workIdentityEvidenceRefreshProgress = {
-            ...this.workIdentityEvidenceRefreshProgress,
-            state: 'running',
-            phase: this.workIdentityEvidenceRefreshResumePhase,
-            updatedAt: new Date().toISOString()
-        }
-    }
-
-    private finishWorkIdentityEvidenceRefreshControl() {
-        this.workIdentityEvidenceRefreshPauseRequested = false
-        this.workIdentityEvidenceRefreshCancelRequested = false
-        for (const resolve of this.workIdentityEvidenceRefreshResumeWaiters)
-            resolve()
-        this.workIdentityEvidenceRefreshResumeWaiters.clear()
-        this.workIdentityEvidenceRefreshRun = null
+        return this.workIdentityTaskV5.control(action)
     }
 
     startRecommendationV5WorkIdentityEvidenceRefresh(requestedLimit = 500) {
-        if (
-            this.workIdentityEvidenceRefreshRun &&
-            [
-                'running',
-                'pausing',
-                'paused',
-                'cancelling'
-            ].includes(this.workIdentityEvidenceRefreshProgress.state)
-        )
-            return {
-                started: false,
-                ...this.recommendationV5WorkIdentityEvidenceRefreshStatus()
-            }
-
-        const limit = Math.max(
-            1,
-            Math.min(1000, Math.floor(Number(requestedLimit) || 500))
-        )
-        const now = new Date().toISOString()
-        this.workIdentityEvidenceRefreshPauseRequested = false
-        this.workIdentityEvidenceRefreshCancelRequested = false
-        this.workIdentityEvidenceRefreshResumePhase = 'loading'
-        this.workIdentityEvidenceRefreshResumeWaiters.clear()
-        this.workIdentityEvidenceRefreshResult = null
-        this.workIdentityEvidenceRefreshProgress = {
-            state: 'running',
-            phase: 'loading',
-            done: 0,
-            total: 0,
-            candidateCount: 0,
-            pairChecks: 0,
-            savedCount: 0,
-            startedAt: now,
-            updatedAt: now
-        }
-
-        const run = (async () => {
-            let releaseResources: () => void = () => undefined
-            try {
-                const lease = await this.runtimeResources.acquire({
-                    ownerId: 'work-identity-evidence',
-                    taskType: 'work-identity-evidence-refresh',
-                    priority: 'background',
-                    resources: {
-                        'cpu-analysis': 1,
-                        'sqlite-read-heavy': 1,
-                        'sqlite-write-heavy': 1
-                    }
-                })
-                releaseResources = () => lease.release()
-                // Detach the first full-catalog read from the start request.
-                await new Promise<void>((resolve) => setTimeout(resolve, 0))
-                await this.workIdentityEvidenceRefreshCheckpoint()
-                const catalog = this.allComicsForIdentity()
-                const state = new RecommendationPolicyStoreV5(
-                    this.database
-                ).state()
-                await this.workIdentityEvidenceRefreshCheckpoint()
-                const audit = await buildWorkIdentityAuditAsyncV5(
-                    catalog,
-                    state,
-                    limit,
-                    {
-                        checkpoint: () =>
-                            this.workIdentityEvidenceRefreshCheckpoint(),
-                        onProgress: (progress) => {
-                            const controlState =
-                                this.workIdentityEvidenceRefreshProgress.state
-                            this.workIdentityEvidenceRefreshResumePhase =
-                                progress.phase
-                            this.workIdentityEvidenceRefreshProgress = {
-                                ...this.workIdentityEvidenceRefreshProgress,
-                                ...progress,
-                                state:
-                                    controlState === 'pausing' ||
-                                    controlState === 'cancelling'
-                                        ? controlState
-                                        : 'running',
-                                updatedAt: new Date().toISOString()
-                            }
-                        }
-                    }
-                )
-                await this.workIdentityEvidenceRefreshCheckpoint()
-                this.workIdentityEvidenceRefreshResumePhase = 'persisting'
-                this.workIdentityEvidenceRefreshProgress = {
-                    ...this.workIdentityEvidenceRefreshProgress,
-                    state: 'running',
-                    phase: 'persisting',
-                    done: audit.scannedComicCount,
-                    total: audit.scannedComicCount,
-                    candidateCount: audit.candidateCount,
-                    updatedAt: new Date().toISOString()
-                }
-                await this.workIdentityEvidenceRefreshCheckpoint()
-                const saved = this.database.saveWorkIdentityEvidence(
-                    audit.candidates.map((candidate) => ({
-                        leftComicId: candidate.leftComicId,
-                        rightComicId: candidate.rightComicId,
-                        relation: candidate.relation,
-                        confidence: candidate.confidence,
-                        resolverVersion: candidate.resolverVersion,
-                        evidence: {
-                            ...candidate.evidence,
-                            leftProvider: candidate.leftProvider,
-                            rightProvider: candidate.rightProvider,
-                            crossProvider: candidate.crossProvider
-                        }
-                    }))
-                )
-                this.workIdentityEvidenceRefreshResult = {
-                    scannedComicCount: audit.scannedComicCount,
-                    candidateCount: audit.candidateCount,
-                    crossProviderCandidateCount:
-                        audit.crossProviderCandidateCount,
-                    savedCount: saved.upserted
-                }
-                this.workIdentityEvidenceRefreshProgress = {
-                    ...this.workIdentityEvidenceRefreshProgress,
-                    state: 'complete',
-                    phase: 'complete',
-                    done: audit.scannedComicCount,
-                    total: audit.scannedComicCount,
-                    candidateCount: audit.candidateCount,
-                    savedCount: saved.upserted,
-                    updatedAt: new Date().toISOString()
-                }
-            } catch (error) {
-                if (
-                    error instanceof WorkIdentityEvidenceRefreshCancelledError
-                )
-                    this.workIdentityEvidenceRefreshProgress = {
-                        ...this.workIdentityEvidenceRefreshProgress,
-                        state: 'cancelled',
-                        phase: 'cancelled',
-                        updatedAt: new Date().toISOString()
-                    }
-                else
-                    this.workIdentityEvidenceRefreshProgress = {
-                        ...this.workIdentityEvidenceRefreshProgress,
-                        state: 'failed',
-                        phase: 'failed',
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : String(error),
-                        updatedAt: new Date().toISOString()
-                    }
-            } finally {
-                releaseResources()
-                this.finishWorkIdentityEvidenceRefreshControl()
-            }
-        })()
-        this.workIdentityEvidenceRefreshRun = run
-        void run.catch(() => {
-            // The task records its authoritative terminal state above.
-        })
-        return {
-            started: true,
-            ...this.recommendationV5WorkIdentityEvidenceRefreshStatus()
-        }
+        return this.workIdentityTaskV5.start(requestedLimit)
     }
 
     recommendationV5WorkIdentityAudit(limit = 200) {
-        const catalog = this.allComicsForIdentity()
-        const state = new RecommendationPolicyStoreV5(this.database).state()
-        return {
-            ...buildWorkIdentityAuditV5(catalog, state, limit),
-            resolverVersion: WORK_IDENTITY_RESOLVER_VERSION,
-            persistence: 'NONE' as const,
-            automaticBinding: false
-        }
+        return this.workIdentityQueriesV5().recommendationV5WorkIdentityAudit(limit)
     }
 
     recommendationV5WorkIdentityEvidence(limit = 200) {
-        return {
-            storage: this.database.workIdentityStorageStatus(),
-            evidence: this.database.listWorkIdentityEvidence(limit),
-            automaticBinding: false
-        }
+        return this.workIdentityQueriesV5().recommendationV5WorkIdentityEvidence(limit)
     }
 
     recommendationV5RefreshWorkIdentityEvidence(limit = 500) {
-        const audit = this.recommendationV5WorkIdentityAudit(limit)
-        const saved = this.database.saveWorkIdentityEvidence(
-            audit.candidates.map((candidate) => ({
-                leftComicId: candidate.leftComicId,
-                rightComicId: candidate.rightComicId,
-                relation: candidate.relation,
-                confidence: candidate.confidence,
-                resolverVersion: candidate.resolverVersion,
-                evidence: {
-                    ...candidate.evidence,
-                    leftProvider: candidate.leftProvider,
-                    rightProvider: candidate.rightProvider,
-                    crossProvider: candidate.crossProvider
-                }
-            }))
-        )
-        return {
-            mode: 'EVIDENCE_ONLY' as const,
-            resolverVersion: audit.resolverVersion,
-            scannedComicCount: audit.scannedComicCount,
-            candidateCount: audit.candidateCount,
-            crossProviderCandidateCount:
-                audit.crossProviderCandidateCount,
-            saved,
-            storage: this.database.workIdentityStorageStatus(),
-            automaticBinding: false
-        }
+        return this.workIdentityCommandsV5().recommendationV5RefreshWorkIdentityEvidence(limit)
     }
 
 
     recommendationV5WorkIdentityReview(limit = 200) {
-        const evidence = this.database.listWorkIdentityEvidence(limit)
-        const decisions = this.database.listWorkIdentityDecisions(5000)
-        const decisionCount =
-            this.database.workIdentityStorageStatus().counts.decisions
-        const authoritativeDecisions =
-            decisionCount > decisions.length
-                ? this.database.listAllWorkIdentityDecisions()
-                : decisions
-        const decisionByPair = new Map(
-            authoritativeDecisions.map((item) => [
-                [item.leftComicId, item.rightComicId].sort().join('\u0000'),
-                item
-            ])
-        )
-        const rows = evidence.map((item) => ({
-            ...item,
-            decision:
-                decisionByPair.get(
-                    [item.leftComicId, item.rightComicId]
-                        .sort()
-                        .join('\u0000')
-                ) ?? null
-        }))
-        const materializationPreview =
-            buildWorkIdentityMaterializationPreviewV5(
-                this.allComicsForIdentity(),
-                authoritativeDecisions
-            )
-        return {
-            mode: 'HUMAN_REVIEW' as const,
-            storage: this.database.workIdentityStorageStatus(),
-            evidence: rows,
-            decisions,
-            undecidedCount: rows.filter((item) => !item.decision).length,
-            materializationPreview,
-            automaticBinding: false
-        }
+        return this.workIdentityQueriesV5().recommendationV5WorkIdentityReview(limit)
     }
 
     recommendationV5WorkIdentityMaterializationPlan() {
-        const catalog = this.allComicsForIdentity()
-        const decisions = this.database.listAllWorkIdentityDecisions()
-        const existingBindings = this.database.listAllWorkIdentityBindings()
-        const plan = buildWorkIdentityMaterializationPlanV5(
-            catalog,
-            decisions,
-            existingBindings
-        )
-        const planDigest = createHash('sha256')
-            .update(JSON.stringify(plan))
-            .digest('hex')
-        return {
-            ...plan,
-            planDigest,
-            storage: this.database.workIdentityStorageStatus()
-        }
+        return this.workIdentityQueriesV5().recommendationV5WorkIdentityMaterializationPlan()
     }
 
     prepareRecommendationV5WorkIdentityMaterialization(
         input: Record<string, unknown>
     ) {
-        const requestKey = String(input.requestKey ?? '').trim()
-        const expectedPlanVersion = String(
-            input.planVersion ?? ''
-        ).trim()
-        const expectedPlanDigest = String(
-            input.planDigest ?? ''
-        )
-            .trim()
-            .toLowerCase()
-        const confirmation = String(input.confirmation ?? '').trim()
-        if (
-            confirmation !==
-            WORK_IDENTITY_MATERIALIZATION_PREPARE_CONFIRMATION
-        )
-            throw new Error(
-                'Explicit materialization preparation confirmation is required'
-            )
-
-        const current =
-            this.recommendationV5WorkIdentityMaterializationPlan()
-        if (expectedPlanVersion !== current.planVersion)
-            throw new Error('Materialization plan version changed')
-        if (expectedPlanDigest !== current.planDigest)
-            throw new Error('Materialization plan digest changed')
-        if (current.summary.workGroupCount < 1)
-            throw new Error('No adjudicated work groups are ready to prepare')
-        if (
-            current.summary.blockedGroupCount > 0 ||
-            current.summary.warningCount > 0 ||
-            current.summary.fullBindingReadyCount !==
-                current.summary.workGroupCount
-        )
-            throw new Error(
-                'Materialization plan still contains blockers, warnings, or unresolved edition partitions'
-            )
-
-        const run = this.database.prepareWorkIdentityMaterializationRun({
-            requestKey,
-            planVersion: current.planVersion,
-            planDigest: current.planDigest,
-            plan: current
-        })
-        return {
-            mode: 'PREPARED_ONLY' as const,
-            executionEnabled: false,
-            applyEndpoint: null,
-            run,
-            currentPlanDigest: current.planDigest
-        }
+        return this.workIdentityCommandsV5().prepareRecommendationV5WorkIdentityMaterialization(input)
     }
 
     recommendationV5WorkIdentityMaterializationRuns(limit = 100) {
-        return {
-            executionEnabled: false,
-            runs: this.database.listWorkIdentityMaterializationRuns(limit)
-        }
+        return this.workIdentityQueriesV5().recommendationV5WorkIdentityMaterializationRuns(limit)
     }
 
     updateRecommendationV5WorkIdentityDecision(
         input: Record<string, unknown>
     ) {
-        const leftComicId = String(input.leftComicId ?? '').trim()
-        const rightComicId = String(input.rightComicId ?? '').trim()
-        const rawDecision = String(input.decision ?? '').trim().toUpperCase()
-        const store = new RecommendationPolicyStoreV5(this.database)
-
-        if (rawDecision === 'CLEAR') {
-            this.database.clearWorkIdentityDecision(
-                leftComicId,
-                rightComicId
-            )
-            store.setExplicitDistinctPair(
-                leftComicId,
-                rightComicId,
-                false
-            )
-            return this.recommendationV5WorkIdentityReview(
-                Number(input.limit ?? 200)
-            )
-        }
-
-        if (
-            !['SAME_WORK', 'EDITION_VARIANT', 'KEEP_SEPARATE'].includes(
-                rawDecision
-            )
-        )
-            throw new Error('Unknown work identity decision')
-
-        const decision = rawDecision as
-            | 'SAME_WORK'
-            | 'EDITION_VARIANT'
-            | 'KEEP_SEPARATE'
-        this.database.saveWorkIdentityDecision({
-            leftComicId,
-            rightComicId,
-            decision,
-            source: 'USER',
-            note: String(input.note ?? '')
-        })
-        // Only KEEP_SEPARATE changes serving at this stage. SAME_WORK and
-        // EDITION_VARIANT remain adjudicated evidence until a later binding
-        // phase is explicitly enabled.
-        store.setExplicitDistinctPair(
-            leftComicId,
-            rightComicId,
-            decision === 'KEEP_SEPARATE'
-        )
-        return this.recommendationV5WorkIdentityReview(
-            Number(input.limit ?? 200)
-        )
+        return this.workIdentityCommandsV5().updateRecommendationV5WorkIdentityDecision(input)
     }
 
     updateRecommendationV5Control(input: Record<string, unknown>) {
@@ -3303,7 +1391,7 @@ export class LibraryService {
     recommendationPortablePackageV5(limit = 500) {
         const bounded = Math.max(24, Math.min(1000, Math.floor(limit)))
         const policyStore = new RecommendationPolicyStoreV5(this.database)
-        const policy = policyStore.state()
+        const policy = policyStore.state({ initialize: false })
         const active = this.database.getAppState<{
             activeCycleId?: string | null
         }>('recommendation.v3.activeCycle.v1')
@@ -3424,6 +1512,7 @@ export class LibraryService {
         const portablePolicyGeneration = createHash('sha256')
             .update(
                 JSON.stringify({
+                    tagPolicy: normalizeTagPolicyV1(policy.tagPolicy),
                     controls: policy.controls
                         .filter((control) => control.scope === 'PERSISTENT')
                         .map((control) => ({
@@ -3495,6 +1584,7 @@ export class LibraryService {
             author: comic.author,
             canonicalAuthor: comic.canonicalAuthor ?? null,
             tags: comic.tags,
+            providerRawTags: comicTagProviderV1(comic) === 'eh' ? providerRawTagFactsV1(comic) : [],
             categories: comic.categories,
             pagesCount: comic.pagesCount ?? null,
             totalLikes: comic.totalLikes ?? null,
@@ -3640,7 +1730,7 @@ export class LibraryService {
 
     visualPreferenceProfile() {
         const tasteExcluded = new Set(
-            new RecommendationPolicyStoreV5(this.database).state()
+            new RecommendationPolicyStoreV5(this.database).state({ initialize: false })
                 .tasteExcludedComicIds
         )
         const favorites = new Set(
@@ -3899,15 +1989,36 @@ export class LibraryService {
         readonly dataDir: string,
         provider?: Pica,
         ehProvider?: EhProvider,
-        runtimeResources?: RuntimeResourceCoordinator
+        runtimeResources?: RuntimeResourceCoordinator,
+        readonly sources = new SourceRuntime()
     ) {
         this.pica = provider ?? null
         this.ehProvider = ehProvider ?? new EhProvider()
+        this.pica?.setSourceAccess?.(sources.acquire)
+        this.ehProvider.setSourceAccess?.(sources.acquire)
+        this.jmProvider.setSourceAccess(sources.acquire)
         this.runtimeResources =
             runtimeResources ??
             new RuntimeResourceCoordinator({
                 mode: 'observe'
             })
+        const identityPorts = workIdentityTaskPortsV5(
+            this.database, () => this.allComicsForIdentity()
+        )
+        this.workIdentityTaskV5 = new WorkIdentityTaskV5(
+            identityPorts.read, identityPorts.write, {
+                acquire: () => this.runtimeResources.acquire({
+                    ownerId: 'work-identity-evidence',
+                    taskType: 'work-identity-evidence-refresh',
+                    priority: 'background',
+                    resources: {
+                        'cpu-analysis': 1,
+                        'sqlite-read-heavy': 1,
+                        'sqlite-write-heavy': 1
+                    }
+                })
+            }
+        )
         fs.mkdirSync(dataDir, { recursive: true })
         this.recoveredLocalDownloadJobs =
             this.database.recoverInterruptedDownloadJobs('LOCAL')
@@ -3915,6 +2026,7 @@ export class LibraryService {
     }
 
     async connect() {
+        const lease = this.sources.acquire('pica')
         if (this.pica) return this.pica
         const account = process.env.PICA_ACCOUNT
         const password = process.env.PICA_PASSWORD
@@ -3923,8 +2035,9 @@ export class LibraryService {
                 'PICA_ACCOUNT and PICA_PASSWORD are required for connected mode'
             )
         }
-        const pica = new Pica()
+        const pica = new Pica({ sourceAccess: this.sources.acquire })
         await pica.login(account, password)
+        lease.check()
         this.pica = pica
         return pica
     }
@@ -3938,7 +2051,8 @@ export class LibraryService {
             () => this.connect(),
             this.database,
             this.ehProvider,
-            this.jmProvider
+            this.jmProvider,
+            this.sources
         )
     }
 
@@ -3946,19 +2060,23 @@ export class LibraryService {
     jmRuntimeAvailable() { return this.jmProvider.available }
     setJmCredentials(username?: string, password?: string) { this.jmProvider.setRememberedCredentials(username, password) }
     async jmLogin(username: string, password: string) {
+        this.sources.acquire('jm')
         this.jmMetadataGeneration++
         this.jmFavorites.clear()
         return this.jmProvider.login(username, password)
     }
     async jmClearAccount() { this.jmMetadataGeneration++; this.jmFavorites.clear(); await this.jmProvider.clearAccount() }
     jmPreviewFavorites(folderId = 0, checkpoint?: () => Promise<void>) {
+        this.sources.acquire('jm')
         return this.jmFavorites.scan(this.jmProvider, folderId, checkpoint)
     }
     async jmConfirmFavorites(token: string) {
-        return this.jmFavorites.confirm(token, await this.jmProvider.accountStatus(), this.database)
+        const identity = await this.sources.run('jm', () => this.jmProvider.accountStatus())
+        return this.jmFavorites.confirm(token, identity, this.database)
     }
     jmCancelFavorites() { this.jmMetadataGeneration++; this.jmFavorites.clear() }
     async jmEnrichFavorites(checkpoint?: () => Promise<void>) {
+        const lease = this.sources.acquire('jm')
         if (this.jmMetadataBusy) throw new Error('JM 资料补全正在进行')
         this.jmMetadataBusy = true
         const generation = ++this.jmMetadataGeneration
@@ -3971,6 +2089,7 @@ export class LibraryService {
                 if (generation !== this.jmMetadataGeneration) break
                 try {
                     const details = await this.jmProvider.details(comic.comicId)
+                    lease.check()
                     if (generation !== this.jmMetadataGeneration) break
                     this.database.importCatalog([providerComicToRecord(details)], 'jm:metadata:details')
                     updated++
@@ -3980,6 +2099,11 @@ export class LibraryService {
         } finally { this.jmMetadataBusy = false }
     }
     closeSources() { this.jmMetadataGeneration++; this.jmFavorites.clear(); this.jmProvider.close() }
+
+    sourceChoicesApplied(disabled: SourceId[]) {
+        if (disabled.includes('jm')) this.closeSources()
+        if (disabled.includes('pica')) this.resetPicaSession()
+    }
 
     async refreshAuthorWorks(authorId: string) {
         const author = this.database.listAuthors().find((item) => item.id === authorId)
@@ -4048,7 +2172,7 @@ export class LibraryService {
     }
 
     async mobileEhRelayFavoritesSnapshot() {
-        const snapshot = await this.ehProvider.favoriteSnapshot()
+        const snapshot = await this.sources.run('eh', () => this.ehProvider.favoriteSnapshot())
         const records = snapshot.comics.map((comic) =>
             this.recordForOnlineSource(comic, 'eh')
         )
@@ -4058,14 +2182,14 @@ export class LibraryService {
 
     async mobileEhRelaySearch(input: SearchRequest) {
         const surface: EhSurface = input.surface === 'exh' ? 'exh' : 'eh'
-        const comics = await this.ehProvider.search({
+        const comics = await this.sources.run('eh', () => this.ehProvider.search({
             ...input,
             surface,
             limit: Math.max(
                 1,
                 Math.min(100, Math.floor(Number(input.limit) || 50))
             )
-        })
+        }))
         if (comics.length)
             this.database.importCatalog(
                 comics.map((comic) =>
@@ -4077,10 +2201,10 @@ export class LibraryService {
     }
 
     async mobileEhRelayDetails(comicId: string, surface: EhSurface) {
-        const comic = await this.ehProvider.detailsOnSurface(
+        const comic = await this.sources.run('eh', () => this.ehProvider.detailsOnSurface(
             comicId,
             surface
-        )
+        ))
         this.database.importCatalog(
             [this.recordForOnlineSource(comic, surface)],
             `${surface}:mobile-relay-details`
@@ -4089,7 +2213,7 @@ export class LibraryService {
     }
 
     mobileEhRelayEpisodes(comicId: string, surface: EhSurface) {
-        return this.ehProvider.episodesOnSurface(comicId, surface)
+        return this.sources.run('eh', () => this.ehProvider.episodesOnSurface(comicId, surface))
     }
 
     mobileEhRelayPages(
@@ -4097,18 +2221,18 @@ export class LibraryService {
         episode: Episode,
         surface: EhSurface
     ) {
-        return this.ehProvider.pagesOnSurface(comicId, episode, surface)
+        return this.sources.run('eh', () => this.ehProvider.pagesOnSurface(comicId, episode, surface))
     }
 
     mobileEhRelayFetchPage(
         locator: string,
         maxBytes = 20 * 1024 * 1024
     ) {
-        return this.ehProvider.fetchPage(locator, maxBytes)
+        return this.sources.run('eh', () => this.ehProvider.fetchPage(locator, maxBytes))
     }
 
     mobileEhRelayProbeExH() {
-        return this.ehProvider.probeExHentai()
+        return this.sources.run('eh', () => this.ehProvider.probeExHentai())
     }
 
     async mobileEhRelaySetFavorite(
@@ -4117,6 +2241,7 @@ export class LibraryService {
         category = 0,
         note = ''
     ) {
+        const lease = this.sources.acquire('eh')
         if (!this.ehProvider.hasSession())
             throw new Error('E-H account session is not configured')
         let before = this.database.getComic(comicId)
@@ -4125,6 +2250,7 @@ export class LibraryService {
                 comicId,
                 'eh'
             )
+            lease.check()
             this.database.importCatalog(
                 [this.recordForOnlineSource(comic, 'eh')],
                 'eh:mobile-relay-favorite'
@@ -4151,6 +2277,7 @@ export class LibraryService {
             category,
             note
         )
+        lease.check()
         const after = this.database.setEhFavoriteState(
             comicId,
             desired
@@ -4166,11 +2293,26 @@ export class LibraryService {
     }
 
     async cover(comicId: string) {
+        // Reuse the existing per-key promise pattern: one writer per comic, including scope changes.
+        const previous = this.coverRequests.get(comicId)
+        const request = (async () => {
+            if (previous) await previous.catch(() => undefined)
+            return this.loadCover(comicId)
+        })()
+        this.coverRequests.set(comicId, request)
+        try { return await request }
+        finally { if (this.coverRequests.get(comicId) === request) this.coverRequests.delete(comicId) }
+    }
+
+    private async loadCover(comicId: string) {
+        if (comicId.startsWith('local:')) return { ...await this.downloadedCover(comicId), cached: true }
         const comic = this.database.getComic(comicId)
         if (!comic?.coverUrl) throw new Error('Comic cover is unavailable')
 
         const cacheDir = path.join(this.dataDir, 'cover-cache')
         const cacheKey = createHash('sha256').update(comicId).digest('hex')
+        const providerService = this.providerService()
+        const sourceScope = providerService.cacheScope(comicId)
         const sourceFingerprint = createHash('sha256')
             .update(
                 [
@@ -4178,12 +2320,20 @@ export class LibraryService {
                     comic.providerId ?? '',
                     comic.providerRemoteId ?? '',
                     comic.coverUrl,
-                    comic.updatedAt ?? ''
+                    comic.updatedAt ?? '',
+                    sourceScope
                 ].join('\n')
             )
             .digest('hex')
         const imageFile = path.join(cacheDir, `${cacheKey}.bin`)
         const metadataFile = path.join(cacheDir, `${cacheKey}.json`)
+        const assertCurrentSource = () => {
+            const current = this.database.getComic(comicId)
+            if (sourceScope !== providerService.cacheScope(comicId) || current?.coverUrl !== comic.coverUrl ||
+                current?.updatedAt !== comic.updatedAt || current?.providerId !== comic.providerId || current?.providerRemoteId !== comic.providerRemoteId)
+                throw new Error('Cover source changed while loading; please retry')
+        }
+        let cached: { data: Buffer; contentType: string; cached: boolean } | undefined
         try {
             const metadata = JSON.parse(
                 await fs.promises.readFile(metadataFile, 'utf8')
@@ -4197,7 +2347,7 @@ export class LibraryService {
                 String(metadata.sourceFingerprint ?? '') !== sourceFingerprint
             )
                 throw new Error('invalid')
-            return {
+            cached = {
                 data: await fs.promises.readFile(imageFile),
                 contentType,
                 cached: true
@@ -4205,9 +2355,10 @@ export class LibraryService {
         } catch {
             // A partial, legacy, or source-stale cache entry is replaced below.
         }
+        if (cached) { assertCurrentSource(); return cached }
 
-        const providerService = this.providerService()
         const image = await providerService.fetchCover(comicId, comic.coverUrl)
+        assertCurrentSource()
         await fs.promises.mkdir(cacheDir, { recursive: true })
         const imagePartial = `${imageFile}.part`
         const metadataPartial = `${metadataFile}.part`
@@ -4225,440 +2376,58 @@ export class LibraryService {
     }
 
     async buildFinalRecommendationCycleV3(cycleId: string) {
+        const sourceRevision = this.sources.snapshot().revision
         this.beginRecommendationBuild(cycleId)
         let releaseResources: () => void = () => undefined
         try {
-        const lease = await this.runtimeResources.acquire({
-            ownerId: 'recommendation-v3',
-            taskType: 'recommendation-v3-build',
-            priority: 'background',
-            resources: {
-                'provider-network': 1,
-                'cpu-analysis': 1,
-                'sqlite-read-heavy': 1,
-                'sqlite-write-heavy': 1
-            }
-        })
-        releaseResources = () => lease.release()
-        await this.recommendationCheckpoint()
-        const pica = await this.connect()
-        const providerService = this.providerService()
-        const catalog = this.database.listComics({ limit: 10000 })
-        const recommendationV5Store = new RecommendationPolicyStoreV5(this.database)
-        const recommendationV5State = recommendationV5Store.state()
-        const tasteExcludedIds = new Set(
-            recommendationV5State.tasteExcludedComicIds
-        )
-        const readingIds = new Set(
-            this.database.readingProgress().map((item) => item.comicId)
-        )
-        const explicitFavoriteIds = new Set(
-            catalog
-                .filter(
-                    (comic) =>
-                        comic.isFavorite &&
-                        !tasteExcludedIds.has(comic.comicId)
-                )
-                .map((comic) => comic.comicId)
-        )
-        const recommendationFeedback = this.database.recommendationFeedback()
-        const latestFeedback = new Map(
-            recommendationFeedback.map((item) => [item.comicId, item])
-        )
-        const dislikedIds = new Set(
-            recommendationFeedback
-                .filter((item) => item.sentiment === 'dislike')
-                .map((item) => item.comicId)
-        )
-        const likedIds = new Set(
-            recommendationFeedback
-                .filter((item) => item.sentiment === 'like')
-                .map((item) => item.comicId)
-        )
-        const favorites = catalog
-            .filter(
-                (comic) =>
-                    !tasteExcludedIds.has(comic.comicId) &&
-                    !dislikedIds.has(comic.comicId) &&
-                    (comic.isFavorite || likedIds.has(comic.comicId))
-            )
-            .map((comic) => ({ ...comic, isFavorite: true }))
-        const registry = loadTagRegistryV3(runtimeRegistryDirectory())
-        const profile = buildFinalLifetimeProfileV3(favorites, { registry })
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = { state: 'running', phase: 'intents', done: 1, total: 7 }
-        const history: IntentCycleHistory[] = this.database
-            .listV3CandidatePools(50)
-            .flatMap((pool) => {
-                const state = String(pool.telemetry.state ?? '')
-                const completedAt = String(pool.telemetry.completedAt ?? '')
-                const plan = Array.isArray(pool.telemetry.intentPlan)
-                    ? (pool.telemetry.intentPlan as Array<{
-                          intentId?: unknown
-                      }>)
-                    : []
-                return completedAt &&
-                    (state === 'EXHAUSTED' || state === 'SUPERSEDED')
-                    ? [
-                          {
-                              state,
-                              completedAt,
-                              intentIds: plan
-                                  .map((intent) =>
-                                      String(intent.intentId ?? '')
-                                  )
-                                  .filter(Boolean)
-                          } as IntentCycleHistory
-                      ]
-                    : []
-            })
-        const baseIntents = buildRecommendationIntentsV3({
-            profile,
-            favorites,
-            history
-        })
-        const intents = applyIntentPolicyV5(
-            baseIntents,
-            recommendationV5State
-        )
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = { state: 'running', phase: 'routes', done: 2, total: 7 }
-        const routes = translateIntentPlanV3(intents)
-        const storePica = (comics: Comic[]) => {
-            const records = comics.map(comicToRecord)
-            this.database.importCatalog(records, 'pica:recommendations')
-            return records.flatMap((record) => {
-                const stored = this.database.getComic(record.comicId)
-                return stored ? [stored] : []
-            })
-        }
-        const storedRecords = (records: FavoriteRecord[]): StoredComic[] =>
-            records.flatMap((record) => {
-                const stored = this.database.getComic(record.comicId)
-                return stored ? [stored] : []
-            })
-        const mergeProviderResults = (
-            primary: StoredComic[],
-            secondary: StoredComic[]
-        ) => [
-            ...new Map(
-                [...primary, ...secondary].map((comic) => [comic.comicId, comic])
-            ).values()
-        ]
-        const externalCache = new Map<string, StoredComic[]>()
-        const sourceBudget: Record<'eh' | 'exh', number> = { eh: 4, exh: 2 }
-        const sourceRequests: Record<'eh' | 'exh', number> = { eh: 0, exh: 0 }
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'providers',
-            done: 3,
-            total: 7
-        }
-        const exhAvailable =
-            (await providerService
-                .probeExHentai()
-                .catch(() => 'UNAVAILABLE')) === 'AVAILABLE'
-        const externalSearch = async (
-            query: string,
-            kind: 'keyword' | 'author',
-            source: 'eh' | 'exh'
-        ): Promise<StoredComic[]> => {
-            if (source === 'exh' && !exhAvailable) return []
-            const clean = query.trim()
-            if (!clean) return []
-            const key = `${source}:${kind}:${clean.toLocaleLowerCase("und")}`
-            const cached = externalCache.get(key)
-            if (cached) return cached
-            if (sourceRequests[source] >= sourceBudget[source]) return []
-            sourceRequests[source] += 1
-            const providerQuery = kind === 'author' ? `artist:"${clean.replaceAll("\"", "")}"` : clean
-            try {
-                await this.recommendationCheckpoint()
-                const records = await providerService.search(
-                    { keyword: providerQuery, limit: 40 },
-                    [source],
-                    'recommendations'
-                )
-                const stored = storedRecords(records)
-                externalCache.set(key, stored)
-                return stored
-            } catch {
-                externalCache.set(key, [])
-                return []
-            }
-        }
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'retrieve',
-            done: 4,
-            total: 7
-        }
-        const retrieved = await retrieveCandidatesV3({
-            provider: {
-                keyword: async (query, page) => {
-                    await this.recommendationCheckpoint()
-                    const picaResults = storePica(
-                        (
-                            await pica.comicsPage(
-                                '',
-                                query,
-                                pica.Order.loved,
-                                page
-                            )
-                        ).docs
-                    )
-                    const ehResults = page === 1 ? await externalSearch(query, 'keyword', 'eh') : []
-                    const exhResults = page === 1 ? await externalSearch(query, 'keyword', 'exh') : []
-                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
-                },
-                author: async (query, page) => {
-                    await this.recommendationCheckpoint()
-                    const picaResults = storePica(
-                        (await pica.search(query, page, pica.Order.loved)).docs
-                    )
-                    const ehResults = page === 1 ? await externalSearch(query, 'author', 'eh') : []
-                    const exhResults = page === 1 ? await externalSearch(query, 'author', 'exh') : []
-                    return mergeProviderResults(mergeProviderResults(picaResults, ehResults), exhResults)
-                },
-                related: async (comicId) => {
-                    await this.recommendationCheckpoint()
-                    return comicId.startsWith('eh:')
-                        ? []
-                        : storePica(await pica.related(comicId))
-                }
-            },
-            routes,
-            intents,
-            favoriteIds: new Set(favorites.map((comic) => comic.comicId)),
-            isSafetyExcluded: (comic) =>
-                comic.tags.some((tag) => {
-                    const resolved = resolveTagV3(tag, registry)
-                    return (
-                        resolved.resolutionType === 'SAFETY' ||
-                        resolved.recommendationRole === 'SAFETY_EXCLUDE'
-                    )
-                }),
-            candidateFandomKeys: (comic) =>
-                comic.tags.flatMap((tag) => {
-                    const resolved = resolveTagV3(tag, registry)
-                    return resolved.facet === 'FANDOM_IP' &&
-                        resolved.resolutionStatus === 'RESOLVED'
-                        ? [resolved.canonicalKey]
-                        : []
-                })
-        })
-        if (retrieved.readiness === 'FAILED_INSUFFICIENT_POOL')
-            throw new Error(
-                'Recommendation generation could not retrieve enough candidates; previous recommendations were kept'
-            )
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'rank',
-            done: 5,
-            total: 7
-        }
-        const v5Filtered = filterCandidatesAgainstOwnedV5(
-            retrieved.candidates,
-            catalog,
-            recommendationV5State
-        )
-        const ranked = rankCandidatesWithFrozenRankerV3({
-            candidates: v5Filtered.rows,
-            favorites,
-            graphEdges: this.database.listRecommendationEdges().map((edge) => ({
-                sourceComicId: edge.sourceComicId,
-                targetComicId: edge.targetComicId,
-                confidence: edge.confidence,
-                observationCount: edge.observationCount
-            }))
-        })
-        const catalogById = new Map(
-            catalog.map((comic) => [comic.comicId, comic])
-        )
-        const feedbackAdjusted = ranked
-            .filter((candidate) => !latestFeedback.has(candidate.comicId))
-            .map((candidate, index) => {
-                const feedbackAdjustment = metadataFeedbackAdjustment({
-                    candidate: candidate.comic,
-                    feedback: recommendationFeedback,
-                    catalogById
-                })
-                const baselinePercentile =
-                    ranked.length <= 1 ? 1 : 1 - index / (ranked.length - 1)
-                return {
-                    ...candidate,
-                    feedbackAdjustment,
-                    __feedbackRankScore:
-                        baselinePercentile + feedbackAdjustment
+            const lease = await this.runtimeResources.acquire({
+                ownerId: 'recommendation-v3',
+                taskType: 'recommendation-v3-build',
+                priority: 'background',
+                resources: {
+                    'provider-network': 1,
+                    'cpu-analysis': 1,
+                    'sqlite-read-heavy': 1,
+                    'sqlite-write-heavy': 1
                 }
             })
-            .sort(
-                (a, b) =>
-                    b.__feedbackRankScore - a.__feedbackRankScore ||
-                    a.rawRank - b.rawRank ||
-                    a.comicId.localeCompare(b.comicId)
-            )
-            .map(({ __feedbackRankScore: _score, ...candidate }) => candidate)
-        const policyAdjusted = feedbackAdjusted
-            .map((candidate, index) => {
-                const policy = preferenceAdjustmentV5(
-                    candidate.comic,
-                    recommendationV5State
-                )
-                const baselinePercentile =
-                    feedbackAdjusted.length <= 1
-                        ? 1
-                        : 1 - index / (feedbackAdjusted.length - 1)
-                return {
-                    ...candidate,
-                    v5Adjustment: policy.adjustment,
-                    v5Reasons: policy.reasons,
-                    __v5RankScore: baselinePercentile + policy.adjustment
-                }
-            })
-            .filter((candidate) => !preferenceAdjustmentV5(candidate.comic, recommendationV5State).blocked)
-            .sort(
-                (a, b) =>
-                    b.__v5RankScore - a.__v5RankScore ||
-                    a.rawRank - b.rawRank ||
-                    a.comicId.localeCompare(b.comicId)
-            )
-            .map(({ __v5RankScore: _score, ...candidate }) => candidate)
-        await this.recommendationCheckpoint()
-        this.recommendationProgress = {
-            state: 'running',
-            phase: 'visual',
-            done: 6,
-            total: 7
-        }
-        const visualSettings = this.visualSettings()
-        const visualEmbeddings = this.database.listVisualEmbeddings()
-        const visualProfile = buildVisualPreferenceProfile({
-            embeddings: visualEmbeddings,
-            favoriteComicIds: explicitFavoriteIds,
-            feedback: recommendationFeedback,
-            catalogSize: Math.max(1, explicitFavoriteIds.size + likedIds.size)
-        })
-        const reranked = rerankWithVisualStyle({
-            ranked: policyAdjusted,
-            embeddings: visualEmbeddings,
-            profile: visualProfile,
-            mode: visualSettings.enabled ? visualSettings.rerankMode : 'OFF',
-            strength: visualSettings.strength
-        })
-        this.recommendationProgress = {
-            state: 'complete',
-            phase: 'complete',
-            done: 7,
-            total: 7
-        }
-        return {
-            profile,
-            intents,
-            routes,
-            ranked: reranked,
-            readiness: retrieved.readiness,
-            telemetry: {
-                ...retrieved.telemetry,
+            releaseResources = () => lease.release()
+            return await buildRecommendationCycleV3(
                 cycleId,
-                recommendationV5: {
-                    policyVersion: recommendationV5State.policyVersion,
-                    revision: recommendationV5State.revision,
-                    controlCount: recommendationV5State.controls.length,
-                    hardSuppressCount:
-                        recommendationV5State.hardSuppressComicIds.length,
-                    tasteExcludedCount:
-                        recommendationV5State.tasteExcludedComicIds.length,
-                    portableBaseline: {
-                        schemaVersion: recommendationV5State.schemaVersion,
-                        policyVersion: recommendationV5State.policyVersion,
-                        revision: recommendationV5State.revision,
-                        controls: recommendationV5State.controls,
-                        sessionIntent: recommendationV5State.sessionIntent,
-                        hardSuppressComicIds:
-                            recommendationV5State.hardSuppressComicIds
+                recommendationBuildPortsV3({
+                    database: this.database,
+                    sources: this.sources,
+                    connectPica: () => this.connect(),
+                    externalProvider: () => this.providerService(),
+                    convertPica: comicToRecord,
+                    visualSettings: () => this.visualSettings(),
+                    checkpoint: () => this.recommendationCheckpoint(),
+                    progress: (phase) => {
+                        this.recommendationProgress = {
+                            state:
+                                phase === 'complete' ? 'complete' : 'running',
+                            phase,
+                            done:
+                                [
+                                    'intents',
+                                    'routes',
+                                    'providers',
+                                    'retrieve',
+                                    'rank',
+                                    'visual',
+                                    'complete'
+                                ].indexOf(phase) + 1,
+                            total: 7
+                        }
                     },
-                    ownedOrDuplicateRemoved:
-                        v5Filtered.telemetry.exactOrOwnedRemoved +
-                        v5Filtered.telemetry.workDuplicateRemoved,
-                    workDuplicateRemoved:
-                        v5Filtered.telemetry.workDuplicateRemoved,
-                    hardBlockedRemoved:
-                        v5Filtered.telemetry.hardBlockedRemoved,
-                    policyAdjustedCount: policyAdjusted.filter(
-                        (item) =>
-                            Number(
-                                (item as { v5Adjustment?: number })
-                                    .v5Adjustment ?? 0
-                            ) !== 0
-                    ).length
-                },
-                recommendationV4: {
-                    feedbackCount: recommendationFeedback.length,
-                    likedCount: likedIds.size,
-                    dislikedCount: dislikedIds.size,
-                    exactFeedbackItemsSuppressed:
-                        ranked.length - feedbackAdjusted.length,
-                    visual: {
-                        settings: visualSettings,
-                        profileAvailable: Boolean(visualProfile),
-                        profileCoverage: visualProfile?.coverage ?? 0,
-                        positivePrototypeCount:
-                            visualProfile?.positivePrototypes.length ?? 0,
-                        negativePrototypeCount:
-                            visualProfile?.negativePrototypes.length ?? 0,
-                        candidateEmbeddingCount: reranked.filter((item) =>
-                            Boolean(
-                                item.visual &&
-                                    typeof item.visual === 'object' &&
-                                    (item.visual as { available?: boolean })
-                                        .available
+                    assertSourcesCurrent: () => {
+                        if (this.sources.snapshot().revision !== sourceRevision)
+                            throw new Error(
+                                'Source choices changed during recommendation generation; previous recommendations were kept'
                             )
-                        ).length,
-                        shadowMoveCount: reranked.filter((item) => {
-                            const visual = item.visual as
-                                | { shadowRank?: number | null }
-                                | undefined
-                            return Boolean(
-                                visual?.shadowRank &&
-                                    visual.shadowRank !== item.rawRank
-                            )
-                        }).length
                     }
-                },
-                providerSources: {
-                    ehRequests: sourceRequests.eh,
-                    exhRequests: sourceRequests.exh,
-                    exhAvailable,
-                    ehCandidates: retrieved.candidates.filter(
-                        (item) =>
-                            item.comic.providerId === 'eh' ||
-                            item.comic.comicId.startsWith('eh:')
-                    ).length,
-                    preferenceSignals: {
-                        explicitFavorites: explicitFavoriteIds.size,
-                        collectionSeeds: favorites.length,
-                        readingSeeds: readingIds.size,
-                        downloadedSeeds: favorites.filter((comic) => comic.downloadedPictures > 0).length
-                    },
-                    picaCandidates: retrieved.candidates.filter(
-                        (item) =>
-                            item.comic.providerId !== 'eh' &&
-                            !item.comic.comicId.startsWith('eh:')
-                    ).length
-                }
-            },
-            versions: {
-                profileVersion: FINAL_PROFILE_VERSION,
-                registryVersion: profile.registryVersion,
-                rankerModelVersion: `${RANKER_ADAPTER_VERSION}/${VISUAL_RERANK_VERSION}`,
-                candidatePoolVersion: `${INTENT_PLANNER_VERSION}/${QUERY_TRANSLATOR_VERSION}/${RETRIEVER_VERSION}`,
-                allocatorVersion: BATCH_ALLOCATOR_VERSION
-            }
-        }
+                })
+            )
         } catch (error) {
             const cancelled = error instanceof RecommendationBuildCancelledError
             this.recommendationProgress = {
@@ -4693,7 +2462,12 @@ export class LibraryService {
             contentTypes[path.extname(file).toLowerCase()]
         )
         if (!contentType) throw new Error('Downloaded cover type is unsafe')
-        return { data: await fs.promises.readFile(file), contentType }
+        // Reuse Reader's realpath/root checks, including imported local pages.
+        const realRoot = await fs.promises.realpath(this.dataDir)
+        const realFile = await fs.promises.realpath(file)
+        const relative = path.relative(realRoot, realFile)
+        if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Cover file escaped the Library root')
+        return { data: await fs.promises.readFile(realFile), contentType }
     }
 
     favoritesSyncProgress() {
@@ -4882,10 +2656,12 @@ export class LibraryService {
     }
 
     async favoritesPage(page: number) {
+        const lease = this.sources.acquire('pica')
         if (!Number.isInteger(page) || page < 1)
             throw new Error('Favorite page must be a positive integer')
         const pica = await this.connect()
         const result = await pica.favorites(page)
+        lease.check()
         const records = result.docs.map(comicToRecord)
         this.database.importFavorites(
             records,
@@ -4964,457 +2740,14 @@ export class LibraryService {
         return records.slice(0, Math.min(query.limit ?? 100, 1000))
     }
 
-    async recommendations(
-        options: {
-            limit?: number
-            seedCount?: number
-            appSessionId?: string | null
-        } = {}
-    ) {
-        const limit = Math.max(1, Math.min(options.limit ?? 30, 500))
-        const favorites = this.database
-            .listComics({ limit: 5000 })
-            .filter((comic) => comic.isFavorite)
-        if (favorites.length === 0) return recommendComics([], limit)
-
-        const pica = await this.connect()
-        const seedBudget = Math.max(1, Math.min(options.seedCount ?? 12, 16))
-        const seeds = selectDiversifiedSeeds(favorites, seedBudget)
-        const profile = recommendComics(favorites, limit).profile
-        const semanticProfile = buildV3Profile(
-            favorites,
-            this.database.listComics({ limit: 5000 })
-        )
-        const semanticPlans = planSemanticQueries(
-            buildRecommendationIntents(semanticProfile, favorites)
-        )
-        const boundedTagSearch = async (tag: string) => {
-            const first = await pica.comicsPage('', tag, pica.Order.loved, 1)
-            const docs = [...first.docs]
-            for (let page = 2; page <= Math.min(first.pages, 3); page++)
-                docs.push(
-                    ...(await pica.comicsPage('', tag, pica.Order.loved, page))
-                        .docs
-                )
-            return docs
-        }
-        const boundedAuthorSearch = async (author: string) => {
-            const first = await pica.search(author, 1, pica.Order.loved)
-            const docs = [...first.docs]
-            for (let page = 2; page <= Math.min(first.pages, 2); page++)
-                docs.push(
-                    ...(await pica.search(author, page, pica.Order.loved)).docs
-                )
-            return docs
-        }
-        const recallTasks: Array<{
-            route: RecallRoute
-            source: string
-            seedComicId?: string
-            load: () => Promise<Comic[]>
-            accepts?: (comic: Comic) => boolean
-        }> = seeds.map((seed) => ({
-            route: 'related' as const,
-            source: seed.comicId,
-            seedComicId: seed.comicId,
-            load: () => pica.related(seed.comicId)
-        }))
-        // Self-designed semantic routes own the first bounded retrieval budget;
-        // native related remains a later auxiliary route in the merged pool.
-        for (const plan of semanticPlans.slice(0, 4))
-            for (const route of plan.routes.slice(0, 2)) {
-                if (route.kind === 'tag' || route.kind === 'fandom')
-                    recallTasks.push({
-                        route: 'tag',
-                        source: `semantic:${route.kind}:${route.query}`,
-                        load: () => boundedTagSearch(route.query),
-                        accepts: (comic) =>
-                            comic.tags.some(
-                                (tag) =>
-                                    normalizeTag(tag) ===
-                                    normalizeTag(route.query)
-                            )
-                    })
-                else if (route.kind === 'author')
-                    recallTasks.push({
-                        route: 'author',
-                        source: `semantic:${route.query}`,
-                        load: () => boundedAuthorSearch(route.query)
-                    })
-                else if (route.kind === 'genre')
-                    recallTasks.push({
-                        route: 'category',
-                        source: `semantic:genre:${route.query}`,
-                        load: async () => {
-                            const first = await pica.comicsPage(
-                                route.query,
-                                '',
-                                pica.Order.loved,
-                                1
-                            )
-                            const pages = Math.min(
-                                first.pages ?? 1,
-                                route.maxPages
-                            )
-                            const docs = [...first.docs]
-                            for (let page = 2; page <= pages; page++)
-                                docs.push(
-                                    ...(
-                                        await pica.comicsPage(
-                                            route.query,
-                                            '',
-                                            pica.Order.loved,
-                                            page
-                                        )
-                                    ).docs
-                                )
-                            return docs
-                        },
-                        accepts: (comic) =>
-                            comic.categories.some(
-                                (category) =>
-                                    normalizeTag(category) ===
-                                    normalizeTag(route.query)
-                            )
-                    })
-            }
-        const recallTelemetry = new Map<
-            string,
-            {
-                requests: number
-                failures: number
-                raw: number
-                unique: number
-                latencyMs: number
-            }
-        >()
-        for (const item of profile.tags.slice(0, 2))
-            recallTasks.push({
-                route: 'tag',
-                source: item.value,
-                load: () => boundedTagSearch(item.value),
-                accepts: (comic) =>
-                    comic.tags.some(
-                        (tag) => normalizeTag(tag) === normalizeTag(item.value)
-                    )
-            })
-        const combinations = mineTagCombinations(
-            favorites,
-            this.database.listComics({ limit: 5000 })
-        )
-        for (const combination of [
-            ...combinations.pairs.slice(0, 2),
-            ...combinations.triples.slice(0, 1)
-        ]) {
-            const anchor = combination.tags
-                .map((tag) => ({
-                    tag,
-                    count: favorites.filter((comic) =>
-                        comic.tags.some(
-                            (value) => normalizeTag(value) === normalizeTag(tag)
-                        )
-                    ).length
-                }))
-                .sort(
-                    (a, b) => a.count - b.count || a.tag.localeCompare(b.tag)
-                )[0]?.tag
-            if (!anchor) continue
-            recallTasks.push({
-                route: 'tag',
-                source: `combination:${combination.tags.join('+')}`,
-                load: () => boundedTagSearch(anchor),
-                accepts: (comic) =>
-                    combination.tags.every((wanted) =>
-                        comic.tags.some(
-                            (value) =>
-                                normalizeTag(value) === normalizeTag(wanted)
-                        )
-                    )
-            })
-        }
-        for (const item of profile.categories.slice(0, 2))
-            recallTasks.push({
-                route: 'category',
-                source: item.value,
-                load: async () =>
-                    (await pica.comicsPage(item.value, '', pica.Order.loved, 1))
-                        .docs,
-                accepts: (comic) =>
-                    comic.categories.some(
-                        (category) =>
-                            normalizeAuthorKey(category) ===
-                            normalizeAuthorKey(item.value)
-                    )
-            })
-        for (const item of profile.authors.slice(0, 2))
-            recallTasks.push({
-                route: 'author',
-                source: item.value,
-                load: () => boundedAuthorSearch(item.value),
-                accepts: (comic) =>
-                    normalizeAuthorKey(comic.author) ===
-                    normalizeAuthorKey(item.value)
-            })
-        for (const item of profile.circles.slice(0, 2))
-            recallTasks.push({
-                route: 'circle',
-                source: item.value,
-                load: () => boundedAuthorSearch(item.value),
-                accepts: (comic) =>
-                    normalizeAuthorKey(comic.author).includes(
-                        normalizeAuthorKey(item.value)
-                    )
-            })
-        // Keep the cycle bounded even when semantic and legacy fallback routes
-        // are both available. Native related seeds occupy the first slots;
-        // semantic routes then receive the remaining bounded budget.
-        const boundedRecallTasks = recallTasks.slice(0, 24)
-        const gate = pLimit(3)
-        const recalled = await Promise.all(
-            boundedRecallTasks.map((task) =>
-                gate(async (): Promise<RecommendationCandidate[]> => {
-                    const startedAt = Date.now()
-                    const telemetry = recallTelemetry.get(task.route) ?? {
-                        requests: 0,
-                        failures: 0,
-                        raw: 0,
-                        unique: 0,
-                        latencyMs: 0
-                    }
-                    telemetry.requests += 1
-                    try {
-                        const loaded = await task.load()
-                        telemetry.raw += loaded.length
-                        const result = loaded
-                            .filter((comic) => task.accepts?.(comic) ?? true)
-                            .map((comic) => ({
-                                comic: comicToRecord(comic),
-                                recalls: [
-                                    {
-                                        route: task.route,
-                                        source: task.source,
-                                        seedComicId: task.seedComicId,
-                                        providerPage: 1,
-                                        providerRank: loaded.indexOf(comic) + 1,
-                                        retrievedAt: new Date().toISOString(),
-                                        queryTag:
-                                            task.route === 'tag' &&
-                                            !task.source.startsWith(
-                                                'combination:'
-                                            )
-                                                ? task.source
-                                                : undefined,
-                                        queryCombination:
-                                            task.source.startsWith(
-                                                'combination:'
-                                            )
-                                                ? task.source
-                                                      .slice(
-                                                          'combination:'.length
-                                                      )
-                                                      .split('+')
-                                                : undefined
-                                    }
-                                ]
-                            }))
-                        telemetry.unique += new Set(
-                            result.map((item) => item.comic.comicId)
-                        ).size
-                        telemetry.latencyMs += Date.now() - startedAt
-                        recallTelemetry.set(task.route, telemetry)
-                        return result
-                    } catch {
-                        telemetry.failures += 1
-                        telemetry.latencyMs += Date.now() - startedAt
-                        recallTelemetry.set(task.route, telemetry)
-                        return []
-                    }
-                })
-            )
-        )
-        const mergedCandidates = mergeRecallCandidates(recalled.flat())
-        // Native related is auxiliary only: semantic/tag/creator/category
-        // routes own the pool, while related results can rescue a bounded
-        // fraction of candidates and add graph corroboration.
-        const semanticCandidates = mergedCandidates.filter((candidate) =>
-            candidate.recalls.some((recall) => recall.route !== 'related')
-        )
-        const nativeCandidates = mergedCandidates.filter((candidate) =>
-            candidate.recalls.every((recall) => recall.route === 'related')
-        )
-        const nativeBudget = Math.min(
-            120,
-            Math.max(24, Math.floor(mergedCandidates.length * 0.25))
-        )
-        const candidates = [
-            ...semanticCandidates,
-            ...nativeCandidates.slice(0, nativeBudget)
-        ].slice(0, 1500)
-        for (const candidate of candidates)
-            for (const evidence of candidate.recalls)
-                if (evidence.route === 'related' && evidence.seedComicId)
-                    this.database.recordRecommendationEdge({
-                        sourceComicId: evidence.seedComicId,
-                        targetComicId: candidate.comic.comicId,
-                        edgeType: 'provider-related',
-                        confidence: 0.5,
-                        metadata: { source: evidence.source }
-                    })
-        this.database.importCatalog(
-            candidates.map((item) => item.comic),
-            'pica:recommendations'
-        )
-        const catalog = this.database.listComics({ limit: 5000 })
-        try {
-            const v3Profile = buildBehaviorProfile(
-                buildV3Profile(favorites, catalog),
-                this.database.listUserEvents({ limit: 5000 }),
-                catalog,
-                options.appSessionId
-            )
-            const ranked = rankV3(
-                catalog.filter((comic) =>
-                    candidates.some(
-                        (item) => item.comic.comicId === comic.comicId
-                    )
-                ),
-                favorites,
-                v3Profile,
-                this.database.listUserEvents(),
-                {
-                    graphEdges: this.database
-                        .listRecommendationEdges()
-                        .map((edge) => ({
-                            sourceComicId: edge.sourceComicId,
-                            targetComicId: edge.targetComicId,
-                            confidence: edge.confidence,
-                            observationCount: edge.observationCount
-                        })),
-                    routeFamilies: new Map(
-                        [
-                            'related',
-                            'cluster',
-                            'tag',
-                            'combination',
-                            'author',
-                            'circle'
-                        ].map((route) => [
-                            route,
-                            new Set(
-                                candidates
-                                    .filter((item) =>
-                                        item.recalls.some(
-                                            (recall) => recall.route === route
-                                        )
-                                    )
-                                    .map((item) => item.comic.comicId)
-                            )
-                        ])
-                    )
-                }
-            )
-            const byId = new Map(catalog.map((comic) => [comic.comicId, comic]))
-            const reranked = rerankV3(
-                ranked,
-                byId,
-                limit,
-                v3Profile.historical.clusters
-            )
-            const recallById = new Map(
-                candidates.map((item) => [item.comic.comicId, item.recalls])
-            )
-            if (reranked.length) {
-                return {
-                    profile: {
-                        favoriteCount: favorites.length,
-                        finishedRatio: favorites.length
-                            ? favorites.filter((comic) => comic.finished)
-                                  .length / favorites.length
-                            : 0,
-                        tags: v3Profile.historical.tags
-                            .slice(0, 20)
-                            .map((item) => ({
-                                value: item.tag,
-                                count: item.favoriteCount,
-                                weight: item.score
-                            })),
-                        categories: [],
-                        authors: [],
-                        circles: []
-                    },
-                    recommendations: reranked.map((item) => {
-                        const comic = byId.get(item.comicId)!
-                        const evidence = recallById.get(item.comicId) ?? []
-                        return {
-                            comic,
-                            score: item.score,
-                            reasons: item.reasons,
-                            recallSources: [
-                                ...new Set(evidence.map((value) => value.route))
-                            ],
-                            matchedSignals: item.reasons,
-                            exploration: item.features.novelty > 0
-                        }
-                    }),
-                    audit: {
-                        favoriteCount: favorites.length,
-                        seedCount: seeds.length,
-                        seedAuthorDiversity: new Set(
-                            seeds.map((item) => item.authorId)
-                        ).size,
-                        seedTagDiversity: new Set(
-                            seeds.flatMap((item) => item.tags)
-                        ).size,
-                        candidateCountByRecallRoute: {
-                            related: candidates.filter((item) =>
-                                item.recalls.some((r) => r.route === 'related')
-                            ).length,
-                            author: candidates.filter((item) =>
-                                item.recalls.some((r) => r.route === 'author')
-                            ).length,
-                            tag: candidates.filter((item) =>
-                                item.recalls.some((r) => r.route === 'tag')
-                            ).length,
-                            category: candidates.filter((item) =>
-                                item.recalls.some((r) => r.route === 'category')
-                            ).length,
-                            circle: candidates.filter((item) =>
-                                item.recalls.some((r) => r.route === 'circle')
-                            ).length
-                        },
-                        deduplicatedCandidateCount: candidates.length,
-                        alreadyFavoriteExcludedCount: 0,
-                        finalRecommendationCount: reranked.length,
-                        maxSameAuthorInTopN: 2,
-                        explorationCount: reranked.filter(
-                            (item) => item.features.novelty > 0
-                        ).length,
-                        recallTelemetry: Object.fromEntries(
-                            [...recallTelemetry.entries()].map(
-                                ([route, value]) => [
-                                    route,
-                                    {
-                                        ...value,
-                                        duplicateCount: Math.max(
-                                            0,
-                                            value.raw - value.unique
-                                        ),
-                                        pageDepth: 1,
-                                        yield:
-                                            value.unique /
-                                            Math.max(1, value.requests)
-                                    }
-                                ]
-                            )
-                        )
-                    }
-                }
-            }
-        } catch {
-            // V3 is deliberately fail-safe: preserve the V2 contract if a
-            // profile, ranking, or schema-8 derived artifact is unavailable.
-        }
-        return recommendComics(catalog, limit, candidates)
+    async recommendations(options: import('../recommendation/legacy-ports').LegacyRecommendationOptions = {}) {
+        return new LegacyRecommendationRetrieval(legacyRecallPorts({
+            database: this.database,
+            tagPolicy: () => this.preferenceViewState(),
+            connect: () => this.connect(),
+            sources: this.sources,
+            convert: comicToRecord
+        })).execute(options)
     }
 
     libraryOrganizeStatus() {

@@ -1,4 +1,5 @@
 import type { StoredComic } from '../library/types'
+import { defaultTagPolicyV1, privateTagForSignalV1, privateTagMatchesV1, projectComicTagSignalsV1, providerRawTagFactsV1, tagControlParticipatesV1, type TagPolicyV1, type TagPolicyCarrierV1 } from '../tags/policy'
 
 export const RECOMMENDATION_V5_POLICY_VERSION = '5.0.0-portable-policy-beta'
 export const RECOMMENDATION_V5_POLICY_STATE_KEY = 'recommendation.v5.portablePolicy.v1'
@@ -64,6 +65,8 @@ export interface PortablePolicyStateV5 {
     tasteExcludedComicIds: string[]
     explicitDistinctPairs: string[]
     deviceSyncRevisions: Record<string, number>
+    /** Optional on legacy snapshots; omission means all original tags participate. */
+    tagPolicy?: TagPolicyV1
 }
 
 export interface PortablePreferenceSignalV5 {
@@ -120,7 +123,8 @@ export function defaultPortablePolicyStateV5(): PortablePolicyStateV5 {
         temporarySuppressions: [],
         tasteExcludedComicIds: [],
         explicitDistinctPairs: [],
-        deviceSyncRevisions: {}
+        deviceSyncRevisions: {},
+        tagPolicy: defaultTagPolicyV1()
     }
 }
 
@@ -496,15 +500,18 @@ export function upsertControlV5(state: PortablePolicyStateV5, control: Preferenc
     }
 }
 
-export function matchesControlV5(comic: StoredComic, control: PreferenceControlV5) {
+export function matchesControlV5(comic: StoredComic, control: PreferenceControlV5, state: TagPolicyCarrierV1 = {}) {
     const key = normalizePreferenceKey(control.key)
     if (!key) return false
     if (control.targetType === 'AUTHOR')
         return normalizePreferenceKey(comic.canonicalAuthor ?? comic.author) === key
     if (control.targetType === 'CATEGORY')
         return comic.categories.some((value) => normalizePreferenceKey(value) === key)
-    if (control.targetType === 'TAG' || control.targetType === 'FANDOM')
-        return comic.tags.some((value) => normalizePreferenceKey(value) === key)
+    if (control.targetType === 'TAG' || control.targetType === 'FANDOM') {
+        const privateTag = privateTagForSignalV1(state, key)
+        if (privateTag) return privateTagMatchesV1(privateTag, comic)
+        return [...comic.tags, ...providerRawTagFactsV1(comic)].some((value) => normalizePreferenceKey(value) === key)
+    }
     return false
 }
 
@@ -524,7 +531,8 @@ export function preferenceAdjustmentV5(comic: StoredComic, state: PortablePolicy
         ) ||
         isTemporarilySuppressedV5(comic.comicId, state)
     for (const control of state.controls) {
-        if (!matchesControlV5(comic, control)) continue
+        if (!matchesControlV5(comic, control, state)) continue
+        if (control.direction !== 'BLOCK' && (control.targetType === 'TAG' || control.targetType === 'FANDOM') && !tagControlParticipatesV1(state, control.key, comic)) continue
         if (control.direction === 'BLOCK') {
             blocked = true
             reasons.push(`BLOCK:${control.targetType}:${control.label}`)
@@ -568,7 +576,7 @@ export function preferenceAdjustmentV5(comic: StoredComic, state: PortablePolicy
             source: intent.source,
             updatedAt: intent.updatedAt
         }
-        if (matchesControlV5(comic, synthetic)) {
+        if (matchesControlV5(comic, synthetic, state) && (!['TAG', 'FANDOM'].includes(synthetic.targetType) || tagControlParticipatesV1(state, synthetic.key, comic))) {
             adjustment += 0.16
             reasons.push(`SESSION_TARGET:${synthetic.targetType}:${synthetic.label}`)
         }
@@ -623,16 +631,18 @@ export function filterCandidatesAgainstOwnedV5<T extends { comic: StoredComic }>
 export function portableInferredSignalsV5(
     catalog: StoredComic[],
     limit = 120,
-    tasteExcludedComicIds: Iterable<string> = []
+    tasteExcludedComicIds: Iterable<string> = [],
+    state: TagPolicyCarrierV1 = {}
 ): PortablePreferenceSignalV5[] {
-    return collectPortableInferredSignalsV5(catalog, tasteExcludedComicIds)
+    return collectPortableInferredSignalsV5(catalog, tasteExcludedComicIds, state)
         .slice(0, Math.max(1, Math.min(500, limit)))
 }
 
 /** Full local universe for explicit search; default/mobile snapshots stay bounded. */
 export function collectPortableInferredSignalsV5(
     catalog: StoredComic[],
-    tasteExcludedComicIds: Iterable<string> = []
+    tasteExcludedComicIds: Iterable<string> = [],
+    state: TagPolicyCarrierV1 = {}
 ): PortablePreferenceSignalV5[] {
     const excluded = new Set(
         [...tasteExcludedComicIds].map(normalizePreferenceKey)
@@ -654,14 +664,14 @@ export function collectPortableInferredSignalsV5(
     }
     for (const comic of positives) {
         add('AUTHOR', comic.canonicalAuthor ?? comic.author, comic.comicId)
-        for (const tag of comic.tags) add('TAG', tag, comic.comicId)
+        for (const tag of projectComicTagSignalsV1(comic, state).tags) add('TAG', tag, comic.comicId)
         for (const category of comic.categories) add('CATEGORY', category, comic.comicId)
     }
     return [...groups.values()]
         .map((row) => ({
             targetType: row.targetType,
             key: row.key,
-            label: row.label,
+            label: privateTagForSignalV1(state, row.key)?.name ?? row.label,
             supportCount: row.ids.size,
             supportShare: row.ids.size / total,
             facet:
@@ -684,7 +694,8 @@ export function portablePolicySnapshotV5(state: PortablePolicyStateV5, catalog: 
         inferred: portableInferredSignalsV5(
             catalog,
             500,
-            state.tasteExcludedComicIds
+            state.tasteExcludedComicIds,
+            state
         ),
         counts: {
             owned: catalog.filter(isOwnedComicV5).length,

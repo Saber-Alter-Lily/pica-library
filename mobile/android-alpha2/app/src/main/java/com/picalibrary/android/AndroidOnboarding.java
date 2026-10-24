@@ -7,10 +7,14 @@ import android.view.View;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+import java.util.Map;
+import java.util.WeakHashMap;
 import com.developer.spoti.vspoti.VSpotView;
 
-/** Two-stage VSpot tour: persistent bottom navigation first, then stable Settings rows. */
+/** Short daily spotlight; advanced chapters are explicit and separately tracked. */
 final class AndroidOnboarding {
+    private static final Map<Activity,Integer> pendingTargets=new WeakHashMap<>();
     static final String NAV_LIBRARY="pica-tour-nav-0";
     static final String NAV_RECOMMEND="pica-tour-nav-1";
     static final String NAV_ONLINE="pica-tour-nav-2";
@@ -56,6 +60,11 @@ final class AndroidOnboarding {
             .setPositiveButton(R.string.onboarding_start,(d,w)->{
                 if(never.isChecked())OnboardingStore.setAutoShow(activity,false);
                 activity.startOnboardingTour();
+            })
+            .setNeutralButton(R.string.advanced_guide_title,(d,w)->{
+                if(never.isChecked())OnboardingStore.setAutoShow(activity,false);
+                OnboardingStore.later();
+                activity.startActivity(new Intent(activity,AdvancedGuideActivity.class));
             })
             .setOnCancelListener(d->{
                 if(never.isChecked())OnboardingStore.neverAuto(activity);
@@ -105,16 +114,25 @@ final class AndroidOnboarding {
         for(View view:views)if(view==null)return false;
         return true;
     }
+    private static boolean awaitTargets(Activity activity,Runnable retry,View... views){
+        return awaitTargets(activity,retry,false,views);
+    }
+    private static boolean awaitTargets(Activity activity,Runnable retry,boolean advanced,View... views){
+        if(activity.isFinishing()||activity.isDestroyed()){pendingTargets.remove(activity);return false;}
+        if(ready(views)){pendingTargets.remove(activity);return true;}
+        int attempts=pendingTargets.getOrDefault(activity,0)+1;
+        if(attempts>=20){pendingTargets.remove(activity);if(!advanced)OnboardingStore.later();Toast.makeText(activity,R.string.onboarding_target_unavailable,Toast.LENGTH_LONG).show();return false;}
+        pendingTargets.put(activity,attempts);
+        activity.getWindow().getDecorView().postDelayed(()->{if(!activity.isFinishing()&&!activity.isDestroyed())retry.run();else pendingTargets.remove(activity);},120);
+        return false;
+    }
 
     private static void showBottomTour(HomeActivity activity){
         View library=target(activity,NAV_LIBRARY);
         View recommend=target(activity,NAV_RECOMMEND);
         View online=target(activity,NAV_ONLINE);
         View settings=target(activity,NAV_SETTINGS);
-        if(!ready(library,recommend,online,settings)){
-            activity.getWindow().getDecorView().postDelayed(()->showBottomTour(activity),120);
-            return;
-        }
+        if(!awaitTargets(activity,()->showBottomTour(activity),library,recommend,online,settings))return;
         VSpotView tour=new VSpotView.Builder(activity)
             .setStyle(style(activity))
             .setDismissType(VSpotView.DismissType.NONE)
@@ -136,10 +154,7 @@ final class AndroidOnboarding {
     private static void showLibraryWorkflowTour(HomeActivity activity){
         View shelves=target(activity,LIBRARY_SHELVES);
         View refresh=target(activity,LIBRARY_REFRESH);
-        if(!ready(shelves,refresh)){
-            activity.getWindow().getDecorView().postDelayed(()->showLibraryWorkflowTour(activity),120);
-            return;
-        }
+        if(!awaitTargets(activity,()->showLibraryWorkflowTour(activity),shelves,refresh))return;
         new VSpotView.Builder(activity)
             .setStyle(style(activity))
             .setDismissType(VSpotView.DismissType.NONE)
@@ -157,10 +172,7 @@ final class AndroidOnboarding {
     private static void showRecommendationWorkflowTour(HomeActivity activity){
         View build=target(activity,RECOMMEND_BUILD);
         View preferences=target(activity,RECOMMEND_PREFERENCES);
-        if(!ready(build,preferences)){
-            activity.getWindow().getDecorView().postDelayed(()->showRecommendationWorkflowTour(activity),120);
-            return;
-        }
+        if(!awaitTargets(activity,()->showRecommendationWorkflowTour(activity),build,preferences))return;
         new VSpotView.Builder(activity)
             .setStyle(style(activity))
             .setDismissType(VSpotView.DismissType.NONE)
@@ -169,7 +181,10 @@ final class AndroidOnboarding {
             .setCallback(new VSpotView.Callback(){
                 @Override public void onDismiss(View last,boolean completed,int index){
                     if(activity.isFinishing()||activity.isDestroyed())return;
-                    if(completed)activity.onboardingShowTab(3,()->showSettingsTour(activity));
+                    if(completed){
+                        OnboardingStore.complete(activity);
+                        new AlertDialog.Builder(activity).setTitle(R.string.tour_complete_title).setMessage(R.string.tour_complete_body).setPositiveButton(R.string.common_ok,null).show();
+                    }
                     else handleSkip(activity);
                 }
             }).build().show();
@@ -181,10 +196,7 @@ final class AndroidOnboarding {
         View language=target(activity,SETTINGS_LANGUAGE);
         View update=target(activity,SETTINGS_UPDATE);
         View help=target(activity,SETTINGS_HELP);
-        if(!ready(recommend,pair,language,update,help)){
-            activity.getWindow().getDecorView().postDelayed(()->showSettingsTour(activity),120);
-            return;
-        }
+        if(!awaitTargets(activity,()->showSettingsTour(activity),recommend,pair,language,update,help))return;
         VSpotView tour=new VSpotView.Builder(activity)
             .setStyle(style(activity))
             .setDismissType(VSpotView.DismissType.NONE)
@@ -209,10 +221,7 @@ final class AndroidOnboarding {
 
     static void startRecommendationStyleTour(RecommendationStyleActivity activity){
         View profile=target(activity,REC_PROFILE),adjust=target(activity,REC_ADJUST),sync=target(activity,REC_SYNC),visualMode=target(activity,REC_VISUAL_MODE),visualStrength=target(activity,REC_VISUAL_STRENGTH);
-        if(!ready(profile,adjust,sync,visualMode,visualStrength)){
-            activity.getWindow().getDecorView().postDelayed(()->startRecommendationStyleTour(activity),120);
-            return;
-        }
+        if(!awaitTargets(activity,()->startRecommendationStyleTour(activity),true,profile,adjust,sync,visualMode,visualStrength))return;
         new VSpotView.Builder(activity)
             .setStyle(style(activity))
             .setDismissType(VSpotView.DismissType.NONE)
@@ -225,15 +234,19 @@ final class AndroidOnboarding {
                 @Override public void onDismiss(View last,boolean completed,int index){
                     if(activity.isFinishing()||activity.isDestroyed())return;
                     if(completed){
-                        OnboardingStore.complete(activity);
-                        new AlertDialog.Builder(activity).setTitle(R.string.tour_complete_title).setMessage(R.string.tour_complete_body).setPositiveButton(R.string.common_ok,null).show();
-                    }else handleSkip(activity);
+                        OnboardingStore.completeAdvanced(activity);
+                        new AlertDialog.Builder(activity).setTitle(R.string.advanced_guide_title).setMessage(R.string.advanced_guide_spotlight_done).setPositiveButton(R.string.common_ok,null).show();
+                    }else handleSkip(activity,true);
                 }
             }).build().show();
     }
 
     private static void handleSkip(Activity activity){
-        OnboardingStore.skip(activity);
+        handleSkip(activity,false);
+    }
+    private static void handleSkip(Activity activity,boolean advanced){
+        if(advanced)OnboardingStore.skipAdvanced(activity);
+        else OnboardingStore.skip(activity);
         new AlertDialog.Builder(activity)
             .setTitle(R.string.onboarding_skip)
             .setMessage(R.string.onboarding_skip_notice)

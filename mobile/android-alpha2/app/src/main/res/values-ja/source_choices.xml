@@ -1,0 +1,13 @@
+<resources>
+    <string name="source_choices_title">この端末の外部ソース</string>
+    <string name="source_choices_summary">PC とは別に Pica / E-H / JM を選択</string>
+    <string name="source_choices_help">この端末で接続を許可する外部ソースを選択し、保存してください。無効にしてもアカウント、ダウンロード、お気に入り、読書履歴は削除されません。ローカル読書、PC の保存済みファイル、クラウド接続は別管理です。</string>
+    <string name="source_choices_reload">現在の設定を再読込</string>
+    <string name="source_choices_save">ソースの選択を保存</string>
+    <string name="source_choices_unsaved">未保存の変更</string>
+    <string name="source_choices_current">保存済みのソース選択</string>
+    <string name="source_choices_saved">保存して適用しました。有効化したソース画面を開き直してください。一時停止中のダウンロードは手動で再開します。</string>
+    <string name="source_choices_stale">別の画面で設定が変更されました。現在の設定を再読込してください。</string>
+    <string name="source_choices_storage_error">ソース設定を安全に読み書きできません。新たなソースは有効にしていません。データを保持してエラーを報告してください。</string>
+    <string name="source_disabled">このソースは無効です。「アカウントとソース → この端末の外部ソース」で有効にできます。</string>
+</resources>

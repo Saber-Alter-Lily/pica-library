@@ -80,6 +80,7 @@ export const jaReaderUpdateTranslations = {
     'reader.loadingChapter': 'チャプターを読み込み中…',
     'reader.loadingChapters': 'チャプター一覧を読み込み中…',
     'reader.onlineNotice': 'オンライン閲覧 · 一時キャッシュのみで、ダウンロードは作成しません',
+    'reader.hostedNotice': '利用者が選択した外部ホストの内容です。ローカル進捗は別保存し、ホスト独自のキャッシュ・同期が動作する場合があります。',
     'reader.exit': '← リーダーを終了',
     'reader.prevChapter': '← 前のチャプター',
     'reader.nextChapter': '次のチャプター →',

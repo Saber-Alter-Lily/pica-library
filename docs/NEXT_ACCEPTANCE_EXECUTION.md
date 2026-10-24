@@ -1,8 +1,148 @@
 # Next consolidated acceptance candidate
 
-Status: UNPUBLISHED / NEXT-41 NATIVE JM SOURCE-SCREEN UX CONTINUATION IN PROGRESS. This is an integration candidate, not a release or device-acceptance result.
+## 2026-10-24 NEXT-67: actual user-host library → shared Reader (unpublished)
 
-The prior frozen source `43d9c2bc5a789994973703fe84408e8824962d5c` completed NEXT-40 automated/package gates in run `39759492930`; it did not establish real-provider/device acceptance. This 2026-10-22 round is limited to native JM source-screen localization, operation feedback and duplicate prevention with synthetic tests. Its exact-source build results must be recorded separately. See [JM_SOURCE_UI_ACCEPTANCE.md](JM_SOURCE_UI_ACCEPTANCE.md) and the retained [download boundary](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md).
+Continues frozen NEXT-66 `91b62d0fcccd552e4a6af1609283598f75022080`,159-entry complete handoff SHA256 `f82d331443e0ea78c8d31661c737181c8bc458a62aee03cba9fbaa7edb524406`. Its candidate3/3,39success+6conditional skips/45,57 Chromium and402 native results are historical proof, not current-source validation.
+
+Actual optional Desktop reading of a user's existing Suwayomi library now reuses the main Reader/state/cache/identity ports. Separate explicit session credentials/scope, user-host fetch/sync disclosure, canonical source/comic/principal/URL identity, fresh row/chapter checks before cache, scoped private progress/resume, cancellation/late guards, same-origin media protection and no source/catalogue/default-service import. [Scope and exact limits](USER_HOST_LIBRARY_READER.md). Source search/downloads/native/trust/secure remembered sessions remain open; do not relabel all external-source work complete.
+
+Inspected local source148 assertions/types/Web48/48 require a final clean-source run. Real HTTP/three-language Reader browser/compiled-Windows private state/cache/resume/stale-row/cross-site/revocation plus existing upgrade/native/signature gates require fresh CI. Daily/advanced guidance now separates diagnostic permission from the Desktop-only15-minute library session, distinguishes hide from revoke and marks host fetch/sync side effects and unsupported mobile/search/import. No local Java/app/browser/listener/update runtime, production data, main merge, tag/Release, stable OTA,key download,install/deployment. Dev81→82 only advances candidate build identity. User acceptance remains deferred; full objective OPEN.
+
+## 2026-10-24 NEXT-66: user-owned external-host configuration (unpublished)
+
+Continues frozen NEXT-65 `e0265086584340ef19fbf7106170f0542bdffcb2`, complete183-entry handoff SHA256 `29f6685722c6c44d715a4eb9342f175f3cfe69b7d60a669e079d34f259e7b592`. Its exact candidate3/3, standard/macOS/Linux/recovery and broader39success+6conditional skips/45 are historical proof, not current-source proof. Recovery passed on that source; prior timeout/J7 internal cause remains undetermined.
+
+The product stays a reader/library, not a manga platform. Actual local persisted host metadata/permission lifecycle is separate from provider/content/user state: no default host, save-disabled, separate explicit enable, manual one-page inspection only, per-request credentials, strict metadata schema, stale-tab rejection, abort/late-result fences and configured-loopback/Origin/CSRF routes. Corrupt optional config degrades that module without resetting it or blocking local reading. [Scope, implementation, limits and open work](USER_OWNED_SOURCE_HOST_SETTINGS.md).
+
+Local113/113 inspected source/temp/fake-fetch assertions, types and Web47/47 PASS. Real HTTP, three-language browser and actual Windows package lifecycle gates are authored for fresh CI, not executed locally. Native code/algorithms/schema/sync/update helpers remain unchanged; the existing single Dev version authority advances80→81. No production reads/writes, local Java/app/browser/LAN runtime, main merge, Release/tag, OTA, key download or deployment. External comic/search/read/library/native/secure session/trust and physical-provider acceptance remain OPEN. No immediate user testing requested.
+
+## 2026-10-24 NEXT-65: minimal tag runtime and one-action layout replacement (unpublished)
+
+Continues frozen NEXT-64 `a5e4a1d0cb078823f872e22a8561ea651f2a8db8`, complete handoff SHA256 `db3c4c4c632892e094977c3c0df32393e86ce2203fa0a40ddc70d277d2e87498`. Its candidate3/3 and standard CI passed, but broader recovery40080731580 timed out after actual test/probe PASS:38success+6conditional skip+1CANCELLED/45 remains PARTIAL/HOLD, with internal exit cause UNDETERMINED. It is not current-source proof.
+
+This source separates consumed tag vocabulary from reviewed examples/statistics: one seven-file format/allowlist under app/, shared by all packagers; no legacy source directory copy. Same frozen semantic authority/profile registryVersion, complete old-map/3957 differential cases, actual isolated asset import graph, strict integrity/schema bounds and reproducible generation. [Exact scope and neutrality/provenance limits](MINIMAL_TAG_RUNTIME.md).
+
+Old review-layout removal requires existing one-click full replacement, not unsafe incremental deletion; modern app-only incremental transport remains. CI-only full upgrade/health rollback/launch rollback/deep cases add exact original/target tag asset snapshots while retaining external config/SQLite canaries. No updater helper/API/schema/state format change. Dev79→80 changes only candidate version authority; no native feature change. Full current-source CI/artifacts/signature/raw evidence are required before PASS. No local Java/app/browser/LAN/update runtime, production data, merge/release/OTA, key download, install/deploy or immediate user testing. Full objective and deferred real host/device/source lifecycle remain OPEN.
+
+## 2026-10-24 NEXT-64: optional user-selected source-host inspection (unpublished)
+
+Continues frozen NEXT-63 `cbbf3432efb2ead4517cebeafc44ac1901ac9fdb`, complete handoff SHA256 `b41913dbcc8ddbb9ca4824229a1b0bd9cb83123137ef0f76aa84fd30a0d2690d`. Actual Desktop wiring now uses separate protocol/inspection/HTTP modules for explicit checks of an existing user-managed Suwayomi host. This is a reader, not a content platform: no official catalogue, enabled source/repository, downloaded host/extension, required external backend or new Reader/import claim. [Product boundary](CORE_READER_SOURCE_BOUNDARY.md), [protocol/privacy/limits and remaining work](SOURCE_HOST_INSPECTION.md).
+
+Local92/92 pure/contract/injected-fetch assertions, types and Web46/46 syntax passed; actual local HTTP/three-language Chromium/compiled-Windows and inherited full/incremental/deep-upgrade gates remain required in current-source CI. The existing Windows source/media application's isolated lifecycle is reused for real compiled checks. Native code is unchanged; single fixed-signing candidate authority advances Dev78→79, which is not phone installation evidence. No local Java/application/browser/LAN/upgrader runtime, production data, main merge, Release/tag, stable OTA, signing-key download, install or deployment. Real host interoperability, stable host/comic identities, source-to-library/Reader/native integration, trust and concentrated physical/user acceptance remain OPEN.
+
+## 2026-10-24 NEXT-63: native local-comic body export (unpublished)
+
+Continues frozen NEXT-62 `7203626e1cb324e6ca9601872e561950234f7231`, immutable complete handoff SHA256 `c899272db9eeddcb0bef8a1d082236323a6af3dcced78f8f27acb77d19b6100d`. Android owned imports now have explicit standard CBZ body export through a pure bounded ZIP module, app-owned stage/lease adapter and internal SAF UI. Existing importer logic/Reader/catalog/history remain; no private-state archive or new library format. [Scope, reuse, limits and holds](NATIVE_LOCAL_CONTENT_EXPORT.md).
+
+Current-source native SDK28/35 roundtrip/cancellation/lifecycle/bounds, full Windows/browser/source/update regressions, lint/R8/fixed-certificate Dev77→78 continuity and artifact verification are required before package PASS. No local Java/Gradle/apps/browser/LAN/updater runtime: all permission-sensitive checks stay in authorized Draft CI. No production access, merge/release/OTA, key download, install or deployment. Whole-state restore, source host/trust, crash/orphan lifecycle, physical/provider/OEM and broader objective acceptance remain open; no user testing is requested now.
+
+## 2026-10-23 NEXT-62: legacy recall and stored-only compatibility sessions (unpublished)
+
+Continues frozen NEXT-61 `3ce697566f379fef2dc566af9e91f3ee183c2d21`, full handoff SHA256 `a6ee113fa3ab7957bdd03d3dd14d07baaa666807f419d9f8a7a9c97ab21b66b3`. Actual old recall/V2/adaptive bodies now use domain ports; idle GETs stay ephemeral, adaptive allocation/batch/pointer share an existing savepoint, and source changes fence late legacy metadata. No ranking/schema/API/wire-format change. [Scope and unresolved acceptance](LEGACY_ADAPTIVE_RECOMMENDATION_MODULE.md).
+
+Current-source full/native/compiled/updater gates and fixed-certificate Dev76→77 continuity are required; prior green runs are not current proof. No local Java/application/browser/LAN/update runtime. Physical/provider/OEM and broader product QA remain deferred; no production data, merge/release/OTA or automatic deployment.
+
+## 2026-10-23 NEXT-61: identity view/command/task separation and atomic human decisions (unpublished)
+
+Continues frozen NEXT-60 `2c3f7d647100441398b28fbdc0cc41a5e8ffd0cc`, complete handoff SHA256 `da40f5b62e7370ec4b304eb7b5c91abe5f94f097a04de0048c1f893251876c99`. Extracts actual stored-identity views, explicit commands and cooperative evidence task. Read/evidence defaults no longer create policy; decision/clear + distinct policy + returned review reuse one existing synchronous savepoint. No matching/threshold/schema/API change or binding apply. [Scope and exact holds](WORK_IDENTITY_MODULE.md).
+
+Current-source CI, compiled Windows post-SQL fault/prepare-only gates and fixed-certificate Dev75→76 metadata continuity are required in the new handoff. No local Java/application/LAN/update runtime under the user's [security-prompt restriction](LOCAL_VALIDATION_SAFETY.md). Physical/provider/gesture/tag/AI/offline acceptance remains deferred; no production data, main/Release/OTA or deployment.
+
+## 2026-10-23 NEXT-60 / NEXT-59: actual shadow control and read-only audit/export modules (unpublished)
+
+NEXT-59 `f4e2c2ba8cb147292e4c344c59ca1619766a4380` extracted13 actual audit/planning reads and native-picked schema2 export assembly, with no implicit policy initialization and no report acquisition after cancelled Save. NEXT-60 `2c3f7d647100441398b28fbdc0cc41a5e8ffd0cc` extracted the real manual shadow pipeline/task, adding source revision fences and audit-only save. [Audit/export](RECOMMENDATION_AUDIT_READ_MODULE.md), [shadow](RECOMMENDATION_SHADOW_MODULE.md). Their exact-source CI/artifact handoffs are frozen separately; they do not validate a later identity change or complete the entire objective.
+
+The full/native/runtime validation location is now CI, not the user's PC. Signatures and package hashes are retained separately from physical installation. No merge/release/OTA, key download or deployment.
+
+## 2026-10-23 NEXT-58: acknowledged helper startup and shared incremental/full recovery (unpublished)
+
+Continues frozen NEXT-57 `7f9fdb772feadf40fdf24906ea553df677f0fe3b`, complete handoff SHA256 `48086613a54936fd365c615d9b4831a4b8ed3ba9bf9b64d02f40950e456d77c0`. Reuses full-helper lifecycle/state recovery, adds ready/parent-ack before app exit, and applies owned-backup/state/health recovery to incremental commands. A narrow async host port prevents exit on pending/failed activation. [Scope and limits](INCREMENTAL_UPDATE_RUNTIME.md).
+
+Current actual assets, signatures and source-compatible fixtures are required, not old passing results. Scoped current-source assets and full-engine replacements are not a next-release incremental or an old-client published OTA. Changed helper still requires full replacement; native/JVM logic unchanged, signed Dev72→73 continuity is not physical install. The full local-reader objective and concentrated device/provider/gesture/tag/AI/offline acceptance remain open. No production access, merge/release/OTA, key download or deployment.
+
+## 2026-10-23 NEXT-57: actual recommendation build pipeline and commit-status boundary (unpublished)
+
+Continues frozen NEXT-56 `2167576eea14e2c02f4d143e2097f4ca24da8856`; complete handoff SHA256 `593c0b28eadebbe89acb4758e587c5fee22de4896bf46eb1b6d0db9af8e61874`. Separates ordered generation from account/Registry/SQLite/provider I/O through explicit ports, reusing all existing algorithms and stage observation timing. A frozen old-method differential oracle and actual browser-platform import graph guard the behavior and boundary. Commit progress now reports save failure instead of false success. [Exact scope and holds](RECOMMENDATION_BUILD_PIPELINE.md).
+
+Current-source CI and downloaded-Windows synthetic gates plus signed Dev71→72 packaging continuity are required in the new handoff. No user testing is forced now; native/JVM app logic unchanged. V5/legacy/extension/native-export work, generic incremental launch failure, physical QA and released OTA remain open. No production access, merge/release/OTA, private key download or deployment.
+
+## 2026-10-23 NEXT-56: long physical SQLite paths and deep recovery (unpublished)
+
+Continues frozen NEXT-55 `acab174c7b01f3ee32883b2bb89cfbf717ac0bf7`, complete handoff SHA256 `4d2a819a0325cebe118fc6c1fe3dd7dcfd359a30f14dceceb73212b15691b8e3`. Reuses built-in SQLite long-path locking and Node namespaces behind one storage adapter, keeping logical files/schema/config unchanged. Current source-free import/Reader/restart/backup/locking gates and same-source deep replacement/health/async recovery are required separately from historical normal-path upgrades. [Exact boundaries](SQLITE_PATH_ADAPTER.md).
+
+Native/JVM logic is unchanged; current-source CI and fixed-signed Dev70→71 identity plus actual Windows/stable/prior upgrade evidence must be captured in the new handoff. No production access, main/Release/OTA change or deployment. UNC/OEM/physical provider/gesture/tag/offline acceptance stays deferred; the full modular-reader objective remains open.
+
+## 2026-10-23 NEXT-55: transactional update recovery and bounded CI diagnostics (unpublished)
+
+Continues frozen NEXT-54 `bb9bdefe53768a421afa9bc7e7428c541e4af75a`, complete handoff SHA256 `08d6f8ff612ddd7863893edf5de8d5933acd5a9d4be3df6c3fc39b3bede9b432`. The existing full updater now awaits asynchronous launch errors, restores state despite status-write errors and records backup ownership before copy. Test-only diagnostics retain bounded/allowlisted progress/stdout/stderr after runner failure; actual async-failure injection verifies baseline relaunch with the old source as a rejecting counterexample. [Recovery/diagnostic contract and limitations](UPGRADE_RECOVERY_MODULE.md).
+
+Dev70 preserves Dev69 identity; native/JVM logic unchanged. Original runner-only code1 remains unexplained, not retroactively "fixed" by a green retry. Exact-source/current installables, stable/prior replacement and failure rollback remain required; physical/OTA acceptance remains held. No merge, release/OTA, production access or deployment.
+
+## 2026-10-23 NEXT-54: Android direct local comic import (unpublished)
+
+Continues frozen NEXT-53 `9ff83d2d09fdcb87e3f43e761ac5e09004b5b5f7`, complete handoff SHA256 `19ebe7123f012394a5d27aad79a57b2d82cc531320b3339a74d34b0d77635293`. Phone users can select one folder/CBZ, preview and explicitly import owned copies without Desktop/source login. Existing Reader/catalog/history are reused behind a pure bounded ingestion seam. Device/origin identity and relative-page bookmarks preserve reimport state; originals and private state stay separate from copy removal. [Scope, bounds, reuse, retention and device holds](NATIVE_LOCAL_CONTENT_INGESTION.md).
+
+Dev69 preserves Dev68 identity; no uninstall. Exact-source tests, fixed-certificate installables and existing Windows full-upgrade/rollback evidence must be frozen separately. Real system picker/provider/SD-card/physical upgrade tests remain deferred; pipeline/extension-host work remains open. No production data, merge, release/OTA or deployment.
+
+## 2026-10-23 NEXT-53: recommendation cycle module and read-only mobile delivery (unpublished)
+
+Continues frozen NEXT-52 `21c94df844f87db7d58aaa9625612b132eaea32f`, handoff SHA256 `a6a33363ad1f96e7f26b19f5118989c9db2b9812c61477f052f8df4fe309a1c8`. V3 cycle commands/result queries now use explicit storage/build/runtime ports, with the existing application constructor preserved. Mobile GET reads persisted results only; explicit recompute prepares a first batch. Local startup stops legacy recall. Warm filtering now honors new blocks/seen/duplicate/temporary facts and canonical ownership without rewriting original scores/batches. [Contract, evidence and limits](RECOMMENDATION_CYCLE_MODULE.md).
+
+State keys/schema14/public module APIs remain. Dev code68 preserves code67 identity. Native/JVM logic remains unchanged; current CI still validates the installables. Full build-pipeline decomposition and deferred physical/provider acceptance remain open. No merge, release/OTA or deployment.
+
+## 2026-10-23 NEXT-52: native personal-tag domain and shared contract (unpublished)
+
+Continues frozen NEXT-51 `b4517ea70519d0266c985e1f67cb48beb393bc2d`, complete handoff SHA256 `2412d0fcadbd5bde549e963cb1d86da230d0139511bd307b13d48ac438670dbd`. Separates pure native participation/private matching and directory counts from existing JSON/raw-fact adapters; both clients consume one 44-case synthetic golden fixture. Fixes local/unscoped gating, stale SELECTED leakage in ALL, current-comic fact forwarding and malformed-state coercion. [Contract and limits](NATIVE_TAG_POLICY_MODULE.md).
+
+Schema1/module API2 and valid state formats remain; no source/ranker/Visual change or production access. Dev code67 must retain code66 package/certificate. Exact-head CI, signatures and actual Windows state-retaining upgrade/rollback gates are recorded in the new handoff, not borrowed from NEXT-51. Physical QA remains deferred; no merge, release/OTA or deployment.
+
+## 2026-10-23 NEXT-51: native Reader gesture module (unpublished)
+
+Continues frozen NEXT-50 `76898ad29c1ac804b7451ac889107511c7532b21`, complete handoff SHA256 `7c2003e35c5a5a48a735da2488821939c57f037a5046f3d31cc833ecf9d6a1e2`. Pure Java decisions/stream ownership are separated from Android recognition/rendering and phone-local storage. Existing platforms/libraries remain in use. SDK28/35 event and preference regressions plus a no-Android compilation gate cover the bounded corrections in [the native gesture contract](NATIVE_READER_GESTURE_MODULE.md).
+
+Dev code66 preserves code65 package/signature; preference keys/defaults, portable state and all production data remain unchanged. Exact-source tests, installables and upgrade/rollback receipts are frozen separately after the new build. Physical installation, real pager/continuous-scroll feel, OEM touch, native tag matching, recommendation seams and other previously listed holds remain open. No main merge, Release/OTA change, automatic install or deployment.
+
+## 2026-10-23 NEXT-50: native source lifecycle (unpublished)
+
+Continues frozen NEXT-49 `81f8b5665c6ba456a64b6660049727182d3ff4d1`, complete handoff SHA256 `9385440668d86fdb96e682eaeded5fba9fc54e56b61c8fbfe0be01f9f3f0246f`. Phone-local explicit source choices now gate direct/relayed provider requests, native workers and late metadata/image-cache commits. Existing data and ordinary local/LAN/WebDAV access remain independent. New installs start source-free; legacy adoption is one-time and does not decrypt secrets. [Native contract and device holds](NATIVE_SOURCE_LIFECYCLE.md).
+
+Local synthetic Android regression: 240 passed, 13 Windows-only SDK35 AtomicFile skips, zero failures/errors; those SDK35 cases must run on Linux CI. Shared JVM regression has five tests, including active-request revocation. Candidate Dev code65 must retain code64's package/signature; physical installation remains pending. Exact new source, CI/installable hashes and Windows upgrade/rollback evidence are recorded in this slice's separate immutable handoff. No main merge, Release/OTA change, installation or production-profile access.
+
+## 2026-10-23 NEXT-49: Desktop source lifecycle (unpublished)
+
+Continues frozen NEXT-48 `963af71c96e55578722f0806e37393b5bfa40c13` and its unchanged complete handoff SHA256 `ec732724f7435eecc8a012008d290f8a9c34252671fffa8f70536a3c28eb0f86`. Adds persisted local source choices, atomic/CAS save, transport-level cancellation and late-result fences while local Reader/LAN stays independent. Legacy upgrades preserve existing adapter behavior; fresh local setup starts all external sources off. Native Android receives the Desktop relay availability contract, not a forced copy of Desktop choices. [Full scope and pending native lifecycle](SOURCE_LIFECYCLE.md). New exact-source gates belong to the new handoff; do not reuse the previous build's green checks.
+
+## 2026-10-23 NEXT-48: actual local-content ingestion (unpublished)
+
+Continues frozen NEXT-47 `241734856565b09f6bf18dae43b4f2fba6094268`, whose complete source/media handoff SHA256 is `bf344a511dc5ad5abb854f61a5f3629cef06c95e03078741bad88ceca7845798`. Prior artifacts remain unchanged. Adds one-comic folder/CBZ native selection → bounded preview → confirmed owned copy → existing Reader/LAN, stable local namespace, reimport/progress preservation, cover browser revalidation, native foreign-source guards and expanded CSV identity. Library/tag module APIs2 deliberately require full one-click replacement; schema14 remains unchanged. Dev code63 retains package/certificate. [Limits, workflow, failure behavior and holds](LOCAL_CONTENT_INGESTION.md).
+
+Local automation and exact-archive gates must bind to the newly frozen source in its final handoff; previous green packages are not reused. Native file dialogs, OEM gestures, physical installs, real accounts/AI and published OTA are still unverified; no user test is forced now. Main/Release/OTA, installed applications and production data are untouched.
+
+## 2026-10-23 NEXT-47: source-owned media continuation
+
+After frozen NEXT-45 source `4230e66c3c86` (complete handoff SHA256 `b736ef3f76b2dcb76a4b2f645cccce147bdf82eaada69c2b33d4aa6717aa58fc`), this isolated continuation extracts credential-free media transport, routes covers through their owning source and removes JM cover dependence on Pica login. Cover cache gains source/session scope, per-comic writer serialization and stale-response rejection. No database migration, recommendation change, source account or production data. Candidate Dev versionCode62 keeps the fixed identity. Exact new source, package hashes and new gates must be recorded separately; previous green checks are not reused. [Scope, safety and local-ingestion continuation](SOURCE_MEDIA_BOUNDARY.md).
+
+## 2026-10-23 continuation: modular local-first reader foundation
+
+The product authority is now recorded in [MODULAR_LOCAL_READER_ARCHITECTURE.md](MODULAR_LOCAL_READER_ARCHITECTURE.md): a local reader/library, no included comic bodies, optional external sources and independently maintainable functional modules with one application update action. This is the NEXT-45 candidate, not a claim that every module or source ecosystem is finished.
+
+Implemented source slice: pure standalone tag domain with an old-path compatibility barrel; compiled source routing manifests and capability inspection; public module API declarations bound into incremental packages; incompatible APIs use the existing full-application path; source-free local setup/relaunch and no automatic online generation; preservation of unrelated source credentials when Pica settings change. New module and local-first behavior tests complement the existing update/rollback gates. Actual source-bound results must be recorded after the final build.
+
+Previous NEXT-44 is frozen at `9ff972e50446b40445c9c54e24350f8ce9ef312b`, with its independently verified handoff retained unchanged. It passed automated/package gates but still has real-AI/provider/device holds. Tags/private mappings and AI file exchange are implemented in that previous slice; the older "first UX slice" descriptions below are historical, not the current feature inventory.
+
+The complete objective remains open: NEXT-48 adds the bounded folder/CBZ slice, not all local formats. Source enable/disable/trust lifecycle, further recommendation/native separation, relocation/watchers/native direct import and physical gestures/upgrade acceptance remain. No old hold/issue is silently closed.
+
+## 2026-10-22 continuation: daily UX and two separate guides
+
+Current local slice: `codex/ux-tags-dual-onboarding-20261022`, based on frozen `e3c0ff365153555511f396321be6cdb63c981384`. The user authorized isolated writes despite the DPAPI claim failure, then separately authorized pushing this new branch, a Draft PR and fixed-signature unpublished builds. No main merge, stable release/OTA, private-key download or deployment.
+
+Implemented: short daily onboarding and optional advanced chapters on Web/Android; independent help state and v2 compatibility; opt-in full preference controls and advanced diagnostic tools; two linked Chinese handbooks. Local Desktop unit/integration and real-browser gates are recorded in the slice evidence. Fresh Android/package evidence must bind to its new source SHA; previous candidate results are not reused.
+
+This is the **first UX/onboarding slice**, not completion of tag participation or #200. Whitelist gating, private work tags, provider-tag mappings, visual reference sets and automatic Save-and-apply recomputation remain pending. See [scope and evidence](UX_SIMPLIFICATION_DUAL_ONBOARDING.md), [daily guide](DAILY_USE_GUIDE.zh-CN.md) and [advanced guide](ADVANCED_FEATURES_GUIDE.zh-CN.md).
+
+Status: UNPUBLISHED / NEXT-42 DUAL ONBOARDING FIRST SLICE. Fresh exact-source CI/package results belong in the accompanying post-build validation. This is an integration candidate, not a release or device-acceptance result.
+
+Earlier history: frozen source `43d9c2bc5a789994973703fe84408e8824962d5c` completed NEXT-40 automated/package gates in run `39759492930`; it did not establish real-provider/device acceptance. NEXT-41 subsequently covered native JM source-screen localization, operation feedback and duplicate prevention with synthetic tests, preserved in the current base `e3c0ff365153555511f396321be6cdb63c981384`. See [JM_SOURCE_UI_ACCEPTANCE.md](JM_SOURCE_UI_ACCEPTANCE.md) and the retained [download boundary](JM_NATIVE_DOWNLOAD_ACCEPTANCE.md). This new slice does not reuse those build results as its own.
 
 ## Authority and baseline
 

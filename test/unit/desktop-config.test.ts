@@ -4,8 +4,13 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
     buildConfig,
+    buildLocalConfig,
+    buildSettingsConfig,
+    hasStoredCredentials,
+    mergePicaSetupCredentials,
     connectionProxy,
     credentialedProxy,
+    connectionEnvironment,
     loadConfig,
     saveConfig
 } from '../../src/desktop/config'
@@ -23,6 +28,50 @@ afterEach(() =>
 )
 
 describe('desktop configuration security', () => {
+    it('applies a saved public proxy without a Pica account or credential file', () => {
+        const config = { ...buildLocalConfig({ libraryDirectory: path.resolve('synthetic-library'), profile: 'balanced' }), proxyUrl: 'http://127.0.0.1:7890' }
+        expect(connectionEnvironment(config, null)).toEqual({ PICA_PROXY: 'http://127.0.0.1:7890' })
+        expect(connectionEnvironment(null, null)).toEqual({})
+        expect(config.proxyUrl).toBe('http://127.0.0.1:7890')
+    })
+    it('keeps proxy authentication separate from source identities and omits incomplete Pica credentials', () => {
+        const config = { ...buildLocalConfig({ libraryDirectory: path.resolve('synthetic-library'), profile: 'balanced' }), proxyUrl: 'http://127.0.0.1:7890' }
+        const stored = { account: '', password: '', jmUsername: 'fixture-jm', jmPassword: 'fixture-jm-secret', proxyUsername: 'proxy-user', proxyPassword: 'proxy-secret' }
+        expect(connectionEnvironment(config, stored)).toEqual({ PICA_PROXY: 'http://proxy-user:proxy-secret@127.0.0.1:7890' })
+        expect(connectionEnvironment(config, { account: 'partial', password: '' })).not.toHaveProperty('PICA_ACCOUNT')
+        expect(connectionEnvironment(config, { account: 'fixture-pica', password: 'fixture-password' })).toMatchObject({ PICA_ACCOUNT: 'fixture-pica', PICA_PASSWORD: 'fixture-password' })
+        expect(stored.account).toBe('')
+    })
+    it('lets existing local libraries change storage and public proxy without synthesizing credentials or weakening Pica login validation', () => {
+        const current = buildLocalConfig({ libraryDirectory: path.resolve('synthetic-library'), profile: 'balanced' })
+        const input = { account: '', password: '', libraryDirectory: current.libraryDirectory, profile: 'fast' as const }
+        const local = buildSettingsConfig(input, current)
+        expect(local.config.profile).toBe('fast')
+        expect(hasStoredCredentials(local.credentials)).toBe(false)
+        expect(hasStoredCredentials(buildSettingsConfig({ ...input, proxyUrl: 'http://127.0.0.1:7890' }, current).credentials)).toBe(false)
+        expect(hasStoredCredentials(buildSettingsConfig({ ...input, proxyUrl: 'http://synthetic-user:synthetic-secret@127.0.0.1:7890' }, current).credentials)).toBe(true)
+        expect(() => buildSettingsConfig({ ...input, account: 'partial-account' }, current)).toThrow(/password/)
+        expect(() => buildSettingsConfig(input, null)).toThrow(/Pica account/)
+    })
+    it('sets up a local library without any source credentials and preserves existing unrelated configuration', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-local-library-')); directories.push(directory)
+        const file = path.join(directory, 'config.json')
+        const config = buildLocalConfig({ libraryDirectory: path.join(directory, 'library'), profile: 'balanced' })
+        saveConfig(file, config)
+        expect(loadConfig(file)).toEqual(config)
+        expect(fs.readdirSync(directory)).toEqual(['config.json'])
+        expect(config).not.toHaveProperty('account')
+        const existing = { ...config, openBrowser: false, preferredPort: 4811, proxyUrl: 'http://127.0.0.1:7890' }
+        expect(buildLocalConfig({ libraryDirectory: config.libraryDirectory, profile: 'fast' }, existing)).toEqual({ ...existing, profile: 'fast' })
+        expect(() => buildLocalConfig({ libraryDirectory: 'relative', profile: 'balanced' })).toThrow(/absolute/)
+        expect(() => buildConfig({ account: '', password: '', libraryDirectory: config.libraryDirectory, profile: 'balanced' })).toThrow(/Pica account/)
+    })
+    it('preserves JM, EH, all WebDAV target credentials and proxy identity when only the Pica account changes', () => {
+        const previous = { account: 'old', password: 'old-secret', ehMemberId: 'fixture-id', ehPassHash: 'fixture-hash', jmUsername: 'fixture-jm', jmPassword: 'fixture-jm-secret', remoteStorageCredentials: { one: { username: 'fixture-one', password: 'fixture-secret' }, two: { password: 'fixture-two' } }, proxyUsername: 'proxy-user', proxyPassword: 'proxy-secret' }
+        expect(mergePicaSetupCredentials({ account: 'new', password: 'new-secret' }, previous, true)).toEqual({ ...previous, account: 'new', password: 'new-secret' })
+        expect(previous.account).toBe('old')
+        expect(mergePicaSetupCredentials({ account: 'new', password: 'new-secret', proxyUsername: undefined, proxyPassword: undefined }, previous, false).proxyPassword).toBeUndefined()
+    })
     it.runIf(process.platform === 'win32')(
         'round-trips credentials through Windows DPAPI',
         () => {
@@ -66,6 +115,17 @@ describe('desktop configuration security', () => {
         expect(
             credentialedProxy(built.config.proxyUrl, built.credentials)
         ).toContain('proxy-user:proxy-password@')
+    })
+
+    it('permits ordinary folder names containing account/token without allowing secret keys or proxy credentials', () => {
+        const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pica-config-folder-'));directories.push(dir)
+        const file=path.join(dir,'config.json')
+        const built=buildLocalConfig({libraryDirectory:path.join(dir,'account-token-comics'),profile:'balanced'})
+        saveConfig(file,built)
+        expect(loadConfig(file)?.libraryDirectory).toBe(built.libraryDirectory)
+        expect(()=>saveConfig(file,{...built,password:'fixture-secret'} as never)).toThrow(/sensitive/)
+        expect(()=>saveConfig(file,{...built,nested:{authorization:'fixture-secret'}} as never)).toThrow(/sensitive/)
+        expect(()=>saveConfig(file,{...built,proxyUrl:'http://alice:secret@127.0.0.1:7890'})).toThrow(/proxy credentials/)
     })
 
     it('does not fall back to a plaintext credential file', () => {

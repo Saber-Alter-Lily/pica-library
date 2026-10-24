@@ -14,6 +14,7 @@ public final class PicaLibraryApp extends Application {
     @Override protected void attachBaseContext(Context base){super.attachBaseContext(LocaleStore.wrap(base));}
     @Override public void onCreate(){
         super.onCreate();
+        SourceAccess.get(this); // before a new install accepts the disclaimer
         LocalizedText.init(this);
         ThemeStore.applyPlatformNightMode(this,ThemeStore.mode(this));
         Ui.applyTheme(this);
@@ -32,7 +33,7 @@ public final class PicaLibraryApp extends Application {
         // Side-by-side Dev builds are manual QA artifacts and must not consume the formal OTA channel.
         boolean debuggable=(getApplicationInfo().flags&ApplicationInfo.FLAG_DEBUGGABLE)!=0;
         if(!debuggable)UpdateCheckJobs.schedule(this);
-        if(PicaAccountStore.load(this).configured())PicaBootstrapJobs.enqueue(this);
+        if(SourceAccess.enabled(this,"pica")&&!PicaBootstrapJobs.paused(this)&&PicaAccountStore.load(this).configured())PicaBootstrapJobs.enqueue(this);
         SupporterSyncJobs.enqueue(this);
         StoragePolicy.maintain(this);
     }

@@ -96,10 +96,19 @@ jobs:
             'X-GitHub-Api-Version' = '2022-11-28'
             'User-Agent' = 'pica-library-p2-hardening-gate'
           }
-          $releases = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=100'
+          # Some API/cache paths return an empty result for per_page=100 even
+          # while the default-size pages and direct tag lookups remain available.
+          # Enumerate bounded smaller pages; never turn lookup failure into PASS.
+          $releases = @()
+          for ($page = 1; $page -le 20; $page++) {
+            $batch = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/Saber-Alter-Lily/pica-library/releases?per_page=30&page=$page"
+            $releases += $batch
+            if ($batch.Count -lt 30) { break }
+            if ($page -eq 20) { throw 'Accepted release enumeration exceeded the safe page limit' }
+          }
           $candidates = @(
             $releases | ForEach-Object {
-              if ([string]$_.tag_name -match '^v(\d+\.\d+\.\d+)$') {
+              if (-not $_.draft -and -not $_.prerelease -and [string]$_.tag_name -match '^v(\d+\.\d+\.\d+)$') {
                 $candidate = [version]$Matches[1]
                 if ($candidate -lt $current) {
                   [pscustomobject]@{ Version=$candidate; Release=$_ }

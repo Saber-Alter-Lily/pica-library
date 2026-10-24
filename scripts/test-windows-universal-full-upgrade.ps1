@@ -3,10 +3,20 @@ param(
     [Parameter(Mandatory = $true)][string]$CandidateZip,
     [Parameter(Mandatory = $true)][string]$CandidateVersion,
     [Parameter(Mandatory = $true)][string]$CandidateSourceSha,
+    [switch]$ForceHealthFailure,
+    [switch]$ForceLaunchFailure,
+    [ValidateRange(0,4096)][int]$LibraryPathLength = 0,
+    [string]$DiagnosticsDirectory = '',
     [string]$DesktopHomeName = 'Pica Library P2 RC'
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'lib\windows-upgrade-diagnostics.ps1')
+
+function Quote-UpgradeArgument([string]$Value) {
+    if ($Value.Contains('"')) { throw 'Invalid quoted upgrade argument' }
+    return '"' + $Value + '"'
+}
 
 function Expand-AppPackage([string]$Zip, [string]$Destination) {
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -22,6 +32,19 @@ function Expand-AppPackage([string]$Zip, [string]$Destination) {
         return $directories[0].FullName
     }
     throw "Package does not contain one Pica Library application root: $Zip"
+}
+
+function Get-TagAssetSnapshot([string]$ApplicationRoot) {
+    $records = @()
+    foreach ($relativeRoot in @('src\data\registry-v3-final','app\runtime-assets\registry-v3-final','app\runtime-assets\tag-runtime-v1')) {
+        $assetRoot = Join-Path $ApplicationRoot $relativeRoot
+        if (-not (Test-Path -LiteralPath $assetRoot)) { continue }
+        foreach ($asset in @(Get-ChildItem -LiteralPath $assetRoot -Recurse -File | Sort-Object FullName)) {
+            $relative = $asset.FullName.Substring($ApplicationRoot.TrimEnd('\').Length + 1).Replace('\','/')
+            $records += [ordered]@{ path=$relative; bytes=$asset.Length; sha256=(Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+        }
+    }
+    return ConvertTo-Json -InputObject $records -Compress
 }
 
 function Wait-Instance([string]$InstanceFile, [int]$TimeoutSeconds = 30) {
@@ -40,6 +63,11 @@ function Wait-Instance([string]$InstanceFile, [int]$TimeoutSeconds = 30) {
 
 function Stop-Desktop($Instance) {
     if (-not $Instance) { return }
+    $owned = Get-CimInstance Win32_Process -Filter "ProcessId=$([int]$Instance.pid)" -ErrorAction SilentlyContinue
+    if (-not $owned) { return }
+    if (-not $owned.ExecutablePath -or -not $owned.ExecutablePath.StartsWith($work + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Refusing to stop a process outside the exact upgrade acceptance root'
+    }
     try {
         $status = Invoke-RestMethod -Uri ($Instance.url + '/api/v1/desktop/status') -TimeoutSec 5
         Invoke-RestMethod -Method Post -Uri ($Instance.url + '/api/v1/desktop/shutdown') -Headers @{
@@ -61,9 +89,17 @@ function Stop-Desktop($Instance) {
     }
 }
 
+function Assert-DeepDatabaseCanary([string]$Runtime,[string]$Database) {
+    if (-not $LibraryPathLength) { return }
+    $code = 'const {DatabaseSync}=require("node:sqlite"),path=require("node:path");const db=new DatabaseSync("file:"+encodeURIComponent(path.toNamespacedPath(process.argv[1]))+"?vfs=win32-longpath",{readOnly:true});const value=db.prepare("SELECT value FROM synthetic_upgrade_path").get().value;db.close();if(String(value)!=="12345")process.exit(2);'
+    & $Runtime -e $code $Database
+    if ($LASTEXITCODE -ne 0) { throw 'Deep-path upgrade lost the original synthetic database row' }
+}
+
 if ($CandidateSourceSha -notmatch '^[0-9a-f]{40}$') {
     throw 'CandidateSourceSha must be a full Git commit SHA'
 }
+if ($ForceHealthFailure -and $ForceLaunchFailure) { throw 'Select only one synthetic failure mode' }
 if ($DesktopHomeName -notin @('Pica Library P2 RC', 'Pica Library Post Stable RC')) {
     throw 'Acceptance requires one of the isolated RC home names'
 }
@@ -80,12 +116,20 @@ $originalLocal = $env:LOCALAPPDATA
 $originalHome = $env:PICA_LIBRARY_DESKTOP_HOME
 $currentInstance = $null
 $success = $false
+$helperProcess = $null
+$failureMessage = ''
+$scenario = if ($ForceLaunchFailure) { 'launch-failure' } elseif ($ForceHealthFailure) { 'health-failure' } else { 'normal' }
+$expectedFailure = $ForceHealthFailure -or $ForceLaunchFailure
 
 New-Item -ItemType Directory -Force -Path $work,$local,$bootstrap | Out-Null
 
 try {
     $currentRoot = Expand-AppPackage $BaselineZip $currentExtract
     $candidateRoot = Expand-AppPackage $CandidateZip $candidateExtract
+    $baselineTagAssets = Get-TagAssetSnapshot $currentRoot
+    $candidateTagAssets = Get-TagAssetSnapshot $candidateRoot
+    if (-not (Test-Path -LiteralPath (Join-Path $candidateRoot 'app\runtime-assets\tag-runtime-v1\TAG_RUNTIME_MANIFEST.json'))) { throw 'Candidate minimal tag runtime is missing' }
+    $baselineSha = [IO.File]::ReadAllText((Join-Path $currentRoot 'SOURCE_SHA.txt')).Trim()
 
     foreach ($required in @(
         'Pica Library.exe',
@@ -112,6 +156,22 @@ try {
     $env:PICA_LIBRARY_DESKTOP_HOME = $desktopHome
     $instanceFile = Join-Path $desktopHome 'runtime-state\instance.json'
     $libraryDirectory = Join-Path $desktopHome 'data'
+    if ($LibraryPathLength) {
+        # Only the task-owned data directory becomes deep; the launcher/profile
+        # paths stay short so this gate isolates SQLite and its real sidecars.
+        $libraryDirectory = Join-Path $work 'deep data with spaces'
+        while ($libraryDirectory.Length + 11 -lt $LibraryPathLength) {
+            $remaining = $LibraryPathLength - $libraryDirectory.Length - 11
+            if ($remaining -eq 1) { $libraryDirectory += 'x' }
+            else { $libraryDirectory = Join-Path $libraryDirectory ('x' * [Math]::Min($remaining - 1,60)) }
+        }
+        if ((Join-Path $libraryDirectory 'library.db').Length -ne $LibraryPathLength) { throw 'Exact synthetic database length could not be constructed' }
+        New-Item -ItemType Directory -Force -Path (Join-Path $desktopHome 'config'),$libraryDirectory | Out-Null
+        [ordered]@{ schemaVersion=1; libraryDirectory=$libraryDirectory; profile='balanced'; openBrowser=$false; preferredPort=4789; externalSources=@{ schemaVersion=1; revision=0; enabled=@() } } | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 -LiteralPath (Join-Path $desktopHome 'config\config.json')
+        $seedCode = 'const {DatabaseSync}=require("node:sqlite"),path=require("node:path");const db=new DatabaseSync("file:"+encodeURIComponent(path.toNamespacedPath(process.argv[1]))+"?vfs=win32-longpath");db.exec("CREATE TABLE synthetic_upgrade_path(value TEXT); INSERT INTO synthetic_upgrade_path VALUES (12345)");db.close();'
+        & (Join-Path $candidateRoot 'runtime\node.exe') -e $seedCode (Join-Path $libraryDirectory 'library.db')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not seed the isolated deep-path database' }
+    }
 
     Start-Process -FilePath (Join-Path $currentRoot 'Pica Library.exe') -ArgumentList '--no-open' -WorkingDirectory $currentRoot -WindowStyle Hidden
     $currentInstance = Wait-Instance $instanceFile
@@ -141,15 +201,43 @@ try {
         libraryDirectory = $libraryDirectory
         instanceFile = $instanceFile
         progressFile = $progressFile
-        targetVersion = $CandidateVersion
+        targetVersion = if ($ForceHealthFailure) { $CandidateVersion + '-deliberate-health-failure' } else { $CandidateVersion }
         targetSourceSha = $CandidateSourceSha
         previousUrl = [string]$currentInstance.url
-        healthTimeoutMs = 60000
+        healthTimeoutMs = if ($ForceHealthFailure) { 5000 } else { 60000 }
     }
     $instruction | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 -LiteralPath $instructionFile
 
-    $helperProcess = Start-Process -FilePath $bootstrapRuntime -ArgumentList @($bootstrapHelper,$instructionFile) -WorkingDirectory $bootstrap -WindowStyle Hidden -PassThru
-    Start-Sleep -Milliseconds 300
+    $helperArguments = @((Quote-UpgradeArgument $bootstrapHelper),(Quote-UpgradeArgument $instructionFile))
+    if ($ForceLaunchFailure) {
+        # Deterministic asynchronous API fault, not an assertion about a real OS/antivirus fault.
+        $faultLoader = Join-Path $bootstrap 'synthetic-launch-error.cjs'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'fixtures\upgrade-launch-error.cjs') -Destination $faultLoader
+        $helperArguments = @('--require',(Quote-UpgradeArgument $faultLoader)) + $helperArguments
+    }
+    # The helper must finish preflight and receive the parent's explicit acknowledgement
+    # before the existing app is closed. OS CreateProcess success alone is insufficient.
+    $readyNonce=[guid]::NewGuid().ToString()
+    $readyFile=Join-Path $bootstrap ("helper-ready-$readyNonce.json")
+    $instruction['readyNonce']=$readyNonce
+    $instruction['readyFile']=$readyFile
+    $instruction | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 -LiteralPath $instructionFile
+    $helperProcess = Start-Process -FilePath $bootstrapRuntime -ArgumentList $helperArguments -WorkingDirectory $bootstrap -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $bootstrap 'helper.stdout.log') -RedirectStandardError (Join-Path $bootstrap 'helper.stderr.log')
+    $readyDeadline=(Get-Date).AddSeconds(15)
+    $helperReady=$false
+    do {
+        $helperProcess.Refresh()
+        if($helperProcess.HasExited){throw 'Full helper exited before startup confirmation; original app was not closed'}
+        if(Test-Path -LiteralPath $readyFile){
+            $ready=Get-Content -Raw -LiteralPath $readyFile | ConvertFrom-Json
+            if($ready.schemaVersion -ne 1 -or $ready.kind -ne 'full-application' -or $ready.nonce -ne $readyNonce -or $ready.pid -ne $helperProcess.Id -or $ready.parentPid -ne $currentInstance.pid){throw 'Full helper readiness does not match this invocation'}
+            [IO.File]::WriteAllText($readyFile+'.accepted',($ready | ConvertTo-Json -Compress),(New-Object Text.UTF8Encoding($false)))
+            $helperReady=$true
+            break
+        }
+        Start-Sleep -Milliseconds 50
+    } while((Get-Date) -lt $readyDeadline)
+    if(!$helperReady){throw 'Full helper readiness timed out; original app was not closed'}
     Stop-Desktop $currentInstance
     $currentInstance = $null
 
@@ -162,11 +250,50 @@ try {
         Stop-Process -Id $helperProcess.Id -Force -ErrorAction SilentlyContinue
         throw 'Universal full-upgrader did not finish within the acceptance timeout'
     }
-    if ($helperProcess.ExitCode -ne 0) {
+    if ($helperProcess.ExitCode -ne 0 -and -not $expectedFailure) {
         throw "Universal full-upgrader exited with code $($helperProcess.ExitCode)"
     }
 
     $progress = Get-Content -Raw -LiteralPath $progressFile | ConvertFrom-Json
+    if ($expectedFailure) {
+        if ($helperProcess.ExitCode -ne 1 -or $progress.phase -ne 'failed') {
+            throw "Deliberate $scenario did not take the actual rollback path"
+        }
+        $restored = Wait-Instance $instanceFile
+        $currentInstance = $restored
+        $restoredCaps = Invoke-RestMethod -Uri ($restored.url + '/api/v1/capabilities') -TimeoutSec 10
+        if ($restoredCaps.appVersion -ne $baselineCaps.appVersion -or
+            [IO.File]::ReadAllText((Join-Path $currentRoot 'SOURCE_SHA.txt')).Trim() -ne $baselineSha) {
+            throw 'Rollback did not restore the original released application'
+        }
+        if ((Get-TagAssetSnapshot $currentRoot) -cne $baselineTagAssets) { throw 'Rollback did not restore exact original tag asset layout/bytes' }
+        if (-not (Test-Path -LiteralPath $marker) -or
+            [IO.File]::ReadAllText($marker) -ne 'preserve-me' -or
+            -not (Test-Path -LiteralPath $database)) {
+            throw 'Rollback did not preserve external configuration/database'
+        }
+        Assert-DeepDatabaseCanary (Join-Path $candidateRoot 'runtime\node.exe') $database
+        Stop-Desktop $restored
+        $currentInstance = $null
+        [ordered]@{
+            universal_full_rollback = 'PASS'
+            helper_startup_confirmed = [bool]$helperReady
+            universal_full_launch_rollback = if ($ForceLaunchFailure) { 'PASS' } else { 'NOT_RUN' }
+            injected_failure = $scenario
+            injection_mode = if ($ForceLaunchFailure) { 'TEST_ONLY_FIRST_SPAWN_ASYNC_ERROR' } else { 'TEST_ONLY_TARGET_VERSION_MISMATCH' }
+            original_version_restored = $baselineCaps.appVersion
+            original_source_restored = $baselineSha
+            tag_runtime_rollback = 'PASS'
+            original_tag_asset_bytes_restored = $true
+            external_config_preserved = $true
+            external_database_preserved = $true
+            library_database_path_characters = $database.Length
+            same_source_recovery_fixture = $baselineSha -eq $CandidateSourceSha
+            source_sha = $CandidateSourceSha
+        } | ConvertTo-Json
+        $success = $true
+        return
+    }
     if ($progress.phase -ne 'complete') {
         throw "Universal full-upgrader did not report completion: $($progress.phase)"
     }
@@ -188,12 +315,17 @@ try {
     if ($installedSha -ne $CandidateSourceSha) {
         throw 'Full replacement did not install the candidate application tree'
     }
+    if ((Get-TagAssetSnapshot $currentRoot) -cne $candidateTagAssets) { throw 'Full replacement retained stale or changed tag assets' }
+    foreach ($legacy in @('src\data\registry-v3-final','app\runtime-assets\registry-v3-final')) {
+        if (Test-Path -LiteralPath (Join-Path $currentRoot $legacy)) { throw 'Full replacement retained reviewed tag evidence in the application tree' }
+    }
     if (-not (Test-Path -LiteralPath $marker) -or [IO.File]::ReadAllText($marker) -ne 'preserve-me') {
         throw 'External Desktop configuration was not preserved'
     }
     if (-not (Test-Path -LiteralPath $database)) {
         throw 'External Library database was not preserved'
     }
+    Assert-DeepDatabaseCanary (Join-Path $candidateRoot 'runtime\node.exe') $database
     if ($candidateSchema -gt $baselineSchema) {
         $migrationBackup = "$database.pre-migration-v$candidateSchema.bak"
         if (-not (Test-Path -LiteralPath $migrationBackup)) {
@@ -209,24 +341,49 @@ try {
 
     [ordered]@{
         universal_full_upgrade = 'PASS'
+        helper_startup_confirmed = [bool]$helperReady
         baseline_schema = $baselineSchema
         candidate_schema = $candidateSchema
         candidate_version = $CandidateVersion
         source_sha = $CandidateSourceSha
+        tag_runtime_full_replacement = 'PASS'
+        legacy_review_evidence_removed = $true
         external_config_preserved = $true
         external_database_preserved = $true
+        library_database_path_characters = $database.Length
+        same_source_recovery_fixture = $baselineSha -eq $CandidateSourceSha
         pre_migration_backup = if ($candidateSchema -gt $baselineSchema) { 'PASS' } else { 'NOT_REQUIRED' }
     } | ConvertTo-Json
     $success = $true
+} catch {
+    $failureMessage = $_.Exception.Message
+    throw
 } finally {
-    if ($currentInstance) { Stop-Desktop $currentInstance }
+    if ($currentInstance) { try { Stop-Desktop $currentInstance } catch { Write-Warning 'Owned instance cleanup needs inspection' } }
+    # Recover the instance published by a rollback, even if the test threw before assigning it.
+    if (Test-Path -LiteralPath (Join-Path (Join-Path $local $DesktopHomeName) 'runtime-state\instance.json')) {
+        try { Stop-Desktop (Get-Content -Raw -LiteralPath (Join-Path (Join-Path $local $DesktopHomeName) 'runtime-state\instance.json') | ConvertFrom-Json) } catch { Write-Warning 'Published owned process cleanup needs inspection' }
+    }
+    $ownedProcesses = @(Get-CimInstance Win32_Process -Filter "Name='node.exe' OR Name='Pica Library.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($work + '\', [StringComparison]::OrdinalIgnoreCase) })
+    foreach ($ownedProcess in $ownedProcesses) {
+        Stop-Process -Id $ownedProcess.ProcessId -Force -ErrorAction SilentlyContinue
+        Wait-Process -Id $ownedProcess.ProcessId -Timeout 5 -ErrorAction SilentlyContinue
+    }
+    $diagnosticError = $null
+    if ($DiagnosticsDirectory) {
+        try {
+            $exitCode = if ($helperProcess -and $helperProcess.HasExited) { $helperProcess.ExitCode } else { $null }
+            $diagnostic = Write-PicaUpgradeDiagnostics -WorkRoot $work -Destination $DiagnosticsDirectory -CandidateSourceSha $CandidateSourceSha -ProgressFile $progressFile -Scenario $scenario -FailureMessage $failureMessage -GatePassed $success -HelperExitCode $exitCode
+            Write-Host "UPGRADE_DIAGNOSTICS: $diagnostic"
+        } catch { $diagnosticError = $_; Write-Warning 'Could not export bounded upgrade diagnostics; synthetic work directory retained' }
+    }
     $env:LOCALAPPDATA = $originalLocal
     if ($null -eq $originalHome) {
         Remove-Item Env:PICA_LIBRARY_DESKTOP_HOME -ErrorAction SilentlyContinue
     } else {
         $env:PICA_LIBRARY_DESKTOP_HOME = $originalHome
     }
-    if ($success -and (Test-Path -LiteralPath $work)) {
+    if ($success -and -not $diagnosticError -and (Test-Path -LiteralPath $work)) {
         $resolved = [IO.Path]::GetFullPath($work)
         $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
         if (-not $resolved.StartsWith($tempRoot + '\', [StringComparison]::OrdinalIgnoreCase) -or
@@ -235,7 +392,8 @@ try {
             throw 'Refusing cleanup outside the task-owned upgrade acceptance directory'
         }
         Remove-Item -Recurse -Force -LiteralPath $resolved -ErrorAction SilentlyContinue
-    } elseif (-not $success) {
+    } elseif (-not $success -or $diagnosticError) {
         Write-Warning "Universal full-upgrade acceptance retained for diagnosis: $work"
     }
+    if ($success -and $diagnosticError) { throw $diagnosticError }
 }

@@ -33,9 +33,11 @@ describe('Windows/Web RC connection and onboarding corrective batch', () => {
         expect(eh).toContain("new CustomEvent('pica-eh-login-complete')")
     })
 
-    it('promotes Web onboarding to version 2 with task-oriented shelf, sync, recommendation and visual steps', () => {
+    it('separates v3 daily onboarding and optional task-oriented advanced chapters', () => {
         const onboarding = read('web/onboarding-v1.js')
-        expect(onboarding).toContain('const TOUR_VERSION = 2')
+        const catalog = read('web/guide-catalog.js')
+        expect(onboarding).toContain('const TOUR_VERSION = GUIDE_VERSION')
+        expect(read('web/onboarding-state.js')).toContain('GUIDE_VERSION = 3')
         for (const target of [
             "'library-sync'",
             "'shelves-nav'",
@@ -46,10 +48,10 @@ describe('Windows/Web RC connection and onboarding corrective batch', () => {
             "'connection-status'",
             "'eh-account'"
         ]) expect(onboarding).toContain(target)
-        expect(onboarding).toContain('先同步收藏')
-        expect(onboarding).toContain('建立书架')
-        expect(onboarding).toContain('一个推荐周期会提前生成多批结果')
-        expect(onboarding).toContain('OFF 表示完全不影响常规推荐')
-        expect(onboarding).toContain('推荐的“网页登录并自动回传”')
+        expect(catalog).toContain('已有漫画直接从书库打开')
+        expect(catalog).toContain('不需要每次重新生成')
+        expect(catalog).toContain('OFF 不参与排序')
+        expect(catalog).toContain('普通官网登录链接不会自动回传')
+        expect(onboarding).toContain('showAdvancedGuide')
     })
 })

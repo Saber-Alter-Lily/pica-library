@@ -110,10 +110,12 @@ const checks = {
     assert(v.credentialBackend?.sessionOnly === true, 'credential fixture expected session-only mode')
     assert(v.credentialBackend?.securePersistence === false, 'session-only credential mode claimed secure persistence')
     assert(v.configured === true, 'session credentials did not configure the current process')
+    assert(v.picaAccount?.configured === true, 'Pica session was not configured in the current process')
   },
   credentialSessionCleared(v) {
     assert(v.credentialBackend?.sessionOnly === true, 'credential backend changed unexpectedly after restart')
-    assert(v.configured === false, 'session-only credentials survived a process restart')
+    assert(v.configured === true, 'local library configuration did not survive a process restart')
+    assert(v.picaAccount?.configured === false, 'session-only credentials survived a process restart')
   }
 }
 if (!checks[source]) throw new Error(`unknown assertion set: ${source}`)

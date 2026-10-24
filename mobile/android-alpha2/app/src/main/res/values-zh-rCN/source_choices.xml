@@ -1,0 +1,13 @@
+<resources>
+    <string name="source_choices_title">本机外部漫画源</string>
+    <string name="source_choices_summary">独立选择 Pica / E-H / JM，不改变电脑设置</string>
+    <string name="source_choices_help">选择本手机允许访问的外部来源。先勾选，再保存；停用不退出账号，不删除下载、收藏或阅读记录。本地阅读、电脑已有文件和网盘连接不受这些开关控制。</string>
+    <string name="source_choices_reload">重新读取</string>
+    <string name="source_choices_save">保存来源选择</string>
+    <string name="source_choices_unsaved">尚未保存</string>
+    <string name="source_choices_current">当前已保存的来源选择</string>
+    <string name="source_choices_saved">保存立即生效。启用后请重新打开对应来源页面；暂停的下载需手动继续。</string>
+    <string name="source_choices_stale">设置已被其他页面更改，请先重新读取。</string>
+    <string name="source_choices_storage_error">来源配置无法安全读写，未启用新来源。请保留现有数据并反馈此错误。</string>
+    <string name="source_disabled">此来源已停用。可在“账号与来源 → 本机外部漫画源”中启用。</string>
+</resources>

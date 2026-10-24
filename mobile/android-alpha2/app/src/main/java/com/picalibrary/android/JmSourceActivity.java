@@ -71,7 +71,7 @@ public class JmSourceActivity extends LocaleAwareActivity {
         root.addView(Ui.button(this,getString(R.string.common_back),v->finish(),true));
         ScrollView scroll=new ScrollView(this);LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(Ui.dp(this,14),Ui.dp(this,8),Ui.dp(this,14),Ui.dp(this,24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        content.addView(Ui.rawText(this,getString(R.string.jm_source_title),22,Ui.TEXT,true));
+        content.addView(Ui.rawText(this,getString(R.string.jm_source_title),22,Ui.TEXT,true));SourceAccessUi.entry(this,content);
         status=Ui.rawText(this,getString(R.string.jm_source_status_loading),13,Ui.MUTED,false);status.setTag("jm.status");content.addView(status);
         content.addView(Ui.rawText(this,getString(R.string.jm_source_help),12,Ui.MUTED,false));
         login=button(content,"jm.login",R.string.jm_source_login,v->loginDialog());
@@ -116,13 +116,14 @@ public class JmSourceActivity extends LocaleAwareActivity {
     private void showMessage(int resource,Object... args){message.setText(getString(resource,args));}
     private void showIdentity(JSONObject identity){
         configured=identity!=null&&identity.optBoolean("configured");
-        status.setText(identity==null?getString(R.string.jm_source_status_unknown):configured?getString(R.string.jm_source_status_signed_in,identity.optString("username")):getString(R.string.jm_source_status_signed_out));
+        status.setText(identity!=null&&!identity.optBoolean("enabled",true)?getString(R.string.source_disabled):identity==null?getString(R.string.jm_source_status_unknown):configured?getString(R.string.jm_source_status_signed_in,identity.optString("username")):getString(R.string.jm_source_status_signed_out));
     }
     private void postProgress(long request,int resource,Object... args){
         runOnUiThread(()->{if(!destroyed&&request==activeRequest&&!cancelRequested)showMessage(resource,args);});
     }
     private void start(Operation nextOperation,int messageResource,Task task){
         if(!idle())return;
+        if(nextOperation!=Operation.STATUS&&nextOperation!=Operation.LOGOUT&&!SourceAccessUi.require(this,"jm"))return;
         operation=nextOperation;cancelRequested=false;long request=++activeRequest;showMessage(messageResource);updateButtons();
         worker.execute(()->{
             Runnable success=null;Exception failure=null;JSONObject failedIdentity=null;
@@ -135,7 +136,7 @@ public class JmSourceActivity extends LocaleAwareActivity {
                     if(nextOperation==Operation.LOGIN||nextOperation==Operation.LOGOUT)showIdentity(identity);
                     if(nextOperation==Operation.STATUS)showIdentity(null);
                     if(nextOperation==Operation.SCAN||nextOperation==Operation.IMPORT)clearPreview();
-                    showMessage(errorResource(nextOperation));
+                    showMessage(error instanceof com.picalibrary.android.sources.SourceAccessPolicy.Disabled?R.string.source_disabled:errorResource(nextOperation));
                 }else if(completed!=null)completed.run();
                 operation=Operation.IDLE;updateButtons();
             });

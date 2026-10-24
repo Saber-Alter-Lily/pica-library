@@ -12,28 +12,33 @@ final class JmClientManager {
     interface EnrichmentProgress {void onItem(int done,int total,int updated,int failed);}
     private static JmClientManager instance;
     private final Context context;
+    final com.picalibrary.android.sources.SourceAccessPolicy.Permit access;
+    private com.picalibrary.android.sources.SourceAccessPolicy.Registration cancellation;
     private final JmSource source=new JmSource();
     private final Gson json=new Gson();
     private boolean restoreAttempted;
     private volatile int generation;
     private volatile Preview preview;
     private static final class Preview {final String token,accountId;final long expires;final JSONArray items;Preview(String token,String accountId,JSONArray items){this.token=token;this.accountId=accountId;this.items=items;expires=System.currentTimeMillis()+900000;}}
-    private JmClientManager(Context c){context=c.getApplicationContext();}
-    static synchronized JmClientManager get(Context c){if(instance==null)instance=new JmClientManager(c);return instance;}
+    private JmClientManager(Context c){context=c.getApplicationContext();access=SourceAccess.bind(context,"jm");}
+    static synchronized JmClientManager get(Context c){if(instance==null||!instance.access.current()||!instance.context.getFilesDir().equals(c.getFilesDir()))instance=new JmClientManager(c);return instance;}
+    private void activate(){access.check();if(cancellation==null)cancellation=access.onCancel(()->{cancel();source.revoke();});}
+    private JSONObject checkedObject(Object value) throws Exception {access.check();return object(value);}
+    private JSONArray checkedArray(Object value) throws Exception {access.check();return array(value);}
     private JSONObject object(Object value) throws Exception{return new JSONObject(json.toJson(value));}
     private JSONArray array(Object value) throws Exception{return new JSONArray(json.toJson(value));}
     private synchronized void restore() throws Exception {
-        if(restoreAttempted)return;restoreAttempted=true;JSONObject saved=JmAccountStore.load(context);
-        if(!saved.optString("username").isEmpty()){Map<String,Object> identity=source.login(saved.getString("username"),saved.getString("password"));JmAccountStore.sessionScope(context,String.valueOf(identity.get("accountId")));}
+        activate();if(restoreAttempted)return;restoreAttempted=true;JSONObject saved=JmAccountStore.load(context);
+        if(!saved.optString("username").isEmpty()){Map<String,Object> identity=source.login(saved.getString("username"),saved.getString("password"));access.commit(()->{JmAccountStore.sessionScope(context,String.valueOf(identity.get("accountId")));return null;});}
     }
-    synchronized JSONObject status() throws Exception {restore();return object(source.status());}
+    synchronized JSONObject status() throws Exception {if(!SourceAccess.enabled(context,"jm"))return new JSONObject().put("enabled",false).put("configured",false);restore();return checkedObject(source.status()).put("enabled",true);}
     synchronized JSONObject login(String username,String password,boolean remember) throws Exception {
-        JmDownloadSession.invalidate(context);cancel();restoreAttempted=true;JmAccountStore.clear(context);
+        activate();access.commit(()->{JmDownloadSession.invalidate(context);cancel();restoreAttempted=true;JmAccountStore.clear(context);return null;});
         try {
             JSONObject identity=object(source.login(username,password));
-            if(remember)JmAccountStore.save(context,username,password,identity.getString("accountId"));else JmAccountStore.sessionScope(context,identity.getString("accountId"));
+            access.commit(()->{if(remember)JmAccountStore.save(context,username,password,identity.getString("accountId"));else JmAccountStore.sessionScope(context,identity.getString("accountId"));return null;});
             identity.put("remembered",remember);return identity;
-        } catch(Exception error) {source.close();JmAccountStore.clear(context);throw error;}
+        } catch(Exception error) {source.close();access.check();access.commit(()->{JmAccountStore.clear(context);return null;});throw error;}
     }
     synchronized void logout(){JmDownloadSession.invalidate(context);cancel();restoreAttempted=true;source.close();JmAccountStore.clear(context);}
     private void requireDownloadSession(String binding) throws Exception {
@@ -45,18 +50,18 @@ final class JmClientManager {
     synchronized JSONArray downloadEpisodes(String binding,String id) throws Exception {requireDownloadSession(binding);return episodes(id);}
     synchronized JSONArray downloadPages(String binding,String id) throws Exception {requireDownloadSession(binding);return pages(id);}
     synchronized byte[] downloadImage(String binding,String locator) throws Exception {requireDownloadSession(binding);return image(locator);}
-    JSONObject search(String query,int page) throws Exception {restore();return object(source.search(query,page));}
-    JSONObject details(String comicId) throws Exception {restore();return object(source.details(comicId));}
-    JSONArray episodes(String comicId) throws Exception {restore();return array(source.episodes(comicId));}
-    JSONArray pages(String episodeId) throws Exception {restore();return array(source.pages(episodeId));}
-    byte[] image(String locator) throws Exception {restore();return source.image(locator,20*1024*1024);}
+    JSONObject search(String query,int page) throws Exception {restore();return checkedObject(source.search(query,page));}
+    JSONObject details(String comicId) throws Exception {restore();return checkedObject(source.details(comicId));}
+    JSONArray episodes(String comicId) throws Exception {restore();return checkedArray(source.episodes(comicId));}
+    JSONArray pages(String episodeId) throws Exception {restore();return checkedArray(source.pages(episodeId));}
+    byte[] image(String locator) throws Exception {restore();byte[] bytes=source.image(locator,20*1024*1024);access.check();return bytes;}
     void cancel(){generation++;preview=null;}
     JSONObject previewFavorites() throws Exception {return previewFavorites(null);}
     JSONObject previewFavorites(FavoritesProgress progress) throws Exception {
         cancel();final int current=generation;restore();JSONObject identity=object(source.status());String accountId=identity.optString("accountId");if(!identity.optBoolean("configured")||accountId.isEmpty())throw new IllegalStateException("请先登录 JM");
         LinkedHashMap<String,JSONObject> items=new LinkedHashMap<>();int total=-1,pages=-1;
         for(int page=1;;page++){
-            if(current!=generation)throw new IllegalStateException("收藏扫描已取消");
+            access.check();if(current!=generation)throw new IllegalStateException("收藏扫描已取消");
             JSONObject result=object(source.favorites(0,page));
             if(page==1){total=result.getInt("total");pages=result.getInt("pages");}
             if(total<0||total>10000||pages<0||pages>500||result.getInt("page")!=page||result.getInt("total")!=total||result.getInt("pages")!=pages||!accountId.equals(result.optString("accountId")))throw new IllegalStateException("收藏分页发生变化，请重新扫描");
@@ -66,12 +71,12 @@ final class JmClientManager {
             if(progress!=null)progress.onPage(page,Math.max(1,pages),items.size(),total);
             if(page>=Math.max(1,pages))break;
         }
-        if(current!=generation||items.size()!=total||!accountId.equals(source.status().get("accountId")))throw new IllegalStateException("收藏扫描失效，尚未导入");
+        access.check();if(current!=generation||items.size()!=total||!accountId.equals(source.status().get("accountId")))throw new IllegalStateException("收藏扫描失效，尚未导入");
         Preview ready=new Preview(UUID.randomUUID().toString(),accountId,new JSONArray(items.values()));preview=ready;
         return new JSONObject().put("token",ready.token).put("count",items.size());
     }
     synchronized int confirm(String token) throws Exception {
-        Preview ready=preview;if(ready==null||!ready.token.equals(token)||System.currentTimeMillis()>ready.expires||!ready.accountId.equals(source.status().get("accountId")))throw new IllegalStateException("收藏预览失效，请重新扫描");
+        access.check();Preview ready=preview;if(ready==null||!ready.token.equals(token)||System.currentTimeMillis()>ready.expires||!ready.accountId.equals(source.status().get("accountId")))throw new IllegalStateException("收藏预览失效，请重新扫描");
         merge(ready.items,true);preview=null;return ready.items.length();
     }
     JSONObject enrichFavorites() throws Exception {return enrichFavorites(null);}
@@ -83,7 +88,7 @@ final class JmClientManager {
         return new JSONObject().put("updated",updated).put("failed",failed).put("remaining",pending.size()-updated);
     }
     void merge(JSONArray rows,boolean favorite) throws Exception {
-        mergeCatalog(context,rows,favorite);
+        access.commit(()->{mergeCatalog(context,rows,favorite);return null;});
     }
     static void mergeCatalog(Context context,JSONArray rows,boolean favorite) throws Exception {
         synchronized(UnifiedCatalogStore.class){

@@ -45,7 +45,7 @@ final class ReaderImages implements AutoCloseable {
             }
             File target=new File(cache,ReaderPolicy.hash(path));File partial=null;
             try{
-                if(!target.isFile()){partial=fetchNetworkToPartial(path,request);validateImage(partial);synchronized(ReaderImages.class){if(!target.exists()&&!partial.renameTo(target))throw new IOException("cache rename failed");}}
+                if(!target.isFile()){partial=fetchNetworkToPartial(path,request);validateImage(partial);commitCache(partial,target);}
                 if(request.cancelled||closed)return;
                 Bitmap bitmap=decodeFile(target,width);if(bitmap==null){target.delete();throw new IOException("decode failed");}failures.remove(path);target.setLastModified(System.currentTimeMillis());main.post(()->{if(!request.cancelled&&!closed)callback.complete(bitmap);else bitmap.recycle();});trim(target);
             }catch(Exception|OutOfMemoryError e){String reason=failureReason(e);failures.put(path,reason);main.post(()->{if(!request.cancelled&&!closed){Toast.makeText(context,LocalizedText.ui("图片读取失败 · ")+reason,Toast.LENGTH_LONG).show();callback.failed();}});}
@@ -59,11 +59,12 @@ final class ReaderImages implements AutoCloseable {
         for(String path:paths){
             if(path==null||path.isEmpty()||isLocal(path))continue;
             File target=new File(cache,ReaderPolicy.hash(path));if(target.isFile())continue;
-            prefetchers.submit(()->{if(closed||generation!=prefetchGeneration.get())return;Request request=new Request();File partial=null;try{partial=fetchNetworkToPartial(path,request);if(closed||generation!=prefetchGeneration.get())return;validateImage(partial);synchronized(ReaderImages.class){if(!target.exists()&&!partial.renameTo(target))throw new IOException("cache rename failed");}target.setLastModified(System.currentTimeMillis());trim(target);}catch(Exception ignored){}finally{if(partial!=null)partial.delete();}});
+            prefetchers.submit(()->{if(closed||generation!=prefetchGeneration.get())return;Request request=new Request();File partial=null;try{partial=fetchNetworkToPartial(path,request);if(closed||generation!=prefetchGeneration.get())return;validateImage(partial);commitCache(partial,target);target.setLastModified(System.currentTimeMillis());trim(target);}catch(Exception ignored){}finally{if(partial!=null)partial.delete();}});
         }
     }
 
     String failureDetail(String path){String value=failures.get(path);return value==null||value.isEmpty()?"暂时无法读取":value;}
+    private void commitCache(File partial,File target){SourceAccess.commit(source.sourceAccess(),()->{synchronized(ReaderImages.class){if(!target.exists()&&!partial.renameTo(target))throw new IOException("cache rename failed");return null;}});}
     String diagnose(String path){if(source instanceof EhReaderSource)return ((EhReaderSource)source).diagnose(path);return "当前来源没有额外诊断信息";}
 
     private File fetchNetworkToPartial(String path,Request request) throws Exception {
@@ -91,7 +92,8 @@ final class ReaderImages implements AutoCloseable {
     private void copy(InputStream in,OutputStream out,Request request) throws Exception {byte[] buffer=new byte[32768];int n;long bytes=0;while((n=in.read(buffer))!=-1){if(request.cancelled||closed||Thread.currentThread().isInterrupted())throw new IOException("cancelled");bytes+=n;if(bytes>64L*1024*1024)throw new IOException("page too large");out.write(buffer,0,n);}}
     private static void validateImage(File file) throws IOException {BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(file.getPath(),bounds);if(bounds.outWidth<=0||bounds.outHeight<=0)throw new IOException("invalid image");}
 
-    private static String failureReason(Throwable error){
+    private String failureReason(Throwable error){
+        if(error instanceof com.picalibrary.android.sources.SourceAccessPolicy.Disabled)return context.getString(R.string.source_disabled);
         if(error instanceof OutOfMemoryError)return "图片过大或内存不足";
         String value=error==null||error.getMessage()==null?"":error.getMessage().trim();String lower=value.toLowerCase(Locale.ROOT);
         if(value.contains("HTTP 509"))return "请求过于频繁";

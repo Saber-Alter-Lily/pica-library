@@ -9,6 +9,7 @@ import org.json.*;
 final class JmDownloadEngine {
     interface Client {
         void check() throws Exception;
+        default <T>T commit(com.picalibrary.android.sources.SourceAccessPolicy.Commit<T> action) throws Exception {check();return action.run();}
         JSONObject details(String comicId) throws Exception;
         JSONArray episodes(String comicId) throws Exception;
         JSONArray pages(String episodeId) throws Exception;
@@ -68,15 +69,16 @@ final class JmDownloadEngine {
                     boolean reused = !uri.isEmpty();
                     if (!reused) {
                         byte[] bytes = client.image(locator); check(client, listener);
-                        uri = store.save(locator, i, bytes);
+                        final int index=i;uri = client.commit(()->store.save(locator,index,bytes));
                     }
                     stored.add(new PhoneDownloadStore.Page(i, uri));
                     listener.progress(comic.optString("title"), chapter.optString("title"), done, chapters.size(), i+1, pages.length(), reused);
                 }
                 check(client, listener);
-                PhoneDownloadStore.putChapter(context, comicId, comic.optString("title"), comic.optString("author"),
-                        new PhoneDownloadStore.Chapter(episodeId, chapter.optString("title"), chapter.optInt("order", done+1), stored));
-                JmClientManager.mergeCatalog(context, new JSONArray().put(comic), false);
+                final int chapterOrder=chapter.optInt("order",done+1);
+                client.commit(()->{PhoneDownloadStore.putChapter(context, comicId, comic.optString("title"), comic.optString("author"),
+                        new PhoneDownloadStore.Chapter(episodeId, chapter.optString("title"), chapterOrder, stored));
+                    JmClientManager.mergeCatalog(context, new JSONArray().put(comic), false);return null;});
                 done++;
                 listener.progress(comic.optString("title"), chapter.optString("title"), done, chapters.size(), pages.length(), pages.length(), true);
             }

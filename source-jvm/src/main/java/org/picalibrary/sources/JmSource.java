@@ -8,11 +8,16 @@ import io.github.jukomu.jmcomic.core.config.JmConfiguration;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CancellationException;
 
 /** Thin shared adapter over the maintained MIT SDK. No provider protocol is reimplemented here. */
 public final class JmSource implements AutoCloseable {
     public static final String SDK_VERSION="v1.1.12";
-    private JmClient client;
+    private volatile JmClient client;
+    private final Object lifecycle=new Object();
+    private volatile boolean revoked;
+    private CompletableFuture<? extends JmClient> initializing;
     private String accountId="",accountName="";
     private String proxyHost="";private int proxyPort;
     private final Map<String,JmImage> imageLocators=new LinkedHashMap<>();
@@ -21,14 +26,40 @@ public final class JmSource implements AutoCloseable {
     public JmSource(JmClient client) { this.client=Objects.requireNonNull(client); }
 
     private JmClient client() throws Exception {
+        if(revoked)throw new CancellationException("JM source was disabled");
         JmConfiguration.Builder configuration=new JmConfiguration.Builder()
                 .timeout(Duration.ofSeconds(12)).imageTimeout(Duration.ofSeconds(20))
                 .retryTimes(1).downloadThreadPoolSize(2).cacheSize(8*1024*1024)
                 .closeTimeoutMs(1500);
         if(!proxyHost.isEmpty())configuration.proxy(proxyHost,proxyPort);
-        if(client==null)client=JmComic.newApiClientAsync(configuration.build()).get(45,TimeUnit.SECONDS);
+        if(client==null){
+            CompletableFuture<? extends JmClient> pending;
+            synchronized(lifecycle){
+                if(revoked)throw new CancellationException("JM source was disabled");
+                pending=JmComic.newApiClientAsync(configuration.build());initializing=pending;
+            }
+            JmClient ready;
+            try{ready=pending.get(45,TimeUnit.SECONDS);}catch(Exception error){pending.cancel(true);throw error;}
+            synchronized(lifecycle){
+                initializing=null;
+                if(revoked){closeClient(ready);throw new CancellationException("JM source was disabled");}
+                client=ready;
+            }
+        }
+        if(revoked)throw new CancellationException("JM source was disabled");
         return client;
     }
+
+    /** Permanent revocation, intentionally NOT synchronized on a running SDK request.
+     * SDK v1.1.12 close cancels OkHttp calls/probes; cancelled initialization closes its SDK.
+     * Call off the UI thread. Re-enabling creates a new adapter, never revives old results. */
+    public void revoke(){
+        JmClient active;CompletableFuture<? extends JmClient> pending;
+        synchronized(lifecycle){revoked=true;active=client;pending=initializing;}
+        if(pending!=null)pending.cancel(true);
+        closeClient(active);
+    }
+    private static void closeClient(JmClient value){if(value instanceof AbstractJmClient)((AbstractJmClient)value).close();else if(value instanceof AutoCloseable)try{((AutoCloseable)value).close();}catch(Exception ignored){}}
 
     public synchronized void configureProxy(String host,int port){
         String value=clean(host);if(value.length()>253||(!value.isEmpty()&&(port<1||port>65535)))throw new IllegalArgumentException("无效的 JM 代理");
@@ -100,7 +131,7 @@ public final class JmSource implements AutoCloseable {
 
     public synchronized void close(){
         accountId="";accountName="";imageLocators.clear();
-        if(client instanceof AbstractJmClient)((AbstractJmClient)client).close();client=null;
+        closeClient(client);client=null;
     }
 
     private static Map<String,Object> summary(JmAlbumMeta item){

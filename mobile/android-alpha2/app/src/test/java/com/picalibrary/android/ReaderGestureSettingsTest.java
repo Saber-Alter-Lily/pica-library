@@ -13,7 +13,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk = 35, manifest = Config.NONE)
+@Config(sdk = {28, 35}, manifest = Config.NONE)
 public class ReaderGestureSettingsTest {
     private Context context;
 
@@ -57,5 +57,18 @@ public class ReaderGestureSettingsTest {
         Map<String, ?> before = new HashMap<>(context.getSharedPreferences("reader-display", Context.MODE_PRIVATE).getAll());
         ReaderGestureSettings.save(context, false, 150);
         assertEquals(before, context.getSharedPreferences("reader-display", Context.MODE_PRIVATE).getAll());
+    }
+
+    @Test public void existingPreferenceKeysAreReadWithoutMigrationOrRewritingUnrelatedKeys() {
+        context.getSharedPreferences("reader-gestures-v1", Context.MODE_PRIVATE).edit()
+                .putBoolean("doubleTapEnabled", false).putInt("zoomPercent", 300)
+                .putString("futureSetting", "retained").commit();
+        Map<String, ?> before = new HashMap<>(context.getSharedPreferences("reader-gestures-v1", Context.MODE_PRIVATE).getAll());
+        ReaderGestureSettings.Snapshot settings = ReaderGestureSettings.local(context);
+        assertFalse(settings.doubleTapEnabled);
+        assertEquals(3f, settings.doubleTapScale(), 0f);
+        assertEquals(before, context.getSharedPreferences("reader-gestures-v1", Context.MODE_PRIVATE).getAll());
+        ReaderGestureSettings.save(context, true, 150);
+        assertEquals("retained", context.getSharedPreferences("reader-gestures-v1", Context.MODE_PRIVATE).getString("futureSetting", ""));
     }
 }

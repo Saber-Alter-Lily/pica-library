@@ -1,3 +1,5 @@
+import type { RuntimeModuleContracts } from '../modules/contracts'
+
 export type UpdatePackageType = 'incremental' | 'local-test'
 
 export interface UpdateManifestFile {
@@ -19,6 +21,8 @@ export interface UpdateManifest {
     appApiVersion: number
     databaseSchemaVersion: number
     requiresFullInstall: boolean
+    /** Optional for legacy packages. New builders bind this to the actual payload. */
+    moduleContracts?: RuntimeModuleContracts
     files: UpdateManifestFile[]
     deletions: string[]
 }
@@ -66,6 +70,10 @@ export interface UpdateProgress {
 }
 
 export interface UpdaterInstruction {
+    desktopHomeRoot: string
+    libraryDirectory: string
+    readyFile?: string
+    readyNonce?: string
     parentPid: number
     applicationRoot: string
     stagingRoot: string
@@ -80,6 +88,8 @@ export interface UpdaterInstruction {
 }
 
 export interface FullApplicationUpdaterInstruction {
+    readyFile?: string
+    readyNonce?: string
     parentPid: number
     applicationRoot: string
     stagedApplicationRoot: string

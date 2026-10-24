@@ -131,6 +131,7 @@ beforeEach(() => {
     })
 })
 afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
     for (const root of roots.splice(0))
@@ -138,6 +139,122 @@ afterEach(() => {
 })
 
 describe('actual full-upgrade orchestration with synthetic I/O faults', () => {
+    it.each(['EPERM', 'EBUSY', 'EACCES'])(
+        'retries bounded Windows %s before copying or claiming a backup',
+        async (code) => {
+            vi.useFakeTimers({ toFake: ['setTimeout'] })
+            const value = fixture(),
+                rename = fs.renameSync
+            let attempts = 0
+            vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+                if (
+                    from === value.applicationRoot &&
+                    to === value.backupRoot &&
+                    ++attempts <= 2
+                )
+                    throw Object.assign(
+                        new Error('synthetic transient directory lock'),
+                        { code }
+                    )
+                return rename(from, to)
+            })
+            fakeLaunch(value)
+            vi.stubGlobal(
+                'fetch',
+                vi.fn(async () =>
+                    Response.json({ appVersion: value.targetVersion })
+                )
+            )
+            const result = runFullApplicationUpgrade(value)
+            await vi.runAllTimersAsync()
+            await result
+            expect(attempts).toBe(3)
+            expect(
+                fs.readFileSync(
+                    path.join(value.applicationRoot, 'Pica Library.exe'),
+                    'utf8'
+                )
+            ).toBe('candidate')
+            expect(fs.existsSync(value.backupRoot)).toBe(false)
+            expect(spawn).toHaveBeenCalledTimes(1)
+        }
+    )
+    it('stops retrying a persistent directory lock and keeps the original app/state intact', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout'] })
+        const value = fixture()
+        let attempts = 0
+        vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+            attempts++
+            throw Object.assign(
+                new Error('synthetic persistent directory lock'),
+                { code: 'EPERM' }
+            )
+        })
+        fakeLaunch(value)
+        const result = expect(runFullApplicationUpgrade(value)).rejects.toThrow(
+            'synthetic persistent directory lock'
+        )
+        await vi.runAllTimersAsync()
+        await result
+        expect(attempts).toBe(11)
+        expectOriginal(value)
+        expect(fs.existsSync(value.backupRoot)).toBe(false)
+        expect(
+            fs.existsSync(
+                path.join(
+                    value.bootstrapRoot,
+                    'user-state-snapshot/snapshot.json'
+                )
+            )
+        ).toBe(true)
+        expect(spawn).toHaveBeenCalledTimes(1)
+    })
+    it('does not adopt a foreign backup appearing during retry', async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout'] })
+        const value = fixture()
+        let attempts = 0
+        vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+            attempts++
+            fs.mkdirSync(value.backupRoot)
+            fs.writeFileSync(
+                path.join(value.backupRoot, 'retain.txt'),
+                'foreign backup'
+            )
+            throw Object.assign(
+                new Error('synthetic transient directory lock'),
+                { code: 'EPERM' }
+            )
+        })
+        fakeLaunch(value)
+        const result = expect(runFullApplicationUpgrade(value)).rejects.toThrow(
+            'backup directory already exists'
+        )
+        await vi.runAllTimersAsync()
+        await result
+        expect(attempts).toBe(1)
+        expectOriginal(value)
+        expect(
+            fs.readFileSync(path.join(value.backupRoot, 'retain.txt'), 'utf8')
+        ).toBe('foreign backup')
+        expect(spawn).toHaveBeenCalledTimes(1)
+    })
+    it('does not retry nontransient directory I/O errors', async () => {
+        const value = fixture()
+        let attempts = 0
+        vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+            attempts++
+            throw Object.assign(new Error('synthetic directory I/O failure'), {
+                code: 'EIO'
+            })
+        })
+        fakeLaunch(value)
+        await expect(runFullApplicationUpgrade(value)).rejects.toThrow(
+            'synthetic directory I/O failure'
+        )
+        expect(attempts).toBe(1)
+        expectOriginal(value)
+        expect(fs.existsSync(value.backupRoot)).toBe(false)
+    })
     it('retains recovery copies without relaunch when a successfully spawned replacement has no published instance', async () => {
         const value = fixture()
         spawn.mockImplementation(() => {

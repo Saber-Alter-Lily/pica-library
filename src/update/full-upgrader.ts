@@ -149,19 +149,37 @@ function openBrowserFallback(value: string | null) {
     child.unref()
 }
 
-function replaceApplication(
+async function replaceApplication(
     instruction: FullApplicationUpdaterInstruction,
     backedUp: () => void
 ) {
-    if (fs.existsSync(instruction.backupRoot))
-        throw new Error(
-            'Application backup directory already exists: ' +
-                instruction.backupRoot
-        )
-    fs.renameSync(instruction.applicationRoot, instruction.backupRoot)
-    // Record ownership immediately after the rename. A partial copy must use the
-    // same outer recovery path, including user-state restoration and awaited launch.
-    backedUp()
+    for (let attempt = 0; ; attempt++) {
+        if (fs.existsSync(instruction.backupRoot))
+            throw new Error(
+                'Application backup directory already exists: ' +
+                    instruction.backupRoot
+            )
+        try {
+            fs.renameSync(instruction.applicationRoot, instruction.backupRoot)
+        } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code
+            // The parent has exited, but Windows can release a launcher/image
+            // handle slightly later. Never retry arbitrary errors or wait forever.
+            if (
+                process.platform !== 'win32' ||
+                !['EPERM', 'EACCES', 'EBUSY'].includes(code ?? '') ||
+                attempt >= 10
+            )
+                throw error
+            await new Promise((resolve) =>
+                setTimeout(resolve, 100 * (attempt + 1))
+            )
+            continue
+        }
+        // Record ownership in the same turn as successful rename, before copy/await.
+        backedUp()
+        break
+    }
     copyTree(instruction.stagedApplicationRoot, instruction.applicationRoot)
 }
 
@@ -202,7 +220,7 @@ export async function runFullApplicationUpgrade(
             phase: 'replacing-files',
             targetVersion: instruction.targetVersion
         })
-        replaceApplication(instruction, () => {
+        await replaceApplication(instruction, () => {
             replaced = true
         })
 

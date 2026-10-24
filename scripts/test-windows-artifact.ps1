@@ -43,28 +43,23 @@ foreach ($guide in @('README-WINDOWS.txt','README-WINDOWS.zh-CN.txt')) {
 }
 $sourceSha = [IO.File]::ReadAllText((Join-Path $rootPath 'SOURCE_SHA.txt')).Trim()
 if ($sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Packaged source SHA is invalid' }
-$registryRoot = Join-Path $rootPath 'src\data\registry-v3-final'
-$registryMirror = Join-Path $rootPath 'app\runtime-assets\registry-v3-final'
-$registryManifestFile = Join-Path $registryRoot 'PICA_REGISTRY_V3_FINAL_MANIFEST.json'
-if (-not (Test-Path -LiteralPath $registryManifestFile)) { throw 'Packaged Registry V3 manifest is missing' }
+$registryRoot = Join-Path $rootPath 'app\runtime-assets\tag-runtime-v1'
+foreach ($legacy in @('src\data\registry-v3-final','app\runtime-assets\registry-v3-final')) {
+    if (Test-Path -LiteralPath (Join-Path $rootPath $legacy)) { throw 'Reviewed tag evidence was bundled into the application' }
+}
+$registryManifestFile = Join-Path $registryRoot 'TAG_RUNTIME_MANIFEST.json'
+if (-not (Test-Path -LiteralPath $registryManifestFile)) { throw 'Minimal tag runtime manifest is missing' }
 $registryManifest = Get-Content -Raw -LiteralPath $registryManifestFile | ConvertFrom-Json
-foreach ($asset in @(
-    [string]$registryManifest.runtime_semantic_file,
-    'PICA_ENTITY_REGISTRY_V3_FINAL.csv',
-    'PICA_TAG_ALIAS_MAP_V3_FINAL.json',
-    'PICA_TAG_UNRESOLVED_V3_FINAL_WATCHLIST.csv',
-    'PICA_TAG_LIBRARY_V2_REVIEWED.csv',
-    'PICA_TAG_ALIAS_MAP_V2.json'
-)) {
-    $primary = Join-Path $registryRoot $asset
-    $mirror = Join-Path $registryMirror $asset
-    if (
-        -not $asset -or
-        -not (Test-Path -LiteralPath $primary) -or
-        -not (Test-Path -LiteralPath $mirror) -or
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $primary).Hash -ne (Get-FileHash -Algorithm SHA256 -LiteralPath $mirror).Hash
-    ) {
-        throw "Packaged Registry V3 runtime asset is missing: $asset"
+if ($registryManifest.formatVersion -ne 1 -or $registryManifest.semanticAuthoritySha256 -ne 'ef28fda608510bf4ce91307d71af5d76af3bce07950e107b0b02a71a21517ffb' -or $registryManifest.semanticContentSha256 -ne 'ff375402b9e39fa0a636af4533badbedc363fee4238eec6a300944827551e899') { throw 'Tag semantic authority changed' }
+$registryNames = @('semantic-v2.csv','semantic-v3.csv','entities-v3.csv','unresolved-v3.csv','aliases-v2.json','aliases-v3.json')
+$actualRegistryNames = @((Get-ChildItem -LiteralPath $registryRoot -Force).Name | Sort-Object)
+$expectedRegistryNames = @(($registryNames + 'TAG_RUNTIME_MANIFEST.json') | Sort-Object)
+if (Compare-Object $actualRegistryNames $expectedRegistryNames) { throw 'Unexpected tag runtime payload' }
+foreach ($asset in $registryNames) {
+    $file = Join-Path $registryRoot $asset
+    $integrity = $registryManifest.files.PSObject.Properties[$asset].Value
+    if (-not $integrity -or (Get-Item -LiteralPath $file).Length -ne $integrity.bytes -or (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant() -ne $integrity.sha256) {
+        throw "Minimal tag runtime integrity failure: $asset"
     }
 }
 foreach ($license in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICENSES.txt')) {

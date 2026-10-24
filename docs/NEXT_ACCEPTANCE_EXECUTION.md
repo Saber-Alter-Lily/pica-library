@@ -1,5 +1,13 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-24 NEXT-65: minimal tag runtime and one-action layout replacement (unpublished)
+
+Continues frozen NEXT-64 `a5e4a1d0cb078823f872e22a8561ea651f2a8db8`, complete handoff SHA256 `db3c4c4c632892e094977c3c0df32393e86ce2203fa0a40ddc70d277d2e87498`. Its candidate3/3 and standard CI passed, but broader recovery40080731580 timed out after actual test/probe PASS:38success+6conditional skip+1CANCELLED/45 remains PARTIAL/HOLD, with internal exit cause UNDETERMINED. It is not current-source proof.
+
+This source separates consumed tag vocabulary from reviewed examples/statistics: one seven-file format/allowlist under app/, shared by all packagers; no legacy source directory copy. Same frozen semantic authority/profile registryVersion, complete old-map/3957 differential cases, actual isolated asset import graph, strict integrity/schema bounds and reproducible generation. [Exact scope and neutrality/provenance limits](MINIMAL_TAG_RUNTIME.md).
+
+Old review-layout removal requires existing one-click full replacement, not unsafe incremental deletion; modern app-only incremental transport remains. CI-only full upgrade/health rollback/launch rollback/deep cases add exact original/target tag asset snapshots while retaining external config/SQLite canaries. No updater helper/API/schema/state format change. Dev79→80 changes only candidate version authority; no native feature change. Full current-source CI/artifacts/signature/raw evidence are required before PASS. No local Java/app/browser/LAN/update runtime, production data, merge/release/OTA, key download, install/deploy or immediate user testing. Full objective and deferred real host/device/source lifecycle remain OPEN.
+
 ## 2026-10-24 NEXT-64: optional user-selected source-host inspection (unpublished)
 
 Continues frozen NEXT-63 `cbbf3432efb2ead4517cebeafc44ac1901ac9fdb`, complete handoff SHA256 `b41913dbcc8ddbb9ca4824229a1b0bd9cb83123137ef0f76aa84fd30a0d2690d`. Actual Desktop wiring now uses separate protocol/inspection/HTTP modules for explicit checks of an existing user-managed Suwayomi host. This is a reader, not a content platform: no official catalogue, enabled source/repository, downloaded host/extension, required external backend or new Reader/import claim. [Product boundary](CORE_READER_SOURCE_BOUNDARY.md), [protocol/privacy/limits and remaining work](SOURCE_HOST_INSPECTION.md).

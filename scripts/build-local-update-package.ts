@@ -123,6 +123,8 @@ export function buildLocalUpdatePackage(
     const targetVersion = target.version
     const sourceEntries = files(new AdmZip(sourceZipFile))
     const targetEntries = files(new AdmZip(targetZipFile))
+    if (targetEntries.has('app/runtime-assets/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json') && [...targetEntries.keys()].some(name => name.startsWith(registrySourceRoot) || name.startsWith(registryMirrorRoot)))
+        throw new Error('A minimal tag runtime package must not reintroduce legacy reviewed evidence')
     const sourceModules = sourceEntries.get(MODULE_CONTRACT_PATH)
     const targetModules = targetEntries.get(MODULE_CONTRACT_PATH)
     if (sourceModules && !targetModules)

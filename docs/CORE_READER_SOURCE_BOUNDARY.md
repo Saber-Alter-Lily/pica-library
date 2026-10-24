@@ -29,3 +29,7 @@ Persistent external-host/comic identities, source repositories and code trust, i
 Only an explicitly approved, bounded inspection of an already-running host is wired now. It does not register/enable a source, import a catalogue, change a favorite or expose Reader/extension-install capability. No host connection or other provider's credentials are persisted/shared. Its result must continue to say Reader/import/install are unsupported until those independent boundaries are actually implemented and verified.
 
 The next reader integration must use explicit source-owned ports and reviewed identities without coupling ordinary local reading to Suwayomi, Pica or any other provider. No official Release/OTA, production data, automatic install or source activation is authorized by this document.
+
+## NEXT-65 distribution consequence
+
+The tracked Registry audit confirmed historical example title/author/count/review columns were being copied twice. [Minimal tag runtime](MINIMAL_TAG_RUNTIME.md) now separates exact consumed rule files and their stable semantic authority from that evidence. All current platform packagers share an exact allowlist; old-layout upgrades must use the existing full one-click replacement, not unsafe incremental deletions or a stale directory fallback. This does not establish complete neutrality, vocabulary provenance, every binary/image's semantics or finished external-source support. User records/preferences and the frozen resolution/ranking behavior remain protected.

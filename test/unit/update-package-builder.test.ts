@@ -32,6 +32,44 @@ afterEach(() => {
 })
 
 describe('local incremental update package builder', () => {
+    it('requires full application replacement to remove old non-allowlisted review evidence', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-tag-layout-')); directories.push(directory)
+        const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'old', {
+            'src/data/registry-v3-final/PICA_TAG_LIBRARY_V2_REVIEWED.csv': 'synthetic-old-evidence',
+            [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts())
+        })
+        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'new', {
+            'app/runtime-assets/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json': fs.readFileSync('src/data/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json', 'utf8'),
+            [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts())
+        })
+        const output = path.join(directory, 'update.zip')
+        expect(() => buildLocalUpdatePackage(source, target, output)).toThrow(/full install.*non-allowlisted/)
+        expect(fs.existsSync(output)).toBe(false)
+    })
+
+    it('allows a semantic-identical runtime manifest transport change on the existing app-only incremental path', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-tag-transport-')); directories.push(directory)
+        const name = 'app/runtime-assets/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json'
+        const manifest = fs.readFileSync('src/data/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json', 'utf8')
+        const contracts = { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) }
+        const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'same', { ...contracts, [name]: manifest })
+        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'same', { ...contracts, [name]: JSON.stringify(JSON.parse(manifest)) })
+        const result = buildLocalUpdatePackage(source, target, path.join(directory, 'update.zip'))
+        expect(result.manifest.requiresFullInstall).toBe(false)
+        expect(result.manifest.files.map(row => row.path)).toContain(name)
+        expect(result.manifest.deletions).toEqual([])
+    })
+
+    it('refuses an otherwise allowlisted target that mixes minimal rules with old evidence', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-tag-mix-')); directories.push(directory)
+        const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'old')
+        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'new', {
+            'app/runtime-assets/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json': '{}',
+            'app/runtime-assets/registry-v3-final/PICA_TAG_LIBRARY_V2_REVIEWED.csv': 'synthetic-only'
+        })
+        expect(() => buildLocalUpdatePackage(source, target, path.join(directory, 'update.zip'))).toThrow(/reintroduce legacy reviewed evidence/)
+    })
+
     it('adopts module metadata from the real target and binds it into the incremental manifest', () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-module-adoption-')); directories.push(directory)
         const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'old')

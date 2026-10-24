@@ -34,6 +34,19 @@ function Expand-AppPackage([string]$Zip, [string]$Destination) {
     throw "Package does not contain one Pica Library application root: $Zip"
 }
 
+function Get-TagAssetSnapshot([string]$ApplicationRoot) {
+    $records = @()
+    foreach ($relativeRoot in @('src\data\registry-v3-final','app\runtime-assets\registry-v3-final','app\runtime-assets\tag-runtime-v1')) {
+        $assetRoot = Join-Path $ApplicationRoot $relativeRoot
+        if (-not (Test-Path -LiteralPath $assetRoot)) { continue }
+        foreach ($asset in @(Get-ChildItem -LiteralPath $assetRoot -Recurse -File | Sort-Object FullName)) {
+            $relative = $asset.FullName.Substring($ApplicationRoot.TrimEnd('\').Length + 1).Replace('\','/')
+            $records += [ordered]@{ path=$relative; bytes=$asset.Length; sha256=(Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+        }
+    }
+    return ConvertTo-Json -InputObject $records -Compress
+}
+
 function Wait-Instance([string]$InstanceFile, [int]$TimeoutSeconds = 30) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     do {
@@ -113,6 +126,9 @@ New-Item -ItemType Directory -Force -Path $work,$local,$bootstrap | Out-Null
 try {
     $currentRoot = Expand-AppPackage $BaselineZip $currentExtract
     $candidateRoot = Expand-AppPackage $CandidateZip $candidateExtract
+    $baselineTagAssets = Get-TagAssetSnapshot $currentRoot
+    $candidateTagAssets = Get-TagAssetSnapshot $candidateRoot
+    if (-not (Test-Path -LiteralPath (Join-Path $candidateRoot 'app\runtime-assets\tag-runtime-v1\TAG_RUNTIME_MANIFEST.json'))) { throw 'Candidate minimal tag runtime is missing' }
     $baselineSha = [IO.File]::ReadAllText((Join-Path $currentRoot 'SOURCE_SHA.txt')).Trim()
 
     foreach ($required in @(
@@ -250,6 +266,7 @@ try {
             [IO.File]::ReadAllText((Join-Path $currentRoot 'SOURCE_SHA.txt')).Trim() -ne $baselineSha) {
             throw 'Rollback did not restore the original released application'
         }
+        if ((Get-TagAssetSnapshot $currentRoot) -cne $baselineTagAssets) { throw 'Rollback did not restore exact original tag asset layout/bytes' }
         if (-not (Test-Path -LiteralPath $marker) -or
             [IO.File]::ReadAllText($marker) -ne 'preserve-me' -or
             -not (Test-Path -LiteralPath $database)) {
@@ -266,6 +283,8 @@ try {
             injection_mode = if ($ForceLaunchFailure) { 'TEST_ONLY_FIRST_SPAWN_ASYNC_ERROR' } else { 'TEST_ONLY_TARGET_VERSION_MISMATCH' }
             original_version_restored = $baselineCaps.appVersion
             original_source_restored = $baselineSha
+            tag_runtime_rollback = 'PASS'
+            original_tag_asset_bytes_restored = $true
             external_config_preserved = $true
             external_database_preserved = $true
             library_database_path_characters = $database.Length
@@ -296,6 +315,10 @@ try {
     if ($installedSha -ne $CandidateSourceSha) {
         throw 'Full replacement did not install the candidate application tree'
     }
+    if ((Get-TagAssetSnapshot $currentRoot) -cne $candidateTagAssets) { throw 'Full replacement retained stale or changed tag assets' }
+    foreach ($legacy in @('src\data\registry-v3-final','app\runtime-assets\registry-v3-final')) {
+        if (Test-Path -LiteralPath (Join-Path $currentRoot $legacy)) { throw 'Full replacement retained reviewed tag evidence in the application tree' }
+    }
     if (-not (Test-Path -LiteralPath $marker) -or [IO.File]::ReadAllText($marker) -ne 'preserve-me') {
         throw 'External Desktop configuration was not preserved'
     }
@@ -323,6 +346,8 @@ try {
         candidate_schema = $candidateSchema
         candidate_version = $CandidateVersion
         source_sha = $CandidateSourceSha
+        tag_runtime_full_replacement = 'PASS'
+        legacy_review_evidence_removed = $true
         external_config_preserved = $true
         external_database_preserved = $true
         library_database_path_characters = $database.Length

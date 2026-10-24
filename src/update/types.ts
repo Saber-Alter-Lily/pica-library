@@ -70,6 +70,10 @@ export interface UpdateProgress {
 }
 
 export interface UpdaterInstruction {
+    desktopHomeRoot: string
+    libraryDirectory: string
+    readyFile?: string
+    readyNonce?: string
     parentPid: number
     applicationRoot: string
     stagingRoot: string
@@ -84,6 +88,8 @@ export interface UpdaterInstruction {
 }
 
 export interface FullApplicationUpdaterInstruction {
+    readyFile?: string
+    readyNonce?: string
     parentPid: number
     applicationRoot: string
     stagedApplicationRoot: string

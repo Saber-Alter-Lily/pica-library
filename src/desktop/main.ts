@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import { applyUpdateAndScheduleShutdown } from './update-command'
 import path from 'node:path'
 import type { Server } from 'node:http'
 import AdmZip from 'adm-zip'
@@ -1258,15 +1259,11 @@ async function startEngine(preferredPort: number) {
         stageUpdate: async (name, value) => updateManager.stage(name, value),
         stageFullUpdate: async (version, name, value) =>
             updateManager.stageFullApplication(version, name, value),
-        applyUpdate: async (id) => {
-            const result = updateManager.apply(id, {
+        applyUpdate: (id) => applyUpdateAndScheduleShutdown(updateManager,id,{
                 desktopHomeRoot: paths.root,
                 libraryDirectory: config?.libraryDirectory ?? paths.data,
                 currentUrl
-            })
-            setTimeout(() => void stop(), 150)
-            return result
-        },
+            },stop),
         updateProgress: () => updateManager.progress(),
         runtimeTasks: () => {
             if (!service)

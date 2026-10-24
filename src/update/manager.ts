@@ -1,7 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import { spawn } from 'node:child_process'
+import type { SpawnOptions } from 'node:child_process'
+import { startUpgradeHelper, UpgradeHelperStopError, type HelperReadiness, type UpgradeHelperKind } from './helper-startup'
 import AdmZip from 'adm-zip'
 import {
     APP_API_VERSION,
@@ -13,7 +14,7 @@ import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import { applicationFetch } from './application-fetch'
 import { classifyUpdateCompatibility } from './compatibility'
 import { MODULE_CONTRACT_PATH, normalizeModuleContracts, parseModuleContracts, runtimeModuleContracts, sameModuleContracts } from '../modules/contracts'
-import { normalizeUpdatePath, updaterSelfReplacement } from './path-safety'
+import { normalizeUpdatePath, updaterSelfReplacement, forbiddenUpdatePayload as forbiddenPayload } from './path-safety'
 import {
     selectReleaseUpdateAsset,
     updateAssetNamesForChecksums
@@ -37,8 +38,6 @@ import type {
 } from './types'
 
 const officialRepository = 'Saber-Alter-Lily/pica-library'
-const forbiddenPayload =
-    /(^|\/)(data|cache|downloads?|previews?|logs?|browser-lite)(\/|$)|\.(?:db|sqlite)(?:-|$)|(^|\/)\.env/i
 
 const forbiddenFullPackageRoot =
     /^(?:config|data|cache|downloads?|logs?|runtime-state|packs)(?:\/|$)|\.(?:db|sqlite)(?:-|$)/i
@@ -216,29 +215,31 @@ function validateFileList(zip: AdmZip, manifest: UpdateManifest) {
         .filter((entry) => !entry.isDirectory)
         .map((entry) => entry.entryName.replaceAll('\\', '/'))
     const declared = new Map<string, UpdateManifestFile>()
+    const declaredIdentities = new Set<string>()
     for (const item of manifest.files) {
         const safe = normalizeUpdatePath(String(item.path ?? ''))
         if (forbiddenPayload.test(safe))
             throw new Error(
                 `User data is forbidden in update packages: ${safe}`
             )
-        if (declared.has(safe))
+        if (declaredIdentities.has(safe.toUpperCase()))
             throw new Error(`Duplicate update path: ${safe}`)
         if (!/^[0-9a-f]{64}$/.test(item.sha256))
             throw new Error(`Invalid SHA-256 for ${safe}`)
         if (!Number.isSafeInteger(item.size) || item.size < 0)
             throw new Error(`Invalid size for ${safe}`)
         declared.set(safe, item)
+        declaredIdentities.add(safe.toUpperCase())
     }
     const deletions = new Set(manifest.deletions.map(normalizeUpdatePath))
-    if (deletions.size !== manifest.deletions.length)
+    if (new Set([...deletions].map(name=>name.toUpperCase())).size !== manifest.deletions.length)
         throw new Error('Duplicate deletion path')
     for (const deletion of deletions) {
         if (forbiddenPayload.test(deletion))
             throw new Error(
                 `User data is forbidden in update packages: ${deletion}`
             )
-        if (declared.has(deletion))
+        if (declaredIdentities.has(deletion.toUpperCase()))
             throw new Error(`Path cannot be replaced and deleted: ${deletion}`)
     }
     const payloadEntries = entries.filter(
@@ -291,6 +292,7 @@ export interface UpdateManagerOptions {
 export class UpdateManager {
     private staged: StagedUpdate | null = null
     private stagedFull: StagedFullApplicationUpdate | null = null
+    private activeApply: {id:string;promise:Promise<{accepted:true;mode:UpgradeHelperKind;targetVersion:string}>}|null=null
     readonly progressFile: string
 
     constructor(private readonly options: UpdateManagerOptions) {
@@ -768,6 +770,7 @@ export class UpdateManager {
     }
 
     async stage(archiveName: string, buffer: Buffer) {
+        if(this.activeApply)throw new Error('An update is already being applied')
         this.writeProgress({ phase: 'validating' })
         try {
             const archiveHash = sha256(buffer)
@@ -931,6 +934,7 @@ export class UpdateManager {
         archiveName: string,
         buffer: Buffer
     ) {
+        if(this.activeApply)throw new Error('An update is already being applied')
         this.writeProgress({ phase: 'validating' })
         try {
             const target = this.updateTarget()
@@ -1026,6 +1030,19 @@ export class UpdateManager {
         }
     }
 
+    private launchApply(id:string,kind:UpgradeHelperKind,targetVersion:string,executable:string,args:string[],options:Pick<SpawnOptions,'cwd'|'env'>,instruction:HelperReadiness){
+        const promise=startUpgradeHelper(executable,args,options,instruction,kind)
+            .then(()=>({accepted:true as const,mode:kind,targetVersion}))
+            .catch(error=>{
+                // A failed helper must not close the current app or hide the original failure.
+                try{this.writeProgress({phase:'failed',targetVersion,message:error instanceof Error?error.message:String(error)})}catch{/* App remains running even if its status store is unavailable. */}
+                if(!(error instanceof UpgradeHelperStopError)&&this.activeApply?.id===id)this.activeApply=null
+                throw error
+            })
+        this.activeApply={id,promise}
+        return promise
+    }
+
     apply(
         id: string,
         context?: {
@@ -1034,6 +1051,10 @@ export class UpdateManager {
             currentUrl?: string
         }
     ) {
+        if(this.activeApply){
+            if(this.activeApply.id!==id)throw new Error('An update is already being applied')
+            return this.activeApply.promise
+        }
         if (this.stagedFull?.id === id) {
             if (!context)
                 throw new Error(
@@ -1094,7 +1115,10 @@ export class UpdateManager {
                     this.options.applicationRoot
                 )}.backup-before-v${full.targetVersion}-${stamp}`
             )
+            const readyNonce=randomUUID()
             const instruction: FullApplicationUpdaterInstruction = {
+                readyNonce,
+                readyFile:path.join(bootstrapRoot,`helper-ready-${readyNonce}.json`),
                 parentPid: process.pid,
                 applicationRoot: this.options.applicationRoot,
                 stagedApplicationRoot: full.directory,
@@ -1122,23 +1146,14 @@ export class UpdateManager {
                 phase: 'waiting-for-exit',
                 targetVersion: full.targetVersion
             })
-            const child = spawn(
+            return this.launchApply(id,'full-application',full.targetVersion,
                 bootstrapRuntime,
                 [bootstrapHelper, instructionFile],
                 {
-                    detached: true,
-                    stdio: 'ignore',
-                    windowsHide: true,
                     cwd: bootstrapRoot,
                     env: sanitizedChildEnv()
-                }
+                },instruction
             )
-            child.unref()
-            return {
-                accepted: true,
-                mode: 'full-application' as const,
-                targetVersion: full.targetVersion
-            }
         }
 
         if (!this.staged || this.staged.id !== id)
@@ -1149,7 +1164,14 @@ export class UpdateManager {
             throw new Error(
                 'This update requires the full application upgrade path'
             )
+        if(!context)throw new Error('Incremental application upgrade context is unavailable')
+        sqliteDiskFilename(path.resolve(context.libraryDirectory,'library.db'))
+        const readyNonce=randomUUID()
         const instruction: UpdaterInstruction = {
+            desktopHomeRoot:context.desktopHomeRoot,
+            libraryDirectory:context.libraryDirectory,
+            readyNonce,
+            readyFile:path.join(this.options.stateRoot,`helper-ready-${readyNonce}.json`),
             parentPid: process.pid,
             applicationRoot: this.options.applicationRoot,
             stagingRoot: this.staged.directory,
@@ -1185,22 +1207,14 @@ export class UpdateManager {
             phase: 'waiting-for-exit',
             targetVersion: this.staged.manifest.targetVersion
         })
-        const child = spawn(
+        return this.launchApply(id,'incremental',this.staged.manifest.targetVersion,
             this.options.runtimePath,
             [updater, instructionFile],
             {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true,
+                cwd:this.options.applicationRoot,
                 env: sanitizedChildEnv()
-            }
+            },instruction
         )
-        child.unref()
-        return {
-            accepted: true,
-            mode: 'incremental' as const,
-            targetVersion: this.staged.manifest.targetVersion
-        }
     }
 }
 

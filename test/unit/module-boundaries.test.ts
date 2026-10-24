@@ -52,6 +52,11 @@ function imports(file: string): string[] {
     return found
 }
 describe('enforced first module boundaries', () => {
+    it('keeps Desktop update shutdown authorization behind its async apply port without process or storage I/O', async () => {
+        const result=await build({entryPoints:['src/desktop/update-command.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
+        expect(Object.keys(result.metafile!.inputs)).toEqual(['src/desktop/update-command.ts'])
+        expect(result.outputFiles).toHaveLength(1)
+    })
     it('bundles the real ordered recommendation build with only pure algorithm dependencies, never database/session/registry/model I/O', async () => {
         const result=await build({entryPoints:['src/recommendation/build-pipeline.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
         const allowed=new Set([

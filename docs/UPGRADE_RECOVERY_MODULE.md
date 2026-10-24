@@ -1,5 +1,7 @@
 # Upgrade recovery and bounded acceptance diagnostics — NEXT-55, unpublished
 
+NEXT-58 continues this implementation through [shared lifecycle/state modules, acknowledged helper startup and incremental recovery](INCREMENTAL_UPDATE_RUNTIME.md). The older paragraphs below describe NEXT-55 evidence, not automatic acceptance of the newer source or old installed OTA controllers.
+
 ## Product boundary
 
 One-click updates still replace only the Windows application tree, using the existing external helper and separately retained user data. No parallel updater, new format, migration or dependency was introduced. Public module API/instruction/progress fields remain compatible. Android keeps the fixed Dev identity/certificate and increments to code70; no uninstall is proposed. Formal source accounts/data, Visual, ranking, tags, favorites, caches/sync protocols and stable OTA are not inputs to this development pass.

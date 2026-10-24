@@ -1,0 +1,33 @@
+# Shared update lifecycle and incremental recovery — NEXT-58, unpublished
+
+## Scope and authority
+
+Continues frozen NEXT-57 `7f9fdb772feadf40fdf24906ea553df677f0fe3b`, complete immutable handoff SHA256 `48086613a54936fd365c615d9b4831a4b8ed3ba9bf9b64d02f40950e456d77c0`. That handoff's exact-function probe confirmed an incremental asynchronous-launch gap, not a real transaction fix. Previous packages/evidence stay unchanged. Only the independent candidate/Draft/CI and synthetic fixtures are in scope: no real account/profile/database/embedding/body, main merge, tag/Release, OTA, private-key download, installation or deployment.
+
+## Module ownership and reuse
+
+- `src/update/process-lifecycle.ts` shares the existing full helper's process wait, loopback health/controller shutdown, bounded PID fallback and progress reporting. Detached startup awaits OS `spawn`/`error` before unref. No new process/update framework or dependency.
+- `user-state-snapshot.ts` shares configuration and SQLite main/WAL/SHM snapshot/restore. A completed private snapshot records original config presence; failed replacement defaults do not survive rollback of originally absent config. Existing snapshots are not erased or adopted by another attempt.
+- `helper-startup.ts` binds ready to a fresh nonce, helper PID, parent PID and kind. After preflight the helper publishes ready, then requires the parent's acknowledgement before waiting to replace the app. Unconfirmed startup leaves the current app running. An unacknowledged orphan expires without update authority; cleanup may stop only the child spawned by this invocation.
+- `desktop/update-command.ts` is a narrow async host port. The existing150ms shutdown is scheduled only after acknowledged apply; no process/storage/source/UI ownership. Its actual browser-platform dependency closure is enforced.
+
+The manager deduplicates repeated apply and rejects overlapping staging. A failed startup may retry with a fresh nonce; if an unconfirmed helper cannot be stopped, the retry lock stays instead of spawning another helper. The [bundled Node24.15 event contract](https://nodejs.org/download/release/v24.15.0/docs/api/child_process.html#event-spawn) distinguishes OS creation from failure inside a child, hence the additional ready/ack boundary. The [filesystem API](https://nodejs.org/download/release/v24.15.0/docs/api/fs.html#fscopyfilesyncsrc-dest-mode) does not guarantee atomic copy: a fresh fixed-length sibling is copied and renamed without deleting the destination first. No power-loss or arbitrary-filesystem transaction guarantee is inferred.
+
+## Incremental transaction
+
+1. Before acknowledgement/exit, validate absolute/disjoint application/staging/backup/data paths and path budgets; regular non-linked files; case collisions; forbidden data; unchanged updater; staged hashes/lengths; original/target source binding. Reject existing backup roots instead of deleting/adopting them. Staging also rejects case-variant self-replacement and colliding plans.
+2. After the original parent exits, clear stale instance state, reserve a new backup root, snapshot config/database, and finish the application backup/journal before installed-file mutation.
+3. Replace/delete only declared allowlisted files, await startup and reuse loopback health. A partial backup is not a complete rollback; partial apply restores only from the completed owned backup.
+4. Failed launch/health stops the replacement before restoring application and user state, then awaits original-app relaunch. If stopping fails, keep recovery copies instead of overwriting live files. Unwritable status cannot block recovery. Reporting failure after proven health cannot undo a healthy installation.
+
+Incremental recovery copies remain under the existing retention policy; automatic cleanup is not added. Full replacement keeps successful cleanup. Both paths avoid stopping/relaunching an original parent that never exited. Readiness fields are additive for legacy direct helper use, but current Desktop always supplies/verifies them. New incremental context comes from the current manager. Changed updater bytes still require full replacement: no self-replacement/allowlist relaxation delivers this fix into old helpers.
+
+## Evidence and explicit limits
+
+Source tests execute actual manager/transaction code with synthetic OS, file and status faults, including async/early exit, stale/absent acknowledgement, duplicate apply, partial backup/apply, inability to stop, failed health, config absence, runtime fallback and rejected data/source/path plans. Existing full recovery and real isolated single-file Rollup build gates stay enabled.
+
+The new Windows archive gate runs the actual compiled Desktop HTTP controller and helper in a source-free synthetic profile. Its manual local-test payload changes three allowlisted assets plus one deletion, retaining the helper and current source/version metadata. It tests success, helper OS/early-exit rejection, post-stage tampering, app-launch failure, unhealthy-app state writes and unwritable recovery status; favorites/raw facts/reading/private canaries/behavior/config/source choices/downloaded dummy bytes are checked. Fault/observer preloads are generated outside the app tree, not shipped production flags. This is **same-source scoped transaction evidence**, not a real next Release or old-to-new incremental package.
+
+Current full-engine Windows gates also require ready/ack before baseline shutdown. Public/prior baseline replacement-engine tests are not old installed controller/OTA acceptance. Historical helpers are not retroactively fixed by a green current build. Source-to-source compatibility remains separately required; this changed helper correctly needs full replacement. Published OTA/legacy first-hop acceptance stays held until an actual stable release is authorized.
+
+Exact-source CI, signed Dev72→73 identity, downloaded artifacts and current Windows gates are frozen in the new handoff after verification, not borrowed from old passes. Native/JVM, recommendation/tag/Visual logic, schema and public module contracts stay unchanged. Physical/OEM/SAF/source/gesture/tag/AI/offline QA, V5/legacy separation, optional runtime/trust, native export/orphan/backup retention and crash/power-loss/UNC behavior remain open. Original runner-only exit1 stays undetermined; the full modular-reader objective is not complete.

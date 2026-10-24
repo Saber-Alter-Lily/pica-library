@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-58: acknowledged helper startup and shared incremental/full recovery (unpublished)
+
+Continues frozen NEXT-57 `7f9fdb772feadf40fdf24906ea553df677f0fe3b`, complete handoff SHA256 `48086613a54936fd365c615d9b4831a4b8ed3ba9bf9b64d02f40950e456d77c0`. Reuses full-helper lifecycle/state recovery, adds ready/parent-ack before app exit, and applies owned-backup/state/health recovery to incremental commands. A narrow async host port prevents exit on pending/failed activation. [Scope and limits](INCREMENTAL_UPDATE_RUNTIME.md).
+
+Current actual assets, signatures and source-compatible fixtures are required, not old passing results. Scoped current-source assets and full-engine replacements are not a next-release incremental or an old-client published OTA. Changed helper still requires full replacement; native/JVM logic unchanged, signed Dev72→73 continuity is not physical install. The full local-reader objective and concentrated device/provider/gesture/tag/AI/offline acceptance remain open. No production access, merge/release/OTA, key download or deployment.
+
 ## 2026-10-23 NEXT-57: actual recommendation build pipeline and commit-status boundary (unpublished)
 
 Continues frozen NEXT-56 `2167576eea14e2c02f4d143e2097f4ca24da8856`; complete handoff SHA256 `593c0b28eadebbe89acb4758e587c5fee22de4896bf46eb1b6d0db9af8e61874`. Separates ordered generation from account/Registry/SQLite/provider I/O through explicit ports, reusing all existing algorithms and stage observation timing. A frozen old-method differential oracle and actual browser-platform import graph guard the behavior and boundary. Commit progress now reports save failure instead of false success. [Exact scope and holds](RECOMMENDATION_BUILD_PIPELINE.md).

@@ -122,6 +122,11 @@ afterEach(() => {
 })
 
 describe('UpdateManager module payload boundary', () => {
+    it('rejects case-variant updater replacement and Windows file-plan collisions before staging',async()=>{
+        await expect(manager().stage('helper-case.zip',packageBuffer({}, {'SOURCE_SHA.txt':targetSourceSha,'app/UPDATER.JS':'changed helper'}).buffer)).rejects.toThrow(/Updater replacement requires a full install/)
+        await expect(manager().stage('duplicate-case.zip',packageBuffer({}, {'SOURCE_SHA.txt':targetSourceSha,'web/app.js':'a','web/APP.JS':'b'}).buffer)).rejects.toThrow(/Duplicate update path/)
+        await expect(manager().stage('delete-case.zip',packageBuffer({deletions:['web/APP.JS']}).buffer)).rejects.toThrow(/replaced and deleted/)
+    })
     it('stages an adopted or unchanged module contract while retaining legacy update support', async () => {
         for (const includeFile of [true, false]) {
             const payload = { 'SOURCE_SHA.txt': `${targetSourceSha}\n`, ...(includeFile ? { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) } : {}) }

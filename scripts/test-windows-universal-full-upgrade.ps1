@@ -199,8 +199,29 @@ try {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'fixtures\upgrade-launch-error.cjs') -Destination $faultLoader
         $helperArguments = @('--require',(Quote-UpgradeArgument $faultLoader)) + $helperArguments
     }
+    # The helper must finish preflight and receive the parent's explicit acknowledgement
+    # before the existing app is closed. OS CreateProcess success alone is insufficient.
+    $readyNonce=[guid]::NewGuid().ToString()
+    $readyFile=Join-Path $bootstrap ("helper-ready-$readyNonce.json")
+    $instruction['readyNonce']=$readyNonce
+    $instruction['readyFile']=$readyFile
+    $instruction | ConvertTo-Json -Depth 20 | Set-Content -Encoding utf8 -LiteralPath $instructionFile
     $helperProcess = Start-Process -FilePath $bootstrapRuntime -ArgumentList $helperArguments -WorkingDirectory $bootstrap -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $bootstrap 'helper.stdout.log') -RedirectStandardError (Join-Path $bootstrap 'helper.stderr.log')
-    Start-Sleep -Milliseconds 300
+    $readyDeadline=(Get-Date).AddSeconds(15)
+    $helperReady=$false
+    do {
+        $helperProcess.Refresh()
+        if($helperProcess.HasExited){throw 'Full helper exited before startup confirmation; original app was not closed'}
+        if(Test-Path -LiteralPath $readyFile){
+            $ready=Get-Content -Raw -LiteralPath $readyFile | ConvertFrom-Json
+            if($ready.schemaVersion -ne 1 -or $ready.kind -ne 'full-application' -or $ready.nonce -ne $readyNonce -or $ready.pid -ne $helperProcess.Id -or $ready.parentPid -ne $currentInstance.pid){throw 'Full helper readiness does not match this invocation'}
+            [IO.File]::WriteAllText($readyFile+'.accepted',($ready | ConvertTo-Json -Compress),(New-Object Text.UTF8Encoding($false)))
+            $helperReady=$true
+            break
+        }
+        Start-Sleep -Milliseconds 50
+    } while((Get-Date) -lt $readyDeadline)
+    if(!$helperReady){throw 'Full helper readiness timed out; original app was not closed'}
     Stop-Desktop $currentInstance
     $currentInstance = $null
 
@@ -239,6 +260,7 @@ try {
         $currentInstance = $null
         [ordered]@{
             universal_full_rollback = 'PASS'
+            helper_startup_confirmed = [bool]$helperReady
             universal_full_launch_rollback = if ($ForceLaunchFailure) { 'PASS' } else { 'NOT_RUN' }
             injected_failure = $scenario
             injection_mode = if ($ForceLaunchFailure) { 'TEST_ONLY_FIRST_SPAWN_ASYNC_ERROR' } else { 'TEST_ONLY_TARGET_VERSION_MISMATCH' }
@@ -296,6 +318,7 @@ try {
 
     [ordered]@{
         universal_full_upgrade = 'PASS'
+        helper_startup_confirmed = [bool]$helperReady
         baseline_schema = $baselineSchema
         candidate_schema = $candidateSchema
         candidate_version = $CandidateVersion

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runFullApplicationUpgrade } from '../../src/update/full-upgrader'
+import * as lifecycle from '../../src/update/process-lifecycle'
 import type { FullApplicationUpdaterInstruction } from '../../src/update/types'
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
@@ -81,6 +82,20 @@ afterEach(() => {
 })
 
 describe('actual full-upgrade orchestration with synthetic I/O faults', () => {
+    it('never stops or relaunches the original application if the parent did not exit',async()=>{
+        const value=fixture();fakeLaunch(value)
+        vi.spyOn(lifecycle,'waitForExit').mockRejectedValueOnce(new Error('synthetic parent exit timeout'))
+        await expect(runFullApplicationUpgrade(value)).rejects.toThrow('synthetic parent exit timeout')
+        expectOriginal(value);expect(spawn).not.toHaveBeenCalled();expect(fs.existsSync(value.backupRoot)).toBe(false)
+    })
+    it('restores original absence of a config directory instead of retaining failed replacement defaults',async()=>{
+        const value=fixture(),config=path.join(value.desktopHomeRoot,'config')
+        fs.rmSync(config,{recursive:true})
+        fakeLaunch(value,n=>{if(n===1){fs.mkdirSync(config);fs.writeFileSync(path.join(config,'replacement.json'),'failed defaults')}return null})
+        await expect(runFullApplicationUpgrade(value)).rejects.toThrow('health check')
+        expect(fs.existsSync(config)).toBe(false)
+        expect(fs.readFileSync(path.join(value.applicationRoot,'Pica Library.exe'),'utf8')).toBe('original')
+    })
     it('preflights impossible database paths before waiting, snapshotting or replacing files', async () => {
         const value=fixture()
         value.libraryDirectory=path.resolve(value.libraryDirectory, ...Array.from({length:6000},()=> 'nested'))

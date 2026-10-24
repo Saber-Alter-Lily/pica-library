@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-58 — shared update lifecycle, acknowledged startup and incremental recovery (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_RELEASE_OTA_PHYSICAL_QA_OPEN.**
+
+- Continues frozen NEXT-57 `7f9fdb772feadf40fdf24906ea553df677f0fe3b`, handoff SHA256 `48086613a54936fd365c615d9b4831a4b8ed3ba9bf9b64d02f40950e456d77c0`. Its isolated incremental-launch probe was a confirmed follow-up, not completed transaction acceptance.
+- Shares existing full-helper process/health/shutdown/progress and user-state recovery via small modules. Current Desktop exits only after nonce/PID/parent/kind-bound ready plus acknowledgement. An unacknowledged orphan cannot later acquire replacement authority. Duplicate apply/staging are fenced; unsafe helper-stop failure retains the lock. No new framework/dependency.
+- Incremental preflight rechecks source/bytes, path/disjoint roots, regular files, collisions, data exclusions and unchanged updater before app exit. Completes owned application/config/SQLite-sidecar backups before mutation; awaits launch and stops unhealthy replacement before recovery. Failed backup/status cannot be treated as usable recovery. Config absence is restored; proven healthy success is not rolled back for reporting failure. Existing recovery copies are retained.
+- Adds actual Desktop/controller/helper same-source scoped asset cases and ready/ack to full-engine tests. No helper self-replacement/allowlist relaxation. These are **not** a published OTA or proof that new helper fixes already exist in old installed clients. [Scope, reuse, protocol, tests and limits](docs/INCREMENTAL_UPDATE_RUNTIME.md).
+- Native/JVM and recommendation/tag/Visual/schema/module contracts stay; current-source CI, fixed-signed Dev72→73 and actual packages/stable/prior/deep gates belong to the new handoff. User/device QA remains deferred. V5/legacy, optional runtime/trust, export/orphan/backup retention and crash/power-loss/UNC remain open; original runner-only cause undetermined.
+- Same independent candidate/Draft/CI + prior DPAPI exception; no production account/data, main merge, tag/Release, OTA, key download, installation or deployment.
+
 ## NEXT-57 — recommendation build ports, actual pipeline and commit-status truth (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_AND_PHYSICAL_QA_OPEN.**

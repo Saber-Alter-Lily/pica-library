@@ -4,6 +4,16 @@
 
 User reported repeated security-center permission prompts for Java/validation programs. Stop launching local Java, random-path Windows artifacts, LAN bridges and upgrade runtime matrices by default; move those checks to the already-authorized Draft CI. Local source/type/syntax and inspected no-Java/no-LAN targeted tests may continue. Do not allow dialogs, add exceptions or weaken protection. Read-only snapshot found zero active Java/current validation drivers; firewall logs confirmed prior task-temp application paths, including Node. Exact unseen dialog identity remains unverified. [Effective local validation policy](docs/LOCAL_VALIDATION_SAFETY.md).
 
+## NEXT-63 — native local-comic body export (2026-10-24, unpublished)
+
+**ISOLATED_IMPLEMENTATION / CURRENT_SOURCE_NATIVE_CI_AND_INSTALLABLE_PROOF_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-62 `7203626e1cb324e6ca9601872e561950234f7231`, full handoff SHA256 `c899272db9eeddcb0bef8a1d082236323a6af3dcced78f8f27acb77d19b6100d`. Its Linux1780+8 / Windows1787+1 /1788, Chromium48, Android362 and signed Dev77 results are historical proof, not current-source validation.
+- New pure native body exporter reuses existing name/signature/natural-order validators and standard Java ZIP, with actual page/total/complete-archive byte limits. Separate stage/SAF/UI adapters expose only owned imports, pin the generation through final copy, refuse active-copy removal and never delete originals or external documents. [Actual ownership, limits and open acceptance](docs/NATIVE_LOCAL_CONTENT_EXPORT.md).
+- Explicit write-only system destination, retained rotation task, cancellation/finish and no raw error paths. En/zh/ja daily/advanced guidance distinguishes pages-only export from complete personal-state backup. Reimport of an exported selection creates a new local identity; history/private tags are not restored. No schema, recommendation, Visual, source/account, Reader API or sync format change.
+- Inspected local source checks:23/23 across4 files, TypeScript, Web45/45 syntax and six localized resource XML parses PASS. The first contract attempt misclassified the `com.picalibrary.android.local` package namespace as a runtime import (22 pass/1 fail); the criterion now removes only the package declaration and retains a rejecting Android-import counterexample. Raw failed/passing evidence remains. Real synthetic plain-Java / SDK28/35 store/SAF/Reader/UI tests are authored but not executed locally. Native execution, lint/R8/fixed signing and same-source Windows/source/browser/update regression remain REQUIRED before claiming current package PASS. Single Android candidate authority advances to Dev78, retaining Dev77 package/certificate.
+- No local Java/Gradle/application/browser/LAN/upgrade runtime, no production data, main merge, tag/Release, OTA, signing-key download, install or deployment. Whole-state backup/restore, identity-preserving relocation, crash-orphan/retired generation cleanup, source host/trust and concentrated physical/provider/gesture/tag/AI/offline QA remain OPEN; no immediate user testing is requested.
+
 ## NEXT-62 — legacy recall and stored-only compatibility sessions (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / CURRENT_SOURCE_CI_AND_INSTALLABLE_PROOF_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**

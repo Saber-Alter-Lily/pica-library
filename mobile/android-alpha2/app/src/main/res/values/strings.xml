@@ -26,7 +26,7 @@
     <string name="onboarding_back">Back</string>
     <string name="onboarding_next">Next</string>
     <string name="tour_library_title">Library</string>
-    <string name="tour_library_body">Your Pica, E-H, local downloads and remote copies are organized here.</string>
+    <string name="tour_library_body">Start with your own folder or CBZ: Import local comics needs no source account. Optional connected sources and other copies appear here too.</string>
     <string name="tour_recommend_title">Recommendations</string>
     <string name="tour_recommend_body">Read the existing batch or change batches without recomputing every time. Correct recommendations when needed; full preference setup is not required.</string>
     <string name="tour_online_title">Online</string>
@@ -165,4 +165,16 @@
     <string name="local_import_remove">Remove imported copy</string>
     <string name="local_import_remove_warning">Remove only this app-owned imported copy and retained generations? Your selected original folder/CBZ, history, shelves and private tags stay untouched. This does not delete Desktop or cloud copies.</string>
     <string name="local_import_no_picker">The system document picker is unavailable on this device.</string>
+    <string name="local_export_title">Export pages as CBZ</string>
+    <string name="local_export_help">Export imported images as a standard CBZ (up to 256 MiB). History, shelves, private tags and accounts are not included. Open or reimport the file before removing the app or its copy; reimport does not restore the old personal state.</string>
+    <string name="local_export_choose">Choose where to save CBZ</string>
+    <string name="local_export_working">Preparing and writing locally… Do not remove the imported copy yet.</string>
+    <string name="local_export_cancel">Cancel export</string>
+    <string name="local_export_done">CBZ written. Open or reimport it to check it before removing your local copy. This is a pages-only export, not a complete backup.</string>
+    <string name="local_export_failed">Export did not complete. Check free space and the selected location. Your imported copy is unchanged; the destination may be partial. Inspect it before retrying.</string>
+    <string name="local_export_cancelled">Export cancelled. Your imported copy is unchanged; the selected destination may be empty or partial.</string>
+    <string name="local_export_picker_cancelled">No destination selected. Nothing was exported.</string>
+    <string name="local_export_busy">Another export is active. Finish or cancel it before removing this copy or starting another export.</string>
+    <string name="local_export_unavailable">The imported copy is unavailable. Reopen the local import page and check the copy.</string>
+    <string name="local_export_receipt">%1$d pages · %2$d chapters · %3$.1f MiB</string>
 </resources>

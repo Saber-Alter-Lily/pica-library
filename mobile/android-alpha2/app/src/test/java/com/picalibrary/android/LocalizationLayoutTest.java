@@ -81,6 +81,8 @@ public class LocalizationLayoutTest {
                 widthDp, language + "/recommendation-settings");
         checkActivity(LocalComicImportActivity.class, new Intent(app, LocalComicImportActivity.class),
                 widthDp, language + "/local-import");
+        checkActivity(LocalComicExportActivity.class, new Intent(app, LocalComicExportActivity.class),
+                widthDp, language + "/local-export");
         checkActivity(PairingActivity.class, new Intent(app, PairingActivity.class),
                 widthDp, language + "/pairing");
         checkActivity(OnboardingSettingsActivity.class, new Intent(app, OnboardingSettingsActivity.class),

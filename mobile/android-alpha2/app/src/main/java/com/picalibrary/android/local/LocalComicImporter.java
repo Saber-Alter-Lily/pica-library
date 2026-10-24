@@ -69,7 +69,7 @@ public final class LocalComicImporter {
         }
         return name;
     }
-    private static String extension(String name) {
+    static String extension(String name) {
         int dot=name.lastIndexOf('.'); String ext=dot<0?"":name.substring(dot+1).toLowerCase(Locale.ROOT);
         return Arrays.asList("jpg","jpeg","png","gif","webp").contains(ext)?ext:"";
     }
@@ -115,7 +115,7 @@ public final class LocalComicImporter {
         }
         cancel.check();return new Prepared(staging,copied,total);
     }
-    private static boolean signature(byte[] h,int n,String ext) {
+    static boolean signature(byte[] h,int n,String ext) {
         if(("jpg".equals(ext)||"jpeg".equals(ext)))return n>=3&&(h[0]&255)==255&&(h[1]&255)==216&&(h[2]&255)==255;
         if("png".equals(ext))return n>=8&&Arrays.equals(Arrays.copyOf(h,8),new byte[]{(byte)137,80,78,71,13,10,26,10});
         if("gif".equals(ext))return n>=6&&(new String(h,0,6,StandardCharsets.US_ASCII).equals("GIF87a")||new String(h,0,6,StandardCharsets.US_ASCII).equals("GIF89a"));

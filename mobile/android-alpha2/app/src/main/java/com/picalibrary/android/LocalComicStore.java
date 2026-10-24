@@ -44,10 +44,25 @@ final class LocalComicStore {
         }
     }
     private LocalComicStore(){}
+    static final class ExportBusyException extends IOException { ExportBusyException(){super("Local copy is being exported; finish or cancel export first");} }
+    private static final Set<String> exports=new HashSet<>();
+    static final class ExportLease implements AutoCloseable {
+        final Comic comic;
+        private final String key;
+        private boolean closed;
+        ExportLease(Comic comic,String key){this.comic=comic;this.key=key;}
+        @Override public void close(){synchronized(LocalComicStore.class){if(!closed){closed=true;exports.remove(key);}}}
+    }
+    static synchronized ExportLease exportLease(Context c,String id) throws Exception {
+        String key=comicRoot(c,id).getCanonicalPath();
+        if(!exports.isEmpty())throw new ExportBusyException();
+        Comic comic=read(c,id);if(comic==null)throw new IOException("Imported local comic is unavailable");
+        exports.add(key);return new ExportLease(comic,key);
+    }
     // Deliberately pinned internal. Changing cache/data preferences never strands owned comic bodies.
     static File root(Context c){return new File(c.getFilesDir(),"local-comics-v1");}
     private static File comicRoot(Context c,String id) throws IOException {if(id==null||!id.matches("local:[0-9a-f]{64}"))throw new IOException("Invalid local comic id");return inside(root(c),new File(root(c),id.substring(6)));}
-    private static File inside(File root,File target) throws IOException {String base=root.getCanonicalPath()+File.separator;if(!target.getCanonicalPath().startsWith(base)||!target.getAbsoluteFile().equals(target.getCanonicalFile()))throw new IOException("Unsafe owned comic path");return target;}
+    static File inside(File root,File target) throws IOException {String base=root.getCanonicalPath()+File.separator;if(!target.getCanonicalPath().startsWith(base)||!target.getAbsoluteFile().equals(target.getCanonicalFile()))throw new IOException("Unsafe owned comic path");return target;}
     static void removeOwned(File parent,File target){try{inside(parent,target);deleteTree(target);}catch(IOException ignored){}}
     private static void deleteTree(File file) throws IOException {
         // Never follow links; every descendant must still resolve to exactly its lexical location.
@@ -119,6 +134,7 @@ final class LocalComicStore {
     static File cover(Context c,String id){try{Comic comic=read(c,id);return comic==null?null:pageFile(c,comic,comic.pages.get(0));}catch(Exception e){return null;}}
     static synchronized void remove(Context c,String id) throws Exception {
         File directory=comicRoot(c,id);if(read(c,id)==null)return;
+        if(exports.contains(directory.getCanonicalPath()))throw new ExportBusyException();
         // Hide the manifest atomically before deleting only this app-owned comic directory.
         File trash=inside(root(c),new File(root(c),"removed-"+UUID.randomUUID()));if(!directory.renameTo(trash))throw new IOException("Cannot remove imported copy");deleteTree(trash);
     }

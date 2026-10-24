@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-24 NEXT-63: native local-comic body export (unpublished)
+
+Continues frozen NEXT-62 `7203626e1cb324e6ca9601872e561950234f7231`, immutable complete handoff SHA256 `c899272db9eeddcb0bef8a1d082236323a6af3dcced78f8f27acb77d19b6100d`. Android owned imports now have explicit standard CBZ body export through a pure bounded ZIP module, app-owned stage/lease adapter and internal SAF UI. Existing importer logic/Reader/catalog/history remain; no private-state archive or new library format. [Scope, reuse, limits and holds](NATIVE_LOCAL_CONTENT_EXPORT.md).
+
+Current-source native SDK28/35 roundtrip/cancellation/lifecycle/bounds, full Windows/browser/source/update regressions, lint/R8/fixed-certificate Dev77→78 continuity and artifact verification are required before package PASS. No local Java/Gradle/apps/browser/LAN/updater runtime: all permission-sensitive checks stay in authorized Draft CI. No production access, merge/release/OTA, key download, install or deployment. Whole-state restore, source host/trust, crash/orphan lifecycle, physical/provider/OEM and broader objective acceptance remain open; no user testing is requested now.
+
 ## 2026-10-23 NEXT-62: legacy recall and stored-only compatibility sessions (unpublished)
 
 Continues frozen NEXT-61 `3ce697566f379fef2dc566af9e91f3ee183c2d21`, full handoff SHA256 `a6ee113fa3ab7957bdd03d3dd14d07baaa666807f419d9f8a7a9c97ab21b66b3`. Actual old recall/V2/adaptive bodies now use domain ports; idle GETs stay ephemeral, adaptive allocation/batch/pointer share an existing savepoint, and source changes fence late legacy metadata. No ranking/schema/API/wire-format change. [Scope and unresolved acceptance](LEGACY_ADAPTIVE_RECOMMENDATION_MODULE.md).

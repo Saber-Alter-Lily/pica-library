@@ -26,7 +26,7 @@
     <string name="onboarding_back">上一步</string>
     <string name="onboarding_next">下一步</string>
     <string name="tour_library_title">书库</string>
-    <string name="tour_library_body">Pica、E-H、本地下载和远程副本都在这里统一整理。</string>
+    <string name="tour_library_body">先点“导入本地漫画”选择自己的文件夹或 CBZ，无需来源账号即可阅读。需要时再连接外部来源，其他副本也在这里整理。</string>
     <string name="tour_recommend_title">推荐</string>
     <string name="tour_recommend_body">已有推荐可以直接看或换一批，不必每次重算。推荐不合口味时再纠正，不要求先配置所有偏好。</string>
     <string name="tour_online_title">在线</string>
@@ -165,4 +165,16 @@
     <string name="local_import_remove">移除导入副本</string>
     <string name="local_import_remove_warning">仅移除此应用保存的导入副本及历史文件代次？原文件夹/CBZ、阅读历史、书架和私人标签不动。不会删除电脑或网盘副本。</string>
     <string name="local_import_no_picker">当前设备没有可用的系统文件选择器。</string>
+    <string name="local_export_title">导出正文为 CBZ</string>
+    <string name="local_export_help">将手机导入的图片另存为标准 CBZ（上限 256 MiB），不含历史、书架、私人标签或账号。先打开或重新导入检查可读，再移除应用或本机副本；重新导入不会恢复原来的个人状态。</string>
+    <string name="local_export_choose">选择 CBZ 保存位置</string>
+    <string name="local_export_working">正在本地生成并写入… 完成前请勿删除导入副本。</string>
+    <string name="local_export_cancel">取消导出</string>
+    <string name="local_export_done">CBZ 已写入。请打开或重新导入检查可读，再移除本机副本。这是正文导出，不是完整数据备份。</string>
+    <string name="local_export_failed">导出未完成，请检查剩余空间与保存位置。本机导入副本不变；目标文件可能不完整，请检查后再重试。</string>
+    <string name="local_export_cancelled">已取消导出。本机导入副本不变；选中的目标文件可能为空或不完整。</string>
+    <string name="local_export_picker_cancelled">未选择保存位置，没有导出。</string>
+    <string name="local_export_busy">另一项导出尚未结束。请完成或取消后，再移除此副本或开始其他导出。</string>
+    <string name="local_export_unavailable">导入副本不可用，请重新进入本地导入页检查。</string>
+    <string name="local_export_receipt">%1$d 页 · %2$d 章 · %3$.1f MiB</string>
 </resources>

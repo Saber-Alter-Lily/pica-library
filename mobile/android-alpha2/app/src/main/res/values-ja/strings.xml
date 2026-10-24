@@ -26,7 +26,7 @@
     <string name="onboarding_back">戻る</string>
     <string name="onboarding_next">次へ</string>
     <string name="tour_library_title">ライブラリ</string>
-    <string name="tour_library_body">Pica、E-H、ローカルダウンロード、リモートコピーをここでまとめて整理します。</string>
+    <string name="tour_library_body">自分のフォルダーや CBZ を「ローカル漫画を取り込む」から追加できます。配信元アカウントは不要で、必要な接続やほかのコピーもここで整理します。</string>
     <string name="tour_recommend_title">おすすめ</string>
     <string name="tour_recommend_body">既存のおすすめはそのまま読むかバッチを切り替えます。毎回の再計算や全嗜好の設定は不要です。</string>
     <string name="tour_online_title">オンライン</string>
@@ -165,4 +165,16 @@
     <string name="local_import_remove">取り込んだコピーを削除</string>
     <string name="local_import_remove_warning">このアプリのコピーと旧世代だけを削除しますか？元フォルダ/CBZ、履歴、本棚、個人タグは保持します。PCやクラウドのコピーは削除しません。</string>
     <string name="local_import_no_picker">システムのファイル選択画面を利用できません。</string>
+    <string name="local_export_title">本文をCBZに書き出す</string>
+    <string name="local_export_help">取り込んだ画像を標準CBZ（最大256 MiB）で保存します。履歴、本棚、個人タグ、アカウントは含みません。アプリやコピーを削除する前に開くか再取り込みして確認してください。再取り込みで元の個人状態は復元しません。</string>
+    <string name="local_export_choose">CBZの保存先を選ぶ</string>
+    <string name="local_export_working">端末内で作成・書き込み中… 完了前にコピーを削除しないでください。</string>
+    <string name="local_export_cancel">書き出しを中止</string>
+    <string name="local_export_done">CBZを書き込みました。コピーを削除する前に開くか再取り込みして確認してください。本文のみの書き出しで、完全なバックアップではありません。</string>
+    <string name="local_export_failed">完了できませんでした。空き容量と保存先を確認してください。取り込んだコピーは変更しませんが、保存先は不完全な場合があります。</string>
+    <string name="local_export_cancelled">中止しました。取り込んだコピーは変更しませんが、保存先が空または不完全な場合があります。</string>
+    <string name="local_export_picker_cancelled">保存先が選択されていないため、書き出していません。</string>
+    <string name="local_export_busy">別の書き出しが進行中です。完了または中止後に削除・再実行してください。</string>
+    <string name="local_export_unavailable">取り込んだコピーを利用できません。取り込み画面で確認してください。</string>
+    <string name="local_export_receipt">%1$dページ · %2$d章 · %3$.1f MiB</string>
 </resources>

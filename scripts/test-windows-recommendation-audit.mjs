@@ -225,7 +225,8 @@ cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowe
             'steerability',
             'retrospective',
             'versions',
-            'compare'
+            'compare?baselineVersion=v5-shadow/fixture-a&candidateVersion=v5-shadow/fixture-b',
+            'advanced-learning-gate'
         ].map((name) => '/api/v1/desktop/recommendation-v5/evaluation/' + name),
         '/api/v1/desktop/recommendation-v5/shadow-runs',
         '/api/v1/desktop/recommendation-v5/visual-activation-gate',

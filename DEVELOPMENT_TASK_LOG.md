@@ -4,6 +4,16 @@
 
 User reported repeated security-center permission prompts for Java/validation programs. Stop launching local Java, random-path Windows artifacts, LAN bridges and upgrade runtime matrices by default; move those checks to the already-authorized Draft CI. Local source/type/syntax and inspected no-Java/no-LAN targeted tests may continue. Do not allow dialogs, add exceptions or weaken protection. Read-only snapshot found zero active Java/current validation drivers; firewall logs confirmed prior task-temp application paths, including Node. Exact unseen dialog identity remains unverified. [Effective local validation policy](docs/LOCAL_VALIDATION_SAFETY.md).
 
+## NEXT-62 — legacy recall and stored-only compatibility sessions (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / CURRENT_SOURCE_CI_AND_INSTALLABLE_PROOF_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-61 `3ce697566f379fef2dc566af9e91f3ee183c2d21`, full handoff SHA256 `a6ee113fa3ab7957bdd03d3dd14d07baaa666807f419d9f8a7a9c97ab21b66b3`. Its CI passed Linux1737+8 / Windows1744+1 /1745, Chromium48, Android362; those results do not validate this new source.
+- Three actual baseline probes reproduced status initialization and seen-ID consumption before a failed adaptive batch. Actual recall/V2/adaptive bodies now use explicit domain ports;19 frozen method hashes include both complete old controllers. [Scope, reuse and holds](docs/LEGACY_ADAPTIVE_RECOMMENDATION_MODULE.md).
+- Status uses ephemeral drafts without writes or generation capability. Existing SQLite savepoint covers adaptive pool+pointer and final allocation+batch+pointer+view; source revision fences late legacy metadata. Same old rankers/p-limit/converter, schema/API/state keys/response shapes; no new dependency/framework/protocol/model.
+- Inspected source-only108/108 across11 files, including43 new assertions, types and Web45/45 PASS. Shared helper text hash proves its only change is the import of the same normalizer. Sandbox dependency denial occurred before tests and is retained separately. Full exact-source CI/compiled faults/fixed-certificate Dev76→77 remain REQUIRED before package PASS. No local Java/application/browser/LAN/upgrade runtime.
+- Static session-size criteria now inspect the actual inherited constants/owner. No security/cap/timeout/retry/skip relaxation. Full objective/source host-trust/overlapping commands/physical provider-phone-gesture-tag-AI-offline QA/crash-OTA-UNC remain OPEN. No production access, merge/release/OTA/key download/install/deployment.
+
 ## NEXT-61 — stored work-identity views/commands/task and atomic human decisions (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / CURRENT_SOURCE_CI_AND_INSTALLABLE_PROOF_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**

@@ -161,7 +161,7 @@ const control=${JSON.stringify(control)},trace=${JSON.stringify(trace)},output=$
 const read=fs.readFileSync.bind(fs),spawn=cp.spawn;
 const state=()=>{try{return JSON.parse(read(control,'utf8'))}catch{return {trace:false}}};
 const record=kind=>{if(state().trace)fs.appendFileSync(trace,JSON.stringify({kind})+'\\n')};
-for(const method of ['prepare','exec']){const original=DatabaseSync.prototype[method];DatabaseSync.prototype[method]=function(...args){record('sqlite-'+method);const result=original.apply(this,args);if(method==='prepare'&&/INSERT\\s+INTO\\s+app_state/i.test(String(args[0])))return new Proxy(result,{get(target,key){if(key==='run')return function(...values){const saved=target.run(...values);if(state().mode==='identity-policy-fail'&&values[0]==='recommendation.v5.portablePolicy.v1'){record('identity-policy-after-write-fault');throw Error('Synthetic identity policy write fault')}return saved};const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value}});return result}}
+for(const method of ['prepare','exec']){const original=DatabaseSync.prototype[method];DatabaseSync.prototype[method]=function(...args){record('sqlite-'+method);const result=original.apply(this,args);const sql=String(args[0]),isState=/INSERT\\s+INTO\\s+app_state/i.test(sql),isBatch=/INSERT\\s+INTO\\s+recommendation_v3_batches/i.test(sql);if(method==='prepare'&&(isState||isBatch))return new Proxy(result,{get(target,key){if(key==='run')return function(...values){const saved=target.run(...values);const mode=state().mode;if(mode==='identity-policy-fail'&&isState&&values[0]==='recommendation.v5.portablePolicy.v1'){record('identity-policy-after-write-fault');throw Error('Synthetic identity policy write fault')}if((mode==='adaptive-batch-fail'&&isBatch)||(mode==='adaptive-pointer-fail'&&isState&&values[0]==='recommendation.v3.activeCycle')){record('adaptive-after-write-fault');throw Error('Synthetic adaptive persistence fault')}return saved};const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value}});return result}}
 fs.readFileSync=function(file,...args){if(state().trace&&typeof file==='string'&&forbidden.includes(path.resolve(file).toLowerCase())){record('forbidden-fixture-read');throw Error('Audit must not read credential/body fixture')}return read(file,...args)};
 cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowerCase()==='powershell.exe'&&Array.isArray(args)&&args.some(a=>String(a).includes('SaveFileDialog')&&String(a).includes('Pica-Library-Recommendation-Audit-'))){record('audit-native-picker');const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();process.nextTick(()=>{if(state().mode==='accept')child.stdout.write(output);child.stdout.end();child.stderr.end();child.emit('exit',0)});return child}return spawn.call(this,command,args,...rest)};syncBuiltinESMExports();
 `
@@ -487,6 +487,67 @@ cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowe
         unrelated_user_tables_preserved: true, external_preload_only: true,
         real_provider_acceptance: 'NOT_RUN', production_accessed: false,
         execution_location: 'GITHUB_WINDOWS_CI'
+    }))
+    // Legacy/adaptive compatibility remains explicit; status GETs cannot initialize a cycle.
+    const beforeCompatibility = snapshot()
+    for (const route of ['/api/v1/recommendation-sessions/status?engine=v2', '/api/v1/recommendation-sessions/status']) {
+        const idle = await get(route)
+        if (!idle.preparing || idle.recommendations.length || typeof idle.cycleId !== 'string')
+            throw new Error('Compiled compatibility idle response changed shape')
+        if (JSON.stringify(await get(route)) !== JSON.stringify(idle))
+            throw new Error('Compiled idle draft changed during repeated read')
+        requireUnchanged(beforeCompatibility)
+    }
+    // The two imported favorites must not cause an implicit login when sources are disabled.
+    const disabledRecall = await fetch(instance.url + '/api/v1/recommendations', {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': state.csrfToken, Origin: instance.url },
+        body: JSON.stringify({ limit: 2 }), signal: AbortSignal.timeout(15000)
+    })
+    const disabledRecallText = await disabledRecall.text()
+    if (disabledRecall.ok || !disabledRecallText.includes('Source is disabled: pica'))
+        throw new Error('Compiled legacy recall bypassed explicit source choice')
+    requireUnchanged(beforeCompatibility)
+    // Only synthetic non-favorite metadata and an already prepared pool are seeded at the
+    // test-storage seam. No provider request or product-side fault endpoint is introduced.
+    packagedNode(`const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(process.argv[1]);
+const row=db.prepare('SELECT * FROM comics WHERE id=?').get('local:fixture');if(!row)throw Error('Missing owned seed');
+for(const id of ['local:compat-a','local:compat-b']){const copy={...row,id,is_favorite:0,title:'Synthetic compatibility '+id};const keys=Object.keys(copy);db.prepare('INSERT INTO comics('+keys.map(k=>'"'+k+'"').join(',')+') VALUES ('+keys.map(()=>'?').join(',')+')').run(...keys.map(k=>copy[k]));}
+db.prepare('INSERT INTO recommendation_v3_candidate_pools(id,recommendation_cycle_id,generated_at,model_version,candidate_ids_json) VALUES (?,?,?,?,?)').run('synthetic-compat-pool','synthetic-compat-cycle',new Date().toISOString(),'v3.0.0-local-explainable',JSON.stringify(['local:compat-a','local:compat-b']));
+db.prepare('INSERT INTO app_state(key,value_json,updated_at) VALUES (?,?,?)').run('recommendation.v3.activeCycle',JSON.stringify({cycleId:'synthetic-compat-cycle',poolId:'synthetic-compat-pool',batchIndex:-1,appSessionId:null}),new Date().toISOString());db.close();console.log('{}');`, databaseFile)
+    const beforeAdaptive = snapshot()
+    for (const fault of ['adaptive-batch-fail', 'adaptive-pointer-fail']) {
+        mode(fault)
+        const rejected = await fetch(instance.url + '/api/v1/recommendation-sessions', {
+            method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': state.csrfToken, Origin: instance.url },
+            body: JSON.stringify({ engine: 'v3' }), signal: AbortSignal.timeout(15000)
+        })
+        await rejected.text()
+        mode('cancel', false)
+        if (rejected.ok) throw new Error('Compiled adaptive path accepted an actual post-SQL fault')
+        requireUnchanged(beforeAdaptive)
+    }
+    if (rows().filter(row => row.kind === 'adaptive-after-write-fault').length !== 2)
+        throw new Error('Both compiled adaptive SQL faults were not observed')
+    const adaptive = await post('/api/v1/recommendation-sessions', { engine: 'v3' }, state)
+    if (adaptive.currentBatchIndex !== 0 || adaptive.recommendations.length !== 2 || adaptive.seenCount !== 2)
+        throw new Error('Compiled adaptive retry lost the unconsumed candidates')
+    const afterAdaptive = nonIdentityEqual(beforeAdaptive, ['app_state', 'recommendation_v3_batches', 'recommendation_seen'])
+    const finalCycleBefore = beforeAdaptive.find(row => row.name === 'app_state').rows.filter(row => JSON.parse(row).key !== 'recommendation.v3.activeCycle')
+    const finalCycleAfter = afterAdaptive.find(row => row.name === 'app_state').rows.filter(row => JSON.parse(row).key !== 'recommendation.v3.activeCycle')
+    if (JSON.stringify(finalCycleBefore) !== JSON.stringify(finalCycleAfter)) throw new Error('Compatibility path changed the final-serving cycle')
+    requireUnchanged(afterAdaptive)
+    const storedAdaptive = await get('/api/v1/recommendation-sessions/status')
+    if (storedAdaptive.recommendations.length !== 2 || storedAdaptive.contextId !== adaptive.contextId)
+        throw new Error('Compiled adaptive stored status lost its batch/context')
+    requireUnchanged(afterAdaptive)
+    console.log(JSON.stringify({
+        packaged_legacy_adaptive_module: 'PASS', source_sha: sourceSha, version,
+        idle_status_gets: 4, idle_cycle_not_persisted: true, disabled_source_recall_rejected: true,
+        observed_adaptive_post_sql_faults: 2, both_faults_all_tables_rolled_back: true,
+        retry_unconsumed_candidates: 2, stored_context_preserved: true,
+        final_serving_state_unchanged: true, unrelated_tables_preserved: true,
+        external_preload_only: true, provider_runtime_acceptance: 'NOT_RUN',
+        production_accessed: false, execution_location: 'GITHUB_WINDOWS_CI'
     }))
     // Remove only the two exact synthetic canaries before normal shutdown/startup handling.
     fs.unlinkSync(credentialCanary)

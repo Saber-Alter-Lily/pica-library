@@ -1,4 +1,4 @@
-import { normalizeAuthorKey } from './author'
+import { normalizeAuthorKey } from './author-normalization'
 import type {
     PreferenceItem,
     RecallRoute,

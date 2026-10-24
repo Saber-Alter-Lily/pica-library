@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-23 NEXT-62: legacy recall and stored-only compatibility sessions (unpublished)
+
+Continues frozen NEXT-61 `3ce697566f379fef2dc566af9e91f3ee183c2d21`, full handoff SHA256 `a6ee113fa3ab7957bdd03d3dd14d07baaa666807f419d9f8a7a9c97ab21b66b3`. Actual old recall/V2/adaptive bodies now use domain ports; idle GETs stay ephemeral, adaptive allocation/batch/pointer share an existing savepoint, and source changes fence late legacy metadata. No ranking/schema/API/wire-format change. [Scope and unresolved acceptance](LEGACY_ADAPTIVE_RECOMMENDATION_MODULE.md).
+
+Current-source full/native/compiled/updater gates and fixed-certificate Dev76→77 continuity are required; prior green runs are not current proof. No local Java/application/browser/LAN/update runtime. Physical/provider/OEM and broader product QA remain deferred; no production data, merge/release/OTA or automatic deployment.
+
 ## 2026-10-23 NEXT-61: identity view/command/task separation and atomic human decisions (unpublished)
 
 Continues frozen NEXT-60 `2c3f7d647100441398b28fbdc0cc41a5e8ffd0cc`, complete handoff SHA256 `da40f5b62e7370ec4b304eb7b5c91abe5f94f097a04de0048c1f893251876c99`. Extracts actual stored-identity views, explicit commands and cooperative evidence task. Read/evidence defaults no longer create policy; decision/clear + distinct policy + returned review reuse one existing synchronous savepoint. No matching/threshold/schema/API change or binding apply. [Scope and exact holds](WORK_IDENTITY_MODULE.md).

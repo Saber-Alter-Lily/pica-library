@@ -1,4 +1,4 @@
-import { parseEhTag } from '../providers/eh-provider'
+import { parseEhTag } from '../providers/eh-tags'
 import type {
     EhSurface,
     SearchRequest

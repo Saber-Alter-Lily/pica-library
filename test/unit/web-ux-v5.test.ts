@@ -488,14 +488,17 @@ describe('V5 Web UX audit contract', () => {
         const main = read('src/desktop/main.ts')
         const server = read('src/library/server.ts')
         const controls = read('web/recommendation-v5.js')
+        const archive = read('src/recommendation/audit-export-v5.ts')
         expect(main).toContain('exportRecommendationAudit: async (input = {}) =>')
-        expect(main).toContain("'behavior_evidence_v5.json'")
-        expect(main).toContain("'user_events.json'")
-        expect(main).toContain("'shadow_runs.json'")
-        expect(main).toContain("'evaluation_snapshot.json'")
-        expect(main).toContain("'catalog_minimal.json'")
-        expect(main).toContain("'pica_password'")
-        expect(main).toContain("'eh_cookies'")
+        expect(main).toContain('return exportRecommendationAuditV5({')
+        // File families now belong to the pure builder; real ZIP differential tests cover their bytes.
+        expect(archive).toContain("'behavior_evidence_v5.json'")
+        expect(archive).toContain("'user_events.json'")
+        expect(archive).toContain("'shadow_runs.json'")
+        expect(archive).toContain("'evaluation_snapshot.json'")
+        expect(archive).toContain("'catalog_minimal.json'")
+        expect(archive).toContain("'pica_password'")
+        expect(archive).toContain("'eh_cookies'")
         expect(server).toContain(
             "'/api/v1/desktop/recommendation-v5/export-audit'"
         )
@@ -570,18 +573,17 @@ describe('V5 Web UX audit contract', () => {
         const app = read('web/app.js')
         const controls = read('web/recommendation-v5.js')
         const main = read('src/desktop/main.ts')
+        const exporter = read('src/services/recommendation-audit-export.ts')
+        const archive = read('src/recommendation/audit-export-v5.ts')
         expect(app).toContain('window.picaAppSessionId = state.appSessionId')
         expect(controls).toContain("query.set('appSessionId', appSessionId)")
         expect(controls).toContain(
             '{ appSessionId: window.picaAppSessionId || null }'
         )
-        expect(main).toContain(
-            "const appSessionId = String(input.appSessionId ?? '').trim() || null"
-        )
-        expect(main).toContain(
-            'recommendationV5PreferenceTimescales(\n                appSessionId'
-        )
-        expect(main).toContain("'serving_composition.json'")
+        expect(main).toContain('appSessionId: input.appSessionId')
+        expect(exporter).toContain("String(options.appSessionId ?? '').trim() || null")
+        expect(archive).toContain('read.preferenceTimescales(context.appSessionId, 10000)')
+        expect(archive).toContain("'serving_composition.json'")
     })
 
     it('keeps onboarding close and update header controls compact under theme overrides', () => {

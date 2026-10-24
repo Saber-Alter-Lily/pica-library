@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## NEXT-59 — read-only V5 audit/query and export modules (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-58 `fe360d315d53c597042307a47e6e81fc14c9a1ef`, immutable handoff SHA256 `39faf0f43235c6cdce911962f3253aa14c677f72d2ec43a4362d8ced953ed632`. Keeps all prior packages and first failures unchanged.
+- Verified eight read paths initializing missing policy and export computing reports before a cancelled Save dialog; a separate rejecting regression also exposed initialization in mobile sync preview. Extracts13 actual V5 query/audit/planning methods through explicit read-only ports, plus schema2 export assembly and existing ZIP/file adapter. Selected reads and preview no longer initialize policy; explicit merge/save defaults and JSON/schema/weights/Visual thresholds stay unchanged. Save cancellation precedes any data acquisition.
+- Moves existing E-H string tag parsing unchanged away from the account client, keeping its compatibility export. Actual browser-platform dependency closure, frozen14-method/output/read-order oracle and frozen old export entry-byte comparison complement synthetic all-table no-write/cancel/error tests. [Ownership, evidence, privacy and limits](docs/RECOMMENDATION_AUDIT_READ_MODULE.md).
+- NEXT-58 J7 initial timeout remains UNDETERMINED despite one same-parameter passing retry. Adds bounded, allowlisted phase/button/card/network-status failure diagnostics with no identities/text/headers/bodies; no timeout/retry/criterion relaxation or claimed product fix.
+- Native/JVM app logic, recommendation algorithms and stored formats stay; current-source CI, downloaded artifact gates and signed Dev73→74 belong to the new handoff. Physical testing stays deferred. Legacy/adaptive, V5 shadow/identity mutation, optional runtime/trust, native export/orphan/backup retention and published OTA/first-hop remain open.
+- Same candidate/Draft/CI + prior DPAPI exception; no production access, merge/release/OTA, key download or deployment.
+
 ## NEXT-58 — shared update lifecycle, acknowledged startup and incremental recovery (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_RELEASE_OTA_PHYSICAL_QA_OPEN.**

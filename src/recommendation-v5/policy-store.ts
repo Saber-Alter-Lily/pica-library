@@ -163,9 +163,9 @@ export class RecommendationPolicyStoreV5 {
         return state
     }
 
-    snapshot() {
+    snapshot(options: { initialize?: boolean } = {}) {
         return portablePolicySnapshotV5(
-            this.state(),
+            this.state(options),
             this.database.listComics({ limit: 10000 })
         )
     }
@@ -492,7 +492,7 @@ export class RecommendationPolicyStoreV5 {
     }
 
     previewMobile(input: MobileRecommendationSyncV5) {
-        const state = this.state()
+        const state = this.state({ initialize: false })
         const tags = previewTagPolicyMergeV1(state.tagPolicy, input.baseTagPolicy, input.tagPolicy, tagResolution(input))
         const preview = previewMobileRecommendationSyncV1({ ...input, desktopRevision: state.revision, desktopControls: state.controls, androidControls: input.controls })
         return {
@@ -500,7 +500,7 @@ export class RecommendationPolicyStoreV5 {
             hasPortableChanges: preview.hasPortableChanges || tags.changed || Boolean(tags.conflict),
             tagPolicyConflict: tags.conflict,
             tagPolicyChanged: tags.changed,
-            snapshot: this.snapshot()
+            snapshot: this.snapshot({ initialize: false })
         }
     }
 

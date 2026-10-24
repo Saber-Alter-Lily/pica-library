@@ -20,7 +20,7 @@ concurrency:
 env:
   STABLE_VERSION: '0.5.0'
   BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
-  PICA_ANDROID_CANDIDATE_VERSION_CODE: '73'
+  PICA_ANDROID_CANDIDATE_VERSION_CODE: '74'
 
 jobs:
   web-and-source:
@@ -99,6 +99,8 @@ jobs:
           node scripts/test-windows-sqlite-paths.mjs $zip $version $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test-windows-recommendation-module.mjs $zip $version $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-recommendation-audit.mjs $zip $version $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test-windows-incremental-update.mjs $zip $version $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

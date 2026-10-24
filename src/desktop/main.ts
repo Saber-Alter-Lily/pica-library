@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { applyUpdateAndScheduleShutdown } from './update-command'
+import { exportRecommendationAuditV5 } from '../services/recommendation-audit-export'
 import path from 'node:path'
 import type { Server } from 'node:http'
 import AdmZip from 'adm-zip'
@@ -1098,116 +1099,24 @@ async function startEngine(preferredPort: number) {
         },
         exportRecommendationAudit: async (input = {}) => {
             if (!database || !service) throw new Error('Library is not ready')
-            const generatedAt = new Date().toISOString()
-            const appSessionId = String(input.appSessionId ?? '').trim() || null
-            const events = database.listUserEvents({ limit: 10000 })
-            const catalog = database.listComics({ limit: 10000 }).map((comic) => ({
-                comicId: comic.comicId,
-                title: comic.title,
-                author: comic.author,
-                canonicalAuthor: comic.canonicalAuthor ?? null,
-                tags: comic.tags,
-                categories: comic.categories,
-                providerId: comic.providerId ?? null,
-                isFavorite: comic.isFavorite,
-                inLibrary: comic.inLibrary,
-                downloadedPictures: comic.downloadedPictures,
-                firstSeenAt: comic.firstSeenAt,
-                lastSeenAt: comic.lastSeenAt
-            }))
-            const policy = service.recommendationV5Snapshot()
-            const timescales = service.recommendationV5PreferenceTimescales(
-                appSessionId,
-                10000
-            )
-            const behavior = service.recommendationV5BehaviorEvidence(10000)
-            const channels = service.recommendationV5CandidateChannels(
-                appSessionId,
-                10000
-            )
-            const servingComposition =
-                service.recommendationServingCompositionV3()
-            const shadowRuns = service.recommendationV5ShadowRuns(500)
-            const evaluation = service.recommendationV5EvaluationSummary(
-                500,
-                30,
-                3,
-                50
-            )
-            const manifest = {
-                schemaVersion: 2,
-                kind: 'pica-library-recommendation-audit',
-                generatedAt,
+            const library = database, app = service
+            return exportRecommendationAuditV5({
                 productVersion: PRODUCT_VERSION,
-                sourceSha: currentSourceSha ?? null,
-                appSessionId,
-                includes: [
-                    'manifest.json',
-                    'policy_snapshot.json',
-                    'preference_timescales.json',
-                    'candidate_channels.json',
-                    'serving_composition.json',
-                    'behavior_evidence_v5.json',
-                    'user_events.json',
-                    'shadow_runs.json',
-                    'evaluation_snapshot.json',
-                    'catalog_minimal.json',
-                    'README.txt'
-                ],
-                excludes: [
-                    'pica_password',
-                    'pica_token',
-                    'eh_cookies',
-                    'github_token',
-                    'webdav_credentials',
-                    'comic_images',
-                    'downloaded_files'
-                ]
-            }
-            const zip = new AdmZip()
-            const addJson = (name: string, value: unknown) =>
-                zip.addFile(
-                    name,
-                    Buffer.from(JSON.stringify(value, null, 2), 'utf8')
-                )
-            addJson('manifest.json', manifest)
-            addJson('policy_snapshot.json', policy)
-            addJson('preference_timescales.json', timescales)
-            addJson('candidate_channels.json', channels)
-            addJson('serving_composition.json', servingComposition)
-            addJson('behavior_evidence_v5.json', behavior)
-            addJson('user_events.json', events)
-            addJson('shadow_runs.json', shadowRuns)
-            addJson('evaluation_snapshot.json', evaluation)
-            addJson('catalog_minimal.json', catalog)
-            zip.addFile(
-                'README.txt',
-                Buffer.from(
-                    [
-                        'Pica Library Recommendation Audit Export',
-                        '',
-                        'This package contains allowlisted recommendation and interaction audit data only.',
-                        'preference_timescales.json is generated for the appSessionId recorded in manifest.json when the export is requested from the active Web session.',
-                        'candidate_channels.json describes the V5 shadow planner and is not the serving recommendation batch.',
-                        'serving_composition.json describes the persisted Final V3 serving batch without allocating or regenerating a recommendation batch.',
-                        'It intentionally excludes account passwords, provider tokens/cookies, GitHub credentials, WebDAV credentials, comic images, and downloaded manga files.',
-                        'Share this ZIP only when you intentionally want another person or analysis tool to review recommendation behavior.',
-                        ''
-                    ].join('\n'),
-                    'utf8'
-                )
-            )
-            const buffer = zip.toBuffer()
-            const file = await chooseRecommendationAuditPath(generatedAt)
-            if (!file) return { success: false, cancelled: true }
-            fs.writeFileSync(file, buffer)
-            return {
-                success: true,
-                fileName: path.basename(file),
-                generatedAt,
-                sizeBytes: buffer.byteLength,
-                sha256: createHash('sha256').update(buffer).digest('hex')
-            }
+                sourceSha: currentSourceSha,
+                appSessionId: input.appSessionId,
+                choosePath: chooseRecommendationAuditPath,
+                read: {
+                    userEvents: limit => library.listUserEvents({limit}),
+                    catalog: limit => library.listComics({limit}),
+                    policySnapshot: () => app.recommendationV5Snapshot(),
+                    preferenceTimescales: (session, limit) => app.recommendationV5PreferenceTimescales(session, limit),
+                    behaviorEvidence: limit => app.recommendationV5BehaviorEvidence(limit),
+                    candidateChannels: (session, limit) => app.recommendationV5CandidateChannels(session, limit),
+                    servingComposition: () => app.recommendationServingCompositionV3(),
+                    shadowRuns: limit => app.recommendationV5ShadowRuns(limit),
+                    evaluationSummary: (limit, horizon, step, targets) => app.recommendationV5EvaluationSummary(limit, horizon, step, targets)
+                }
+            })
         },
         syncAndExportBrowserLitePackage: async () => {
             if (!database || !service) throw new Error('Library is not ready')

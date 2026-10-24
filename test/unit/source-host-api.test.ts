@@ -9,6 +9,8 @@ import { LibraryService } from '../../src/library/service'
 import { startLibraryServer, type DesktopServerController } from '../../src/library/server'
 import { SourceHostInspector } from '../../src/source-hosts/inspector'
 import { sourceHostHttp } from '../../src/source-hosts/http-transport'
+import { SourceHostConnections } from '../../src/source-hosts/connections'
+import { sourceHostStore } from '../../src/desktop/source-host-store'
 import { shadowDatabaseState } from '../fixtures/recommendation-shadow-fixture'
 
 const cleanup: (() => Promise<void>)[] = []
@@ -33,13 +35,14 @@ async function fixture(options: { configured?: boolean; desktop?: boolean } = {}
         return new Response(JSON.stringify(operation === 'PicaSourceHostInfo' ? info : sources), { headers: { 'content-type': 'application/json' } })
     })
     const inspector = new SourceHostInspector(connection => sourceHostHttp(connection, wire))
+    const connections = new SourceHostConnections(sourceHostStore(path.join(root, 'source-hosts.json')), inspector, () => '64d223e0-5d29-4320-babb-5a2da654d345')
     const inspect = vi.fn((value: Record<string, unknown>, abort: AbortSignal) => { signal = abort; return inspector.inspect(value, abort) })
-    const desktop: DesktopServerController = { csrfToken: 'synthetic-host-csrf', configured: () => options.configured !== false, status: () => ({ sourceHostInspection: { available: true } }), inspectSourceHost: inspect, save: async () => ({}), testConnection: async () => ({}), chooseFolder: async () => null, exportBrowserLitePackage: async () => ({}), openDirectory: async () => {}, shutdown: () => {} }
+    const desktop: DesktopServerController = { csrfToken: 'synthetic-host-csrf', configured: () => options.configured !== false, status: () => ({ sourceHostInspection: { available: true } }), inspectSourceHost: inspect, sourceHostConnections: value => connections.command(value), inspectSavedSourceHost: (value, signal) => connections.inspect(value, signal), save: async () => ({}), testConnection: async () => ({}), chooseFolder: async () => null, exportBrowserLitePackage: async () => ({}), openDirectory: async () => {}, shutdown: () => {} }
     const server = await startLibraryServer({ database: db, service, port: 0, desktop: options.desktop === false ? undefined : desktop })
     cleanup.push(async () => { inspector.close(); resolveLate(); server.server.closeAllConnections(); await new Promise<void>(resolve => server.server.close(() => resolve())); db.close(); const resolved = fs.realpathSync(root); if (path.dirname(resolved) !== fs.realpathSync(os.tmpdir()) || !path.basename(resolved).startsWith('pica-host-api-') || fs.lstatSync(root).isSymbolicLink()) throw Error('Unsafe synthetic cleanup'); fs.rmSync(resolved, { recursive: true, force: true }) })
     const headers = { 'content-type': 'application/json', Origin: server.url, 'x-pica-csrf': desktop.csrfToken }
     const post = (value: unknown = input, override: Record<string, string> = {}) => fetch(server.url + route, { method: 'POST', headers: { ...headers, ...override }, body: JSON.stringify(value) })
-    return { root, db, service, server, desktop, wire, inspector, inspect, headers, post, entered, release: resolveLate, getSignal: () => signal, behavior: (value: string) => { behavior = value } }
+    return { root, db, service, server, desktop, wire, inspector, connections, inspect, headers, post, entered, release: resolveLate, getSignal: () => signal, behavior: (value: string) => { behavior = value } }
 }
 
 describe('actual local host-inspection HTTP boundary — synthetic CI listener only', () => {
@@ -103,5 +106,34 @@ describe('actual local host-inspection HTTP boundary — synthetic CI listener o
         })
         expect(Date.now() - started).toBeGreaterThanOrEqual(4500); expect(Date.now() - started).toBeLessThan(7500)
         expect(f.inspect).not.toHaveBeenCalled(); expect(f.wire).not.toHaveBeenCalled()
+    })
+    it('persists only opt-in host metadata through the actual Desktop routes, never source/content/account state', async () => {
+        const f = await fixture(), before = shadowDatabaseState(f.db)
+        const connectionRoute = f.server.url + '/api/v1/desktop/source-hosts/connections'
+        const command = (value: unknown) => fetch(connectionRoute, { method: 'POST', headers: f.headers, body: JSON.stringify(value) })
+        const savedResponse = await command({ action: 'save', kind: 'suwayomi', label: '<img src=x onerror=alert(1)>', endpoint: input.endpoint, allowInsecureLan: false, authMode: 'none', consent: true, scope: 'inspect-only' })
+        expect(savedResponse.status).toBe(200)
+        const saved = await savedResponse.json(), host = saved.hosts[0]
+        expect(host.enabled).toBe(false); expect(f.wire).not.toHaveBeenCalled()
+        const enabledResponse = await command({ action: 'set-enabled', id: host.id, expectedRevision: 0, enabled: true, consent: true })
+        expect(enabledResponse.status).toBe(200); expect(f.wire).not.toHaveBeenCalled()
+        const read = await fetch(f.server.url + '/api/v1/desktop/source-hosts/inspect-saved', { method: 'POST', headers: f.headers, body: JSON.stringify({ id: host.id, expectedRevision: 1, consent: true }) })
+        expect(read.status).toBe(200); expect((await read.json()).capabilities.reader).toBe(false)
+        expect(f.wire).toHaveBeenCalledTimes(2)
+        const removed = await command({ action: 'remove', id: host.id, expectedRevision: 1, consent: true })
+        expect(removed.status).toBe(200); expect((await removed.json()).hosts).toEqual([])
+        expect(shadowDatabaseState(f.db)).toEqual(before)
+        expect(f.service.sources.snapshot().enabled).toEqual([])
+    })
+    it('applies the same method, local-origin, CSRF and bounded-input guards to saved-host routes', async () => {
+        const f = await fixture()
+        for (const name of ['connections', 'inspect-saved']) {
+            const url = f.server.url + '/api/v1/desktop/source-hosts/' + name
+            expect((await fetch(url)).status).toBe(405)
+            for (const headers of [{ ...f.headers, Origin: 'https://outside.example' }, { ...f.headers, Origin: '' }, { ...f.headers, 'x-pica-csrf': 'wrong' }]) expect((await fetch(url, { method: 'POST', headers, body: JSON.stringify({ action: 'list' }) })).status).toBe(403)
+            expect((await fetch(url, { method: 'POST', headers: f.headers, body: JSON.stringify({ action: 'list', password: 'synthetic-secret' }) })).status).toBe(400)
+        }
+        expect(f.connections.snapshot().hosts).toEqual([]); expect(f.wire).not.toHaveBeenCalled()
+        expect(fs.existsSync(path.join(f.root, 'source-hosts.json'))).toBe(false)
     })
 })

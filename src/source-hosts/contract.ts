@@ -17,6 +17,10 @@ export type SourceHostErrorCode =
     | 'SOURCE_HOST_BUSY'
     | 'SOURCE_HOST_CANCELLED'
     | 'SOURCE_HOST_TIMEOUT'
+    | 'SOURCE_HOST_STORAGE'
+    | 'SOURCE_HOST_DUPLICATE'
+    | 'SOURCE_HOST_STALE'
+    | 'SOURCE_HOST_DISABLED'
 
 export class SourceHostError extends Error {
     constructor(readonly code: SourceHostErrorCode) {

@@ -64,9 +64,33 @@ export async function assertPackagedSourceHostInspection({ status, home, data, s
         await wait(() => stalled === 1); abort.abort(); await assert.rejects(pending); await wait(() => cancelled >= 1)
         const timed = await post(input); assert.equal(timed.status, 504); assert.equal((await timed.json()).code, 'SOURCE_HOST_TIMEOUT'); await wait(() => cancelled >= 2)
         mode = 'normal'; const retry = await post(input); assert.equal(retry.status, 200); await retry.arrayBuffer()
+        const connectionsApi = appUrl.origin + '/api/v1/desktop/source-hosts/connections'
+        const savedInspectApi = appUrl.origin + '/api/v1/desktop/source-hosts/inspect-saved'
+        const command = body => fetch(connectionsApi, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(16000) })
+        const count = observations.length
+        assert.equal(current.sourceHostConnections?.available, true)
+        const empty = await command({ action: 'list' }); assert.equal(empty.status, 200); assert.deepEqual((await empty.json()).hosts, [])
+        const savedResponse = await command({ action: 'save', kind: 'suwayomi', label: 'Synthetic user-owned host', endpoint: input.endpoint, authMode: 'basic', allowInsecureLan: false, consent: true, scope: 'inspect-only' })
+        assert.equal(savedResponse.status, 200); const host = (await savedResponse.json()).hosts[0]
+        assert.equal(host.enabled, false); assert.equal(observations.length, count)
+        const enabled = await command({ action: 'set-enabled', id: host.id, expectedRevision: 0, enabled: true, consent: true }); assert.equal(enabled.status, 200); await enabled.arrayBuffer()
+        assert.equal(observations.length, count)
+        const checkSaved = body => fetch(savedInspectApi, { method: 'POST', headers, body: JSON.stringify({ id: host.id, expectedRevision: 1, consent: true, ...body }), signal: AbortSignal.timeout(16000) })
+        const noSecret = await checkSaved({}); assert.equal(noSecret.status, 401); await noSecret.arrayBuffer()
+        assert.equal(observations.length, count)
+        const checked = await checkSaved({ auth: { mode: 'basic', username: 'synthetic', password: secret } }); assert.equal(checked.status, 200); assert.equal((await checked.json()).persisted, false)
+        assert.equal(observations.length, count + 2); assert.equal(observations.slice(-2).every(row => row.explicitBasic), true)
+        const metadata = fs.readFileSync(path.join(home, 'config/source-hosts.json'), 'utf8')
+        assert.equal(metadata.includes(secret), false); assert.doesNotMatch(metadata, /password|username|authorization|cookie|token/)
+        assert.equal(JSON.parse(metadata).hosts[0].id, host.id); assert.equal(JSON.parse(metadata).hosts[0].enabled, true)
+        const disabled = await command({ action: 'set-enabled', id: host.id, expectedRevision: 1, enabled: false, consent: true }); assert.equal(disabled.status, 200); await disabled.arrayBuffer()
+        const denied = await checkSaved({ expectedRevision: 2 }); assert.equal(denied.status, 409); assert.equal((await denied.json()).code, 'SOURCE_HOST_DISABLED')
+        const stale = await command({ action: 'set-enabled', id: host.id, expectedRevision: 1, enabled: true, consent: true }); assert.equal(stale.status, 409); await stale.arrayBuffer()
+        const removed = await command({ action: 'remove', id: host.id, expectedRevision: 2, consent: true }); assert.equal(removed.status, 200); assert.deepEqual((await removed.json()).hosts, [])
+        assert.equal(observations.length, count + 2)
         assert.equal(snapshot(), before); assert.deepEqual(fs.readFileSync(path.join(home, 'config/config.json')), config)
         assert.deepEqual((await status()).externalSources, choices); assert.equal(fs.existsSync(path.join(home, 'config/credentials.dat')), false)
         assert.equal(unexpected, 0); assert.equal(observations.some(row => row.ambientAuth || row.cookie), false)
-        process.stdout.write(JSON.stringify({ packaged_source_host_inspection: 'PASS', source_sha: sourceSha, version, execution_location: 'GITHUB_WINDOWS_CI', actual_http_adapter: true, lossless_long_source_id: true, get_and_csrf_and_origin_and_consent_rejected_before_host: true, source_choices_unchanged: true, all_tables_unchanged: true, config_bytes_unchanged: true, credentials_file_created: false, basic_scoped_to_explicit_host: true, redirects_refused: true, size_and_graphql_errors_sanitized: true, explicit_cancel_closed_remote_stream: true, actual_deadline_closed_remote_stream: true, successful_retry: true, reader_or_library_import_advertised: false, extension_or_host_installed: false, unexpected_fixture_requests: unexpected, host_requests: observations.length, production_accessed: false }) + '\n')
+        process.stdout.write(JSON.stringify({ packaged_source_host_inspection: 'PASS', saved_host_lifecycle: 'PASS', saved_disabled_by_default: true, settings_changes_do_not_contact_host: true, per_request_only_credentials: true, stale_permission_rejected: true, saved_metadata_excludes_secrets: true, source_sha: sourceSha, version, execution_location: 'GITHUB_WINDOWS_CI', actual_http_adapter: true, lossless_long_source_id: true, get_and_csrf_and_origin_and_consent_rejected_before_host: true, source_choices_unchanged: true, all_tables_unchanged: true, config_bytes_unchanged: true, credentials_file_created: false, basic_scoped_to_explicit_host: true, redirects_refused: true, size_and_graphql_errors_sanitized: true, explicit_cancel_closed_remote_stream: true, actual_deadline_closed_remote_stream: true, successful_retry: true, reader_or_library_import_advertised: false, extension_or_host_installed: false, unexpected_fixture_requests: unexpected, host_requests: observations.length, production_accessed: false }) + '\n')
     } finally { fixture.closeAllConnections(); await new Promise(resolve => fixture.close(resolve)) }
 }

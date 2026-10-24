@@ -1,5 +1,13 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-24 NEXT-66: user-owned external-host configuration (unpublished)
+
+Continues frozen NEXT-65 `e0265086584340ef19fbf7106170f0542bdffcb2`, complete183-entry handoff SHA256 `29f6685722c6c44d715a4eb9342f175f3cfe69b7d60a669e079d34f259e7b592`. Its exact candidate3/3, standard/macOS/Linux/recovery and broader39success+6conditional skips/45 are historical proof, not current-source proof. Recovery passed on that source; prior timeout/J7 internal cause remains undetermined.
+
+The product stays a reader/library, not a manga platform. Actual local persisted host metadata/permission lifecycle is separate from provider/content/user state: no default host, save-disabled, separate explicit enable, manual one-page inspection only, per-request credentials, strict metadata schema, stale-tab rejection, abort/late-result fences and configured-loopback/Origin/CSRF routes. Corrupt optional config degrades that module without resetting it or blocking local reading. [Scope, implementation, limits and open work](USER_OWNED_SOURCE_HOST_SETTINGS.md).
+
+Local113/113 inspected source/temp/fake-fetch assertions, types and Web47/47 PASS. Real HTTP, three-language browser and actual Windows package lifecycle gates are authored for fresh CI, not executed locally. Native code/algorithms/schema/sync/update helpers remain unchanged; the existing single Dev version authority advances80→81. No production reads/writes, local Java/app/browser/LAN runtime, main merge, Release/tag, OTA, key download or deployment. External comic/search/read/library/native/secure session/trust and physical-provider acceptance remain OPEN. No immediate user testing requested.
+
 ## 2026-10-24 NEXT-65: minimal tag runtime and one-action layout replacement (unpublished)
 
 Continues frozen NEXT-64 `a5e4a1d0cb078823f872e22a8561ea651f2a8db8`, complete handoff SHA256 `db3c4c4c632892e094977c3c0df32393e86ce2203fa0a40ddc70d277d2e87498`. Its candidate3/3 and standard CI passed, but broader recovery40080731580 timed out after actual test/probe PASS:38success+6conditional skip+1CANCELLED/45 remains PARTIAL/HOLD, with internal exit cause UNDETERMINED. It is not current-source proof.

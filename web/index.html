@@ -912,6 +912,25 @@
                         <button id="source-choices-refresh" type="button">读取当前选择</button>
                         <p id="source-choices-state" role="status" aria-live="polite"></p>
                     </form>
+                    <details id="saved-host-panel">
+                        <summary id="saved-host-summary">我的外部宿主配置（实验）</summary>
+                        <p id="saved-host-boundary">这是本地阅读器，不经营漫画内容平台。外部宿主由你自行选择和管理；本软件不会提供默认内容目录、源仓库或托管服务。此配置目前只授权检查，尚不能阅读或导入。</p>
+                        <p id="saved-host-privacy">只在本机保存名称、地址和检查权限，不保存账号密码、不上传或同步。保存后默认停用；允许检查也不会自动连接。停用或移除只影响该连接，不删除漫画或阅读数据。</p>
+                        <button id="saved-host-refresh" type="button">查看 / 刷新我的配置</button>
+                        <form id="saved-host-form" class="settings-form" method="post">
+                            <fieldset id="saved-host-fields" class="wide settings-form">
+                                <label><span id="saved-host-label-label">自定义名称</span><input id="saved-host-label" maxlength="100" autocomplete="off" required /></label>
+                                <label class="wide"><span id="saved-host-endpoint-label">你自行运行的 Suwayomi 2.4 宿主地址</span><input id="saved-host-endpoint" type="url" maxlength="2048" autocomplete="off" required /></label>
+                                <label><span id="saved-host-auth-label">宿主认证方式</span><select id="saved-host-auth"><option value="none" id="saved-host-anonymous">匿名</option><option value="basic" id="saved-host-basic">Basic（每次检查单独输入）</option></select></label>
+                                <label class="wide"><input id="saved-host-lan" type="checkbox" /><span id="saved-host-lan-label">允许该明确的局域网 IP 使用 HTTP；不能携带 Basic 密码</span></label>
+                                <label class="wide"><input id="saved-host-consent" type="checkbox" required /><span id="saved-host-consent-label">我选择并管理该宿主，仅保存本机检查配置，不授权其他能力</span></label>
+                                <button id="saved-host-save" type="submit" disabled>保存配置（默认停用）</button>
+                            </fieldset>
+                        </form>
+                        <button id="saved-host-cancel" type="button" disabled>取消当前请求</button>
+                        <p id="saved-host-state" role="status" aria-live="polite"></p>
+                        <div id="saved-host-list"></div>
+                    </details>
                     <details id="source-host-panel">
                         <summary id="source-host-summary">外部宿主诊断（实验）</summary>
                         <p id="source-host-help">连接你已自行运行的 Suwayomi 2.4 宿主，只检查版本和已安装来源。不会下载、安装或启动宿主/扩展；本软件内阅读和导入尚未接通。</p>
@@ -1291,6 +1310,7 @@
         <script type="module" src="./jm-account.js"></script>
         <script type="module" src="./source-choices.js"></script>
         <script type="module" src="./source-hosts.js"></script>
+        <script type="module" src="./saved-source-hosts.js"></script>
         <script type="module" src="./recommendation-v5.js"></script>
         <script type="module" src="./ecosystem-pack-v1.js"></script>
         <script type="module" src="./ui-polish-v5.js"></script>

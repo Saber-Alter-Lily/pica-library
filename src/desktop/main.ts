@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import { applyUpdateAndScheduleShutdown } from './update-command'
@@ -67,6 +67,8 @@ import { saveSourceChoices } from './source-settings'
 import { SourceHostInspector } from '../source-hosts/inspector'
 import { sourceHostHttp } from '../source-hosts/http-transport'
 import { SourceHostError } from '../source-hosts/contract'
+import { SourceHostConnections } from '../source-hosts/connections'
+import { sourceHostStore } from './source-host-store'
 import {
     isLoopbackListening,
     knownProxyPorts,
@@ -134,6 +136,11 @@ let config = loadConfig(paths.config)
 const sources = new SourceRuntime(sourcePolicyForConfig(config))
 // Constructor performs no network, discovery, process launch or persistence.
 const sourceHostInspector = new SourceHostInspector(sourceHostHttp)
+const sourceHostConnections = new SourceHostConnections(
+    sourceHostStore(path.join(path.dirname(paths.config), 'source-hosts.json')),
+    sourceHostInspector,
+    () => randomUUID()
+)
 let credentials: StoredCredentials | null = null
 let server: Server | null = null
 let mobileBridge: MobileBridgeController | null = null
@@ -176,6 +183,7 @@ function mobileBridgeHasActiveLease(now = Date.now()) {
 function activeDesktopWorkLeases() {
     const leases: string[] = []
     if (sourceHostInspector.busy) leases.push('source-host-inspection')
+    if (sourceHostConnections.busy) leases.push('saved-source-host-inspection')
     if (
         database?.hasActiveDownloadJobs('LOCAL') ||
         service?.localDownloadRuntime().running
@@ -343,6 +351,7 @@ async function shutdownStep(
 async function closeEngine() {
     const errors: string[] = []
     sourceHostInspector.cancel()
+    sourceHostConnections.cancel()
 
     log.write('Shutdown: closing Remote API gateway')
     await shutdownStep(
@@ -448,6 +457,7 @@ async function stop(exitCode = 0) {
     }
     stopping = true
     sourceHostInspector.close()
+    sourceHostConnections.close()
     cancelBrowserCloseShutdown()
     process.exitCode = exitCode
 
@@ -748,6 +758,14 @@ async function startEngine(preferredPort: number) {
             if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
             return sourceHostInspector.inspect(input, signal)
         },
+        sourceHostConnections: (input) => {
+            if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
+            return sourceHostConnections.command(input)
+        },
+        inspectSavedSourceHost: async (input, signal) => {
+            if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
+            return sourceHostConnections.inspect(input, signal)
+        },
         startEhWebLogin: async () => {
             sources.acquire('eh')
             if (!ehWebLogin) throw new Error('E-H 网页登录不可用')
@@ -768,6 +786,7 @@ async function startEngine(preferredPort: number) {
             : nativePicker.chooseComicArchive(),
         status: () => ({
             sourceHostInspection: { available: true, reader: false, libraryImport: false, extensionInstall: false, persisted: false },
+            sourceHostConnections: { available: true, storage: sourceHostConnections.snapshot().storage, scope: 'inspect-only', reader: false },
             externalSources: sources.snapshot(),
             sourcePolicyOrigin: config?.externalSources ? 'explicit' : config ? 'legacy-compatible' : 'new-local',
             startupReady,

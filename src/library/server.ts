@@ -39,6 +39,8 @@ import { SourceHostError, type SourceHostInspection } from '../source-hosts/cont
 export interface DesktopServerController {
     csrfToken: string
     inspectSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
+    sourceHostConnections?: (input: Record<string, unknown>) => unknown
+    inspectSavedSourceHost?: (input: Record<string, unknown>, signal: AbortSignal) => Promise<SourceHostInspection>
     registerAccount?: (input: Record<string, unknown>) => Promise<Record<string, unknown>>
     configured: () => boolean
     status: () => Record<string, unknown>
@@ -374,10 +376,11 @@ export async function startLibraryServer(options: {
                     ...options.desktop.status()
                 })
             }
-            if (url.pathname === '/api/v1/desktop/source-hosts/inspect') {
+            if (['/api/v1/desktop/source-hosts/inspect', '/api/v1/desktop/source-hosts/connections', '/api/v1/desktop/source-hosts/inspect-saved'].includes(url.pathname)) {
                 const peer = request.socket.remoteAddress ?? ''
                 if (request.method !== 'POST') return json(response, 405, { error: 'Source-host inspection requires an explicit local POST' })
-                if (!options.desktop?.inspectSourceHost || !options.desktop.configured() || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) || !origin || request.headers['x-pica-csrf'] !== options.desktop.csrfToken)
+                const sourceHostAction = url.pathname.endsWith('/connections') ? options.desktop?.sourceHostConnections : url.pathname.endsWith('/inspect-saved') ? options.desktop?.inspectSavedSourceHost : options.desktop?.inspectSourceHost
+                if (!sourceHostAction || !options.desktop?.configured() || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer) || !origin || request.headers['x-pica-csrf'] !== options.desktop.csrfToken)
                     return json(response, 403, { error: 'Source-host inspection requires the configured local Desktop UI' })
                 if (url.search || !/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? ''))
                     return json(response, 400, { error: 'INVALID_SOURCE_HOST', code: 'INVALID_SOURCE_HOST' })
@@ -390,11 +393,11 @@ export async function startLibraryServer(options: {
                     try { input = await body(request, 16384) }
                     catch { if (!response.destroyed) json(response, 400, { error: 'INVALID_SOURCE_HOST', code: 'INVALID_SOURCE_HOST' }); return }
                     finally { clearTimeout(bodyDeadline) }
-                    const result = await options.desktop.inspectSourceHost(input, abort.signal)
+                    const result = await sourceHostAction(input, abort.signal)
                     if (!response.destroyed) json(response, 200, result)
                 } catch (error) {
                     const code = error instanceof SourceHostError ? error.code : 'SOURCE_HOST_UNAVAILABLE'
-                    const status = ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED', 'SOURCE_HOST_INSECURE'].includes(code) ? 400 : code === 'SOURCE_HOST_BUSY' || code === 'SOURCE_HOST_CANCELLED' ? 409 : code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : code === 'SOURCE_HOST_UNSUPPORTED' ? 422 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : 502
+                    const status = ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED', 'SOURCE_HOST_INSECURE'].includes(code) ? 400 : ['SOURCE_HOST_BUSY', 'SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DUPLICATE', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED'].includes(code) ? 409 : code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : code === 'SOURCE_HOST_UNSUPPORTED' ? 422 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : code === 'SOURCE_HOST_STORAGE' ? 503 : 502
                     if (!response.destroyed) json(response, status, { error: code, code })
                 } finally { response.removeListener('close', disconnected) }
                 return

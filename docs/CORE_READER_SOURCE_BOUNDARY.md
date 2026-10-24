@@ -33,3 +33,9 @@ The next reader integration must use explicit source-owned ports and reviewed id
 ## NEXT-65 distribution consequence
 
 The tracked Registry audit confirmed historical example title/author/count/review columns were being copied twice. [Minimal tag runtime](MINIMAL_TAG_RUNTIME.md) now separates exact consumed rule files and their stable semantic authority from that evidence. All current platform packagers share an exact allowlist; old-layout upgrades must use the existing full one-click replacement, not unsafe incremental deletions or a stale directory fallback. This does not establish complete neutrality, vocabulary provenance, every binary/image's semantics or finished external-source support. User records/preferences and the frozen resolution/ranking behavior remain protected.
+
+## NEXT-66 user-selected configuration consequence
+
+The user's repeated “reader, not manga platform” requirement is a hard product constraint, not a disclaimer-only patch. [User-owned host settings](USER_OWNED_SOURCE_HOST_SETTINGS.md) now persist an explicitly chosen endpoint as a separate local permission record, disabled by default. Saving/enabling/listing/restarting never contacts a host; only a manual inspection does. Endpoint identity cannot be rebound in-place. Credentials stay per request, and disable/removal cancels late responses without deleting content or personal state. Corrupt optional-host settings cannot block ordinary local reading.
+
+This advances connection identity/lifecycle only: external comic identity, reading/search/install authority, unified Reader/library/native and trust remain open. `reader/import/install=false` is still the truthful advertised contract. The application remains responsible for its own adapter safety and accurate scope; “user-chosen” does not imply blanket legal immunity or remove that responsibility. No source market/content service/default repository/required backend or extra content is introduced.

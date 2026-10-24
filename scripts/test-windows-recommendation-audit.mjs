@@ -5,9 +5,12 @@ import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import AdmZip from 'adm-zip'
 
+// CI runtime gate: do not launch locally under LOCAL_VALIDATION_SAFETY.md.
 // Unmodified compiled application + synthetic owned profile only. The external preload
 // replaces only the native Save dialog outcome and observes SQL/forbidden fixture reads.
 // It is never included in an application ZIP and is not a shipped test/fault API.
+if (process.env.GITHUB_ACTIONS !== 'true')
+    throw new Error('Permission-sensitive packaged runtime gate is CI-only; see docs/LOCAL_VALIDATION_SAFETY.md')
 const [zipFile, version, sourceSha] = process.argv.slice(2)
 if (
     process.platform !== 'win32' ||
@@ -329,6 +332,77 @@ cp.spawn=function(command,args,...rest){if(path.basename(String(command)).toLowe
     if (rows().some((row) => row.kind === 'forbidden-fixture-read'))
         throw new Error('Export attempted to read a credential/body fixture')
     requireUnchanged(before)
+    // Exercise the real compiled background task through its Desktop API with all
+    // sources disabled. No fake endpoint or provider/account credential is shipped.
+    // Earlier read/export checks remain exact all-table checks; only this explicit
+    // manual shadow operation may append one non-serving candidate-pool audit row.
+    const shadowRoute = '/api/v1/desktop/recommendation-v5/shadow-retrieval'
+    const refused = await fetch(instance.url + shadowRoute, {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/json',
+            'x-pica-csrf': state.csrfToken,
+            Origin: instance.url
+        },
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(15000)
+    })
+    await refused.text()
+    if (refused.ok)
+        throw new Error('Packaged shadow task accepted missing explicit authority')
+    requireUnchanged(before)
+    const started = await post(shadowRoute, {
+        confirmation: 'RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL',
+        appSessionId: 'fixture-shadow-session'
+    }, state)
+    if (started.started !== true)
+        throw new Error('Compiled shadow background task did not start')
+    let shadowState
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const response = await fetch(instance.url + shadowRoute + '/status', {
+            signal: AbortSignal.timeout(3000)
+        })
+        if (!response.ok) throw new Error('Compiled shadow task status unavailable')
+        shadowState = await response.json()
+        if (!shadowState.active) break
+        await sleep(50)
+    }
+    if (shadowState?.state !== 'complete' || !shadowState.result?.audit?.poolId)
+        throw new Error('Compiled shadow task did not complete: ' + shadowState?.state)
+    const afterShadow = snapshot()
+    for (const table of before) {
+        const actual = afterShadow.find(row => row.name === table.name)
+        if (!actual) throw new Error('Compiled shadow removed a user table')
+        if (table.name !== 'recommendation_v3_candidate_pools') {
+            if (JSON.stringify(actual.rows) !== JSON.stringify(table.rows))
+                throw new Error('Compiled shadow modified non-audit table: ' + table.name)
+        } else if (actual.rows.length !== table.rows.length + 1 ||
+            table.rows.some(row => !actual.rows.includes(row))) {
+            throw new Error('Compiled shadow did not append exactly one audit pool')
+        }
+    }
+    const savedShadow = packagedNode(
+        `const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync(process.argv[1],{readOnly:true});const r=d.prepare('SELECT * FROM recommendation_v3_candidate_pools WHERE id=?').get(process.argv[2]);d.close();console.log(JSON.stringify(r));`,
+        databaseFile, shadowState.result.audit.poolId
+    )
+    const telemetry = JSON.parse(savedShadow.telemetry_json)
+    if (telemetry.mode !== 'SHADOW' || telemetry.servingImpact !== false ||
+        telemetry.persistCandidates !== false ||
+        !savedShadow.recommendation_cycle_id.startsWith('v5-shadow:') ||
+        savedShadow.app_session_id !== 'fixture-shadow-session' ||
+        savedShadow.model_version !== shadowState.result.audit.modelVersion ||
+        !telemetry.pipelineVersions || !telemetry.visualCandidateCoverage)
+        throw new Error('Compiled shadow persistence violated its audit-only identity')
+    console.log(JSON.stringify({
+        packaged_recommendation_shadow: 'PASS', source_sha: sourceSha, version,
+        actual_background_task: true, explicit_confirmation_rejected: true,
+        appended_audit_pools: 1, all_non_audit_tables_preserved: true,
+        missing_policy_not_initialized: true, enabled_external_sources: 0,
+        serving_impact: false, candidate_persistence: false,
+        source_revision_fault_injection: 'UNIT_SYNTHETIC_ONLY',
+        provider_runtime_acceptance: 'NOT_RUN', synthetic_only: true,
+        production_accessed: false, execution_location: 'GITHUB_WINDOWS_CI'
+    }))
     // Remove only the two exact synthetic canaries before normal shutdown/startup handling.
     fs.unlinkSync(credentialCanary)
     fs.unlinkSync(bodyCanary)

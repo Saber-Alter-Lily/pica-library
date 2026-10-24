@@ -332,6 +332,8 @@ describe('Recommendation V5 portable product contract', () => {
         )
         const provider = read('src/services/provider-service.ts')
         const service = read('src/library/service.ts')
+        const ports = read('src/recommendation/shadow-ports-v5.ts')
+        const adapter = read('src/services/recommendation-shadow-adapter.ts')
         const server = read('src/library/server.ts')
         const retriever = read(
             'src/recommendation-v3/retriever-v3.ts'
@@ -348,10 +350,10 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain(
             'RECOMMENDATION_V5_SHADOW_RETRIEVAL_CONFIRMATION'
         )
-        expect(service).toContain(
+        expect(ports).toContain(
             "RUN_RECOMMENDATION_V5_SHADOW_RETRIEVAL"
         )
-        expect(service).toContain('{ persist: false }')
+        expect(adapter).toContain('persist: false')
         expect(server).toContain(
             '/api/v1/desktop/recommendation-v5/shadow-retrieval'
         )
@@ -364,6 +366,8 @@ describe('Recommendation V5 portable product contract', () => {
         const database = read('src/library/database.ts')
         const service = read('src/library/service.ts')
         const server = read('src/library/server.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
+        const adapter = read('src/services/recommendation-shadow-adapter.ts')
         const shadow = read(
             'src/recommendation-v5/shadow-retrieval.ts'
         )
@@ -374,10 +378,10 @@ describe('Recommendation V5 portable product contract', () => {
             'listCandidatePoolsByModelVersionPrefix'
         )
         expect(database).toContain('modelVersion:')
-        expect(service).toContain("cycleId = `v5-shadow:")
+        expect(service).toContain('createCycleId: () => `v5-shadow:')
         expect(pipeline).toContain("'v5-shadow'")
-        expect(service).toContain('saveV3CandidatePool')
-        expect(service).toContain('candidateIds: ranking.rows.map')
+        expect(adapter).toContain('database.saveV3CandidatePool(value)')
+        expect(execution).toContain('candidateIds: ranking.rows.map')
         expect(service).toContain(
             'recommendationV5ShadowRuns'
         )
@@ -385,14 +389,14 @@ describe('Recommendation V5 portable product contract', () => {
             '/api/v1/desktop/recommendation-v5/shadow-runs'
         )
         expect(shadow).toContain('persistCandidates: false')
-        expect(service).toContain('{ persist: false }')
+        expect(adapter).toContain('persist: false')
     })
 
     it('adds deterministic candidate hygiene before any relevance ranking', () => {
         const hygiene = read(
             'src/recommendation-v5/candidate-hygiene.ts'
         )
-        const service = read('src/library/service.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
         const ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
@@ -408,8 +412,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(hygiene).toContain("'OWNED_WORK'")
         expect(hygiene).toContain("'ALREADY_SEEN'")
         expect(hygiene).toContain("'BLOCK_CONTROL'")
-        expect(service).toContain('applyCandidateHygieneV5')
-        expect(service).toContain('hygieneTelemetry')
+        expect(execution).toContain('applyCandidateHygieneV5')
+        expect(execution).toContain('hygieneTelemetry')
         expect(ranker).not.toContain('candidate-hygiene')
         expect(coordinator).not.toContain('candidate-hygiene')
     })
@@ -418,7 +422,7 @@ describe('Recommendation V5 portable product contract', () => {
         const ranker = read(
             'src/recommendation-v5/relevance-ranker.ts'
         )
-        const service = read('src/library/service.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
         const v3Ranker = read(
             'src/recommendation-v3/ranker-adapter-v3.ts'
         )
@@ -436,8 +440,8 @@ describe('Recommendation V5 portable product contract', () => {
         expect(ranker).toContain('exactItemEvidence')
         expect(ranker).toContain('sessionAffinity')
         expect(ranker).toContain('explicitAdjustment')
-        expect(service).toContain('rankShadowCandidatesV5')
-        expect(service).toContain('rankingTelemetry')
+        expect(execution).toContain('rankShadowCandidatesV5')
+        expect(execution).toContain('rankingTelemetry')
         expect(v3Ranker).not.toContain('relevance-ranker')
         expect(coordinator).not.toContain('relevance-ranker')
     })
@@ -446,7 +450,7 @@ describe('Recommendation V5 portable product contract', () => {
         const diversity = read(
             'src/recommendation-v5/batch-diversity.ts'
         )
-        const service = read('src/library/service.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
         const coordinator = readCycleImplementation()
         expect(diversity).toContain(
             "BATCH_DIVERSITY_V5_VERSION ="
@@ -463,9 +467,9 @@ describe('Recommendation V5 portable product contract', () => {
         expect(diversity).toContain('FANDOM_SATURATION')
         expect(diversity).toContain('TAG_SATURATION')
         expect(diversity).toContain('PROVIDER_BALANCE')
-        expect(service).toContain('diversifyShadowBatchV5')
-        expect(service).toContain('diversityTelemetry')
-        expect(service).toContain('diversifiedBatch')
+        expect(execution).toContain('diversifyShadowBatchV5')
+        expect(execution).toContain('diversityTelemetry')
+        expect(execution).toContain('diversifiedBatch')
         expect(coordinator).not.toContain('batch-diversity')
     })
 
@@ -516,7 +520,7 @@ describe('Recommendation V5 portable product contract', () => {
         expect(service).toContain(
             'recommendationV5P3PromotionGate'
         )
-        expect(service).toContain(
+        expect(read('src/recommendation/audit-queries-v5.ts')).toContain(
             'shadowPipelineModelVersionV5()'
         )
         expect(server).toContain(
@@ -640,7 +644,7 @@ describe('Recommendation V5 portable product contract', () => {
         const coverage = read(
             'src/recommendation-v5/visual-candidate-coverage.ts'
         )
-        const service = read('src/library/service.ts')
+        const execution = read('src/recommendation/shadow-execution-v5.ts')
         expect(coverage).toContain(
             "VISUAL_CANDIDATE_COVERAGE_V5_VERSION ="
         )
@@ -656,12 +660,12 @@ describe('Recommendation V5 portable product contract', () => {
             "'SHADOW_CANDIDATE_NOT_PERSISTED'"
         )
         expect(coverage).toContain("'DIVERSIFIED_BATCH'")
-        expect(service).toContain(
+        expect(execution).toContain(
             'buildVisualCandidateCoverageV5'
         )
-        expect(service).toContain('visualCandidateCoverage')
-        expect(service).toContain('visualCoverage')
-        expect(service).not.toContain(
+        expect(execution).toContain('visualCandidateCoverage')
+        expect(execution).toContain('visualCoverage')
+        expect(execution).not.toContain(
             'visualCoverage.selectedForAnalysis.forEach'
         )
     })

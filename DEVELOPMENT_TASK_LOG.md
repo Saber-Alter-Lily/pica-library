@@ -1,5 +1,20 @@
 # Pica Library Development Task Log
 
+## Local execution restriction — security prompt disruption (2026-10-23)
+
+User reported repeated security-center permission prompts for Java/validation programs. Stop launching local Java, random-path Windows artifacts, LAN bridges and upgrade runtime matrices by default; move those checks to the already-authorized Draft CI. Local source/type/syntax and inspected no-Java/no-LAN targeted tests may continue. Do not allow dialogs, add exceptions or weaken protection. Read-only snapshot found zero active Java/current validation drivers; firewall logs confirmed prior task-temp application paths, including Node. Exact unseen dialog identity remains unverified. [Effective local validation policy](docs/LOCAL_VALIDATION_SAFETY.md).
+
+## NEXT-60 — V5 shadow execution/task boundaries (2026-10-23, unpublished)
+
+**ISOLATED_IMPLEMENTATION / EXACT_SOURCE_CI_AND_PACKAGE_GATES_REQUIRED / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**
+
+- Continues frozen NEXT-59 `f4e2c2ba8cb147292e4c344c59ca1619766a4380`, immutable handoff SHA256 `cb56e1130ea34af23fd64ed1823f2a29d757728419ea85aeda5b19b4c55292b0`; prior packages/results untouched.
+- Three isolated synthetic baseline probes confirmed missing-policy initialization and audit commits after source revision changes. No real provider/profile/body/vector was used.
+- Extracted the actual shadow pipeline and existing task-control state through explicit evidence/provider/semantic/audit/runtime capabilities, retaining compatibility entry points. New audit adapter reads policy without initialization and fences source revisions; no serving activation or raw-catalog writer is exposed. Existing algorithm bodies/limits/model versions remain.
+- Frozen six-method hash oracle and actual browser-platform closure enforce real extraction. Local inspected synthetic tests compare complete outputs/telemetry/progress/read/provider order, budgets, private tags, failure, pause/resume/cancel/admission/duplicate/release, all-table safety and source fences; targeted94/94 across6 files, typecheck and Web45/45 syntax PASS. One first sandbox dependency-read failure and one stale source-location assertion failure are retained; no application or permission guard was weakened. [Ownership and limits](docs/RECOMMENDATION_SHADOW_MODULE.md).
+- Full Windows unit/runtime and Linux/browser/JVM suites now belong to the authorized CI, with raw test artifacts; compiled Desktop gate adds real confirmation/background completion and exactly one audit-only append in a source-disabled synthetic profile. Fixed-certificate Dev75, exact-head complete CI, artifact integrity and a new handoff are **REQUIRED BEFORE CLAIMING PACKAGE PASS**. Local Java/artifact/LAN/upgrade runtime checks are deliberately NOT RUN, not inferred from CI. Previous immutable evidence is not borrowed as current acceptance.
+- Apply the new no-local-Java/no-random-artifact/no-LAN validation policy. Continue only within the original isolated candidate/Draft/CI authority and prior coordination exception; no production data, main merge, tag/Release, OTA, signing-key download or deployment.
+
 ## NEXT-59 — read-only V5 audit/query and export modules (2026-10-23, unpublished)
 
 **ISOLATED_IMPLEMENTATION / EXACT_SOURCE_GATES_REQUIRED_IN_HANDOFF / FULL_OBJECTIVE_RELEASE_OTA_DEVICE_QA_OPEN.**

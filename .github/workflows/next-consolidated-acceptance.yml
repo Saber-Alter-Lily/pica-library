@@ -20,7 +20,7 @@ concurrency:
 env:
   STABLE_VERSION: '0.5.0'
   BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
-  PICA_ANDROID_CANDIDATE_VERSION_CODE: '74'
+  PICA_ANDROID_CANDIDATE_VERSION_CODE: '75'
 
 jobs:
   web-and-source:
@@ -43,9 +43,17 @@ jobs:
         with:
           gradle-version: '8.9'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm type:check && pnpm web:check && pnpm test && pnpm build
+      - run: pnpm type:check && pnpm web:check && pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/linux-unit.json && pnpm build
       - run: gradle -p source-jvm test bundle dependencyNotices --no-daemon
       - run: bash scripts/run-web-browser-smoke.sh
+      - name: Retain source-side synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Source-Evidence
+          path: artifacts/linux-unit.json
+          retention-days: 3
+          if-no-files-found: ignore
 
   windows:
     needs: web-and-source
@@ -77,6 +85,9 @@ jobs:
       - shell: pwsh
         run: |
           pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Full Windows tests moved from the user's PC to this disposable runner.
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/windows-unit.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/build-windows-jm-runtime.ps1 -JdkDirectory $env:JAVA_HOME -GradleExecutable (Get-Command gradle.bat).Source
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -127,6 +138,14 @@ jobs:
           $env:GITHUB_SHA | Set-Content -Encoding ascii candidate/windows/SOURCE_SHA.txt
           $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
           "$hash  Pica-Library-Next-Acceptance-Windows-x64.zip" | Set-Content -Encoding ascii candidate/windows/SHA256SUMS.txt
+      - name: Retain Windows synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Windows-Unit-Evidence
+          path: artifacts/windows-unit.json
+          retention-days: 3
+          if-no-files-found: ignore
       - name: Retain bounded synthetic upgrade diagnostics
         if: always()
         uses: actions/upload-artifact@v4

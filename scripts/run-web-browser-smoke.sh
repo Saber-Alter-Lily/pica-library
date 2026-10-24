@@ -36,6 +36,7 @@ fi
 PICA_WEB_SMOKE_URL="${BASE_URL}" \
     pnpm exec playwright test test/e2e/web-smoke.spec.mjs test/e2e/localization-layout.spec.mjs test/e2e/onboarding.spec.mjs test/e2e/recommendation-controls.spec.mjs test/e2e/chronicle-display-view.spec.mjs test/e2e/remote-web-readonly.spec.mjs test/e2e/poller-discipline.spec.mjs test/e2e/update-reconnect.spec.mjs test/e2e/jm-source.spec.mjs test/e2e/tag-participation.spec.mjs test/e2e/local-first-setup.spec.mjs test/e2e/local-import.spec.mjs test/e2e/source-choices.spec.mjs \
     test/e2e/recommendation-audit-diagnostics.spec.mjs \
+    test/e2e/source-hosts.spec.mjs \
     --config=playwright.smoke.config.mjs \
     --workers=1 \
     --reporter=line

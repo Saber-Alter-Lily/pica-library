@@ -6,6 +6,8 @@ User objective, 2026-10-23: this is a **local comic reader and personal library 
 
 External-source support is an adapter capability, not permission to redistribute provider content. Software/data separation is an engineering boundary, not a legal conclusion. Source code and distribution archives must retain upstream notices; no reference-APK implementation/artwork is imported.
 
+User clarification, 2026-10-24: **we are always a manga reader, not a manga platform**. Users choose/configure external sources; those services and content are not operated, supplied or endorsed by this application. Do not turn “add more providers” into an official content catalogue, source marketplace, pre-enabled repository or required source account/host. [Core/source ownership and the remaining legacy separation](CORE_READER_SOURCE_BOUNDARY.md) is a product requirement, not a claim that the existing fixed-source implementation has already reached that end state.
+
 ## Boundaries being enforced now
 
 | Module | Current implementation and interface | What it owns | Must not own |
@@ -29,6 +31,8 @@ This is **not** a claim that the whole monolithic service/UI has already been de
 Routing for Pica/EH/ExH/JM now comes from a single compiled manifest: API version, adapter version, comic namespace, source aliases and image-locator schemes. Registry inspection does not log in or fetch anything. Duplicate routes or incompatible adapter APIs reject atomically. Unknown explicit comic/page namespaces never fall back to an unrelated authenticated provider. Legacy unprefixed Pica IDs remain unchanged.
 
 This step remains a **compiled adapter system**, not a finished dynamic-extension ecosystem. Adding a genuinely new provider still needs an explicit stable ID/storage/portable-tag review and native parity. A future downloadable adapter requires signed repository trust, reviewable permissions, enable/disable/remove lifecycle, host compatibility, cancellation/resource limits and rollback. No arbitrary JavaScript/JAR/APK can be installed through these descriptors.
+
+NEXT-64 is implementing a separate [explicit existing-host inspection](SOURCE_HOST_INSPECTION.md): a user-selected Suwayomi endpoint, fixed bounded queries and lossless source IDs, with actual Desktop wiring but no catalogue/Reader/import/extension-install capability. It is not a provider registration, trusted-code loader or completed source-host integration; current CI and real-host interoperation remain required.
 
 ## Local-first startup
 

@@ -4,6 +4,9 @@ import path from 'node:path'
 import http from 'node:http'
 import { spawn } from 'node:child_process'
 import AdmZip from 'adm-zip'
+import { assertPackagedSourceHostInspection } from './lib/assert-source-host-inspection.mjs'
+
+if (process.env.GITHUB_ACTIONS !== 'true') throw new Error('Permission-sensitive source runtime gate is CI-only; see docs/LOCAL_VALIDATION_SAFETY.md')
 
 // Actual packaged engine and local HTTP fixture only; never substitute an installed profile.
 const [zipFile, version, sourceSha] = process.argv.slice(2)
@@ -84,6 +87,7 @@ try {
     }
     if (!ready) throw new Error('Local setup did not finish its actual engine restart')
     if (current.externalSources?.enabled.length !== 0) throw new Error('Fresh local setup unexpectedly enabled a source')
+    await assertPackagedSourceHostInspection({ status: async () => ({ ...await status(), fixtureApplicationUrl: instance.url }), home, data, sourceSha, version })
     await post('/api/v1/desktop/settings', { sourceAction: 'save', enabled: ['jm'], expectedRevision: current.externalSources.revision })
     await post('/api/v1/desktop/settings', { libraryDirectory: data, profile: 'balanced', proxyUrl })
     await post('/api/v1/import', { records: [{ comicId: 'jm:123', providerId: 'jm', providerRemoteId: '123', title: 'Synthetic packaged JM cover', author: 'Fixture', tags: [], categories: [], finished: false, coverUrl: 'https://cdn.pica-acceptance.invalid/cover.png' }] })

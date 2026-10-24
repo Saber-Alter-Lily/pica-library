@@ -1,5 +1,11 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-24 NEXT-64: optional user-selected source-host inspection (unpublished)
+
+Continues frozen NEXT-63 `cbbf3432efb2ead4517cebeafc44ac1901ac9fdb`, complete handoff SHA256 `b41913dbcc8ddbb9ca4824229a1b0bd9cb83123137ef0f76aa84fd30a0d2690d`. Actual Desktop wiring now uses separate protocol/inspection/HTTP modules for explicit checks of an existing user-managed Suwayomi host. This is a reader, not a content platform: no official catalogue, enabled source/repository, downloaded host/extension, required external backend or new Reader/import claim. [Product boundary](CORE_READER_SOURCE_BOUNDARY.md), [protocol/privacy/limits and remaining work](SOURCE_HOST_INSPECTION.md).
+
+Local92/92 pure/contract/injected-fetch assertions, types and Web46/46 syntax passed; actual local HTTP/three-language Chromium/compiled-Windows and inherited full/incremental/deep-upgrade gates remain required in current-source CI. The existing Windows source/media application's isolated lifecycle is reused for real compiled checks. Native code is unchanged; single fixed-signing candidate authority advances Dev78→79, which is not phone installation evidence. No local Java/application/browser/LAN/upgrader runtime, production data, main merge, Release/tag, stable OTA, signing-key download, install or deployment. Real host interoperability, stable host/comic identities, source-to-library/Reader/native integration, trust and concentrated physical/user acceptance remain OPEN.
+
 ## 2026-10-24 NEXT-63: native local-comic body export (unpublished)
 
 Continues frozen NEXT-62 `7203626e1cb324e6ca9601872e561950234f7231`, immutable complete handoff SHA256 `c899272db9eeddcb0bef8a1d082236323a6af3dcced78f8f27acb77d19b6100d`. Android owned imports now have explicit standard CBZ body export through a pure bounded ZIP module, app-owned stage/lease adapter and internal SAF UI. Existing importer logic/Reader/catalog/history remain; no private-state archive or new library format. [Scope, reuse, limits and holds](NATIVE_LOCAL_CONTENT_EXPORT.md).

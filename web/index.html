@@ -912,6 +912,26 @@
                         <button id="source-choices-refresh" type="button">读取当前选择</button>
                         <p id="source-choices-state" role="status" aria-live="polite"></p>
                     </form>
+                    <details id="source-host-panel">
+                        <summary id="source-host-summary">外部宿主诊断（实验）</summary>
+                        <p id="source-host-help">连接你已自行运行的 Suwayomi 2.4 宿主，只检查版本和已安装来源。不会下载、安装或启动宿主/扩展；本软件内阅读和导入尚未接通。</p>
+                        <p id="source-host-privacy">仅使用你在这里输入的宿主凭据，临时保留在当前面板；关闭即停止使用，不保存或同步。不会使用或转发 Pica、E-H、JM、GitHub 或网盘凭据。</p>
+                        <form id="source-host-form" class="settings-form" method="post">
+                            <fieldset id="source-host-fields" class="wide settings-form">
+                                <label class="wide"><span id="source-host-endpoint-label">宿主地址</span><input id="source-host-endpoint" type="url" maxlength="2048" autocomplete="off" placeholder="http://127.0.0.1:4567/" required /></label>
+                                <label><span id="source-host-auth-label">宿主认证</span><select id="source-host-auth"><option value="none" id="source-host-auth-none">匿名</option><option value="basic" id="source-host-auth-basic">Basic 账号</option></select></label>
+                                <label><span id="source-host-username-label">宿主用户名（非 Pica 账号）</span><input id="source-host-username" maxlength="256" autocomplete="off" disabled /></label>
+                                <label><span id="source-host-password-label">宿主密码</span><input id="source-host-password" type="password" maxlength="4096" autocomplete="new-password" disabled /></label>
+                                <label class="wide"><input id="source-host-lan" type="checkbox" /><span id="source-host-lan-label">仅本次允许明确输入的局域网 IP 使用 HTTP（不能携带 Basic 密码）</span></label>
+                                <label class="wide"><input id="source-host-consent" type="checkbox" required /><span id="source-host-consent-label">我确认该宿主及请求范围，允许本次只读连接</span></label>
+                                <button id="source-host-submit" type="submit" disabled>检查宿主与来源</button>
+                            </fieldset>
+                            <button id="source-host-cancel" type="button" disabled>取消检查</button>
+                            <p id="source-host-state" class="wide" role="status" aria-live="polite"></p>
+                        </form>
+                        <div id="source-host-results" class="wide" style="max-width:100%;overflow-x:auto" hidden></div>
+                        <div class="actions"><button id="source-host-previous" type="button" disabled>上一页</button><button id="source-host-next" type="button" disabled>下一页</button></div>
+                    </details>
                 </section>
                 <form id="settings-form" class="settings-form panel">
                                         <details class="wide account-disclosure">
@@ -1270,6 +1290,7 @@
         <script type="module" src="./eh-account.js"></script>
         <script type="module" src="./jm-account.js"></script>
         <script type="module" src="./source-choices.js"></script>
+        <script type="module" src="./source-hosts.js"></script>
         <script type="module" src="./recommendation-v5.js"></script>
         <script type="module" src="./ecosystem-pack-v1.js"></script>
         <script type="module" src="./ui-polish-v5.js"></script>

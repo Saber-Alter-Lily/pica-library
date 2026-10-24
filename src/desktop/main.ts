@@ -64,6 +64,9 @@ import { assertLibraryChangeAllowed } from './lifecycle'
 import { SourceRuntime } from '../sources/source-policy'
 import { sourcePolicyForConfig } from './config'
 import { saveSourceChoices } from './source-settings'
+import { SourceHostInspector } from '../source-hosts/inspector'
+import { sourceHostHttp } from '../source-hosts/http-transport'
+import { SourceHostError } from '../source-hosts/contract'
 import {
     isLoopbackListening,
     knownProxyPorts,
@@ -129,6 +132,8 @@ const platformCapabilities = {
 const instance = new InstanceLock(paths.lock, paths.instance)
 let config = loadConfig(paths.config)
 const sources = new SourceRuntime(sourcePolicyForConfig(config))
+// Constructor performs no network, discovery, process launch or persistence.
+const sourceHostInspector = new SourceHostInspector(sourceHostHttp)
 let credentials: StoredCredentials | null = null
 let server: Server | null = null
 let mobileBridge: MobileBridgeController | null = null
@@ -170,6 +175,7 @@ function mobileBridgeHasActiveLease(now = Date.now()) {
 
 function activeDesktopWorkLeases() {
     const leases: string[] = []
+    if (sourceHostInspector.busy) leases.push('source-host-inspection')
     if (
         database?.hasActiveDownloadJobs('LOCAL') ||
         service?.localDownloadRuntime().running
@@ -336,6 +342,7 @@ async function shutdownStep(
 
 async function closeEngine() {
     const errors: string[] = []
+    sourceHostInspector.cancel()
 
     log.write('Shutdown: closing Remote API gateway')
     await shutdownStep(
@@ -440,6 +447,7 @@ async function stop(exitCode = 0) {
         return
     }
     stopping = true
+    sourceHostInspector.close()
     cancelBrowserCloseShutdown()
     process.exitCode = exitCode
 
@@ -736,6 +744,10 @@ async function startEngine(preferredPort: number) {
     let startupReady = false
     const desktop: DesktopServerController = {
         csrfToken,
+        inspectSourceHost: async (input, signal) => {
+            if (!config || !service || !startupReady) throw new SourceHostError('SOURCE_HOST_UNAVAILABLE')
+            return sourceHostInspector.inspect(input, signal)
+        },
         startEhWebLogin: async () => {
             sources.acquire('eh')
             if (!ehWebLogin) throw new Error('E-H 网页登录不可用')
@@ -755,6 +767,7 @@ async function startEngine(preferredPort: number) {
             ? nativePicker.chooseFolder('选择一本本地漫画文件夹 / Choose one local comic folder')
             : nativePicker.chooseComicArchive(),
         status: () => ({
+            sourceHostInspection: { available: true, reader: false, libraryImport: false, extensionInstall: false, persisted: false },
             externalSources: sources.snapshot(),
             sourcePolicyOrigin: config?.externalSources ? 'explicit' : config ? 'legacy-compatible' : 'new-local',
             startupReady,

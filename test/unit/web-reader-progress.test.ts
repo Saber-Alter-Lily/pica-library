@@ -52,6 +52,8 @@ function adapter(hosted = false) {
     recordReaderProgress(owner, 4)
     const context = vm.createContext({
         state: { reader: owner },
+        activeView: 'reader',
+        readingLibraryPanel: { refresh: vi.fn(async () => undefined) },
         readerProgressTimer: null,
         captureReaderProgress,
         acknowledgeReaderProgress,
@@ -157,6 +159,20 @@ describe('actual AST-extracted Web save transport with mocked ports', () => {
         await expect(saving).resolves.toBe(true)
         expect(h.owner.progressSaved).toBe(4)
         expect(h.owner.dirty).toBe(false)
+    })
+    it('refreshes the common Library after a successful save only while that view is active', async () => {
+        for (const activeView of ['reader', 'library']) {
+            const h = adapter()
+            h.context.activeView = activeView
+            const saving = h.flush()
+            h.response.resolve({})
+            await expect(saving).resolves.toBe(true)
+            expect(h.context.readingLibraryPanel.refresh).toHaveBeenCalledTimes(
+                activeView === 'library' ? 1 : 0
+            )
+            expect(h.owner.progressSaved).toBe(4)
+            expect(h.owner.dirty).toBe(false)
+        }
     })
     it('does not clear newer edits when an earlier request returns', async () => {
         const h = adapter(),

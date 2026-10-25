@@ -22,6 +22,8 @@ These engine tests do not prove old-client official OTA discovery/download, phys
 
 ## Remaining holds and stop
 
+The first remote candidate `74ba5d07fa4cce682ce04a562493c509d93fc926` failed its two candidate source jobs on five old Reader-VM fixture omissions (2184pass/5fail/8platform skips). The same40-test inert closure reproduced35pass/5fail locally. The correction changes only those two test fixtures and explanatory records, adding an explicit successful-save/view-refresh assertion while retaining original Reader payload/race/exit checks. No production source, test timeout, retry, skip or dependency is changed; do not count the failed head as validated or replace it with an unmodified rerun. Corrected-source local and cloud results must be recorded separately.
+
 The read projection is real integration, not generalized persistent hosted catalogue import, native/phone-host access, new source-marketplace/trust, or hosted favorite/tag/recommendation/download/sync support. Existing source formats/protocols/IDs and Reader engines remain. Ordinary source-free reading must not activate external processes. Physical/OEM/real-provider/gesture/AI-file roundtrip and whole-objective acceptance remain pending.
 
 Prepare one self-contained unpublished handoff with installables, exact source/patches/scripts, CI/local evidence, integrity manifest and review prompt after gates actually pass. Stop before deployment, main merge, tag/Release or stable OTA change. Do not rewrite old frozen handoffs or mark the full objective complete.

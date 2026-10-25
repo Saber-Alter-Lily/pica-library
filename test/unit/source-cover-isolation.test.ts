@@ -11,6 +11,7 @@ import { EhProvider } from '../../src/providers/eh-provider'
 import { HttpMediaClient } from '../../src/media/http-media-client'
 import type { Pica } from '../../src/sdk'
 import { startLibraryServer } from '../../src/library/server'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const roots: string[] = [],
     databases: LibraryDatabase[] = []
@@ -39,14 +40,14 @@ describe('source-owned covers without unrelated accounts', () => {
             close: vi.fn(),
             sessionKey: () => session
         })
-        const source = new ProviderService(vi.fn(), db, new EhProvider(), jm)
+        const source = new ProviderService(vi.fn(), db, new EhProvider(), jm, enabledFixtureSources())
         const image = vi
             .spyOn(HttpMediaClient.prototype, 'fetchImage')
             .mockResolvedValue({
                 data: Buffer.from('old-scope'),
                 contentType: 'image/png'
             })
-        const library = new LibraryService(db, root)
+        const library = new LibraryService(db, root, undefined, undefined, undefined, enabledFixtureSources())
         vi.spyOn(library, 'providerService').mockReturnValue(source)
         db.importCatalog([
             {
@@ -84,7 +85,7 @@ describe('source-owned covers without unrelated accounts', () => {
                 data: Buffer.from('synthetic-http-cover'),
                 contentType: 'image/png'
             })
-        const library = new LibraryService(db, root)
+        const library = new LibraryService(db, root, undefined, undefined, undefined, enabledFixtureSources())
         const connect = vi
             .spyOn(library, 'connect')
             .mockRejectedValue(new Error('No Pica account'))
@@ -139,7 +140,7 @@ describe('source-owned covers without unrelated accounts', () => {
                 data: Buffer.from('synthetic-concurrent-cover'),
                 contentType: 'image/png'
             })
-        const library = new LibraryService(db, root)
+        const library = new LibraryService(db, root, undefined, undefined, undefined, enabledFixtureSources())
         db.importCatalog([
             {
                 comicId: 'jm:123',
@@ -183,7 +184,7 @@ describe('source-owned covers without unrelated accounts', () => {
             close: vi.fn(),
             sessionKey: () => session
         })
-        const source = new ProviderService(vi.fn(), db, new EhProvider(), jm)
+        const source = new ProviderService(vi.fn(), db, new EhProvider(), jm, enabledFixtureSources())
         const image = vi
             .spyOn(HttpMediaClient.prototype, 'fetchImage')
             .mockImplementationOnce(async () => {
@@ -198,7 +199,7 @@ describe('source-owned covers without unrelated accounts', () => {
                 data: Buffer.from('new-scope'),
                 contentType: 'image/png'
             })
-        const library = new LibraryService(db, root)
+        const library = new LibraryService(db, root, undefined, undefined, undefined, enabledFixtureSources())
         vi.spyOn(library, 'providerService').mockReturnValue(source)
         db.importCatalog([
             {
@@ -249,7 +250,7 @@ describe('source-owned covers without unrelated accounts', () => {
                     })
                 })
         )
-        const service = new ProviderService(connect, db, new EhProvider(), jm)
+        const service = new ProviderService(connect, db, new EhProvider(), jm, enabledFixtureSources())
         expect(
             (
                 await service.fetchCover(
@@ -276,7 +277,7 @@ describe('source-owned covers without unrelated accounts', () => {
             data: Buffer.from('EH'),
             contentType: 'image/jpeg'
         })
-        const service = new ProviderService(connect, db, eh)
+        const service = new ProviderService(connect, db, eh, undefined, enabledFixtureSources())
         await service.fetchCover(
             'eh:123:abc',
             'https://cdn.example.test/eh.jpg',
@@ -340,8 +341,8 @@ describe('source-owned covers without unrelated accounts', () => {
         const connect = vi.fn(async (): Promise<Pica> => {
             throw new Error('No Pica account')
         })
-        const source = new ProviderService(connect, db, new EhProvider(), jm)
-        const library = new LibraryService(db, root)
+        const source = new ProviderService(connect, db, new EhProvider(), jm, enabledFixtureSources())
+        const library = new LibraryService(db, root, undefined, undefined, undefined, enabledFixtureSources())
         vi.spyOn(library, 'providerService').mockReturnValue(source)
         db.importCatalog(
             [

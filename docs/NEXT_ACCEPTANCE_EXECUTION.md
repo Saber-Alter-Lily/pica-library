@@ -1,5 +1,13 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-25: explicit source admission and passive JM status — Dev84 candidate
+
+The current independently authorized Draft continues frozen PR207 `1b7a9184eca11f73b295a55827d2cddee34dc69c`, not main. Its source fixes were sealed at `a723fbe29bc4323dddeb7370c37721dd6a4789bd`; candidate-only workflow metadata advances Dev83 to Dev84. [Current scope, safety and remaining validation](SOURCE_IDLE_CLOUD_CANDIDATE.md).
+
+Core/CLI defaults no longer admit sources implicitly. Opening JM settings reads cached local account state only; **Connect / restore sign-in** is the explicit worker/network action. Existing Desktop source choices are retained. No new source marketplace, source content, arbitrary extension loader or production-data migration is included.
+
+Local source/mock and synthetic update-planning results are not installable evidence. Require the exact current Actions commit, Windows runtime/update/rollback gates and Dev84 package/certificate verification before handing this candidate out. Physical source login, device/OEM, gestures, AI file roundtrip and whole-objective acceptance remain pending. No automatic deployment, main merge, Release, stable OTA, uninstall or data copying.
+
 ## 2026-10-24 NEXT-67: actual user-host library → shared Reader (unpublished)
 
 Continues frozen NEXT-66 `91b62d0fcccd552e4a6af1609283598f75022080`,159-entry complete handoff SHA256 `f82d331443e0ea78c8d31661c737181c8bc458a62aee03cba9fbaa7edb524406`. Its candidate3/3,39success+6conditional skips/45,57 Chromium and402 native results are historical proof, not current-source validation.

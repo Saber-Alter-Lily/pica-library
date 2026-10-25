@@ -10,12 +10,13 @@ import {
 } from '../../src/mobile/bridge-server'
 import { startLibraryServer } from '../../src/library/server'
 import { syntheticCycle } from '../fixtures/recommendation-cycle'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 it('opens a local library with favorites and serves Final V3 status without preparing a legacy cycle', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-local-no-recall-'))
     vi.stubEnv('PICA_LIBRARY_DESKTOP_HOME', path.join(root, 'desktop'))
     const database = new LibraryDatabase(path.join(root, 'library.db')),
-        service = new LibraryService(database, root)
+        service = new LibraryService(database, root, undefined, undefined, undefined, enabledFixtureSources())
     database.importFavorites(
         [
             {
@@ -80,7 +81,7 @@ it('keeps paired mobile GETs read-only; only explicit recompute prepares a new c
     )
     vi.stubEnv('PICA_LIBRARY_DESKTOP_HOME', path.join(root, 'desktop'))
     const database = new LibraryDatabase(path.join(root, 'library.db')),
-        service = new LibraryService(database, root),
+        service = new LibraryService(database, root, undefined, undefined, undefined, enabledFixtureSources()),
         built = syntheticCycle()
     database.importCatalog(
         built.ranked.map((r) => r.comic),

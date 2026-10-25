@@ -24,9 +24,9 @@ function localize() {
                 ' · オプション配信元'
             )
     $('jm-account-state').textContent = t(
-        '打开此区域后检查连接状态',
-        'Open this section to check the connection',
-        'この項目を開くと接続状態を確認します'
+        '仅显示本机状态 · 不会自动连接 JM',
+        'Local status only · No automatic JM connection',
+        '端末内の状態のみ · JM へ自動接続しません'
     )
     panel.querySelectorAll(':scope > p')[1].textContent = t(
         '先导入收藏，再分批补全作品详情中的标签。未补全的标签属于未知，不代表不喜欢；导入不会创建 Like 或修改云端收藏。',
@@ -51,6 +51,7 @@ function localize() {
     }
     for (const [id, zh, en, ja] of [
         ['jm-login', '登录 JM', 'Sign in to JM', 'JM にログイン'],
+        ['jm-connect', '连接 / 恢复登录', 'Connect / restore sign-in', '接続 / ログインを復元'],
         ['jm-preview', '扫描收藏', 'Scan favorites', 'お気に入りを読み込む'],
         [
             'jm-enrich',
@@ -98,6 +99,7 @@ async function request(action, input) {
 function state() {
     for (const id of [
         'jm-login',
+        'jm-connect',
         'jm-preview',
         'jm-confirm',
         'jm-logout',
@@ -133,10 +135,16 @@ async function refresh() {
           )
         : result.configured
           ? t(
-                `已登录：${result.username}`,
-                `Signed in: ${result.username}`,
-                `ログイン済み：${result.username}`
+                `本次已登录：${result.username || ''} · 本地缓存状态，未重新验证连接`,
+                `Signed in this session: ${result.username || ''} · Cached locally; connection not rechecked`,
+                `今回ログイン済み：${result.username || ''} · 端末内の記録です。接続は未確認`
             )
+          : result.remembered
+            ? t(
+                  '已保存登录 · 点击“连接 / 恢复登录”后验证；仅打开设置不会启动来源进程',
+                  'Sign-in saved · Connect / restore sign-in to verify; opening settings starts no source process',
+                  'ログイン保存済み · 接続 / ログインを復元で確認します。設定を開くだけでは配信元のプロセスを起動しません'
+              )
           : t(
                 '尚未登录 · 可独立配置此来源',
                 'Not signed in · Configure this source independently',
@@ -147,6 +155,14 @@ panel?.addEventListener('toggle', () => {
     if (panel.open && !busy) void run(refresh)
 })
 document.addEventListener('pica-source-choices-changed', () => { if (panel?.open && !busy) void run(refresh) })
+$('jm-connect')?.addEventListener('click', () => void run(async () => {
+    message(t('正在连接 JM 并验证保存的登录…', 'Connecting to JM and verifying saved sign-in…', 'JM に接続し、保存したログインを確認中…'))
+    const result = await request('connect', {})
+    message(result.configured
+        ? t('JM 连接验证成功。', 'JM connection verified.', 'JM の接続を確認しました。')
+        : t('已连接来源进程，尚未登录；如需账号功能请明确登录。', 'Source process connected; not signed in. Sign in explicitly for account features.', '配信元のプロセスに接続しましたが未ログインです。アカウント機能にはログインしてください。'))
+    await refresh()
+}))
 $('jm-login')?.addEventListener(
     'click',
     () =>

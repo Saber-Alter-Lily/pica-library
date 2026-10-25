@@ -1,5 +1,36 @@
 # Pica Library Development Task Log
 
+## Source idle boundary — authorized independent cloud candidate (2026-10-25)
+
+**Status: LOCAL_SOURCE_GATES_PASS / CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_PROVIDER_QA_PENDING. Not released or deployed.**
+
+- Human approval permits a new independent Draft PR and unpublished Actions builds using existing signing Secrets; the isolated coordination exception still applies. Base is frozen PR207 `1b7a9184eca11f73b295a55827d2cddee34dc69c`; local source corrections are sealed as `a723fbe29bc4323dddeb7370c37721dd6a4789bd`. PR206/207 and their packages stay unchanged.
+- Candidate-only Dev84 advances the single build/manifest authority from Dev83. Same Dev application ID and fixed certificate are required; no private-key download, uninstall, installation or production profile is authorized. Existing owner/non-PR/explicit-branch signing restrictions remain.
+- Exact a723 source passed135 selected assertions/18suites, strict TypeScript and Web51 syntax. A separate23-case/4suite source-and-synthetic update-planning check passed, including22 unchanged dependency/schema/module/updater inputs. These selections overlap; do not sum them as unique tests or borrow PR207 CI for this source.
+- Compatible metadata is necessary, not sufficient for real incremental eligibility. Generated updater/helper bytes are unknown until build; differing helpers require the existing one-click full-application path. Actual Windows runtime, HTTP/browser, signed Android, package/upgrade/rollback and physical/provider checks need their own current-source evidence.
+- No new product feature or updater implementation is added for cloud preparation. No main merge, tag/Release, stable OTA, local Java/application/browser/listener/upgrader, production data access or deployment. [Candidate scope and review limits](docs/SOURCE_IDLE_CLOUD_CANDIDATE.md).
+
+## JM command route and Node-stream error boundary (2026-10-25, local-only continuation)
+
+**ACTUAL_CALLBACK_OVER_VIRTUAL_REQUESTS / PASSIVE_GET_AND_EXPLICIT_POST / BOUNDED_GENERIC_INPUT_ERRORS / NO_SOCKET_OR_SOURCE_PROCESS / FULL_GOAL_OPEN.**
+
+- Continues local `0d8dc49713e7400f9c53b57b592212759b1fc72f`, within the same authorized source-idle isolation. Actual callback/json/body and three service methods run through compiler-extracted VM functions, fake responses/transport and in-memory Node Readables; no application/server setup/listener/provider/profile is started.
+- Initial24 cases had21pass/3fail: invalid JSON500, text/plain reaching the connection, oversize input using generic parsing. This action alone now requires JSON, limits input4096bytes and returns constant non-reflective errors; ordinary login/favorite routes remain unchanged.
+- Actual Node-stream counterexample then had24pass/1fail: early rejection destroyed input before an error reply. Native iterator(false) is opt-in only for this command, with Connection:close on parse/media failure. A separate case retains ordinary body-reader default behavior. Reuses the existing parser and standard Node API, no new dependencies or runtime floor.
+- Development133/134 runtime/type history retained. A contextual-this strict-type failure in the fake iterator is fixed using an explicit closure, not casts/relaxed criteria. Final target135 assertions/18 inspected suites plus types/Web51 is independently sealed; real HTTP/browser/compiled/cloud/signature/upgrade/device/source acceptance remains pending.
+- PR207/installables, main, OTA, production data, schema/deps/Android/recommendation/Visual/sync/updater remain untouched. No push, release, deployment or Java/permission-sensitive execution. [Exact method and limits](docs/JM_VIRTUAL_ROUTING_VALIDATION.md).
+
+## Source admission and idle observation boundary (2026-10-25, local-only)
+
+**LOCAL_ONLY_CORE_DEFAULT / EXPLICIT_CLI_SOURCES / PASSIVE_JM_STATUS / FROZEN_PR207_UNCHANGED / FULL_GOAL_OPEN.**
+
+- Continues candidate `1b7a9184eca11f73b295a55827d2cddee34dc69c` on a new local branch, not the unfinished profile-recovery branch. PR207, its Dev83/Windows handoff, main, stable OTA and official data remain untouched. User authorized this isolated write exception after Local Memory routing returned NOT_FOUND and broker status still showed DPAPI failure; no registration/secret/security-policy changes.
+- New SourceRuntime/LibraryService/ProviderService contexts default to no external adapters, even with credentials or an injected SDK. Desktop explicitly retains its old-config compatibility and saved choices. CLI uses an explicit validated `--sources pica,eh,jm|none` invocation choice before opening storage; intentional online CLI automation must add that flag. No implicit credential-to-source consent.
+- JM settings GET now reads an allowlisted local account snapshot and never restores login/requests a worker. UI distinguishes remembered/cached/not-checked in three languages. Empty-body, Desktop-CSRF-protected explicit connect reuses the existing worker/account flow, can retry saved login, and cannot enable sources or accept secrets/choice fields. The earlier trigger was opening the JM section, not ordinary homepage startup.
+- Local selected gates108/108 across17 inspected suites, strict types and Web51 PASS. Original68pass/1 historical policy-hash guard failure is retained; updated current pin plus exact inverse old-text hash permits only the reviewed default change. Historical50 fixture/harness files/92 constructors now declare their prior enabled context via a test-only helper; default-off tests remain separate. No test is skipped to obtain this result.
+- Final review reproduced an actual empty-array acceptance bug in the initial connect predicate through its AST-extracted expression (4pass/1fail preserved); now rejects nonobjects/arrays and unexpected fields. The new pure guard case plus future HTTP array/null/primitive cases are added; exact final-source target109 assertions is recorded separately.
+- Actual HTTP route/CSRF cases are extended but not locally run. Current full CI/browser/package/signature/upgrade/device/provider gates remain pending; no prior green is borrowed. No local Java/app/browser/listener or production data, new dependencies/schema/Android/ranking/Visual/sync/updater changes, push/Release/OTA/install/deployment. [Boundary, CLI compatibility and limits](docs/SOURCE_IDLE_BOUNDARY.md).
+
 ## Reader reliability integration — focused unpublished candidate (2026-10-25)
 
 **IMPLEMENTED_AND_LOCALLY_INTEGRATED / EXACT_HEAD_CLOUD_RECEIPTS_ARE_SEPARATE / MANUAL_QA_PENDING / FULL_GOAL_OPEN.**

@@ -3,10 +3,11 @@ import path from 'node:path'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const root = path.resolve(process.argv[2])
 const db = new LibraryDatabase(path.join(root, 'data', 'library.db'))
-const service = new LibraryService(db, path.join(root, 'data'))
+const service = new LibraryService(db, path.join(root, 'data'), undefined, undefined, undefined, enabledFixtureSources())
 service.connect = async () => {
     throw new Error('Provider access forbidden in local import browser fixture')
 }

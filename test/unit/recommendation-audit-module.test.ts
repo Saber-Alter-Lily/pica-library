@@ -10,13 +10,14 @@ import { LibraryService } from '../../src/library/service'
 import { RECOMMENDATION_V5_POLICY_STATE_KEY } from '../../src/recommendation-v5/portable-policy'
 import { parseEhTag } from '../../src/providers/eh-tags'
 import { parseEhTag as compatibleParseEhTag } from '../../src/providers/eh-provider'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const fixtures: Array<{ root: string; database: LibraryDatabase }> = []
 function fixture() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-audit-module-'))
     const database = new LibraryDatabase(path.join(root, 'library.db'))
     fixtures.push({ root, database })
-    return { root, database, service: new LibraryService(database, root) }
+    return { root, database, service: new LibraryService(database, root, undefined, undefined, undefined, enabledFixtureSources()) }
 }
 afterEach(() => {
     vi.useRealTimers()

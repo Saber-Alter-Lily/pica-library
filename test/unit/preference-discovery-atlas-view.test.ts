@@ -22,6 +22,7 @@ import {
     portableInferredSignalsV5,
     RECOMMENDATION_V5_POLICY_STATE_KEY
 } from '../../src/recommendation-v5/portable-policy'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 function comic(id: string, tags: string[], author = 'Writer'): StoredComic {
     return {
@@ -424,7 +425,7 @@ describe('read-only discovery service', () => {
         const all = vi
             .spyOn(db, 'listAllComics')
             .mockReturnValue([comic('a', ['雙馬尾'])])
-        const service = new LibraryService(db, dir)
+        const service = new LibraryService(db, dir, undefined, undefined, undefined, enabledFixtureSources())
         expect(
             service.recommendationV5SearchPreferences('双马尾').items
         ).toHaveLength(1)

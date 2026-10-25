@@ -12,6 +12,7 @@ import { assertLibraryChangeAllowed } from '../../src/desktop/lifecycle'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import type { Pica } from '../../src/sdk'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 afterEach(() => {
@@ -177,7 +178,7 @@ describe('desktop remediation boundaries', () => {
         const service = new LibraryService(
             database,
             dataDir,
-            provider as unknown as Pica
+            provider as unknown as Pica, undefined, undefined, enabledFixtureSources()
         )
         const job = service.enqueueDownload({ comicId: 'shutdown-comic' })
         const running = service.runDownloadQueue({
@@ -275,7 +276,7 @@ describe('desktop remediation boundaries', () => {
         const service = new LibraryService(
             database,
             dataDir,
-            provider as unknown as Pica
+            provider as unknown as Pica, undefined, undefined, enabledFixtureSources()
         )
         const job = service.enqueueDownload({ comicId: 'timeout-comic' })
         const running = service.runDownloadQueue({
@@ -309,7 +310,7 @@ describe('desktop remediation boundaries', () => {
         const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-switch-'))
         directories.push(dataDir)
         const database = new LibraryDatabase(path.join(dataDir, 'library.db'))
-        const service = new LibraryService(database, dataDir, {} as Pica)
+        const service = new LibraryService(database, dataDir, {} as Pica, undefined, undefined, enabledFixtureSources())
         service.enqueueDownload({ comicId: 'queued-local' })
         expect(service.hasActiveLocalDownloads()).toBe(true)
         database.close()

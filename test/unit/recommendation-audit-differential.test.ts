@@ -20,6 +20,7 @@ import {
     FrozenRecommendationAuditV5,
     AUDIT_ORACLE_SOURCE_V5
 } from '../fixtures/recommendation-audit-legacy'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const fixtures: Array<{ root: string; database: LibraryDatabase }> = []
 const model = shadowPipelineModelVersionV5()
@@ -220,7 +221,7 @@ function fixture(scenario: Scenario) {
         metadata: { query: 'School' },
         source: 'synthetic'
     })
-    const service = new LibraryService(proxy, root)
+    const service = new LibraryService(proxy, root, undefined, undefined, undefined, enabledFixtureSources())
     const eligibility =
         scenario === 'providers-off'
             ? { pica: false, eh: false, exh: false }

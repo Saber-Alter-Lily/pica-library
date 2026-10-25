@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { Pica } from '../../src/sdk'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 
@@ -24,7 +25,7 @@ function setup() {
     const service = new LibraryService(
         database,
         dataDir,
-        {} as unknown as Pica
+        {} as unknown as Pica, undefined, undefined, enabledFixtureSources()
     )
     return { database, service }
 }

@@ -11,6 +11,7 @@ import { PreviewCacheManager } from '../../src/services/preview-cache-manager'
 import { PreviewService } from '../../src/services/preview-service'
 import { ProviderService } from '../../src/services/provider-service'
 import type { Episode, Picture } from '../../src/types'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const roots: string[] = []
 const originalPicaAccount = process.env.PICA_ACCOUNT
@@ -64,7 +65,7 @@ describe('P2 E2 provider-scoped cache identity', () => {
         const service = new ProviderService(
             async () => ({}) as Pica,
             database,
-            eh
+            eh, undefined, enabledFixtureSources()
         )
 
         process.env.PICA_ACCOUNT = 'account-one@example.test'

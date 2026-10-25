@@ -3,7 +3,7 @@
   "protectedTextHashes": {
     "src/providers/provider-registry.ts": "6f05107567c0f336f7a5a0f2d24fbb667b63757eb07da2673e0a406450d2bd3d",
     "src/providers/module-manifests.ts": "8073c72682ebca63795df287a898f9f9890327a6ba050900568d28262e63a937",
-    "src/sources/source-policy.ts": "911e66766739e15df229bc26ad4db24981bf7b7c3d29a3faf86aa8eb9cffbf2f",
+    "src/sources/source-policy.ts": "29444105387cfecd17a5357a084e90cdc9eca0bf72d88c27193ca2a856f39fcf",
     "src/library/content-identity.ts": "134cc019c4b9dba2d4b544a72a2c5578c19a94ad5ec39ca98bcb77c216dc76cf",
     "src/modules/contracts.ts": "4d759d061c00c54d2db23e7b6d46f22e8ac0cd23b97e6a93fba94986be93d15b"
   },

@@ -15,6 +15,7 @@ import { buildPreferenceTimescalesV5 } from '../../src/recommendation-v5/prefere
 import { buildCandidateChannelPlanV5 } from '../../src/recommendation-v5/candidate-channels'
 import { compileCandidateProviderRoutesV5 } from '../../src/recommendation-v5/provider-query-compiler'
 import type { RecommendationIntentV3 } from '../../src/recommendation-v3/intent-planner-v3'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const cleanup: Array<() => void> = []
 afterEach(() => { cleanup.splice(0).reverse().forEach(fn => fn()) })
@@ -33,7 +34,7 @@ describe('tag policy storage, routes and paired knowledge contract', () => {
         const { database, dir, store } = fixture()
         database.importFavorites([{ comicId: 'synthetic', title: 'Synthetic', author: 'Author', tags: ['School'], categories: [], finished: true }], 'test')
         const before = JSON.stringify(database.getComic('synthetic')), write = vi.spyOn(database, 'setAppState')
-        const service = new LibraryService(database, dir), directory = service.recommendationTagPolicyV1()
+        const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources()), directory = service.recommendationTagPolicyV1()
         expect(directory.revision).toBe(0);expect(directory.directorySource).toBe('LOCAL_OBSERVED_METADATA');expect(directory.rows[0].supportCount).toBe(1)
         expect(write).not.toHaveBeenCalled();expect(JSON.stringify(database.getComic('synthetic'))).toBe(before)
         expect(() => store.setTagPolicy({ tagPolicy: off(), baseRevision: undefined })).toThrow()

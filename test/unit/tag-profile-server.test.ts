@@ -6,13 +6,14 @@ import { expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 it('protects actual tag-profile HTTP export/preview/apply/undo with Desktop CSRF and explicit regeneration', async () => {
     const dir = fs.mkdtempSync(
             path.join(os.tmpdir(), 'pica-tag-http-fixture-')
         ),
         database = new LibraryDatabase(path.join(dir, 'library.db')),
-        service = new LibraryService(database, dir)
+        service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
     database.importFavorites(
         [
             {
@@ -165,7 +166,7 @@ it('protects actual tag-profile HTTP export/preview/apply/undo with Desktop CSRF
 it('does not expose Desktop file exchange in the non-Desktop server', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-tag-nondesktop-')),
         database = new LibraryDatabase(path.join(dir, 'library.db')),
-        service = new LibraryService(database, dir)
+        service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
     const started = await startLibraryServer({
         database,
         service,

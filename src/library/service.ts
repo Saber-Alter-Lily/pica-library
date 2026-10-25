@@ -2056,7 +2056,8 @@ export class LibraryService {
         )
     }
 
-    jmAccountStatus() { return this.jmProvider.accountStatus() }
+    async jmAccountStatus() { return this.jmProvider.accountSnapshot() }
+    jmConnectAccount() { return this.jmProvider.connectAccount() }
     jmRuntimeAvailable() { return this.jmProvider.available }
     setJmCredentials(username?: string, password?: string) { this.jmProvider.setRememberedCredentials(username, password) }
     async jmLogin(username: string, password: string) {

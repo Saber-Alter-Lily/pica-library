@@ -15,6 +15,11 @@ describe('optional source-host ownership and application safety contracts',()=>{
     })
     it('introduces no catalogue/provider namespace, schema/module change or fallback to Pica',()=>{
         for(const [file,hash]of Object.entries(authority.protectedTextHashes))expect(createHash('sha256').update(read(file).replaceAll('\r\n','\n')).digest('hex')).toBe(hash)
+        // The only allowed source-policy change since the host authority is the
+        // explicitly reviewed local-only constructor default, not schema/routing.
+        const policy = read('src/sources/source-policy.ts').replaceAll('\r\n','\n')
+        expect(policy.split('constructor(policy = initialSourcePolicy())')).toHaveLength(2)
+        expect(createHash('sha256').update(policy.replace('constructor(policy = initialSourcePolicy())', 'constructor(policy = initialSourcePolicy(true))')).digest('hex')).toBe('911e66766739e15df229bc26ad4db24981bf7b7c3d29a3faf86aa8eb9cffbf2f')
         expect(read('src/source-hosts/contract.ts')).toContain('reader: false; libraryImport: false; extensionInstall: false')
     })
     it('uses exactly two official fixed queries and documents a real pinned LongString registration',()=>{

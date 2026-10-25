@@ -9,6 +9,7 @@ import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-
 import { RECOMMENDATION_V5_POLICY_STATE_KEY } from '../../src/recommendation-v5/portable-policy'
 import { defaultTagPolicyV1 } from '../../src/recommendation-v5/tag-policy'
 import { TagProfileExchangeV1 } from '../../src/recommendation-v5/tag-profile-exchange'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const cleanups: Array<() => void> = []
 afterEach(() =>
@@ -55,7 +56,7 @@ function fixture(manual = false) {
                 ]
             }
         })
-    const service = new LibraryService(db, dir),
+    const service = new LibraryService(db, dir, undefined, undefined, undefined, enabledFixtureSources()),
         exchange = service.tagProfileExchangeV1()
     return { db, store, service, exchange, dir }
 }
@@ -267,7 +268,7 @@ describe('AI tag-profile exchange (synthetic state only)', () => {
             p = preview(exchange, template, [
                 { op: 'set_mode', mode: 'SELECTED' }
             ])
-        const restarted = new LibraryService(db, '.').tagProfileExchangeV1()
+        const restarted = new LibraryService(db, '.', undefined, undefined, undefined, enabledFixtureSources()).tagProfileExchangeV1()
         expect(() => restarted.apply(p.previewId)).toThrow('REPREVIEW')
         expect(
             preview(restarted, template, [{ op: 'set_mode', mode: 'SELECTED' }])

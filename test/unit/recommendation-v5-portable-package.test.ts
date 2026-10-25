@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { RecommendationPolicyStoreV5 } from '../../src/recommendation-v5/policy-store'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('Recommendation V5 portable mobile package', () => {
     it('exports reusable candidates and generations without copying the current batch or raw visual vectors', () => {
@@ -49,7 +50,7 @@ describe('Recommendation V5 portable mobile package', () => {
                 activeBatchIndex: 0
             })
 
-            const service = new LibraryService(database, dir)
+            const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
             const beforeBatches = database.listV3Batches(pool.id)
             const first = service.recommendationPortablePackageV5(100)
             const second = service.recommendationPortablePackageV5(100)
@@ -122,7 +123,7 @@ describe('Recommendation V5 portable mobile package', () => {
                 activeCycleId: cycleId,
                 activeBatchIndex: 0
             })
-            const service = new LibraryService(database, dir)
+            const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
             const store = new RecommendationPolicyStoreV5(database)
 
             const baseline = service.recommendationPortablePackageV5(100)

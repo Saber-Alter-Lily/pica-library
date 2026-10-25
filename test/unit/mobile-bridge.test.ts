@@ -9,6 +9,7 @@ import {
     startMobileBridge,
     type MobileBridgeController
 } from '../../src/mobile/bridge-server'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const roots: string[] = []
 const bridges: MobileBridgeController[] = []
@@ -40,7 +41,7 @@ describe('Mobile Bridge', () => {
         )
         const shelf = database.createShelf('Phone Shelf')
         database.addShelfItems(shelf.id, ['comic-1'])
-        const service = new LibraryService(database, root)
+        const service = new LibraryService(database, root, undefined, undefined, undefined, enabledFixtureSources())
         const bridge = await startMobileBridge({
             database,
             service,
@@ -124,7 +125,7 @@ describe('Mobile Bridge', () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-mobile-device-'))
         roots.push(root)
         const database = new LibraryDatabase(path.join(root, 'library.db'))
-        const service = new LibraryService(database, root)
+        const service = new LibraryService(database, root, undefined, undefined, undefined, enabledFixtureSources())
         const bridge = await startMobileBridge({
             database,
             service,
@@ -223,7 +224,7 @@ describe('Mobile Bridge', () => {
             database,
             root,
             undefined,
-            ehProvider
+            ehProvider, undefined, enabledFixtureSources()
         )
         const bridge = await startMobileBridge({
             database,
@@ -350,7 +351,7 @@ describe('Mobile Bridge', () => {
         const service = new LibraryService(
             database,
             root,
-            fakePica as never
+            fakePica as never, undefined, undefined, enabledFixtureSources()
         )
         const bridge = await startMobileBridge({
             database,
@@ -548,7 +549,7 @@ describe('Mobile Bridge', () => {
             database,
             root,
             undefined,
-            fakeEh as never
+            fakeEh as never, undefined, enabledFixtureSources()
         )
         const bridge = await startMobileBridge({
             database,

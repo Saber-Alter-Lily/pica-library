@@ -8,6 +8,7 @@ import { defaultTagPolicyV1 } from '../../src/tags/policy'
 import type { Comic } from '../../src/types'
 import type { Pica } from '../../src/sdk'
 import type { LegacyGeneratedRecommendations } from '../../src/recommendation/legacy-ports'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 export const COMPATIBILITY_TEST_NOW = '2026-10-23T12:00:00.000Z'
 export type RecallScenario =
@@ -148,7 +149,7 @@ export function compatibilityFixture(
             pages: 4
         })
     } as unknown as Pica
-    const service = new LibraryService(proxy, root, sdk)
+    const service = new LibraryService(proxy, root, sdk, undefined, undefined, enabledFixtureSources())
     const sessionRecords = Array.from(
         { length: candidateCount },
         (_, index) => ({

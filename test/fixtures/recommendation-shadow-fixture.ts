@@ -15,6 +15,7 @@ import { recommendationShadowPortsV5 } from '../../src/services/recommendation-s
 import { defaultTagPolicyV1, normalizeTagPolicyV1 } from '../../src/tags/policy'
 import type { FavoriteRecord } from '../../src/library/types'
 import type { RecommendationShadowApplicationV5 } from '../../src/services/recommendation-shadow-adapter'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 export const SHADOW_TEST_NOW = '2026-10-23T12:00:00.000Z'
 export const SHADOW_CONFIRM = {
@@ -238,7 +239,7 @@ export function shadowFixture(scenario: ShadowScenario = 'normal') {
         timescales,
         acquire: async () => ({ release() {} })
     }
-    const service = new LibraryService(proxy, root)
+    const service = new LibraryService(proxy, root, undefined, undefined, undefined, enabledFixtureSources())
     service.providerService = hooks.provider as typeof service.providerService
     service.recommendationV5ProviderRoutes = plan
     service.recommendationV5PreferenceTimescales = timescales

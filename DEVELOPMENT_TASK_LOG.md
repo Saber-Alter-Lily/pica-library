@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+## Reader reliability integration — focused unpublished candidate (2026-10-25)
+
+**IMPLEMENTED_AND_LOCALLY_INTEGRATED / EXACT_HEAD_CLOUD_RECEIPTS_ARE_SEPARATE / MANUAL_QA_PENDING / FULL_GOAL_OPEN.**
+
+- Human authorized a new independent Draft branch and existing Actions/signing-Secrets builds only. Do not edit frozen PR206, merge main, create tag/Release, change stable OTA, download keys, install/deploy or read production data.
+- Frozen base is `9e879d3aa7030d1fc49a92354f54bba0bd610074`; Reader/local-guide/input/viewport/progress fixes come from the bounded local series through `90a1595769ed382fe0bb43988a27d3c47651ad1f`. Preserve local-only reading with no source/account/content service, existing native/tags/recommendation/source/sync protocols and one application updater.
+- The source integration includes the independently useful instance/owned-profile initialization fix and its data-only theme-validator dependency/tests. It excludes unfinished `src/profile-backup`, ZIP64 packages/lockfile additions and unrelated local work; those remain in the original local branch/backlog, not reverted or accepted.
+- Initial integration commit `679a5f15d4f95a9ad4f7ecfc3d83acb7963b63dd` exactly binds all1371 tested source files/modes to manifest SHA256 `3193b497a414eacc5493ce31df3448e9ae0aad2efaac3081f14964734e989425`. Local284 tests/23files, strict types/Web51 PASS. These mocks/owned synthetic fixtures are not HTTP/browser/physical/provider/upgrade or full-CI acceptance.
+- Read-only Windows checkout-root guard prevents a nested source snapshot borrowing an ancestor's Git SHA before any provenance override/build/download/delete. Genuine roots remain supported; no Git ownership/security exception is added by the production helper.
+- This subsequent CI/ledger-only overlay enables the exact new candidate branch in the existing unpublished workflow and advances fixed-signature Dev82→83 from one tested public version authority; certificate/package checks and test-before-secret order remain strict. Native implementation remains unchanged. Local pre-overlay gates are not mislabeled as cloud or installer results: consult the exact source SHA/run/artifact receipts recorded in the new Draft PR and immutable handoff.
+- Existing r2/Dev82 handoff and PR206 head remain frozen. New binaries, if produced and verified, use their own exact SHA and isolated profile. Full neutral-source/trust/native/sync/asset/backup scope, real user/gesture/provider/AI/offline/retention/physical-upgrade acceptance remain OPEN. [Integration ownership and provenance](docs/READER_RELIABILITY_INTEGRATION.md).
+
 ## Local execution restriction — security prompt disruption (2026-10-23)
 
 User reported repeated security-center permission prompts for Java/validation programs. Stop launching local Java, random-path Windows artifacts, LAN bridges and upgrade runtime matrices by default; move those checks to the already-authorized Draft CI. Local source/type/syntax and inspected no-Java/no-LAN targeted tests may continue. Do not allow dialogs, add exceptions or weaken protection. Read-only snapshot found zero active Java/current validation drivers; firewall logs confirmed prior task-temp application paths, including Node. Exact unseen dialog identity remains unverified. [Effective local validation policy](docs/LOCAL_VALIDATION_SAFETY.md).

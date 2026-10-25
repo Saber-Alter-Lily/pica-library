@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'lib/assert-checkout-root.ps1')
+Assert-PicaBuildCheckoutRoot -Root $root
 $package = Get-Content -Raw -LiteralPath (Join-Path $root 'package.json') | ConvertFrom-Json
 $version = [string]$package.version
 $nodeVersion = '24.15.0'

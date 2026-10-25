@@ -1894,6 +1894,8 @@ export const domTranslations = [
     ['#reader-next-chapter', 'reader.nextChapter'],
     ['#reader-mode option[value="vertical"]', 'reader.vertical'],
     ['#mobile-bridge-opt-in-help', 'mobile.optInHelp'],
+    ['#mobile-bridge-enable', 'mobile.enable'],
+    ['#mobile-bridge-disable', 'mobile.disable'],
     ['#reader-mode option[value="single"]', 'reader.single'],
     ['#reader-mode option[value="double"]', 'reader.double'],
     ['#reader-direction option[value="ltr"]', 'reader.ltr'],

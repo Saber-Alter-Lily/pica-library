@@ -2,7 +2,7 @@ name: Next consolidated acceptance (unpublished)
 
 on:
   push:
-    branches: [codex/next-acceptance-sources-jm, codex/ux-tags-dual-onboarding-20261022]
+    branches: [codex/next-acceptance-sources-jm, codex/ux-tags-dual-onboarding-20261022, codex/reader-reliability-integration-20261025]
   pull_request:
     paths:
       - '.github/workflows/next-consolidated-acceptance.yml'
@@ -20,7 +20,7 @@ concurrency:
 env:
   STABLE_VERSION: '0.5.0'
   BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
-  PICA_ANDROID_CANDIDATE_VERSION_CODE: '82'
+  PICA_ANDROID_CANDIDATE_VERSION_CODE: '83'
 
 jobs:
   web-and-source:
@@ -57,7 +57,7 @@ jobs:
 
   windows:
     needs: web-and-source
-    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022')
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025')
     runs-on: windows-latest
     timeout-minutes: 50
     env:
@@ -163,7 +163,7 @@ jobs:
 
   android:
     needs: web-and-source
-    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022')
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:

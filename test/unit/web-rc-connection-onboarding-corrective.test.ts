@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { guideCatalog } from '../../web/guide-catalog.js'
 
 const read = (path: string) => fs.readFileSync(path, 'utf8')
 
@@ -48,8 +49,13 @@ describe('Windows/Web RC connection and onboarding corrective batch', () => {
             "'connection-status'",
             "'eh-account'"
         ]) expect(onboarding).toContain(target)
-        expect(catalog).toContain('已有漫画直接从书库打开')
-        expect(catalog).toContain('不需要每次重新生成')
+        const guide = guideCatalog((zh: string) => zh)
+        expect(guide.daily[0].view).toBe('library')
+        expect(guide.daily[0].selector).toBe('nav [data-view="library"]')
+        expect(guide.daily[0].body).toContain('无需登录也能阅读本地漫画')
+        expect(guide.daily[0].body).toContain('已有漫画直接打开')
+        expect(guide.daily.find((step) => step.selector === 'nav [data-view="discover"]')!.body)
+            .toMatch(/(?:不必|不需要)每次重新生成/)
         expect(catalog).toContain('OFF 不参与排序')
         expect(catalog).toContain('普通官网登录链接不会自动回传')
         expect(onboarding).toContain('showAdvancedGuide')

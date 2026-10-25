@@ -59,6 +59,8 @@ import {
 import { connectionCredentials } from './connection'
 import { desktopPlatformCapabilities } from './platform'
 import { desktopRuntimeOptions } from './runtime-mode'
+import { mobileBridgeOptIn, parseMobileBridgeChoice } from './mobile-bridge-policy'
+import { normalizeReaderSettings, parseReaderSettings } from '../../web/reader-settings.js'
 import { DesktopNativePicker } from './pickers'
 import { findManagedBrowser } from './managed-browser'
 import { assertLibraryChangeAllowed } from './lifecycle'
@@ -136,6 +138,9 @@ let credentials: StoredCredentials | null = null
 let hostedReader: HostedLibraryReader | null = null
 let server: Server | null = null
 let mobileBridge: MobileBridgeController | null = null
+let mobileBridgeEpoch = 0
+let mobileBridgeSettingsBusy = false
+let engineReady = false
 let remoteApiGateway: RemoteApiGateway | null = null
 let database: LibraryDatabase | null = null
 let service: LibraryService | null = null
@@ -342,6 +347,8 @@ async function shutdownStep(
 }
 
 async function closeEngine() {
+    engineReady = false
+    mobileBridgeEpoch++
     const errors: string[] = []
     sourceHostInspector.cancel()
     sourceHostConnections.cancel()
@@ -522,6 +529,57 @@ function friendlyConnectionError(error: unknown) {
     return 'PROVIDER_UNEXPECTED: The provider returned an unexpected error.'
 }
 
+async function startSelectedMobileBridge() {
+    if (mobileBridge) return
+    if (stopping || !database || !service || !mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode))
+        throw new Error('Mobile Bridge is not explicitly enabled or the library is not ready')
+    const epoch = mobileBridgeEpoch, owner = database
+    const started = await startMobileBridge({
+        database,
+        service,
+        host: '0.0.0.0',
+        port: 7788,
+        stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
+        accountStatus: () => ({
+            pica: { enabled: sources.isEnabled('pica'), configured: Boolean(sources.isEnabled('pica') && credentials?.account?.trim() && credentials?.password) },
+            eh: { enabled: sources.isEnabled('eh'), configured: Boolean(sources.isEnabled('eh') && credentials?.ehMemberId && credentials?.ehPassHash) }
+        })
+    })
+    if (stopping || epoch !== mobileBridgeEpoch || database !== owner || !mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode)) {
+        await started.close()
+        throw new Error('Mobile Bridge activation was cancelled')
+    }
+    mobileBridge = started
+    const mobile = started.status()
+    log.write(`Mobile Bridge started at ${mobile.addresses.join(', ') || `port ${mobile.port}`}`)
+}
+
+async function setMobileBridgeEnabled(input: Record<string, unknown>) {
+    const enabled = parseMobileBridgeChoice(input)
+    if (!config || !service || !engineReady || stopping) throw new Error('Configure a ready local library before enabling LAN sharing')
+    if (enabled && runtimeOptions.mode === 'headless' && !runtimeOptions.mobileBridge)
+        throw new Error('Headless LAN sharing also requires --mobile-bridge')
+    if (mobileBridgeSettingsBusy) throw new Error('Mobile Bridge settings are already being changed')
+    mobileBridgeSettingsBusy = true
+    try {
+        const next = { ...config, mobileBridgeEnabled: enabled }
+        mobileBridgeEpoch++
+        if (enabled) {
+            saveConfig(paths.config, next)
+            config = next
+            await startSelectedMobileBridge()
+        }
+        else {
+            // A failed config write must not leave a user-disabled listener open.
+            config = next
+            await mobileBridge?.close()
+            mobileBridge = null
+            saveConfig(paths.config, next)
+        }
+        return { success: true, enabled, running: Boolean(mobileBridge) }
+    } finally { mobileBridgeSettingsBusy = false }
+}
+
 async function testConnection(input: Record<string, unknown>) {
     const remoteAction = String(input.remoteStorageAction ?? '')
     if (remoteAction === 'inventory') {
@@ -542,6 +600,7 @@ async function testConnection(input: Record<string, unknown>) {
         mobileBridge.rotatePairingCode()
         return { success: true }
     }
+    if (mobileAction) throw new Error('Unsupported Mobile Bridge action')
     const { account, password } = connectionCredentials(input, credentials)
     if (!account || !password)
         throw new Error('Enter account and password first')
@@ -807,6 +866,8 @@ async function startEngine(preferredPort: number) {
             lastExportAt: lastBrowserLiteExportAt,
             browserLiteExportProgress,
             mobileBridge: mobileBridge?.status() ?? null,
+            mobileBridgePreference: mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode),
+            readerSettings: normalizeReaderSettings(config?.readerSettings),
             remoteApi: remoteApiGateway
                 ? {
                       enabled: true,
@@ -857,6 +918,17 @@ async function startEngine(preferredPort: number) {
             }
         },
         save: async (input) => {
+            if (input.mobileBridgeAction !== undefined) return await setMobileBridgeEnabled(input)
+            if (input.readerSettingsAction !== undefined) {
+                if (!config || input.readerSettingsAction !== 'save' ||
+                    Object.keys(input).some(key => !['readerSettingsAction', 'readerSettings'].includes(key)))
+                    throw new Error('Invalid reader settings action')
+                const readerSettings = parseReaderSettings(input.readerSettings)
+                const next = { ...config, readerSettings }
+                saveConfig(paths.config, next)
+                config = next
+                return { success: true, readerSettings }
+            }
             if (input.sourceAction !== undefined) {
                 if (input.sourceAction !== 'save' || !config || !service) throw new Error('Configure a local library before choosing sources')
                 if (Object.keys(input).some(key => !['sourceAction', 'enabled', 'expectedRevision'].includes(key))) throw new Error('Unsupported source settings field')
@@ -1298,47 +1370,20 @@ async function startEngine(preferredPort: number) {
     } else {
         remoteApiGateway = null
     }
-    if (runtimeOptions.mobileBridge) {
+    if (mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode)) {
         try {
-            mobileBridge = await startMobileBridge({
-                database: database!,
-                service: service!,
-                host: '0.0.0.0',
-                port: 7788,
-                stateFile: path.join(paths.runtimeState, 'mobile-bridge.json'),
-                accountStatus: () => ({
-                    pica: {
-                        enabled: sources.isEnabled('pica'),
-                        configured: Boolean(
-                            sources.isEnabled('pica') && credentials?.account?.trim() &&
-                                credentials?.password
-                        )
-                    },
-                    eh: {
-                        enabled: sources.isEnabled('eh'),
-                        configured: Boolean(
-                            sources.isEnabled('eh') && credentials?.ehMemberId &&
-                                credentials?.ehPassHash
-                        )
-                    }
-                })
-            })
-            const mobile = mobileBridge.status()
-            log.write(
-                `Mobile Bridge started at ${
-                    mobile.addresses.join(', ') || `port ${mobile.port}`
-                }`
-            )
+            await startSelectedMobileBridge()
         } catch (error) {
             mobileBridge = null
             log.write(`Mobile Bridge unavailable: ${String(error)}`)
         }
     } else {
         mobileBridge = null
-        log.write('Mobile Bridge disabled in headless mode; pass --mobile-bridge to enable it')
+        log.write('Mobile Bridge disabled; explicitly enable LAN sharing in Settings (or --mobile-bridge before a choice is saved)')
     }
     instance.publish(currentUrl)
     startupReady = true
+    engineReady = true
     log.write(
         `Desktop engine ${PRODUCT_VERSION} started at ${currentUrl} [${runtimeOptions.mode}]`
     )

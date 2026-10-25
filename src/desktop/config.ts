@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { normalizeReaderSettings, parseReaderSettings } from '../../web/reader-settings.js'
 import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import { initialSourcePolicy, normalizeSourcePolicy } from '../sources/source-policy'
 import type {
@@ -162,11 +163,17 @@ export function loadConfig(file: string): DesktopConfig | null {
         throw new Error('The saved configuration is invalid')
     if (value.proxyUrl) safeProxy(value.proxyUrl)
     if (value.externalSources !== undefined) value.externalSources = normalizeSourcePolicy(value.externalSources)
+    if (value.mobileBridgeEnabled !== undefined && typeof value.mobileBridgeEnabled !== 'boolean')
+        throw new Error('The saved Mobile Bridge choice is invalid')
+    if (value.readerSettings !== undefined) value.readerSettings = normalizeReaderSettings(value.readerSettings)
     return value
 }
 
 export function saveConfig(file: string, config: DesktopConfig) {
     if (config.externalSources !== undefined) normalizeSourcePolicy(config.externalSources)
+    if (config.mobileBridgeEnabled !== undefined && typeof config.mobileBridgeEnabled !== 'boolean')
+        throw new Error('Invalid Mobile Bridge choice')
+    if (config.readerSettings !== undefined) parseReaderSettings(config.readerSettings)
     const serialized = JSON.stringify(config, null, 2)
     const hasSecretKey = (value: unknown): boolean => Boolean(value && typeof value === 'object' &&
         Object.entries(value).some(([key,child]) => /password|account|username|authorization|cookie|token/i.test(key) || hasSecretKey(child)))

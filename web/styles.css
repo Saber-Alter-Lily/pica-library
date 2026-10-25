@@ -1244,6 +1244,8 @@ body.reader-active > nav {
 
 .reader-pages img {
     display: block;
+    /* Reserve a lazy-page box before intrinsic dimensions arrive. */
+    aspect-ratio: auto 2 / 3;
     max-width: 100%;
     max-height: calc(100vh - 7rem);
     object-fit: contain;

@@ -1,0 +1,53 @@
+DEV85 — LOCAL READER / OPTIONAL LAN CORRECTIVE SLICE
+2026-10-25; local-only, unpublished, not installed
+
+Authority
+---------
+Base source: 16449a00a0eb2d9d0d792e5efe5312c86dbf4220, frozen PR209.
+New local branch: codex/dev85-local-reader-runtime-fixes-20261025.
+Human approved bypassing the unavailable Local coordination claim only for these source fixes and offline tests. No push, cloud build, merge, tag/Release, OTA, deployment, Java, application, browser or listener startup. No production or pre-existing RC profile access.
+
+Problem -> implementation
+-------------------------
+1. Stored page survived restart, but continuous Reader displayed page one.
+   The old viewport adapter positioned lazy images after two animation frames without waiting for loaded geometry, then accepted observer-driven page changes. Its old tests mocked scrollIntoView without cold layout behavior.
+   The adapter now waits for the saved image to be ready, requests only that image eagerly, repositions on preceding-image load/ResizeObserver changes, and does not replace the saved page from layout-only callbacks before real scroll/navigation intent. CSS reserves a lazy-page box. Exit/chapter/mode ownership still fences delayed work. A synthetic geometry model checks actual computed page centering, not only a scroll spy. This remains a simulated geometry test, not a new real-browser PASS.
+
+2. Mode/direction/fit reset on document reload.
+   A small runtime-neutral versioned codec rejects unknown/invalid fields. Desktop saves only these display preferences to its existing non-secret profile config; ordinary settings edits retain them, with no DB migration. Web applies the profile after bootstrap, caches display settings locally for Browser Lite, serializes rapid edits and refuses stale status overwrites while edits are pending or Reader is active. Save failure is visible. No book identities, page positions or credentials enter this setting.
+
+3. Interactive Desktop opened LAN Mobile Bridge without a connection choice.
+   Absent/legacy config is now off. Settings -> connection offers an explicit enable confirmation and disable button, separate from manga source login/enablement. A successful opt-in can persist for later interactive starts. Existing paired-device records are kept; enabling does not clear or regenerate them. Disabling closes the current listener even if saving the choice fails; such failure is reported rather than claimed durable. A failed close remains visible and retryable. In-flight activation cannot survive shutdown ownership changes.
+   Headless still additionally requires --mobile-bridge. Saved explicit off takes precedence over the fallback startup flag. Upgrading an older auto-on installation requires the user to explicitly enable LAN sharing once; finding an old state/pairing file is not treated as consent.
+
+Module boundaries / reuse
+------------------------
+- web/reader-viewport.js: browser layout/input lifecycle only; no source identity, account, storage or network transport implementation.
+- web/reader-settings.js + declaration: runtime-neutral codec and serial write queue, used by Web and Desktop. Pure import-graph test has one input.
+- src/desktop/mobile-bridge-policy.ts: side-effect-free admission/strict input boundary. Existing bridge transport, CSRF settings route, profile writer and paired-device persistence are reused.
+- No dependency/lockfile, Android, schema, ranking/model, Visual, tags or sync-protocol change. Existing one-application updater remains the only update mechanism. New optional profile fields do not introduce a second module updater.
+
+Current evidence
+----------------
+159 targeted assertions / 10 files PASS; strict types PASS; Web syntax53/53 PASS; Desktop bundle compiled only in memory with199 inputs. Neither compiled output nor product entry was executed. The current new-source SHA, final receipts, payload hashes and exact assertions belong in the local handoff ZIP, not an earlier green CI.
+
+The offline Node test runner disables only Vite's own unused WS transport before bind. A separate process preload rejects real TCP listeners/clients/fetch, Java and application launch. It also checks the resolved scope of recursive temporary-fixture cleanup. Initial rejected framework-bind and sandbox/esbuild failures are retained as harness evidence, not product regression results. No test timeout, retry or skip was added to obtain PASS.
+
+One-click compatibility tests use synthetic ZIPs, check current module metadata and include the actual Reader JS assets without configuration/DB/runtime replacement. They do not prove an installed client's discovery, physical update, helper/rollback, or signed Android update.
+
+Next actual acceptance — separately authorize, do not auto-run
+-------------------------------------------------------------
+Use only a fresh isolated profile and synthetic content, never a formal DB copy.
+
+A. Cold continuous resume
+   Explicitly choose continuous mode before shutdown, save a later chapter/page, stop the owned process, reopen with a cold image cache, and visually verify the page itself. Compare progress before opening Reader and after restoring. Repeat with image load errors/retry and earlier-page late loading. Confirm scrolling after restoration takes control and is not pulled back to the saved page.
+B. Settings
+   Save single/RTL/fit-height, reload/restart and change the test service port while retaining only the same fresh profile. Verify the profile-backed settings remain. Also test storage/API failure feedback and rapid mixed edits. Do not infer this from a successful same-origin browser cache alone.
+C. LAN boundary
+   With no saved LAN choice, verify only the main loopback service listens. Source status/settings/history reads must not start LAN sharing. Explicitly authorize LAN enable and verify listener and pairing continuity; disable, verify closed, restart and verify still off. Never change Windows security settings or approve security prompts automatically.
+D. GUI import / native / update
+   The prior native PowerShell-owned picker remains unverified by automation. Human picker confirmation or a separately permitted alternative is required. Android gestures, actual providers, source-host sync/trust/ecosystem, complete profile recovery, full exact-source cloud/package/update/rollback and physical-device acceptance remain separate outstanding work.
+
+Stop conditions
+---------------
+No app install/launch, G-drive overwrite, cloud signing/push or release follows from local tests. Preserve the old failure evidence and frozen installables. Keep the complete local-first/content-free/optional-source/modular/maintained-OSS/one-update-action objective OPEN.

@@ -8,14 +8,14 @@ describe('Desktop headless runtime foundation P5C', () => {
             mode: 'interactive',
             openBrowser: true,
             idleBrowserShutdown: true,
-            mobileBridge: true,
+            mobileBridge: false,
             remoteApi: false
         })
         expect(desktopRuntimeOptions(['--no-open'])).toEqual({
             mode: 'interactive',
             openBrowser: false,
             idleBrowserShutdown: true,
-            mobileBridge: true,
+            mobileBridge: false,
             remoteApi: false
         })
     })
@@ -70,13 +70,13 @@ describe('Desktop headless runtime foundation P5C', () => {
         )
         expect(main).toContain('!runtimeOptions.idleBrowserShutdown')
         expect(main).toContain('scheduleBrowserCloseShutdown()')
-        expect(main).toContain('if (runtimeOptions.mobileBridge)')
+        expect(main).toContain('if (mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode))')
         expect(main).toContain('remoteApiConfiguration(runtimeOptions.remoteApi)')
         expect(main).toContain('startRemoteApiGateway({')
         expect(main).toContain('readRemoteApiToken(remoteApiSettings.tokenFile)')
         expect(main).toContain('Shutdown: closing Remote API gateway')
         expect(main).toContain(
-            "Mobile Bridge disabled in headless mode; pass --mobile-bridge to enable it"
+            'Mobile Bridge disabled; explicitly enable LAN sharing in Settings'
         )
         expect(main).toContain('runtime: runtimeOptions')
         expect(main).toContain(

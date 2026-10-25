@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+## Source-neutral reading Library — authorized Dev85 cloud candidate (2026-10-25)
+
+**Status: LOCAL_SOURCE_SEALED / NEW_EXACT_HEAD_CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_QA_PENDING. Not released or deployed.**
+
+- Human separately approved pushing this independent branch, a new Draft outside frozen PR208 and existing-Secret unpublished Actions builds. Local source is sealed at `291bdec208c96ff2cf3f2484b2e14859448a597c`; its101 selected assertions, strict types and Web52 are source-only evidence, not new installable results.
+- Candidate-only Dev85 advances the single build/manifest authority beyond frozen Dev84, retaining the same development package and certificate. Existing public-owner/non-PR/explicit-branch restrictions remain. No private-key download or local Java/application/browser/listener/updater execution.
+- Windows cloud validation additionally downloads the exact retained Dev84 Actions package, pins payload/source and requires normal replacement plus health/launch rollback in disposable synthetic profiles. The prior artifact is ephemeral: missing/expired/wrong bytes fail closed, never silently substitute a source rebuild or latest release. This is a replacement-engine test, not proof of old-client OTA discovery or physical installation.
+- Existing stable-baseline and deep-path gates remain; no production updater implementation/schema/algorithm/dependency change. PR206/207/208, main, Release and stable OTA remain untouched. [New candidate plan, safety and evidence requirements](docs/SOURCE_NEUTRAL_CLOUD_CANDIDATE.md).
+
 ## Source-neutral reading Library — local-only integration (2026-10-25)
 
 **Status: LOCAL_IMPLEMENTATION_AND_SELECTED_GATES / NEW_CLOUD_BROWSER_INSTALLABLE_DEVICE_GATES_PENDING. Not pushed, released or deployed.**

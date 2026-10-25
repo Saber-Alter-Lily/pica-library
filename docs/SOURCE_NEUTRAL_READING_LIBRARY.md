@@ -1,6 +1,6 @@
-# Source-neutral reading-library projection — local development
+# Source-neutral reading-library projection — unpublished candidate
 
-Base is frozen PR208 `295942c297f9377b28df5a2d3d32a311fed8a18f`. New local branch `codex/source-neutral-reading-library-20261025`; the human authorized this phase under the routing/coordination exception. No push, cloud build, main merge, Release/OTA, install or deployment is authorized. No local Java/application/browser/listener/updater or production profile access.
+Base is frozen PR208 `295942c297f9377b28df5a2d3d32a311fed8a18f`. New branch `codex/source-neutral-reading-library-20261025`; the human first authorized isolated local development under the routing/coordination exception, then separately approved a new Draft and unpublished remote builds. Local source is sealed at `291bdec208c96ff2cf3f2484b2e14859448a597c`; [Dev85 cloud preparation and evidence](SOURCE_NEUTRAL_CLOUD_CANDIDATE.md) is separate. No main merge, Release/OTA, install or deployment. No local Java/application/browser/listener/updater or production profile access.
 
 ## Actual gap and intended change
 
@@ -35,4 +35,4 @@ The selected local development target is101 assertions/10files, strict TypeScrip
 
 Three-language actual-browser journeys now cover returning from host Reader to the common Library entry, host resume, local reading and explicit session end. The existing CI-only Windows host gate additionally checks selected-only projection, no implicit scope, no extra host fetch/writes, retained private state and partial results after revocation. These gates were authored and syntax-checked, **not executed locally**; no browser, socket, downloaded app or Java was started.
 
-Full CI/compiled packages, real browser/host/device/OEM, tag/AI/sync integration, generalized persistent catalogue/trust/native work and the complete modular reader objective remain OPEN. PR208 and its Dev84 handoff stay unchanged; do not relabel them as this source. A later cloud build needs separate human approval, new candidate signing identity metadata and exact-source evidence. No stale green, synthetic SQL or import graph can establish physical upgrade/data retention, true source interoperability, gesture feel, recommendation quality or legal clearance.
+Full CI/compiled packages, real browser/host/device/OEM, tag/AI/sync integration, generalized persistent catalogue/trust/native work and the complete modular reader objective remain OPEN until their own exact-source evidence exists. PR208 and its Dev84 handoff stay unchanged; do not relabel them as this source. Remote build authorization now exists, but success is not presumed. No stale green, synthetic SQL or import graph can establish physical upgrade/data retention, true source interoperability, gesture feel, recommendation quality or legal clearance.

@@ -9,7 +9,7 @@ function versionContract(workflow: string) {
     ]
     return (
         authorities.length === 1 &&
-        Number(authorities[0][1]) > 83 &&
+        Number(authorities[0][1]) > 84 &&
         workflow.includes(
             'export PICA_ANDROID_VERSION_CODE="$PICA_ANDROID_CANDIDATE_VERSION_CODE"'
         ) &&
@@ -22,7 +22,7 @@ function versionContract(workflow: string) {
 }
 
 describe('unpublished Android build and manifest version authority', () => {
-    it('builds and verifies Dev84 from one public authority without weakening package/certificate gates', () => {
+    it('builds and verifies Dev85 from one public authority without weakening package/certificate gates', () => {
         const workflow = fs.readFileSync(
             '.github/workflows/next-consolidated-acceptance.yml',
             'utf8'
@@ -35,14 +35,14 @@ describe('unpublished Android build and manifest version authority', () => {
             'Dev manifest versionCode does not match expected'
         )
     })
-    it('rejects the frozen Dev83 authority rather than producing a same-version replacement', () => {
+    it('rejects the frozen Dev84 authority rather than producing a same-version replacement', () => {
         const workflow = fs.readFileSync(
             '.github/workflows/next-consolidated-acceptance.yml',
             'utf8'
         )
         const previous = workflow.replace(
             /^  PICA_ANDROID_CANDIDATE_VERSION_CODE: '\d+'$/m,
-            "  PICA_ANDROID_CANDIDATE_VERSION_CODE: '83'"
+            "  PICA_ANDROID_CANDIDATE_VERSION_CODE: '84'"
         )
         expect(versionContract(previous)).toBe(false)
     })

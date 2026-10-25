@@ -5,15 +5,15 @@ const workflow = fs.readFileSync('.github/workflows/next-consolidated-acceptance
 const windows = workflow.split('\n  windows:\n')[1]?.split('\n  android:\n')[0] ?? ''
 
 function pinnedPredecessor(value: string) {
-    return value.includes("run-id: '40192577286'") &&
+    return value.includes("run-id: '40204828683'") &&
         value.includes('repository: Saber-Alter-Lily/pica-library') &&
         value.includes('name: Pica-Library-Next-Acceptance-Windows') &&
-        value.includes('path: artifacts/prior-dev84') &&
-        value.includes(".Hash.ToLowerInvariant() -ne '571d7fddd0aee561513ed60c2b777e3a88a9445db32ffb7cdcd9265b28d31634'") &&
-        value.includes(".Trim() -ne '295942c297f9377b28df5a2d3d32a311fed8a18f'") &&
-        value.includes("throw 'Frozen Dev84 payload hash mismatch'") &&
-        value.includes("throw 'Frozen Dev84 source mismatch'") &&
-        value.includes("throw 'Frozen Dev84 artifact unavailable; do not substitute or skip'")
+        value.includes('path: artifacts/prior-dev85') &&
+        value.includes(".Hash.ToLowerInvariant() -ne 'd35ca45c7909197236eb27206370504f202b32b62b1f79aca452d0742fb31bb2'") &&
+        value.includes(".Trim() -ne '16449a00a0eb2d9d0d792e5efe5312c86dbf4220'") &&
+        value.includes("throw 'Frozen Dev85 payload hash mismatch'") &&
+        value.includes("throw 'Frozen Dev85 source mismatch'") &&
+        value.includes("throw 'Frozen Dev85 artifact unavailable; do not substitute or skip'")
 }
 
 describe('candidate-only exact predecessor upgrade recipe', () => {
@@ -22,7 +22,7 @@ describe('candidate-only exact predecessor upgrade recipe', () => {
         expect(windows).not.toContain('continue-on-error:')
     })
     it('detects changed package, source or run authority', () => {
-        for (const authority of ['571d7fddd0aee561513ed60c2b777e3a88a9445db32ffb7cdcd9265b28d31634', '295942c297f9377b28df5a2d3d32a311fed8a18f', '40192577286']) {
+        for (const authority of ['d35ca45c7909197236eb27206370504f202b32b62b1f79aca452d0742fb31bb2', '16449a00a0eb2d9d0d792e5efe5312c86dbf4220', '40204828683']) {
             expect(pinnedPredecessor(windows.replaceAll(authority, 'UNPINNED'))).toBe(false)
         }
     })
@@ -39,6 +39,6 @@ describe('candidate-only exact predecessor upgrade recipe', () => {
         expect(scenarios.filter(line => !line.includes('-Force'))).toHaveLength(1)
         expect(scenarios.filter(line => line.includes('-ForceHealthFailure'))).toHaveLength(1)
         expect(scenarios.filter(line => line.includes('-ForceLaunchFailure'))).toHaveLength(1)
-        expect(scenarios.every(line => line.includes('-DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev84'))).toBe(true)
+        expect(scenarios.every(line => line.includes('-DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev85'))).toBe(true)
     })
 })

@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## Reader-runtime correction — authorized Dev86 cloud candidate (2026-10-25)
+
+**Status: LOCAL_FIX_SEALED / NEW_EXACT_HEAD_CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_QA_PENDING. Not released or deployed.**
+
+- Human corrected the accidental local-only choice and explicitly authorized this independent Draft branch, required candidate metadata and existing-Secret unpublished Actions builds. Frozen PR209 stays at `16449a00a0eb2d9d0d792e5efe5312c86dbf4220`; corrective source `9aa5e1d162bcf6d804e489d0cede43bff14567c7` and its complete source-only review ZIP SHA256 `b039bfff2e0ff7494a13d5b5d468b7ad0b666ddde2e99b3cc9239be2afe13f9b` remain immutable.
+- Candidate-only Dev86 uses one public build/manifest authority, the unchanged Dev package and fixed certificate. Signing remains owner/public/exact-branch/non-PR only, after tests/lint/release-compatibility checks. No private key is downloaded. The still-NOT_FOUND coordination exception covers only the approved work; no registration, DPAPI or Windows security-policy change.
+- Retains all nine normal/health/launch replacement scenarios: stable baseline, current deep path and the exact actual Dev85 predecessor. Dev85 run40204828683, source16449a00a0eb and Windows payload SHA256 `d35ca45c7909197236eb27206370504f202b32b62b1f79aca452d0742fb31bb2` are pinned; unavailable/expired/mismatched artifacts fail closed rather than substituting a rebuild/latest. This remains replacement-engine evidence, not old-client OTA discovery.
+- Adds authored cloud-only real Chromium cold/late-image centering plus stored-page checks, and compiled Windows default-LAN-off, explicit enable/disable, paired-token continuity and display-setting restart gates. Browser image requests are synthetic/no-store; the test does not scroll to repair the app. Source-side artifacts retain the screenshot/diagnostics. These gates are not run on the user's PC and remain PENDING until the exact new source actually executes them successfully.
+- Local overlay selection passes170 assertions/13 files plus strict types and Web53/53; the two cloud test scripts are parsed, not executed here. Those local mock/static/fixture tests are not new Chromium, Windows, signature or installation evidence. The frozen159-assertion source-only handoff is not rewritten or relabeled.
+- No new product feature, source protocol, native implementation, DB schema/migration, dependency, ranking/Visual/tag/sync or updater implementation change is added by this build overlay. Current full CI, actual ZIP/APK/source/certificate and upgrade/runtime receipts must be inspected before handoff. No main merge, tag/Release, stable OTA, G-drive replacement, local Java/application/browser/listener or production-state access.
+
 ## Dev85 local runtime acceptance — bounded Reader/LAN corrective slice (2026-10-25)
 
 **Status: LOCAL_SOURCE_AND_OFFLINE_GATES / NEW_BROWSER_AND_INSTALLABLE_RUNTIME_GATES_PENDING / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**

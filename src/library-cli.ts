@@ -24,6 +24,8 @@ import type {
 import type { DownloadRunner } from './core/downloads/types'
 import { PRODUCT_VERSION } from './version'
 import { LocalLibraryIngestion } from './local-library/ingestion'
+import { SourceRuntime } from './sources/source-policy'
+import { cliSourcePolicyFromArgs } from './sources/cli-source-policy'
 
 loadEnv()
 
@@ -50,7 +52,8 @@ const flagsWithValues = new Set([
     'page',
     'output',
     'path',
-    'kind'
+    'kind',
+    'sources'
 ])
 
 function flag(name: string, fallback?: string) {
@@ -136,11 +139,13 @@ Maintenance options:
 
 Global options:
   --data-dir PATH   Data, database and library root (default: .pica-library)
+  --sources IDS     Explicit optional sources: pica,eh,jm or none (default: none)
   --json            Machine-readable output
   --profile NAME    conservative, balanced, fast or custom
   --runner NAME     LOCAL or GITHUB
 
-Connected commands use PICA_ACCOUNT and PICA_PASSWORD from the environment or
+Local commands and serve do not enable a source. Connected commands also require
+an explicit selection, e.g. sync --sources pica. Pica uses PICA_ACCOUNT and PICA_PASSWORD from the environment or
 .env.local. Credentials and tokens are never written to the library database.`)
 }
 
@@ -179,8 +184,9 @@ async function main() {
     const databaseFile = path.resolve(
         flag('db', path.join(dataDir, 'library.db'))!
     )
+    const sources = new SourceRuntime(cliSourcePolicyFromArgs(argv))
     const database = new LibraryDatabase(databaseFile)
-    const service = new LibraryService(database, dataDir)
+    const service = new LibraryService(database, dataDir, undefined, undefined, undefined, sources)
     let keepOpen = false
     try {
         if (command === 'local-import') {

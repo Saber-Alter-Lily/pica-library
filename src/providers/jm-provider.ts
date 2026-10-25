@@ -11,6 +11,12 @@ import { JmWorkerTransport, type JmTransport } from './jm-worker'
 import { HttpMediaClient } from '../media/http-media-client'
 import { SourceDisabledError, type SourceAccess } from '../sources/source-policy'
 
+export interface JmAccountSnapshot extends ProviderAccountIdentity {
+    enabled: boolean
+    remembered: boolean
+    verification: 'CACHED' | 'NOT_CHECKED'
+}
+
 export class JmProvider implements AccountComicProvider {
     readonly id = 'jm' as const
     get capabilities() {
@@ -63,6 +69,29 @@ export class JmProvider implements AccountComicProvider {
                 `${this.identity.accountId ?? 'anonymous'}\n${this.transport.sessionKey?.() ?? ''}`
             )
             .digest('hex')
+    }
+    /** Passive local evidence only: never restore credentials or request a worker. */
+    accountSnapshot(): JmAccountSnapshot {
+        let enabled = true
+        try { this.sourceAccess?.('jm') } catch (error) {
+            if (!(error instanceof SourceDisabledError)) throw error
+            enabled = false
+        }
+        return {
+            configured: Boolean(this.identity.configured),
+            ...(typeof this.identity.accountId === 'string' ? {accountId: this.identity.accountId} : {}),
+            ...(typeof this.identity.username === 'string' ? {username: this.identity.username} : {}),
+            enabled,
+            remembered: Boolean(this.remembered),
+            verification: this.identity.configured ? 'CACHED' : 'NOT_CHECKED'
+        }
+    }
+    /** The user explicitly requested a connection, including retrying remembered login. */
+    connectAccount() {
+        this.sourceAccess?.('jm')
+        if (!this.available) throw new Error('此包尚未包含 JM 运行组件')
+        if (!this.identity.configured) this.restoreAttempted = false
+        return this.accountStatus()
     }
     async accountStatus() {
         try { this.sourceAccess?.('jm') } catch (error) {

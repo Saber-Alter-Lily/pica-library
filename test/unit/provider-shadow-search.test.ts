@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Pica } from '../../src/sdk'
 import { LibraryDatabase } from '../../src/library/database'
 import { ProviderService } from '../../src/services/provider-service'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 function picaComic(id: string) {
     return {
@@ -53,7 +54,7 @@ function fixture() {
     } as unknown as Pica
     const service = new ProviderService(
         async () => fake,
-        database
+        database, undefined, undefined, enabledFixtureSources()
     )
     return {
         dir,

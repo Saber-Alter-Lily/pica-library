@@ -13,6 +13,7 @@ import {
     initialSourcePolicy
 } from '../../src/sources/source-policy'
 import { HttpMediaClient } from '../../src/media/http-media-client'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const cleanups: Array<() => void> = []
 afterEach(() => {
@@ -28,7 +29,7 @@ function fixture() {
         db.close()
         fs.rmSync(root, { recursive: true, force: true })
     })
-    const sources = new SourceRuntime()
+    const sources = enabledFixtureSources()
     const transport = {
         available: true,
         request: vi.fn(async () => ({ items: [] })),
@@ -174,7 +175,7 @@ describe('source lifecycle at real call boundaries', () => {
         await new Promise<void>((resolve) =>
             server.listen(0, '127.0.0.1', resolve)
         )
-        const sources = new SourceRuntime()
+        const sources = enabledFixtureSources()
         const lease = sources.acquire('jm')
         const media = new HttpMediaClient({
             proxyUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}`

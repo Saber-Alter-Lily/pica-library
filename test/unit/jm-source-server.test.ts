@@ -5,16 +5,21 @@ import { expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 it('keeps JM credentials/import mutations inside the loopback Desktop CSRF boundary', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-jm-server-'))
     const database = new LibraryDatabase(path.join(dir, 'library.db'))
-    const service = new LibraryService(database, dir)
+    const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
     vi.spyOn(service, 'jmRuntimeAvailable').mockReturnValue(true)
     vi.spyOn(service, 'jmAccountStatus').mockResolvedValue({
         configured: true,
-        username: 'Fixture'
+        username: 'Fixture',
+        enabled: true,
+        remembered: true,
+        verification: 'CACHED'
     })
+    const connect = vi.spyOn(service, 'jmConnectAccount').mockResolvedValue({configured: true, username: 'Fixture'})
     const preview = vi
         .spyOn(service, 'jmPreviewFavorites')
         .mockResolvedValue({
@@ -53,9 +58,13 @@ it('keeps JM credentials/import mutations inside the loopback Desktop CSRF bound
         expect(status).toEqual({
             available: true,
             configured: true,
-            username: 'Fixture'
+            username: 'Fixture',
+            enabled: true,
+            remembered: true,
+            verification: 'CACHED'
         })
-        const call = (action: string, csrf: string, origin = started.url) =>
+        expect(connect).not.toHaveBeenCalled()
+        const call = (action: string, csrf: string, origin = started.url, input: object = {folderId: 0}) =>
             fetch(`${started.url}/api/v1/desktop/sources/jm/${action}`, {
                 method: 'POST',
                 headers: {
@@ -63,7 +72,7 @@ it('keeps JM credentials/import mutations inside the loopback Desktop CSRF bound
                     'x-pica-csrf': csrf,
                     origin
                 },
-                body: JSON.stringify({ folderId: 0 })
+                body: JSON.stringify(input)
             })
         expect((await call('preview', '')).status).toBe(403)
         expect(
@@ -71,6 +80,12 @@ it('keeps JM credentials/import mutations inside the loopback Desktop CSRF bound
                 .status
         ).toBe(403)
         expect(preview).not.toHaveBeenCalled()
+        expect((await call('connect', '', started.url, {})).status).toBe(403)
+        expect((await call('connect', 'fixture-csrf', 'https://not-local.example', {})).status).toBe(403)
+        expect((await call('connect', 'fixture-csrf', started.url, {enabled: ['jm']})).status).toBe(400)
+        expect(connect).not.toHaveBeenCalled()
+        expect((await call('connect', 'fixture-csrf', started.url, {})).status).toBe(200)
+        expect(connect).toHaveBeenCalledOnce()
         expect((await call('preview', 'fixture-csrf')).status).toBe(200)
         expect(preview).toHaveBeenCalledOnce()
         expect((await call('logout', 'fixture-csrf')).status).toBe(200)

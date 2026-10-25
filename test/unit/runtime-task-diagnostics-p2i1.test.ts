@@ -10,6 +10,7 @@ import {
     sanitizeRuntimeDiagnosticError,
     runtimeTaskDiagnostic
 } from '../../src/runtime/task-diagnostics'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 
@@ -34,7 +35,7 @@ function setup(provider: Partial<Pica> = {}) {
         },
         ...provider
     } as unknown as Pica
-    const service = new LibraryService(database, dataDir, pica)
+    const service = new LibraryService(database, dataDir, pica, undefined, undefined, enabledFixtureSources())
     return { database, service }
 }
 

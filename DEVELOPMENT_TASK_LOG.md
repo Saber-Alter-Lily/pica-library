@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## Source admission and idle observation boundary (2026-10-25, local-only)
+
+**LOCAL_ONLY_CORE_DEFAULT / EXPLICIT_CLI_SOURCES / PASSIVE_JM_STATUS / FROZEN_PR207_UNCHANGED / FULL_GOAL_OPEN.**
+
+- Continues candidate `1b7a9184eca11f73b295a55827d2cddee34dc69c` on a new local branch, not the unfinished profile-recovery branch. PR207, its Dev83/Windows handoff, main, stable OTA and official data remain untouched. User authorized this isolated write exception after Local Memory routing returned NOT_FOUND and broker status still showed DPAPI failure; no registration/secret/security-policy changes.
+- New SourceRuntime/LibraryService/ProviderService contexts default to no external adapters, even with credentials or an injected SDK. Desktop explicitly retains its old-config compatibility and saved choices. CLI uses an explicit validated `--sources pica,eh,jm|none` invocation choice before opening storage; intentional online CLI automation must add that flag. No implicit credential-to-source consent.
+- JM settings GET now reads an allowlisted local account snapshot and never restores login/requests a worker. UI distinguishes remembered/cached/not-checked in three languages. Empty-body, Desktop-CSRF-protected explicit connect reuses the existing worker/account flow, can retry saved login, and cannot enable sources or accept secrets/choice fields. The earlier trigger was opening the JM section, not ordinary homepage startup.
+- Local selected gates108/108 across17 inspected suites, strict types and Web51 PASS. Original68pass/1 historical policy-hash guard failure is retained; updated current pin plus exact inverse old-text hash permits only the reviewed default change. Historical50 fixture/harness files/92 constructors now declare their prior enabled context via a test-only helper; default-off tests remain separate. No test is skipped to obtain this result.
+- Actual HTTP route/CSRF cases are extended but not locally run. Current full CI/browser/package/signature/upgrade/device/provider gates remain pending; no prior green is borrowed. No local Java/app/browser/listener or production data, new dependencies/schema/Android/ranking/Visual/sync/updater changes, push/Release/OTA/install/deployment. [Boundary, CLI compatibility and limits](docs/SOURCE_IDLE_BOUNDARY.md).
+
 ## Reader reliability integration — focused unpublished candidate (2026-10-25)
 
 **IMPLEMENTED_AND_LOCALLY_INTEGRATED / EXACT_HEAD_CLOUD_RECEIPTS_ARE_SEPARATE / MANUAL_QA_PENDING / FULL_GOAL_OPEN.**

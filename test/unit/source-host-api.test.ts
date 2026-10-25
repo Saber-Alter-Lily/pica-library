@@ -14,6 +14,7 @@ import { sourceHostStore } from '../../src/desktop/source-host-store'
 import { HostedLibraryReader } from '../../src/source-hosts/library-reader'
 import { PreviewCacheManager } from '../../src/services/preview-cache-manager'
 import { shadowDatabaseState } from '../fixtures/recommendation-shadow-fixture'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const cleanup: (() => Promise<void>)[] = []
 const route = '/api/v1/desktop/source-hosts/inspect'
@@ -26,7 +27,7 @@ afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await c
 
 async function fixture(options: { configured?: boolean; desktop?: boolean } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-host-api-')), db = new LibraryDatabase(path.join(root, 'library.db'))
-    const service = new LibraryService(db, root)
+    const service = new LibraryService(db, root, undefined, undefined, undefined, enabledFixtureSources())
     service.sources.apply({ schemaVersion: 1, revision: 1, enabled: [] })
     db.setAppState('synthetic.source-host.private-canary', { password: 'not-for-host-export', tags: ['private'], preserved: true })
     let behavior = 'normal', signal: AbortSignal | undefined, resolveEntered!: () => void, resolveLate!: () => void

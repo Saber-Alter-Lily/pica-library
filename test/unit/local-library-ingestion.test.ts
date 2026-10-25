@@ -14,6 +14,7 @@ import { ReaderService } from '../../src/services/reader-service'
 import { LibraryQueryService } from '../../src/services/library-query-service'
 import { comicTagProviderV1, normalizeTagPolicyV1 } from '../../src/tags/policy'
 import { favoritesFromCsv, favoritesToCsv } from '../../src/library/csv'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6FkwAAAAASUVORK5CYII=',
@@ -59,7 +60,7 @@ describe('local-first owned media ingestion (synthetic, no provider)', () => {
             search: async () => ({ docs: [], pages: 1 }),
             comicsPage: async () => ({ docs: [], pages: 1 })
         }
-        const service = new LibraryService(f.db, f.data, sdk as never)
+        const service = new LibraryService(f.db, f.data, sdk as never, undefined, undefined, enabledFixtureSources())
         await service.recommendations({ limit: 1 })
         expect(related).not.toHaveBeenCalled()
         f.db.importFavorites(
@@ -143,7 +144,7 @@ describe('local-first owned media ingestion (synthetic, no provider)', () => {
         const connect = vi
             .spyOn(LibraryService.prototype, 'connect')
             .mockRejectedValue(new Error('Must not connect'))
-        const service = new LibraryService(f.db, f.data)
+        const service = new LibraryService(f.db, f.data, undefined, undefined, undefined, enabledFixtureSources())
         expect((await service.cover(result.comicId)).data).toEqual(png)
         await service.providerService().setFavorite(result.comicId, true)
         expect(connect).not.toHaveBeenCalled()

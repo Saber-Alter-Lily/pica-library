@@ -6,6 +6,7 @@ import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
 import { startMobileBridge } from '../../src/mobile/bridge-server'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const png = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6FkwAAAAASUVORK5CYII=',
@@ -28,7 +29,7 @@ describe('local import HTTP and paired Reader boundary', () => {
         const connect = vi
             .spyOn(LibraryService.prototype, 'connect')
             .mockRejectedValue(new Error('No provider allowed'))
-        const service = new LibraryService(db, data)
+        const service = new LibraryService(db, data, undefined, undefined, undefined, enabledFixtureSources())
         service.sources.apply({ schemaVersion: 1, revision: 1, enabled: [] })
         cleanup.push(async () => {
             db.close()

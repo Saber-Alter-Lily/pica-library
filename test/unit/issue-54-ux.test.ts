@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const root = path.resolve(import.meta.dirname, '../..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
@@ -70,7 +71,7 @@ describe('Issue #54 UX regression contract', () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-issue54-'))
         const databasePath = path.join(dir, 'library.sqlite')
         let database = new LibraryDatabase(databasePath)
-        let service = new LibraryService(database, dir)
+        let service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
         expect(
             service.updateVisualSettings({
                 enabled: true,
@@ -87,7 +88,7 @@ describe('Issue #54 UX regression contract', () => {
         database.close()
 
         database = new LibraryDatabase(databasePath)
-        service = new LibraryService(database, dir)
+        service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
         expect(service.visualSettings()).toMatchObject({
             enabled: true,
             samplingMode: 'standard',

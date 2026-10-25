@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { RuntimeResourceCoordinator } from '../../src/runtime/resource-coordinator'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 
@@ -26,7 +27,7 @@ describe('P2 C2B shared runtime resource observation', () => {
             dataDir,
             undefined,
             undefined,
-            coordinator
+            coordinator, enabledFixtureSources()
         )
 
         const lease = await coordinator.acquire({

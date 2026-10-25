@@ -47,6 +47,8 @@ The Web shell loads existing local state but does not automatically create an on
 
 ## One-click upgrade contract
 
+[Explicit source admission and passive JM observations](SOURCE_IDLE_BOUNDARY.md) continues the local-first boundary after the frozen acceptance candidate. New core/service/CLI contexts require explicit source choices; pre-policy Desktop compatibility stays in its configuration adapter. Opening the JM section reads cached evidence only, while connection/restored login is an explicit command. This local source work is not in the prior installables and still needs full cloud/runtime/device acceptance.
+
 - Application modules ship together in the signed/verified application distribution. Users retain one update action; they do not manage seven independent packages.
 - `app/module-contracts.json` is copied from the versioned source declaration and compared against the actual running engine by the Windows artifact gate. It contains public interface numbers only, not user state or executable entry points.
 - New incremental manifests bind their module declarations to the target payload (or unchanged compiled declaration). Mismatched, undeclared, malformed or removed declarations reject before extraction/application.

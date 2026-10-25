@@ -10,6 +10,7 @@ import {
     runHttpLatencyScenario,
     type ScenarioOptions
 } from './http-latency-scenario'
+import { enabledFixtureSources } from "../../test/helpers/source-runtime-fixture"
 
 interface J8Options {
     rounds: number
@@ -182,7 +183,7 @@ async function main() {
         }
     } as unknown as Pica
 
-    const service = new LibraryService(database, root, provider)
+    const service = new LibraryService(database, root, provider, undefined, undefined, enabledFixtureSources())
     const started = await (
         await import('../../src/library/server')
     ).startLibraryServer({

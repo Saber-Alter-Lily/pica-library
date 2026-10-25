@@ -6,6 +6,7 @@ import type { Pica } from '../../src/sdk'
 import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import type { Episode } from '../../src/types'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const directories: string[] = []
 
@@ -39,7 +40,7 @@ function setup(provider: Partial<Pica> = {}) {
         },
         ...provider
     } as unknown as Pica
-    const service = new LibraryService(database, dataDir, pica)
+    const service = new LibraryService(database, dataDir, pica, undefined, undefined, enabledFixtureSources())
     return { dataDir, database, service }
 }
 

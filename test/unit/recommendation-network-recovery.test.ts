@@ -6,6 +6,7 @@ import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { retrieveCandidatesV3 } from '../../src/recommendation-v3/retriever-v3'
 import { CycleCoordinatorV3, type BuiltRecommendationCycleV3 } from '../../src/recommendation-v3/cycle-coordinator-v3'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const dirs: string[] = []
 function tempDb(prefix: string) {
@@ -27,7 +28,7 @@ describe('recommendation network interruption recovery', () => {
                 buildingRequestId: 'old-request',
                 versions: {}
             })
-            const service = new LibraryService(database, dir)
+            const service = new LibraryService(database, dir, undefined, undefined, undefined, enabledFixtureSources())
             const state = database.getAppState<Record<string, unknown>>(
                 'recommendation.v3.activeCycle.v1'
             )!

@@ -476,6 +476,10 @@ export async function startLibraryServer(options: {
                     return json(response, 200, { available: options.service.jmRuntimeAvailable(), ...await options.service.jmAccountStatus() })
                 if (request.method === 'POST') {
                     const input = await body(request)
+                    if (action === 'connect') {
+                        if (Object.keys(input).length) return json(response, 400, { error: 'JM connect accepts no credential or source-choice fields' })
+                        return json(response, 200, await options.service.jmConnectAccount())
+                    }
                     if (action === 'login' || action === 'logout') return json(response, 200, await options.desktop.save({ ...input, jmAccountAction: action }))
                     if (action === 'preview') return json(response, 200, await options.service.jmPreviewFavorites(Number(input.folderId ?? 0), async () => { if (response.destroyed) throw new Error('收藏扫描已取消') }))
                     if (action === 'confirm') return json(response, 200, await options.service.jmConfirmFavorites(String(input.token ?? '')))

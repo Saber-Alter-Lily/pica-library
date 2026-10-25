@@ -60,7 +60,7 @@ export class SourceRuntime {
     private policy: SourcePolicyV1
     private readonly controllers = new Map<SourceId, AbortController>()
 
-    constructor(policy = initialSourcePolicy(true)) {
+    constructor(policy = initialSourcePolicy()) {
         this.policy = normalizeSourcePolicy(policy)
         for (const id of SOURCE_IDS)
             this.controllers.set(id, new AbortController())

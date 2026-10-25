@@ -6,6 +6,7 @@ import { LibraryDatabase } from '../../src/library/database'
 import { LibraryService } from '../../src/library/service'
 import { startLibraryServer } from '../../src/library/server'
 import type { Pica } from '../../src/sdk'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('account and online reader HTTP boundary (no external provider)', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-onboarding-http-'))
@@ -24,7 +25,7 @@ describe('account and online reader HTTP boundary (no external provider)', () =>
         ],
         fetchImage: fetchPage
     } as unknown as Pica
-    const service = new LibraryService(database, dir, sdk)
+    const service = new LibraryService(database, dir, sdk, undefined, undefined, enabledFixtureSources())
     let started: Awaited<ReturnType<typeof startLibraryServer>>
     beforeAll(async () => {
         started = await startLibraryServer({

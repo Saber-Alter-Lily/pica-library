@@ -15,6 +15,7 @@ import {
     runHttpLatencyScenario,
     type ScenarioOptions
 } from './http-latency-scenario'
+import { enabledFixtureSources } from "../../test/helpers/source-runtime-fixture"
 
 interface Options {
     rounds: number
@@ -301,7 +302,7 @@ async function main() {
         root,
         provider,
         undefined,
-        coordinator
+        coordinator, enabledFixtureSources()
     )
     seedRemoteSource(
         database,

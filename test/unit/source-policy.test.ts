@@ -5,6 +5,7 @@ import {
     SourceDisabledError,
     SourceRuntime
 } from '../../src/sources/source-policy'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 describe('installation-local source policy', () => {
     it('fresh installs are local-only and legacy choices are preserved explicitly', () => {
@@ -39,7 +40,7 @@ describe('installation-local source policy', () => {
         expect(runtime.isEnabled('jm')).toBe(true)
     })
     it('disabling fences in-flight work and old leases remain invalid after reenabling', () => {
-        const runtime = new SourceRuntime()
+        const runtime = enabledFixtureSources()
         const jm = runtime.acquire('jm'),
             pica = runtime.acquire('pica')
         expect(runtime.apply(runtime.prepare(['pica', 'eh'], 0))).toEqual([
@@ -54,7 +55,7 @@ describe('installation-local source policy', () => {
         expect(() => pica.check()).not.toThrow()
     })
     it('rejects malformed policy before any enabled source or lease changes', () => {
-        const runtime = new SourceRuntime(),
+        const runtime = enabledFixtureSources(),
             lease = runtime.acquire('eh')
         expect(() =>
             runtime.apply({ schemaVersion: 1, revision: -1, enabled: [] })

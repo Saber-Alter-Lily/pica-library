@@ -15,6 +15,7 @@ import type {
     ProviderComic,
     ProviderFavoritesPage
 } from '../../src/providers/types'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const cleanups: Array<() => void> = []
 afterEach(() => {
@@ -312,7 +313,7 @@ describe('source routing and bounded account-favorite imports', () => {
         const jm = new JmProvider(
             transport as ConstructorParameters<typeof JmProvider>[0]
         )
-        const service = new ProviderService(connect, db, undefined, jm)
+        const service = new ProviderService(connect, db, undefined, jm, enabledFixtureSources())
         expect((await service.getComicDetails('jm:1')).providerId).toBe('jm')
         await service.getEpisodes('jm:1')
         await jm.login('fixture', 'not-a-real-secret')

@@ -18,6 +18,7 @@ import {
 } from '../../src/recommendation-v5/portable-policy'
 import { WORK_IDENTITY_RESOLVER_VERSION } from '../../src/recommendation-v5/work-identity-foundation'
 import { FrozenWorkIdentityV5 } from './work-identity-legacy'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 // Reuse the existing all-table synthetic snapshot; it opens no profile on import.
 export { shadowDatabaseState as identityDatabaseState } from './recommendation-shadow-fixture'
 
@@ -282,7 +283,7 @@ export function identityFixture(scenario: IdentityScenario = 'ready') {
         task = workIdentityTaskPortsV5(proxy, catalog)
     const queries = new WorkIdentityQueriesV5(read),
         commands = new WorkIdentityCommandsV5(queries, write)
-    const service = new LibraryService(proxy, root),
+    const service = new LibraryService(proxy, root, undefined, undefined, undefined, enabledFixtureSources()),
         frozen = new FrozenWorkIdentityV5(proxy)
     trace.length = 0
     return {

@@ -6,6 +6,7 @@ import { LibraryDatabase } from '../../src/library/database'
 import { ProviderService } from '../../src/services/provider-service'
 import type { Comic, PageFavorites } from '../../src/types'
 import type { Pica } from '../../src/sdk'
+import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
 const roots: string[] = []
 
@@ -80,7 +81,7 @@ describe('fast favorites synchronization', () => {
         const provider = { favorites } as unknown as Pica
         const result = await new ProviderService(
             async () => provider,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('quick')
         expect(result).toMatchObject({
             syncMode: 'quick',
@@ -106,7 +107,7 @@ describe('fast favorites synchronization', () => {
         } as unknown as Pica
         const result = await new ProviderService(
             async () => provider,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('quick')
         expect(result).toMatchObject({ syncMode: 'quick', foundNew: 2 })
         database.close()
@@ -131,7 +132,7 @@ describe('fast favorites synchronization', () => {
         )
         const result = await new ProviderService(
             async () => ({ favorites }) as unknown as Pica,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('quick')
         expect(result).toMatchObject({ syncMode: 'quick', pagesChecked: 1 })
         database.close()
@@ -156,7 +157,7 @@ describe('fast favorites synchronization', () => {
         )
         const result = await new ProviderService(
             async () => ({ favorites }) as unknown as Pica,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('quick')
         expect(result).toMatchObject({ syncMode: 'quick', pagesChecked: 2 })
         database.close()
@@ -172,7 +173,7 @@ describe('fast favorites synchronization', () => {
         )
         const result = await new ProviderService(
             async () => ({ favorites }) as unknown as Pica,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('quick')
         expect(result.pagesChecked).toBeLessThanOrEqual(2)
         database.close()
@@ -197,7 +198,7 @@ describe('fast favorites synchronization', () => {
         } as unknown as Pica
         const result = await new ProviderService(
             async () => provider,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('quick')
         expect(result).toMatchObject({
             syncMode: 'full',
@@ -216,7 +217,7 @@ describe('fast favorites synchronization', () => {
                 return { comics: exact, pages: 1 }
             })
         } as unknown as Pica
-        await new ProviderService(async () => provider, database).syncFavorites(
+        await new ProviderService(async () => provider, database, undefined, undefined, enabledFixtureSources()).syncFavorites(
             'full'
         )
         expect(database.favoriteIds()).toEqual(['exact-1', 'exact-2'])
@@ -240,7 +241,7 @@ describe('fast favorites synchronization', () => {
         } as unknown as Pica
         const result = await new ProviderService(
             async () => provider,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('full')
         expect(result.favoriteOrderIds).toEqual(
             providerOrder.map((item) => item._id)
@@ -264,7 +265,7 @@ describe('fast favorites synchronization', () => {
         } as unknown as Pica
         const result = await new ProviderService(
             async () => provider,
-            database
+            database, undefined, undefined, enabledFixtureSources()
         ).syncFavorites('quick')
         expect(result.syncMode).toBe('full')
         expect(new Set(database.favoriteIds()).size).toBe(20)

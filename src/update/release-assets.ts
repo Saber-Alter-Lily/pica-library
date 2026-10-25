@@ -4,6 +4,7 @@ import {
     updateTargetKey,
     type UpdateTarget
 } from './target'
+import { coreRuntimeComposition, runtimeCompositionSuffix, type RuntimeComposition } from '../modules/runtime-composition'
 
 export interface ReleaseAssetLike {
     name?: string
@@ -13,9 +14,14 @@ export interface ReleaseAssetLike {
 export function targetScopedUpdateAssetName(
     targetVersion: string,
     sourceVersion: string,
-    target: UpdateTarget
+    target: UpdateTarget,
+    composition: RuntimeComposition = coreRuntimeComposition()
 ) {
-    return `Pica-Library-v${targetVersion}-${updateTargetKey(target)}-update-from-v${sourceVersion}.zip`
+    return `Pica-Library-v${targetVersion}${runtimeCompositionSuffix(composition)}-${updateTargetKey(target)}-update-from-v${sourceVersion}.zip`
+}
+
+export function fullApplicationAssetName(version: string, target: UpdateTarget, composition: RuntimeComposition = coreRuntimeComposition()) {
+    return `Pica-Library-v${version}${runtimeCompositionSuffix(composition)}-${updateTargetKey(target)}.zip`
 }
 
 export function scopedUpdateAssetName(
@@ -33,13 +39,15 @@ export function selectReleaseUpdateAsset(
     assets: ReleaseAssetLike[] | undefined,
     targetVersion: string,
     sourceVersion: string,
-    target: UpdateTarget = LEGACY_GENERIC_UPDATE_TARGET
+    target: UpdateTarget = LEGACY_GENERIC_UPDATE_TARGET,
+    composition: RuntimeComposition = coreRuntimeComposition()
 ) {
     const list = assets ?? []
     const targetScopedName = targetScopedUpdateAssetName(
         targetVersion,
         sourceVersion,
-        target
+        target,
+        composition
     )
     const targetScoped = list.find(
         (asset) => asset.name === targetScopedName
@@ -55,7 +63,7 @@ export function selectReleaseUpdateAsset(
     // always described the Windows x64 distribution. Keep them only as a
     // compatibility path for that target; never let another OS/arch consume
     // them.
-    if (!isLegacyGenericUpdateTarget(target)) return null
+    if (!isLegacyGenericUpdateTarget(target) || runtimeCompositionSuffix(composition)) return null
 
     const scopedName = scopedUpdateAssetName(targetVersion, sourceVersion)
     const scoped = list.find((asset) => asset.name === scopedName)
@@ -81,12 +89,13 @@ export function selectReleaseUpdateAsset(
 export function updateAssetNamesForChecksums(
     targetVersion: string,
     sourceVersion: string,
-    target: UpdateTarget = LEGACY_GENERIC_UPDATE_TARGET
+    target: UpdateTarget = LEGACY_GENERIC_UPDATE_TARGET,
+    composition: RuntimeComposition = coreRuntimeComposition()
 ) {
     const names = [
-        targetScopedUpdateAssetName(targetVersion, sourceVersion, target)
+        targetScopedUpdateAssetName(targetVersion, sourceVersion, target, composition)
     ]
-    if (isLegacyGenericUpdateTarget(target))
+    if (isLegacyGenericUpdateTarget(target) && !runtimeCompositionSuffix(composition))
         names.push(
             scopedUpdateAssetName(targetVersion, sourceVersion),
             legacyUpdateAssetName(targetVersion)

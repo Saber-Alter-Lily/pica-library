@@ -15,9 +15,13 @@ import { applicationFetch } from './application-fetch'
 import { classifyUpdateCompatibility } from './compatibility'
 import { MODULE_CONTRACT_PATH, normalizeModuleContracts, parseModuleContracts, runtimeModuleContracts, sameModuleContracts } from '../modules/contracts'
 import { normalizeUpdatePath, updaterSelfReplacement, forbiddenUpdatePayload as forbiddenPayload } from './path-safety'
+import { compositionFromPayload, normalizeRuntimeComposition, RUNTIME_COMPOSITION_PATH } from '../modules/runtime-composition'
+import { requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { validateAutomaticFullRuntimeComposition, validateIncrementalRuntimeComposition } from './runtime-composition'
 import {
     selectReleaseUpdateAsset,
-    updateAssetNamesForChecksums
+    updateAssetNamesForChecksums,
+    fullApplicationAssetName
 } from './release-assets'
 import {
     LEGACY_GENERIC_UPDATE_TARGET,
@@ -102,7 +106,8 @@ function validateFullApplicationArchive(zip: AdmZip) {
         throw new Error('Full application SOURCE_SHA.txt is invalid')
     const moduleEntry = declared.get(MODULE_CONTRACT_PATH)
     if (moduleEntry) parseModuleContracts(moduleEntry.getData().toString('utf8'))
-    return { declared, sourceSha }
+    const composition = compositionFromPayload(declared.keys(), declared.get(RUNTIME_COMPOSITION_PATH)?.getData().toString('utf8'))
+    return { declared, sourceSha, composition }
 }
 
 function sha256(value: Buffer | string) {
@@ -189,6 +194,8 @@ function readManifest(zip: AdmZip): UpdateManifest {
         throw new Error('Update manifest file lists are invalid')
     if (manifest.moduleContracts !== undefined)
         manifest.moduleContracts = normalizeModuleContracts(manifest.moduleContracts)
+    if (manifest.runtimeComposition !== undefined)
+        manifest.runtimeComposition = normalizeRuntimeComposition(manifest.runtimeComposition)
     manifestUpdateTarget(manifest)
     return manifest
 }
@@ -656,6 +663,8 @@ export class UpdateManager {
 
     async checkForUpdate() {
         this.writeProgress({ phase: 'idle' })
+        // Invalid installed packaging facts must not be mislabeled as a network outage.
+        const composition = requireInstalledRuntimeComposition(this.options.applicationRoot)
         const request = this.options.fetchImplementation ?? applicationFetch
         try {
             const response = await request(
@@ -690,13 +699,14 @@ export class UpdateManager {
                               release.assets,
                               version,
                               this.options.currentVersion,
-                              target
+                              target,
+                              composition
                           )
                         : null
                     const fullAssetName =
                         target &&
                         updateTargetKey(target) === 'windows-x64'
-                            ? `Pica-Library-v${version}-windows-x64.zip`
+                            ? fullApplicationAssetName(version, target, composition)
                             : undefined
                     const fullAsset = fullAssetName
                         ? release.assets?.find(
@@ -736,14 +746,15 @@ export class UpdateManager {
                 ? updateAssetNamesForChecksums(
                       version,
                       this.options.currentVersion,
-                      target
+                      target,
+                      composition
                   ).find((name) => this.shaFromSums(sums, name))
                 : undefined
             const releaseUrl = `https://github.com/${officialRepository}/releases/tag/v${version}`
             const fullAssetName =
                 target &&
                 updateTargetKey(target) === 'windows-x64'
-                    ? `Pica-Library-v${version}-windows-x64.zip`
+                    ? fullApplicationAssetName(version, target, composition)
                     : undefined
             const verifiedFullAssetName =
                 fullAssetName && this.shaFromSums(sums, fullAssetName)
@@ -776,6 +787,7 @@ export class UpdateManager {
             const archiveHash = sha256(buffer)
         const zip = new AdmZip(buffer)
         const manifest = readManifest(zip)
+        const composition = requireInstalledRuntimeComposition(this.options.applicationRoot)
         const installedTarget = this.updateTarget()
         if (!installedTarget)
             throw new Error(
@@ -799,6 +811,8 @@ export class UpdateManager {
             targetDatabaseSchemaVersion: manifest.databaseSchemaVersion,
             currentModuleContracts: runtimeModuleContracts(),
             targetModuleContracts: manifest.moduleContracts,
+            currentRuntimeComposition: composition,
+            targetRuntimeComposition: manifest.runtimeComposition,
             updaterHelperChanged: updaterSelfReplacement([
                 ...manifest.files.map((item) => String(item.path ?? '')),
                 ...manifest.deletions
@@ -868,6 +882,9 @@ export class UpdateManager {
         }
         const declared = validateFileList(zip, manifest)
         validateModulePayload(zip, manifest)
+        validateIncrementalRuntimeComposition({ current: composition, target: manifest.runtimeComposition,
+            files: manifest.files.map(file => file.path), deletions: manifest.deletions,
+            descriptor: zip.getEntry(RUNTIME_COMPOSITION_PATH)?.getData().toString('utf8') })
         const id = randomUUID()
         const directory = path.join(this.options.stateRoot, `staged-${id}`)
         fs.mkdirSync(directory, { recursive: true })
@@ -949,8 +966,8 @@ export class UpdateManager {
                 throw new Error(
                     'Full application upgrade requires a newer stable version'
                 )
-            const expectedName =
-                `Pica-Library-v${version}-windows-x64.zip`
+            const composition = requireInstalledRuntimeComposition(this.options.applicationRoot)
+            const expectedName = fullApplicationAssetName(version, target, composition)
             if (archiveName !== expectedName)
                 throw new Error(
                     'Unexpected full application package name'
@@ -963,6 +980,7 @@ export class UpdateManager {
             )
             const zip = new AdmZip(buffer)
             const validated = validateFullApplicationArchive(zip)
+            validateAutomaticFullRuntimeComposition(composition, validated.composition)
             const id = randomUUID()
             const directory = path.join(
                 this.options.stateRoot,
@@ -1002,6 +1020,7 @@ export class UpdateManager {
                 directory,
                 targetVersion: version,
                 targetSourceSha: validated.sourceSha,
+                runtimeComposition: validated.composition,
                 stagedAt: new Date().toISOString()
             }
             this.writeProgress({
@@ -1063,6 +1082,11 @@ export class UpdateManager {
             // Fail before preparing a helper or asking the live app to exit.
             sqliteDiskFilename(path.resolve(context.libraryDirectory, 'library.db'))
             const full = this.stagedFull
+            validateAutomaticFullRuntimeComposition(
+                requireInstalledRuntimeComposition(this.options.applicationRoot),
+                requireInstalledRuntimeComposition(full.directory),
+                full.runtimeComposition
+            )
             const persistentAssistant =
                 this.preparePersistentUpgradeAssistant({
                     verifyExisting: true
@@ -1130,6 +1154,7 @@ export class UpdateManager {
                 progressFile: this.progressFile,
                 targetVersion: full.targetVersion,
                 targetSourceSha: full.targetSourceSha,
+                runtimeComposition: full.runtimeComposition,
                 previousUrl: context.currentUrl,
                 healthTimeoutMs: 60_000
             }

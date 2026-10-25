@@ -16,6 +16,7 @@ import { startMobileBridge, type MobileBridgeController } from '../mobile/bridge
 import { serializeBrowserLiteDataPackage } from '../library/bundle-export'
 import { Pica } from '../sdk'
 import { PRODUCT_VERSION } from '../version'
+import { installedRuntimeComposition } from '../runtime/installed-runtime-composition'
 import { RemoteStorageDesktopManager } from '../remote-storage/desktop-manager'
 import { RuntimeResourceCoordinator } from '../runtime/resource-coordinator'
 import { desktopRuntimeTaskDiagnostics } from '../runtime/desktop-task-diagnostics'
@@ -871,6 +872,7 @@ async function startEngine(preferredPort: number) {
             browserLiteExportProgress,
             mobileBridge: mobileBridge?.status() ?? null,
             mobileBridgePreference: mobileBridgeOptIn(config, runtimeOptions.mobileBridge, runtimeOptions.mode),
+            runtimeComposition: installedRuntimeComposition(applicationRoot),
             readerSettings: normalizeReaderSettings(config?.readerSettings),
             remoteApi: remoteApiGateway
                 ? {

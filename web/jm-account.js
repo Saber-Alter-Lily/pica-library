@@ -129,9 +129,9 @@ async function refresh() {
         ? t('来源已关闭 · 账号和本地下载保留', 'Source disabled · Account and local downloads retained', '配信元は無効 · アカウントとローカル保存は保持')
         : !result.available
         ? t(
-              '此包尚未包含 JM 运行组件',
-              'JM is not included in this package',
-              'このパッケージには JM が含まれていません'
+              '此应用包未包含有效的 JM 运行组件；普通本地阅读不受影响',
+              'This application has no valid JM runtime; local reading remains available',
+              '有効な JM 実行環境は含まれていません。ローカルの読書は引き続き利用できます'
           )
         : result.configured
           ? t(

@@ -92,8 +92,10 @@ async function fixture(mode: 'incremental' | 'full-application') {
             archiveSha256: 'fixture',
             targetVersion: '0.6.0',
             targetSourceSha: next,
+            runtimeComposition: { formatVersion: 1, sourceRuntimes: [] },
             stagedAt: new Date(0).toISOString()
         }
+        fs.mkdirSync(path.join(root, 'full-staged'))
         const digest = createHash('sha256').update('synthetic').digest('hex')
         vi.spyOn(manager, 'preparePersistentUpgradeAssistant').mockReturnValue({
             available: true,

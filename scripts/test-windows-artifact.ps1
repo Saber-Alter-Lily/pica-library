@@ -3,6 +3,7 @@ param(
     [switch]$PortCollision,
     [switch]$SetupPersistence,
     [switch]$LocalOnlySetup,
+    [ValidateSet('', 'core', 'jm')][string]$ExpectedSourceRuntimes = '',
     [string]$ExpectedVersion = '',
     [string]$DesktopHomeName = 'Pica Library'
 )
@@ -105,6 +106,15 @@ try {
     if ($PortCollision -and $instance.url -eq 'http://127.0.0.1:4789') { throw 'Packaged app attached to unrelated port occupant' }
     $status = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/status') -TimeoutSec 10
     if ($status.application -ne 'Pica Library' -or $status.version -ne $expectedVersion -or $status.configured) { throw 'Unexpected packaged status' }
+    if ($ExpectedSourceRuntimes) {
+        $actual = $status.runtimeComposition
+        $runtimeNames = @($actual.composition.sourceRuntimes)
+        if ($actual.status -ne 'declared' -or $actual.composition.formatVersion -ne 1 -or
+            ($ExpectedSourceRuntimes -eq 'core' -and $runtimeNames.Count -ne 0) -or
+            ($ExpectedSourceRuntimes -eq 'jm' -and ($runtimeNames.Count -ne 1 -or $runtimeNames[0] -ne 'jm'))) {
+            throw 'Actual compiled Desktop runtime composition does not match the selected package'
+        }
+    }
     $atlas = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/recommendation/profile/rebuild') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body '{}' -TimeoutSec 30
     if (-not $atlas.available -or $atlas.snapshot.snapshotVersion -ne 2) { throw 'Clean package Atlas rebuild failed' }
     $recommendation = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/recommendations') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body '{"limit":12}' -TimeoutSec 30
@@ -167,6 +177,12 @@ try {
             } catch { $status = $null }
         } while ((-not $status -or -not $status.configured -or -not $status.startupReady) -and (Get-Date) -lt $deadline)
         if (-not $status.configured -or $status.picaAccount.configured -or $status.csrfToken -eq $initialCsrfToken) { throw 'Local-only configuration/account/CSRF state is incorrect' }
+        if ($ExpectedSourceRuntimes) {
+            $jmState = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/sources/jm/status') -TimeoutSec 10
+            if ($jmState.enabled -or $jmState.configured -or ($jmState.available -ne ($ExpectedSourceRuntimes -eq 'jm'))) {
+                throw 'Packaged local-only source availability/enablement/account boundary failed'
+            }
+        }
         $ordinarySettings = @{ libraryDirectory=[string]$status.libraryDirectory; profile='fast'; proxyUrl='' } | ConvertTo-Json
         $settingsResult = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/desktop/settings') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body $ordinarySettings -TimeoutSec 15
         if (-not $settingsResult.success) { throw 'Ordinary local library settings still require a source account' }

@@ -1,11 +1,14 @@
 param(
     [Parameter(Mandatory = $true)][string]$RcVersion,
     [string]$Output = '',
-    [switch]$PostStable
+    [switch]$PostStable,
+    [string]$SourceRuntimes = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'lib/source-runtime-build.ps1')
+$picaRuntimeMode = Resolve-PicaSourceRuntimeMode -Requested $SourceRuntimes -RequireJm $env:PICA_REQUIRE_JM_RUNTIME
 $packageFile = Join-Path $root 'package.json'
 $stableVersion = [string]((Get-Content -Raw -LiteralPath $packageFile | ConvertFrom-Json).version)
 $desktopHomeName = 'Pica Library P2 RC'
@@ -55,7 +58,7 @@ if (-not (Test-Path -LiteralPath $requiredBase)) {
 
 Push-Location $root
 try {
-    & (Join-Path $root 'scripts\build-windows-package.ps1')
+    & (Join-Path $root 'scripts\build-windows-package.ps1') -SourceRuntimes $picaRuntimeMode
     if ($LASTEXITCODE -ne 0) {
         throw 'Stable package assembly failed before RC repackaging'
     }
@@ -63,13 +66,15 @@ try {
     Pop-Location
 }
 
-$stableZip = Join-Path $root "artifacts\Pica-Library-v$stableVersion-windows-x64.zip"
+$stableStem = Get-PicaWindowsPackageStem -Version $stableVersion -SourceRuntimes $picaRuntimeMode
+$stableZip = Join-Path $root "artifacts\$stableStem.zip"
 if (-not (Test-Path -LiteralPath $stableZip)) {
     throw 'Stable-layout package assembly did not produce the expected ZIP'
 }
 
 if ([string]::IsNullOrWhiteSpace($Output)) {
-    $Output = Join-Path $root "artifacts\Pica-Library-v$RcVersion-local-test-windows-x64.zip"
+    $runtimeSuffix = if ($picaRuntimeMode -eq 'jm') { '-with-jm' } else { '' }
+    $Output = Join-Path $root "artifacts\Pica-Library-v$RcVersion-local-test$runtimeSuffix-windows-x64.zip"
 } elseif (-not [IO.Path]::IsPathRooted($Output)) {
     $Output = Join-Path $root $Output
 }
@@ -137,6 +142,8 @@ Post-stable RC builds also do not read or migrate historical Pica Library P2 RC 
 
 No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
 This unsigned build may show a Windows SmartScreen reputation warning.
+Source runtime composition: $picaRuntimeMode. This does not enable or sign in to a source.
+Local reading requires no Java or external account. Optional runtimes update with the application.
 "@
     [IO.File]::WriteAllText(
         (Join-Path $extract 'README-WINDOWS.txt'),
@@ -159,6 +166,8 @@ Post-stable RC 也不会读取或迁移历史 Pica Library P2 RC 测试数据。
 
 无需另行安装 Node.js、npm、pnpm、Git，也不需要管理员权限。
 未签名构建可能触发 Windows SmartScreen 提示。
+来源运行时组成：$picaRuntimeMode；这不代表来源已启用或已登录。
+本地阅读不需要 Java 或外部账号；可选运行时随整个应用更新。
 "@
     [IO.File]::WriteAllText(
         (Join-Path $extract 'README-WINDOWS.zh-CN.txt'),
@@ -221,6 +230,7 @@ Stable data root is intentionally isolated.
         stable_repository_version = $stableVersion
         unpublished_rc = $true
         desktop_home = "%LOCALAPPDATA%\$desktopHomeName"
+        source_runtimes = $picaRuntimeMode
     } | ConvertTo-Json
 
     $success = $true

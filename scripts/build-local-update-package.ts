@@ -14,6 +14,7 @@ import {
 import { classifyUpdateCompatibility } from '../src/update/compatibility'
 import { MODULE_CONTRACT_PATH, parseModuleContracts, legacyModuleContracts } from '../src/modules/contracts'
 import { releasedUpdateBaseline } from '../src/update/released-baselines'
+import { compositionFromPayload, RUNTIME_COMPOSITION_PATH, runtimeCompositionSuffix, sameRuntimeComposition } from '../src/modules/runtime-composition'
 import type { UpdateManifest } from '../src/update/types'
 import {
     normalizeUpdateTarget,
@@ -90,10 +91,10 @@ function packageIdentity(file: string): {
 } {
     const basename = path.basename(file)
     const stable = basename.match(
-        /^Pica-Library-v(\d+\.\d+\.\d+)-(windows|macos|linux)-(x64|arm64)\.zip$/
+        /^Pica-Library-v(\d+\.\d+\.\d+)(?:-with-jm)?-(windows|macos|linux)-(x64|arm64)\.zip$/
     )
     const development = basename.match(
-        /^Pica-Library-v(.+)-(?:update-base|local-test)-(windows|macos|linux)-(x64|arm64)\.zip$/
+        /^Pica-Library-v(.+)-(?:update-base|local-test)(?:-with-jm)?-(windows|macos|linux)-(x64|arm64)\.zip$/
     )
     const match = stable ?? development
     if (!match)
@@ -123,6 +124,17 @@ export function buildLocalUpdatePackage(
     const targetVersion = target.version
     const sourceEntries = files(new AdmZip(sourceZipFile))
     const targetEntries = files(new AdmZip(targetZipFile))
+    const sourceComposition = compositionFromPayload(sourceEntries.keys(), sourceEntries.get(RUNTIME_COMPOSITION_PATH)?.toString('utf8'))
+    const targetComposition = compositionFromPayload(targetEntries.keys(), targetEntries.get(RUNTIME_COMPOSITION_PATH)?.toString('utf8'))
+    if (sourceEntries.has(RUNTIME_COMPOSITION_PATH) && !targetEntries.has(RUNTIME_COMPOSITION_PATH))
+        throw new Error('Removing runtime composition requires a complete application')
+    if (!sameRuntimeComposition(sourceComposition, targetComposition))
+        throw new Error('Optional source runtime composition changed; select a complete application explicitly')
+    for (const [file, entries, composition] of [[sourceZipFile, sourceEntries, sourceComposition], [targetZipFile, targetEntries, targetComposition]] as const) {
+        // Legacy archives retain their accepted names. Newly declared variants must be unambiguous.
+        if (entries.has(RUNTIME_COMPOSITION_PATH) && /-with-jm-(?:windows|macos|linux)-(?:x64|arm64)\.zip$/.test(path.basename(file)) !== Boolean(runtimeCompositionSuffix(composition)))
+            throw new Error('Package filename does not match its runtime composition')
+    }
     if (targetEntries.has('app/runtime-assets/tag-runtime-v1/TAG_RUNTIME_MANIFEST.json') && [...targetEntries.keys()].some(name => name.startsWith(registrySourceRoot) || name.startsWith(registryMirrorRoot)))
         throw new Error('A minimal tag runtime package must not reintroduce legacy reviewed evidence')
     const sourceModules = sourceEntries.get(MODULE_CONTRACT_PATH)
@@ -202,6 +214,7 @@ export function buildLocalUpdatePackage(
         appApiVersion: APP_API_VERSION,
         databaseSchemaVersion: DATABASE_SCHEMA_VERSION,
         requiresFullInstall: false,
+        runtimeComposition: targetComposition,
         ...(targetModuleContracts ? { moduleContracts: targetModuleContracts } : {}),
         files: changed.map(([name, value]) => ({
             path: normalizeUpdatePath(name),

@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## Core / optional-runtime composition — isolated local continuation (2026-10-25)
+
+**Status: LOCAL_IMPLEMENTATION_AND_SELECTED_OFFLINE_GATES_PASS / NEW_INSTALLABLE_AND_OLD_FIRST_HOP_GATES_PENDING / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**
+
+- Human granted a continuing exception for this goal's isolated local work after Local Memory routing remained `NOT_FOUND`. New branch `codex/reader-core-runtime-composition-20261025` starts at frozen PR210 `4a18ba769fb3c8df1e6bd100293d38db3013b5dc`. Frozen Dev86 artifacts/G-drive app, formal data/schema, Java/app/browser/listener and remote/OTA authority are unchanged; cloud signing/build needs separate permission.
+- Windows/RC builders now choose core by default instead of copying any checkout JVM that happens to exist. Explicit JM uses the existing pinned SDK/JRE. A strict non-executable composition descriptor, pure format module and separate filesystem adapter bind the physical payload. A packaged core never borrows cwd's runtime. Core/optional docs and JM-unavailable UX distinguish installation from source enablement/account state.
+- Reuses the single existing updater. Discovery is composition-scoped; optional JM cannot fall back to generic/core. Delta manifest/file binding, allowlists, helper-self-replacement restrictions and full staging/apply/detached preflight checks prohibit silent component changes. Helper bytes change, so use full application transition, not a falsely eligible incremental package. No DB/API/schema, dependency, ranking/Visual algorithm, account/choice or private-state rewrite.
+- Expanded final local target:293/293 assertions across28 files,0skips; strict types and Web53/53 PASS, zero guarded boundary events. Initial119-case run failed a stale expectation and a real pure-layer filesystem violation; the adapter was moved without relaxing architecture rules. Two new fixture-table typing errors remain recorded as failures before correction. These are source/mock/synthetic tests, not new installable/device acceptance.
+- Exact pinned v0.5.0 compiled discovery methods pass7 inert-VM response checks, including API/checksum fallback. Standard core filename is retained because renaming it `-core` breaks old discovery. This does not establish actual old-controller first-hop OTA; synthetic0.5.1 is not published/proposed. Previous unreleased JM controllers cannot be assumed composition-aware. An actual ZIP inspector and CI-only same-composition runtime/recovery recipe are authored, not locally executed or automatically triggered.
+- [Scope, evidence, old-client limits and required cloud gates](docs/CORE_RUNTIME_COMPOSITION.md). Next: separately authorized exact-head core/JM package and compiled runtime/recovery checks, followed by actual first-hop/device/provider validation. The broader user-owned source/trust/catalogue/native/sync architecture remains open; do not close user issues or claim a finished content-free extension ecosystem from this slice.
+
 ## Reader-runtime correction — authorized Dev86 cloud candidate (2026-10-25)
 
 **Status: LOCAL_FIX_SEALED / NEW_EXACT_HEAD_CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_QA_PENDING. Not released or deployed.**

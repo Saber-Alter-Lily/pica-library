@@ -3,6 +3,7 @@ import {
     sameModuleContracts,
     type RuntimeModuleContracts
 } from '../modules/contracts'
+import { normalizeRuntimeComposition, sameRuntimeComposition, type RuntimeComposition } from '../modules/runtime-composition'
 
 export type UpdateCompatibilityKind =
     | 'INCREMENTAL'
@@ -17,6 +18,8 @@ export interface UpdateCompatibilityInput {
     updaterHelperChanged?: boolean
     currentModuleContracts?: RuntimeModuleContracts
     targetModuleContracts?: RuntimeModuleContracts
+    currentRuntimeComposition?: RuntimeComposition
+    targetRuntimeComposition?: RuntimeComposition
 }
 
 export interface UpdateCompatibilityDecision {
@@ -28,6 +31,7 @@ export interface UpdateCompatibilityDecision {
         | 'SCHEMA_DOWNGRADE'
         | 'UPDATER_HELPER_CHANGED'
         | 'MODULE_API_CHANGED'
+        | 'RUNTIME_COMPOSITION_CHANGED'
 }
 
 export function classifyUpdateCompatibility(
@@ -41,6 +45,8 @@ export function classifyUpdateCompatibility(
         input.targetModuleContracts === undefined
             ? undefined
             : normalizeModuleContracts(input.targetModuleContracts)
+    const currentComposition = input.currentRuntimeComposition === undefined ? undefined : normalizeRuntimeComposition(input.currentRuntimeComposition)
+    const targetComposition = input.targetRuntimeComposition === undefined ? undefined : normalizeRuntimeComposition(input.targetRuntimeComposition)
     if (
         !Number.isInteger(input.currentAppApiVersion) ||
         !Number.isInteger(input.targetAppApiVersion) ||
@@ -64,6 +70,9 @@ export function classifyUpdateCompatibility(
             kind: 'FULL_APPLICATION',
             reason: 'UPDATER_HELPER_CHANGED'
         }
+
+    if (currentComposition && targetComposition && !sameRuntimeComposition(currentComposition, targetComposition))
+        return { kind: 'FULL_APPLICATION', reason: 'RUNTIME_COMPOSITION_CHANGED' }
 
     if (input.targetAppApiVersion !== input.currentAppApiVersion)
         return {

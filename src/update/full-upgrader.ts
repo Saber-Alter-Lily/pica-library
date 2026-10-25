@@ -20,6 +20,8 @@ import {
     restoreUserState
 } from './user-state-snapshot'
 import { prepareHelperStartup } from './helper-startup'
+import { requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { validateAutomaticFullRuntimeComposition } from './runtime-composition'
 
 /** Status storage must never prevent recovery of the application or user state. */
 
@@ -49,6 +51,14 @@ function requiredApplicationFiles(root: string) {
         path.join('app', 'full-upgrader.js'),
         'SOURCE_SHA.txt'
     ].map((item) => path.join(root, item))
+}
+
+function validateRuntimeComposition(instruction: FullApplicationUpdaterInstruction) {
+    validateAutomaticFullRuntimeComposition(
+        requireInstalledRuntimeComposition(instruction.applicationRoot),
+        requireInstalledRuntimeComposition(instruction.stagedApplicationRoot),
+        instruction.runtimeComposition
+    )
 }
 
 function validateStagedApplication(
@@ -105,6 +115,7 @@ function validateStagedApplication(
         .trim()
     if (sourceSha !== instruction.targetSourceSha)
         throw new Error('Staged full application source SHA does not match')
+    validateRuntimeComposition(instruction)
 }
 
 function removeApplicationTree(root: string) {
@@ -208,6 +219,7 @@ export async function runFullApplicationUpgrade(
         await prepareHelperStartup(instruction, 'full-application')
         await waitForExit(instruction.parentPid)
         parentExited = true
+        validateRuntimeComposition(instruction)
         fs.rmSync(instruction.instanceFile, { force: true })
 
         writeProgress(instruction.progressFile, {

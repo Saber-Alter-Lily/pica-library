@@ -43,9 +43,7 @@ describe('P2 unpublished RC package contract', () => {
 
         expect(stableBuild).not.toContain('PICA_LIBRARY_UNPUBLISHED_RC')
         expect(stableBuild).not.toContain('RcLauncher.cs')
-        expect(stableBuild).toContain(
-            '"Pica-Library-v$version-windows-x64"'
-        )
+        expect(stableBuild).toContain('Get-PicaWindowsPackageStem -Version $version -SourceRuntimes $picaRuntimeMode')
         expect(stableBuild).toContain(
             "'0.4.11' = 'artifacts\\release-base\\Pica-Library-v0.4.10-windows-x64.zip'"
         )
@@ -63,7 +61,8 @@ describe('P2 unpublished RC package contract', () => {
         expect(rcBuild).toContain('scripts\\build-windows-rc-launcher.ps1')
         expect(read('scripts/build-windows-rc-launcher.ps1')).toContain('packaging\\windows\\RcLauncher.cs')
         expect(rcBuild).toContain("$desktopHomeName = 'Pica Library P2 RC'")
-        expect(rcBuild).toContain('local-test-windows-x64')
+        expect(rcBuild).toContain('local-test$runtimeSuffix-windows-x64')
+        expect(rcBuild).toContain('-SourceRuntimes $picaRuntimeMode')
 
         expect(workflow).toContain('build-windows-rc-package.ps1')
         expect(workflow).toContain(

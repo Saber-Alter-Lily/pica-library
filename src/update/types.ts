@@ -1,4 +1,5 @@
 import type { RuntimeModuleContracts } from '../modules/contracts'
+import type { RuntimeComposition } from '../modules/runtime-composition'
 
 export type UpdatePackageType = 'incremental' | 'local-test'
 
@@ -23,6 +24,8 @@ export interface UpdateManifest {
     requiresFullInstall: boolean
     /** Optional for legacy packages. New builders bind this to the actual payload. */
     moduleContracts?: RuntimeModuleContracts
+    /** Packaging facts bound to the actual payload; not source-enable state. */
+    runtimeComposition?: RuntimeComposition
     files: UpdateManifestFile[]
     deletions: string[]
 }
@@ -43,6 +46,7 @@ export interface StagedFullApplicationUpdate {
     directory: string
     targetVersion: string
     targetSourceSha: string
+    runtimeComposition: RuntimeComposition
     stagedAt: string
 }
 
@@ -101,6 +105,8 @@ export interface FullApplicationUpdaterInstruction {
     progressFile: string
     targetVersion: string
     targetSourceSha: string
+    /** Optional only for legacy instructions; never an instruction to change components. */
+    runtimeComposition?: RuntimeComposition
     previousUrl?: string
     healthTimeoutMs: number
 }

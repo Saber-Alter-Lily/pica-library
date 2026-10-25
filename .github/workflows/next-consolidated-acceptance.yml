@@ -2,7 +2,7 @@ name: Next consolidated acceptance (unpublished)
 
 on:
   push:
-    branches: [codex/next-acceptance-sources-jm, codex/ux-tags-dual-onboarding-20261022, codex/reader-reliability-integration-20261025, codex/source-idle-boundary-20261025, codex/source-neutral-reading-library-20261025]
+    branches: [codex/next-acceptance-sources-jm, codex/ux-tags-dual-onboarding-20261022, codex/reader-reliability-integration-20261025, codex/source-idle-boundary-20261025, codex/source-neutral-reading-library-20261025, codex/dev85-local-reader-runtime-fixes-20261025]
   pull_request:
     paths:
       - '.github/workflows/next-consolidated-acceptance.yml'
@@ -20,7 +20,7 @@ concurrency:
 env:
   STABLE_VERSION: '0.5.0'
   BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
-  PICA_ANDROID_CANDIDATE_VERSION_CODE: '85'
+  PICA_ANDROID_CANDIDATE_VERSION_CODE: '86'
 
 jobs:
   web-and-source:
@@ -51,13 +51,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Pica-Library-Next-Acceptance-Source-Evidence
-          path: artifacts/linux-unit.json
+          path: |
+            artifacts/linux-unit.json
+            test-results/
           retention-days: 3
           if-no-files-found: ignore
 
   windows:
     needs: web-and-source
-    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025' || github.ref == 'refs/heads/codex/source-idle-boundary-20261025' || github.ref == 'refs/heads/codex/source-neutral-reading-library-20261025')
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025' || github.ref == 'refs/heads/codex/source-idle-boundary-20261025' || github.ref == 'refs/heads/codex/source-neutral-reading-library-20261025' || github.ref == 'refs/heads/codex/dev85-local-reader-runtime-fixes-20261025')
     runs-on: windows-latest
     permissions:
       contents: read
@@ -85,21 +87,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Download frozen Dev84 predecessor (candidate-only)
+      - name: Download frozen Dev85 predecessor (candidate-only)
         uses: actions/download-artifact@v4
         with:
           repository: Saber-Alter-Lily/pica-library
           github-token: ${{ github.token }}
-          run-id: '40192577286'
+          run-id: '40204828683'
           name: Pica-Library-Next-Acceptance-Windows
-          path: artifacts/prior-dev84
-      - name: Require exact retained Dev84 payload and source
+          path: artifacts/prior-dev85
+      - name: Require exact retained Dev85 payload and source
         shell: pwsh
         run: |
-          $prior='artifacts/prior-dev84/Pica-Library-Next-Acceptance-Windows-x64.zip'
-          if (-not (Test-Path -LiteralPath $prior -PathType Leaf)) { throw 'Frozen Dev84 artifact unavailable; do not substitute or skip' }
-          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $prior).Hash.ToLowerInvariant() -ne '571d7fddd0aee561513ed60c2b777e3a88a9445db32ffb7cdcd9265b28d31634') { throw 'Frozen Dev84 payload hash mismatch' }
-          if ((Get-Content -Raw -LiteralPath 'artifacts/prior-dev84/SOURCE_SHA.txt').Trim() -ne '295942c297f9377b28df5a2d3d32a311fed8a18f') { throw 'Frozen Dev84 source mismatch' }
+          $prior='artifacts/prior-dev85/Pica-Library-Next-Acceptance-Windows-x64.zip'
+          if (-not (Test-Path -LiteralPath $prior -PathType Leaf)) { throw 'Frozen Dev85 artifact unavailable; do not substitute or skip' }
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $prior).Hash.ToLowerInvariant() -ne 'd35ca45c7909197236eb27206370504f202b32b62b1f79aca452d0742fb31bb2') { throw 'Frozen Dev85 payload hash mismatch' }
+          if ((Get-Content -Raw -LiteralPath 'artifacts/prior-dev85/SOURCE_SHA.txt').Trim() -ne '16449a00a0eb2d9d0d792e5efe5312c86dbf4220') { throw 'Frozen Dev85 source mismatch' }
       - shell: pwsh
         run: |
           pnpm install --frozen-lockfile
@@ -150,14 +152,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $zip -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -LibraryPathLength 1200 -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/deep-1200
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Exact Dev84 package, synthetic runner profile only. This tests the
+          # Exact Dev85 package, synthetic runner profile only. This tests the
           # replacement engine, not an already-published old-client OTA path.
-          $prior='artifacts/prior-dev84/Pica-Library-Next-Acceptance-Windows-x64.zip'
-          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $prior -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev84
+          $prior='artifacts/prior-dev85/Pica-Library-Next-Acceptance-Windows-x64.zip'
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $prior -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev85
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $prior -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceHealthFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev84
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $prior -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceHealthFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev85
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $prior -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev84
+          ./scripts/test-windows-universal-full-upgrade.ps1 -BaselineZip $prior -CandidateZip $zip -CandidateVersion $version -CandidateSourceSha $env:GITHUB_SHA -DesktopHomeName 'Pica Library Post Stable RC' -ForceLaunchFailure -DiagnosticsDirectory artifacts/upgrade-diagnostics/prior-dev85
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
           Copy-Item -LiteralPath $zip -Destination candidate/windows/
@@ -190,7 +192,7 @@ jobs:
 
   android:
     needs: web-and-source
-    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025' || github.ref == 'refs/heads/codex/source-idle-boundary-20261025' || github.ref == 'refs/heads/codex/source-neutral-reading-library-20261025')
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025' || github.ref == 'refs/heads/codex/source-idle-boundary-20261025' || github.ref == 'refs/heads/codex/source-neutral-reading-library-20261025' || github.ref == 'refs/heads/codex/dev85-local-reader-runtime-fixes-20261025')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:

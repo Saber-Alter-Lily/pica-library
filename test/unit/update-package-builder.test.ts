@@ -32,6 +32,25 @@ afterEach(() => {
 })
 
 describe('local incremental update package builder', () => {
+    it('ships the new Reader modules through the existing app-only incremental path without touching user configuration', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-reader-module-update-')); directories.push(directory)
+        const contracts = { [MODULE_CONTRACT_PATH]: JSON.stringify(runtimeModuleContracts()) }
+        const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'synthetic-old-app', contracts)
+        const target = fullPackage(directory, 'Pica-Library-v0.5.0-dev.1-local-test-windows-x64.zip', '2'.repeat(40), 'synthetic-new-app', {
+            ...contracts,
+            'web/reader-settings.js': fs.readFileSync('web/reader-settings.js', 'utf8'),
+            'web/reader-viewport.js': fs.readFileSync('web/reader-viewport.js', 'utf8')
+        })
+        const output = path.join(directory, 'update.zip')
+        const result = buildLocalUpdatePackage(source, target, output)
+        expect(result.manifest.requiresFullInstall).toBe(false)
+        expect(result.manifest.files.map(row => row.path)).toEqual(expect.arrayContaining(['web/reader-settings.js', 'web/reader-viewport.js']))
+        expect(result.manifest.deletions).toEqual([])
+        const entries = new AdmZip(output).getEntries().map(row => row.entryName)
+        expect(entries).not.toContain('config.json')
+        expect(entries).not.toContain('library.db')
+        expect(entries).not.toContain('runtime/node.exe')
+    })
     it('requires full application replacement to remove old non-allowlisted review evidence', () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-tag-layout-')); directories.push(directory)
         const source = fullPackage(directory, 'Pica-Library-v0.5.0-dev.0-update-base-windows-x64.zip', '1'.repeat(40), 'old', {

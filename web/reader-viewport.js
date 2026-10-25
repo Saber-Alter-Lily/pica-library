@@ -13,8 +13,9 @@ export function createReaderViewportTracker({
         for (const id of previous.frames) browser.cancelAnimationFrame(id)
         previous.frames.clear()
         previous.observer?.disconnect()
-        if (previous.scroll)
-            browser.removeEventListener('scroll', previous.scroll)
+        previous.resize?.disconnect()
+        for (const [node, name, listener] of previous.listeners)
+            node.removeEventListener(name, listener)
     }
     function start({ target, resumePage, pageCount, isCurrent }) {
         stop()
@@ -28,11 +29,19 @@ export function createReaderViewportTracker({
             !isCurrent()
         )
             return false
+        const anchor = target.querySelector(
+            `[data-reader-page="${resumePage}"]`
+        )
+        if (!anchor) return false
         const session = {
             abort: new AbortController(),
             frames: new Set(),
             observer: null,
-            scroll: null
+            resize: null,
+            listeners: [],
+            interacted: false,
+            restoreQueued: false,
+            sampleQueued: false
         }
         owner = session
         function current() {
@@ -52,7 +61,18 @@ export function createReaderViewportTracker({
             session.frames.add(id)
         }
         function record(index) {
-            if (current() && validPage(index)) onPage(index)
+            // Layout changes and the restore's own scroll are not new reading intent.
+            if (
+                current() &&
+                validPage(index) &&
+                (session.interacted || index === resumePage)
+            )
+                onPage(index)
+        }
+        const ready = (image) => image.complete && image.naturalHeight > 0
+        function listen(node, name, callback) {
+            node.addEventListener(name, callback, { passive: true })
+            session.listeners.push([node, name, callback])
         }
         function sample() {
             const bounds = target.getBoundingClientRect(),
@@ -78,6 +98,7 @@ export function createReaderViewportTracker({
                     if (
                         image &&
                         target.contains(image) &&
+                        ready(image) &&
                         validPage(Number(image.dataset.readerPage))
                     ) {
                         record(Number(image.dataset.readerPage))
@@ -85,69 +106,104 @@ export function createReaderViewportTracker({
                     }
                 }
         }
-        frame(() => {
-            target
-                .querySelector(`[data-reader-page="${resumePage}"]`)
-                ?.scrollIntoView({ block: 'center' })
+        function queueSample() {
+            if (!current() || session.sampleQueued) return
+            session.sampleQueued = true
             frame(() => {
-                if ('IntersectionObserver' in browser) {
-                    const observer = new browser.IntersectionObserver(
-                        (entries) => {
-                            if (!current()) return
-                            const center = browser.innerHeight / 2
-                            const nearest = entries
-                                .filter(
-                                    (entry) =>
-                                        entry.isIntersecting &&
-                                        target.contains(entry.target) &&
-                                        validPage(
-                                            Number(
-                                                entry.target.dataset.readerPage
-                                            )
-                                        )
-                                )
-                                .map((entry) => ({
-                                    pageIndex: Number(
-                                        entry.target.dataset.readerPage
-                                    ),
-                                    distance: Math.abs(
-                                        entry.boundingClientRect.top +
-                                            entry.boundingClientRect.height /
-                                                2 -
-                                            center
-                                    )
-                                }))
-                                .sort((a, b) => a.distance - b.distance)[0]
-                            if (nearest) record(nearest.pageIndex)
-                        },
-                        {
-                            root: null,
-                            rootMargin: '-45% 0px -45% 0px',
-                            threshold: [0, 0.01]
-                        }
-                    )
-                    session.observer = observer
-                    target
-                        .querySelectorAll('[data-reader-page]')
-                        .forEach((image) => observer.observe(image))
-                    record(resumePage)
-                } else {
-                    let queued = false
-                    session.scroll = () => {
-                        if (!current() || queued) return
-                        queued = true
-                        frame(() => {
-                            queued = false
-                            sample()
-                        })
-                    }
-                    browser.addEventListener('scroll', session.scroll, {
-                        passive: true
-                    })
-                    session.scroll()
-                }
+                session.sampleQueued = false
+                sample()
             })
+        }
+        function restore() {
+            if (
+                !current() ||
+                session.interacted ||
+                !ready(anchor) ||
+                session.restoreQueued
+            )
+                return
+            session.restoreQueued = true
+            frame(() => {
+                session.restoreQueued = false
+                if (session.interacted || !ready(anchor)) return
+                anchor.scrollIntoView({ block: 'center', behavior: 'instant' })
+                // No write until actual loaded image geometry has been positioned.
+                frame(() => {
+                    if (!session.interacted) record(resumePage)
+                })
+            })
+        }
+        function intent(event) {
+            if (!current() || event.defaultPrevented) return
+            const node = event.target
+            if (
+                node?.isContentEditable ||
+                node?.closest?.(
+                    'input,select,textarea,button,dialog,[role="dialog"],[role="slider"],[role="textbox"],[contenteditable="true"],.driver-popover,.driver-overlay'
+                )
+            )
+                return
+            if (
+                event.type === 'keydown' &&
+                ![
+                    'ArrowDown',
+                    'ArrowUp',
+                    'PageDown',
+                    'PageUp',
+                    'Home',
+                    'End',
+                    ' '
+                ].includes(event.key)
+            )
+                return
+            if (
+                event.type === 'pointerdown' &&
+                node !== document.documentElement &&
+                !target.contains(node)
+            )
+                return
+            session.interacted = true
+            queueSample()
+        }
+        for (const name of ['wheel', 'touchmove', 'pointerdown', 'keydown'])
+            listen(browser, name, intent)
+        // Lazy pages reserve a box in CSS. Request only the saved page eagerly,
+        // not the preceding chapter, and re-anchor if earlier images alter layout.
+        for (const image of target.querySelectorAll('[data-reader-page]')) {
+            if (Number(image.dataset.readerPage) <= resumePage) {
+                listen(image, 'load', () =>
+                    session.interacted ? queueSample() : restore()
+                )
+            }
+        }
+        if (!ready(anchor)) anchor.loading = 'eager'
+        if ('ResizeObserver' in browser) {
+            session.resize = new browser.ResizeObserver(() =>
+                session.interacted ? queueSample() : restore()
+            )
+            session.resize.observe(target)
+        }
+        if ('IntersectionObserver' in browser) {
+            session.observer = new browser.IntersectionObserver(
+                () => {
+                    if (!current()) return
+                    if (session.interacted) queueSample()
+                    else restore()
+                },
+                {
+                    root: null,
+                    rootMargin: '-45% 0px -45% 0px',
+                    threshold: [0, 0.01]
+                }
+            )
+            target
+                .querySelectorAll('[data-reader-page]')
+                .forEach((image) => session.observer.observe(image))
+        }
+        listen(browser, 'scroll', () => {
+            if (session.interacted) queueSample()
         })
+        restore()
         return true
     }
     return { start, stop }

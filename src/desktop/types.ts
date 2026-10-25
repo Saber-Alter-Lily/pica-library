@@ -8,6 +8,9 @@ export interface DesktopConfig {
     preferredPort: number
     proxyUrl?: string
     externalSources?: import('../sources/source-policy').SourcePolicyV1
+    /** No listener is opened until the user explicitly opts in. Pairing records stay separate. */
+    mobileBridgeEnabled?: boolean
+    readerSettings?: import('../../web/reader-settings.js').ReaderSettings
 }
 
 export interface RemoteTargetStoredCredentials {

@@ -14,6 +14,7 @@ import { installReadingLibrary } from './reading-library.js'
 import { currentHostedLibrarySession, resumeHostedLibraryComic } from './host-library.js'
 import { readerKeyboardAction, readerPageIndex } from './reader-input.js'
 import { createReaderViewportTracker } from './reader-viewport.js'
+import { normalizeReaderSettings, loadReaderSettings, cacheReaderSettings, createReaderSettingsWriter } from './reader-settings.js'
 import { recordReaderProgress, captureReaderProgress, acknowledgeReaderProgress } from './reader-progress.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
@@ -172,6 +173,22 @@ installDialogScrollRestoration()
 const t = (key, values) => translate(language, key, values)
 const $ = (selector) => document.querySelector(selector)
 const $$ = (selector) => [...document.querySelectorAll(selector)]
+let readerSettingsEditVersion = 0
+const readerSettingsWriter = createReaderSettingsWriter(settings => desktop?.csrfToken
+    ? desktopPost('/api/v1/desktop/settings', { readerSettingsAction: 'save', readerSettings: settings })
+    : undefined)
+function applyReaderSettingsControls(value) {
+    const settings = normalizeReaderSettings(value)
+    for (const key of ['mode', 'direction', 'fit']) $(`#reader-${key}`).value = settings[key]
+    cacheReaderSettings(localStorage, settings)
+}
+function persistReaderSettings() {
+    readerSettingsEditVersion++
+    const settings = { schemaVersion: 1, mode: $('#reader-mode').value, direction: $('#reader-direction').value, fit: $('#reader-fit').value }
+    cacheReaderSettings(localStorage, settings)
+    void readerSettingsWriter.save(settings).catch(error => showOperationToast(t('reader.settingsSaveFailed') + ' ' + localizeError(language, error), 'error'))
+}
+applyReaderSettingsControls(loadReaderSettings(localStorage))
 
 const VISUAL_SETTINGS_CACHE_KEY = 'pica-visual-settings-confirmed-v1'
 const AUTO_UPDATE_PROMPT_KEY = 'pica-auto-update-prompt-v1'
@@ -427,6 +444,28 @@ $('#mobile-bridge-copy-code')?.addEventListener('click', () =>
 $('#mobile-bridge-copy-link')?.addEventListener('click', () =>
     void copyMobileBridgeValue('#mobile-bridge-pair-link', 'mobile.copiedLink')
 )
+let mobileBridgeUiBusy = false
+async function changeMobileBridge(enabled) {
+    if (mobileBridgeUiBusy || !desktop?.csrfToken) return
+    mobileBridgeUiBusy = true
+    renderMobileBridge()
+    let failure = null, attempted = false
+    try {
+        if (enabled && !(await askConfirm(t('mobile.enableConfirm')))) return
+        attempted = true
+        await desktopPost('/api/v1/desktop/settings', { mobileBridgeAction: 'set-enabled', enabled })
+    } catch (error) { failure = localizeError(language, error) }
+    finally {
+        // A disable can close the listener even if persisting the choice failed.
+        // Re-read actual status on both success and failure, not the old QR state.
+        if (attempted) await loadDesktop()
+        mobileBridgeUiBusy = false
+        renderMobileBridge()
+        if (failure) $('#mobile-bridge-state').textContent = failure
+    }
+}
+$('#mobile-bridge-enable')?.addEventListener('click', () => void changeMobileBridge(true))
+$('#mobile-bridge-disable')?.addEventListener('click', () => void changeMobileBridge(false))
 applyLanguage(language)
 
 async function api(path, options) {
@@ -660,9 +699,23 @@ function renderMobileBridge() {
     const stateLabel = $('#mobile-bridge-state')
     if (!panel || !stateLabel) return
     const mobile = desktop?.mobileBridge
+    const enable = $('#mobile-bridge-enable'), disable = $('#mobile-bridge-disable')
+    if (enable) {
+        enable.hidden = Boolean(mobile?.enabled)
+        enable.disabled = mobileBridgeUiBusy || !desktop?.configured || !desktop?.startupReady
+        enable.textContent = t(desktop?.mobileBridgePreference ? 'mobile.retry' : 'mobile.enable')
+    }
+    if (disable) {
+        disable.hidden = !mobile?.enabled && !desktop?.mobileBridgePreference
+        disable.disabled = mobileBridgeUiBusy
+        disable.textContent = t('mobile.disable')
+    }
     if (!mobile?.enabled) {
         panel.hidden = true
-        stateLabel.textContent = t('mobile.bridgeStopped')
+        stateLabel.textContent = t(desktop?.mobileBridgePreference ? 'mobile.bridgeUnavailable' : 'mobile.bridgeStopped')
+        for (const id of ['mobile-bridge-code', 'mobile-bridge-address', 'mobile-bridge-pair-link', 'mobile-bridge-devices', 'mobile-bridge-expiry'])
+            if ($('#' + id)) $('#' + id).textContent = ''
+        $('#mobile-bridge-qr')?.replaceChildren()
         return
     }
     panel.hidden = false
@@ -744,6 +797,7 @@ function closeDesktopBrowserSession() {
 }
 
 async function loadDesktop() {
+    const settingsVersion = readerSettingsEditVersion
     try {
         desktop = await api('/api/v1/desktop/status')
         state.capabilities = await api('/api/v1/capabilities')
@@ -755,6 +809,8 @@ async function loadDesktop() {
         $('#settings-profile').value = desktop.profile || 'balanced'
         $('#settings-proxy').value = desktop.proxyUrl || ''
         $('#setup-directory').value = desktop.libraryDirectory || ''
+        if (desktop.readerSettings && settingsVersion === readerSettingsEditVersion && !readerSettingsWriter.pending && activeView !== 'reader')
+            applyReaderSettingsControls(desktop.readerSettings)
         applyDesktopPlatformCapabilities()
         renderTimestamps()
         renderMobileBridge()
@@ -3187,13 +3243,14 @@ $('#reader-next-chapter').onclick = () => {
         void openReaderChapter(readable[index + 1].id)
 }
 $('#reader-mode').onchange = () => {
+    persistReaderSettings()
     renderReaderPages()
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
         queueReaderViewportTop()
 }
-$('#reader-direction').onchange = renderReaderPages
-$('#reader-fit').onchange = renderReaderPages
+$('#reader-direction').onchange = () => { persistReaderSettings(); renderReaderPages() }
+$('#reader-fit').onchange = () => { persistReaderSettings(); renderReaderPages() }
 $('#reader-fullscreen').onclick = () =>
     document.fullscreenElement
         ? document.exitFullscreen()

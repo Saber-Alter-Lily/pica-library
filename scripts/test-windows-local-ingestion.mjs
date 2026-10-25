@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import net from 'node:net'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import AdmZip from 'adm-zip'
@@ -29,6 +30,73 @@ const sha = (bytes) => createHash('sha256').update(bytes).digest('hex'),
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 let instance,
     success = false
+let pairingToken
+const displaySettings = {
+    schemaVersion: 1,
+    mode: 'single',
+    direction: 'rtl',
+    fit: 'height'
+}
+async function bridgeClosed() {
+    await new Promise((resolve, reject) => {
+        const socket = net.createConnection({ host: '127.0.0.1', port: 7788 })
+        const finish = (error) => {
+            socket.removeAllListeners()
+            socket.destroy()
+            error ? reject(error) : resolve()
+        }
+        socket.once('connect', () =>
+            finish(new Error('Disabled bridge still accepts connections'))
+        )
+        socket.once('error', (error) =>
+            finish(error.code === 'ECONNREFUSED' ? null : error)
+        )
+        socket.setTimeout(3000, () =>
+            finish(new Error('Could not prove disabled bridge port closed'))
+        )
+    })
+}
+async function enableAndCheckPairing(first) {
+    await post('/api/v1/desktop/settings', {
+        mobileBridgeAction: 'set-enabled',
+        enabled: true
+    })
+    const current = await status(),
+        mobile = current.mobileBridge
+    if (!mobile?.enabled || mobile.port !== 7788)
+        throw new Error('Explicit bridge enable failed')
+    if (first) {
+        const response = await fetch('http://127.0.0.1:7788/mobile/v1/pair', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                code: mobile.pairingCode,
+                deviceName: 'Synthetic Runtime Gate'
+            }),
+            signal: AbortSignal.timeout(5000)
+        })
+        if (!response.ok) throw new Error('Synthetic runtime pairing failed')
+        pairingToken = (await response.json()).token
+    } else if (
+        !mobile.pairedDevices?.some(
+            (row) => row.deviceName === 'Synthetic Runtime Gate'
+        )
+    )
+        throw new Error('Explicit disable/restart erased pairing records')
+    const response = await fetch('http://127.0.0.1:7788/mobile/v1/library', {
+        headers: { authorization: 'Bearer ' + pairingToken },
+        signal: AbortSignal.timeout(5000)
+    })
+    if (!response.ok)
+        throw new Error('Preserved paired token failed after explicit enable')
+    await post('/api/v1/desktop/settings', {
+        mobileBridgeAction: 'set-enabled',
+        enabled: false
+    })
+    if ((await status()).mobileBridge !== null)
+        throw new Error('Disabled bridge still reported running')
+    await bridgeClosed()
+}
 new AdmZip(zipFile).extractAllTo(app)
 if (
     fs.readFileSync(path.join(app, 'SOURCE_SHA.txt'), 'utf8').trim() !==
@@ -128,6 +196,13 @@ try {
     let current = await status()
     if (current.version !== version || current.picaAccount?.configured)
         throw new Error('Unexpected actual Desktop identity')
+    if (
+        current.mobileBridge !== null ||
+        current.mobileBridgePreference !== false
+    )
+        throw new Error(
+            'Fresh interactive package opened LAN sharing without opt-in'
+        )
     if (!current.configured) {
         const old = current.csrfToken
         await post('/api/v1/desktop/settings', {
@@ -152,6 +227,22 @@ try {
         current.picaAccount?.configured
     )
         throw new Error('Local-only setup failed')
+    if (
+        current.mobileBridge !== null ||
+        current.mobileBridgePreference !== false
+    )
+        throw new Error('Local-only setup implicitly enabled LAN sharing')
+    await bridgeClosed()
+    await post('/api/v1/desktop/settings', {
+        readerSettingsAction: 'save',
+        readerSettings: displaySettings
+    })
+    if (
+        JSON.stringify((await status()).readerSettings) !==
+        JSON.stringify(displaySettings)
+    )
+        throw new Error('Packaged display settings did not save')
+    await enableAndCheckPairing(true)
     const capabilities = await fetch(
         instance.url + '/api/v1/capabilities'
     ).then((r) => r.json())
@@ -184,8 +275,18 @@ try {
                 encodeURIComponent(chapters[0].id)
         )
         const chapter = await chapterResponse.json()
-        if (!chapterResponse.ok || !Array.isArray(chapter.pages) || !chapter.pages.length)
-            throw new Error('Actual packaged Reader chapter failed: '+JSON.stringify({status:chapterResponse.status,body:chapter}))
+        if (
+            !chapterResponse.ok ||
+            !Array.isArray(chapter.pages) ||
+            !chapter.pages.length
+        )
+            throw new Error(
+                'Actual packaged Reader chapter failed: ' +
+                    JSON.stringify({
+                        status: chapterResponse.status,
+                        body: chapter
+                    })
+            )
         const bytes = Buffer.from(
             await fetch(instance.url + chapter.pages[0].url).then((r) =>
                 r.arrayBuffer()
@@ -230,7 +331,18 @@ try {
         windowsHide: true,
         stdio: 'ignore'
     }).on('error', () => {})
-    await status()
+    const restarted = await status()
+    if (
+        restarted.mobileBridge !== null ||
+        restarted.mobileBridgePreference !== false ||
+        JSON.stringify(restarted.readerSettings) !==
+            JSON.stringify(displaySettings)
+    )
+        throw new Error(
+            'Restart lost display settings or restarted disabled LAN sharing'
+        )
+    await bridgeClosed()
+    await enableAndCheckPairing(false)
     const after = await read(folder.comicId)
     if (after.chapter.progress?.pageIndex !== 1)
         throw new Error('Actual package reimport/restart lost progress')
@@ -256,6 +368,9 @@ try {
             provider_login: false,
             credentials_file_created: false,
             originals_unchanged: true,
+            default_lan_off: true,
+            explicit_lan_disable_restart_and_paired_token: true,
+            reader_display_config_saved_restart: true,
             native_picker_manual_gate: 'PENDING',
             synthetic_only: true,
             production_accessed: false

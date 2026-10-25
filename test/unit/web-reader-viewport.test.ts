@@ -11,8 +11,23 @@ function viewport(observer = true) {
         history: Array<() => void> = [],
         scroll = new Set<() => void>()
     let next = 0
+    const imageListeners = Array.from(
+        { length: 10 },
+        () => new Map<string, Set<() => void>>()
+    )
     const pages = Array.from({ length: 10 }, (_, index) => ({
         dataset: { readerPage: String(index) },
+        complete: true,
+        naturalHeight: 100,
+        loading: 'lazy',
+        addEventListener(name: string, callback: () => void) {
+            const listeners = imageListeners[index].get(name) ?? new Set()
+            listeners.add(callback)
+            imageListeners[index].set(name, listeners)
+        },
+        removeEventListener(name: string, callback: () => void) {
+            imageListeners[index].get(name)?.delete(callback)
+        },
         scrollIntoView: vi.fn(),
         closest() {
             return this
@@ -33,6 +48,18 @@ function viewport(observer = true) {
         disconnect: ReturnType<typeof vi.fn>
         options: unknown
     }> = []
+    const resizes: Array<{
+        callback: () => void
+        observe: ReturnType<typeof vi.fn>
+        disconnect: ReturnType<typeof vi.fn>
+    }> = []
+    class Resize {
+        observe = vi.fn()
+        disconnect = vi.fn()
+        constructor(public callback: () => void) {
+            resizes.push(this)
+        }
+    }
     class Observer {
         observe = vi.fn()
         disconnect = vi.fn()
@@ -43,6 +70,7 @@ function viewport(observer = true) {
             observers.push(this)
         }
     }
+    const events = new Map<string, Set<(event: unknown) => void>>()
     const browser = {
         innerHeight: 1000,
         requestAnimationFrame: vi.fn((callback: () => void) => {
@@ -52,15 +80,33 @@ function viewport(observer = true) {
             return id
         }),
         cancelAnimationFrame: vi.fn((id: number) => frames.delete(id)),
-        addEventListener: vi.fn((_name: string, callback: () => void) =>
-            scroll.add(callback)
-        ),
-        removeEventListener: vi.fn((_name: string, callback: () => void) =>
-            scroll.delete(callback)
-        ),
+        addEventListener: vi.fn((name: string, callback: () => void) => {
+            const listeners = events.get(name) ?? new Set()
+            listeners.add(callback)
+            events.set(name, listeners)
+            if (name === 'scroll') scroll.add(callback)
+        }),
+        removeEventListener: vi.fn((name: string, callback: () => void) => {
+            events.get(name)?.delete(callback)
+            if (name === 'scroll') scroll.delete(callback)
+        }),
+        ResizeObserver: Resize,
         ...(observer ? { IntersectionObserver: Observer } : {})
     }
-    const document = { elementFromPoint: vi.fn(() => pages[2]) }
+    const document = {
+        elementFromPoint: vi.fn(() => pages[2]),
+        documentElement: {}
+    }
+    const interact = (name = 'wheel', extra = {}) => {
+        for (const callback of events.get(name) ?? [])
+            callback({ type: name, target: document.documentElement, ...extra })
+    }
+    const load = (index: number) => {
+        pages[index].complete = true
+        pages[index].naturalHeight = 100
+        for (const callback of imageListeners[index].get('load') ?? [])
+            callback()
+    }
     const onPage = vi.fn(),
         scope = { current: true }
     const tracker = createReaderViewportTracker({
@@ -98,7 +144,12 @@ function viewport(observer = true) {
         history,
         scroll,
         tick,
-        entry
+        entry,
+        interact,
+        load,
+        events,
+        imageListeners,
+        resizes
     }
 }
 
@@ -220,15 +271,16 @@ describe('isolated browser viewport module with explicitly mocked browser APIs',
             'web/reader-viewport.js'
         ])
     })
-    it('restores the saved page before installing the same centered observer', () => {
+    it('positions the loaded saved page before writing, then tracks real user intent at the viewport center', () => {
         const h = viewport()
         expect(h.tracker.start(h.options)).toBe(true)
         expect(h.onPage).not.toHaveBeenCalled()
         h.tick()
         expect(h.pages[4].scrollIntoView).toHaveBeenCalledWith({
-            block: 'center'
+            block: 'center',
+            behavior: 'instant'
         })
-        expect(h.observers).toHaveLength(0)
+        expect(h.onPage).not.toHaveBeenCalled()
         h.tick()
         expect(h.observers[0].options).toEqual({
             root: null,
@@ -237,7 +289,10 @@ describe('isolated browser viewport module with explicitly mocked browser APIs',
         })
         expect(h.observers[0].observe).toHaveBeenCalledTimes(10)
         expect(h.onPage).toHaveBeenLastCalledWith(4)
+        h.document.elementFromPoint.mockReturnValue(h.pages[7])
+        h.interact()
         h.observers[0].callback([h.entry(2, 100), h.entry(7)])
+        h.tick()
         expect(h.onPage).toHaveBeenLastCalledWith(7)
     })
     it.each([0, 1])(
@@ -250,7 +305,7 @@ describe('isolated browser viewport module with explicitly mocked browser APIs',
             h.tracker.stop()
             expect(h.frames.size).toBe(0)
             callback()
-            expect(h.observers).toHaveLength(0)
+            expect(h.observers[0].disconnect).toHaveBeenCalledOnce()
             expect(h.onPage).not.toHaveBeenCalled()
             expect(h.browser.cancelAnimationFrame).toHaveBeenCalled()
         }
@@ -269,7 +324,10 @@ describe('isolated browser viewport module with explicitly mocked browser APIs',
         expect(old.disconnect).toHaveBeenCalledOnce()
         expect(h.observers[1].disconnect).not.toHaveBeenCalled()
         expect(h.onPage).not.toHaveBeenCalled()
+        h.document.elementFromPoint.mockReturnValue(h.pages[3])
+        h.interact()
         h.observers[1].callback([h.entry(3)])
+        h.tick()
         expect(h.onPage).toHaveBeenCalledWith(3)
     })
     it('disposes its own observer when the chapter/view predicate becomes stale', () => {
@@ -311,6 +369,8 @@ describe('isolated browser viewport module with explicitly mocked browser APIs',
             expect.any(Function),
             { passive: true }
         )
+        h.onPage.mockClear()
+        h.interact()
         for (const callback of h.scroll) {
             callback()
             callback()
@@ -329,15 +389,17 @@ describe('isolated browser viewport module with explicitly mocked browser APIs',
         h.tick()
         const scroll = [...h.scroll][0],
             callback = h.history.at(-1)!
+        h.onPage.mockClear()
         h.tracker.stop()
         scroll()
         callback()
         expect(h.scroll.size).toBe(0)
         expect(h.frames.size).toBe(0)
+        const removals = h.browser.removeEventListener.mock.calls.length
         expect(h.onPage).not.toHaveBeenCalled()
-        expect(h.browser.removeEventListener).toHaveBeenCalledOnce()
+        expect(removals).toBe(5)
         h.tracker.stop()
-        expect(h.browser.removeEventListener).toHaveBeenCalledOnce()
+        expect(h.browser.removeEventListener).toHaveBeenCalledTimes(removals)
     })
     it('rejects empty/invalid chapters and resume indices without scheduling or writing', () => {
         const h = viewport()
@@ -353,6 +415,125 @@ describe('isolated browser viewport module with explicitly mocked browser APIs',
             expect(h.tracker.start({ ...h.options, ...override })).toBe(false)
         expect(h.frames.size).toBe(0)
         expect(h.onPage).not.toHaveBeenCalled()
+    })
+    it('does not replace a saved position with page zero while cold images are still loading', () => {
+        const h = viewport()
+        for (const page of h.pages) {
+            page.complete = false
+            page.naturalHeight = 0
+        }
+        h.tracker.start(h.options)
+        expect(h.pages[4].loading).toBe('eager')
+        expect(h.pages.filter((page) => page.loading === 'eager')).toHaveLength(
+            1
+        )
+        h.observers[0].callback([h.entry(0)])
+        h.tick()
+        h.tick()
+        expect(h.pages[4].scrollIntoView).not.toHaveBeenCalled()
+        expect(h.onPage).not.toHaveBeenCalled()
+        h.load(4)
+        h.tick()
+        h.tick()
+        expect(h.onPage.mock.calls).toEqual([[4]])
+        h.observers[0].callback([h.entry(0)])
+        h.tick()
+        h.tick()
+        expect(h.onPage.mock.calls.every(([index]) => index === 4)).toBe(true)
+    })
+    it('re-anchors after preceding image and resize layout changes, without fighting later user scrolling', () => {
+        const h = viewport()
+        h.pages[1].complete = false
+        h.tracker.start(h.options)
+        h.tick()
+        h.tick()
+        const before = h.pages[4].scrollIntoView.mock.calls.length
+        h.load(1)
+        h.resizes[0].callback()
+        h.resizes[0].callback()
+        expect(h.frames.size).toBe(1)
+        h.tick()
+        h.tick()
+        expect(h.pages[4].scrollIntoView).toHaveBeenCalledTimes(before + 1)
+        h.interact()
+        h.tick()
+        const after = h.pages[4].scrollIntoView.mock.calls.length
+        h.resizes[0].callback()
+        h.tick()
+        expect(h.pages[4].scrollIntoView).toHaveBeenCalledTimes(after)
+        expect(h.onPage).toHaveBeenLastCalledWith(2)
+    })
+    it('ignores settings/control input as scroll intent and disposes late image/resize delivery on exit', () => {
+        const h = viewport()
+        h.pages[4].complete = false
+        h.tracker.start(h.options)
+        const imageCallback = [...h.imageListeners[4].get('load')!][0]
+        h.interact('keydown', {
+            key: 'ArrowDown',
+            target: { closest: () => ({}) }
+        })
+        h.tracker.stop()
+        h.load(4)
+        imageCallback()
+        h.resizes[0].callback()
+        h.tick()
+        h.tick()
+        expect(h.onPage).not.toHaveBeenCalled()
+        expect(h.pages[4].scrollIntoView).not.toHaveBeenCalled()
+        expect(h.resizes[0].disconnect).toHaveBeenCalledOnce()
+        expect(
+            [...h.events.values()].every((listeners) => listeners.size === 0)
+        ).toBe(true)
+    })
+    it('does not treat a broken image as a valid restored page, but supports its successful retry', () => {
+        const h = viewport()
+        h.pages[4].naturalHeight = 0
+        h.tracker.start(h.options)
+        h.tick()
+        h.tick()
+        expect(h.onPage).not.toHaveBeenCalled()
+        h.load(4)
+        h.tick()
+        h.tick()
+        expect(h.onPage).toHaveBeenLastCalledWith(4)
+    })
+    it('centers the saved page in a synthetic geometry model after late preceding-page growth', () => {
+        const h = viewport(),
+            heights = new Array<number>(10).fill(200)
+        let y = 0
+        const top = (index: number) =>
+            heights.slice(0, index).reduce((a, b) => a + b, 0)
+        h.pages[4].complete = false
+        h.pages[4].scrollIntoView.mockImplementation(() => {
+            y = top(4) + heights[4] / 2 - 500
+        })
+        h.document.elementFromPoint.mockImplementation(
+            () =>
+                h.pages[
+                    heights.findIndex(
+                        (height, index) =>
+                            top(index) <= y + 500 &&
+                            top(index) + height > y + 500
+                    )
+                ]
+        )
+        h.tracker.start(h.options)
+        heights[4] = 900
+        h.load(4)
+        h.tick()
+        h.tick()
+        expect(h.document.elementFromPoint()).toBe(h.pages[4])
+        heights[0] += 700
+        expect(h.document.elementFromPoint()).not.toBe(h.pages[4])
+        h.resizes[0].callback()
+        h.tick()
+        h.tick()
+        expect(h.document.elementFromPoint()).toBe(h.pages[4])
+        expect(h.onPage.mock.calls.every(([index]) => index === 4)).toBe(true)
+        y = top(8) + heights[8] / 2 - 500
+        h.interact()
+        h.tick()
+        expect(h.onPage).toHaveBeenLastCalledWith(8)
     })
 })
 

@@ -24,8 +24,9 @@ describe('dev.2 connected Web lifecycle contracts', () => {
     it('reader_progress_vertical_visible_window', () => {
         expect(viewport).toContain("'IntersectionObserver' in browser")
         expect(viewport).toContain("rootMargin: '-45% 0px -45% 0px'")
-        expect(viewport).toContain('entry.boundingClientRect.top')
-        expect(viewport).toContain('record(nearest.pageIndex)')
+        expect(viewport).toContain('if (session.interacted) queueSample()')
+        expect(viewport).toContain('ready(image)')
+        expect(viewport).toContain('record(Number(image.dataset.readerPage))')
         expect(viewport).toMatch(/document\s*\.elementFromPoint\(x, y\)/)
         expect(app).toContain('onPage: queueReaderProgress')
         expect(app).not.toContain("$('[data-reader-page]')")
@@ -81,17 +82,15 @@ describe('dev.2 connected Web lifecycle contracts', () => {
         expect(app).toContain('Math.max(0, chapter.pages.length - 1)')
     })
 
-    it('reader_vertical_resume_scrolls_to_saved_page_before_observing', () => {
+    it('reader_vertical_resume_waits_for_image_before_positioning_and_writing', () => {
         expect(app).toContain('const resumePage = reader.pageIndex')
-        expect(viewport).toContain(
-            '.querySelector(`[data-reader-page="${resumePage}"]`)'
-        )
-        expect(viewport).toContain("?.scrollIntoView({ block: 'center' })")
-        const tracker = viewport
-        expect(tracker.indexOf('scrollIntoView')).toBeGreaterThanOrEqual(0)
+        expect(viewport).toMatch(/target\.querySelector\(\s*`\[data-reader-page="\$\{resumePage\}"\]`/)
+        expect(viewport).toContain('!ready(anchor)')
+        expect(viewport).toContain("anchor.scrollIntoView({ block: 'center', behavior: 'instant' })")
+        expect(viewport).toContain('if (!session.interacted) record(resumePage)')
         expect(
-            tracker.indexOf('new browser.IntersectionObserver')
-        ).toBeGreaterThan(tracker.indexOf('scrollIntoView'))
+            viewport.indexOf('record(resumePage)')
+        ).toBeGreaterThan(viewport.indexOf('anchor.scrollIntoView'))
         expect(app).toContain("t('reader.resume'")
     })
 

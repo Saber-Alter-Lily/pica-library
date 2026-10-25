@@ -24,14 +24,20 @@ describe('actual shell authority with only synthetic bootstrap ports', () => {
     it.each([false, true])('retains fail-closed Library admission when capability success is %s', async capabilitiesAvailable => {
         const controls = new Map<string, { value: string; textContent: string; hidden: boolean }>()
         const register = vi.fn(async () => undefined)
+        const applySettings = vi.fn()
+        const readerSettings = { schemaVersion: 1, mode: 'single', direction: 'rtl', fit: 'height' }
         const api = vi.fn(async (path: string) => {
-            if (path === '/api/v1/desktop/status') return { version: 'synthetic', configured: true, startupReady: true, csrfToken: 'synthetic-csrf' }
+            if (path === '/api/v1/desktop/status') return { version: 'synthetic', configured: true, startupReady: true, csrfToken: 'synthetic-csrf', readerSettings }
             if (path === '/api/v1/capabilities' && capabilitiesAvailable) return { features: {}, capabilityStates: {} }
             throw Error('synthetic503')
         })
         const context = vm.createContext({
             desktop: null,
             state: { mode: 'connected', capabilities: null },
+            readerSettingsEditVersion: 0,
+            readerSettingsWriter: { pending: false },
+            activeView: 'home',
+            applyReaderSettingsControls: applySettings,
             api,
             Event: class {},
             document: { dispatchEvent: vi.fn(), querySelector: () => ({ hidden: false }), body: { classList: { add: vi.fn(), remove: vi.fn() } } },
@@ -46,6 +52,8 @@ describe('actual shell authority with only synthetic bootstrap ports', () => {
         expect(api.mock.calls.map(([path]) => path)).toEqual(['/api/v1/desktop/status', '/api/v1/capabilities'])
         expect(vm.runInContext('(' + admission + ')', context)()).toBe(capabilitiesAvailable)
         expect(register).toHaveBeenCalledTimes(capabilitiesAvailable ? 1 : 0)
+        expect(applySettings).toHaveBeenCalledTimes(capabilitiesAvailable ? 1 : 0)
+        if (capabilitiesAvailable) expect(applySettings).toHaveBeenCalledWith(readerSettings)
         if (capabilitiesAvailable) expect(context.desktop).toMatchObject({ configured: true, csrfToken: 'synthetic-csrf' })
         else expect(context.desktop).toBeNull()
     })

@@ -274,6 +274,21 @@ describe('optional LAN bridge policy and actual extracted commands, no real sock
         expect(h.ctx.mobileBridge).toBeNull()
         expect(h.ctx.config.mobileBridgeEnabled).toBe(false)
     })
+    it('preserves display and storage edits saved while an asynchronous disable is closing', async () => {
+        const h = harness()
+        await h.ctx.setMobileBridgeEnabled({ mobileBridgeAction: 'set-enabled', enabled: true })
+        let close!: () => void
+        h.controller.close.mockImplementationOnce(() => new Promise<undefined>(resolve => { close = () => resolve(undefined) }))
+        const pending = h.ctx.setMobileBridgeEnabled({ mobileBridgeAction: 'set-enabled', enabled: false })
+        const display = { schemaVersion: 1, mode: 'double', direction: 'rtl', fit: 'height' }
+        h.ctx.config = { ...h.ctx.config, readerSettings: display, preferredPort: 4817 }
+        close()
+        await pending
+        const persisted = h.ctx.saveConfig.mock.calls.at(-1)![1]
+        expect(persisted.readerSettings).toEqual(display)
+        expect(persisted.preferredPort).toBe(4817)
+        expect(persisted.mobileBridgeEnabled).toBe(false)
+    })
     it('keeps a failed close visible instead of reporting a listener as stopped', async () => {
         const h = harness()
         await h.ctx.setMobileBridgeEnabled({

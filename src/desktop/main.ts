@@ -574,7 +574,11 @@ async function setMobileBridgeEnabled(input: Record<string, unknown>) {
             config = next
             await mobileBridge?.close()
             mobileBridge = null
-            saveConfig(paths.config, next)
+            // Other settings can be saved while close() awaits active requests.
+            // Persist current configuration, not the pre-close snapshot.
+            const latest = { ...config, mobileBridgeEnabled: false }
+            saveConfig(paths.config, latest)
+            config = latest
         }
         return { success: true, enabled, running: Boolean(mobileBridge) }
     } finally { mobileBridgeSettingsBusy = false }

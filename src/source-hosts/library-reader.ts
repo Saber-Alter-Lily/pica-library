@@ -6,6 +6,7 @@ import { object, sourceHostAbort, sourceHostRequest, SourceHostError } from './c
 import { sourceHostGraphql, sourceHostBytes } from './http-body'
 import { SUWAYOMI_QUERIES, sourceHostData, suwayomiServer, suwayomiSourceId } from './suwayomi'
 import { HOST_READER_OPERATIONS, hostLibraryPage, hostMangaChapters, hostChapter, hostChapterPages, type HostChapter, type HostManga, type HostReaderOperation } from './reader-protocol'
+import type { ReadingLibraryRow } from '../library/reading-library'
 
 type StatePort = OnlineReaderState
 interface Book { comicId: string; connectionId: string; principal: string; sourceId: string; remoteId: number; urlDigest: string; title: string }
@@ -89,6 +90,27 @@ export class HostedLibraryReader {
         const chapter = session.chapters.get(comic)?.find(row => chapterId(comic, row) === episode)
         if (!chapter) throw new SourceHostError('SOURCE_HOST_STALE')
         return chapter
+    }
+    /** Already-selected references only. No RPC, credential export, catalogue import or write. */
+    readingLibraryRows(id: string): ReadingLibraryRow[] {
+        const session = this.session(id), progress = session.reader.recentProgress()
+        if (!Array.isArray(progress) || progress.length > 100) throw new SourceHostError('SOURCE_HOST_STORAGE')
+        const rows = this.storedBooks()
+            .filter(book => book.connectionId === session.host.id && book.principal === session.principal)
+            .map(book => {
+                const recent = progress.filter(row => row.comicId === book.comicId)
+                    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0]
+                return {
+                    source: { key: 'hosted-source:' + digest(JSON.stringify([book.connectionId, book.principal, book.sourceId])), label: session.host.label + ' · ' + book.sourceId },
+                    comicId: book.comicId,
+                    title: book.title,
+                    channel: 'hosted' as const,
+                    available: true,
+                    ...(recent ? { progress: { episodeId: recent.episodeId, pageIndex: recent.pageIndex, updatedAt: recent.updatedAt } } : {})
+                }
+            })
+        this.guard(session)
+        return rows
     }
     async command(value: unknown, signal: AbortSignal) {
         const input = object(value)

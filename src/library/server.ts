@@ -36,6 +36,8 @@ import { LocalLibraryIngestion } from '../local-library/ingestion'
 import { SourceDisabledError } from '../sources/source-policy'
 import { SourceHostError, type SourceHostInspection } from '../source-hosts/contract'
 import type { HostedLibraryReader } from '../source-hosts/library-reader'
+import { ReadingLibrary, ReadingLibraryInputError, type ReadingLibraryPort } from './reading-library'
+import { catalogueReadingPort } from '../services/reading-library-adapters'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -378,6 +380,33 @@ export async function startLibraryServer(options: {
                     csrfToken: options.desktop.csrfToken,
                     ...options.desktop.status()
                 })
+            }
+            if (url.pathname === '/api/v1/desktop/reading-library/query') {
+                if (request.method !== 'POST') return json(response, 405, { error: 'Explicit reading-library query required' })
+                const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`
+                if (!options.desktop?.configured() || options.desktop.status().startupReady === false || origin !== expectedOrigin || request.headers['x-pica-csrf'] !== options.desktop.csrfToken || !/^(?:127(?:\.\d{1,3}){3}|::1|::ffff:127(?:\.\d{1,3}){3})$/.test(peer)) return json(response, 403, { error: 'Local Desktop Reader authority required' })
+                try {
+                    if (url.search || !/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) throw new ReadingLibraryInputError()
+                    const deadline = setTimeout(() => request.destroy(), 5000)
+                    let input: Record<string, unknown>
+                    try { input = await body(request, 4096, true) } finally { clearTimeout(deadline) }
+                    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(key => !['query', 'hostSessionId'].includes(key)) || input.hostSessionId !== undefined && (typeof input.hostSessionId !== 'string' || !/^[0-9a-f-]{36}$/.test(input.hostSessionId))) throw new ReadingLibraryInputError()
+                    const ports: ReadingLibraryPort[] = [
+                        catalogueReadingPort('local', () => options.database.recentReadingProgress(100), options.database, id => options.service.sources.isEnabled(id)),
+                        catalogueReadingPort('online', () => onlineReader.recentProgress(), options.database, id => options.service.sources.isEnabled(id))
+                    ]
+                    if (typeof input.hostSessionId === 'string') {
+                        const sessionId = input.hostSessionId
+                        ports.push({ id: 'selected-host', snapshot: () => {
+                            if (!options.desktop?.hostedReader) throw new Error('Hosted reading unavailable')
+                            return options.desktop.hostedReader.readingLibraryRows(sessionId)
+                        } })
+                    }
+                    return json(response, 200, new ReadingLibrary(ports).query(input.query === undefined ? {} : input.query))
+                } catch {
+                    response.setHeader('connection', 'close')
+                    return json(response, 400, { error: 'Invalid reading library query' })
+                }
             }
             if (url.pathname === '/api/v1/desktop/host-reader' || url.pathname.startsWith('/api/v1/desktop/host-reader/')) {
                 const peer = request.socket.remoteAddress ?? '', expectedOrigin = `http://${request.headers.host}`

@@ -70,6 +70,7 @@ async function request(path, input, inspect = false) {
         } else {
             if (!valid(value)) throw { code: 'SOURCE_HOST_PROTOCOL' }
             registry = value
+            document.dispatchEvent(new CustomEvent('pica-host-connections-snapshot', { detail: { hosts: value.hosts.map(host => ({ id: host.id, revision: host.revision, enabled: host.enabled })) } }))
             $('state').textContent = value.storage === 'unavailable' ? t(...errors.SOURCE_HOST_STORAGE) : t('本机配置已更新；未连接外部宿主。', 'Local settings updated; no external host was contacted.', 'ローカル設定を更新しました。外部ホストへ接続していません。')
             $('consent').checked = false
         }

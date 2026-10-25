@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+## Source-neutral reading Library — local-only integration (2026-10-25)
+
+**Status: LOCAL_IMPLEMENTATION_AND_SELECTED_GATES / NEW_CLOUD_BROWSER_INSTALLABLE_DEVICE_GATES_PENDING. Not pushed, released or deployed.**
+
+- Human authorization permits this local branch `codex/source-neutral-reading-library-20261025` outside frozen PR208 `295942c297f9377b28df5a2d3d32a311fed8a18f`, under the still-unavailable coordination exception. No new remote/build permission, production state, SQLite migration/schema, local Java/app/browser/listener/updater or stable OTA operation is authorized.
+- Actual generic read-projection module, bounded legacy bulk adapter, principal-owned explicitly selected host snapshot, configured Desktop host/origin/CSRF query and common Library/Reader entry are wired. No detached-interface-only completion claim, source protocol clone, catalogue auto-import, fake Pica identity, new persistent state key or unsupported phone/tag/favorite/recommendation sync.
+- Local and online route positions remain separate. A new readonly per-work SQLite view fixes chapter-row starvation; original `readingProgress()` source/API and every stored position are preserved. Missing metadata/history stays unknown. Optional host failure cannot reset local state. Opaque source facets do not contain endpoint/credentials/raw principal.
+- Preserved actual48pass/2fail UI and51pass/1fail synthetic-memory SQL counterexamples, plus test-tool/type scaffold failures. Request freshness is distinct from ownership; revocation evicts stale labels, validated connection snapshots revoke client sessions without secrets, and expiry permits a new explicit session. No timeout/retry/skip/dependency relaxation.
+- Selected target101 assertions/10files, types and Web52; clean final source/hash/evidence are recorded in the source-only handoff, not inferred from earlier green output. New Chromium/actual-Windows projection checks are authored and syntax-checked but require separately authorized cloud execution. [Scope, failures, concrete integration and remaining holds](docs/SOURCE_NEUTRAL_READING_LIBRARY.md).
+
+Post-build historical PR208 evidence: exact `295942c297f9377b28df5a2d3d32a311fed8a18f`, run40192577286 candidate3/3,27/27 successful workflows;2147 assertions paired across Linux/Windows, Chromium60, Android402/53suites and six normal/deep upgrade/rollback diagnostics. Complete Dev84 handoff SHA256 `6aed83a17d7b33f3792abd2e1d6daafbdff964d4b2d3ca9d8207777cc69d8bf8`. It remains frozen and does not validate the new reading-library source. Main/Release/data are unchanged; human/provider/OEM acceptance and the full modular-reader objective remain open.
+
 ## Source idle boundary — authorized independent cloud candidate (2026-10-25)
 
 **Status: LOCAL_SOURCE_GATES_PASS / CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_PROVIDER_QA_PENDING. Not released or deployed.**

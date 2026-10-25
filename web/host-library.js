@@ -1,6 +1,6 @@
 import { copy as t } from './locale-runtime.js'
 
-let dialog, host = null, session = null, csrf = '', active = null, generation = 0, offset = 0, hasNext = false
+let dialog, host = null, session = null, csrf = '', active = null, generation = 0, offset = 0, hasNext = false, expiryTimer = null
 const $ = id => document.getElementById('host-library-' + id)
 function node(tag, value) { const element = document.createElement(tag); element.textContent = value; return element }
 function button(id, caption, action) { const element = node('button', caption); element.type = 'button'; element.id = 'host-library-' + id; element.onclick = action; return element }
@@ -8,7 +8,24 @@ function endOnExit() {
     active?.abort()
     if (session && csrf) void fetch('/api/v1/desktop/host-reader', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': csrf }, body: JSON.stringify({ action: 'close', sessionId: session.sessionId }), keepalive: true }).catch(() => {})
     session = null
+    clearTimeout(expiryTimer); expiryTimer = null
+    document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
     if ($('password')) { $('password').value = ''; $('username').value = '' }
+}
+/** Volatile authority only; never publish credentials or persist the session in a library row. */
+export function currentHostedLibrarySession() {
+    return session && Number.isSafeInteger(session.expiresAt) && session.expiresAt > Date.now()
+        ? { sessionId: session.sessionId, expiresAt: session.expiresAt }
+        : null
+}
+export async function resumeHostedLibraryComic(comicId, expectedSessionId) {
+    if (currentHostedLibrarySession()?.sessionId !== expectedSessionId) throw Error('SOURCE_HOST_CANCELLED')
+    const success = await working(async () => {
+        const selected = await command({ action: 'select', sessionId: expectedSessionId, comicId })
+        document.dispatchEvent(new CustomEvent('pica-open-hosted-reader', { detail: { ...selected, csrfToken: csrf } }))
+        dialog.close()
+    })
+    if (!success) throw Error('SOURCE_HOST_UNAVAILABLE')
 }
 function makeDialog() {
     dialog = document.createElement('dialog'); dialog.id = 'host-library-dialog'; dialog.style.maxWidth = 'min(900px, 96vw)'; dialog.style.overflowWrap = 'anywhere'
@@ -51,8 +68,8 @@ async function working(action) {
     const ticket = generation, controller = new AbortController(); active = controller; controls()
     const timer = setTimeout(() => controller.abort(), 19000)
     $('state').textContent = t('正在读取你的宿主…', 'Reading your host…', '自分のホストを読み取り中…')
-    try { await action(); if (ticket === generation) $('state').textContent = t('仅显示你的宿主书库；没有导入到本地书库。', 'Showing your hosted library only; nothing imported into the local catalogue.', '自分のホスト書庫のみ表示しています。ローカル書庫には取り込んでいません。') }
-    catch (error) { if (ticket === generation) { if (['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DISABLED'].includes(error.message)) session = null; $('state').textContent = t('无法继续。请检查宿主、权限或重新建立会话。', 'Cannot continue. Check the host/permissions or start a new session.', '続行できません。ホスト・権限を確認するか、セッションを作り直してください。') + (/^SOURCE_HOST_[A-Z_]+$/.test(error.message || '') ? ` (${error.message})` : '') } }
+    try { await action(); if (ticket === generation) $('state').textContent = t('仅显示你的宿主书库；没有导入到本地书库。', 'Showing your hosted library only; nothing imported into the local catalogue.', '自分のホスト書庫のみ表示しています。ローカル書庫には取り込んでいません。'); return true }
+    catch (error) { if (ticket === generation) { if (['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DISABLED'].includes(error.message)) { session = null; clearTimeout(expiryTimer); document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed')) } $('state').textContent = t('无法继续。请检查宿主、权限或重新建立会话。', 'Cannot continue. Check the host/permissions or start a new session.', '続行できません。ホスト・権限を確認するか、セッションを作り直してください。') + (/^SOURCE_HOST_[A-Z_]+$/.test(error.message || '') ? ` (${error.message})` : '') }; return false }
     finally { clearTimeout(timer); $('password').value = ''; $('username').value = ''; if (active === controller) active = null; controls() }
 }
 function render(value) {
@@ -74,6 +91,9 @@ async function startSession() {
         const value = await command({ action: 'start', id: host.id, expectedRevision: host.revision, auth, consent: $('consent').checked, scope: 'library-read', acceptHostFetchSideEffects: $('consent').checked })
         if (!/^[0-9a-f-]{36}$/.test(value.sessionId || '') || value.capabilities?.libraryRead !== true || value.capabilities.libraryImport !== false) throw Error('SOURCE_HOST_PROTOCOL')
         session = value
+        clearTimeout(expiryTimer)
+        if (Number.isSafeInteger(value.expiresAt)) expiryTimer = setTimeout(() => { generation++; endOnExit(); $('books').replaceChildren(); controls(); $('state').textContent = t('本次阅读会话已到期；请重新明确授权。', 'This reading session expired. Authorize a new session explicitly.', '読書セッションの有効期限が切れました。改めて明示的に許可してください。') }, Math.max(0, value.expiresAt - Date.now()))
+        document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
         render(await command({ action: 'list', sessionId: session.sessionId, offset: 0 }))
         if (Array.isArray(value.history) && value.history.length) {
             $('books').prepend(node('h3', t('最近阅读（可继续）', 'Recent reading (resume)', '最近の閲覧（再開）')))
@@ -88,5 +108,14 @@ document.addEventListener('pica-host-library-config', event => {
     if (!dialog) makeDialog()
     if (host?.id !== input.id || host?.revision !== input.revision) { generation++; endOnExit(); host = input; $('books').replaceChildren(); $('consent').checked = false; offset = 0; hasNext = false }
     $('title').textContent = host.label + ' · ' + host.endpoint; controls(); dialog.showModal()
+})
+document.addEventListener('pica-host-connections-snapshot', event => {
+    const values = event instanceof CustomEvent ? event.detail?.hosts : null
+    if (!host || !session || !Array.isArray(values) || values.length > 16 || values.some(value => !value || typeof value.id !== 'string' || !Number.isSafeInteger(value.revision) || typeof value.enabled !== 'boolean')) return
+    const current = values.find(value => value.id === host.id)
+    if (!current?.enabled || current.revision !== host.revision) {
+        generation++; endOnExit(); $('books').replaceChildren(); controls()
+        $('state').textContent = t('宿主权限已改变；请重新明确授权。阅读记录未删除。', 'Host permissions changed. Authorize a new session explicitly; reading records were not deleted.', 'ホストの権限が変更されました。改めて明示的に許可してください。読書記録は削除していません。')
+    }
 })
 window.addEventListener('pagehide', endOnExit)

@@ -10,6 +10,8 @@ import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { installLocalImport } from './local-import.js'
+import { installReadingLibrary } from './reading-library.js'
+import { currentHostedLibrarySession, resumeHostedLibraryComic } from './host-library.js'
 import { readerKeyboardAction, readerPageIndex } from './reader-input.js'
 import { createReaderViewportTracker } from './reader-viewport.js'
 import { recordReaderProgress, captureReaderProgress, acknowledgeReaderProgress } from './reader-progress.js'
@@ -106,6 +108,7 @@ const state = {
 }
 window.picaAppSessionId = state.appSessionId
 let desktop = null
+let readingLibraryPanel = null
 let language = resolveLanguage(
     localStorage,
     navigator.languages || [navigator.language]
@@ -579,6 +582,7 @@ function activateView(id) {
     if (id === 'reader' && previousView !== 'reader')
         state.reader.originView = previousView
     activeView = id
+    if (id === 'library') void readingLibraryPanel?.refresh()
     document.querySelectorAll('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
     )
@@ -1222,6 +1226,15 @@ async function testDesktop(prefix) {
 $('#setup-folder').onclick = () => chooseFolder('setup')
 $('#settings-folder').onclick = () => chooseFolder('settings')
 installAccountOnboarding({ post: desktopPost, getDesktop: () => desktop, getLanguage: () => language })
+readingLibraryPanel = installReadingLibrary({
+    target: $('#reading-library'),
+    canQuery: () => state.mode === 'connected' && Boolean(desktop?.configured && desktop?.csrfToken) && desktop?.startupReady !== false,
+    isVisible: () => activeView === 'library',
+    query: (value, signal) => api('/api/v1/desktop/reading-library/query', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': desktop?.csrfToken || '' }, body: JSON.stringify(value), signal }),
+    hostSession: currentHostedLibrarySession,
+    openReader: (comicId, online) => openReaderComic(comicId, online),
+    openHosted: resumeHostedLibraryComic
+})
 $('#setup-open-settings').onclick = () => activateView('settings')
 $('#setup-open-eh').onclick = () => {
     activateView('settings')
@@ -3011,6 +3024,7 @@ async function flushReaderProgress(keepalive = false) {
         else if (reader.hostedSessionId) await api(`${root}/progress`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' }, body: JSON.stringify(payload) })
         else await post(`${root}/progress`, payload)
         acknowledgeReaderProgress(state.reader, snapshot)
+        if (activeView === 'library') void readingLibraryPanel?.refresh()
         return true
     } catch {
         // Reader remains usable if progress persistence briefly fails.

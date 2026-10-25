@@ -52,6 +52,13 @@ function imports(file: string): string[] {
     return found
 }
 describe('enforced first module boundaries', () => {
+    it('bundles the actual reading projection and compatibility adapter without storage, network, provider SDKs or framework ownership', async () => {
+        const result = await build({entryPoints:['src/library/reading-library.ts','src/services/reading-library-adapters.ts'],bundle:true,platform:'browser',format:'esm',write:false,outdir:'_validation/reading-library-boundary-memory',metafile:true,logLevel:'silent'})
+        const allowed = new Set(['src/library/reading-library.ts','src/services/reading-library-adapters.ts','src/library/content-identity.ts'])
+        expect(result.outputFiles).toHaveLength(2)
+        for (const file of Object.keys(result.metafile!.inputs)) expect(allowed.has(file.replaceAll('\\','/')),file).toBe(true)
+        expect(imports(path.join(root,'src/library/reading-library.ts'))).toEqual([])
+    })
     it('keeps Desktop update shutdown authorization behind its async apply port without process or storage I/O', async () => {
         const result=await build({entryPoints:['src/desktop/update-command.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
         expect(Object.keys(result.metafile!.inputs)).toEqual(['src/desktop/update-command.ts'])

@@ -28,7 +28,8 @@ import { remoteApiConfiguration } from '../remote-api/config'
 import { UpdateManager } from '../update/manager'
 import { updateTargetFromRuntime } from '../update/target'
 import { EcosystemPackStore } from '../ecosystem/pack-store'
-import { PersonalizationService } from '../services/personalization-service'
+import type { PersonalizationService } from '../services/personalization-service'
+import { initializeOwnedDesktopProfile } from './profile-initialization'
 import { GitHubAccountAuthService } from '../services/github-account-auth'
 import { DesktopEhWebLogin, type EhCapturedSession } from './eh-web-login'
 import {
@@ -108,20 +109,8 @@ const updateManager = new UpdateManager({
     target: updateTargetFromRuntime()
 })
 const ecosystemPacks = new EcosystemPackStore(paths.packs, PRODUCT_VERSION)
-const personalization = new PersonalizationService(
-    path.join(paths.runtimeState, 'personalization'),
-    path.join(applicationRoot, 'web')
-)
+let personalization: PersonalizationService
 const githubAccountAuth = new GitHubAccountAuthService()
-for (const directory of [
-    paths.root,
-    paths.data,
-    paths.cache,
-    paths.packs,
-    paths.logs,
-    paths.runtimeState
-])
-    fs.mkdirSync(directory, { recursive: true })
 const log = new DesktopLog(paths.logs)
 const credentialBackend = credentialStoreForPlatform(paths.credentials)
 const credentialsStore = credentialBackend.store
@@ -1378,6 +1367,11 @@ async function main() {
         }
         throw new Error('Another Pica Library instance is starting')
     }
+    personalization = initializeOwnedDesktopProfile(
+        instance,
+        paths,
+        path.join(applicationRoot, 'web')
+    )
     try {
         const assistant = updateManager.preparePersistentUpgradeAssistant({
             verifyExisting: false

@@ -74,8 +74,9 @@ describe('optional source-host ownership and application safety contracts',()=>{
     })
     it('shares the real Reader via narrow state/source/cache/identity ports without pulling SQL/accounts/filesystem into its emitted graph',async()=>{
         const result=await build({entryPoints:['src/services/online-reader-service.ts'],bundle:true,platform:'node',format:'esm',write:false,metafile:true,logLevel:'silent'})
-        expect(Object.keys(result.metafile!.inputs).map(file=>file.replaceAll('\\','/')).filter(file=>file.startsWith('src/')).sort()).toEqual(['src/services/online-reader-service.ts'])
+        expect(Object.keys(result.metafile!.inputs).map(file=>file.replaceAll('\\','/')).filter(file=>file.startsWith('src/')).sort()).toEqual(['src/reader/progress-writes.ts','src/services/online-reader-service.ts'])
         expect(read('src/services/online-reader-service.ts')).not.toMatch(/LibraryDatabase|ProviderService|PreviewCacheManager|node:fs|credentialsStore/)
+        expect(read('src/reader/progress-writes.ts')).not.toMatch(/LibraryDatabase|ProviderService|PreviewCacheManager|node:fs|credentialsStore|fetch\(|listen\(/)
         const protocol=await build({entryPoints:['src/source-hosts/reader-protocol.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
         expect(Object.keys(protocol.metafile!.inputs).map(file=>file.replaceAll('\\','/')).sort()).toEqual(['src/source-hosts/contract.ts','src/source-hosts/reader-protocol.ts','src/source-hosts/suwayomi.ts'])
         const ui=read('web/host-library.js'),server=read('src/library/server.ts')

@@ -10,6 +10,9 @@ import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { installLocalImport } from './local-import.js'
+import { readerKeyboardAction, readerPageIndex } from './reader-input.js'
+import { createReaderViewportTracker } from './reader-viewport.js'
+import { recordReaderProgress, captureReaderProgress, acknowledgeReaderProgress } from './reader-progress.js'
 import { createDownloadedCloud } from './downloaded-cloud.js'
 import { createChronicleView } from './chronicle-view.js'
 import { analyzeVisualSamples, VISUAL_RUNTIME } from './visual-runtime.js'
@@ -565,6 +568,12 @@ function setupValue(prefix) {
 
 function activateView(id) {
     const previousView = activeView
+    if (previousView === 'reader' && id !== 'reader') {
+        readerComicRequest++
+        readerChapterRequest++
+        resetReaderViewportTracking()
+        void flushReaderProgress()
+    }
     if (previousView && previousView !== 'reader')
         viewScrollPositions.set(previousView, Math.max(0, window.scrollY))
     if (id === 'reader' && previousView !== 'reader')
@@ -578,6 +587,7 @@ function activateView(id) {
     )
     document.body.classList.toggle('reader-active', id === 'reader')
     requestAnimationFrame(() => {
+        if (activeView !== id) return
         if (id === 'reader') window.scrollTo(0, 0)
         else window.scrollTo(0, viewScrollPositions.get(id) ?? 0)
     })
@@ -2880,10 +2890,9 @@ $('#recommend-detail-dialog').onclick = async (event) => {
 }
 
 let readerProgressTimer = null
-let readerScrollHandler = null
-let readerPageObserver = null
 let readerChapterRequest = 0
 let readerComicRequest = 0
+const readerViewportTracker = createReaderViewportTracker({ window, document, onPage: queueReaderProgress })
 function readerApiRoot() {
     if (state.reader.hostedSessionId) return '/api/v1/desktop/host-reader/' + state.reader.hostedSessionId
     return state.reader.online ? '/api/v1/online-reader' : '/api/v1/reader'
@@ -2918,90 +2927,24 @@ function scrollReaderViewportToTop() {
 }
 
 function resetReaderViewportTracking() {
-    readerPageObserver?.disconnect()
-    readerPageObserver = null
-    if (readerScrollHandler)
-        window.removeEventListener('scroll', readerScrollHandler)
-    readerScrollHandler = null
-}
-
-function queueReaderProgressFromViewport(target) {
-    const bounds = target.getBoundingClientRect()
-    const centerY = window.innerHeight / 2
-    const sampleXs = [
-        bounds.left + bounds.width / 2,
-        bounds.left + bounds.width * 0.35,
-        bounds.left + bounds.width * 0.65
-    ]
-    const sampleYs = [
-        centerY,
-        Math.max(0, centerY - window.innerHeight * 0.08),
-        Math.min(window.innerHeight - 1, centerY + window.innerHeight * 0.08)
-    ]
-    for (const y of sampleYs) {
-        for (const x of sampleXs) {
-            const element = document.elementFromPoint(x, y)
-            const image = element?.closest?.('[data-reader-page]')
-            if (image && target.contains(image)) {
-                queueReaderProgress(Number(image.dataset.readerPage))
-                return
-            }
-        }
-    }
+    readerViewportTracker.stop()
 }
 
 function observeVerticalReaderProgress(target, resumePage) {
-    requestAnimationFrame(() => {
-        target
-            .querySelector(`[data-reader-page="${resumePage}"]`)
-            ?.scrollIntoView({ block: 'center' })
-        requestAnimationFrame(() => {
-            if ('IntersectionObserver' in window) {
-                readerPageObserver = new IntersectionObserver(
-                    (entries) => {
-                        const center = window.innerHeight / 2
-                        const nearest = entries
-                            .filter((entry) => entry.isIntersecting)
-                            .map((entry) => ({
-                                pageIndex: Number(
-                                    entry.target.dataset.readerPage
-                                ),
-                                distance: Math.abs(
-                                    entry.boundingClientRect.top +
-                                        entry.boundingClientRect.height / 2 -
-                                        center
-                                )
-                            }))
-                            .sort((a, b) => a.distance - b.distance)[0]
-                        if (nearest) queueReaderProgress(nearest.pageIndex)
-                    },
-                    {
-                        root: null,
-                        rootMargin: '-45% 0px -45% 0px',
-                        threshold: [0, 0.01]
-                    }
-                )
-                target
-                    .querySelectorAll('[data-reader-page]')
-                    .forEach((image) => readerPageObserver.observe(image))
-                queueReaderProgress(resumePage)
-                return
-            }
+    const reader = state.reader, chapter = reader.chapter, episodeId = reader.episodeId
+    readerViewportTracker.start({
+        target, resumePage, pageCount: chapter.pages.length,
+        isCurrent: () => activeView === 'reader' && state.reader === reader &&
+            reader.chapter === chapter && reader.episodeId === episodeId &&
+            $('#reader-mode').value === 'vertical'
+    })
+}
 
-            let queued = false
-            readerScrollHandler = () => {
-                if (queued) return
-                queued = true
-                requestAnimationFrame(() => {
-                    queued = false
-                    queueReaderProgressFromViewport(target)
-                })
-            }
-            window.addEventListener('scroll', readerScrollHandler, {
-                passive: true
-            })
-            readerScrollHandler()
-        })
+function queueReaderViewportTop() {
+    const reader = state.reader, chapter = reader.chapter
+    requestAnimationFrame(() => {
+        if (activeView === 'reader' && state.reader === reader && reader.chapter === chapter && $('#reader-mode').value !== 'vertical')
+            scrollReaderViewportToTop()
     })
 }
 
@@ -3043,8 +2986,7 @@ function renderReaderPages() {
 }
 
 function queueReaderProgress(pageIndex) {
-    state.reader.pageIndex = pageIndex
-    state.reader.dirty = state.reader.progressSaved !== pageIndex
+    if (activeView !== 'reader' || !recordReaderProgress(state.reader, pageIndex)) return
     clearTimeout(readerProgressTimer)
     readerProgressTimer = setTimeout(() => void flushReaderProgress(), 400)
 }
@@ -3052,14 +2994,9 @@ function queueReaderProgress(pageIndex) {
 async function flushReaderProgress(keepalive = false) {
     clearTimeout(readerProgressTimer)
     readerProgressTimer = null
-    if (!state.reader.dirty || !state.reader.comicId || !state.reader.episodeId)
-        return true
-    const payload = {
-        comicId: state.reader.comicId,
-        episodeId: state.reader.episodeId,
-        pageIndex: state.reader.pageIndex
-    }
-    const reader = state.reader
+    const snapshot = captureReaderProgress(state.reader)
+    if (!snapshot) return true
+    const { payload, owner: reader } = snapshot
     const root = readerApiRoot()
     try {
         if (keepalive) {
@@ -3073,10 +3010,7 @@ async function flushReaderProgress(keepalive = false) {
         }
         else if (reader.hostedSessionId) await api(`${root}/progress`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': reader.hostedCsrfToken || desktop?.csrfToken || '' }, body: JSON.stringify(payload) })
         else await post(`${root}/progress`, payload)
-        if (state.reader === reader && reader.episodeId === payload.episodeId && reader.pageIndex === payload.pageIndex) {
-            reader.progressSaved = payload.pageIndex
-            reader.dirty = false
-        }
+        acknowledgeReaderProgress(state.reader, snapshot)
         return true
     } catch {
         // Reader remains usable if progress persistence briefly fails.
@@ -3108,7 +3042,7 @@ async function openReaderChapter(episodeId) {
     renderReaderPages()
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
-        requestAnimationFrame(() => scrollReaderViewportToTop())
+        queueReaderViewportTop()
     $('#reader-message').textContent = !chapter.pages.length ? t('reader.noPages') : state.reader.hostedSessionId ? t('reader.hostedNotice') : state.reader.online ? t('reader.onlineNotice') : ''
     } catch (error) {
         if (requestId === readerChapterRequest)
@@ -3138,6 +3072,7 @@ async function openReaderComic(comicId, online = false, hosted = null) {
     online = online && !String(comicId).startsWith('local:')
     const requestId = ++readerComicRequest
     readerChapterRequest++
+    resetReaderViewportTracking()
     try {
         await flushReaderProgress()
         if (requestId !== readerComicRequest) return
@@ -3207,14 +3142,14 @@ document.addEventListener('pica-open-hosted-reader', event => {
 })
 
 function moveReader(delta) {
-    const total = state.reader.chapter?.pages?.length || 0
-    if (!total || $('#reader-mode').value === 'vertical') return
-    const step = $('#reader-mode').value === 'double' ? 2 : 1
-    const direction = $('#reader-direction').value === 'rtl' ? -1 : 1
-    state.reader.pageIndex = Math.max(
-        0,
-        Math.min(total - 1, state.reader.pageIndex + delta * step * direction)
-    )
+    const next = readerPageIndex({
+        pageIndex: state.reader.pageIndex,
+        total: state.reader.chapter?.pages?.length || 0,
+        mode: $('#reader-mode').value,
+        direction: $('#reader-direction').value
+    }, delta)
+    if (next === null || next === state.reader.pageIndex) return
+    state.reader.pageIndex = next
     renderReaderPages()
 }
 
@@ -3241,7 +3176,7 @@ $('#reader-mode').onchange = () => {
     renderReaderPages()
     updateReaderChapterNavigation()
     if ($('#reader-mode').value !== 'vertical')
-        requestAnimationFrame(() => scrollReaderViewportToTop())
+        queueReaderViewportTop()
 }
 $('#reader-direction').onchange = renderReaderPages
 $('#reader-fit').onchange = renderReaderPages
@@ -3250,37 +3185,38 @@ $('#reader-fullscreen').onclick = () =>
         ? document.exitFullscreen()
         : $('#reader').requestFullscreen()
 async function exitReader() {
-    readerComicRequest++
-    readerChapterRequest++
+    const requestId = ++readerComicRequest, chapterRequest = ++readerChapterRequest
+    const reader = state.reader
+    const current = () => activeView === 'reader' && state.reader === reader &&
+        requestId === readerComicRequest && chapterRequest === readerChapterRequest
+    resetReaderViewportTracking()
     await flushReaderProgress()
+    if (!current()) return
     if (document.fullscreenElement)
         await document.exitFullscreen().catch(() => undefined)
-    resetReaderViewportTracking()
+    if (!current()) return
     activateView(state.reader.originView || 'downloaded')
 }
 $('#reader-exit').onclick = () => void exitReader()
 document.addEventListener('keydown', (event) => {
     if (activeView !== 'reader') return
-    const target = event.target
-    if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLSelectElement ||
-        target instanceof HTMLTextAreaElement
-    )
-        return
-    if (event.key === 'Escape' && !document.fullscreenElement) {
-        event.preventDefault()
-        void exitReader()
-        return
-    }
-    if ($('#reader-mode').value === 'vertical') return
-    if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-        event.preventDefault()
-        moveReader(-1)
-    } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
-        event.preventDefault()
-        moveReader(1)
-    }
+    const targets = event.composedPath?.() || [event.target]
+    const editing = targets.some((target) => target instanceof Element && (
+        target.isContentEditable || target.closest(
+            'input, select, textarea, [role="textbox"], [role="combobox"], [role="slider"], [role="spinbutton"], [role="listbox"], [role="menu"], [role="tree"], [role="grid"], [role="tablist"]'
+        )
+    ))
+    const action = readerKeyboardAction(event, {
+        active: true,
+        mode: $('#reader-mode').value,
+        fullscreen: Boolean(document.fullscreenElement),
+        blocked: editing || Boolean(document.querySelector('dialog[open]')) ||
+            document.body.classList.contains('driver-active')
+    })
+    if (action === null) return
+    event.preventDefault()
+    if (action === 'exit') void exitReader()
+    else moveReader(action)
 })
 async function exportReaderArchive(format) {
     try {

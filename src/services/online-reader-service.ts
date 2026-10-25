@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import pLimit from 'p-limit'
 import type { Episode, Picture } from '../types'
+import { orderReaderProgress } from '../reader/progress-writes'
 
 export interface OnlineReaderState {
     getAppState<T>(key: string): T | undefined
@@ -192,31 +193,37 @@ export class OnlineReaderService {
     async saveProgress(comicId: string, episodeId: string, index: number) {
         this.comicId(comicId); this.episodeId(episodeId)
         const scope = this.scope(comicId)
-        const { pictures } = await this.metadata(comicId, episodeId)
-        this.current(comicId, scope)
-        if (
-            !Number.isSafeInteger(index) ||
-            index < 0 ||
-            index >= pictures.length
-        )
-            throw new Error('阅读页码无效')
-        const value = {
-            comicId,
-            episodeId,
-            pageIndex: index,
-            updatedAt: new Date().toISOString()
-        }
-        this.database.setAppState(
+        return orderReaderProgress(
+            this.database,
             this.contract?.progressKey ?? 'online-reader-progress-v1',
-            [
-                value,
-                ...this.recentProgress().filter(
-                    (item) =>
-                        item.comicId !== comicId || item.episodeId !== episodeId
+            async () => {
+                this.current(comicId, scope)
+                const { pictures } = await this.metadata(comicId, episodeId)
+                this.current(comicId, scope)
+                if (
+                    !Number.isSafeInteger(index) ||
+                    index < 0 ||
+                    index >= pictures.length
                 )
-            ].slice(0, 100)
+                    throw new Error('阅读页码无效')
+                const value = {
+                    comicId,
+                    episodeId,
+                    pageIndex: index,
+                    updatedAt: new Date().toISOString()
+                }
+                this.database.setAppState(
+                    this.contract?.progressKey ?? 'online-reader-progress-v1',
+                    [
+                        value,
+                        ...this.recentProgress().filter(
+                            (item) => item.comicId !== comicId || item.episodeId !== episodeId
+                        )
+                    ].slice(0, 100)
+                )
+                return value
+            }
         )
-        return value
     }
 
     recentProgress() {

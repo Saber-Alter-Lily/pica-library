@@ -1,5 +1,15 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-25: source-neutral continue-reading entry — Dev85 candidate
+
+This separately authorized Draft continues frozen PR208 `295942c297f9377b28df5a2d3d32a311fed8a18f`. Local implementation was sealed at `291bdec208c96ff2cf3f2484b2e14859448a597c`. [Candidate scope and pending gates](SOURCE_NEUTRAL_CLOUD_CANDIDATE.md).
+
+The Library now composes existing local/online progress and explicitly selected user-host books into a common read-only entry, using the existing Reader. It does not connect to sources, import whole catalogues, merge identities by title or add hosted works to unsupported favorite/tag/recommendation/mobile APIs. No source comes enabled by default.
+
+Require exact-head CI, real Chromium, actual Windows projection/runtime/update/rollback and signed Dev85 artifact checks before handing out installables. Previous green Dev84 evidence is not current-source proof. Cloud Windows additionally tests the pinned actual Dev84 package against the new candidate using synthetic profiles only; it does not modify a local installation or official OTA.
+
+Windows remains isolated at `%LOCALAPPDATA%\Pica Library Post Stable RC`; Android remains `com.picalibrary.android.dev`, fixed preview certificate. Do not uninstall or copy databases; stop on signature/version incompatibility. Physical/provider/OEM/gesture/AI acceptance and the whole modular-reader objective remain open. No deployment, main merge, tag/Release or stable OTA change.
+
 ## 2026-10-25: explicit source admission and passive JM status — Dev84 candidate
 
 The current independently authorized Draft continues frozen PR207 `1b7a9184eca11f73b295a55827d2cddee34dc69c`, not main. Its source fixes were sealed at `a723fbe29bc4323dddeb7370c37721dd6a4789bd`; candidate-only workflow metadata advances Dev83 to Dev84. [Current scope, safety and remaining validation](SOURCE_IDLE_CLOUD_CANDIDATE.md).

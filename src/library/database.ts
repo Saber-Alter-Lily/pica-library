@@ -2779,6 +2779,21 @@ export class LibraryDatabase {
         }))
     }
 
+    /** Read projection only: limit works, not chapters; leave the original progress API intact. */
+    recentReadingProgress(limit = 100): ReadingProgress[] {
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 5000)
+            throw new Error('Invalid reading progress limit')
+        const rows = this.db.prepare(`
+            SELECT comic_id, episode_id, page_index, updated_at FROM (
+                SELECT comic_id, episode_id, page_index, updated_at,
+                       ROW_NUMBER() OVER (PARTITION BY comic_id ORDER BY updated_at DESC, episode_id ASC) AS reading_rank
+                FROM reading_progress
+            ) WHERE reading_rank = 1
+            ORDER BY updated_at DESC, comic_id ASC LIMIT ?
+        `).all(limit) as SqlRow[]
+        return rows.map(row => ({ comicId: String(row.comic_id), episodeId: String(row.episode_id), pageIndex: numberValue(row.page_index), updatedAt: String(row.updated_at) }))
+    }
+
     recommendationSeen(cycleId: string) {
         return (
             this.db

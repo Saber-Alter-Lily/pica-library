@@ -1,5 +1,13 @@
 # Next concentrated user acceptance — scope, remaining development and timing
 
+## 2026-10-25 current milestone (supersedes the historical readiness estimate below)
+
+Frozen PR208 `295942c297f9377b28df5a2d3d32a311fed8a18f` already has a complete Windows/Dev84 acceptance package, exact candidate3/3,27 successful workflows,2147 cross-platform assertions,Chromium60,Android402 and six verified synthetic upgrade/rollback scenarios. Complete handoff SHA256 `6aed83a17d7b33f3792abd2e1d6daafbdff964d4b2d3ca9d8207777cc69d8bf8`. It is available for a grouped user test, not installed/released or physically accepted.
+
+The later [source-neutral reading Library](SOURCE_NEUTRAL_READING_LIBRARY.md) is on a new local-only branch, implementing a common read projection and continuing both saved local/online positions and explicitly selected host books through existing engines. Its local scoped gates are not a new compiled package. Full legacy catalogue/tag/phone/source-trust integration remains open. Do not confuse this additional implementation with an unfinished Dev84 build, wait for a complete extension ecosystem before offering a test, or replace the frozen package silently. Finish this authorized slice, seek separate cloud-build permission, then consolidate its exact-source evidence if approved. Do not reopen unfinished profile-recovery work or expand new product scope while closing this milestone.
+
+The following NEXT-67 observations/failures and estimates are historical evidence, not current readiness or a new deadline. Full local-first modular-reader requirements remain unchanged; engineering gates do not settle real source/login, device/OEM/gestures, AI file roundtrip, tag burden, sync or recommendation/Visual quality.
+
 Observed 2026-10-24 while NEXT-67 source is being closed. This is not a release authorization, a new goal, or a claim that the full modular reader is complete. Keep the full local-first/content-free/user-managed-source/modular/one-update-action objective intact.
 
 ## Actual state

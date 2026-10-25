@@ -43,6 +43,35 @@ function fixture() {
 }
 
 describe('actual hosted-library adapter + shared Reader — injected HTTP and state/cache ports only', () => {
+    it('projects only explicitly selected references without network/cache/writes; records survive revocation', async () => {
+        const f = fixture(), { sessionId } = await f.start()
+        await f.reader.command({ action: 'list', sessionId, offset: 0 }, signal())
+        const browsedCalls = f.calls.length
+        expect(f.reader.readingLibraryRows(sessionId)).toEqual([])
+        expect(f.calls).toHaveLength(browsedCalls)
+        const ids = await f.select(sessionId)
+        await f.reader.read(sessionId, 'save-progress', { ...ids, pageIndex: 1 }, signal())
+        const before = JSON.stringify([...f.state]), writes = f.db.setAppState.mock.calls.length, calls = f.calls.length
+        const rows = f.reader.readingLibraryRows(sessionId)
+        expect(rows).toMatchObject([{ comicId: ids.comicId, channel: 'hosted', available: true, progress: { episodeId: ids.episodeId, pageIndex: 1 } }])
+        expect(rows[0].source.key).toMatch(/^hosted-source:[a-f0-9]{64}$/)
+        expect(JSON.stringify(rows)).not.toContain('host.example')
+        expect(JSON.stringify(rows)).not.toContain('/own-comic/')
+        expect(f.calls).toHaveLength(calls); expect(f.cache.get).not.toHaveBeenCalled(); expect(f.db.setAppState).toHaveBeenCalledTimes(writes)
+        f.connections.command({ action: 'set-enabled', id: HOST, expectedRevision: 1, enabled: false, consent: true })
+        expect(() => f.reader.readingLibraryRows(sessionId)).toThrow('SOURCE_HOST_CANCELLED')
+        expect(JSON.stringify([...f.state])).toBe(before)
+        expect(f.calls).toHaveLength(calls)
+    })
+    it('rejects expired or unknown projection scopes without restoring sessions or fetching a host', async () => {
+        const f = fixture(), { sessionId } = await f.start()
+        await f.select(sessionId)
+        const calls = f.calls.length, before = JSON.stringify([...f.state])
+        expect(() => f.reader.readingLibraryRows('unknown-session')).toThrow('SOURCE_HOST_CANCELLED')
+        f.advance()
+        expect(() => f.reader.readingLibraryRows(sessionId)).toThrow('SOURCE_HOST_CANCELLED')
+        expect(f.calls).toHaveLength(calls); expect(JSON.stringify([...f.state])).toBe(before)
+    })
     it('does not contact hosts or read personal state on construction; inspector consent cannot authorize reading', async () => {
         const f = fixture()
         expect(f.calls).toEqual([]); expect(f.db.setAppState).not.toHaveBeenCalled()

@@ -33,6 +33,7 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
     const protectedState=value=>JSON.stringify(Object.fromEntries(Object.entries(value).map(([name,rows])=>[name,rows.filter(row=>name!=='app_state'||!owned(row.key)).map(row=>JSON.stringify(row)).sort()])))
     const post=async(url,input)=>{const response=await fetch(url,{method:'POST',headers,body:JSON.stringify(input),signal:AbortSignal.timeout(20000)});const value=await response.json();return{status:response.status,value}}
     const command=input=>post(endpoint,input),configuration=input=>post(app.origin+'/api/v1/desktop/source-hosts/connections',input)
+    const readingLibrary=hostSessionId=>post(app.origin+'/api/v1/desktop/reading-library/query',{query:{limit:100},...(hostSessionId?{hostSessionId}:{})})
     try{
         await new Promise(resolve=>fixture.listen(0,'127.0.0.1',resolve))
         const before=tables(),config=fs.readFileSync(path.join(home,'config/config.json')),choices=current.externalSources
@@ -45,6 +46,9 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
         const started=await command(input);assert.equal(started.status,200);const session=started.value.sessionId,root=endpoint+'/'+session
         const listed=await command({action:'list',sessionId:session,offset:0});assert.equal(listed.status,200)
         const comic=listed.value.books[0].comicId;assert.match(comic,/^hosted:/);assert.equal(listed.value.books[0].sourceId,'9007199254740993')
+        const beforeProjection=tables(),beforeQueryCalls=calls,unselected=await readingLibrary(session)
+        assert.equal(unselected.status,200);assert.equal(unselected.value.items.some(row=>row.comicId===comic),false)
+        assert.equal(calls,beforeQueryCalls);assert.deepEqual(tables(),beforeProjection)
         assert.equal((await command({action:'select',sessionId:session,comicId:comic})).status,200)
         const chaptersUrl=root+'/comics/'+encodeURIComponent(comic)+'/chapters',chapters=await fetch(chaptersUrl,{headers}).then(r=>r.json()),episode=chapters[0].id
         const chapterResponse=await fetch(chaptersUrl+'/'+encodeURIComponent(episode),{headers});assert.equal(chapterResponse.status,200);const metadata=await chapterResponse.json()
@@ -53,6 +57,12 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
         for(let i=0;i<2;i++){const image=await fetch(imageUrl,{headers});assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');assert.deepEqual(Buffer.from(await image.arrayBuffer()),png)}
         assert.equal(images,1)
         const progress=await post(root+'/progress',{comicId:comic,episodeId:episode,pageIndex:1});assert.equal(progress.status,200)
+        const selectedState=tables(),selectedQueryCalls=calls,selectedView=await readingLibrary(session),plainView=await readingLibrary()
+        assert.equal(selectedView.status,200);assert.equal(selectedView.value.complete,true)
+        const selectedBook=selectedView.value.items.find(row=>row.comicId===comic)
+        assert.equal(selectedBook.title,'Synthetic hosted book');assert.equal(selectedBook.routes[0].channel,'hosted');assert.equal(selectedBook.routes[0].progress.pageIndex,1)
+        assert.equal(plainView.value.items.some(row=>row.comicId===comic),false);assert.equal(calls,selectedQueryCalls)
+        assert.deepEqual(tables(),selectedState);assert.equal(JSON.stringify(selectedView.value).includes(secret),false);assert.equal(JSON.stringify(selectedView.value).includes('/own/'),false)
         assert.equal((await command({action:'close',sessionId:session})).status,200)
         const next=await command(input);assert.equal(next.status,200);const session2=next.value.sessionId,root2=endpoint+'/'+session2
         assert.equal(next.value.history[0].comicId,comic);assert.equal(next.value.history[0].pageIndex,1)
@@ -64,8 +74,11 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
         assert.equal(protectedState(after),protectedState(before));assert.equal(JSON.stringify(after).includes(secret),false)
         assert.equal((await configuration({action:'set-enabled',id:host.id,expectedRevision:1,enabled:false,consent:true})).status,200)
         assert.equal((await fetch(root2+'/progress',{headers})).status,409)
+        const revokedState=tables(),revokedCalls=calls,revokedView=await readingLibrary(session2)
+        assert.equal(revokedView.status,200);assert.equal(revokedView.value.complete,false);assert.equal(revokedView.value.items.some(row=>row.comicId===comic),false)
+        assert.ok(revokedView.value.issues.some(row=>row.port==='selected-host'));assert.equal(calls,revokedCalls);assert.deepEqual(tables(),revokedState)
         assert.equal((await configuration({action:'remove',id:host.id,expectedRevision:2,consent:true})).status,200)
         assert.deepEqual(fs.readFileSync(path.join(home,'config/config.json')),config);assert.deepEqual((await status()).externalSources,choices);assert.equal(fs.existsSync(path.join(home,'config/credentials.dat')),false);assert.equal(unexpected,0)
-        process.stdout.write(JSON.stringify({packaged_host_library_reader:'PASS',source_sha:sourceSha,version,execution_location:'GITHUB_WINDOWS_CI',actual_shared_reader:true,host_library_only:true,independent_progress_resumed:true,only_owned_app_state_keys_changed:2,stale_remote_id_rejected_before_cached_body:true,cross_site_media_denied_before_host:true,session_revoked_on_disable:true,credential_persistence:false,catalogue_import:false,native_host_reader:false,unexpected_fixture_requests:unexpected,production_accessed:false})+'\n')
+        process.stdout.write(JSON.stringify({packaged_host_library_reader:'PASS',source_sha:sourceSha,version,execution_location:'GITHUB_WINDOWS_CI',actual_shared_reader:true,host_library_only:true,independent_progress_resumed:true,only_owned_app_state_keys_changed:2,stale_remote_id_rejected_before_cached_body:true,cross_site_media_denied_before_host:true,session_revoked_on_disable:true,selected_reading_projection_without_host_fetch_or_writes:true,implicit_host_projection:false,revoked_projection_is_partial_without_private_rows:true,credential_persistence:false,catalogue_import:false,native_host_reader:false,unexpected_fixture_requests:unexpected,production_accessed:false})+'\n')
     }finally{fixture.closeAllConnections();await new Promise(resolve=>fixture.close(resolve))}
 }

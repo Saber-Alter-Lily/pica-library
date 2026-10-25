@@ -161,11 +161,16 @@ for (const language of ['zh-CN', 'en', 'ja']) test(`saved hosts have no default 
 })
 
 for (const language of ['zh-CN', 'en', 'ja']) test(`hosted library uses the actual shared Reader and independent progress (${language})`, async ({ page }) => {
-    const state = await setup(page, language), requests = [], progress = []
+    const state = await setup(page, language), requests = [], progress = [], projections = []
+    let selected = false
     const hostId = '64d223e0-5d29-4320-babb-5a2da654d345', sessionId = '64d223e0-5d29-4320-babb-5a2da654d346', comicId = 'hosted:' + hostId + ':' + 'b'.repeat(64), episodeId = 'host-chapter:' + 'c'.repeat(64)
     const root = '/api/v1/desktop/host-reader/' + sessionId, chapterPath = `${root}/comics/${encodeURIComponent(comicId)}/chapters/${encodeURIComponent(episodeId)}`
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XFoAAAAASUVORK5CYII=', 'base64')
-    await page.route('**/api/v1/desktop/status', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, startupReady: true, csrfToken: 'host-test-csrf', sourceHostConnections: { available: true }, hostedLibraryReader: { available: true } }) }))
+    await page.route('**/api/v1/desktop/status', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '0.5.0-source-neutral-fixture', configured: true, startupReady: true, csrfToken: 'host-test-csrf', picaAccount: {configured:false}, ehAccount: {configured:false}, sourceHostConnections: { available: true }, hostedLibraryReader: { available: true } }) }))
+    // loadDesktop deliberately clears authority when capability discovery fails.
+    // Supply its real bootstrap contract, rather than relaxing the Library guard.
+    await page.route('**/api/v1/capabilities', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ appVersion: '0.5.0-source-neutral-fixture', appApiVersion: 2, features: { updatePackages: false }, capabilityStates: {} }) }))
+    await page.route('**/api/v1/desktop/browser-session', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) }))
     await page.route('**/api/v1/desktop/source-hosts/connections', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ schemaVersion: 1, revision: 2, scope: 'inspect-only', credentials: 'per-request-not-stored', storage: 'available', capabilities: { sourceInspection: true, reader: false, libraryImport: false, extensionInstall: false }, hosts: [{ id: hostId, label: 'My host', endpoint, authMode: 'basic', enabled: true, revision: 1 }] }) }))
     await page.route('**/api/v1/desktop/host-reader**', async route => {
         const req = route.request(), path = new URL(req.url()).pathname, input = req.postData() ? req.postDataJSON() : null
@@ -173,9 +178,9 @@ for (const language of ['zh-CN', 'en', 'ja']) test(`hosted library uses the actu
         if (req.method() === 'POST') expect(req.headers()['x-pica-csrf']).toBe('host-test-csrf')
         let value
         if (path === '/api/v1/desktop/host-reader') {
-            if (input.action === 'start') { expect(input).toMatchObject({ scope: 'library-read', consent: true, acceptHostFetchSideEffects: true }); value = { sessionId, history: [], capabilities: { libraryRead: true, libraryImport: false } } }
+            if (input.action === 'start') { expect(input).toMatchObject({ scope: 'library-read', consent: true, acceptHostFetchSideEffects: true }); value = { sessionId, expiresAt: Date.now()+15*60*1000, history: [], capabilities: { libraryRead: true, libraryImport: false } } }
             else if (input.action === 'list') value = { offset: 0, hasNext: false, books: [{ comicId, title: hostileName, sourceId: '9007199254740993' }] }
-            else if (input.action === 'select') value = { sessionId, comicId, title: hostileName }
+            else if (input.action === 'select') { selected = true; value = { sessionId, comicId, title: hostileName } }
             else value = { closed: true }
         } else if (path.endsWith('/progress')) {
             if (input) { progress.splice(0, progress.length, input); value = input } else value = progress
@@ -184,6 +189,27 @@ for (const language of ['zh-CN', 'en', 'ja']) test(`hosted library uses the actu
         else { await route.fulfill({ status: 200, contentType: 'image/png', body: png }); return }
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) })
     })
+    // Boot the actual connected Library shell before testing its new shared entry point.
+    for (const path of ['/api/v1/comics*','/api/v1/authors','/api/v1/recommendation-feedback']) await page.route('**'+path,route=>route.fulfill({status:200,contentType:'application/json',body:'[]'}))
+    await page.route('**/api/v1/status',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({summary:{}})}))
+    await page.route('**/api/v1/recommendation-sessions/status*',route=>route.fulfill({status:200,contentType:'application/json',body:'{}'}))
+    await page.route('**/api/v1/library/query',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items:[],total:0,facets:{authors:[],tags:[]},query:route.request().postDataJSON()})}))
+    await page.route('**/api/v1/desktop/reading-library/query',route=>{
+        const input=route.request().postDataJSON();projections.push(input);expect(route.request().headers()['x-pica-csrf']).toBe('host-test-csrf')
+        const local={comicId:'local:fixture',title:'Synthetic local book',source:{key:'catalogue:local',label:'Local'},routes:[{channel:'local',available:true,progress:{pageIndex:0}}]}
+        const hosted={comicId,title:hostileName,source:{key:'host:chosen',label:'My authorized host'},routes:[{channel:'hosted',available:true,...(progress[0]?{progress:progress[0]}:{})}]}
+        const items=[local,...(selected&&input.hostSessionId===sessionId?[hosted]:[])]
+        return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({items,total:items.length,complete:true,sources:items.map(item=>({...item.source,count:1}))})})
+    })
+    await page.route('**/api/v1/reader/**',route=>{
+        const req=route.request(),path=new URL(req.url()).pathname
+        let value=path.endsWith('/progress')?(req.method()==='POST'?req.postDataJSON():[]):path.endsWith('/chapters')?[{id:'local-chapter',title:'Local chapter',downloadedPictures:2,knownPictures:2}]:{episode:{id:'local-chapter',title:'Local chapter'},pages:[0,1].map(index=>({id:'local-'+index,url:'/fixture-local-'+index+'.png'}))}
+        return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(value)})
+    })
+    await page.route('**/fixture-local-*.png',route=>route.fulfill({status:200,contentType:'image/png',body:png}))
+    await page.reload({waitUntil:'domcontentloaded'})
+    await expect(page.locator('#settings-version')).toHaveText('Pica Library 0.5.0-source-neutral-fixture')
+    await page.locator('nav [data-view="maintenance"]').click()
     await page.locator('#saved-host-summary').click(); await page.locator('#saved-host-refresh').click()
     await page.locator('[data-host-library]').click()
     await expect(page.locator('#host-library-dialog')).toBeVisible(); expect(requests).toHaveLength(0)
@@ -209,7 +235,23 @@ for (const language of ['zh-CN', 'en', 'ja']) test(`hosted library uses the actu
     expect(requests.some(row => row.path.startsWith('/api/v1/online-reader'))).toBe(false)
     expect(await page.evaluate(secret => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }).includes(secret), secret)).toBe(false)
     await page.locator('#reader-exit').click()
+    await page.locator('nav [data-view="library"]').click()
+    const unified=page.locator('#reading-library')
+    await expect(unified).toBeVisible();await expect(unified.locator('article strong')).toHaveCount(2)
+    expect(projections.at(-1).hostSessionId).toBe(sessionId)
+    expect(await unified.locator('img').count()).toBe(0)
+    await unified.locator('article').filter({hasText:hostileName}).getByRole('button').click()
+    await expect(page.locator('#reader')).toHaveClass(/active/);await expect(page.locator('#reader-title')).toHaveText(hostileName)
+    await page.locator('#reader-exit').click()
+    await expect(unified).toBeVisible()
+    await unified.locator('article').filter({hasText:'Synthetic local book'}).getByRole('button').click()
+    await expect(page.locator('#reader')).toHaveClass(/active/);await expect(page.locator('#reader-pages img')).toHaveCount(1)
+    await page.locator('#reader-exit').click();await page.locator('nav [data-view="maintenance"]').click()
     await page.locator('[data-host-library]').click(); await page.locator('#host-library-end').click()
     await expect.poll(() => requests.some(row => row.input?.action === 'close')).toBe(true)
+    await page.locator('#host-library-hide').click();await page.locator('nav [data-view="library"]').click()
+    await expect(unified.locator('article strong')).toHaveText('Synthetic local book')
+    expect(projections.at(-1).hostSessionId).toBeUndefined()
+    expect(await page.evaluate(secret=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}).includes(secret),secret)).toBe(false)
     expect(state.errors).toEqual([])
 })

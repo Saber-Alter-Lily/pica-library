@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## Source idle boundary — authorized independent cloud candidate (2026-10-25)
+
+**Status: LOCAL_SOURCE_GATES_PASS / CLOUD_AND_INSTALLABLE_GATES_PENDING / HUMAN_PROVIDER_QA_PENDING. Not released or deployed.**
+
+- Human approval permits a new independent Draft PR and unpublished Actions builds using existing signing Secrets; the isolated coordination exception still applies. Base is frozen PR207 `1b7a9184eca11f73b295a55827d2cddee34dc69c`; local source corrections are sealed as `a723fbe29bc4323dddeb7370c37721dd6a4789bd`. PR206/207 and their packages stay unchanged.
+- Candidate-only Dev84 advances the single build/manifest authority from Dev83. Same Dev application ID and fixed certificate are required; no private-key download, uninstall, installation or production profile is authorized. Existing owner/non-PR/explicit-branch signing restrictions remain.
+- Exact a723 source passed135 selected assertions/18suites, strict TypeScript and Web51 syntax. A separate23-case/4suite source-and-synthetic update-planning check passed, including22 unchanged dependency/schema/module/updater inputs. These selections overlap; do not sum them as unique tests or borrow PR207 CI for this source.
+- Compatible metadata is necessary, not sufficient for real incremental eligibility. Generated updater/helper bytes are unknown until build; differing helpers require the existing one-click full-application path. Actual Windows runtime, HTTP/browser, signed Android, package/upgrade/rollback and physical/provider checks need their own current-source evidence.
+- No new product feature or updater implementation is added for cloud preparation. No main merge, tag/Release, stable OTA, local Java/application/browser/listener/upgrader, production data access or deployment. [Candidate scope and review limits](docs/SOURCE_IDLE_CLOUD_CANDIDATE.md).
+
 ## JM command route and Node-stream error boundary (2026-10-25, local-only continuation)
 
 **ACTUAL_CALLBACK_OVER_VIRTUAL_REQUESTS / PASSIVE_GET_AND_EXPLICIT_POST / BOUNDED_GENERIC_INPUT_ERRORS / NO_SOCKET_OR_SOURCE_PROCESS / FULL_GOAL_OPEN.**

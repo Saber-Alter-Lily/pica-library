@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## JM command route and Node-stream error boundary (2026-10-25, local-only continuation)
+
+**ACTUAL_CALLBACK_OVER_VIRTUAL_REQUESTS / PASSIVE_GET_AND_EXPLICIT_POST / BOUNDED_GENERIC_INPUT_ERRORS / NO_SOCKET_OR_SOURCE_PROCESS / FULL_GOAL_OPEN.**
+
+- Continues local `0d8dc49713e7400f9c53b57b592212759b1fc72f`, within the same authorized source-idle isolation. Actual callback/json/body and three service methods run through compiler-extracted VM functions, fake responses/transport and in-memory Node Readables; no application/server setup/listener/provider/profile is started.
+- Initial24 cases had21pass/3fail: invalid JSON500, text/plain reaching the connection, oversize input using generic parsing. This action alone now requires JSON, limits input4096bytes and returns constant non-reflective errors; ordinary login/favorite routes remain unchanged.
+- Actual Node-stream counterexample then had24pass/1fail: early rejection destroyed input before an error reply. Native iterator(false) is opt-in only for this command, with Connection:close on parse/media failure. A separate case retains ordinary body-reader default behavior. Reuses the existing parser and standard Node API, no new dependencies or runtime floor.
+- Development133/134 runtime/type history retained. A contextual-this strict-type failure in the fake iterator is fixed using an explicit closure, not casts/relaxed criteria. Final target135 assertions/18 inspected suites plus types/Web51 is independently sealed; real HTTP/browser/compiled/cloud/signature/upgrade/device/source acceptance remains pending.
+- PR207/installables, main, OTA, production data, schema/deps/Android/recommendation/Visual/sync/updater remain untouched. No push, release, deployment or Java/permission-sensitive execution. [Exact method and limits](docs/JM_VIRTUAL_ROUTING_VALIDATION.md).
+
 ## Source admission and idle observation boundary (2026-10-25, local-only)
 
 **LOCAL_ONLY_CORE_DEFAULT / EXPLICIT_CLI_SOURCES / PASSIVE_JM_STATUS / FROZEN_PR207_UNCHANGED / FULL_GOAL_OPEN.**

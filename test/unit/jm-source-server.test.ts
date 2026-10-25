@@ -85,6 +85,13 @@ it('keeps JM credentials/import mutations inside the loopback Desktop CSRF bound
         expect((await call('connect', 'fixture-csrf', started.url, {enabled: ['jm']})).status).toBe(400)
         for (const input of [[], null, '', false])
             expect((await call('connect', 'fixture-csrf', started.url, input)).status).toBe(400)
+        for (const [contentType, raw] of [['text/plain', '{}'], ['application/json', '{"password":"synthetic-private"'], ['application/json', ' '.repeat(4097)]]) {
+            const invalid = await fetch(`${started.url}/api/v1/desktop/sources/jm/connect`, {
+                method: 'POST', headers: {'content-type': contentType, 'x-pica-csrf': 'fixture-csrf', origin: started.url}, body: raw
+            })
+            expect(invalid.status).toBe(400)
+            expect(await invalid.text()).not.toContain('synthetic-private')
+        }
         expect(connect).not.toHaveBeenCalled()
         expect((await call('connect', 'fixture-csrf', started.url, {})).status).toBe(200)
         expect(connect).toHaveBeenCalledOnce()

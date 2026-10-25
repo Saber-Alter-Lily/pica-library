@@ -84,8 +84,8 @@ describe('actual JM settings module with fake DOM/transport, no browser/server',
         let condition = ''
         function visit(node: ts.Node) {
             if (ts.isIfStatement(node) && node.expression.getText(ast) === "action === 'connect'" && ts.isBlock(node.thenStatement)) {
-                const guard = node.thenStatement.statements[0]
-                if (ts.isIfStatement(guard)) condition = guard.expression.getText(ast)
+                const guard = node.thenStatement.statements.find(statement => ts.isIfStatement(statement) && statement.expression.getText(ast).includes('Object.keys(input)'))
+                if (guard && ts.isIfStatement(guard)) condition = guard.expression.getText(ast)
             }
             ts.forEachChild(node, visit)
         }

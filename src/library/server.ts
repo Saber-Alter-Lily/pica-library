@@ -93,10 +93,11 @@ function json(response: ServerResponse, status: number, value: unknown) {
     response.end(JSON.stringify(value))
 }
 
-async function body(request: IncomingMessage, limit = 10 * 1024 * 1024) {
+async function body(request: IncomingMessage, limit = 10 * 1024 * 1024, preserveForErrorReply = false) {
     const chunks: Buffer[] = []
     let size = 0
-    for await (const chunk of request) {
+    const input = preserveForErrorReply ? request.iterator({ destroyOnReturn: false }) : request
+    for await (const chunk of input) {
         const buffer = Buffer.from(chunk)
         size += buffer.byteLength
         if (size > limit)
@@ -475,11 +476,21 @@ export async function startLibraryServer(options: {
                 if (action === 'status' && request.method === 'GET')
                     return json(response, 200, { available: options.service.jmRuntimeAvailable(), ...await options.service.jmAccountStatus() })
                 if (request.method === 'POST') {
-                    const input = await body(request)
                     if (action === 'connect') {
+                        if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
+                            response.setHeader('connection', 'close')
+                            return json(response, 400, { error: 'JM connect requires an empty JSON object' })
+                        }
+                        let input: Record<string, unknown>
+                        try { input = await body(request, 4096, true) }
+                        catch {
+                            response.setHeader('connection', 'close')
+                            return json(response, 400, { error: 'JM connect requires an empty JSON object within 4096 bytes' })
+                        }
                         if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length) return json(response, 400, { error: 'JM connect accepts no credential or source-choice fields' })
                         return json(response, 200, await options.service.jmConnectAccount())
                     }
+                    const input = await body(request)
                     if (action === 'login' || action === 'logout') return json(response, 200, await options.desktop.save({ ...input, jmAccountAction: action }))
                     if (action === 'preview') return json(response, 200, await options.service.jmPreviewFavorites(Number(input.folderId ?? 0), async () => { if (response.destroyed) throw new Error('收藏扫描已取消') }))
                     if (action === 'confirm') return json(response, 200, await options.service.jmConfirmFavorites(String(input.token ?? '')))

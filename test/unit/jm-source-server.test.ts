@@ -64,7 +64,7 @@ it('keeps JM credentials/import mutations inside the loopback Desktop CSRF bound
             verification: 'CACHED'
         })
         expect(connect).not.toHaveBeenCalled()
-        const call = (action: string, csrf: string, origin = started.url, input: object = {folderId: 0}) =>
+        const call = (action: string, csrf: string, origin = started.url, input: unknown = {folderId: 0}) =>
             fetch(`${started.url}/api/v1/desktop/sources/jm/${action}`, {
                 method: 'POST',
                 headers: {
@@ -83,6 +83,8 @@ it('keeps JM credentials/import mutations inside the loopback Desktop CSRF bound
         expect((await call('connect', '', started.url, {})).status).toBe(403)
         expect((await call('connect', 'fixture-csrf', 'https://not-local.example', {})).status).toBe(403)
         expect((await call('connect', 'fixture-csrf', started.url, {enabled: ['jm']})).status).toBe(400)
+        for (const input of [[], null, '', false])
+            expect((await call('connect', 'fixture-csrf', started.url, input)).status).toBe(400)
         expect(connect).not.toHaveBeenCalled()
         expect((await call('connect', 'fixture-csrf', started.url, {})).status).toBe(200)
         expect(connect).toHaveBeenCalledOnce()

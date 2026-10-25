@@ -477,7 +477,7 @@ export async function startLibraryServer(options: {
                 if (request.method === 'POST') {
                     const input = await body(request)
                     if (action === 'connect') {
-                        if (Object.keys(input).length) return json(response, 400, { error: 'JM connect accepts no credential or source-choice fields' })
+                        if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length) return json(response, 400, { error: 'JM connect accepts no credential or source-choice fields' })
                         return json(response, 200, await options.service.jmConnectAccount())
                     }
                     if (action === 'login' || action === 'logout') return json(response, 200, await options.desktop.save({ ...input, jmAccountAction: action }))

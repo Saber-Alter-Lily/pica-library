@@ -78,4 +78,22 @@ describe('actual JM settings module with fake DOM/transport, no browser/server',
         expect(api).toContain("if (action === 'connect')")
         expect(api).toContain('JM connect accepts no credential or source-choice fields')
     })
+    it('the actual connect guard accepts only an empty object, not arrays/primitives or fields', () => {
+        const source = fs.readFileSync('src/library/server.ts', 'utf8')
+        const ast = ts.createSourceFile('server.ts', source, ts.ScriptTarget.Latest, true)
+        let condition = ''
+        function visit(node: ts.Node) {
+            if (ts.isIfStatement(node) && node.expression.getText(ast) === "action === 'connect'" && ts.isBlock(node.thenStatement)) {
+                const guard = node.thenStatement.statements[0]
+                if (ts.isIfStatement(guard)) condition = guard.expression.getText(ast)
+            }
+            ts.forEachChild(node, visit)
+        }
+        visit(ast)
+        expect(condition).not.toBe('')
+        const rejected = new Function('input', 'return Boolean('+condition+');') as (input: unknown) => boolean
+        expect(rejected({})).toBe(false)
+        for (const input of [[], [1], '', 'text', null, false, true, 0, 1, {password: 'synthetic'}, {enabled: ['jm']}])
+            expect(rejected(input)).toBe(true)
+    })
 })

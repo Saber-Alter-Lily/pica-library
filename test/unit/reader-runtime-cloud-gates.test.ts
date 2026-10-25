@@ -60,6 +60,8 @@ describe('Reader correction cloud recipe, source inspection only', () => {
         expect(text).not.toMatch(
             /\.scrollIntoView\(|\.scrollTo\(|waitForTimeout\(|test\.skip/
         )
+        expect(text).toContain("testInfo.outputPath('cold-continuous-saved-page.png')")
+        expect(text).toContain('await page.screenshot({ path: screenshotPath })')
         expect(text.indexOf('real browser imports folder/CBZ')).toBeLessThan(text.indexOf('cold continuous resume centers'))
     })
     it('retains success/failure browser artifacts without turning previous runtime evidence into a new PASS', () => {

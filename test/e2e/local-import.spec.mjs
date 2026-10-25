@@ -317,8 +317,10 @@ test('cold continuous resume centers the saved page after an earlier image loads
             .toBe(true)
         await expect.poll(centeredPage).toBe('2')
         await expect.poll(centerError).toBeLessThan(24)
+        const screenshotPath = testInfo.outputPath('cold-continuous-saved-page.png')
+        await page.screenshot({ path: screenshotPath })
         await testInfo.attach('cold-continuous-saved-page.png', {
-            body: await page.screenshot(),
+            path: screenshotPath,
             contentType: 'image/png'
         })
         await page.locator('#reader-exit').click()

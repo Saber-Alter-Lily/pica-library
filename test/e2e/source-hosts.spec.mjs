@@ -166,7 +166,11 @@ for (const language of ['zh-CN', 'en', 'ja']) test(`hosted library uses the actu
     const hostId = '64d223e0-5d29-4320-babb-5a2da654d345', sessionId = '64d223e0-5d29-4320-babb-5a2da654d346', comicId = 'hosted:' + hostId + ':' + 'b'.repeat(64), episodeId = 'host-chapter:' + 'c'.repeat(64)
     const root = '/api/v1/desktop/host-reader/' + sessionId, chapterPath = `${root}/comics/${encodeURIComponent(comicId)}/chapters/${encodeURIComponent(episodeId)}`
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XFoAAAAASUVORK5CYII=', 'base64')
-    await page.route('**/api/v1/desktop/status', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true, startupReady: true, csrfToken: 'host-test-csrf', picaAccount: {configured:false}, ehAccount: {configured:false}, sourceHostConnections: { available: true }, hostedLibraryReader: { available: true } }) }))
+    await page.route('**/api/v1/desktop/status', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '0.5.0-source-neutral-fixture', configured: true, startupReady: true, csrfToken: 'host-test-csrf', picaAccount: {configured:false}, ehAccount: {configured:false}, sourceHostConnections: { available: true }, hostedLibraryReader: { available: true } }) }))
+    // loadDesktop deliberately clears authority when capability discovery fails.
+    // Supply its real bootstrap contract, rather than relaxing the Library guard.
+    await page.route('**/api/v1/capabilities', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ appVersion: '0.5.0-source-neutral-fixture', appApiVersion: 2, features: { updatePackages: false }, capabilityStates: {} }) }))
+    await page.route('**/api/v1/desktop/browser-session', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) }))
     await page.route('**/api/v1/desktop/source-hosts/connections', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ schemaVersion: 1, revision: 2, scope: 'inspect-only', credentials: 'per-request-not-stored', storage: 'available', capabilities: { sourceInspection: true, reader: false, libraryImport: false, extensionInstall: false }, hosts: [{ id: hostId, label: 'My host', endpoint, authMode: 'basic', enabled: true, revision: 1 }] }) }))
     await page.route('**/api/v1/desktop/host-reader**', async route => {
         const req = route.request(), path = new URL(req.url()).pathname, input = req.postData() ? req.postDataJSON() : null
@@ -204,6 +208,7 @@ for (const language of ['zh-CN', 'en', 'ja']) test(`hosted library uses the actu
     })
     await page.route('**/fixture-local-*.png',route=>route.fulfill({status:200,contentType:'image/png',body:png}))
     await page.reload({waitUntil:'domcontentloaded'})
+    await expect(page.locator('#settings-version')).toHaveText('Pica Library 0.5.0-source-neutral-fixture')
     await page.locator('nav [data-view="maintenance"]').click()
     await page.locator('#saved-host-summary').click(); await page.locator('#saved-host-refresh').click()
     await page.locator('[data-host-library]').click()

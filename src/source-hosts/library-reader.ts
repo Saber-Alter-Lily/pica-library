@@ -2,15 +2,15 @@ import { createHash, randomUUID } from 'node:crypto'
 import pLimit from 'p-limit'
 import { OnlineReaderService, type OnlineReaderState, type OnlineReaderCache } from '../services/online-reader-service'
 import type { SourceHostConnections, SourceHostRecord } from './connections'
-import { object, sourceHostAbort, sourceHostRequest, SourceHostError } from './contract'
+import { object, sourceHostAbort, sourceHostRequest, SourceHostError, type HostedSource } from './contract'
 import { sourceHostGraphql, sourceHostBytes } from './http-body'
-import { SUWAYOMI_QUERIES, sourceHostData, suwayomiServer, suwayomiSourceId } from './suwayomi'
-import { HOST_READER_OPERATIONS, hostLibraryPage, hostMangaChapters, hostChapter, hostChapterPages, type HostChapter, type HostManga, type HostReaderOperation } from './reader-protocol'
+import { SUWAYOMI_QUERIES, sourceHostData, suwayomiServer, suwayomiSourceId, suwayomiSourcePage } from './suwayomi'
+import { HOST_READER_OPERATIONS, HOST_DISCOVERY_OPERATIONS, hostSearchPage, hostPreparedManga, hostLibraryPage, hostMangaChapters, hostChapter, hostChapterPages, type HostChapter, type HostManga, type HostReaderOperation } from './reader-protocol'
 import type { ReadingLibraryRow } from '../library/reading-library'
 
 type StatePort = OnlineReaderState
 interface Book { comicId: string; connectionId: string; principal: string; sourceId: string; remoteId: number; urlDigest: string; title: string }
-interface Session { id: string; host: SourceHostRecord; principal: string; controller: AbortController; expiresAt: number; timer: ReturnType<typeof setTimeout>; reader: OnlineReaderService; refs: Map<string, Book>; chapters: Map<string, HostChapter[]>; connection: ReturnType<typeof sourceHostRequest>['connection'] }
+interface Session { id: string; host: SourceHostRecord; principal: string; scope: 'library-read' | 'source-search-read'; sourceId: string | null; sourceChoices: Map<string, HostedSource>; controller: AbortController; expiresAt: number; timer: ReturnType<typeof setTimeout>; reader: OnlineReaderService; refs: Map<string, Book>; chapters: Map<string, HostChapter[]>; connection: ReturnType<typeof sourceHostRequest>['connection'] }
 const BOOKS_KEY = 'host-reader-book-references-v1'
 const TTL = 15 * 60 * 1000
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -21,7 +21,7 @@ function comicId(value: string) { if (!comicPattern.test(value)) throw new Sourc
 function episodeId(value: string) { if (!episodePattern.test(value)) throw new SourceHostError('INVALID_SOURCE_HOST'); return value }
 const chapterId = (comic: string, chapter: HostChapter) => 'host-chapter:' + digest(comic + '\n' + chapter.url)
 
-/** Optional user-host library adapter. Uses the actual shared Reader, not a parallel Reader engine. */
+/** Optional host adapter with separate library/selected-source grants, using the SAME shared Reader. */
 export class HostedLibraryReader {
     private readonly sessions = new Map<string, Session>()
     private readonly network = pLimit(4)
@@ -75,12 +75,27 @@ export class HostedLibraryReader {
     private findBook(session: Session, id: string) {
         comicId(id); this.guard(session)
         const book = session.refs.get(id) ?? this.storedBooks().find(row => row.comicId === id && row.connectionId === session.host.id && row.principal === session.principal)
-        if (!book || book.principal !== session.principal || book.connectionId !== session.host.id) throw new SourceHostError('SOURCE_HOST_STALE')
+        if (!book || book.principal !== session.principal || book.connectionId !== session.host.id || !this.scopeAllows(session, book)) throw new SourceHostError('SOURCE_HOST_STALE')
         return book
+    }
+    private scopeAllows(session: Session, book: Book) { return session.scope === 'library-read' || session.sourceId !== null && session.sourceId === book.sourceId }
+    private remember(session: Session, mangas: HostManga[]) {
+        for (const manga of mangas) { const book = this.book(session, manga); if (session.refs.size >= 128) session.refs.delete(session.refs.keys().next().value!); session.refs.set(book.comicId, book) }
+        return mangas.map(manga => { const book = this.book(session, manga); return { comicId: book.comicId, title: book.title, sourceId: book.sourceId } })
+    }
+    private scopedProgress(session: Session) {
+        const books = this.storedBooks().filter(book => book.connectionId === session.host.id && book.principal === session.principal && this.scopeAllows(session, book))
+        return session.reader.recentProgress().filter(progress => books.some(book => book.comicId === progress.comicId))
+    }
+    private history(session: Session) {
+        const books = this.storedBooks()
+        return this.scopedProgress(session).flatMap(progress => { const book = books.find(book => book.comicId === progress.comicId); return book ? [{ ...progress, title: book.title }] : [] })
     }
     private async ensureComic(session: Session, id: string) {
         const expected = this.findBook(session, id), result = hostMangaChapters(await this.rpc(session, 'manga', { id: expected.remoteId }))
         if (result.manga.id !== expected.remoteId || result.manga.sourceId !== expected.sourceId || digest(result.manga.url) !== expected.urlDigest) throw new SourceHostError('SOURCE_HOST_STALE')
+        // Persisted search references are not permission to expand an old library-only session.
+        if (session.scope === 'library-read' && !result.manga.inLibrary) throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')
         if (!session.chapters.has(id) && session.chapters.size >= 20) session.chapters.delete(session.chapters.keys().next().value!)
         session.chapters.set(id, result.chapters)
         return result
@@ -96,7 +111,7 @@ export class HostedLibraryReader {
         const session = this.session(id), progress = session.reader.recentProgress()
         if (!Array.isArray(progress) || progress.length > 100) throw new SourceHostError('SOURCE_HOST_STORAGE')
         const rows = this.storedBooks()
-            .filter(book => book.connectionId === session.host.id && book.principal === session.principal)
+            .filter(book => book.connectionId === session.host.id && book.principal === session.principal && this.scopeAllows(session, book))
             .map(book => {
                 const recent = progress.filter(row => row.comicId === book.comicId)
                     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0]
@@ -114,9 +129,13 @@ export class HostedLibraryReader {
     }
     async command(value: unknown, signal: AbortSignal) {
         const input = object(value)
+        if (typeof input.action !== 'string') throw new SourceHostError('INVALID_SOURCE_HOST')
         if (input.action === 'start') {
-            fields(input, ['action', 'id', 'expectedRevision', 'auth', 'consent', 'scope', 'acceptHostFetchSideEffects'])
-            if (input.consent !== true || input.scope !== 'library-read' || input.acceptHostFetchSideEffects !== true) throw new SourceHostError('SOURCE_HOST_READER_CONSENT_REQUIRED')
+            if (input.scope !== 'library-read' && input.scope !== 'source-search-read') throw new SourceHostError('SOURCE_HOST_READER_CONSENT_REQUIRED')
+            const discovery = input.scope === 'source-search-read'
+            fields(input, ['action', 'id', 'expectedRevision', 'auth', 'consent', 'scope', 'acceptHostFetchSideEffects', ...(discovery ? ['acceptHostCatalogueSideEffects'] : [])])
+            if (input.consent !== true || input.acceptHostFetchSideEffects !== true ||
+                discovery && input.acceptHostCatalogueSideEffects !== true) throw new SourceHostError('SOURCE_HOST_READER_CONSENT_REQUIRED')
             if (this.closed) throw new SourceHostError('SOURCE_HOST_CANCELLED')
             if (this.sessions.size >= 3) throw new SourceHostError('SOURCE_HOST_BUSY')
             const host = this.connections.snapshot().hosts.find(row => row.id === input.id)
@@ -126,7 +145,7 @@ export class HostedLibraryReader {
             if (auth.mode !== host.authMode) throw new SourceHostError('SOURCE_HOST_AUTH_REQUIRED')
             const connection = sourceHostRequest({ kind: host.kind, endpoint: host.endpoint, allowInsecureLan: host.allowInsecureLan, auth, consent: true }).connection
             const id = randomUUID(), principal = digest(host.id + '\n' + auth.mode + '\n' + (connection.auth.mode === 'basic' ? connection.auth.username : ''))
-            const session = { id, host, principal, controller: new AbortController(), expiresAt: this.now() + TTL, refs: new Map(), chapters: new Map(), connection } as Session
+            const session = { id, host, principal, scope: input.scope, sourceId: null, sourceChoices: new Map(), controller: new AbortController(), expiresAt: this.now() + TTL, refs: new Map(), chapters: new Map(), connection } as Session
             this.sessions.set(id, session)
             session.timer = setTimeout(() => this.end(id), TTL); session.timer.unref?.()
             const disconnect = () => this.end(id)
@@ -161,24 +180,60 @@ export class HostedLibraryReader {
                 this.cache ??= this.makeCache()
                 const root = '/api/v1/desktop/host-reader/' + id
                 session.reader = new OnlineReaderService(this.database, provider, this.cache, { comicId, episodeId, progressKey: 'host-reader-progress-v1:' + principal, assertAccess: () => this.guard(session), pageUrl: (comic, episode, index) => `${root}/comics/${encodeURIComponent(comic)}/chapters/${encodeURIComponent(episode)}/pages/${index}` })
-                return { sessionId: id, expiresAt: session.expiresAt, capabilities: { libraryRead: true, providerSearch: false, libraryImport: false, extensionInstall: false }, history: session.reader.recentProgress().flatMap(progress => { const book = this.storedBooks().find(book => book.comicId === progress.comicId && book.principal === principal); return book ? [{ ...progress, title: book.title }] : [] }) }
+                return { sessionId: id, expiresAt: session.expiresAt, scope: session.scope, selectedSource: null,
+                    capabilities: { libraryRead: !discovery, providerSearch: discovery, libraryImport: false, extensionInstall: false, downloads: false, native: false }, history: this.history(session) }
             } catch (error) { this.end(id); throw error }
             finally { signal.removeEventListener('abort', disconnect) }
         }
-        fields(input, input.action === 'list' ? ['action', 'sessionId', 'offset'] : ['action', 'sessionId', 'comicId'])
+        const allowed = input.action === 'list' || input.action === 'sources' ? ['action', 'sessionId', 'offset'] :
+            input.action === 'bind-source' ? ['action', 'sessionId', 'sourceId', 'consent'] : input.action === 'search' ? ['action', 'sessionId', 'query', 'page'] : ['action', 'sessionId', 'comicId']
+        fields(input, allowed)
         const session = this.session(String(input.sessionId))
         if (input.action === 'close') { this.end(session.id); return { closed: true } }
         return this.withSignal(session, signal, async () => {
+        if (['sources', 'bind-source', 'search'].includes(String(input.action))) {
+            if (session.scope !== 'source-search-read') throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')
+            if (input.action === 'sources') {
+                if (session.sourceId !== null) throw new SourceHostError('SOURCE_HOST_STALE')
+                const offset = input.offset ?? 0
+                if (!Number.isInteger(offset) || Number(offset) < 0 || Number(offset) > 5000 || Number(offset) % 25) throw new SourceHostError('INVALID_SOURCE_HOST')
+                const page = suwayomiSourcePage(await this.run(session, abort => sourceHostGraphql(session.connection, SUWAYOMI_QUERIES.sources, { first: 25, offset }, abort, this.fetcher)), Number(offset))
+                this.guard(session); session.sourceChoices = new Map(page.sources.map(source => [source.id, source]))
+                return page
+            }
+            if (input.action === 'bind-source') {
+                if (input.consent !== true) throw new SourceHostError('SOURCE_HOST_CONSENT_REQUIRED')
+                const sourceId = suwayomiSourceId(input.sourceId), selected = session.sourceChoices.get(sourceId)
+                if (session.sourceId !== null || !selected) throw new SourceHostError('SOURCE_HOST_STALE')
+                session.sourceId = sourceId; session.sourceChoices.clear()
+                return { selectedSource: selected, history: this.history(session) }
+            }
+            if (session.sourceId === null) throw new SourceHostError('SOURCE_HOST_SOURCE_SELECTION_REQUIRED')
+            const query = input.query, page = input.page ?? 1
+            if (typeof query !== 'string' || !query.trim() || query.length > 256 || /[\u0000-\u001f\u007f]/.test(query) ||
+                !Number.isSafeInteger(page) || Number(page) < 1 || Number(page) > 200) throw new SourceHostError('INVALID_SOURCE_HOST')
+            const result = hostSearchPage(await this.run(session, abort => sourceHostGraphql(session.connection, HOST_DISCOVERY_OPERATIONS.search,
+                { input: { source: session.sourceId, type: 'SEARCH', page, query: query.trim() } }, abort, this.fetcher)), session.sourceId)
+            this.guard(session)
+            return { page, query: query.trim(), sourceId: session.sourceId, hasNext: result.hasNext, books: this.remember(session, result.mangas) }
+        }
         if (input.action === 'list') {
+            if (session.scope !== 'library-read') throw new SourceHostError('SOURCE_HOST_SCOPE_REQUIRED')
             const offset = input.offset ?? 0
             if (!Number.isInteger(offset) || Number(offset) < 0 || Number(offset) > 5000 || Number(offset) % 25) throw new SourceHostError('INVALID_SOURCE_HOST')
             const page = hostLibraryPage(await this.rpc(session, 'library', { offset }))
-            for (const manga of page.mangas) { const book = this.book(session, manga); if (session.refs.size >= 128) session.refs.delete(session.refs.keys().next().value!); session.refs.set(book.comicId, book) }
-            return { offset, hasNext: page.hasNext, books: page.mangas.map(manga => { const book = this.book(session, manga); return { comicId: book.comicId, title: book.title, sourceId: book.sourceId } }) }
+            return { offset, hasNext: page.hasNext, books: this.remember(session, page.mangas) }
         }
         if (input.action === 'select') {
             const comic = comicId(String(input.comicId)), book = this.findBook(session, comic)
             await this.ensureComic(session, comic); this.guard(session)
+            if (session.scope === 'source-search-read') {
+                const prepared = hostPreparedManga(await this.run(session, abort => sourceHostGraphql(session.connection, HOST_DISCOVERY_OPERATIONS.prepare,
+                    { input: { id: book.remoteId, fetchManga: true, fetchChapters: true } }, abort, this.fetcher)))
+                if (prepared.manga.id !== book.remoteId || prepared.manga.sourceId !== book.sourceId || digest(prepared.manga.url) !== book.urlDigest)
+                    throw new SourceHostError('SOURCE_HOST_STALE')
+                this.guard(session); session.chapters.set(comic, prepared.chapters)
+            }
             this.database.setAppState(BOOKS_KEY, [book, ...this.storedBooks().filter(row => row.comicId !== comic)].slice(0, 500))
             return { sessionId: session.id, comicId: comic, title: book.title }
         }
@@ -195,7 +250,7 @@ export class HostedLibraryReader {
         const session = this.session(id)
         return this.withSignal(session, signal, async () => {
             const reader = session.reader
-            if (operation === 'progress') return reader.recentProgress()
+            if (operation === 'progress') return this.scopedProgress(session)
             const comic = comicId(String(input.comicId))
             this.findBook(session, comic)
             if (operation === 'chapters') return reader.chapters(comic)

@@ -12,8 +12,8 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
     const headers = { 'content-type': 'application/json', Origin: app.origin, 'x-pica-csrf': current.csrfToken }
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XFoAAAAASUVORK5CYII=', 'base64')
     const secret = 'synthetic-hosted-reader-not-a-real-secret', authorization = 'Basic ' + Buffer.from('fixture-user:' + secret).toString('base64')
-    let reused = false, images = 0, calls = 0, unexpected = 0
-    const manga = () => ({ id: 1, sourceId: '9007199254740993', url: reused ? '/reused-for-another-work' : '/owned-book', title: 'Synthetic hosted book' })
+    let reused = false, inLibrary = true, images = 0, calls = 0, unexpected = 0, searches = 0, preparations = 0
+    const manga = () => ({ id: 1, sourceId: '9007199254740993', url: reused ? '/reused-for-another-work' : '/owned-book', title: 'Synthetic hosted book', inLibrary })
     const chapter = { id: 2, mangaId: 1, url: '/owned-book/chapter-1', name: 'One', sourceOrder: 0, chapterNumber: 1, pageCount: 2 }
     const fixture = http.createServer(async (request, response) => {
         try {
@@ -22,9 +22,15 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
             assert.equal(request.method, 'POST'); assert.equal(request.url, '/own/api/graphql')
             const chunks=[];let bytes=0;for await(const chunk of request){bytes+=chunk.length;if(bytes>4096)throw Error('Unexpected body');chunks.push(chunk)}
             const value=JSON.parse(Buffer.concat(chunks).toString('utf8'))
-            assert.ok(['PicaSourceHostInfo','PicaHostLibrary','PicaHostManga','PicaHostChapter','PicaHostChapterPages'].includes(value.operationName))
-            if(value.operationName==='PicaHostChapterPages')assert.match(value.query,/^mutation PicaHostChapterPages/);else assert.match(value.query,/^query /)
-            const payload=value.operationName==='PicaSourceHostInfo'?{aboutServer:{name:'Suwayomi-Server',version:'2.4.2366'}}:value.operationName==='PicaHostLibrary'?{mangas:{nodes:[manga()],pageInfo:{hasNextPage:false}}}:value.operationName==='PicaHostManga'?{manga:{...manga(),chapters:{nodes:[chapter]}}}:value.operationName==='PicaHostChapter'?{chapter}:{fetchChapterPages:{chapter,pages:[0,1].map(index=>'/api/v1/manga/1/chapter/0/page/'+index)}}
+            assert.ok(['PicaSourceHostInfo','PicaSourceHostSources','PicaHostLibrary','PicaHostManga','PicaHostChapter','PicaHostChapterPages','PicaHostSourceSearch','PicaHostPrepareManga'].includes(value.operationName))
+            if(['PicaHostChapterPages','PicaHostSourceSearch','PicaHostPrepareManga'].includes(value.operationName))assert.match(value.query,new RegExp('^mutation '+value.operationName));else assert.match(value.query,/^query /)
+            if(value.operationName==='PicaHostSourceSearch'){searches++;assert.deepEqual(value.variables,{input:{source:'9007199254740993',type:'SEARCH',page:1,query:'fixture search'}})}
+            if(value.operationName==='PicaHostPrepareManga'){preparations++;assert.deepEqual(value.variables,{input:{id:1,fetchManga:true,fetchChapters:true}})}
+            const payload=value.operationName==='PicaSourceHostInfo'?{aboutServer:{name:'Suwayomi-Server',version:'2.4.2366'}}:
+                value.operationName==='PicaSourceHostSources'?{sources:{nodes:[{id:'9007199254740993',name:'My installed fixture source',lang:'zh',supportsLatest:true}],pageInfo:{hasNextPage:false,hasPreviousPage:false},totalCount:1}}:
+                value.operationName==='PicaHostSourceSearch'?{fetchSourceManga:{mangas:[manga()],hasNextPage:false}}:
+                value.operationName==='PicaHostPrepareManga'?{fetchMangaAndChapters:{manga:manga(),chapters:[chapter]}}:
+                value.operationName==='PicaHostLibrary'?{mangas:{nodes:[manga()],pageInfo:{hasNextPage:false}}}:value.operationName==='PicaHostManga'?{manga:{...manga(),chapters:{nodes:[chapter]}}}:value.operationName==='PicaHostChapter'?{chapter}:{fetchChapterPages:{chapter,pages:[0,1].map(index=>'/api/v1/manga/1/chapter/0/page/'+index)}}
             response.writeHead(200,{'content-type':'application/json'});response.end(JSON.stringify({data:payload}))
         }catch{unexpected++;if(!response.headersSent)response.writeHead(502);response.end()}
     })
@@ -70,15 +76,34 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
         const resumed=await fetch(root2+'/comics/'+encodeURIComponent(comic)+'/chapters/'+encodeURIComponent(episode),{headers}).then(r=>r.json());assert.equal(resumed.progress.pageIndex,1)
         reused=true
         const stale=await fetch(app.origin+resumed.pages[0].url,{headers});assert.equal(stale.status,409);assert.equal((await stale.json()).code,'SOURCE_HOST_STALE');assert.equal(images,1)
+        const beforeSearchScope=calls
+        assert.equal((await command({action:'search',sessionId:session2,query:'fixture search',page:1})).status,403);assert.equal(calls,beforeSearchScope)
+        reused=false;inLibrary=false
+        assert.equal(current.hostedSourceBrowser?.available,true);assert.equal(current.hostedSourceBrowser?.downloads,false);assert.equal(current.hostedSourceBrowser?.native,false)
+        const searchInput={...input,scope:'source-search-read',acceptHostCatalogueSideEffects:true}
+        assert.equal((await command({...searchInput,acceptHostCatalogueSideEffects:false})).status,400);assert.equal(calls,beforeSearchScope)
+        const searchStarted=await command(searchInput);assert.equal(searchStarted.status,200);const sourceSession=searchStarted.value.sessionId,sourceRoot=endpoint+'/'+sourceSession
+        assert.equal((await command({action:'search',sessionId:sourceSession,query:'fixture search',page:1})).status,400)
+        assert.equal((await command({action:'sources',sessionId:sourceSession,offset:0})).status,200)
+        assert.equal((await command({action:'bind-source',sessionId:sourceSession,sourceId:'9007199254740993',consent:true})).status,200)
+        assert.equal((await command({action:'bind-source',sessionId:sourceSession,sourceId:'1',consent:true})).status,409)
+        const beforeSearch=tables(),searched=await command({action:'search',sessionId:sourceSession,query:'fixture search',page:1})
+        assert.equal(searched.status,200);assert.equal(searched.value.books[0].comicId,comic);assert.deepEqual(tables(),beforeSearch);assert.equal(searches,1)
+        assert.equal((await command({action:'select',sessionId:sourceSession,comicId:comic})).status,200);assert.equal(preparations,1)
+        const sourceMetadata=await fetch(sourceRoot+'/comics/'+encodeURIComponent(comic)+'/chapters/'+encodeURIComponent(episode),{headers}).then(response=>response.json())
+        assert.equal((await fetch(app.origin+sourceMetadata.pages[1].url,{headers})).status,200)
+        const sourceProgress=await post(sourceRoot+'/progress',{comicId:comic,episodeId:episode,pageIndex:0});assert.equal(sourceProgress.status,200)
+        const libraryDenied=await fetch(root2+'/comics/'+encodeURIComponent(comic)+'/chapters',{headers});assert.equal(libraryDenied.status,403);assert.equal((await libraryDenied.json()).code,'SOURCE_HOST_SCOPE_REQUIRED')
         const after=tables(),own=(after.app_state??[]).filter(row=>owned(row.key));assert.equal(own.length,2)
         assert.equal(protectedState(after),protectedState(before));assert.equal(JSON.stringify(after).includes(secret),false)
         assert.equal((await configuration({action:'set-enabled',id:host.id,expectedRevision:1,enabled:false,consent:true})).status,200)
         assert.equal((await fetch(root2+'/progress',{headers})).status,409)
+        assert.equal((await fetch(sourceRoot+'/progress',{headers})).status,409)
         const revokedState=tables(),revokedCalls=calls,revokedView=await readingLibrary(session2)
         assert.equal(revokedView.status,200);assert.equal(revokedView.value.complete,false);assert.equal(revokedView.value.items.some(row=>row.comicId===comic),false)
         assert.ok(revokedView.value.issues.some(row=>row.port==='selected-host'));assert.equal(calls,revokedCalls);assert.deepEqual(tables(),revokedState)
         assert.equal((await configuration({action:'remove',id:host.id,expectedRevision:2,consent:true})).status,200)
         assert.deepEqual(fs.readFileSync(path.join(home,'config/config.json')),config);assert.deepEqual((await status()).externalSources,choices);assert.equal(fs.existsSync(path.join(home,'config/credentials.dat')),false);assert.equal(unexpected,0)
-        process.stdout.write(JSON.stringify({packaged_host_library_reader:'PASS',source_sha:sourceSha,version,execution_location:'GITHUB_WINDOWS_CI',actual_shared_reader:true,host_library_only:true,independent_progress_resumed:true,only_owned_app_state_keys_changed:2,stale_remote_id_rejected_before_cached_body:true,cross_site_media_denied_before_host:true,session_revoked_on_disable:true,selected_reading_projection_without_host_fetch_or_writes:true,implicit_host_projection:false,revoked_projection_is_partial_without_private_rows:true,credential_persistence:false,catalogue_import:false,native_host_reader:false,unexpected_fixture_requests:unexpected,production_accessed:false})+'\n')
+        process.stdout.write(JSON.stringify({packaged_host_library_reader:'PASS',source_sha:sourceSha,version,execution_location:'GITHUB_WINDOWS_CI',actual_shared_reader:true,library_scope_cannot_search:true,explicit_single_source_search_read:true,search_browsing_has_no_local_catalogue_write:true,selected_source_metadata_fetches:preparations,library_scope_rejects_nonlibrary_search_refs:true,independent_progress_resumed:true,only_owned_app_state_keys_changed:2,stale_remote_id_rejected_before_cached_body:true,cross_site_media_denied_before_host:true,session_revoked_on_disable:true,selected_reading_projection_without_host_fetch_or_writes:true,implicit_host_projection:false,revoked_projection_is_partial_without_private_rows:true,credential_persistence:false,catalogue_import:false,native_host_reader:false,host_downloads:false,unexpected_fixture_requests:unexpected,production_accessed:false})+'\n')
     }finally{fixture.closeAllConnections();await new Promise(resolve=>fixture.close(resolve))}
 }

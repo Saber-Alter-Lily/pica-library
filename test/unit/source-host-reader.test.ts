@@ -9,7 +9,7 @@ const HOST = '64d223e0-5d29-4320-babb-5a2da654d345', signal = () => new AbortCon
 const cleanup: Array<() => void> = []
 afterEach(() => { for (const close of cleanup.splice(0)) close() })
 function fixture() {
-    const manga = { id: 1, sourceId: '9007199254740993', url: '/own-comic/one', title: 'Synthetic host book' }
+    const manga = { id: 1, sourceId: '9007199254740993', url: '/own-comic/one', title: 'Synthetic host book', inLibrary: true }
     const chapter = { id: 2, mangaId: 1, url: '/own-comic/chapter-1', name: 'Chapter 1', sourceOrder: 0, pageCount: 2, chapterNumber: 1 }
     let stored: unknown = null, clock = 1000, mode = 'normal', release = () => {}
     const state = new Map<string, unknown>([['online-reader-progress-v1', [{ comicId: 'legacy-comic', pageIndex: 9 }]], ['synthetic-private-canary', { favorite: true, visual: 'OFF' }]])

@@ -2,7 +2,7 @@ import { SourceHostError, object } from './contract'
 import { sourceHostData, suwayomiSourceId } from './suwayomi'
 
 // Official 2.4.2366 fixed subset; no extension/account/favorite/library/progress mutation.
-const mangaFields = 'id sourceId url title'
+const mangaFields = 'id sourceId url title inLibrary'
 const chapterFields = 'id mangaId url name sourceOrder pageCount chapterNumber'
 export const HOST_READER_OPERATIONS = {
     library: { operationName: 'PicaHostLibrary', query: `query PicaHostLibrary($offset: Int!) { mangas(condition: { inLibrary: true }, first: 25, offset: $offset) { nodes { ${mangaFields} } pageInfo { hasNextPage } } }` },
@@ -11,6 +11,11 @@ export const HOST_READER_OPERATIONS = {
     pages: { operationName: 'PicaHostChapterPages', query: `mutation PicaHostChapterPages($id: Int!) { fetchChapterPages(input: { chapterId: $id }) { chapter { ${chapterFields} } pages } }` }
 } as const
 export type HostReaderOperation = keyof typeof HOST_READER_OPERATIONS
+// Explicit search scope only. The host stores fetched metadata; these are NOT read-only operations.
+export const HOST_DISCOVERY_OPERATIONS = {
+    search: { operationName: 'PicaHostSourceSearch', query: `mutation PicaHostSourceSearch($input: FetchSourceMangaInput!) { fetchSourceManga(input: $input) { mangas { ${mangaFields} } hasNextPage } }` },
+    prepare: { operationName: 'PicaHostPrepareManga', query: `mutation PicaHostPrepareManga($input: FetchMangaAndChaptersInput!) { fetchMangaAndChapters(input: $input) { manga { ${mangaFields} } chapters { ${chapterFields} } } }` }
+} as const
 function text(value: unknown, max: number) {
     if (typeof value !== 'string' || !value.trim() || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
     return value
@@ -21,7 +26,8 @@ export function hostInteger(value: unknown, zero = false): number {
 }
 export function hostManga(value: unknown) {
     const row = object(value)
-    return { id: hostInteger(row.id), sourceId: suwayomiSourceId(row.sourceId), url: text(row.url, 2048), title: text(row.title, 500) }
+    if (typeof row.inLibrary !== 'boolean') throw new SourceHostError('SOURCE_HOST_PROTOCOL')
+    return { id: hostInteger(row.id), sourceId: suwayomiSourceId(row.sourceId), url: text(row.url, 2048), title: text(row.title, 500), inLibrary: row.inLibrary }
 }
 export function hostChapter(value: unknown) {
     const row = object(value), pageCount = hostInteger(row.pageCount, true)
@@ -34,15 +40,31 @@ export function hostLibraryPage(value: unknown) {
     const data = object(sourceHostData(value).mangas), page = object(data.pageInfo)
     if (!Array.isArray(data.nodes) || data.nodes.length > 25 || typeof page.hasNextPage !== 'boolean') throw new SourceHostError('SOURCE_HOST_PROTOCOL')
     const mangas = data.nodes.map(hostManga)
-    if (new Set(mangas.map(row => row.id)).size !== mangas.length) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
+    if (mangas.some(row => !row.inLibrary) || new Set(mangas.map(row => row.id)).size !== mangas.length) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
     return { mangas, hasNext: page.hasNextPage }
 }
 export function hostMangaChapters(value: unknown) {
     const data = object(sourceHostData(value).manga), manga = hostManga(data), chapters = object(data.chapters).nodes
+    return mangaChapters(manga, chapters)
+}
+function mangaChapters(manga: HostManga, chapters: unknown) {
     if (!Array.isArray(chapters) || chapters.length > 2000) throw new SourceHostError('SOURCE_HOST_TOO_LARGE')
     const rows = chapters.map(hostChapter)
     if (rows.some(row => row.mangaId !== manga.id) || new Set(rows.map(row => row.id)).size !== rows.length || new Set(rows.map(row => row.url)).size !== rows.length) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
     return { manga, chapters: rows }
+}
+export function hostSearchPage(value: unknown, sourceId: string) {
+    const data = object(sourceHostData(value).fetchSourceManga)
+    if (!Array.isArray(data.mangas) || data.mangas.length > 100 || typeof data.hasNextPage !== 'boolean')
+        throw new SourceHostError('SOURCE_HOST_PROTOCOL')
+    const mangas = data.mangas.map(hostManga)
+    if (mangas.some(row => row.sourceId !== sourceId) || new Set(mangas.map(row => row.id)).size !== mangas.length ||
+        new Set(mangas.map(row => row.url)).size !== mangas.length) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
+    return { mangas, hasNext: data.hasNextPage }
+}
+export function hostPreparedManga(value: unknown) {
+    const data = object(sourceHostData(value).fetchMangaAndChapters)
+    return mangaChapters(hostManga(data.manga), data.chapters)
 }
 export function hostChapterPages(value: unknown, expected: HostChapter) {
     const data = object(sourceHostData(value).fetchChapterPages), chapter = hostChapter(data.chapter)

@@ -21,7 +21,7 @@ const route = '/api/v1/desktop/source-hosts/inspect'
 const input = { kind: 'suwayomi', endpoint: 'http://127.0.0.1:4567/', consent: true }
 const info = { data: { aboutServer: { name: 'Suwayomi-Server', version: '2.4.2366' } } }
 const sources = { data: { sources: { nodes: [{ id: '9223372036854775807', name: 'Synthetic', lang: 'zh', supportsLatest: true }], pageInfo: { hasNextPage: false, hasPreviousPage: false }, totalCount: 1 } } }
-const hostBook = { id: 1, sourceId: '9223372036854775807', url: '/own-book', title: 'Synthetic own book' }
+const hostBook = { id: 1, sourceId: '9223372036854775807', url: '/own-book', title: 'Synthetic own book', inLibrary: true }
 const hostChapter = { id: 2, mangaId: 1, url: '/own-book/chapter', name: 'One', sourceOrder: 0, chapterNumber: 1, pageCount: 1 }
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.restoreAllMocks() })
 
@@ -38,7 +38,9 @@ async function fixture(options: { configured?: boolean; desktop?: boolean } = {}
         if (behavior === 'stall') await late
         if (!init?.body) return new Response(Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), Buffer.alloc(16)]), { headers: { 'content-type': 'image/png' } })
         const operation = JSON.parse(String(init.body)).operationName
-        const value = operation === 'PicaSourceHostInfo' ? info : operation === 'PicaHostLibrary' ? { data: { mangas: { nodes: [hostBook], pageInfo: { hasNextPage: false } } } } : operation === 'PicaHostManga' ? { data: { manga: { ...hostBook, chapters: { nodes: [hostChapter] } } } } : operation === 'PicaHostChapter' ? { data: { chapter: hostChapter } } : operation === 'PicaHostChapterPages' ? { data: { fetchChapterPages: { chapter: hostChapter, pages: ['/api/v1/manga/1/chapter/0/page/0'] } } } : sources
+        const value = operation === 'PicaSourceHostInfo' ? info : operation === 'PicaHostLibrary' ? { data: { mangas: { nodes: [hostBook], pageInfo: { hasNextPage: false } } } } : operation === 'PicaHostManga' ? { data: { manga: { ...hostBook, chapters: { nodes: [hostChapter] } } } } : operation === 'PicaHostChapter' ? { data: { chapter: hostChapter } } : operation === 'PicaHostChapterPages' ? { data: { fetchChapterPages: { chapter: hostChapter, pages: ['/api/v1/manga/1/chapter/0/page/0'] } } } :
+            operation === 'PicaHostSourceSearch' ? { data: { fetchSourceManga: { mangas: [{ ...hostBook, inLibrary: false }], hasNextPage: false } } } :
+            operation === 'PicaHostPrepareManga' ? { data: { fetchMangaAndChapters: { manga: { ...hostBook, inLibrary: false }, chapters: [hostChapter] } } } : sources
         return new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } })
     })
     const inspector = new SourceHostInspector(connection => sourceHostHttp(connection, wire))
@@ -172,5 +174,45 @@ describe('actual local host-inspection HTTP boundary — synthetic CI listener o
         expect(f.service.sources.snapshot().enabled).toEqual([])
         await command({ action: 'close', sessionId: session.sessionId })
         expect((await fetch(chaptersPath, { headers: ownHeaders })).status).toBe(409)
+    })
+    it('separately authorizes one source over the real local HTTP boundary and delegates search/chapters/pages to the same Reader', async () => {
+        const f = await fixture(), endpoint = f.server.url + '/api/v1/desktop/host-reader', hostId = '64d223e0-5d29-4320-babb-5a2da654d345'
+        f.connections.command({ action: 'save', kind: 'suwayomi', label: 'My source host', endpoint: 'https://synthetic.example/', authMode: 'none', allowInsecureLan: false, consent: true, scope: 'inspect-only' })
+        f.connections.command({ action: 'set-enabled', id: hostId, expectedRevision: 0, enabled: true, consent: true })
+        const command = async (input: unknown, override: Record<string, string> = {}) => {
+            const response = await fetch(endpoint, { method: 'POST', headers: { ...f.headers, ...override }, body: JSON.stringify(input) })
+            return { status: response.status, value: await response.json() }
+        }
+        const start = { action: 'start', id: hostId, expectedRevision: 1, scope: 'source-search-read', consent: true, acceptHostFetchSideEffects: true, acceptHostCatalogueSideEffects: true }
+        const rejectedHeaders: Array<Record<string, string>> = [{ Origin: 'https://outside.invalid' }, { 'x-pica-csrf': 'wrong' }]
+        for (const override of rejectedHeaders) expect((await command(start, override)).status).toBe(403)
+        expect((await command({ ...start, acceptHostCatalogueSideEffects: false })).status).toBe(400)
+        expect(f.wire).not.toHaveBeenCalled()
+        const session = await command(start); expect(session.status).toBe(200)
+        expect(session.value.capabilities).toMatchObject({ libraryRead: false, providerSearch: true, downloads: false, native: false })
+        const sessionId = session.value.sessionId
+        expect((await command({ action: 'search', sessionId, query: 'test', page: 1 })).status).toBe(400)
+        expect((await command({ action: 'list', sessionId, offset: 0 })).status).toBe(403)
+        expect((await command({ action: 'sources', sessionId, offset: 0 })).status).toBe(200)
+        expect((await command({ action: 'bind-source', sessionId, sourceId: hostBook.sourceId, consent: false })).status).toBe(400)
+        expect((await command({ action: 'bind-source', sessionId, sourceId: hostBook.sourceId, consent: true })).status).toBe(200)
+        const before = shadowDatabaseState(f.db), search = await command({ action: 'search', sessionId, query: 'test', page: 1 })
+        expect(search.status).toBe(200); expect(shadowDatabaseState(f.db)).toEqual(before)
+        const comicId = search.value.books[0].comicId
+        expect((await command({ action: 'select', sessionId, comicId })).status).toBe(200)
+        const root = endpoint + '/' + sessionId, chaptersPath = root + '/comics/' + encodeURIComponent(comicId) + '/chapters'
+        const chapters = await fetch(chaptersPath, { headers: f.headers }).then(response => response.json())
+        const chapterResponse = await fetch(chaptersPath + '/' + encodeURIComponent(chapters[0].id), { headers: f.headers })
+        expect(chapterResponse.status).toBe(200)
+        const chapter = await chapterResponse.json(), image = await fetch(f.server.url + chapter.pages[0].url, { headers: f.headers })
+        expect(image.status).toBe(200); expect(image.headers.get('content-type')).toBe('image/png')
+        expect((await fetch(root + '/progress', { method: 'POST', headers: f.headers, body: JSON.stringify({ comicId, episodeId: chapters[0].id, pageIndex: 0 }) })).status).toBe(200)
+        expect(f.db.getAppState('online-reader-progress-v1')).toBeUndefined()
+        expect(f.db.getAppState('synthetic.source-host.private-canary')).toEqual({ password: 'not-for-host-export', tags: ['private'], preserved: true })
+        expect(f.service.sources.snapshot().enabled).toEqual([])
+        f.connections.command({ action: 'set-enabled', id: hostId, expectedRevision: 1, enabled: false, consent: true })
+        const calls = f.wire.mock.calls.length
+        expect((await command({ action: 'search', sessionId, query: 'test', page: 1 })).status).toBe(409)
+        expect(f.wire).toHaveBeenCalledTimes(calls)
     })
 })

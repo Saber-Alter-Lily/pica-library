@@ -848,6 +848,7 @@ async function startEngine(preferredPort: number) {
             sourceHostInspection: { available: true, reader: false, libraryImport: false, extensionInstall: false, persisted: false },
             sourceHostConnections: { available: true, storage: sourceHostConnections.snapshot().storage, scope: 'inspect-only', reader: false },
             hostedLibraryReader: { available: true, scope: 'explicit-session-library-read', providerSearch: false, libraryImport: false, extensionInstall: false, native: false },
+            hostedSourceBrowser: { available: true, scope: 'explicit-session-selected-source-search-read', providerSearch: true, libraryImport: false, extensionInstall: false, downloads: false, native: false },
             externalSources: sources.snapshot(),
             sourcePolicyOrigin: config?.externalSources ? 'explicit' : config ? 'legacy-compatible' : 'new-local',
             startupReady,

@@ -1272,6 +1272,8 @@ async function startEngine(preferredPort: number) {
         openDirectory,
         ecosystemPackInventory: () => ecosystemPacks.inventory(),
         checkForUpdate: async () => updateManager.checkForUpdate(),
+        planRuntimeChoice:(choice,signal)=>updateManager.planRuntimeChoice(choice,signal),
+        prepareRuntimeChoice:(id,download,signal)=>updateManager.prepareRuntimeChoice(id,download,signal),
         stageUpdate: async (name, value) => updateManager.stage(name, value),
         stageFullUpdate: async (version, name, value) =>
             updateManager.stageFullApplication(version, name, value),

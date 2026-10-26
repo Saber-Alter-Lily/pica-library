@@ -1,5 +1,6 @@
 import type { RuntimeModuleContracts } from '../modules/contracts'
 import type { RuntimeComposition } from '../modules/runtime-composition'
+import type { RuntimeChoiceReceipt } from './runtime-choice'
 
 export type UpdatePackageType = 'incremental' | 'local-test'
 
@@ -47,6 +48,7 @@ export interface StagedFullApplicationUpdate {
     targetVersion: string
     targetSourceSha: string
     runtimeComposition: RuntimeComposition
+    runtimeChoice?: RuntimeChoiceReceipt
     stagedAt: string
 }
 
@@ -107,6 +109,8 @@ export interface FullApplicationUpdaterInstruction {
     targetSourceSha: string
     /** Optional only for legacy instructions; never an instruction to change components. */
     runtimeComposition?: RuntimeComposition
+    /** Present only after a separate, explicit component preview/confirm command. */
+    runtimeChoice?: RuntimeChoiceReceipt
     previousUrl?: string
     healthTimeoutMs: number
 }

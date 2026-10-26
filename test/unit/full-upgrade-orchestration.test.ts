@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runFullApplicationUpgrade } from '../../src/update/full-upgrader'
 import * as lifecycle from '../../src/update/process-lifecycle'
 import type { FullApplicationUpdaterInstruction } from '../../src/update/types'
+import { randomUUID } from 'node:crypto'
+import { installedRuntimeComposition } from '../../src/runtime/installed-runtime-composition'
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
 vi.mock('node:child_process', () => ({ spawn }))
@@ -139,6 +141,36 @@ afterEach(() => {
 })
 
 describe('actual full-upgrade orchestration with synthetic I/O faults', () => {
+    function choiceFixture(remove=false){
+        const value=fixture(),from={formatVersion:1 as const,sourceRuntimes:remove?['jm' as const]:[]},to={formatVersion:1 as const,sourceRuntimes:remove?[]:['jm' as const]}
+        value.targetVersion='0.5.1';value.runtimeComposition=to
+        for(const[root,composition]of [[value.applicationRoot,from],[value.stagedApplicationRoot,to]] as const){
+            fs.writeFileSync(path.join(root,'app/runtime-composition.json'),JSON.stringify(composition))
+            if(composition.sourceRuntimes.length)for(const name of ['bin/java.exe','lib/pica-jm-source.jar','PICA_JM_RUNTIME.json']){const file=path.join(root,'runtime/jm',name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'synthetic, never executed')}
+        }
+        value.runtimeChoice={kind:'user-selected-runtime-composition',id:randomUUID(),from,to,sourceSha:'b'.repeat(40),sourceVersion:'0.5.0',targetSourceSha:value.targetSourceSha,targetVersion:value.targetVersion,
+            archiveName:`Pica-Library-v0.5.1${remove?'':'-with-jm'}-windows-x64.zip`,archiveSha256:'f'.repeat(64),validUntil:Date.now()+60000}
+        return value
+    }
+    it.each([false,true])('performs explicit component replacement with real temporary file/state transactions and fake processes, remove=%s',async remove=>{
+        const value=choiceFixture(remove)
+        fakeLaunch(value);vi.stubGlobal('fetch',vi.fn(async()=>Response.json({appVersion:value.targetVersion})))
+        await runFullApplicationUpgrade(value)
+        expect(installedRuntimeComposition(value.applicationRoot)).toEqual({status:'declared',composition:value.runtimeComposition})
+        expect(fs.existsSync(path.join(value.applicationRoot,'runtime/jm'))).toBe(!remove)
+        expect(fs.readFileSync(path.join(value.libraryDirectory,'library.db'),'utf8')).toBe('synthetic database bytes')
+        expect(fs.readFileSync(path.join(value.desktopHomeRoot,'config/fixture.json'),'utf8')).toBe('{"synthetic":"keep"}')
+        expect(fs.existsSync(value.backupRoot)).toBe(false);expect(spawn).toHaveBeenCalledTimes(1)
+    })
+    it('rolls back before candidate launch if the copied runtime declaration is missing',async()=>{
+        const value=choiceFixture(),copy=fs.cpSync
+        vi.spyOn(fs,'cpSync').mockImplementation((from,to,options)=>{copy(from,to,options);if(String(from)===value.stagedApplicationRoot&&String(to)===value.applicationRoot)fs.unlinkSync(path.join(value.applicationRoot,'app/runtime-composition.json'))})
+        fakeLaunch(value)
+        await expect(runFullApplicationUpgrade(value)).rejects.toThrow(/Installed runtime composition/)
+        expectOriginal(value)
+        expect(installedRuntimeComposition(value.applicationRoot)).toEqual({status:'declared',composition:{formatVersion:1,sourceRuntimes:[]}})
+        expect(fs.existsSync(path.join(value.applicationRoot,'runtime/jm'))).toBe(false);expect(spawn).toHaveBeenCalledTimes(1)
+    })
     it.each(['EPERM', 'EBUSY', 'EACCES'])(
         'retries bounded Windows %s before copying or claiming a backup',
         async (code) => {

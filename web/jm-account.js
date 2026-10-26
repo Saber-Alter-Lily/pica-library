@@ -11,6 +11,11 @@ const message = (value) => {
 }
 function localize() {
     if (!panel) return
+    $('jm-runtime-hint').textContent = t(
+        '若当前包不含 JM 运行环境，可在“软件更新 → 可选来源运行组件”明确添加；本地阅读不需要 Java。',
+        'If this package has no JM runtime, explicitly add it under Software update → Optional source runtimes. Local reading needs no Java.',
+        'JM 実行環境がない場合は「ソフトウェア更新 → オプション配信元の実行環境」で明示的に追加できます。ローカルの読書に Java は不要です。'
+    )
     panel.querySelector('summary strong').textContent = t(
         'JM 账号与收藏',
         'JM account and favorites',

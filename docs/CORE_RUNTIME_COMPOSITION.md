@@ -6,6 +6,8 @@ This is isolated local development on `codex/reader-core-runtime-composition-202
 
 **Local implementation and selected offline gates: PASS. Actual new installables/cloud runtime gates: PENDING. Complete modular-reader objective: OPEN.**
 
+Later local continuation: [explicit user-selected add/remove via the existing full updater](EXPLICIT_RUNTIME_CHOICE.md). Its offline gates do not supersede the actual-package/legacy first-hop holds below. This document's original scope/evidence remains the composition slice.
+
 ## Concrete problem and implementation
 
 Previously the Windows builder copied `runtime/jm` whenever it happened to exist in the checkout. Packaging a local reader could therefore silently include a JVM/SDK. Availability also searched other candidate roots, so a packaged core needed an explicit boundary against borrowing a checkout's runtime.
@@ -29,9 +31,9 @@ The existing application updater is reused; there is no separate source-module u
 2. Verify existing official origin, SHA-256, target OS/architecture, source/API/schema and file allowlists. These guards are not relaxed.
 3. Bind delta manifest composition to descriptor bytes. An incremental update cannot add/remove a runtime, remove the descriptor, replace the updater helper or write non-allowlisted runtime files.
 4. A full automatic update must retain composition. Recheck at staging, before preparing/launching a helper, in the detached helper's preflight and after parent exit before replacement. Invalid or changed facts fail without treating the issue as a network outage.
-5. Component changes require a separately selected complete application, not an automatic update. No in-app runtime installer is implemented here. Account, enabled-source choices, local media and private state are not packaging facts and are not rewritten by this slice.
+5. Component changes require a separately selected complete application, not an automatic update. This composition slice had no in-app transition; the later linked slice adds an explicit preview/confirm full-application action, not a second updater or source marketplace. Account, enabled-source choices, local media and private state are not packaging facts and are not rewritten by these choices.
 
-Actual helper bytes change in this source: a transition from an older helper must use the existing full-application route, not pretend to qualify as an incremental update. Both profiles remain one application transaction with existing recovery/state preservation.
+Component changes require the existing full-application transaction with recovery/state preservation. For same-composition updates, determine eligibility from actual packaged bytes and compatibility: replacing the currently executing `app/updater.js` forces the full path; changing only the full helper does not by itself prove incremental self-replacement. No production bundle comparison has been run for the later slice.
 
 ## Evidence and honest limits
 

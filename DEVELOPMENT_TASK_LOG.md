@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## Explicit optional-runtime choice — isolated local continuation (2026-10-25)
+
+**Status: LOCAL_SOURCE_AND_OFFLINE_GATES_PASS / EXACT_HEAD_CI_BROWSER_INSTALLABLE_PENDING / LEGACY_FIRST_HOP_HOLD / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**
+
+- Independent `codex/reader-explicit-runtime-choice-20261025` starts from sealed `6a66711611c44df1b410bbe80d05ae725315af46`. Standing human isolation exception continues after NOT_FOUND; frozen PR210/Dev86/prior ZIPs, G-drive app, formal data/schema and local Java/application/browser/listener remain untouched. Cloud push/sign/build still requires separate permission.
+- Added explicit Software update → Optional source runtimes → add/remove JM, using the existing full-application updater. Normal updates retain composition; installation is not source enablement, login, content download or permission reset. Windows x64 stable versions only, exact official variant required; no prerelease-to-stable substitution, downgrade or same-version different-source replacement.
+- Preview/confirm binds single-use 15-minute consent, from/to/source/version/hash/name; stage/apply/detached preflight/post-exit/post-copy recheck. Shared download ownership prevents a cancelled old task's late failure clearing a newer task; owning-request disconnect now reaches actual transport. Same-version readiness requires matching declared composition plus a new Desktop session, not just an unchanged version number. UI passive/three-language/duplicate guards and existing timeouts retained.
+- Final selected offline **358/358 test cases,32files,0skips**; strict types and Web54/54 PASS. In-memory-only closure checks207Desktop/9incremental/11full-helper modules; no generated code execution. Zero guarded boundary events. Synthetic temp filesystem/helper-port tests are not actual installables or real HTTP/browser/source/device evidence.
+- Preserved failures: TS lib missing AbortSignal.any; three old-server same-version readiness regressions; wrong FS injection point in one new rollback test (corrected, assertion retained); request-disconnect355/356 counterexample before abort forwarding. AST/VM differential pins the exact old server branches and current source hashes. Old released Launcher source has no exit watcher; legacy helper launch error remains HOLD, not retroactively repaired by current-source successes.
+- [Behavior, controls, evidence and pending exact-head gates](docs/EXPLICIT_RUNTIME_CHOICE.md). Stop adding features at this verification boundary; obtain new Draft/cloud authority for actual core/JM/HTTP/browser/replacement tests. No DB/native/dependency/version/workflow/ranker/sync contract change. Original issue acceptance and full user-owned source ecosystem remain open.
+
 ## Real old-client first-hop boundary — local continuation (2026-10-25)
 
 **Status: LOCAL_HARNESS_AND_HASH_FIX_GATES_PASS / ACTUAL_FIRST_HOP_NOT_RUN / LEGACY_ASYNC_LAUNCH_COUNTEREXAMPLE_HOLD / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**

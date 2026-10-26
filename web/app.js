@@ -8,6 +8,7 @@ import {
 } from './lite-state.js'
 import { deriveLiteAuthors } from './author-state.js'
 import { waitForUpdateReconnect } from './update-reconnect.js'
+import { installRuntimeChoice } from './runtime-choice.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { installLocalImport } from './local-import.js'
 import { installReadingLibrary } from './reading-library.js'
@@ -874,7 +875,7 @@ function renderStagedUpdate(value) {
         {
             files: Number(value.fileCount),
             deletions: Number(value.deletionCount),
-            schema: Number(value.databaseSchemaVersion),
+            schema: Number.isSafeInteger(value.databaseSchemaVersion) ? value.databaseSchemaVersion : '—',
             full: value.requiresFullInstall
                 ? t('update.fullRequiredInline')
                 : ''
@@ -922,9 +923,10 @@ async function stageUpdateFile(file) {
 
 async function reconnectAfterUpdate(
     targetVersion,
-    timeoutMs = 90_000
+    timeoutMs = 90_000,
+    readiness = {}
 ) {
-    const ready = await waitForUpdateReconnect(targetVersion, { timeoutMs })
+    const ready = await waitForUpdateReconnect(targetVersion, { timeoutMs, ...readiness })
     if (!ready) throw new Error(t('update.reconnectFailed'))
     window.location.reload()
 }
@@ -941,6 +943,7 @@ async function applyStagedUpdate(
         ))
     )
         return
+    const readiness = value.expectedRuntimeComposition ? { expectedRuntimeComposition: value.expectedRuntimeComposition, previousCsrfToken: desktop.csrfToken } : {}
     const result = await desktopPost('/api/v1/update/apply', {
         id: value.id
     })
@@ -951,7 +954,7 @@ async function applyStagedUpdate(
         phase: 'waiting-for-exit',
         targetVersion
     })
-    await reconnectAfterUpdate(targetVersion)
+    await reconnectAfterUpdate(targetVersion, undefined, readiness)
 }
 
 function fullInstallDownloadUrl(version) {
@@ -1105,6 +1108,10 @@ $('#update-apply').onclick = async () => {
         renderUpdateProgress({ phase: 'failed' })
     }
 }
+
+installRuntimeChoice({post:desktopPost,confirm:askConfirm,isDesktop:()=>Boolean(desktop),
+    isUpdateBusy:()=>$('#update-one-click').disabled || $('#update-check').disabled,
+    staged:renderStagedUpdate,apply:applyStagedUpdate})
 
 function readAutoUpdatePromptState() {
     try {

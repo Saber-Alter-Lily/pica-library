@@ -38,6 +38,8 @@ import { SourceHostError, type SourceHostInspection } from '../source-hosts/cont
 import type { HostedLibraryReader } from '../source-hosts/library-reader'
 import { ReadingLibrary, ReadingLibraryInputError, type ReadingLibraryPort } from './reading-library'
 import { catalogueReadingPort } from '../services/reading-library-adapters'
+import { UpdateDownloadTask, type UpdatePackageDownload } from '../update/download-task'
+import { RUNTIME_CHOICE_ROUTES, runtimeChoiceAuthority, runtimeChoiceCommand } from '../update/runtime-choice-http'
 
 export interface DesktopServerController {
     csrfToken: string
@@ -70,6 +72,8 @@ export interface DesktopServerController {
     openDirectory: (kind: string) => Promise<void>
     ecosystemPackInventory?: () => unknown
     checkForUpdate?: () => Promise<Record<string, unknown>>
+    planRuntimeChoice?: (choice:'core'|'jm',signal:AbortSignal)=>Promise<Record<string,unknown>>
+    prepareRuntimeChoice?: (id:string,download:UpdatePackageDownload,signal:AbortSignal)=>Promise<Record<string,unknown>>
     stageUpdate?: (
         name: string,
         value: Buffer
@@ -281,11 +285,7 @@ export async function startLibraryServer(options: {
     const previewCache = new PreviewCacheManager(
         path.join(options.cacheDir ?? options.service.dataDir, 'previews')
     )
-    let updateDownloadController: AbortController | null = null
-    let updateDownloadProgress: Record<string, unknown> | null = null
-    const writeUpdateDownloadProgress = (value: Record<string, unknown>) => {
-        updateDownloadProgress = { ...value, updatedAt: new Date().toISOString() }
-    }
+    const updateDownloads = new UpdateDownloadTask(downloadUpdateAsset)
     const previewService = new PreviewService(
         options.database,
         providerService,
@@ -1566,7 +1566,7 @@ export async function startLibraryServer(options: {
                 return json(
                     response,
                     200,
-                    updateDownloadProgress ?? options.desktop.updateProgress()
+                    updateDownloads.progress() ?? options.desktop.updateProgress()
                 )
             }
             if (
@@ -1580,9 +1580,7 @@ export async function startLibraryServer(options: {
                     return json(response, 403, {
                         error: 'This local request could not be verified'
                     })
-                if (updateDownloadController) updateDownloadController.abort()
-                updateDownloadController = null
-                writeUpdateDownloadProgress({ phase: 'cancelled' })
+                updateDownloads.cancel()
                 return json(response, 200, { success: true })
             }
             if (
@@ -1627,66 +1625,53 @@ export async function startLibraryServer(options: {
                     throw new Error(
                         'Official update asset is missing'
                     )
-                if (updateDownloadController)
-                    throw new Error('An update download is already running')
-
-                updateDownloadController = new AbortController()
-                writeUpdateDownloadProgress({
-                    phase: 'downloading',
-                    current: 0,
-                    total: 0,
-                    targetVersion: version
-                })
                 try {
-                    const archive = await downloadUpdateAsset(
-                        assetUrl,
-                        status === 'full-install'
-                            ? 512 * 1024 * 1024
-                            : 128 * 1024 * 1024,
-                        (current, total) =>
-                            writeUpdateDownloadProgress({
-                                phase: 'downloading',
-                                current,
-                                total: total ?? 0,
-                                targetVersion: version
-                            }),
-                        updateDownloadController.signal
+                    const staged = await updateDownloads.run(
+                        async download => {
+                            const archive = await download(assetUrl,version)
+                            return status === 'full-install'
+                                ? options.desktop!.stageFullUpdate!(version,assetName,archive)
+                                : options.desktop!.stageUpdate!(assetName,archive)
+                        },
+                        status === 'full-install' ? 512 * 1024 * 1024 : 128 * 1024 * 1024,
+                        version
                     )
-                    updateDownloadController = null
-                    updateDownloadProgress = null
-                    const staged =
-                        status === 'full-install'
-                            ? await options.desktop.stageFullUpdate!(
-                                  version,
-                                  assetName,
-                                  archive
-                              )
-                            : await options.desktop.stageUpdate!(
-                                  assetName,
-                                  archive
-                              )
                     return json(response, 200, staged)
                 } catch (error) {
                     const cancelled =
                         error instanceof Error &&
                         (error.name === 'AbortError' ||
                             /abort/i.test(error.message))
-                    updateDownloadController = null
-                    writeUpdateDownloadProgress({
-                        phase: cancelled ? 'cancelled' : 'failed',
-                        error: cancelled
-                            ? 'Update download was cancelled'
-                            : error instanceof Error
-                              ? error.message
-                              : String(error),
-                        targetVersion: version
-                    })
                     if (cancelled)
                         return json(response, 409, {
                             error: 'Update download was cancelled'
                         })
                     throw error
                 }
+            }
+            if ((RUNTIME_CHOICE_ROUTES as readonly string[]).includes(url.pathname)) {
+                if(!runtimeChoiceAuthority({method:request.method,search:url.search,peer:request.socket.remoteAddress??'',host:request.headers.host??'',origin:request.headers.origin,
+                    token:request.headers['x-pica-csrf'],expectedToken:options.desktop?.csrfToken}))return json(response,403,{error:'Explicit local Desktop runtime choice required'})
+                if(!options.desktop?.planRuntimeChoice || !options.desktop.prepareRuntimeChoice)return json(response,409,{error:'Runtime component replacement is unavailable in this mode'})
+                const abort=new AbortController(),disconnected=()=>{if(!response.writableEnded)abort.abort()}
+                response.once('close',disconnected)
+                try{
+                    if(!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type']??''))throw Error('JSON runtime component command required')
+                    const deadline=setTimeout(()=>request.destroy(),5000)
+                    let input:unknown
+                    try{input=await body(request,4096)}finally{clearTimeout(deadline)}
+                    const command=runtimeChoiceCommand(url.pathname,input)
+                    if(command.action==='plan')return json(response,200,await options.desktop.planRuntimeChoice(command.choice,abort.signal))
+                    const staged=await updateDownloads.run(
+                        (download,signal)=>options.desktop!.prepareRuntimeChoice!(command.id,download,signal),
+                        512*1024*1024,
+                        undefined,
+                        abort.signal
+                    )
+                    return json(response,200,staged)
+                }catch(error){
+                    return json(response,abort.signal.aborted || error instanceof Error&&error.name==='AbortError'?409:400,{error:error instanceof Error?error.message:'Runtime component selection failed'})
+                }finally{response.off('close',disconnected)}
             }
             if (
                 url.pathname === '/api/v1/update/stage' &&

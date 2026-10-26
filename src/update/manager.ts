@@ -15,9 +15,12 @@ import { applicationFetch } from './application-fetch'
 import { classifyUpdateCompatibility } from './compatibility'
 import { MODULE_CONTRACT_PATH, normalizeModuleContracts, parseModuleContracts, runtimeModuleContracts, sameModuleContracts } from '../modules/contracts'
 import { normalizeUpdatePath, updaterSelfReplacement, forbiddenUpdatePayload as forbiddenPayload } from './path-safety'
-import { compositionFromPayload, normalizeRuntimeComposition, RUNTIME_COMPOSITION_PATH } from '../modules/runtime-composition'
-import { requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { compositionFromPayload, normalizeRuntimeComposition, RUNTIME_COMPOSITION_PATH, sameRuntimeComposition, type RuntimeComposition } from '../modules/runtime-composition'
+import { installedRuntimeComposition, requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
 import { validateAutomaticFullRuntimeComposition, validateIncrementalRuntimeComposition } from './runtime-composition'
+import { RUNTIME_CHOICE_TTL_MS, runtimeChoiceComposition, validateRuntimeChoiceReceipt, validateRuntimeChoiceVersion, type RuntimeChoiceReceipt } from './runtime-choice'
+import { discoverRuntimeChoiceRelease, type RuntimeChoiceRelease } from './runtime-choice-release'
+import type { UpdatePackageDownload } from './download-task'
 import {
     selectReleaseUpdateAsset,
     updateAssetNamesForChecksums,
@@ -296,10 +299,18 @@ export interface UpdateManagerOptions {
     fetchImplementation?: typeof fetch
 }
 
+interface RuntimeChoicePlan {
+    id:string; from:RuntimeComposition; to:RuntimeComposition; sourceSha:string
+    release:RuntimeChoiceRelease; validUntil:number
+}
+
 export class UpdateManager {
     private staged: StagedUpdate | null = null
     private stagedFull: StagedFullApplicationUpdate | null = null
     private activeApply: {id:string;promise:Promise<{accepted:true;mode:UpgradeHelperKind;targetVersion:string}>}|null=null
+    private preparationEpoch=0
+    private runtimePlanRevision=0
+    private runtimeChoicePlan:RuntimeChoicePlan|null=null
     readonly progressFile: string
 
     constructor(private readonly options: UpdateManagerOptions) {
@@ -517,6 +528,49 @@ export class UpdateManager {
             JSON.stringify({ ...value, updatedAt: new Date().toISOString() }),
             'utf8'
         )
+    }
+
+    private requirePreparation(epoch:number) {
+        if(this.activeApply || epoch!==this.preparationEpoch) throw Error('Update preparation was superseded; select the intended update again')
+    }
+
+    private installedChoiceSource() {
+        const sha=fs.readFileSync(path.join(this.options.applicationRoot,'SOURCE_SHA.txt'),'utf8').trim()
+        if(!/^[a-f0-9]{40}$/.test(sha) || this.options.currentSourceSha!==undefined && sha!==this.options.currentSourceSha) throw Error('Installed application source changed; restart before selecting components')
+        return sha
+    }
+
+    async planRuntimeChoice(choice:unknown,signal?:AbortSignal) {
+        if(this.activeApply)throw Error('An update is already being applied')
+        const target=this.updateTarget()
+        if(!target || updateTargetKey(target)!=='windows-x64')throw Error('Optional runtime replacement is currently supported only on Windows x64')
+        validateRuntimeChoiceVersion(this.options.currentVersion,this.options.currentVersion)
+        const from=requireInstalledRuntimeComposition(this.options.applicationRoot),to=runtimeChoiceComposition(choice)
+        const revision=++this.runtimePlanRevision;this.runtimeChoicePlan=null
+        if(sameRuntimeComposition(from,to))return{status:'unchanged' as const,composition:from}
+        const sourceSha=this.installedChoiceSource()
+        const release=await discoverRuntimeChoiceRelease(to,this.options.fetchImplementation??applicationFetch,signal)
+        if(signal?.aborted || this.activeApply || revision!==this.runtimePlanRevision)throw Error('Runtime component preview was cancelled or superseded')
+        validateRuntimeChoiceVersion(this.options.currentVersion,release.version)
+        const plan:RuntimeChoicePlan={id:randomUUID(),from,to,sourceSha,release,validUntil:Date.now()+RUNTIME_CHOICE_TTL_MS}
+        this.runtimeChoicePlan=plan
+        return{status:'preview' as const,id:plan.id,from:normalizeRuntimeComposition(from),to:normalizeRuntimeComposition(to),
+            version:release.version,archiveName:release.archiveName,archiveSha256:release.sha256,bytes:release.bytes,validUntil:plan.validUntil,
+            replacement:'complete-application',sourceEnablement:'unchanged',accountsAndData:'retained',restartRequired:true}
+    }
+
+    async prepareRuntimeChoice(id:string,download:UpdatePackageDownload,signal?:AbortSignal) {
+        if(this.activeApply)throw Error('An update is already being applied')
+        const plan=this.runtimeChoicePlan
+        if(!plan || plan.id!==id || plan.validUntil<=Date.now() || signal?.aborted)throw Error('Runtime component preview expired; preview and confirm again')
+        this.runtimeChoicePlan=null // Consume once, before any asynchronous download.
+        if(this.installedChoiceSource()!==plan.sourceSha || !sameRuntimeComposition(requireInstalledRuntimeComposition(this.options.applicationRoot),plan.from))throw Error('Installed runtime changed after preview')
+        const epoch=++this.preparationEpoch
+        const bytes=await download(plan.release.url,plan.release.version)
+        if(signal?.aborted)throw Error('Runtime component selection was cancelled')
+        this.requirePreparation(epoch)
+        if(sha256(bytes)!==plan.release.sha256)throw Error('Runtime package changed after preview; preview and confirm again')
+        return this.stageCompleteApplication(plan.release.version,plan.release.archiveName,bytes,epoch,plan,signal)
     }
 
     private async verifyOfficialArchive(
@@ -782,6 +836,7 @@ export class UpdateManager {
 
     async stage(archiveName: string, buffer: Buffer) {
         if(this.activeApply)throw new Error('An update is already being applied')
+        const epoch=++this.preparationEpoch
         this.writeProgress({ phase: 'validating' })
         try {
             const archiveHash = sha256(buffer)
@@ -885,6 +940,7 @@ export class UpdateManager {
         validateIncrementalRuntimeComposition({ current: composition, target: manifest.runtimeComposition,
             files: manifest.files.map(file => file.path), deletions: manifest.deletions,
             descriptor: zip.getEntry(RUNTIME_COMPOSITION_PATH)?.getData().toString('utf8') })
+        this.requirePreparation(epoch)
         const id = randomUUID()
         const directory = path.join(this.options.stateRoot, `staged-${id}`)
         fs.mkdirSync(directory, { recursive: true })
@@ -941,7 +997,7 @@ export class UpdateManager {
         }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            this.writeProgress({ phase: 'failed', message })
+            if(epoch===this.preparationEpoch&&!this.activeApply)this.writeProgress({ phase: 'failed', message })
             throw error
         }
     }
@@ -952,6 +1008,11 @@ export class UpdateManager {
         buffer: Buffer
     ) {
         if(this.activeApply)throw new Error('An update is already being applied')
+        return this.stageCompleteApplication(version,archiveName,buffer,++this.preparationEpoch)
+    }
+
+    private async stageCompleteApplication(version:string,archiveName:string,buffer:Buffer,epoch:number,choice?:RuntimeChoicePlan,signal?:AbortSignal) {
+        if(this.activeApply)throw new Error('An update is already being applied')
         this.writeProgress({ phase: 'validating' })
         try {
             const target = this.updateTarget()
@@ -959,7 +1020,8 @@ export class UpdateManager {
                 throw new Error(
                     'One-click full application upgrade is currently supported only on Windows x64'
                 )
-            if (
+            if (choice) validateRuntimeChoiceVersion(this.options.currentVersion,version)
+            else if (
                 !stableVersionParts(version) ||
                 !isNewerStable(version, this.options.currentVersion)
             )
@@ -967,7 +1029,7 @@ export class UpdateManager {
                     'Full application upgrade requires a newer stable version'
                 )
             const composition = requireInstalledRuntimeComposition(this.options.applicationRoot)
-            const expectedName = fullApplicationAssetName(version, target, composition)
+            const expectedName = fullApplicationAssetName(version, target, choice?.to??composition)
             if (archiveName !== expectedName)
                 throw new Error(
                     'Unexpected full application package name'
@@ -980,7 +1042,16 @@ export class UpdateManager {
             )
             const zip = new AdmZip(buffer)
             const validated = validateFullApplicationArchive(zip)
-            validateAutomaticFullRuntimeComposition(composition, validated.composition)
+            if(signal?.aborted)throw Error('Runtime component selection was cancelled')
+            let runtimeChoice:RuntimeChoiceReceipt|undefined
+            if(choice){
+                if(!validated.declared.has(RUNTIME_COMPOSITION_PATH))throw Error('Explicit runtime replacement requires declared target composition')
+                runtimeChoice={kind:'user-selected-runtime-composition',id:choice.id,from:choice.from,to:choice.to,sourceSha:choice.sourceSha,
+                    sourceVersion:this.options.currentVersion,targetSourceSha:validated.sourceSha,targetVersion:version,archiveName,archiveSha256:archiveHash,validUntil:choice.validUntil}
+                validateRuntimeChoiceReceipt(runtimeChoice,{current:composition,staged:validated.composition,sourceSha:this.installedChoiceSource(),targetSourceSha:validated.sourceSha,targetVersion:version,
+                    expectedArchiveName:choice.release.archiveName,expectedArchiveSha256:choice.release.sha256})
+            }else validateAutomaticFullRuntimeComposition(composition, validated.composition)
+            this.requirePreparation(epoch)
             const id = randomUUID()
             const directory = path.join(
                 this.options.stateRoot,
@@ -1021,6 +1092,7 @@ export class UpdateManager {
                 targetVersion: version,
                 targetSourceSha: validated.sourceSha,
                 runtimeComposition: validated.composition,
+                ...(runtimeChoice?{runtimeChoice}:{}),
                 stagedAt: new Date().toISOString()
             }
             this.writeProgress({
@@ -1039,12 +1111,13 @@ export class UpdateManager {
                 fileCount: validated.declared.size,
                 deletionCount: 0,
                 requiresFullInstall: true,
-                oneClick: true
+                oneClick: true,
+                ...(runtimeChoice?{expectedRuntimeComposition:normalizeRuntimeComposition(validated.composition)}:{})
             }
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : String(error)
-            this.writeProgress({ phase: 'failed', message })
+            if(epoch===this.preparationEpoch&&!this.activeApply)this.writeProgress({ phase: 'failed', message })
             throw error
         }
     }
@@ -1082,11 +1155,13 @@ export class UpdateManager {
             // Fail before preparing a helper or asking the live app to exit.
             sqliteDiskFilename(path.resolve(context.libraryDirectory, 'library.db'))
             const full = this.stagedFull
-            validateAutomaticFullRuntimeComposition(
-                requireInstalledRuntimeComposition(this.options.applicationRoot),
-                requireInstalledRuntimeComposition(full.directory),
-                full.runtimeComposition
-            )
+            if(full.runtimeChoice && installedRuntimeComposition(full.directory).status!=='declared')throw Error('Explicit runtime target declaration changed after staging')
+            if(full.runtimeChoice)validateRuntimeChoiceReceipt(full.runtimeChoice,{
+                current:requireInstalledRuntimeComposition(this.options.applicationRoot),staged:requireInstalledRuntimeComposition(full.directory),sourceSha:this.installedChoiceSource(),
+                targetSourceSha:fs.readFileSync(path.join(full.directory,'SOURCE_SHA.txt'),'utf8').trim(),targetVersion:full.targetVersion,expectedArchiveName:full.archiveName,expectedArchiveSha256:full.archiveSha256
+            })
+            else validateAutomaticFullRuntimeComposition(requireInstalledRuntimeComposition(this.options.applicationRoot),requireInstalledRuntimeComposition(full.directory),full.runtimeComposition)
+            ++this.preparationEpoch
             const persistentAssistant =
                 this.preparePersistentUpgradeAssistant({
                     verifyExisting: true
@@ -1155,6 +1230,7 @@ export class UpdateManager {
                 targetVersion: full.targetVersion,
                 targetSourceSha: full.targetSourceSha,
                 runtimeComposition: full.runtimeComposition,
+                ...(full.runtimeChoice?{runtimeChoice:full.runtimeChoice}:{}),
                 previousUrl: context.currentUrl,
                 healthTimeoutMs: 60_000
             }
@@ -1190,6 +1266,7 @@ export class UpdateManager {
                 'This update requires the full application upgrade path'
             )
         if(!context)throw new Error('Incremental application upgrade context is unavailable')
+        ++this.preparationEpoch
         sqliteDiskFilename(path.resolve(context.libraryDirectory,'library.db'))
         const readyNonce=randomUUID()
         const instruction: UpdaterInstruction = {

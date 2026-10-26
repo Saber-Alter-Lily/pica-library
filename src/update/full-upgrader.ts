@@ -20,6 +20,10 @@ import {
     restoreUserState
 } from './user-state-snapshot'
 import { prepareHelperStartup } from './helper-startup'
+import { installedRuntimeComposition, requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { validateAutomaticFullRuntimeComposition } from './runtime-composition'
+import { validateRuntimeChoiceReceipt } from './runtime-choice'
+import { sameRuntimeComposition } from '../modules/runtime-composition'
 
 /** Status storage must never prevent recovery of the application or user state. */
 
@@ -49,6 +53,23 @@ function requiredApplicationFiles(root: string) {
         path.join('app', 'full-upgrader.js'),
         'SOURCE_SHA.txt'
     ].map((item) => path.join(root, item))
+}
+
+function validateRuntimeComposition(instruction: FullApplicationUpdaterInstruction) {
+    if(instruction.runtimeChoice){
+        if(installedRuntimeComposition(instruction.stagedApplicationRoot).status!=='declared')throw Error('Explicit runtime target declaration changed after staging')
+        if(!instruction.runtimeComposition || !sameRuntimeComposition(instruction.runtimeComposition,instruction.runtimeChoice.to))throw Error('Explicit runtime choice does not match the instruction composition')
+        validateRuntimeChoiceReceipt(instruction.runtimeChoice,{
+            current:requireInstalledRuntimeComposition(instruction.applicationRoot),staged:requireInstalledRuntimeComposition(instruction.stagedApplicationRoot),
+            sourceSha:fs.readFileSync(path.join(instruction.applicationRoot,'SOURCE_SHA.txt'),'utf8').trim(),targetSourceSha:instruction.targetSourceSha,targetVersion:instruction.targetVersion
+        })
+        return
+    }
+    validateAutomaticFullRuntimeComposition(
+        requireInstalledRuntimeComposition(instruction.applicationRoot),
+        requireInstalledRuntimeComposition(instruction.stagedApplicationRoot),
+        instruction.runtimeComposition
+    )
 }
 
 function validateStagedApplication(
@@ -105,6 +126,7 @@ function validateStagedApplication(
         .trim()
     if (sourceSha !== instruction.targetSourceSha)
         throw new Error('Staged full application source SHA does not match')
+    validateRuntimeComposition(instruction)
 }
 
 function removeApplicationTree(root: string) {
@@ -208,6 +230,7 @@ export async function runFullApplicationUpgrade(
         await prepareHelperStartup(instruction, 'full-application')
         await waitForExit(instruction.parentPid)
         parentExited = true
+        validateRuntimeComposition(instruction)
         fs.rmSync(instruction.instanceFile, { force: true })
 
         writeProgress(instruction.progressFile, {
@@ -232,6 +255,9 @@ export async function runFullApplicationUpgrade(
             .trim()
         if (installedSource !== instruction.targetSourceSha)
             throw new Error('Installed application source SHA does not match')
+        const installedComposition=installedRuntimeComposition(instruction.applicationRoot)
+        if(installedComposition.status==='invalid' || !sameRuntimeComposition(installedComposition.composition,requireInstalledRuntimeComposition(instruction.stagedApplicationRoot)) ||
+            instruction.runtimeChoice && installedComposition.status!=='declared')throw Error('Installed runtime composition does not match the verified target')
 
         writeProgress(instruction.progressFile, {
             phase: 'starting',

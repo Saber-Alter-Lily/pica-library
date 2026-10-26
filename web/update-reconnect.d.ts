@@ -5,9 +5,11 @@ export const UPDATE_RECONNECT_PROBE_TIMEOUT_MS: number
 export interface UpdateReconnectProbeOptions {
     fetchFn?: typeof fetch
     now?: () => number
+    expectedRuntimeComposition?: import('../src/modules/runtime-composition').RuntimeComposition
+    previousCsrfToken?: string
 }
 
-export interface WaitForUpdateReconnectOptions {
+export interface WaitForUpdateReconnectOptions extends UpdateReconnectProbeOptions {
     timeoutMs?: number
     pollMs?: number
     stabilityMs?: number

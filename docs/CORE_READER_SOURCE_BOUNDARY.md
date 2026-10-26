@@ -1,5 +1,9 @@
 # Reader core versus user-selected sources
 
+## 2026-10-25 local runtime-distribution continuation
+
+[Core/optional-runtime composition](CORE_RUNTIME_COMPOSITION.md) implements explicit default-core versus optional-JM Windows packaging and composition-preserving application updates, with local source gates only. This removes incidental JVM copying/borrowing; it does not remove every compiled source-specific adapter or complete an extension trust/native/sync system. Frozen PR210 and its installables stay unchanged. New compiled package/old-controller first-hop/provider/device evidence remains pending; no automatic release, deployment or user-state migration follows from a descriptor.
+
 ## User authority — 2026-10-24
 
 The product is a manga reader and personal local library, **not a manga/content platform**. It does not supply or operate manga sources. Users may choose/configure external sources, but connecting one must not make it an application-operated content service or a mandatory dependency. This is a product/engineering boundary, not a blanket legal-exemption claim.

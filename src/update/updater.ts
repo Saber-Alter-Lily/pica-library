@@ -20,6 +20,9 @@ import { snapshotUserState, restoreUserState } from './user-state-snapshot'
 import { prepareHelperStartup } from './helper-startup'
 import { sqliteDiskFilename } from '../storage/sqlite/filename'
 import type { UpdaterInstruction } from './types'
+import { RUNTIME_COMPOSITION_PATH } from '../modules/runtime-composition'
+import { requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { validateIncrementalRuntimeComposition } from './runtime-composition'
 
 function canonical(value: string): string {
     let parent = path.resolve(value)
@@ -204,6 +207,15 @@ function validateIncrementalInstruction(input: UpdaterInstruction) {
             .trim() !== manifest.sourceSha
     )
         throw new Error('Installed source changed after incremental staging')
+    validateIncrementalRuntimeComposition({
+        current: requireInstalledRuntimeComposition(input.applicationRoot),
+        target: manifest.runtimeComposition,
+        files: manifest.files.map(file => file.path),
+        deletions: manifest.deletions,
+        descriptor: manifest.files.some(file => file.path === RUNTIME_COMPOSITION_PATH)
+            ? fs.readFileSync(resolveUpdatePath(input.stagingRoot, RUNTIME_COMPOSITION_PATH), 'utf8')
+            : undefined
+    })
 }
 
 function copyFile(source: string, destination: string) {

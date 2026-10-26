@@ -62,7 +62,7 @@ describe('actual JM settings module with fake DOM/transport, no browser/server',
     it('keeps disabled/missing/anonymous states distinct and binds a real button', async () => {
         for (const [snapshot, text] of [
             [{available: true, enabled: false, remembered: true}, '来源已关闭'],
-            [{available: false, enabled: true}, '尚未包含 JM'],
+            [{available: false, enabled: true}, '未包含有效的 JM'],
             [{available: true, enabled: true, configured: false}, '尚未登录']
         ] as const) {
             const f = screen(0, snapshot)
@@ -77,6 +77,12 @@ describe('actual JM settings module with fake DOM/transport, no browser/server',
         expect(status).not.toContain('jmConnectAccount')
         expect(api).toContain("if (action === 'connect')")
         expect(api).toContain('JM connect accepts no credential or source-choice fields')
+    })
+    it.each([0, 1, 2])('explains optional runtime absence without treating local reading as broken in locale %s', async locale => {
+        const f = screen(locale, { available: false, enabled: true })
+        await f.actual.run(f.actual.refresh)
+        expect(f.node('jm-account-state').textContent).toContain(['普通本地阅读不受影响', 'local reading remains available', 'ローカルの読書は引き続き利用できます'][locale])
+        expect(f.calls.some(call => call.options.method === 'POST')).toBe(false)
     })
     it('the actual connect guard accepts only an empty object, not arrays/primitives or fields', () => {
         const source = fs.readFileSync('src/library/server.ts', 'utf8')

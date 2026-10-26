@@ -844,6 +844,15 @@
                                 使用已上传更新包并重启
                             </button>
                         </div>
+                        <details id="runtime-choice-panel">
+                            <summary id="runtime-choice-title">可选来源运行组件</summary>
+                            <p id="runtime-choice-help">仅在需要时添加。替换整个应用并重启，保留本地数据和账号；不会自动启用来源或登录。</p>
+                            <div class="actions">
+                                <button id="runtime-choice-jm" type="button">添加 JM 运行组件</button>
+                                <button id="runtime-choice-core" type="button">移除 JM 运行组件</button>
+                            </div>
+                            <p id="runtime-choice-message" class="status" aria-live="polite"></p>
+                        </details>
                     </article>
                 </div>
                 <div id="repair" class="tab">
@@ -1101,6 +1110,7 @@
                     <summary><strong>JM 账号与收藏</strong> · 可选来源</summary>
                     <p id="jm-account-state" class="status">仅显示本机状态 · 不会自动连接 JM</p>
                     <p>导入本人账号的收藏作为收藏构成依据；不会自动创建 Like，也不会修改 JM 云端收藏。</p>
+                    <p id="jm-runtime-hint">若当前包不含 JM 运行环境，可在“软件更新 → 可选来源运行组件”明确添加；本地阅读不需要 Java。</p>
                     <div class="settings-form">
                         <label>JM 用户名<input id="jm-username" autocomplete="username" /></label>
                         <label>密码<input id="jm-password" type="password" autocomplete="current-password" /></label>

@@ -1,21 +1,15 @@
+param([string]$SourceRuntimes = '')
+
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'lib/assert-checkout-root.ps1')
+. (Join-Path $PSScriptRoot 'lib/source-runtime-build.ps1')
 Assert-PicaBuildCheckoutRoot -Root $root
 $package = Get-Content -Raw -LiteralPath (Join-Path $root 'package.json') | ConvertFrom-Json
 $version = [string]$package.version
 $nodeVersion = '24.15.0'
-$name = if ($version -match '^\d+\.\d+\.\d+$') {
-    "Pica-Library-v$version-windows-x64"
-} elseif ($version -eq '0.2.0-dev.0') {
-    'Pica-Library-v0.2.0-dev.0-update-base-windows-x64'
-} elseif ($version -eq '0.2.0-dev.1') {
-    'Pica-Library-v0.2.0-dev.1-local-test-windows-x64'
-} elseif ($version -eq '0.2.0-dev.2') {
-    'Pica-Library-v0.2.0-dev.2-local-test-windows-x64'
-} else {
-    throw "Unsupported Windows package version: $version"
-}
+$picaRuntimeMode = Resolve-PicaSourceRuntimeMode -Requested $SourceRuntimes -RequireJm $env:PICA_REQUIRE_JM_RUNTIME
+$name = Get-PicaWindowsPackageStem -Version $version -SourceRuntimes $picaRuntimeMode
 $buildRoot = Join-Path $root 'artifacts\windows-package'
 $stage = Join-Path $buildRoot $name
 $zip = Join-Path $root "artifacts\$name.zip"
@@ -26,8 +20,14 @@ $sourceSha = if ($env:PICA_LIBRARY_BUILD_PROVENANCE) { [string]$env:PICA_LIBRARY
 
 function Get-Sha256([string]$file) {
     $algorithm = [Security.Cryptography.SHA256]::Create()
-    try { return ([BitConverter]::ToString($algorithm.ComputeHash([IO.File]::OpenRead($file)))).Replace('-','').ToLowerInvariant() }
-    finally { $algorithm.Dispose() }
+    $stream = $null
+    try {
+        $stream = [IO.File]::OpenRead($file)
+        return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-','').ToLowerInvariant()
+    } finally {
+        if ($stream) { $stream.Dispose() }
+        $algorithm.Dispose()
+    }
 }
 
 if ($gitSourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve Git source commit SHA' }
@@ -37,7 +37,10 @@ if (Test-Path -LiteralPath $zip) { Remove-Item -Force -LiteralPath $zip }
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'app'),(Join-Path $stage 'runtime'),(Join-Path $stage 'licenses'),(Split-Path $runtimeCache -Parent) | Out-Null
 
 Push-Location $root
-try { pnpm build } finally { Pop-Location }
+try {
+    pnpm build
+    if ($LASTEXITCODE -ne 0) { throw 'Application build failed before package assembly' }
+} finally { Pop-Location }
 
 if (-not (Test-Path -LiteralPath $runtimeCache)) {
     Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip" -OutFile $runtimeCache
@@ -54,23 +57,20 @@ Expand-Archive -LiteralPath $runtimeCache -DestinationPath $runtimeExtract
 Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\node.exe") -Destination (Join-Path $stage 'runtime\node.exe')
 Copy-Item -LiteralPath (Join-Path $runtimeExtract "node-v$nodeVersion-win-x64\LICENSE") -Destination (Join-Path $stage 'licenses\Node.js-LICENSE.txt')
 
-$jmRuntime = Join-Path $root 'runtime\jm'
-if (Test-Path -LiteralPath (Join-Path $jmRuntime 'PICA_JM_RUNTIME.json')) {
-    $jmManifest = Get-Content -Raw -LiteralPath (Join-Path $jmRuntime 'PICA_JM_RUNTIME.json') | ConvertFrom-Json
-    if ($jmManifest.userDataIncluded -or $jmManifest.statusProbe -ne 'PASS' -or $jmManifest.jarSha256 -ne (Get-Sha256 (Join-Path $jmRuntime 'lib\pica-jm-source.jar'))) { throw 'JM runtime integrity gate failed' }
-    Copy-Item -LiteralPath $jmRuntime -Destination (Join-Path $stage 'runtime\jm') -Recurse
-    $jmProbe = '{"id":"package-probe","op":"status"}' | & (Join-Path $stage 'runtime\jm\bin\java.exe') -Xmx128m '-Dfile.encoding=UTF-8' -jar (Join-Path $stage 'runtime\jm\lib\pica-jm-source.jar')
-    $jmStatus = $jmProbe | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0 -or -not $jmStatus.ok -or $jmStatus.value.configured) { throw 'Packaged JM runtime status probe failed' }
-} elseif ($env:PICA_REQUIRE_JM_RUNTIME -eq '1') { throw 'The acceptance candidate requires the bundled JM runtime' }
-
 Copy-Item -Path (Join-Path $root 'dist\*.js') -Destination (Join-Path $stage 'app')
 Copy-Item -LiteralPath (Join-Path $root 'src\modules\runtime-contracts.json') -Destination (Join-Path $stage 'app\module-contracts.json')
 Copy-Item -LiteralPath (Join-Path $root 'dist\licenses\THIRD_PARTY_LICENSES.txt') -Destination (Join-Path $stage 'licenses\THIRD_PARTY_LICENSES.txt')
 Copy-Item -LiteralPath (Join-Path $root 'web') -Destination $stage -Recurse
-# Stage only the verified semantic runtime; never copy the reviewed corpus.
+# Stage source runtimes only by explicit choice; tag semantics use their own allowlist.
 Push-Location $root
 try {
+    pnpm exec tsx scripts/stage-source-runtime.ts $stage $picaRuntimeMode
+    if ($LASTEXITCODE -ne 0) { throw 'Optional source runtime staging failed' }
+    if ($picaRuntimeMode -eq 'jm') {
+        $jmProbe = '{"id":"package-probe","op":"status"}' | & (Join-Path $stage 'runtime\jm\bin\java.exe') -Xmx128m '-Dfile.encoding=UTF-8' -jar (Join-Path $stage 'runtime\jm\lib\pica-jm-source.jar')
+        $jmStatus = $jmProbe | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0 -or -not $jmStatus.ok -or $jmStatus.value.configured) { throw 'Packaged JM runtime status probe failed' }
+    }
     pnpm exec tsx scripts/stage-tag-runtime.ts $stage
     if ($LASTEXITCODE -ne 0) { throw 'Minimal tag runtime staging failed' }
 } finally { Pop-Location }
@@ -227,10 +227,16 @@ Users upgrading from v0.1.3 must use a complete Windows ZIP.
 From v0.2.0 onward, compatible releases may use the built-in incremental update flow.
 No separate Node.js, npm, pnpm, Git, terminal, or administrator access is required.
 This unsigned build may show a Windows SmartScreen reputation warning.
+Source runtime composition: $picaRuntimeMode. This is not a source enable/login choice.
+Local reading needs no Java or external source account. Optional runtimes update with the application, not through a separate module updater.
 "@
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
 $readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
 $readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
+# Keep this BOM-less script ASCII for Windows PowerShell 5 on non-UTF8 locales.
+# Reuse the existing localized README encoding, not a new runtime asset.
+$runtimeReadmeZhBase64 = 'Cuadpea6kOi/kOihjOaXtue7hOaIkO+8mntSVU5USU1FfeOAgui/meS4jeS7o+ihqOW3suWQr+eUqOadpea6kOaIluW3sueZu+W9leOAggrmnKzlnLDpmIXor7vkuI3pnIDopoEgSmF2YSDmiJblpJbpg6jotKblj7fvvJvlj6/pgInov5DooYzml7bpmo/mlbTkuKrlupTnlKjmm7TmlrDvvIzml6DpnIDlj6bkuIDlpZfmqKHlnZfmm7TmlrDlmajjgIIK'
+$readmeZh += [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($runtimeReadmeZhBase64)).Replace('{RUNTIME}',$picaRuntimeMode)
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 
@@ -268,4 +274,5 @@ $launcherBaseReport = if ($reuseAcceptedLauncher) {
     product_version=$version
     source_sha=$sourceSha
     launcher_base_version=$launcherBaseReport
+    source_runtimes=$picaRuntimeMode
 } | ConvertTo-Json

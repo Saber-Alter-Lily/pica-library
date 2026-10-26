@@ -11,6 +11,11 @@ const message = (value) => {
 }
 function localize() {
     if (!panel) return
+    $('jm-runtime-hint').textContent = t(
+        '若当前包不含 JM 运行环境，可在“软件更新 → 可选来源运行组件”明确添加；本地阅读不需要 Java。',
+        'If this package has no JM runtime, explicitly add it under Software update → Optional source runtimes. Local reading needs no Java.',
+        'JM 実行環境がない場合は「ソフトウェア更新 → オプション配信元の実行環境」で明示的に追加できます。ローカルの読書に Java は不要です。'
+    )
     panel.querySelector('summary strong').textContent = t(
         'JM 账号与收藏',
         'JM account and favorites',
@@ -129,9 +134,9 @@ async function refresh() {
         ? t('来源已关闭 · 账号和本地下载保留', 'Source disabled · Account and local downloads retained', '配信元は無効 · アカウントとローカル保存は保持')
         : !result.available
         ? t(
-              '此包尚未包含 JM 运行组件',
-              'JM is not included in this package',
-              'このパッケージには JM が含まれていません'
+              '此应用包未包含有效的 JM 运行组件；普通本地阅读不受影响',
+              'This application has no valid JM runtime; local reading remains available',
+              '有効な JM 実行環境は含まれていません。ローカルの読書は引き続き利用できます'
           )
         : result.configured
           ? t(

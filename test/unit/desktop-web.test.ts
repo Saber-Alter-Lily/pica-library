@@ -87,12 +87,11 @@ describe('desktop setup and settings UI contract', () => {
         expect(build).toContain('README-WINDOWS.txt')
         expect(build).toContain('README-WINDOWS.zh-CN.txt')
         expect(build).toContain('Text.UTF8Encoding($false)')
-        expect(build).toContain(
-            "$version -match '^\\d+\\.\\d+\\.\\d+$'"
-        )
-        expect(build).toContain(
-            '"Pica-Library-v$version-windows-x64"'
-        )
+        expect(build).toContain('Get-PicaWindowsPackageStem -Version $version -SourceRuntimes $picaRuntimeMode')
+        const packageNames = read('scripts/lib/source-runtime-build.ps1')
+        expect(packageNames).toContain("$Version -match '^\\d+\\.\\d+\\.\\d+$'")
+        expect(packageNames).toContain('"Pica-Library-v$Version"')
+        expect(packageNames).toContain('"$stem-windows-x64"')
         expect(build).toContain(
             '$historicLauncherBasePaths.ContainsKey($version)'
         )

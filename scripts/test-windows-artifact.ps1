@@ -3,6 +3,7 @@ param(
     [switch]$PortCollision,
     [switch]$SetupPersistence,
     [switch]$LocalOnlySetup,
+    [ValidateSet('', 'core', 'jm')][string]$ExpectedSourceRuntimes = '',
     [string]$ExpectedVersion = '',
     [string]$DesktopHomeName = 'Pica Library'
 )
@@ -23,6 +24,9 @@ $extract = Join-Path $work 'extract'
 $local = Join-Path $work 'localappdata'
 $listener = $null
 $smokePassed = $false
+$smokeFailureType = ''
+$observerAudit = $null
+$observerDescriptor = $null
 New-Item -ItemType Directory -Force -Path $extract,$local | Out-Null
 Copy-Item -LiteralPath $Zip -Destination (Join-Path $work 'candidate.zip')
 Expand-Archive -LiteralPath (Join-Path $work 'candidate.zip') -DestinationPath $extract
@@ -71,6 +75,8 @@ foreach ($license in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICE
 
 $originalPath = $env:PATH
 $originalLocal = $env:LOCALAPPDATA
+$originalNodeOptions = [Environment]::GetEnvironmentVariable('NODE_OPTIONS','Process')
+$originalSmokeObserver = [Environment]::GetEnvironmentVariable('READER_SMOKE_PROCESS_OBSERVER_FILE','Process')
 $originalPicaEnvironment = @{}
 foreach ($entry in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'PICA_*' })) {
     $originalPicaEnvironment[$entry.Name] = $entry.Value
@@ -81,6 +87,16 @@ foreach ($entry in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'PICA_*' 
 $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
 $env:LOCALAPPDATA = $local
 try {
+    if ($env:GITHUB_ACTIONS -eq 'true' -and $env:RUNNER_OS -eq 'Windows' -and $env:RUNNER_ENVIRONMENT -eq 'github-hosted') {
+        $observer = Join-Path $work 'artifact-smoke-process-observer.cjs'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'fixtures/artifact-smoke-process-observer.cjs') -Destination $observer
+        $observerDescriptor = Join-Path $work 'observer-descriptor.json'
+        $observerAudit = Join-Path $work 'process-audit.jsonl'
+        $observerValue = @{ root=$work; applicationRoot=$rootPath; auditFile=$observerAudit; sourceSha=$sourceSha; desktopSha256=(Get-FileHash -LiteralPath (Join-Path $rootPath 'app/desktop.js') -Algorithm SHA256).Hash.ToLowerInvariant() }
+        [IO.File]::WriteAllText($observerDescriptor,($observerValue|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+        $env:READER_SMOKE_PROCESS_OBSERVER_FILE=$observerDescriptor
+        $env:NODE_OPTIONS='--require="'+$observer.Replace('\','/')+'"'
+    }
     if ($PortCollision) {
         $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,4789)
         try { $listener.Start() }
@@ -105,6 +121,15 @@ try {
     if ($PortCollision -and $instance.url -eq 'http://127.0.0.1:4789') { throw 'Packaged app attached to unrelated port occupant' }
     $status = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/status') -TimeoutSec 10
     if ($status.application -ne 'Pica Library' -or $status.version -ne $expectedVersion -or $status.configured) { throw 'Unexpected packaged status' }
+    if ($ExpectedSourceRuntimes) {
+        $actual = $status.runtimeComposition
+        $runtimeNames = @($actual.composition.sourceRuntimes)
+        if ($actual.status -ne 'declared' -or $actual.composition.formatVersion -ne 1 -or
+            ($ExpectedSourceRuntimes -eq 'core' -and $runtimeNames.Count -ne 0) -or
+            ($ExpectedSourceRuntimes -eq 'jm' -and ($runtimeNames.Count -ne 1 -or $runtimeNames[0] -ne 'jm'))) {
+            throw 'Actual compiled Desktop runtime composition does not match the selected package'
+        }
+    }
     $atlas = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/recommendation/profile/rebuild') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body '{}' -TimeoutSec 30
     if (-not $atlas.available -or $atlas.snapshot.snapshotVersion -ne 2) { throw 'Clean package Atlas rebuild failed' }
     $recommendation = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/recommendations') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body '{"limit":12}' -TimeoutSec 30
@@ -167,6 +192,12 @@ try {
             } catch { $status = $null }
         } while ((-not $status -or -not $status.configured -or -not $status.startupReady) -and (Get-Date) -lt $deadline)
         if (-not $status.configured -or $status.picaAccount.configured -or $status.csrfToken -eq $initialCsrfToken) { throw 'Local-only configuration/account/CSRF state is incorrect' }
+        if ($ExpectedSourceRuntimes) {
+            $jmState = Invoke-RestMethod -Uri ($instance.url + '/api/v1/desktop/sources/jm/status') -TimeoutSec 10
+            if ($jmState.enabled -or $jmState.configured -or ($jmState.available -ne ($ExpectedSourceRuntimes -eq 'jm'))) {
+                throw 'Packaged local-only source availability/enablement/account boundary failed'
+            }
+        }
         $ordinarySettings = @{ libraryDirectory=[string]$status.libraryDirectory; profile='fast'; proxyUrl='' } | ConvertTo-Json
         $settingsResult = Invoke-RestMethod -Method Post -Uri ($instance.url + '/api/v1/desktop/settings') -Headers @{ 'x-pica-csrf'=$status.csrfToken; Origin=$instance.url } -ContentType 'application/json' -Body $ordinarySettings -TimeoutSec 15
         if (-not $settingsResult.success) { throw 'Ordinary local library settings still require a source account' }
@@ -227,10 +258,22 @@ try {
     }
     [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; desktop_home_name=$DesktopHomeName; module_contracts=$moduleContractGate; local_only_setup=$localOnlyGate; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
     $smokePassed = $true
+} catch {
+    $smokeFailureType = $_.Exception.GetType().FullName
+    throw
 } finally {
+    if ($observerDescriptor) {
+        $evidence = Join-Path $repositoryRoot ('artifacts/windows-smoke-evidence/'+(Split-Path -Leaf $work))
+        New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+        $observerReady = $observerAudit -and (Test-Path -LiteralPath $observerAudit)
+        if ($observerReady) { Copy-Item -LiteralPath $observerAudit -Destination (Join-Path $evidence 'process-audit.jsonl') }
+        @{ sourceSha=$sourceSha; gatePassed=$smokePassed; failureType=$smokeFailureType; observerReady=[bool]$observerReady; setupPersistence=[bool]$SetupPersistence; localOnly=[bool]$LocalOnlySetup; requestDeadlinesChanged=$false; privateStateCopied=$false } | ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath (Join-Path $evidence 'result.json')
+    }
     if ($listener) { $listener.Stop() }
     $env:PATH = $originalPath
     $env:LOCALAPPDATA = $originalLocal
+    [Environment]::SetEnvironmentVariable('NODE_OPTIONS',$originalNodeOptions,'Process')
+    [Environment]::SetEnvironmentVariable('READER_SMOKE_PROCESS_OBSERVER_FILE',$originalSmokeObserver,'Process')
     foreach ($key in $originalPicaEnvironment.Keys) { [Environment]::SetEnvironmentVariable($key, $originalPicaEnvironment[$key], 'Process') }
     if (-not $smokePassed) { Write-Warning "Failed smoke retained for isolated diagnosis: $work" }
     if ($smokePassed -and (Test-Path -LiteralPath $work)) {

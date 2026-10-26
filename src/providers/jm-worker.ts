@@ -4,12 +4,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sanitizedChildEnv } from '../desktop/child-process'
+import { installedRuntimeComposition } from '../runtime/installed-runtime-composition'
+import { RUNTIME_COMPOSITION_PATH } from '../modules/runtime-composition'
 
 export interface JmTransport {
     readonly available: boolean
     request<T>(op: string, payload?: Record<string, unknown>): Promise<T>
     close(): void
     sessionKey?(): string
+}
+
+export function selectJmApplicationRoot(roots: string[]) {
+    if (!roots.length) throw new Error('An application root is required')
+    return roots.find(candidate => fs.existsSync(path.join(candidate, 'SOURCE_SHA.txt')) ||
+        fs.existsSync(path.join(candidate, RUNTIME_COMPOSITION_PATH))) ??
+        roots.find(candidate => fs.existsSync(path.join(candidate, 'runtime/jm/lib/pica-jm-source.jar'))) ?? roots[0]
 }
 
 /** The SDK accepts unauthenticated HTTP forward proxies only. Never silently bypass one. */
@@ -56,24 +65,25 @@ export class JmWorkerTransport implements JmTransport {
         const here = path.dirname(fileURLToPath(import.meta.url))
         const roots = root
             ? [root]
-            : [
+            : path.basename(here) === 'app'
+              ? [path.resolve(here, '..')]
+              : [
                   path.resolve(here, '..'),
                   path.resolve(here, '../..'),
                   process.cwd()
               ]
-        const selected =
-            roots.find((candidate) =>
-                fs.existsSync(
-                    path.join(candidate, 'runtime/jm/lib/pica-jm-source.jar')
-                )
-            ) ?? roots[0]
+        // A packaged core must not borrow another checkout's JVM from cwd.
+        const selected = selectJmApplicationRoot(roots)
         this.java = path.join(
             selected,
             'runtime/jm/bin',
             process.platform === 'win32' ? 'java.exe' : 'java'
         )
         this.jar = path.join(selected, 'runtime/jm/lib/pica-jm-source.jar')
-        this.available = fs.existsSync(this.java) && fs.existsSync(this.jar)
+        const composition = installedRuntimeComposition(selected)
+        this.available = composition.status !== 'invalid' &&
+            composition.composition.sourceRuntimes.includes('jm') &&
+            fs.existsSync(this.java) && fs.existsSync(this.jar)
     }
 
     private fail() {
@@ -89,7 +99,7 @@ export class JmWorkerTransport implements JmTransport {
     }
 
     private start() {
-        if (!this.available) throw new Error('此测试包尚未包含 JM 运行组件')
+        if (!this.available) throw new Error('此应用包未包含有效的 JM 运行组件；普通本地阅读不受影响')
         if (this.child) return
         const child = spawn(
             this.java,

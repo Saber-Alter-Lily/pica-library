@@ -1,4 +1,6 @@
 import type { RuntimeModuleContracts } from '../modules/contracts'
+import type { RuntimeComposition } from '../modules/runtime-composition'
+import type { RuntimeChoiceReceipt } from './runtime-choice'
 
 export type UpdatePackageType = 'incremental' | 'local-test'
 
@@ -23,6 +25,8 @@ export interface UpdateManifest {
     requiresFullInstall: boolean
     /** Optional for legacy packages. New builders bind this to the actual payload. */
     moduleContracts?: RuntimeModuleContracts
+    /** Packaging facts bound to the actual payload; not source-enable state. */
+    runtimeComposition?: RuntimeComposition
     files: UpdateManifestFile[]
     deletions: string[]
 }
@@ -43,6 +47,8 @@ export interface StagedFullApplicationUpdate {
     directory: string
     targetVersion: string
     targetSourceSha: string
+    runtimeComposition: RuntimeComposition
+    runtimeChoice?: RuntimeChoiceReceipt
     stagedAt: string
 }
 
@@ -101,6 +107,10 @@ export interface FullApplicationUpdaterInstruction {
     progressFile: string
     targetVersion: string
     targetSourceSha: string
+    /** Optional only for legacy instructions; never an instruction to change components. */
+    runtimeComposition?: RuntimeComposition
+    /** Present only after a separate, explicit component preview/confirm command. */
+    runtimeChoice?: RuntimeChoiceReceipt
     previousUrl?: string
     healthTimeoutMs: number
 }

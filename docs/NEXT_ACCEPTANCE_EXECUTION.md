@@ -1,5 +1,13 @@
 # Next consolidated acceptance candidate
 
+## 2026-10-25: core / optional runtime and upgrade — Dev87 candidate
+
+Separately authorized cloud continuation of local source5559536 / runtime choice749d50f, stacked on frozen PR210/Dev86 without modifying them. [Current scope and gates](CORE_RUNTIME_CLOUD_CANDIDATE.md). This is not a release, deployment or automatic local update.
+
+Windows now produces two different complete applications from the same exact head: **core** (default, no JM JVM) and **with JM** (optional runtime, not enabled/login by install). Use one, never mix their application files. Both use `%LOCALAPPDATA%\Pica Library Post Stable RC`, not the formal profile. Android is fixed-signed `com.picalibrary.android.dev`, candidate versionCode87; do not uninstall or copy data if upgrade is refused.
+
+Require current-source CI, actual ZIP/composition/recovery and signed APK checks. Real old-client first-hop has its own four CI scenarios and retains any failure; earlier verified asynchronous launch gaps are not repaired by merely shipping a newer helper. Explicit component-choice integrated HTTP/browser/add-remove QA remains separately pending. The synthetic first-hop fixture is marked NOT FOR INSTALLATION and must never be handed out as the test application. Physical/source/OEM/gesture/tag/AI/user-issue acceptance and the whole objective remain OPEN.
+
 ## 2026-10-25: source-neutral continue-reading entry — Dev85 candidate
 
 This separately authorized Draft continues frozen PR208 `295942c297f9377b28df5a2d3d32a311fed8a18f`. Local implementation was sealed at `291bdec208c96ff2cf3f2484b2e14859448a597c`. [Candidate scope and pending gates](SOURCE_NEUTRAL_CLOUD_CANDIDATE.md).

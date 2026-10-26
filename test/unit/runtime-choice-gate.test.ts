@@ -49,6 +49,15 @@ function preload(kind: 'desktop' | 'helper', scenario = 'roundtrip') {
 }
 
 describe('runtime-choice actual gate preparation, no application/Java/network/listener', () => {
+    it.each([
+        ['D:\\a\\_temp\\pica-playwright-owned', true], ['D:\\a\\_temporary\\tools', false], ['C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tools', false]
+    ])('confines tools to actual hosted RUNNER_TEMP even when Windows os.tmpdir differs: %s', (toolRoot, accepted) => {
+        const source = fs.readFileSync('scripts/test-windows-runtime-choice.mjs', 'utf8'), start = source.indexOf('const toolRoot ='), end = source.indexOf('const require =', start)
+        expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start)
+        const check = () => new vm.Script(source.slice(start, end)).runInNewContext({ process: { env: { RUNNER_TEMP: 'D:\\a\\_temp', PICA_PLAYWRIGHT_TOOL_ROOT: toolRoot } },
+            fs: { realpathSync: { native: (value: string) => value } }, path: path.win32, assert: require('node:assert/strict') })
+        if (accepted) expect(check).not.toThrow(); else expect(check).toThrow(/RUNNER_TEMP/)
+    })
     it('refuses the actual runtime runner and preload before input access outside hosted CI', () => {
         for (const script of ['scripts/test-windows-runtime-choice.mjs', 'scripts/lib/runtime-choice-preload.mjs']) {
             const result = spawnSync(process.execPath, [script, 'NONEXISTENT_INPUT'], { env: { ...process.env, GITHUB_ACTIONS: 'false' }, encoding: 'utf8', windowsHide: true, timeout: 10000 })

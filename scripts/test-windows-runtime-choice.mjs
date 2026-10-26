@@ -51,7 +51,10 @@ for (const mode of ['core', 'jm']) {
 }
 for (const name of ['app/desktop.js', 'app/full-upgrader.js', 'app/updater.js', 'runtime/node.exe']) assert.deepEqual(zips.core.readFile(name), zips.jm.readFile(name), 'Different source engines between compositions: ' + name)
 const toolRoot = process.env.PICA_PLAYWRIGHT_TOOL_ROOT
-assert.ok(toolRoot && fs.realpathSync.native(toolRoot).toLowerCase().startsWith(fs.realpathSync.native(os.tmpdir()).toLowerCase() + path.sep), 'Explicit disposable Playwright tool root required')
+const runnerTemp = process.env.RUNNER_TEMP
+assert.ok(runnerTemp && path.isAbsolute(runnerTemp), 'Explicit hosted RUNNER_TEMP required')
+const realRunnerTemp = fs.realpathSync.native(runnerTemp)
+assert.ok(path.dirname(realRunnerTemp) !== realRunnerTemp && toolRoot && fs.realpathSync.native(toolRoot).toLowerCase().startsWith(realRunnerTemp.toLowerCase() + path.sep), 'Explicit disposable Playwright tool root under RUNNER_TEMP required')
 const require = createRequire(path.join(toolRoot, 'package.json'))
 assert.equal(require('@playwright/test/package.json').version, '1.63.0', 'Use the existing pinned browser tooling, not project dependency edits')
 const { chromium, expect } = require('@playwright/test')

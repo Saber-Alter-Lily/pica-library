@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## Core / optional runtime and upgrade — authorized Dev87 cloud candidate (2026-10-25)
+
+**Status: HUMAN_CLOUD_AUTHORITY_GRANTED / EXACT_HEAD_CI_AND_PACKAGES_PENDING / LEGACY_FIRST_HOP_HOLD / FULL_OBJECTIVE_OPEN. No merge, release, OTA or deployment.**
+
+- Human approved independent Draft/Actions/existing signing Secrets after the blocked local goal. `codex/reader-core-upgrade-dev87-20261025` continues sealed `555953600144d4e645b52155789f2bd3e6202f65`, stacked on frozen PR210 head4a18ba; PR210/Dev86 and previous archives remain unchanged. Remote main was inspected, not merged. DPAPI write claim still fails; standing isolated-goal exception continues without secret/identity repair.
+- Adds only necessary exact branch allowance and Dev87 candidate authority to existing workflow. Builds both actual core and optional-JM ZIPs, uses composition-aware nine-scenario current-helper recovery recipe, and pins actual Dev86 push-run40222828902 Windows bytes/source. No predecessor substitution or formal data/native/schema/version/dependency change.
+- Exact old-controller first-hop now has four independent real CI scenarios with fail-fast:false, genuine failures retained and no continue-on-error/helper substitution. Marked synthetic stable-version fixture remains separate and must never be installed or promoted. Existing Android tests/lint/shrinker precede fixed signing; package/certificate/version are verified, not bypassed.
+- Pre-push selected offline gate382/382 cases across37files,0skips; strict types/Web54 and YAML/seven PowerShell fragment parses PASS, zero guarded boundary events. These do not establish remote CI/package success. No local Java/application/browser/listener was started.
+- [Authorized scope, actual wiring, pending integrated runtime-choice gates and evidence rules](docs/CORE_RUNTIME_CLOUD_CANDIDATE.md). Current-source integrated component-choice HTTP/browser/add-remove and physical/source/native/user issue acceptance remain open; do not equate a candidate build or old-code audit with completing the full goal.
+
 ## Pinned legacy incremental/full paths — local compatibility audit (2026-10-25)
 
 **Status: EXACT_OLD_CODE_COUNTEREXAMPLES_VERIFIED / LEGACY_FIRST_HOP_RECOVERY_HOLD / CLOUD_AND_INSTALLABLE_NOT_RUN / FULL_OBJECTIVE_OPEN. No product/runtime change, push or release.**

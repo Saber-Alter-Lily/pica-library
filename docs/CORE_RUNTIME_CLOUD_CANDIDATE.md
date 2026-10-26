@@ -1,0 +1,31 @@
+# Core / optional runtime and upgrade — authorized Dev87 candidate
+
+## Authority and provenance — 2026-10-25
+
+The human explicitly approved cloud work after the local goal was blocked awaiting it. New branch `codex/reader-core-upgrade-dev87-20261025` continues sealed local `555953600144d4e645b52155789f2bd3e6202f65` (runtime choice implementation `749d50fc3de9716600f8cc896a57f9a25e07f515`). Its Draft is stacked on frozen PR210 head branch `codex/dev85-local-reader-runtime-fixes-20261025` at `4a18ba769fb3c8df1e6bd100293d38db3013b5dc`, not a replacement or edit to that PR. Remote main was inspected, not merged into this candidate or changed.
+
+Authorized: independent branch/Draft, existing Actions and existing preview-signing Secrets, full CI and unpublished Windows/Android builds/runtime acceptance on disposable hosted runners. Not authorized: main merge, tag/Release, stable OTA, deployment, automatic install/uninstall, private-key download or formal-profile/schema changes. Local Java/application/browser/listeners remain forbidden. Local Memory read resolution works with explicit project intent, but the write claim still fails DPAPI; the human's standing isolated-development exception applies without identity/secret repair.
+
+## Candidate behavior; not yet an acceptance claim
+
+- Default Windows package has the local Reader/Node but no JM JVM/SDK; optional-JM package is explicitly separate. Sources are not enabled by packaging or install.
+- Ordinary updates retain composition. An explicit optional-runtime change uses a preview/confirm complete-application transaction through the same updater, not a second source updater. Consent binds source/version/from/to/hash and expires; same-version requires the same source. See [runtime choice](EXPLICIT_RUNTIME_CHOICE.md).
+- Candidate-only Android versionCode advances from frozen86 to **87** at the existing single workflow authority. Package remains `com.picalibrary.android.dev`, fixed certificate `64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d`. Native feature code is unchanged in this cloud-wiring slice.
+- Product stable metadata remains `0.5.0`; user-facing candidate version is `0.5.0-postrc.<exact-head-12>`. Windows continues `%LOCALAPPDATA%\Pica Library Post Stable RC`. Never copy formal data or uninstall a Dev APK to bypass signature/version refusal.
+
+## Gates actually dispatched by the candidate workflow
+
+1. Exact push-source full Desktop tests/types/Web/build, existing real Chromium navigation/Reader/source/tag/onboarding smoke and source-JVM tests. Standard PR CI also runs without signing secrets.
+2. Windows full tests, actual core and JM ZIP builds/structural checks, compiled setup/local-only/source-media/local-import/SQLite/recommendation/incremental gates. Same-composition replacement/recovery recipe pairs pinned released-core→core, frozen Dev86-JM→JM and current-core deep-path→core, each success/health-failure/launch-failure.
+3. Exact Dev86 predecessor comes from push run `40222828902`, Windows artifact bytes `c716bc3d0ab001e34e5173a3caf8ee6412a9e8aa355eee2f84eccf3fdf604b9b`, source `4a18ba769fb3c8df1e6bd100293d38db3013b5dc`. Missing/expired/wrong input fails rather than substituting or skipping. The pull-request run has source evidence only and is not a Windows predecessor.
+4. Separate CI-only stable-version first-hop fixture is built with existing recipe and restored source metadata. It is marked **SYNTHETIC / NOT FOR INSTALLATION**, uploaded separately from candidate installables and never proposed/reserved as a release version.
+5. Four independent old-controller jobs: success, hash mismatch, health rollback, asynchronous launch rollback. Matrix fail-fast is false so one genuine failure does not cancel the other scenarios; there is no continue-on-error/skip/replaced helper. Each retains its actual failure/success evidence. Known [legacy counterexamples](LEGACY_UPDATE_PATH_AUDIT.md) remain HOLD until those real results and a supported fix establish more.
+6. Android unit/lint/release-build before Secrets, then fixed-signature Dev87 build and apksigner/certificate/package/version checks using existing Secrets only on the exact allowed non-PR repository branch. Signing inputs stay on the hosted runner.
+
+Building a candidate does not make every requirement pass. The explicit runtime-choice **actual integrated HTTP/browser/add-remove transaction** gate is still separate pending work; its pure manager/helper/fake-DOM tests are not substituted for it. Likewise actual source/device/OEM/gesture/AI/tag roundtrip and user issue acceptance remain open. Current package/recovery tests use synthetic profiles, not proof of every historical private-data field.
+
+## Evidence rules and handoff
+
+Preserve exact head/run/job IDs, raw failures, package SOURCE_SHA/hash, declared composition and Dev certificate/version. A green static/local subset is not full CI; a counterexample-audit exit0 is not upgrade success. Do not relabel frozen Dev86 or combine APK/ZIP from different heads. A real old-launch failure keeps that gate failed even if current helper/package tests pass; no overall first-hop PASS is inferred.
+
+The source-review ZIPs stay frozen. New artifacts go in this task's isolated validation area; final installables/evidence are verified and converged into one clearly labelled candidate handoff only after current results are inspected. PRE_HANDOFF_CLEANUP preserves raw failures, necessary source/inputs/receipts and unresolved support evidence; it does not delete historical/user files or runtime data. No automatic deployment.

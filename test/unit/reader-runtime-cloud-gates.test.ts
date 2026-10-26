@@ -13,14 +13,29 @@ describe('Reader correction cloud recipe, source inspection only', () => {
             )
         ).toHaveLength(2)
         expect(text.match(/github.event_name != 'pull_request'/g)).toHaveLength(
-            2
+            3
         )
         expect(
             text.match(/github.event.repository.private == false/g)
-        ).toHaveLength(2)
+        ).toHaveLength(3)
         expect(
             text.match(/github.repository == 'Saber-Alter-Lily\/pica-library'/g)
-        ).toHaveLength(2)
+        ).toHaveLength(3)
+        expect(
+            text.match(
+                /refs\/heads\/codex\/reader-core-upgrade-dev87-20261025/g
+            )
+        ).toHaveLength(3)
+        const legacy =
+            text
+                .split('\n  legacy-first-hop:\n')[1]
+                ?.split('\n  android:\n')[0] ?? ''
+        expect(legacy).toContain('fail-fast: false')
+        expect(legacy).toContain(
+            'scenario: [success, hash-mismatch, health-rollback, launch-rollback]'
+        )
+        expect(legacy).not.toContain('secrets.')
+        expect(legacy).not.toContain('continue-on-error')
         expect(text).not.toMatch(/(?:contents|actions): write/)
         expect(
             text.indexOf(
@@ -60,9 +75,15 @@ describe('Reader correction cloud recipe, source inspection only', () => {
         expect(text).not.toMatch(
             /\.scrollIntoView\(|\.scrollTo\(|waitForTimeout\(|test\.skip/
         )
-        expect(text).toContain("testInfo.outputPath('cold-continuous-saved-page.png')")
-        expect(text).toContain('await page.screenshot({ path: screenshotPath })')
-        expect(text.indexOf('real browser imports folder/CBZ')).toBeLessThan(text.indexOf('cold continuous resume centers'))
+        expect(text).toContain(
+            "testInfo.outputPath('cold-continuous-saved-page.png')"
+        )
+        expect(text).toContain(
+            'await page.screenshot({ path: screenshotPath })'
+        )
+        expect(text.indexOf('real browser imports folder/CBZ')).toBeLessThan(
+            text.indexOf('cold continuous resume centers')
+        )
     })
     it('retains success/failure browser artifacts without turning previous runtime evidence into a new PASS', () => {
         const text = fs.readFileSync(

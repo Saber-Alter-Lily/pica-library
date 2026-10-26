@@ -7,6 +7,7 @@ describe('separately authorized runtime-choice cloud recipe, source inspection o
         expect(workflow).toContain('branches: [codex/reader-runtime-transaction-gate-20261026]')
         expect(workflow.match(/github.repository == 'Saber-Alter-Lily\/pica-library'/g)).toHaveLength(4)
         expect(workflow.match(/github.ref == 'refs\/heads\/codex\/reader-runtime-transaction-gate-20261026'/g)).toHaveLength(4)
+        expect(workflow.match(/github.event.repository.private == false/g)).toHaveLength(4)
         expect(workflow).not.toMatch(/pull_request_target|workflow_dispatch|secrets\.|contents: write|actions: write|gh release|ANDROID_PREVIEW|versionCode/)
         expect(workflow).toContain('cancel-in-progress: false')
     })

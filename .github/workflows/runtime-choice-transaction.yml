@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   source:
-    if: github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -48,7 +48,7 @@ jobs:
           if-no-files-found: warn
 
   windows-unit:
-    if: github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
     runs-on: windows-latest
     timeout-minutes: 50
     env:
@@ -83,7 +83,7 @@ jobs:
 
   fixtures:
     needs: source
-    if: github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -126,7 +126,7 @@ jobs:
 
   transaction:
     needs: fixtures
-    if: github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-runtime-transaction-gate-20261026'
     runs-on: windows-latest
     timeout-minutes: 25
     strategy:

@@ -1,6 +1,16 @@
 # User-hosted library → shared Reader — NEXT-67 (unpublished)
 
-## Current local extension — separate selected-source search/read (2026-10-26)
+## Current local extension — offline storage foundation only (2026-10-26)
+
+Application source`76bee26a41e096a74acb89d5a6f7a1023b2cb778`, isolated branch`codex/user-host-offline-20261026`, adds a reusable generated-chapter producer port to the existing local inventory importer. It is **not wired to Host download jobs/UI or Android**; advertised Host downloads/native capabilities remain false. No new installable, source activation or automatic cache-to-library import is implied.
+
+The same `LocalInventoryV1`/SQLite atomic commit/local Reader stores stable comic and chapter identities. It appends or replaces chapters in one book, preserves existing favorites/progress, verifies/copies old pages locally, and reuses bounded raster/path/hash checks. Exclusive new generations, pre-commit permission and revision checks, failed-generation cleanup and nonfatal old-generation retirement share the existing publication path. It is an in-process stale-writer check, not cross-process CAS. Post-commit revocation does not delete an already accepted local copy. Optional order hints do not change the SQL schema or existing folder/CBZ inventory version.
+
+Final local `regression-2`:422PASS/0FAIL/0skip in28files, including21new actual temporary SQLite/Reader/synthetic-PNG cases. Database reopen with the producer unavailable still reads/resumes; cancellation, SQLite rollback, corrupt hashes/paths, conflicting generations and failed old-copy cleanup retain safe state. Full `types-3` passes; all6new offline boundary audits have0events. Receipts/scripts remain `_validation/host-offline-storage-20261026`; no production profile, runtime/provider, Java, app, browser or listener was used.
+
+Next is explicit save-to-local consent plus the existing `DownloadScheduler`/`MediaRequestGate`, job progress/cancellation and this inventory publication port, then Android. A Host cache is not a local saved book or phone offline support. SRC-05 and the full product remain open; no push/cloud/Release/OTA/deployment.
+
+## Previous local extension — separate selected-source search/read (2026-10-26)
 
 Application source`b85deefd835d1aa661c6640115933de8bf737e93` adds an actual Desktop-only path beyond the original library scope below: saved enabled user host → authorize source browsing separately → list installed sources → confirm one → search/paginate → explicitly fetch that work's metadata/chapters → the SAME main Reader, cache and source-owned progress. No default host/catalogue/repository, extension installation, new Reader engine, database schema or provider-account inheritance.
 

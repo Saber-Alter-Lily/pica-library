@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## P2 S2 user-host offline — shared local storage foundation (2026-10-26)
+
+**Status: LOCAL_STORAGE_FOUNDATION_AND_OFFLINE_GATES_PASS / HOST_JOBS_UI_ANDROID_AND_REAL_INTEROP_PENDING / FULL_OBJECTIVE_OPEN. Application source76bee26a41e096a74acb89d5a6f7a1023b2cb778, isolated branch codex/user-host-offline-20261026. No push/cloud/version/Release/OTA/deployment.**
+
+- Continued the interrupted validation rather than restarting live work: regression-1/types-2 had already completed successfully. Final formatted source reran regression-2/types-3. Local Memory context/claim remains NOT_FOUND/DPAPI denied; standing goal-scoped isolated exception only, no identity/secret repair or memory promotion.
+- Adds a source-neutral generated-chapter port to existing LocalLibraryIngestion, not another Reader/download/publication engine. Same LocalInventoryV1 and actual SQLite atomic transaction group chapters in one stable local book; append/replace retain IDs, favorites and applicable progress. Optional order hints require no SQL schema or old folder/CBZ format migration. Page producer owns no URL, credentials, network or scheduler in this module.
+- Verifies existing owned pages before local copying; bounded raster/bytes/count/hash/path validation, exclusive generation creation, guard-before-publication and in-process stale-revision rejection. Fetch/cancel/save failure removes only this uncommitted generation and preserves prior DB/files. Postcommit revocation does not undo an accepted local copy; failed old-generation cleanup retains both safely. No cross-process CAS, complete Host download job or native offline claim.
+- Final422PASS/0FAIL/0skip across28files, including21new actual temp-SQLite/Reader/PNG cases; full types PASS;6offline boundary audits0events. Database reopen/source-unavailable reading, stable grouping/progress, shortened chapter, late cancellation, actual transaction rollback, corrupted paths/hashes, collision and stale-writer cases are covered. Evidence remains _validation/host-offline-storage-20261026; no local app/Java/browser/listener or real provider/formal data access.
+- Source/API capabilities intentionally still downloads=false/native=false. Next finite S2 step: explicit save consent, existing DownloadScheduler/MediaRequestGate, async progress/cancel/status and this storage port, then Android. Ledger remains7phases/42product cases, not expanded by unit-test count. R1/T3 cloud, real Host/second provider, issue/tag/AI/gesture/sync/device acceptance remain OPEN; user testing NOT_READY. PR212/Dev87/frozen packages and G-drive/formal data unchanged.
+
 ## P2 user-host source search/read — actual separate grant, shared engine (2026-10-26)
 
 **Status: LOCAL_SOURCE_SEARCH_READER_AND_OFFLINE_GATES_PASS / HOST_DOWNLOADS_ANDROID_AND_REAL_INTEROP_PENDING / FULL_OBJECTIVE_OPEN. Application sourceb85deefd835d1aa661c6640115933de8bf737e93, isolated branch codex/user-host-source-browse-20261026. No push/cloud dispatch/version/Release/OTA/deployment.**

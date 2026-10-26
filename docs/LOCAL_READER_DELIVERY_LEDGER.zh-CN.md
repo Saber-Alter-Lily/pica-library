@@ -1,6 +1,6 @@
 # 本地漫画阅读器：总推进与验收账本
 
-版本：P0-20261026-6。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
+版本：P0-20261026-7。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
 
 ## 1. 产品目标与权威规则
 
@@ -20,12 +20,12 @@
 | --- | --- |
 | 正式发布 | [v0.5.0](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0)，不修改 |
 | 最近云端已执行源码 | 6efc865fd229660f77929ebe2018b494fc198995，PR212，仍冻结 |
-| 当前本地源码 | b85deefd835d1aa661c6640115933de8bf737e93；在R1/T1/T2基础上补Host单选来源搜索→章节→原Reader；23文件/380项组合定向回归、完整类型与Web54通过。未推送/构建新安装包，不增加Dev版本 |
+| 当前本地源码 | 76bee26a41e096a74acb89d5a6f7a1023b2cb778；在Host搜索阅读基础上补可复用的本地章节持久化；28文件/422项组合定向回归、完整类型通过。Host下载队列/UI仍未接线；未推送/构建新安装包，不增加Dev版本 |
 | 上轮核对的云端运行 | [40305007546](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40305007546)，completed / failure；source、windows-unit、fixtures 成功，六类事务失败；不是本轮新增源码的验证 |
 | 最近完整安装产物 | PR211 / e9b08b418c2fdbc55dbf499afb74f7b927b12434 / Dev87；PARTIAL 审阅候选，不是全目标可验收完成 |
 | Dev87 本地封存包 | PICA_CORE_RUNTIME_DEV87_CLOUD_REVIEW_20261025_e9b08b418c2f.zip；本轮只读重算 SHA256：6d68de38ba68fb0b2e7a16825df5d8d5146c2b70e69a5b36383e171c507ef2cd |
 | 旧版首跳 | [40274664757](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40274664757)：旧内置路径正常/哈希拒绝有证据，健康/异步启动恢复已知失败，原结果保留；新独立路径已有本地实现/模拟证据，真实执行仍NOT_RUN |
-| 当前状态 | R1/T1/T2及Host搜索阅读本地门禁通过；新源码云端/真实迁移/Host实联未运行。Host下载和Android接入仍缺，不能宣布P2完成；P0与完整目标OPEN，用户暂不测试，不交付假安装包 |
+| 当前状态 | R1/T1/T2、Host搜索阅读及S2本地持久化底座门禁通过；新源码云端/真实迁移/Host实联未运行。Host下载任务/UI和Android接入仍缺，不能宣布P2完成；P0与完整目标OPEN，用户暂不测试，不交付假安装包 |
 
 PR205 → PR206 → PR207 → PR208 → PR209 → PR210 → PR211 → PR212 是层叠候选，不是八套已经接受的产品。先冻结当前应用基线，不再为每个小修提升 Dev 版本或新建整套交付。
 
@@ -79,7 +79,17 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 | P5 更新和数据保留 | P0 已选路线的真实迁移、兼容增量、失败恢复与组件选择 | UPD-01..08；旧正式包首跳与当前 helper 分别证明；失败旧应用仍可启动，个人数据不重置 |
 | P6 单一候选集中验收 | 同源码 Windows/Android、来源/能力矩阵、哈希/签名、精简用户步骤 | DEL-01..02；所有承诺项有匹配范围的证据、无阻断缺陷；用户接受与正式发布另行确认 |
 
-### P2 本地推进 — 从已有书库，补到单选来源搜索阅读
+### P2 S2 本地推进 — 复用已有书库的章节持久化底座
+
+源码76bee26在独立分支`codex/user-host-offline-20261026`实现`LocalLibraryIngestion.importGeneratedChapter`，供后续已授权的页面生产者调用。它不持有远端URL、账号、网络、来源协议或下载调度器，不是已接通的Host下载功能。
+
+- 复用已有`LocalInventoryV1`、`commitLocalInventory`原子事务和本地主Reader；不新增schema、Reader或第二套发布/回滚引擎。多次保存章节归入同一稳定本地图书，按稳定排序提示排列；追加/替换保持章节/页面身份、收藏及可用阅读进度。可选`orderHint`不改变旧文件夹/CBZ格式。
+- 有界验证页面类型、大小、数量、哈希与受管路径；旧章节仅在本地校验/复制，不重复获取。生成目录独占创建，保存前再次检查许可及旧库存版本；失败/取消只清理本次未提交目录，数据库事务失败保留旧副本。提交后许可撤销不追溯删除已接受的本地副本；旧目录清理失败只报告保留，不撤销健康新副本。版本冲突检查是进程内保护，不宣称跨进程CAS。
+- 使用合成PNG、真实临时SQLite和现有Reader验证：关闭/重开数据库后来源不可用仍能读、续读进度保留、乱序追加/缩短替换、取消迟到页面、真实事务回滚、哈希/路径异常、独占目录冲突和第二写入者拒绝。新增21项；最终`regression-2`为**422PASS/0FAIL/0skip，28文件**，`types-3`完整类型通过，6轮离线边界审计均0事件。证据位于`_validation/host-offline-storage-20261026`；未启动应用、Java、浏览器、监听或真实Provider。
+
+**S2仅存储底座已完成**：Host下载能力仍明确`false`，下载任务、UI与Android未接。下一步将明确保存许可、现有`DownloadScheduler`/`MediaRequestGate`、进度/取消与这一库存入口接通，再接Android。不能把Host缓存、可读页面或本轮存储测试冒充完整离线功能。
+
+### P2 先前本地推进 — 从已有书库，补到单选来源搜索阅读
 
 源码b85deef新增实际Desktop路径：已保存且手动启用的用户Host → **另行授权浏览自选来源** → 同意宿主元数据/缓存副作用 → 列出已安装来源 → 明确绑定一个来源 → 输入关键词搜索/翻页 → 选择作品并取章节 → 同一个主Reader阅读/保存原有身份下的进度。启动、打开设置和选择来源不会自动搜索，不添加默认Host/目录/扩展仓库。
 
@@ -158,7 +168,7 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 | SRC-02 | JM 搜索、详情、章节、阅读无需 Pica 会话 | 已实现 SDK 路径；真实来源待验收 |
 | SRC-03 | JM 单章下载、取消、重试和离线阅读 | 已实现；真机/真实来源待验收 |
 | SRC-04 | Host 配置/检查不授予阅读，单独授权可阅读已有书库并撤销 | Desktop 已有部分实现，非完整接源 |
-| SRC-05 | Host 来源搜索、章节、下载纳入统一入口，手机可使用声明能力 | Desktop单源搜索/章节/原Reader本地接通；下载/Android仍缺，实联/成品NOT_RUN，不用SRC-04或离线测试冒充完成 |
+| SRC-05 | Host 来源搜索、章节、下载纳入统一入口，手机可使用声明能力 | Desktop单源搜索/章节/原Reader及本地章节存储底座有工程证据；Host下载任务/UI和Android仍缺，实联/成品NOT_RUN，不用SRC-04或离线测试冒充完成 |
 | SRC-06 | 第二个自选来源走同一 Reader；相同远端 ID 不串书/进度 | 模拟两sourceId/相同URL隔离已覆盖；真实第二来源及完整下载/手机链路仍待验证 |
 | SRC-07 | 禁源/撤销中止请求并拒绝迟到结果，保留本地内容且不串凭据 | 生命周期已有；综合真实操作待验证 |
 | SRC-08 | Pica/E-H 兼容路径按用户选择工作，账号可选不影响本地阅读 | 旧路径保留；不等于全部来源分发已中立 |
@@ -208,6 +218,6 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 5. 用户不逐阶段陪跑。维护者先完成工程项，再一次交付日常/高级两组步骤，已通过且未受影响的项目不反复重验。
 6. 任意 APK 执行器、来源市场、PDF/CBR、自动细粒度画风标签、新模型训练、整库搬迁/监视器和全面备份中心均另列长期项；不删除，但不插入本轮。更新必须具备的状态保护/恢复仍是本轮硬门禁。
 
-**下一有限本地动作：补SRC-05的下载/离线及Android来源接入，不另造Reader/下载引擎。** Host单源搜索阅读已有工程证据，不把它收缩成“全部接源完成”。T3真实生产/Windows迁移与R1归因仍须另行授权的云端临时环境，不能直接复用冻结PR或旧绿灯；本机仍不运行应用、Java、监听或迁移。P1/P3/P4/P5人工与成品证据、真实Host及完整接源缺口未清前，完整目标继续OPEN，用户暂不测试，42项案例不扩张。
+**下一有限本地动作：把明确的保存到本地许可、现有DownloadScheduler/MediaRequestGate、进度/取消与已验证的章节库存入口接通，再补Android来源接入，不另造Reader/下载引擎。** Host单源搜索阅读和S2存储底座已有工程证据，不把它们收缩成“全部接源完成”。T3真实生产/Windows迁移与R1归因仍须另行授权的云端临时环境，不能直接复用冻结PR或旧绿灯；本机仍不运行应用、Java、监听或迁移。P1/P3/P4/P5人工与成品证据、真实Host及完整接源缺口未清前，完整目标继续OPEN，用户暂不测试，42项案例不扩张。
 
 专项契约：[架构](MODULAR_LOCAL_READER_ARCHITECTURE.md)、[核心/来源边界](CORE_READER_SOURCE_BOUNDARY.md)、[Host 已有书库能力](USER_HOST_LIBRARY_READER.md)、[两个 issue](ISSUE_199_200_PREFERENCE_DISPLAY_SEARCH.md)、[私人标签](TAG_PARTICIPATION_PRIVATE_LABELS.md)、[AI 方案](AI_TAG_PROFILE_EXCHANGE.md)、[事务门禁](RUNTIME_CHOICE_TRANSACTION_GATE.md)、[用户分组步骤](NEXT_CONCENTRATED_ACCEPTANCE_CHECKLIST.zh-CN.md)。

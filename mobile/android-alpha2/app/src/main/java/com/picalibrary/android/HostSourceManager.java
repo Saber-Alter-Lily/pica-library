@@ -40,7 +40,7 @@ final class HostSourceManager {
         if(!consent)throw error("SOURCE_HOST_READER_CONSENT_REQUIRED");Session session;
         synchronized(this){ensureStorage();if(!config.configured()||!config.enabled)throw error("SOURCE_HOST_DISABLED");if(active!=null)throw error("SOURCE_HOST_BUSY");if(http==null)http=HostHttp.create(context);session=new Session(config,username,password);active=session;}
         try{HostProtocol.server(rpc(session,"info",new JSONObject()));synchronized(this){session.check();session.ready=true;main.postDelayed(session.expire,TTL);}}
-        catch(Exception failure){end(session);throw failure;}
+        catch(Exception|OutOfMemoryError failure){end(session);throw failure;}
     }
     void end(){Session session;synchronized(this){session=active;}if(session!=null)end(session);}
     private void end(Session session){List<Runnable> cancelled;

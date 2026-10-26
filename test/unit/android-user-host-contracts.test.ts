@@ -123,4 +123,14 @@ describe('native user-Host source/resource contracts only', () => {
             expect(read(`test/java/com/picalibrary/android/${name}.java`)).toContain('@Test')
         expect(read('test/java/com/picalibrary/android/HostTestFixture.java')).toContain('Never opens a socket')
     })
+    it('cleans provisional startup and releases task UI for recoverable worker errors', () => {
+        // Source-only gate. The real synthetic Error propagation/UI assertions are native tests, still NOT_RUN.
+        const manager = java('HostSourceManager'), screen = java('HostSourceActivity')
+        const start = manager.slice(manager.indexOf('void start('), manager.indexOf('void end()'))
+        expect(start).toContain('catch(Exception|OutOfMemoryError failure){end(session);throw failure;}')
+        const task = screen.slice(screen.indexOf('private void task('), screen.indexOf('private void cancelTask('))
+        expect(task).toContain('catch(Exception|OutOfMemoryError failure){error=failure;}')
+        expect(task).toContain('busy=false')
+        expect(task).not.toContain('failure.getMessage()')
+    })
 })

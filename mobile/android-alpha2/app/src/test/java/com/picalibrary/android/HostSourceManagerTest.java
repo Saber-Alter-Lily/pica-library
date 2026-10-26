@@ -62,4 +62,8 @@ public class HostSourceManagerTest {
     @Test public void corruptConfigurationRemainsUntouchedAndFailsClosed()throws Exception {
         File file=new File(context.getFilesDir(),"user-host-config-v1.json");byte[] bytes="{broken private".getBytes(java.nio.charset.StandardCharsets.UTF_8);Files.write(file.toPath(),bytes);HostTestFixture broken=new HostTestFixture(context);assertEquals("SOURCE_HOST_STORAGE",broken.manager.storageError());assertThrows(Exception.class,()->broken.manager.configure(0,"label","https://fixture.invalid","none",false));assertThrows(Exception.class,()->broken.manager.start("","",true));assertEquals(0,broken.opened.size());assertArrayEquals(bytes,Files.readAllBytes(file.toPath()));
     }
+    @Test public void failedStartupErrorDoesNotLeaveAnUnreadySessionBlockingTheNextGrant()throws Exception {
+        fixture.configured();fixture.failWithOom=true;assertThrows(OutOfMemoryError.class,()->fixture.manager.start("","",true));assertFalse(fixture.manager.hasSession());assertTrue(fixture.opened.get(0).disconnects>0);
+        fixture.failWithOom=false;fixture.manager.start("","",true);assertTrue(fixture.manager.hasSession());assertEquals(2,fixture.opened.size());
+    }
 }

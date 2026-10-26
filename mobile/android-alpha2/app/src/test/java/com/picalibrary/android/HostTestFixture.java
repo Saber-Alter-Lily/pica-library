@@ -14,7 +14,7 @@ final class HostTestFixture {
     static final byte[] PNG=Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=");
     final List<Connection> opened=new ArrayList<>();final AtomicLong clock=new AtomicLong(1000);
     final HostSourceManager manager;
-    String source=SOURCE,imageType="image/png",errorOperation="";int status=200;boolean wrongPage;byte[] image=PNG;Runnable imageRead;
+    String source=SOURCE,imageType="image/png",errorOperation="";int status=200;boolean wrongPage,failWithOom;byte[] image=PNG;Runnable imageRead;
     HostTestFixture(Context context)throws Exception {
         JSONObject operations;try(InputStream in=context.getResources().openRawResource(R.raw.host_source_operations)){operations=HostJson.object(HostHttp.read(in,32768));}
         manager=new HostSourceManager(context,new HostHttp(url->{Connection c=new Connection(url);opened.add(c);return c;},operations),clock::get);
@@ -44,6 +44,7 @@ final class HostTestFixture {
         public int getResponseCode(){return status;}
         public String getHeaderField(String name){return "Content-Type".equalsIgnoreCase(name)?(url.getPath().endsWith("api/graphql")?"application/json; charset=utf-8":imageType):null;}
         public InputStream getInputStream()throws IOException {try{
+            if(failWithOom)throw new OutOfMemoryError("Synthetic failure; no memory pressure generated");
             if(!url.getPath().endsWith("api/graphql")){if(imageRead!=null)imageRead.run();return new ByteArrayInputStream(image);}
             request=new JSONObject(output.toString("UTF-8"));String operation=request.getString("operationName");
             if(errorOperation.equals(operation))throw new IOException("secret response https://user:password@fixture.invalid/?token=private");

@@ -45,4 +45,8 @@ public class HostSourceActivityTest {
     @Test public void returningFromHistoryPrefillsOnlyAQueryWithoutNetworkOrSecrets()throws Exception {
         Intent intent=new Intent(RuntimeEnvironment.getApplication(),Screen.class).putExtra("hostQuery","Synthetic previous title");try(ActivityController<Screen> controller=Robolectric.buildActivity(Screen.class,intent)){Screen screen=controller.setup().get();assertEquals("Synthetic previous title",((EditText)view(screen,"host.query")).getText().toString());assertEquals("",((EditText)view(screen,"host.username")).getText().toString());assertEquals("",((EditText)view(screen,"host.password")).getText().toString());assertFalse(view(screen,"host.username").isSaveEnabled());assertFalse(view(screen,"host.password").isSaveEnabled());assertEquals(0,fixture.opened.size());}
     }
+    @Test public void failedBackgroundStartupErrorReleasesBusyUiForExplicitRetry()throws Exception {
+        fixture.configured();fixture.failWithOom=true;try(ActivityController<Screen> controller=Robolectric.buildActivity(Screen.class)){Screen screen=connect(controller);assertFalse(fixture.manager.hasSession());assertTrue(view(screen,"host.start").isEnabled());assertEquals(screen.getString(R.string.host_request_failed),((TextView)view(screen,"host.status")).getText().toString());
+            fixture.failWithOom=false;view(screen,"host.start").performClick();shadowOf(Looper.getMainLooper()).idle();assertTrue(fixture.manager.hasSession());assertTrue(view(screen,"host.bind").isEnabled());}
+    }
 }

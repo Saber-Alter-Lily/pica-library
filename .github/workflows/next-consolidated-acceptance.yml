@@ -57,6 +57,42 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
+  windows-unit:
+    needs: web-and-source
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    env:
+      PICA_REQUIRE_JM_RUNTIME: '1'
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.5.0'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: All Windows tests remain a required independent gate
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/windows-unit.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain Windows synthetic test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pica-Library-Next-Acceptance-Windows-Unit-Evidence
+          path: artifacts/windows-unit.json
+          retention-days: 3
+          if-no-files-found: warn
+
   windows:
     needs: web-and-source
     if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && (github.ref == 'refs/heads/codex/next-acceptance-sources-jm' || github.ref == 'refs/heads/codex/ux-tags-dual-onboarding-20261022' || github.ref == 'refs/heads/codex/reader-reliability-integration-20261025' || github.ref == 'refs/heads/codex/source-idle-boundary-20261025' || github.ref == 'refs/heads/codex/source-neutral-reading-library-20261025' || github.ref == 'refs/heads/codex/dev85-local-reader-runtime-fixes-20261025' || github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025')
@@ -106,9 +142,8 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Full Windows tests moved from the user's PC to this disposable runner.
-          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/windows-unit.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Full Windows tests run in parallel in windows-unit. Both jobs are
+          # mandatory; this is not a skip or a successful overall acceptance.
           ./scripts/build-windows-jm-runtime.ps1 -JdkDirectory $env:JAVA_HOME -GradleExecutable (Get-Command gradle.bat).Source
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
@@ -157,14 +192,6 @@ jobs:
           $jmHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $withJm).Hash.ToLowerInvariant()
           @("$hash  Pica-Library-Next-Acceptance-Windows-x64.zip", "$jmHash  Pica-Library-Next-Acceptance-With-JM-Windows-x64.zip") | Set-Content -Encoding ascii candidate/windows/SHA256SUMS.txt
           'UNPUBLISHED core and optional-JM applications. Synthetic fixture is separate and must not be installed. Legacy first-hop and explicit runtime-choice real HTTP gates remain separate; do not infer PASS here.' | Set-Content -Encoding utf8 candidate/windows/STATUS.txt
-      - name: Retain Windows synthetic test evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Pica-Library-Next-Acceptance-Windows-Unit-Evidence
-          path: artifacts/windows-unit.json
-          retention-days: 3
-          if-no-files-found: ignore
       - name: Retain bounded synthetic upgrade diagnostics
         if: always()
         uses: actions/upload-artifact@v4

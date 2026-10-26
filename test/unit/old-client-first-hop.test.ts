@@ -112,7 +112,13 @@ describe('first-hop harness contracts without applications, Java, HTTP or listen
     })
     it.runIf(process.platform === 'win32')('the actual fixture builder refuses before changing source or starting a build', () => {
         const metadata = fs.readFileSync('package.json')
-        const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', path.resolve('scripts/build-windows-first-hop-fixture.ps1'), '-ExpectedSourceSha', '1'.repeat(40)], { env: { ...process.env, GITHUB_ACTIONS: 'false' }, encoding: 'utf8', windowsHide: true, timeout: 10000 })
+        const script=path.resolve('scripts/build-windows-first-hop-fixture.ps1').replaceAll("'","''")
+        // Preserve the actual refusal message, independent of pwsh's colored,
+        // width-dependent error display. The real script/guard still executes.
+        const command=`$ErrorActionPreference='Stop'; try { & '${script}' -ExpectedSourceSha '${'1'.repeat(40)}' } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }`
+        const result = spawnSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command',command], { env: { ...process.env, GITHUB_ACTIONS: 'false' }, encoding: 'utf8', windowsHide: true, timeout: 10000 })
+        expect(result.error,result.stderr).toBeUndefined()
+        expect(result.status).not.toBeNull()
         expect(result.status).not.toBe(0)
         expect(result.stderr).toContain('separately authorized disposable GitHub-hosted Windows CI')
         expect(fs.readFileSync('package.json')).toEqual(metadata)
@@ -123,7 +129,8 @@ describe('first-hop harness contracts without applications, Java, HTTP or listen
         const quote = (value: string) => value.replaceAll("'", "''")
         const script = path.resolve('scripts/build-windows-package.ps1')
         const command = `$ErrorActionPreference='Stop'; $tokens=$null; $errors=$null; $ast=[System.Management.Automation.Language.Parser]::ParseFile('${quote(script)}',[ref]$tokens,[ref]$errors); if($errors){throw 'Builder parse failed'}; $fn=$ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-Sha256'},$true); if(-not $fn){throw 'Missing actual builder SHA function'}; . ([scriptblock]::Create($fn.Extent.Text)); $hash=Get-Sha256 '${quote(file)}'; if($hash -ne '${sha256(fakeBytes)}'){throw 'Incorrect SHA'}; $exclusive=[IO.File]::Open('${quote(file)}',[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None); $exclusive.Dispose(); 'PASS_HASH_AND_EXCLUSIVE_REOPEN'`
-        const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { encoding: 'utf8', windowsHide: true, timeout: 10000 })
+        const result = spawnSync('pwsh.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { encoding: 'utf8', windowsHide: true, timeout: 10000 })
+        expect(result.error,result.stderr).toBeUndefined()
         expect(result.status, result.stderr).toBe(0)
         expect(result.stdout).toContain('PASS_HASH_AND_EXCLUSIVE_REOPEN')
     })

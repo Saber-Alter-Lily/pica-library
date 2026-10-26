@@ -13,19 +13,25 @@ describe('Reader correction cloud recipe, source inspection only', () => {
             )
         ).toHaveLength(2)
         expect(text.match(/github.event_name != 'pull_request'/g)).toHaveLength(
-            3
+            4
         )
         expect(
             text.match(/github.event.repository.private == false/g)
-        ).toHaveLength(3)
+        ).toHaveLength(4)
         expect(
             text.match(/github.repository == 'Saber-Alter-Lily\/pica-library'/g)
-        ).toHaveLength(3)
+        ).toHaveLength(4)
         expect(
             text.match(
                 /refs\/heads\/codex\/reader-core-upgrade-dev87-20261025/g
             )
-        ).toHaveLength(3)
+        ).toHaveLength(4)
+        const windowsUnit=text.split('\n  windows-unit:\n')[1]?.split('\n  windows:\n')[0]??''
+        expect(windowsUnit).toContain('pnpm exec vitest run --maxWorkers=4 --minWorkers=1')
+        expect(windowsUnit).toContain('name: Pica-Library-Next-Acceptance-Windows-Unit-Evidence')
+        expect(windowsUnit).toContain('if: always()')
+        expect(windowsUnit).not.toContain('continue-on-error')
+        expect(windowsUnit).not.toContain('secrets.')
         const legacy =
             text
                 .split('\n  legacy-first-hop:\n')[1]

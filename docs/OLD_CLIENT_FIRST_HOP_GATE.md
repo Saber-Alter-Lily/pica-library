@@ -68,6 +68,8 @@ Result is deliberately `VERIFIED_LEGACY_COUNTEREXAMPLE_NOT_UPGRADE_PASS`. New ca
 
 Next work must determine a genuinely supported legacy transition/compatibility path without weakening self-replacement, official provenance or state-preservation rules. No compatibility bootstrap has been implemented or validated here. Do not call a one-time manual unzip an accomplished one-action upgrade requirement, and do not assume an old incremental helper is safe without its own evidence. Current-source safety and legacy first-hop support remain separate.
 
+Later local investigation now [pins and audits the old incremental helper, its application dependency and exact controller/registration methods](LEGACY_UPDATE_PATH_AUDIT.md). Both incremental launch branches reproduce the same asynchronous-error gap; the old controller uses installed/registered old helpers rather than staged target helpers. This adds evidence against assuming an incremental bridge repairs the first hop, not a new installed-OTA test or accepted fix. Frozen earlier review ZIPs remain unchanged.
+
 ## Local evidence and next authorized action
 
 Final selected offline suite: **323/323 test cases / 29 files, 0 skips**, strict types and Web **53/53** PASS. Counts are Vitest `numTotalTests`, not the number of individual expect calls. Includes real synthetic SQLite mutation/loss detection, real pure PowerShell hash/reopen, CI-only script refusal before side effects, publisher allowlist/corruption/credential-denial and existing module/update suites. Guards report zero network/listener/Java/application events.

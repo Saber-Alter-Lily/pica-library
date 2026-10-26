@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## Pinned legacy incremental/full paths — local compatibility audit (2026-10-25)
+
+**Status: EXACT_OLD_CODE_COUNTEREXAMPLES_VERIFIED / LEGACY_FIRST_HOP_RECOVERY_HOLD / CLOUD_AND_INSTALLABLE_NOT_RUN / FULL_OBJECTIVE_OPEN. No product/runtime change, push or release.**
+
+- Independent `codex/reader-legacy-update-path-audit-20261025` starts at sealed `749d50fc3de9716600f8cc896a57f9a25e07f515`. Standing isolated-goal exception only after NOT_FOUND; PR210/Dev86/prior review ZIPs, formal data/schema and local Java/application/browser/listener stay frozen. No new cloud authority inferred.
+- Fixed official v0.5.0 bytes confirm both incremental launch branches also have no startup Promise or child-error listener. Exact old controller/registration methods on an in-memory filesystem select installed/registered old helpers, never the staged candidate helper, and return accepted before startup. This rules out assuming a normal incremental bridge or staged new full helper automatically fixes that first-hop defect; actual installed recovery and Desktop global handler effects remain unexecuted.
+- Pinned incremental path-safety dependency inspected too. Old case-variant guard discrepancy is a diagnostic, never a supported self-replacement workaround; current case-insensitive protection remains covered. No payload, runtime/plugin installer, permission bypass or third-party guardian is introduced.
+- Selected368/368 cases across33files,0skips; types/Web54 PASS, zero guarded boundary events. Initial missing-MJS-declaration type failure retained and fixed with explicit `.d.mts`, not suppression. No `src`/Web/native/schema/version/dependency/workflow changes. Audit exit0 means counterexample reproduced, **not upgrade PASS**.
+- [Fixed identities, exact findings, limitations and required next gates](docs/LEGACY_UPDATE_PATH_AUDIT.md). Real first-hop/core/JM/browser/HTTP/replacement tests still need separate Draft/Actions approval. No manual extraction or weakened self-replacement rule is accepted as fulfilling one-click upgrade. Broader modular-reader/device/source acceptance remains open.
+
 ## Explicit optional-runtime choice — isolated local continuation (2026-10-25)
 
 **Status: LOCAL_SOURCE_AND_OFFLINE_GATES_PASS / EXACT_HEAD_CI_BROWSER_INSTALLABLE_PENDING / LEGACY_FIRST_HOP_HOLD / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**

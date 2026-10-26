@@ -1,8 +1,10 @@
-// Reuses the existing incremental acceptance canary contract, never a real library.
-export const firstHopStateProgram = String.raw`
+// Shared selected-state canaries, never a real library. The caller cannot choose an arbitrary root.
+export function syntheticUpgradeStateProgram(kind) {
+if (!['old-first-hop', 'runtime-choice'].includes(kind)) throw Error('Unknown synthetic upgrade state scope')
+return String.raw`
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{DatabaseSync}=require('node:sqlite'),{createHash}=require('node:crypto');
 const [action,root]=process.argv.slice(1),real=fs.realpathSync.native(root);
-if(!/^pica-old-first-hop-[a-f0-9]{32}[a-zA-Z0-9]{6}$/.test(path.basename(real))||fs.realpathSync.native(path.dirname(real))!==fs.realpathSync.native(require('node:os').tmpdir())||fs.lstatSync(root).isSymbolicLink())throw Error('Only an owned synthetic first-hop root is permitted');
+if(!/^pica-${kind}-[a-f0-9]{32}[a-zA-Z0-9]{6}$/.test(path.basename(real))||fs.realpathSync.native(path.dirname(real))!==fs.realpathSync.native(require('node:os').tmpdir())||fs.lstatSync(root).isSymbolicLink())throw Error('Only an owned synthetic upgrade root is permitted');
 const home=path.join(root,'localappdata','Pica Library'),data=path.join(home,'data'),file=path.join(data,'library.db'),config=path.join(home,'config','config.json'),stamp='2026-10-25T00:00:00.000Z';
 const db=new DatabaseSync(file);db.exec('PRAGMA busy_timeout=10000; PRAGMA foreign_keys=ON');
 try{
@@ -21,3 +23,6 @@ if(action==='snapshot')fs.writeFileSync(path.join(root,'expected-state.json'),JS
 }console.log(JSON.stringify({syntheticOnly:true,selectedUserStateCanariesPreserved:true}));
 }finally{db.close()}
 `
+}
+export const firstHopStateProgram = syntheticUpgradeStateProgram('old-first-hop')
+export const runtimeChoiceStateProgram = syntheticUpgradeStateProgram('runtime-choice')

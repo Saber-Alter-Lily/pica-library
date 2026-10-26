@@ -9,7 +9,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import AdmZip from 'adm-zip'
 import { assertDisposableWindowsCi, loopbackHost, sha256 } from './lib/old-client-first-hop.mjs'
-import { RUNTIME_CHOICE_FIXTURE_VERSION, RUNTIME_CHOICE_SCENARIOS, runtimeChoiceReady } from './lib/runtime-choice-fixture.mjs'
+import { RUNTIME_CHOICE_FIXTURE_VERSION, RUNTIME_CHOICE_SCENARIOS, runtimeChoiceReady, runtimeChoiceBrowserRequestEvidence } from './lib/runtime-choice-fixture.mjs'
 import { runtimeChoiceStateProgram } from './lib/first-hop-state.mjs'
 
 // No input reads, tool loading, extraction or runtime action before this guard.
@@ -231,7 +231,7 @@ try {
     await context.route('**/*', route => {
         const url = new URL(route.request().url())
         if (url.protocol === 'http:' && loopbackHost(url.hostname)) return route.continue()
-        browserEvents.push({ kind: 'EXTERNAL_BROWSER_REQUEST_BLOCKED' }); return route.abort('blockedbyclient')
+        browserEvents.push(runtimeChoiceBrowserRequestEvidence(route.request().url(), route.request().resourceType())); return route.abort('blockedbyclient')
     })
     const page = await context.newPage(); page.on('pageerror', error => errors.push(String(error)))
     page.on('console', message => { if (message.type() === 'error' && !message.text().includes('Failed to load resource')) errors.push(message.text()) })
@@ -299,6 +299,7 @@ try {
             result.actualHelperRollback = true
         }
     }
+    result.blockedBrowserRequests = browserEvents
     assert.deepEqual(errors, [], 'Unhandled browser/console error')
     assert.deepEqual(browserEvents, [], 'Unexpected external browser request')
     assert.ok(!events().some(row => /BLOCKED|UNEXPECTED/.test(row.kind)), 'Source/network/Java/process boundary violation')

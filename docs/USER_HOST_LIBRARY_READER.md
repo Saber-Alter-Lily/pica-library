@@ -1,6 +1,16 @@
 # User-hosted library → shared Reader — NEXT-67 (unpublished)
 
-## Current local extension — explicit Desktop local saves (2026-10-26)
+## Current local extension — shared jobs in the Downloads entry (2026-10-26)
+
+Application source`6d5ce26f2fbee9dcf199463e433b5b7d3c21c88a` projects the SAME authorized-session jobs into Downloads, with separately labeled counts/lifetimes from the existing persistent platform queue. It uses the same shared DOM renderer and fixed current-session query/cancel ports as the Host panel. No second scheduler/store, enqueue/retry command, provider startup, credentials/CSRF export or legacy SQL job action is added. Completed copies open the existing local Reader; ending a session does not delete them.
+
+The projection stays lazy without a configured authorized session and polls active jobs only on the visible Downloads page with the Host modal closed. Navigation, hidden tabs, modal visibility, page exit/return, scope changes and disposal abort stale reads/timers and fence late results/buttons. Status/cancel are synchronous local task controls: they still check request cancellation and current authorization before execution, but a disconnected status/cancel reply no longer borrows remote-reading lifecycle to revoke the whole session. A cancel remains scoped to one job; metadata/pages keep their existing disconnect/revoke rules.
+
+Final local evidence:472PASS/0FAIL/0skip across32files;17new projection cases,19save-service cases (2new cancellation-lifecycle cases), complete types/Web56 and9boundary audits0events. Actual modules/shared renderer execute against inert DOM; existing synthetic SQLite/Reader tests remain. Static app wiring/namespace checks do not substitute for a real browser or package. No new actual HTTP/browser/Windows/native/real Host execution; all are still NOT_RUN. Evidence is `_validation/unified-host-downloads-20261026`, with no installable or formal data.
+
+Unified Desktop entry is no longer an implementation gap. Android user-Host/source/Reader/offline integration remains missing; its current ReaderSourceFactory has only the legacy supported kinds. Reuse those Reader/permission/HTTP/download boundaries, not a second interpreter or Desktop-relay-only substitute. SRC-05/06, real interoperability, exact-source packages, device acceptance and the full goal remain open. No push/cloud/version/Release/OTA/deployment.
+
+## Previous local extension — explicit Desktop local saves (2026-10-26)
 
 Application source`7a81e12f53685a1edfc221c97f92766906bd1ae1` wires chosen Host → actual chapter list → separate save checkbox/confirmation → existing scheduler/state machine/media gate/resource coordinator → the same local inventory/Reader. The Host panel shows page-fetch progress, cancellation and a local-reader action only after a complete save. No Host download queue/favorite/progress/source-settings mutation, catalog bulk import, default source or extension engine is added. Initial browse/read permission is not save permission. `libraryImport=false` still means no Host-catalog bulk import; the separate `downloads` capability describes this consent-gated local chapter copy, not native support.
 

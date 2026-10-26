@@ -1659,7 +1659,9 @@ export async function startLibraryServer(options: {
                     if(!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type']??''))throw Error('JSON runtime component command required')
                     const deadline=setTimeout(()=>request.destroy(),5000)
                     let input:unknown
-                    try{input=await body(request,4096)}finally{clearTimeout(deadline)}
+                    try{input=await body(request,4096,true)}
+                    catch{throw Error('Runtime component command must be valid JSON within 4096 bytes')}
+                    finally{clearTimeout(deadline)}
                     const command=runtimeChoiceCommand(url.pathname,input)
                     if(command.action==='plan')return json(response,200,await options.desktop.planRuntimeChoice(command.choice,abort.signal))
                     const staged=await updateDownloads.run(
@@ -1670,6 +1672,9 @@ export async function startLibraryServer(options: {
                     )
                     return json(response,200,staged)
                 }catch(error){
+                    // Keep a bounded rejection writable; close the connection after
+                    // replying instead of destroying the request before the JSON error.
+                    response.setHeader('connection','close')
                     return json(response,abort.signal.aborted || error instanceof Error&&error.name==='AbortError'?409:400,{error:error instanceof Error?error.message:'Runtime component selection failed'})
                 }finally{response.off('close',disconnected)}
             }

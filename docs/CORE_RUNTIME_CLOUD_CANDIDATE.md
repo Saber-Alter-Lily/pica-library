@@ -1,5 +1,11 @@
 # Core / optional runtime and upgrade — authorized Dev87 candidate
 
+## Post-build checkpoint correction — 2026-10-26
+
+Frozen source `e9b08b418c2fdbc55dbf499afb74f7b927b12434` / Draft PR211 has actual core/JM Windows ZIPs and fixed-signed Dev87 APK, independently inspected. Linux2349pass+13conditional skips and Windows2361pass+1conditional skip cover all2362 cases on applicable hosts; Chromium61, native402 and current-helper nine recovery cases pass. Candidate run40274664757 still **FAILS** exact old0.5.0 health/async-launch recovery; normal first hop and hash rejection pass. These results supersede only build-PENDING labels, never prior failure evidence or full-goal scope. The254-file partial review ZIP SHA256 is `6d68de38ba68fb0b2e7a16825df5d8d5146c2b70e69a5b36383e171c507ef2cd`; no release/deployment.
+
+Subsequent local-only [runtime-choice transaction gate preparation](RUNTIME_CHOICE_TRANSACTION_GATE.md) is on a separate branch, not an edit to this frozen candidate. Its offline results and narrow HTTP correction are not new hosted results or signed installables.
+
 ## Authority and provenance — 2026-10-25
 
 The human explicitly approved cloud work after the local goal was blocked awaiting it. New branch `codex/reader-core-upgrade-dev87-20261025` continues sealed local `555953600144d4e645b52155789f2bd3e6202f65` (runtime choice implementation `749d50fc3de9716600f8cc896a57f9a25e07f515`). Its Draft is stacked on frozen PR210 head branch `codex/dev85-local-reader-runtime-fixes-20261025` at `4a18ba769fb3c8df1e6bd100293d38db3013b5dc`, not a replacement or edit to that PR. Remote main was inspected, not merged into this candidate or changed.

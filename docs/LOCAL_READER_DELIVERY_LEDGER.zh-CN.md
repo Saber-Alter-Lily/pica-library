@@ -1,6 +1,6 @@
 # 本地漫画阅读器：总推进与验收账本
 
-版本：P0-20261026-10。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
+版本：P0-20261026-11。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
 
 ## 1. 产品目标与权威规则
 
@@ -20,7 +20,7 @@
 | --- | --- |
 | 正式发布 | [v0.5.0](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0)，不修改 |
 | 最近云端已执行源码 | 6efc865fd229660f77929ebe2018b494fc198995，PR212，仍冻结 |
-| 当前本地源码 | ffa54e2de0b2e573cc2355991c4f6b78e0ea3ede，独立本地分支codex/android-user-host-20261026；增加Android用户Host直连、同Reader、历史与单章本地保存。33文件/484项Node组合回归、完整类型/Web56通过；Java语法解析不是编译，原生测试/成品/实联仍NOT_RUN。未推送/构建新安装包，不增加Dev版本 |
+| 当前本地源码 | cc92217a614666c15ca6b4e1e91f39e87165fd7a，独立分支codex/android-user-host-recovery-20261026；保留ffa54e2接线，仅补启动/worker内存错误清理。33文件/485项Node组合回归、完整类型/Web56通过；38项新原生及3项共享导入器测试未编译/运行。未推送/构建新安装包，不增加Dev版本 |
 | 上轮核对的云端运行 | [40305007546](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40305007546)，completed / failure；source、windows-unit、fixtures 成功，六类事务失败；不是本轮新增源码的验证 |
 | 最近完整安装产物 | PR211 / e9b08b418c2fdbc55dbf499afb74f7b927b12434 / Dev87；PARTIAL 审阅候选，不是全目标可验收完成 |
 | Dev87 本地封存包 | PICA_CORE_RUNTIME_DEV87_CLOUD_REVIEW_20261025_e9b08b418c2f.zip；本轮只读重算 SHA256：6d68de38ba68fb0b2e7a16825df5d8d5146c2b70e69a5b36383e171c507ef2cd |
@@ -80,6 +80,8 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 | P6 单一候选集中验收 | 同源码 Windows/Android、来源/能力矩阵、哈希/签名、精简用户步骤 | DEL-01..02；所有承诺项有匹配范围的证据、无阻断缺陷；用户接受与正式发布另行确认 |
 
 ### P2 当前 Android 接线 — 自选来源、同一 Reader 与明确单章本地保存
+
+**当前补正`cc92217`，不新增功能。** 源码审查发现worker的OutOfMemoryError能绕过未就绪会话清理和busy解除；两处补清理、加两项合成原生回归。当前Node13项契约、组合485/33文件、类型/Web56通过，4次边界审计0事件，252Java文件语法通过；新增原生38+共享导入器3仍NOT_RUN，不称真实低内存恢复已验证。证据`_validation/android-user-host-recovery-20261026`。只读确认PR212仍Draft/Open/未合并、head6efc865；本轮新Draft/云端授权未答复，无新外部写入。下面保留原接线快照。
 
 源码`ffa54e2`在新的本地分支补上手机直接连接用户Host的实现：保存配置（默认停用）→ 明确启用（不联网）→ 另行授权列出已安装来源 → 确认一个来源 → 手动搜索/选书 → 原Reader阅读。不是Desktop Relay，不预装Host/内容目录/扩展，不继承平台凭据。手机不需要电脑客户端在线，但在线路径仍需要用户Host。
 

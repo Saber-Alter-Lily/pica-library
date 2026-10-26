@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+## Android Host failure-path review — no new feature (2026-10-26)
+
+**Source cc92217a614666c15ca6b4e1e91f39e87165fd7a; local codex/android-user-host-recovery-20261026. SOURCE_REVIEW_CLEANUP_FIX / NODE_GATES_PASS / ANDROID_NOT_COMPILED_OR_RUN / CLOUD_AUTHORITY_PENDING / FULL_OBJECTIVE_OPEN.**
+
+- Previous goal turn made actual source/validation progress. Re-read current clean tree and original ZIP, then read GitHub PR212 metadata: still open/Draft/unmerged at6efc865fd229660f77929ebe2018b494fc198995. No PR/workflow mutation or live new job was started.
+- Bounded review found a concrete worker Error gap: OutOfMemoryError bypassed start's provisional-session cleanup and task's UI busy reset. Only those two cleanup catches changed; two synthetic native regressions added, no real memory pressure, new feature, timeout/security weakening or general OOM/crash-recovery claim.
+- Current13Node contract cases,485PASS/0FAIL/0skip across33files, full types/Web56,4offline audits0events and252Java grammar-only parse PASS. New native count38 plus3 shared importer tests are authored but UNCOMPILED/NOT_RUN. Final receipts bind current code under _validation/android-user-host-recovery-20261026; prior484/ffa54e2 ZIP remains unchanged/historical.
+- Context routing NOT_FOUND/claim DPAPI rejection persists; standing goal-scoped isolation only. No local Java/app/browser/listener, real Host/formal data/schema/algorithm/protocol/version/workflow change, push/new Draft/cloud dispatch/Release/OTA/deployment. Fresh cloud authorization for this slice is unanswered; next required step remains actual same-source Android compile/tests/packages, not further feature addition. Ledger7phases/42cases and full goal remain OPEN, user testing NOT_READY.
+
 ## P2 Android user-Host — direct source, same Reader and owned chapter (2026-10-26)
 
 **Status: LOCAL_SOURCE_AND_NODE_GATES_PASS / ANDROID_COMPILE_RUNTIME_AND_REAL_HOST_NOT_RUN / FULL_OBJECTIVE_OPEN. Source ffa54e2de0b2e573cc2355991c4f6b78e0ea3ede, isolated local branch codex/android-user-host-20261026. No push/cloud/version/Release/OTA/deployment.**

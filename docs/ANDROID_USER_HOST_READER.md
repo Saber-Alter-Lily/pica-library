@@ -1,12 +1,14 @@
 # Android 用户自选 Host：未发布实现契约
 
-应用源码：`ffa54e2de0b2e573cc2355991c4f6b78e0ea3ede`；本地分支：`codex/android-user-host-20261026`。总进度仍以[交付账本](LOCAL_READER_DELIVERY_LEDGER.zh-CN.md)为准，7阶段/42案例不变。
+应用源码：`cc92217a614666c15ca6b4e1e91f39e87165fd7a`；本地分支：`codex/android-user-host-recovery-20261026`。包含前段`ffa54e2`接线及下述异常清理，不新增功能。总进度仍以[交付账本](LOCAL_READER_DELIVERY_LEDGER.zh-CN.md)为准，7阶段/42案例不变。
 
 ## 当前证据，不是安装说明
 
-Node 协议/资源契约12项通过；最终组合回归484 PASS / 0 FAIL / 0 skipped（33文件），完整TypeScript与Web56/56语法通过。独立验证目录中的Apache-2.0 `java-parser@3.0.1`解析252个Java文件无语法错误，它**不是Java编译器**，没有引入应用依赖。
+当前Node协议/资源契约13项通过，组合485 PASS / 0 FAIL / 0 skipped（33文件），完整TypeScript与Web56/56语法通过；4次离线边界审计0事件。独立验证目录中的Apache-2.0 `java-parser@3.0.1`解析252个Java文件无语法错误，它**不是Java编译器**，没有引入应用依赖。
 
-新增36项Android/JUnit/Robolectric测试、3项共享导入器测试，**尚未编译或执行**。Android build/lint/原生测试、SDK35、实际Host、真机、同源码安装包均NOT_RUN；不能借用旧CI。没有本地Java、应用、浏览器、监听、正式资料访问或迁移，没有推送/云端构建/版本更新/发布/OTA/部署。证据：`_validation/android-user-host-20261026`。
+新增38项Android/JUnit/Robolectric测试、3项共享导入器测试，**尚未编译或执行**。Android build/lint/原生测试、SDK35、实际Host、真机、同源码安装包均NOT_RUN；不能借用旧CI。没有本地Java、应用、浏览器、监听、正式资料访问或迁移，没有推送/云端构建/版本更新/发布/OTA/部署。当前证据：`_validation/android-user-host-recovery-20261026`；原接线快照和ZIP保留，不冒充当前源码。
+
+有界审查发现worker只捕获Exception：合成OutOfMemoryError会绕过启动会话清理和UI busy解除。当前仅给这两处补清理，并新增“清除未就绪会话后可另行授权”“UI退出busy后可明确重试”的原生用例；不生成真实内存压力，也不声称已证明真实低内存/进程崩溃恢复。这些原生断言仍待云端执行。
 
 状态：`LOCAL_SOURCE_AND_NODE_GATES_PASS / ANDROID_COMPILE_RUNTIME_NOT_RUN / REAL_HOST_NOT_RUN / FULL_OBJECTIVE_OPEN`。
 

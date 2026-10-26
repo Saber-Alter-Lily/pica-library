@@ -2,6 +2,8 @@
 
 ## Latest native slice — direct Android source/Reader/local copy (2026-10-26)
 
+Current correction`cc92217a614666c15ca6b4e1e91f39e87165fd7a` retains the implementation below, only cleaning a failed provisional startup and worker busy state for synthetic memory errors. Node485/33files, contracts13, types/Web56 and grammar252 pass; native38+3 remain UNCOMPILED/NOT_RUN. No new feature/build/cloud authority, push, release, deployment or real Host/device proof. Current evidence: _validation/android-user-host-recovery-20261026; prior source/ZIP below remains historical.
+
 Source`ffa54e2de0b2e573cc2355991c4f6b78e0ea3ede` adds user-owned Host configuration/grants, explicit installed-source search, the original Android Reader/history and separately confirmed single-chapter copies in existing local inventory. Direct phone-to-Host, not Desktop relay; no default host/content, extension execution or account inheritance. Online references remain ephemeral; a saved local copy is durable, not a cache-only claim or full background queue/native catalogue/sync implementation.
 
 Node484PASS, full types/Web56 and grammar-only parsing252 Java files are local evidence. New36 native/3 shared-importer tests are UNCOMPILED/NOT_RUN; Android build/lint, actual Host, device and packages NOT_RUN. No push/cloud/release/deployment/formal-data access. See [native contract](ANDROID_USER_HOST_READER.md) and [delivery ledger](LOCAL_READER_DELIVERY_LEDGER.zh-CN.md); older sections below remain historical evidence, not native acceptance.

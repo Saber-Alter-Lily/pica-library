@@ -1,0 +1,310 @@
+name: User Host acceptance (unpublished Dev88)
+
+on:
+  push:
+    branches: [codex/android-user-host-recovery-20261026]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: user-host-acceptance-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BASE_WINDOWS_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+  PICA_ANDROID_CANDIDATE_VERSION_CODE: '88'
+
+jobs:
+  source:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/android-user-host-recovery-20261026' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - run: pnpm install --frozen-lockfile
+      - name: Full source, JVM and real Chromium gates
+        run: |
+          set -euo pipefail
+          pnpm type:check
+          pnpm web:check
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/user-host-linux-unit.json
+          pnpm build
+          gradle -p source-jvm test bundle dependencyNotices --no-daemon
+          bash scripts/run-web-browser-smoke.sh
+      - name: Retain source evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-Source-Evidence
+          path: |
+            artifacts/user-host-linux-unit.json
+            test-results/
+          retention-days: 1
+          if-no-files-found: warn
+
+  windows-unit:
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/android-user-host-recovery-20261026' && github.event_name != 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    env:
+      PICA_REQUIRE_JM_RUNTIME: '1'
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.5.0'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec vitest run --maxWorkers=4 --minWorkers=1 --reporter=dot --reporter=json --outputFile=artifacts/user-host-windows-unit.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain full Windows unit result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-Windows-Unit-Evidence
+          path: artifacts/user-host-windows-unit.json
+          retention-days: 1
+          if-no-files-found: warn
+
+  windows:
+    needs: source
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/android-user-host-recovery-20261026' && github.event_name != 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    env:
+      PICA_REQUIRE_JM_RUNTIME: '1'
+      PICA_LIBRARY_BUILD_PROVENANCE: ${{ github.sha }}
+      PICA_WINDOWS_LAUNCHER_BASE_VERSION: '0.5.0'
+      PICA_WINDOWS_LAUNCHER_BASE_SHA256: '14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build and test actual isolated core and optional-JM packages
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/build-windows-jm-runtime.ps1 -JdkDirectory $env:JAVA_HOME -GradleExecutable (Get-Command gradle.bat).Source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $base='artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.0/Pica-Library-v0.5.0-windows-x64.zip' -OutFile $base
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $base).Hash.ToLowerInvariant() -ne $env:BASE_WINDOWS_SHA256) { throw 'Released baseline hash mismatch' }
+          $version="0.5.0-postrc.$($env:GITHUB_SHA.Substring(0,12))"
+          $withJm='artifacts/Pica-Library-User-Host-With-JM-Windows-x64.zip'
+          ./scripts/build-windows-rc-package.ps1 -PostStable -RcVersion $version -Output $withJm -SourceRuntimes jm
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PICA_REQUIRE_JM_RUNTIME='0'
+          $zip='artifacts/Pica-Library-User-Host-Windows-x64.zip'
+          ./scripts/build-windows-rc-package.ps1 -PostStable -RcVersion $version -Output $zip -SourceRuntimes core
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -PortCollision -SetupPersistence
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/test-windows-artifact.ps1 -Zip $zip -ExpectedVersion $version -DesktopHomeName 'Pica Library Post Stable RC' -LocalOnlySetup -ExpectedSourceRuntimes core
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($script in @('test-windows-source-media.mjs','test-windows-local-ingestion.mjs','test-windows-sqlite-paths.mjs','test-windows-recommendation-module.mjs','test-windows-recommendation-audit.mjs','test-windows-incremental-update.mjs')) {
+            node "scripts/$script" $zip $version $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          ./scripts/test-upgrade-diagnostics.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/audit-released-upgrade-paths.mjs $base
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/build-windows-runtime-choice-fixtures.ps1 -ExpectedSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path candidate/user-host-windows | Out-Null
+          Copy-Item -LiteralPath $zip,$withJm -Destination candidate/user-host-windows/
+          $env:GITHUB_SHA | Set-Content -Encoding ascii candidate/user-host-windows/SOURCE_SHA.txt
+          @(
+            "$((Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant())  Pica-Library-User-Host-Windows-x64.zip",
+            "$((Get-FileHash -Algorithm SHA256 -LiteralPath $withJm).Hash.ToLowerInvariant())  Pica-Library-User-Host-With-JM-Windows-x64.zip"
+          ) | Set-Content -Encoding ascii candidate/user-host-windows/SHA256SUMS.txt
+          'UNPUBLISHED Dev88. Real Host/device QA PENDING. Exact Dev86 predecessor is unavailable remotely; its cross-version gate and legacy transition T3 are NOT_RUN, not PASS. No deployment or Release/OTA changes.' | Set-Content -Encoding utf8 candidate/user-host-windows/STATUS.txt
+      - name: Retain actual Windows diagnostics including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-Windows-Diagnostics
+          path: |
+            artifacts/upgrade-diagnostics/
+            artifacts/windows-smoke-evidence/
+          retention-days: 1
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-Windows-Candidate
+          path: candidate/user-host-windows/
+          retention-days: 1
+          if-no-files-found: error
+      - name: Synthetic pair is not an installable candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-SYNTHETIC-NOT-FOR-INSTALLATION
+          path: artifacts/runtime-choice-fixtures/
+          retention-days: 1
+          if-no-files-found: error
+
+  android:
+    needs: source
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/android-user-host-recovery-20261026' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPECTED_CERT: '64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Full native tests, lint and release shrinker before secrets
+        working-directory: mobile/android-alpha2
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleRelease --no-daemon --stacktrace
+      - name: Retain native evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-Android-Evidence
+          path: |
+            mobile/android-alpha2/app/build/test-results/testDebugUnitTest/TEST-*.xml
+            mobile/android-alpha2/app/build/reports/lint-results-debug.*
+          retention-days: 1
+          if-no-files-found: warn
+      - name: Fixed-signature side-by-side Dev88 only
+        working-directory: mobile/android-alpha2
+        env:
+          ANDROID_PREVIEW_KEYSTORE_B64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_B64 }}
+          ANDROID_PREVIEW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_PREVIEW_KEYSTORE_B64:-}"
+          test -n "${ANDROID_PREVIEW_KEYSTORE_PASSWORD:-}"
+          export PICA_ANDROID_VERSION_NAME="0.5.0-postrc.${GITHUB_SHA:0:12}"
+          export PICA_ANDROID_VERSION_CODE="$PICA_ANDROID_CANDIDATE_VERSION_CODE"
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/pica-host-signing-XXXXXXXX")
+          export ANDROID_PREVIEW_KEYSTORE_PATH="$signing_dir/preview.jks"
+          trap 'rm -f -- "$ANDROID_PREVIEW_KEYSTORE_PATH"; rmdir -- "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_PREVIEW_KEYSTORE_B64" | base64 --decode > "$ANDROID_PREVIEW_KEYSTORE_PATH"
+          unset ANDROID_PREVIEW_KEYSTORE_B64
+          gradle :app:assembleDebug --no-daemon
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/host-cert.txt"
+          cert=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/host-cert.txt" | head -1 | tr 'A-F' 'a-f')
+          test "$cert" = "$EXPECTED_CERT"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/host-package.txt"
+          grep -q "package: name='com.picalibrary.android.dev'" "$RUNNER_TEMP/host-package.txt"
+          grep -q "versionCode='$PICA_ANDROID_CANDIDATE_VERSION_CODE'" "$RUNNER_TEMP/host-package.txt"
+          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/host-package.txt"
+          mkdir -p candidate-host
+          cp "$apk" candidate-host/Pica-Library-User-Host-Android-Dev88.apk
+          cp "$RUNNER_TEMP/host-package.txt" candidate-host/PACKAGE_INFO.txt
+          printf '%s\n' "$cert" > candidate-host/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate-host/SOURCE_SHA.txt
+          printf '%s\n' 'UNPUBLISHED Dev88; no uninstall/data copy. Real Host/device QA and legacy transition T3 PENDING. No Release/OTA/deployment.' > candidate-host/STATUS.txt
+          (cd candidate-host && sha256sum Pica-Library-User-Host-Android-Dev88.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-Android-Dev88
+          path: mobile/android-alpha2/candidate-host/
+          retention-days: 1
+          if-no-files-found: error
+
+  runtime-choice:
+    needs: windows
+    if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/android-user-host-recovery-20261026' && github.event_name != 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [roundtrip, guardrails, request-abort, hash-mismatch, health-rollback, launch-rollback]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: User-Host-SYNTHETIC-NOT-FOR-INSTALLATION
+          path: artifacts/runtime-choice-fixtures/
+      - name: Existing actual browser and installed-helper scenarios
+        shell: pwsh
+        env:
+          RUNTIME_CHOICE_SCENARIO: ${{ matrix.scenario }}
+        run: |
+          $toolRoot = Join-Path $env:RUNNER_TEMP ('pica-host-playwright-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $toolRoot | Out-Null
+          [IO.File]::WriteAllText((Join-Path $toolRoot 'package.json'), '{"private":true}', [Text.UTF8Encoding]::new($false))
+          $env:PICA_PLAYWRIGHT_TOOL_ROOT = $toolRoot
+          $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $toolRoot 'browsers'
+          pnpm --dir $toolRoot add --save-dev '@playwright/test@1.63.0'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm --dir $toolRoot exec playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test-windows-runtime-choice.mjs artifacts/runtime-choice-fixtures $env:GITHUB_SHA $env:RUNTIME_CHOICE_SCENARIO
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain each real scenario including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: User-Host-Runtime-Evidence-${{ matrix.scenario }}
+          path: artifacts/runtime-choice-evidence/${{ matrix.scenario }}/
+          retention-days: 1
+          if-no-files-found: warn

@@ -1,5 +1,11 @@
 # Pica Library Development Task Log
 
+## Human-authorized Dev88 cloud candidate — pre-execution snapshot (2026-10-26)
+
+The human explicitly approved the current independent branch, new Draft, complete CI and unpublished Windows/Dev APK builds. This supersedes the prior cloud-authority blocker, not the unverified product gates. Preserve PR212 at6efc865, main095d691, Dev87/frozen ZIPs and all formal/G-drive data; no merge, tag/Release/OTA, deployment, local Java/app/listener or private-key download.
+
+Reuse existing source/Windows/native tests, packagers and six actual current-helper/browser scenarios in a dedicated exact-branch public/non-PR/read-only workflow. Fixed-signed side-by-side APK versionCode88, not an official version. The old Dev86 application artifact is absent from run40222828902's current artifact list (only source/unit/diagnostics remain); do not rebuild or substitute it as exact prior bytes. Old predecessor-cross-version and accepted one-time migration T3 remain NOT_RUN/HOLD, not waived or counted PASS. Old workflows/tests remain intact. Preflight unit-1 retains one failure: new recipe retention7 violated existing one-day artifact policy; set all new artifacts to1day, do not weaken the existing gate. Actual CI/package/device outcomes are not yet available at this snapshot.
+
 ## Android Host failure-path review — no new feature (2026-10-26)
 
 **Source cc92217a614666c15ca6b4e1e91f39e87165fd7a; local codex/android-user-host-recovery-20261026. SOURCE_REVIEW_CLEANUP_FIX / NODE_GATES_PASS / ANDROID_NOT_COMPILED_OR_RUN / CLOUD_AUTHORITY_PENDING / FULL_OBJECTIVE_OPEN.**

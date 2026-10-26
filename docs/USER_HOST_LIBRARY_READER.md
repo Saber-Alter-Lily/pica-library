@@ -1,6 +1,18 @@
 # User-hosted library → shared Reader — NEXT-67 (unpublished)
 
-## Current local extension — offline storage foundation only (2026-10-26)
+## Current local extension — explicit Desktop local saves (2026-10-26)
+
+Application source`7a81e12f53685a1edfc221c97f92766906bd1ae1` wires chosen Host → actual chapter list → separate save checkbox/confirmation → existing scheduler/state machine/media gate/resource coordinator → the same local inventory/Reader. The Host panel shows page-fetch progress, cancellation and a local-reader action only after a complete save. No Host download queue/favorite/progress/source-settings mutation, catalog bulk import, default source or extension engine is added. Initial browse/read permission is not save permission. `libraryImport=false` still means no Host-catalog bulk import; the separate `downloads` capability describes this consent-gated local chapter copy, not native support.
+
+`HostedLocalDownloads` is a session QueueStore adapter, not a new scheduler or platform SQL downloader. It does not import concrete SQL/filesystem/providers. Active work retains the existing busy/update lease and shared runtime resource grant; Desktop shutdown awaits its cancellation/cleanup before closing SQLite. Tasks are serial for the shared importer, use existing balanced media spacing, and have no automatic retries. There are at most20active tasks/50temporary records. Jobs and authentication are not persisted; ending/expiring/disabling a session or exiting cancels unfinished work, and restart never silently resumes network requests. Completed independent copies remain. Existing limits are20MiB/page and2000pages/512MiB per local book; saved-copy progress is local, not automatically merged into Host progress.
+
+Duplicate active submissions return one task. Fresh explicit confirmation after completion may replace that chapter; a failure preserves prior files/favorites/progress. Pre-commit cancellation prevents publication; post-commit cancellation reports the accepted complete copy rather than deleting or mislabeling it. Snapshot/cancel are session-scoped and contact no Host; outputs contain no credentials or remote URLs. Preparing/fetching revalidates the existing principal/source/book/chapter ownership and uses the same pinned protocol/transport/body checks as the Reader, without interpreting extensions.
+
+Final local evidence:453PASS/0FAIL/0skip across31files, including17new actual temp-SQLite/Reader/resource/synthetic-HTTP cases and8actual-module inert-DOM cases in three initial locales. Full types and54/54Web syntax pass;12boundary audits have0events. Retain regression-1's4locale-fixture failures (zh/en argument indices reversed), corrected against the actual `copy(zh,en,ja)` contract. Evidence remains `_validation/host-download-flow-20261026`. One new actual-listener HTTP-to-local-Reader case is authored/typed but **NOT_RUN**; no browser, Windows build, real Host/provider, Android or production-profile execution.
+
+The task view currently lives in the Host panel. Unified-download-page projection, Android source/Reader/offline integration and exact-source built/real-Host acceptance remain required by SRC-05/06. Do not call this P2/full-product completion or reuse old CI. No push/cloud dispatch/version/Release/OTA/deployment. The prior storage/search evidence below is historical, not a current unsupported-download claim.
+
+## Previous local extension — offline storage foundation only (2026-10-26)
 
 Application source`76bee26a41e096a74acb89d5a6f7a1023b2cb778`, isolated branch`codex/user-host-offline-20261026`, adds a reusable generated-chapter producer port to the existing local inventory importer. It is **not wired to Host download jobs/UI or Android**; advertised Host downloads/native capabilities remain false. No new installable, source activation or automatic cache-to-library import is implied.
 

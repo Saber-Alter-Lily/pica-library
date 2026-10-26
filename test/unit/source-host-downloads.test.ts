@@ -188,8 +188,10 @@ function fixture(basic = false) {
             }
         }
     )
-    const command = async <T = unknown>(input: Record<string, unknown>) =>
-        (await reader.command(input, new AbortController().signal)) as T
+    const command = async <T = unknown>(
+        input: Record<string, unknown>,
+        signal = new AbortController().signal
+    ) => (await reader.command(input, signal)) as T
     const start = async () =>
         await command<{
             sessionId: string
@@ -647,6 +649,60 @@ describe('explicit hosted chapter saves — existing scheduler + actual SQLite/i
         expect(job.error).toBe('SOURCE_HOST_STALE')
         expect(f.db.listComics({})).toEqual([])
         expect(f.calls.filter((call) => call.operation === 'IMAGE')).toEqual([])
+    })
+    it('aborting a local task snapshot before/after execution does not revoke the session or cancel its running save', async () => {
+        const f = fixture(),
+            { sessionId } = await f.start(),
+            ids = await f.choose(sessionId)
+        f.stall(0)
+        const job = await f.save(sessionId, ids.comicId, ids.episodeId)
+        await vi.waitFor(() =>
+            expect(
+                f.calls.filter((call) => call.operation === 'IMAGE')
+            ).toHaveLength(1)
+        )
+        const before = f.calls.length,
+            after = new AbortController()
+        const snapshot = f.command(
+            { action: 'downloads', sessionId },
+            after.signal
+        )
+        after.abort()
+        await snapshot
+        const early = new AbortController()
+        early.abort()
+        await expect(
+            f.command({ action: 'downloads', sessionId }, early.signal)
+        ).rejects.toThrow('SOURCE_HOST_CANCELLED')
+        expect((await f.jobs(sessionId))[0].status).toBe('RUNNING')
+        expect(f.calls).toHaveLength(before)
+        await f.command({ action: 'download-cancel', sessionId, jobId: job.id })
+        await f.finished(sessionId, job.id, 'CANCELLED')
+    })
+    it('a disconnected cancel reply cancels only that task; another confirmed chapter continues in the same session', async () => {
+        const f = fixture(),
+            { sessionId } = await f.start(),
+            ids = await f.choose(sessionId)
+        f.stall(0)
+        const first = await f.save(sessionId, ids.comicId, ids.episodeId)
+        const second = await f.save(sessionId, ids.comicId, ids.laterEpisodeId)
+        await vi.waitFor(() =>
+            expect(
+                f.calls.filter((call) => call.operation === 'IMAGE')
+            ).toHaveLength(1)
+        )
+        const controller = new AbortController(),
+            cancelled = f.command(
+                { action: 'download-cancel', sessionId, jobId: first.id },
+                controller.signal
+            )
+        controller.abort()
+        f.stall(-1)
+        f.release()
+        await cancelled
+        await f.finished(sessionId, first.id, 'CANCELLED')
+        await f.finished(sessionId, second.id)
+        expect(f.db.listComics({})).toHaveLength(1)
     })
     it('the emitted adapter reuses existing scheduler/gate/state machine without SQL, filesystem, provider or process modules', async () => {
         const output = await build({

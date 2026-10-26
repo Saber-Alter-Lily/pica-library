@@ -1,8 +1,9 @@
 import { copy as t } from './locale-runtime.js'
+import { renderHostedLocalDownloadJobs } from './host-download-view.js'
 
 let dialog, host = null, session = null, csrf = '', active = null, generation = 0, offset = 0, hasNext = false, expiryTimer = null
 let scope = 'library-read', selectedSource = null, searchQuery = '', searchPage = 0
-let downloadTarget = null, downloadPoll = null, downloadPending = false, downloadGeneration = 0
+let downloadTarget = null, downloadPoll = null, downloadPending = false, downloadGeneration = 0, downloadRendering = 0
 const $ = id => document.getElementById('host-library-' + id)
 function node(tag, value) { const element = document.createElement(tag); element.textContent = value; return element }
 function button(id, caption, action) { const element = node('button', caption); element.type = 'button'; element.id = 'host-library-' + id; element.onclick = action; return element }
@@ -22,6 +23,26 @@ export function currentHostedLibrarySession() {
     return session && Number.isSafeInteger(session.expiresAt) && session.expiresAt > Date.now()
         ? { sessionId: session.sessionId, expiresAt: session.expiresAt }
         : null
+}
+export function currentHostedDownloadSession() {
+    return session?.capabilities?.downloads === true && csrf ? currentHostedLibrarySession() : null
+}
+async function localDownloadCommand(expectedSessionId, input, signal) {
+    const ticket = generation
+    if (signal?.aborted || currentHostedDownloadSession()?.sessionId !== expectedSessionId) throw Error('SOURCE_HOST_CANCELLED')
+    const response = await fetch('/api/v1/desktop/host-reader', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': csrf }, cache: 'no-store', signal, body: JSON.stringify({ ...input, sessionId: expectedSessionId }) })
+    const value = await response.json()
+    if (signal?.aborted || ticket !== generation || currentHostedDownloadSession()?.sessionId !== expectedSessionId) throw Error('SOURCE_HOST_CANCELLED')
+    if (!response.ok) throw Error(value.code || 'SOURCE_HOST_UNAVAILABLE')
+    return value
+}
+/** Same-app fixed commands only. Callers never receive credentials/CSRF or select another host. */
+export function queryHostedLocalDownloads(expectedSessionId, signal) { return localDownloadCommand(expectedSessionId, { action: 'downloads' }, signal) }
+export async function cancelHostedLocalDownload(expectedSessionId, jobId, signal) {
+    if (!/^[a-f0-9-]{36}$/.test(jobId || '')) throw Error('INVALID_SOURCE_HOST')
+    const value = await localDownloadCommand(expectedSessionId, { action: 'download-cancel', jobId }, signal)
+    document.dispatchEvent(new CustomEvent('pica-hosted-downloads-changed'))
+    return value
 }
 export async function resumeHostedLibraryComic(comicId, expectedSessionId) {
     if (currentHostedLibrarySession()?.sessionId !== expectedSessionId) throw Error('SOURCE_HOST_CANCELLED')
@@ -62,7 +83,7 @@ function makeDialog() {
     const books = document.createElement('div'); books.id = 'host-library-books'; dialog.append(books)
     makeDownloadPanel()
     dialog.append(button('previous', t('上一页', 'Previous page', '前のページ'), () => void navigate(-1)), button('next', t('下一页', 'Next page', '次のページ'), () => void navigate(1)), button('end', t('结束会话', 'End session', 'セッション終了'), () => { generation++; endOnExit(); books.replaceChildren(); controls(); status.textContent = t('会话已结束；阅读记录保留。', 'Session ended; reading records are retained.', 'セッションを終了しました。閲覧記録は保持します。') }), button('hide', t('关闭面板', 'Close panel', 'パネルを閉じる'), () => dialog.close()))
-    dialog.addEventListener('close', () => { $('password').value = ''; $('username').value = ''; clearTimeout(downloadPoll); downloadPoll = null })
+    dialog.addEventListener('close', () => { $('password').value = ''; $('username').value = ''; clearTimeout(downloadPoll); downloadPoll = null; document.dispatchEvent(new CustomEvent('pica-hosted-download-panel-changed')) })
     document.body.append(dialog)
 }
 function controls() {
@@ -133,7 +154,7 @@ async function startSession() {
     })
 }
 function resetDownloads() {
-    downloadGeneration++; downloadTarget = null; downloadPending = false
+    downloadGeneration++; downloadRendering++; downloadTarget = null; downloadPending = false
     clearTimeout(downloadPoll); downloadPoll = null
     if ($('download-panel')) { $('download-panel').hidden = true; $('download-chapter').replaceChildren(); $('download-consent').checked = false; $('download-jobs').replaceChildren(); $('download-title').textContent = '' }
 }
@@ -168,31 +189,16 @@ async function queueDownload() {
     await working(async () => {
         await command({ action: 'download-start', sessionId: session.sessionId, comicId: downloadTarget.comicId, episodeId: $('download-chapter').value, consent: true, acceptLocalCopy: true })
         $('download-consent').checked = false
+        document.dispatchEvent(new CustomEvent('pica-hosted-downloads-changed'))
     })
     if (session) await refreshDownloads()
 }
 function renderDownloads(value) {
-    if (value.sessionBound !== true || !Array.isArray(value.jobs) || value.jobs.length > 50 || value.jobs.some(job => !/^[a-f0-9-]{36}$/.test(job.id || '') || !['QUEUED', 'PREPARING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(job.status) || !Number.isSafeInteger(job.progressCompleted) || !Number.isSafeInteger(job.progressTotal) || job.progressCompleted < 0 || job.progressTotal < 0)) throw Error('SOURCE_HOST_PROTOCOL')
-    $('download-jobs').replaceChildren()
-    const captions = { QUEUED: t('排队中', 'Queued', '待機中'), PREPARING: t('准备中', 'Preparing', '準備中'), RUNNING: t('保存中', 'Saving', '保存中'), COMPLETED: t('已完整保存，可离线阅读', 'Saved completely; ready offline', '保存完了・オフライン読書可能'), FAILED: t('保存失败；旧副本保留，可重新确认保存', 'Save failed; old copies retained. Confirm another save to retry.', '保存失敗・以前のコピーは保持。再確認して再試行できます。'), CANCELLED: t('已取消；已保存副本未删除', 'Cancelled; saved copies were not deleted', '中止・保存済みコピーは削除していません') }
-    for (const job of value.jobs) {
-        const row = document.createElement('article')
-        const caption = job.status === 'RUNNING' && job.phase === 'waiting-resources' ? t('等待其他读写任务释放资源', 'Waiting for other disk tasks to release resources', '他の読み書き処理の完了待ち') : captions[job.status]
-        row.append(node('p', (job.comicTitle || '') + ' · ' + (job.chapterTitle || '') + ' — ' + caption))
-        row.append(node('p', t('已读取页面：', 'Pages fetched: ', '取得済みページ: ') + job.progressCompleted + '/' + job.progressTotal + (job.cancelRequested && !['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status) ? t(' · 正在取消，等待清理', ' · Cancelling; waiting for cleanup', ' · 中止・後処理中') : '')))
-        if (!['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status)) {
-            const cancel = button('download-cancel-' + job.id, t('取消此任务', 'Cancel this job', 'この処理を中止'), () => void working(async () => { await command({ action: 'download-cancel', sessionId: session.sessionId, jobId: job.id }); await refreshDownloads() }))
-            cancel.disabled = job.cancelRequested; row.append(cancel)
-        }
-        if (job.status === 'COMPLETED') {
-            if (!/^local:[a-f0-9]{64}$/.test(job.localComicId || '')) throw Error('SOURCE_HOST_PROTOCOL')
-            if (job.cancelRequested) row.append(node('p', t('取消到达前已完整保存；已保存副本不会自动删除。', 'The complete save was accepted before cancellation; the saved copy is not deleted.', '中止前に保存が完了したため、保存済みコピーは削除しません。')))
-            if (job.previousGenerationRetained) row.append(node('p', t('新副本已可用；旧临时副本暂未清理。', 'The new copy is available; an old temporary copy could not yet be removed.', '新しいコピーは利用可能ですが、古い一時コピーをまだ削除できていません。')))
-            row.append(button('download-read-' + job.id, t('本地阅读', 'Read locally', 'ローカルで読む'), () => { document.dispatchEvent(new CustomEvent('pica-open-reader', { detail: { comicId: job.localComicId, online: false } })); dialog.close() }))
-        }
-        $('download-jobs').append(row)
-    }
-    return value.jobs.some(job => !['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status))
+    const ticket = ++downloadRendering, scope = currentHostedDownloadSession()?.sessionId
+    return renderHostedLocalDownloadJobs({ target: $('download-jobs'), value, idPrefix: 'host-library-download-',
+        canAct: () => ticket === downloadRendering && dialog.open && currentHostedDownloadSession()?.sessionId === scope,
+        onCancel: async id => { const success = await working(async () => { await cancelHostedLocalDownload(scope, id, active.signal); await refreshDownloads() }); if (!success) throw Error('SOURCE_HOST_UNAVAILABLE') },
+        onRead: comicId => { document.dispatchEvent(new CustomEvent('pica-open-reader', { detail: { comicId, online: false } })); dialog.close() } }).pending
 }
 async function refreshDownloads() {
     if (!session || downloadPending) return
@@ -200,9 +206,8 @@ async function refreshDownloads() {
     downloadPending = true; clearTimeout(downloadPoll); controls()
     const timer = setTimeout(() => controller.abort(), 19000)
     try {
-        const response = await fetch('/api/v1/desktop/host-reader', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': csrf }, cache: 'no-store', signal: controller.signal, body: JSON.stringify({ action: 'downloads', sessionId: selectedSession }) }), value = await response.json()
+        const value = await queryHostedLocalDownloads(selectedSession, controller.signal)
         if (ticket !== generation || downloadTicket !== downloadGeneration || session?.sessionId !== selectedSession || controller.signal.aborted) return
-        if (!response.ok) throw Error(value.code || 'SOURCE_HOST_UNAVAILABLE')
         const pending = renderDownloads(value)
         if (pending && dialog.open) downloadPoll = setTimeout(() => void refreshDownloads(), 1000)
     } catch (error) {
@@ -252,7 +257,7 @@ function configure(event, requestedScope) {
     $('heading').textContent = discovery ? t('浏览我选择的来源', 'Browse my chosen source', '自分で選んだ配信元を閲覧') : t('我的宿主书库', 'My hosted library', '自分のホスト書庫')
     $('start').textContent = discovery ? t('授权并列出已安装来源', 'Authorize and list installed sources', '許可して導入済み配信元を表示') : t('建立本次阅读会话', 'Start this reading session', '今回の読書セッションを開始')
     $('consent-text').textContent = discovery ? t('我另行授权列出自己宿主已安装的来源，确认选定一个后搜索和阅读。搜索/取章节会更新宿主元数据并可能取回、缓存内容或执行宿主同步；不授权安装扩展、修改收藏/来源/设置或下载任务。', 'I separately authorize listing my host’s installed sources, then explicitly choosing one to search/read. Search/chapter requests update host metadata and may fetch/cache content or run host sync. No extension installation, favorites/source/settings changes or download jobs are authorized.', 'ホストに導入済み配信元の表示と、1つを明示選択した後の検索・読書を別途許可します。検索・章取得はホストのメタデータ更新・取得・キャッシュ・同期を伴う場合があります。拡張導入・お気に入り・配信元設定の変更・ダウンロードは許可しません。') : t('我授权读取自己宿主的书库和页面，并理解宿主可自行缓存内容、执行已配置的进度同步；不授权修改收藏、来源或设置。', 'I authorize reading my hosted library/pages and understand the host may cache content and run its configured progress sync. This does not authorize changes to favorites, sources or settings.', '自分のホスト書庫・ページの読み取りを許可し、ホスト独自のキャッシュ・設定済み進捗同期が動く場合があると理解します。お気に入り・配信元・設定の変更は許可しません。')
-    $('title').textContent = host.label + ' · ' + host.endpoint; controls(); dialog.showModal()
+    $('title').textContent = host.label + ' · ' + host.endpoint; controls(); dialog.showModal(); document.dispatchEvent(new CustomEvent('pica-hosted-download-panel-changed'))
 }
 document.addEventListener('pica-host-library-config', event => configure(event, 'library-read'))
 document.addEventListener('pica-host-source-config', event => configure(event, 'source-search-read'))

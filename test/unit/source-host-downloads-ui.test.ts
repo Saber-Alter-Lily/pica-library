@@ -1,8 +1,6 @@
-import fs from 'node:fs'
-import vm from 'node:vm'
-import ts from 'typescript'
 import { afterEach, expect, it, vi } from 'vitest'
 import { inertReadingDom } from '../helpers/fake-reading-dom'
+import { inertHostWebModules } from '../helpers/inert-host-web-modules'
 
 const HOST = '64d223e0-5d29-4320-babb-5a2da654d345',
     SESSION = '74d223e0-5d29-4320-babb-5a2da654d345'
@@ -133,18 +131,7 @@ function fixture(language = 0) {
     dom.document.addEventListener('pica-open-reader', (event) =>
         opens.push(event.detail)
     )
-    vm.runInNewContext(
-        '(function(){\n' +
-            ts.transpileModule(fs.readFileSync('web/host-library.js', 'utf8'), {
-                compilerOptions: {
-                    module: ts.ModuleKind.CommonJS,
-                    target: ts.ScriptTarget.ES2022
-                }
-            }).outputText +
-            '\n})()',
-        context,
-        { timeout: 1000 }
-    )
+    inertHostWebModules(context, (...values) => values[language])('web/host-library.js')
     dom.document.dispatchEvent(
         new Event('pica-host-library-config', {
             detail: {

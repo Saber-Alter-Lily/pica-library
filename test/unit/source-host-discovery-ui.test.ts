@@ -1,8 +1,6 @@
-import fs from 'node:fs'
-import vm from 'node:vm'
-import ts from 'typescript'
 import { afterEach, expect, it, vi } from 'vitest'
 import { inertReadingDom } from '../helpers/fake-reading-dom'
+import { inertHostWebModules } from '../helpers/inert-host-web-modules'
 
 const HOST = '64d223e0-5d29-4320-babb-5a2da654d345', SESSION = '74d223e0-5d29-4320-babb-5a2da654d345', SOURCE = '9007199254740993'
 const COMIC = 'hosted:' + HOST + ':' + 'a'.repeat(64)
@@ -32,7 +30,7 @@ function fixture(language = 1) {
     const context = { exports, require: (name: string) => { expect(name).toBe('./locale-runtime.js'); return { copy: (...values: string[]) => values[language] } },
         document: dom.document, window: dom.window, fetch: fetcher, CustomEvent: Event, AbortController, DOMException, Date, Error,
         setTimeout: (action: () => void) => { timers.set(++timer, action); return timer }, clearTimeout: (id: number) => timers.delete(id) }
-    vm.runInNewContext('(function(){\n' + ts.transpileModule(fs.readFileSync('web/host-library.js', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText + '\n})()', context, { timeout: 1000 })
+    Object.assign(exports, inertHostWebModules(context, (...values) => values[language])('web/host-library.js'))
     const get = (id: string) => dom.document.getElementById('host-library-' + id)!
     const configure = (scope = 'source') => dom.document.dispatchEvent(new Event('pica-host-' + scope + '-config', { detail: host }))
     configure()

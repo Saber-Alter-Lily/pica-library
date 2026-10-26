@@ -201,9 +201,12 @@ export class HostedLibraryReader {
             fields(input, ['action', 'sessionId', ...(input.action === 'download-chapters' ? ['comicId'] : input.action === 'download-start' ? ['comicId', 'episodeId', 'consent', 'acceptLocalCopy'] : input.action === 'download-cancel' ? ['jobId'] : [])])
             const session = this.session(String(input.sessionId))
             if (!this.downloads) throw new SourceHostError('SOURCE_HOST_UNSUPPORTED')
+            // Local synchronous task controls do not borrow/extend reader authority. Aborting
+            // their UI response must not revoke a host session or its already-confirmed jobs.
+            sourceHostAbort(signal)
+            if (input.action === 'downloads') return { jobs: this.downloads.snapshot(session.id), sessionBound: true }
+            if (input.action === 'download-cancel') return this.downloads.cancel(session.id, String(input.jobId))
             return this.withSignal(session, signal, async () => {
-                if (input.action === 'downloads') return { jobs: this.downloads!.snapshot(session.id), sessionBound: true }
-                if (input.action === 'download-cancel') return this.downloads!.cancel(session.id, String(input.jobId))
                 const comic = comicId(String(input.comicId)), book = this.findBook(session, comic)
                 if (input.action === 'download-chapters') {
                     await this.command({ action: 'select', sessionId: session.id, comicId: comic }, signal)

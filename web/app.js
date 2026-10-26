@@ -12,7 +12,8 @@ import { installRuntimeChoice } from './runtime-choice.js'
 import { installAccountOnboarding } from './account-onboarding.js'
 import { installLocalImport } from './local-import.js'
 import { installReadingLibrary } from './reading-library.js'
-import { currentHostedLibrarySession, resumeHostedLibraryComic } from './host-library.js'
+import { currentHostedLibrarySession, resumeHostedLibraryComic, currentHostedDownloadSession, queryHostedLocalDownloads, cancelHostedLocalDownload } from './host-library.js'
+import { installHostedDownloadProjection } from './host-downloads.js'
 import { readerKeyboardAction, readerPageIndex } from './reader-input.js'
 import { createReaderViewportTracker } from './reader-viewport.js'
 import { normalizeReaderSettings, loadReaderSettings, cacheReaderSettings, createReaderSettingsWriter } from './reader-settings.js'
@@ -111,6 +112,7 @@ const state = {
 window.picaAppSessionId = state.appSessionId
 let desktop = null
 let readingLibraryPanel = null
+let hostedDownloadsPanel = null
 let language = resolveLanguage(
     localStorage,
     navigator.languages || [navigator.language]
@@ -623,6 +625,7 @@ function activateView(id) {
         state.reader.originView = previousView
     activeView = id
     if (id === 'library') void readingLibraryPanel?.refresh()
+    void hostedDownloadsPanel?.refresh()
     document.querySelectorAll('.view').forEach((view) =>
         view.classList.toggle('active', view.id === id)
     )
@@ -1297,6 +1300,13 @@ readingLibraryPanel = installReadingLibrary({
     hostSession: currentHostedLibrarySession,
     openReader: (comicId, online) => openReaderComic(comicId, online),
     openHosted: resumeHostedLibraryComic
+})
+hostedDownloadsPanel = installHostedDownloadProjection({
+    target: $('#host-downloads'), boundaryNote: $('#downloads .info-tip'),
+    canQuery: () => state.mode === 'connected' && Boolean(desktop?.configured && desktop?.csrfToken) && desktop?.startupReady !== false,
+    isVisible: () => activeView === 'downloads' && !document.hidden && !document.getElementById('host-library-dialog')?.open,
+    hostSession: currentHostedDownloadSession, query: queryHostedLocalDownloads, cancel: cancelHostedLocalDownload,
+    openReader: (comicId, online) => openReaderComic(comicId, online)
 })
 $('#setup-open-settings').onclick = () => activateView('settings')
 $('#setup-open-eh').onclick = () => {
@@ -4464,7 +4474,7 @@ $('#recommend-feedback-reasons-toggle').onchange = (event) => {
     )
 }
 
-$('#refresh-jobs').onclick = loadJobs
+$('#refresh-jobs').onclick = () => { void loadJobs(); void hostedDownloadsPanel?.refresh() }
 $('#performance-profile').onchange = () => {
     $('#custom-performance').hidden =
         $('#performance-profile').value !== 'custom'

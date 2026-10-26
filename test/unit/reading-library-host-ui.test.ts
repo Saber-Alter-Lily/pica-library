@@ -1,8 +1,6 @@
-import fs from 'node:fs'
-import vm from 'node:vm'
-import ts from 'typescript'
 import { afterEach, expect, it, vi } from 'vitest'
 import { inertReadingDom, ReadingElement } from '../helpers/fake-reading-dom'
+import { inertHostWebModules } from '../helpers/inert-host-web-modules'
 
 const HOST = '64d223e0-5d29-4320-babb-5a2da654d345', SESSION = '74d223e0-5d29-4320-babb-5a2da654d345'
 class InertEvent { detail: unknown; constructor(readonly type: string, options?: {detail?: unknown}) { this.detail = options?.detail } }
@@ -29,7 +27,8 @@ async function fixture() {
     })
     const context = {exports,require:(name:string)=>{expect(name).toBe('./locale-runtime.js');return {copy:(...values:string[])=>values[1]}},document:dom.document,window:dom.window,fetch:fetcher,CustomEvent:InertEvent,AbortController,setTimeout:(action:()=>void,delay:number)=>{const id=++timerId;timers.set(id,{at:clock+delay,action});return id},clearTimeout:(id:number)=>timers.delete(id),Date:SessionDate,Error}
     // CommonJS modules have separate wrapper scopes, while sharing the inert document/window.
-    const execute = (file: string) => vm.runInNewContext('(function(){\n'+ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText+'\n})()',context,{timeout:1000})
+    const load = inertHostWebModules(context, (...values) => values[1])
+    const execute = (file: string) => Object.assign(exports, load(file))
     dom.document.addEventListener('pica-host-connections-snapshot', event => snapshots.push(event.detail))
     dom.document.addEventListener('pica-hosted-reading-scope-changed', event => scopeEvents.push(event))
     execute('web/host-library.js')
@@ -53,6 +52,7 @@ async function fixture() {
 it('keeps host authority volatile and resumes only through an explicit local select command', async () => {
     const f=await fixture(),scope=f.exports.currentHostedLibrarySession()
     expect(Object.keys(scope).sort()).toEqual(['expiresAt','sessionId'])
+    expect(f.exports.currentHostedDownloadSession()).toBe(null)
     scope.sessionId='not-the-actual-session'
     expect(f.exports.currentHostedLibrarySession().sessionId).toBe(SESSION)
     await expect(f.exports.resumeHostedLibraryComic('hosted:fixture','wrong-session')).rejects.toThrow('SOURCE_HOST_CANCELLED')

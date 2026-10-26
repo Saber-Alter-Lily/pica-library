@@ -75,6 +75,7 @@ import { SourceHostConnections } from '../source-hosts/connections'
 import { sourceHostStore } from './source-host-store'
 import { HostedLibraryReader } from '../source-hosts/library-reader'
 import { PreviewCacheManager } from '../services/preview-cache-manager'
+import { LocalLibraryIngestion } from '../local-library/ingestion'
 import {
     isLoopbackListening,
     knownProxyPorts,
@@ -353,7 +354,8 @@ async function closeEngine() {
     const errors: string[] = []
     sourceHostInspector.cancel()
     sourceHostConnections.cancel()
-    hostedReader?.close(); hostedReader = null
+    await shutdownStep('Hosted local downloads', async () => { await hostedReader?.close() }, errors)
+    hostedReader = null
 
     log.write('Shutdown: closing Remote API gateway')
     await shutdownStep(
@@ -809,7 +811,9 @@ async function startEngine(preferredPort: number) {
         runtimeResources
     )
     const csrfToken = randomBytes(32).toString('base64url')
-    hostedReader = new HostedLibraryReader(sourceHostConnections, database, () => new PreviewCacheManager(path.join(paths.cache, 'host-reader'), { maxBytes: 256 * 1024 * 1024, ttlMs: 24 * 60 * 60 * 1000 }))
+    const hostLocalIngestion = new LocalLibraryIngestion(database, dataDir)
+    hostedReader = new HostedLibraryReader(sourceHostConnections, database, () => new PreviewCacheManager(path.join(paths.cache, 'host-reader'), { maxBytes: 256 * 1024 * 1024, ttlMs: 24 * 60 * 60 * 1000 }), undefined, undefined,
+        { saveChapter: input => hostLocalIngestion.importGeneratedChapter(input), resources: runtimeResources })
     let startupReady = false
     const desktop: DesktopServerController = {
         csrfToken,
@@ -847,8 +851,8 @@ async function startEngine(preferredPort: number) {
         status: () => ({
             sourceHostInspection: { available: true, reader: false, libraryImport: false, extensionInstall: false, persisted: false },
             sourceHostConnections: { available: true, storage: sourceHostConnections.snapshot().storage, scope: 'inspect-only', reader: false },
-            hostedLibraryReader: { available: true, scope: 'explicit-session-library-read', providerSearch: false, libraryImport: false, extensionInstall: false, native: false },
-            hostedSourceBrowser: { available: true, scope: 'explicit-session-selected-source-search-read', providerSearch: true, libraryImport: false, extensionInstall: false, downloads: false, native: false },
+            hostedLibraryReader: { available: true, scope: 'explicit-session-library-read', providerSearch: false, libraryImport: false, extensionInstall: false, downloads: Boolean(hostedReader?.localDownloadsAvailable), native: false },
+            hostedSourceBrowser: { available: true, scope: 'explicit-session-selected-source-search-read', providerSearch: true, libraryImport: false, extensionInstall: false, downloads: Boolean(hostedReader?.localDownloadsAvailable), native: false },
             externalSources: sources.snapshot(),
             sourcePolicyOrigin: config?.externalSources ? 'explicit' : config ? 'legacy-compatible' : 'new-local',
             startupReady,

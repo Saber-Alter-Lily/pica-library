@@ -13,6 +13,8 @@ import { SourceHostConnections } from '../../src/source-hosts/connections'
 import { sourceHostStore } from '../../src/desktop/source-host-store'
 import { HostedLibraryReader } from '../../src/source-hosts/library-reader'
 import { PreviewCacheManager } from '../../src/services/preview-cache-manager'
+import { LocalLibraryIngestion } from '../../src/local-library/ingestion'
+import { RuntimeResourceCoordinator } from '../../src/runtime/resource-coordinator'
 import { shadowDatabaseState } from '../fixtures/recommendation-shadow-fixture'
 import { enabledFixtureSources } from "../helpers/source-runtime-fixture"
 
@@ -23,9 +25,10 @@ const info = { data: { aboutServer: { name: 'Suwayomi-Server', version: '2.4.236
 const sources = { data: { sources: { nodes: [{ id: '9223372036854775807', name: 'Synthetic', lang: 'zh', supportsLatest: true }], pageInfo: { hasNextPage: false, hasPreviousPage: false }, totalCount: 1 } } }
 const hostBook = { id: 1, sourceId: '9223372036854775807', url: '/own-book', title: 'Synthetic own book', inLibrary: true }
 const hostChapter = { id: 2, mangaId: 1, url: '/own-book/chapter', name: 'One', sourceOrder: 0, chapterNumber: 1, pageCount: 1 }
+const bodyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6FkwAAAAASUVORK5CYII=', 'base64')
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); vi.restoreAllMocks() })
 
-async function fixture(options: { configured?: boolean; desktop?: boolean } = {}) {
+async function fixture(options: { configured?: boolean; desktop?: boolean; downloads?: boolean } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-host-api-')), db = new LibraryDatabase(path.join(root, 'library.db'))
     const service = new LibraryService(db, root, undefined, undefined, undefined, enabledFixtureSources())
     service.sources.apply({ schemaVersion: 1, revision: 1, enabled: [] })
@@ -36,7 +39,7 @@ async function fixture(options: { configured?: boolean; desktop?: boolean } = {}
         resolveEntered()
         if (behavior === 'throw') throw new Error('https://name:remote-secret@host.invalid/ Authorization: private')
         if (behavior === 'stall') await late
-        if (!init?.body) return new Response(Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]), Buffer.alloc(16)]), { headers: { 'content-type': 'image/png' } })
+        if (!init?.body) return new Response(bodyPng, { headers: { 'content-type': 'image/png' } })
         const operation = JSON.parse(String(init.body)).operationName
         const value = operation === 'PicaSourceHostInfo' ? info : operation === 'PicaHostLibrary' ? { data: { mangas: { nodes: [hostBook], pageInfo: { hasNextPage: false } } } } : operation === 'PicaHostManga' ? { data: { manga: { ...hostBook, chapters: { nodes: [hostChapter] } } } } : operation === 'PicaHostChapter' ? { data: { chapter: hostChapter } } : operation === 'PicaHostChapterPages' ? { data: { fetchChapterPages: { chapter: hostChapter, pages: ['/api/v1/manga/1/chapter/0/page/0'] } } } :
             operation === 'PicaHostSourceSearch' ? { data: { fetchSourceManga: { mangas: [{ ...hostBook, inLibrary: false }], hasNextPage: false } } } :
@@ -45,18 +48,58 @@ async function fixture(options: { configured?: boolean; desktop?: boolean } = {}
     })
     const inspector = new SourceHostInspector(connection => sourceHostHttp(connection, wire))
     const connections = new SourceHostConnections(sourceHostStore(path.join(root, 'source-hosts.json')), inspector, () => '64d223e0-5d29-4320-babb-5a2da654d345')
-    const hostedReader = new HostedLibraryReader(connections, db, () => new PreviewCacheManager(path.join(root, 'host-reader-cache')), wire)
-    cleanup.push(async () => { hostedReader.close() })
+    const ingestion = new LocalLibraryIngestion(db, root)
+    const hostedReader = new HostedLibraryReader(connections, db, () => new PreviewCacheManager(path.join(root, 'host-reader-cache')), wire, undefined,
+        options.downloads ? { saveChapter: input => ingestion.importGeneratedChapter(input), resources: new RuntimeResourceCoordinator() } : undefined)
     const inspect = vi.fn((value: Record<string, unknown>, abort: AbortSignal) => { signal = abort; return inspector.inspect(value, abort) })
     const desktop: DesktopServerController = { csrfToken: 'synthetic-host-csrf', hostedReader, configured: () => options.configured !== false, status: () => ({ sourceHostInspection: { available: true } }), inspectSourceHost: inspect, sourceHostConnections: value => connections.command(value), inspectSavedSourceHost: (value, signal) => connections.inspect(value, signal), save: async () => ({}), testConnection: async () => ({}), chooseFolder: async () => null, exportBrowserLitePackage: async () => ({}), openDirectory: async () => {}, shutdown: () => {} }
     const server = await startLibraryServer({ database: db, service, port: 0, desktop: options.desktop === false ? undefined : desktop })
-    cleanup.push(async () => { inspector.close(); resolveLate(); server.server.closeAllConnections(); await new Promise<void>(resolve => server.server.close(() => resolve())); db.close(); const resolved = fs.realpathSync(root); if (path.dirname(resolved) !== fs.realpathSync(os.tmpdir()) || !path.basename(resolved).startsWith('pica-host-api-') || fs.lstatSync(root).isSymbolicLink()) throw Error('Unsafe synthetic cleanup'); fs.rmSync(resolved, { recursive: true, force: true }) })
+    cleanup.push(async () => { inspector.close(); resolveLate(); await hostedReader.close(); server.server.closeAllConnections(); await new Promise<void>(resolve => server.server.close(() => resolve())); db.close(); const resolved = fs.realpathSync(root); if (path.dirname(resolved) !== fs.realpathSync(os.tmpdir()) || !path.basename(resolved).startsWith('pica-host-api-') || fs.lstatSync(root).isSymbolicLink()) throw Error('Unsafe synthetic cleanup'); fs.rmSync(resolved, { recursive: true, force: true }) })
     const headers = { 'content-type': 'application/json', Origin: server.url, 'x-pica-csrf': desktop.csrfToken }
     const post = (value: unknown = input, override: Record<string, string> = {}) => fetch(server.url + route, { method: 'POST', headers: { ...headers, ...override }, body: JSON.stringify(value) })
     return { root, db, service, server, desktop, wire, inspector, connections, inspect, headers, post, entered, release: resolveLate, getSignal: () => signal, behavior: (value: string) => { behavior = value } }
 }
 
 describe('actual local host-inspection HTTP boundary — synthetic CI listener only', () => {
+    it('requires a separate chapter-save grant at the real HTTP boundary and serves the complete copy through the existing local Reader', async () => {
+        const f = await fixture({ downloads: true }), endpoint = f.server.url + '/api/v1/desktop/host-reader'
+        const id = '64d223e0-5d29-4320-babb-5a2da654d345'
+        f.connections.command({ action: 'save', kind: 'suwayomi', label: 'My optional host', endpoint: 'https://synthetic.example/', authMode: 'none', allowInsecureLan: false, consent: true, scope: 'inspect-only' })
+        f.connections.command({ action: 'set-enabled', id, expectedRevision: 0, enabled: true, consent: true })
+        const command = async (input: unknown, override: Record<string, string> = {}) => {
+            const response = await fetch(endpoint, { method: 'POST', headers: { ...f.headers, ...override }, body: JSON.stringify(input) })
+            return { status: response.status, value: await response.json() }
+        }
+        const { value: session } = await command({ action: 'start', id, expectedRevision: 1, scope: 'source-search-read', consent: true, acceptHostFetchSideEffects: true, acceptHostCatalogueSideEffects: true })
+        expect(session.capabilities).toMatchObject({ downloads: true, native: false })
+        const sessionId = session.sessionId
+        await command({ action: 'sources', sessionId, offset: 0 })
+        await command({ action: 'bind-source', sessionId, sourceId: hostBook.sourceId, consent: true })
+        const found = await command({ action: 'search', sessionId, query: 'synthetic', page: 1 }), comicId = found.value.books[0].comicId
+        const chapters = await command({ action: 'download-chapters', sessionId, comicId }), episodeId = chapters.value.chapters[0].id
+        const save = { action: 'download-start', sessionId, comicId, episodeId, consent: true, acceptLocalCopy: true }
+        const before = f.wire.mock.calls.length
+        expect((await command({ ...save, consent: false })).status).toBe(400)
+        expect((await command(save, { Origin: 'https://outside.invalid' })).status).toBe(403)
+        expect(f.wire).toHaveBeenCalledTimes(before); expect(f.db.listComics({})).toEqual([])
+        const started = await command(save); expect(started.status).toBe(200)
+        let saved: { status: string; localComicId: string; localEpisodeId: string } | undefined
+        await vi.waitFor(async () => {
+            const snapshot = await command({ action: 'downloads', sessionId })
+            saved = snapshot.value.jobs.find((job: { id: string }) => job.id === started.value.id)
+            expect(saved?.status).toBe('COMPLETED')
+        })
+        await command({ action: 'close', sessionId })
+        const calls = f.wire.mock.calls.length
+        const chapterPath = '/api/v1/reader/comics/' + encodeURIComponent(saved!.localComicId) + '/chapters/' + encodeURIComponent(saved!.localEpisodeId)
+        const local = await fetch(f.server.url + chapterPath, { headers: f.headers }).then(response => response.json())
+        const image = await fetch(f.server.url + '/api/v1/reader/pictures/' + encodeURIComponent(local.pages[0].id), { headers: f.headers })
+        expect(image.status).toBe(200); expect(Buffer.from(await image.arrayBuffer())).toEqual(bodyPng)
+        expect(f.wire).toHaveBeenCalledTimes(calls)
+        expect(f.db.listDownloadJobs()).toEqual([])
+        expect(f.db.getAppState('synthetic.source-host.private-canary')).toEqual({ password: 'not-for-host-export', tags: ['private'], preserved: true })
+        expect(f.service.sources.snapshot().enabled).toEqual([])
+    })
     it('executes the real inspector/HTTP adapter but changes no table, source choice or private state', async () => {
         const f = await fixture(), before = shadowDatabaseState(f.db), policy = f.service.sources.snapshot(), files = fs.readdirSync(f.root).sort()
         expect(f.wire).not.toHaveBeenCalled()

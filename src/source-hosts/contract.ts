@@ -24,6 +24,7 @@ export type SourceHostErrorCode =
     | 'SOURCE_HOST_READER_CONSENT_REQUIRED'
     | 'SOURCE_HOST_SCOPE_REQUIRED'
     | 'SOURCE_HOST_SOURCE_SELECTION_REQUIRED'
+    | 'SOURCE_HOST_DOWNLOAD_CONSENT_REQUIRED'
 
 export class SourceHostError extends Error {
     constructor(readonly code: SourceHostErrorCode) {

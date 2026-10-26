@@ -2,6 +2,7 @@ import { copy as t } from './locale-runtime.js'
 
 let dialog, host = null, session = null, csrf = '', active = null, generation = 0, offset = 0, hasNext = false, expiryTimer = null
 let scope = 'library-read', selectedSource = null, searchQuery = '', searchPage = 0
+let downloadTarget = null, downloadPoll = null, downloadPending = false, downloadGeneration = 0
 const $ = id => document.getElementById('host-library-' + id)
 function node(tag, value) { const element = document.createElement(tag); element.textContent = value; return element }
 function button(id, caption, action) { const element = node('button', caption); element.type = 'button'; element.id = 'host-library-' + id; element.onclick = action; return element }
@@ -11,6 +12,7 @@ function endOnExit() {
     session = null
     selectedSource = null; searchQuery = ''; searchPage = 0; offset = 0; hasNext = false
     clearTimeout(expiryTimer); expiryTimer = null
+    resetDownloads()
     document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed'))
     if ($('password')) { $('password').value = ''; $('username').value = '' }
     if ($('query')) { $('query').value = ''; $('source').replaceChildren() }
@@ -58,8 +60,9 @@ function makeDialog() {
     dialog.append(searchForm)
     const status = node('p', ''); status.id = 'host-library-state'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite'); dialog.append(status)
     const books = document.createElement('div'); books.id = 'host-library-books'; dialog.append(books)
+    makeDownloadPanel()
     dialog.append(button('previous', t('上一页', 'Previous page', '前のページ'), () => void navigate(-1)), button('next', t('下一页', 'Next page', '次のページ'), () => void navigate(1)), button('end', t('结束会话', 'End session', 'セッション終了'), () => { generation++; endOnExit(); books.replaceChildren(); controls(); status.textContent = t('会话已结束；阅读记录保留。', 'Session ended; reading records are retained.', 'セッションを終了しました。閲覧記録は保持します。') }), button('hide', t('关闭面板', 'Close panel', 'パネルを閉じる'), () => dialog.close()))
-    dialog.addEventListener('close', () => { $('password').value = ''; $('username').value = '' })
+    dialog.addEventListener('close', () => { $('password').value = ''; $('username').value = ''; clearTimeout(downloadPoll); downloadPoll = null })
     document.body.append(dialog)
 }
 function controls() {
@@ -74,6 +77,10 @@ function controls() {
     $('previous').disabled = Boolean(active) || !session || (discovery && selectedSource ? searchPage <= 1 : offset <= 0)
     $('next').disabled = Boolean(active) || !session || !hasNext || (discovery && selectedSource ? searchPage >= 200 : offset >= 5000)
     $('end').disabled = !session && !active
+    if ($('download-start')) {
+        for (const id of ['download-chapter', 'download-consent', 'download-start']) $(id).disabled = Boolean(active) || !session || !downloadTarget
+        $('download-refresh').disabled = !session || downloadPending
+    }
 }
 async function command(input) {
     const controller = active, ticket = generation
@@ -87,8 +94,8 @@ async function working(action) {
     if (active) return
     const ticket = generation, controller = new AbortController(); active = controller; controls()
     const timer = setTimeout(() => controller.abort(), 19000)
-    $('state').textContent = t('正在读取你的宿主…', 'Reading your host…', '自分のホストを読み取り中…')
-    try { await action(); if (ticket === generation) $('state').textContent = scope === 'source-search-read' ? t('仅连接你选择的宿主与来源；搜索和章节读取可能更新宿主元数据/缓存，没有导入本地目录。', 'Only your selected host/source is used. Search/chapter requests may update host metadata/cache; nothing is imported locally.', '自分で選んだホスト・配信元のみ使用します。検索・章取得はホストのメタデータ・キャッシュを更新する場合があります。ローカル取り込みは行いません。') : t('仅显示你的宿主书库；没有导入到本地书库。', 'Showing your hosted library only; nothing imported into the local catalogue.', '自分のホスト書庫のみ表示しています。ローカル書庫には取り込んでいません。'); return true }
+    $('state').textContent = t('正在处理本次操作…', 'Processing this action…', '今回の操作を処理中…')
+    try { await action(); if (ticket === generation) $('state').textContent = t('仅处理你的自选宿主；搜索和章节读取可能更新其元数据/缓存。浏览不会自动保存本地内容，只有你单独确认的章节才会保存。', 'Only your chosen host is used; search/chapter requests may update its metadata/cache. Browsing never saves content locally; only separately confirmed chapters are saved.', '自分で選んだホストのみ使用し、検索・章取得でメタデータ・キャッシュが更新される場合があります。閲覧だけでローカル保存はせず、別途確認した章のみ保存します。'); return true }
     catch (error) { if (ticket === generation) { if (['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_DISABLED'].includes(error.message)) { session = null; clearTimeout(expiryTimer); document.dispatchEvent(new CustomEvent('pica-hosted-reading-scope-changed')) } $('state').textContent = t('无法继续。请检查宿主、权限或重新建立会话。', 'Cannot continue. Check the host/permissions or start a new session.', '続行できません。ホスト・権限を確認するか、セッションを作り直してください。') + (/^SOURCE_HOST_[A-Z_]+$/.test(error.message || '') ? ` (${error.message})` : '') }; return false }
     finally { clearTimeout(timer); $('password').value = ''; $('username').value = ''; if (active === controller) active = null; controls() }
 }
@@ -102,6 +109,7 @@ function render(value) {
     for (const book of value.books) {
         const card = document.createElement('article'); card.className = 'panel'; card.append(node('strong', book.title), node('p', t('宿主来源 ID：', 'Host source ID: ', 'ホスト配信元 ID: ') + book.sourceId))
         card.append(button('read-' + book.comicId, t('阅读', 'Read', '読む'), () => void working(async () => { const selected = await command({ action: 'select', sessionId: session.sessionId, comicId: book.comicId }); document.dispatchEvent(new CustomEvent('pica-open-hosted-reader', { detail: { ...selected, csrfToken: csrf } })); dialog.close() })))
+        if (session?.capabilities?.downloads === true) card.append(button('save-' + book.comicId, t('保存章节到本地…', 'Save a chapter locally…', '章をローカルに保存…'), () => void chooseDownload(book)))
         $('books').append(card)
     }
 }
@@ -123,6 +131,83 @@ async function startSession() {
         render(await command({ action: 'list', sessionId: session.sessionId, offset: 0 }))
         renderHistory(value.history)
     })
+}
+function resetDownloads() {
+    downloadGeneration++; downloadTarget = null; downloadPending = false
+    clearTimeout(downloadPoll); downloadPoll = null
+    if ($('download-panel')) { $('download-panel').hidden = true; $('download-chapter').replaceChildren(); $('download-consent').checked = false; $('download-jobs').replaceChildren(); $('download-title').textContent = '' }
+}
+function makeDownloadPanel() {
+    const panel = document.createElement('section'); panel.id = 'host-library-download-panel'; panel.className = 'panel'; panel.hidden = true
+    panel.append(node('h3', t('保存到我的本地书库', 'Save to my local library', '自分のローカル書庫に保存')))
+    panel.append(node('p', t('只保存你确认的完整章节；不加入宿主的下载队列，也不会自动保存其他作品。任务仅在当前会话有效：结束会话或关闭程序会取消未完成任务，重启后不会自动联网恢复。已经保存的完整副本仍保留，之后可不依赖宿主离线阅读。', 'Only the confirmed complete chapter is saved. No host download queue or other books are added. Jobs belong to this session: ending it or closing the app cancels unfinished work; restarting never resumes network work automatically. Complete saved copies remain readable offline without the host.', '確認した完全な章のみ保存し、ホストのダウンロードキューや他の作品は追加しません。未完了の処理はセッション終了・アプリ終了で中止され、再起動時に自動接続しません。保存済みの完全なコピーはホストなしで読めます。')))
+    const title = node('p', ''); title.id = 'host-library-download-title'; panel.append(title)
+    const form = document.createElement('form'); form.id = 'host-library-download-form'; form.method = 'post'
+    const label = document.createElement('label'), chapters = document.createElement('select'); chapters.id = 'host-library-download-chapter'
+    label.append(node('span', t('本次章节', 'Chapter to save', '保存する章')), chapters)
+    const consent = document.createElement('label'), check = document.createElement('input'); check.type = 'checkbox'; check.required = true; check.id = 'host-library-download-consent'
+    consent.append(check, node('span', t('我确认保存所选章节为独立本地副本；已有同章副本会在完整保存成功后替换，取消不会删除已保存副本。', 'I confirm an independent local copy of this chapter. An existing copy is replaced only after a complete save; cancellation does not delete saved copies.', '選択した章を独立したローカルコピーとして保存します。既存の同じ章は完全な保存成功後のみ置き換え、中止しても保存済みコピーは削除しません。')))
+    const save = button('download-start', t('确认保存所选章节', 'Confirm chapter save', '選択した章の保存を確認'), () => {}); save.type = 'submit'
+    form.append(label, consent, save); form.onsubmit = event => { event.preventDefault(); if (check.checked && chapters.value) void queueDownload() }
+    panel.append(form, button('download-refresh', t('刷新保存进度', 'Refresh save progress', '保存状況を更新'), () => void refreshDownloads()))
+    const jobs = document.createElement('div'); jobs.id = 'host-library-download-jobs'; jobs.setAttribute('aria-live', 'polite'); panel.append(jobs)
+    dialog.append(panel)
+}
+async function chooseDownload(book) {
+    await working(async () => {
+        const value = await command({ action: 'download-chapters', sessionId: session.sessionId, comicId: book.comicId })
+        if (!Array.isArray(value.chapters) || value.chapters.length > 2000 || value.chapters.some(chapter => !/^host-chapter:[a-f0-9]{64}$/.test(chapter.id || '') || typeof chapter.title !== 'string')) throw Error('SOURCE_HOST_PROTOCOL')
+        downloadGeneration++; downloadPending = false; clearTimeout(downloadPoll); downloadTarget = { comicId: book.comicId, title: book.title }
+        $('download-title').textContent = book.title; $('download-panel').hidden = false; $('download-consent').checked = false; $('download-chapter').replaceChildren()
+        for (const chapter of value.chapters) { const option = node('option', chapter.title); option.value = chapter.id; $('download-chapter').append(option) }
+        if (!value.chapters.length) { downloadTarget = null; $('download-title').textContent = t('此作品暂无可保存章节。', 'No chapters are available to save.', '保存できる章がありません。') }
+    })
+}
+async function queueDownload() {
+    if (!downloadTarget || !$('download-consent').checked) return
+    await working(async () => {
+        await command({ action: 'download-start', sessionId: session.sessionId, comicId: downloadTarget.comicId, episodeId: $('download-chapter').value, consent: true, acceptLocalCopy: true })
+        $('download-consent').checked = false
+    })
+    if (session) await refreshDownloads()
+}
+function renderDownloads(value) {
+    if (value.sessionBound !== true || !Array.isArray(value.jobs) || value.jobs.length > 50 || value.jobs.some(job => !/^[a-f0-9-]{36}$/.test(job.id || '') || !['QUEUED', 'PREPARING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(job.status) || !Number.isSafeInteger(job.progressCompleted) || !Number.isSafeInteger(job.progressTotal) || job.progressCompleted < 0 || job.progressTotal < 0)) throw Error('SOURCE_HOST_PROTOCOL')
+    $('download-jobs').replaceChildren()
+    const captions = { QUEUED: t('排队中', 'Queued', '待機中'), PREPARING: t('准备中', 'Preparing', '準備中'), RUNNING: t('保存中', 'Saving', '保存中'), COMPLETED: t('已完整保存，可离线阅读', 'Saved completely; ready offline', '保存完了・オフライン読書可能'), FAILED: t('保存失败；旧副本保留，可重新确认保存', 'Save failed; old copies retained. Confirm another save to retry.', '保存失敗・以前のコピーは保持。再確認して再試行できます。'), CANCELLED: t('已取消；已保存副本未删除', 'Cancelled; saved copies were not deleted', '中止・保存済みコピーは削除していません') }
+    for (const job of value.jobs) {
+        const row = document.createElement('article')
+        const caption = job.status === 'RUNNING' && job.phase === 'waiting-resources' ? t('等待其他读写任务释放资源', 'Waiting for other disk tasks to release resources', '他の読み書き処理の完了待ち') : captions[job.status]
+        row.append(node('p', (job.comicTitle || '') + ' · ' + (job.chapterTitle || '') + ' — ' + caption))
+        row.append(node('p', t('已读取页面：', 'Pages fetched: ', '取得済みページ: ') + job.progressCompleted + '/' + job.progressTotal + (job.cancelRequested && !['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status) ? t(' · 正在取消，等待清理', ' · Cancelling; waiting for cleanup', ' · 中止・後処理中') : '')))
+        if (!['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status)) {
+            const cancel = button('download-cancel-' + job.id, t('取消此任务', 'Cancel this job', 'この処理を中止'), () => void working(async () => { await command({ action: 'download-cancel', sessionId: session.sessionId, jobId: job.id }); await refreshDownloads() }))
+            cancel.disabled = job.cancelRequested; row.append(cancel)
+        }
+        if (job.status === 'COMPLETED') {
+            if (!/^local:[a-f0-9]{64}$/.test(job.localComicId || '')) throw Error('SOURCE_HOST_PROTOCOL')
+            if (job.cancelRequested) row.append(node('p', t('取消到达前已完整保存；已保存副本不会自动删除。', 'The complete save was accepted before cancellation; the saved copy is not deleted.', '中止前に保存が完了したため、保存済みコピーは削除しません。')))
+            if (job.previousGenerationRetained) row.append(node('p', t('新副本已可用；旧临时副本暂未清理。', 'The new copy is available; an old temporary copy could not yet be removed.', '新しいコピーは利用可能ですが、古い一時コピーをまだ削除できていません。')))
+            row.append(button('download-read-' + job.id, t('本地阅读', 'Read locally', 'ローカルで読む'), () => { document.dispatchEvent(new CustomEvent('pica-open-reader', { detail: { comicId: job.localComicId, online: false } })); dialog.close() }))
+        }
+        $('download-jobs').append(row)
+    }
+    return value.jobs.some(job => !['COMPLETED', 'CANCELLED', 'FAILED'].includes(job.status))
+}
+async function refreshDownloads() {
+    if (!session || downloadPending) return
+    const ticket = generation, selectedSession = session.sessionId, downloadTicket = downloadGeneration, controller = new AbortController()
+    downloadPending = true; clearTimeout(downloadPoll); controls()
+    const timer = setTimeout(() => controller.abort(), 19000)
+    try {
+        const response = await fetch('/api/v1/desktop/host-reader', { method: 'POST', headers: { 'content-type': 'application/json', 'x-pica-csrf': csrf }, cache: 'no-store', signal: controller.signal, body: JSON.stringify({ action: 'downloads', sessionId: selectedSession }) }), value = await response.json()
+        if (ticket !== generation || downloadTicket !== downloadGeneration || session?.sessionId !== selectedSession || controller.signal.aborted) return
+        if (!response.ok) throw Error(value.code || 'SOURCE_HOST_UNAVAILABLE')
+        const pending = renderDownloads(value)
+        if (pending && dialog.open) downloadPoll = setTimeout(() => void refreshDownloads(), 1000)
+    } catch (error) {
+        if (ticket === generation && session?.sessionId === selectedSession) $('download-jobs').textContent = t('暂时无法读取保存进度。可手动刷新；请勿因此重复添加任务。', 'Save progress is unavailable. Refresh manually; do not add duplicate jobs.', '保存状況を取得できません。手動更新してください。重複追加は不要です。')
+    } finally { clearTimeout(timer); if (ticket === generation && downloadTicket === downloadGeneration) { downloadPending = false; controls() } }
 }
 async function list(nextOffset) { await working(async () => render(await command({ action: 'list', sessionId: session.sessionId, offset: nextOffset }))) }
 function renderHistory(history) {

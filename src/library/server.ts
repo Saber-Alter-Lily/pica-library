@@ -442,7 +442,7 @@ export async function startLibraryServer(options: {
                     return json(response, 200, await options.desktop.hostedReader.read(sessionId, episodeId ? 'chapter' : 'chapters', { comicId, episodeId }, abort.signal))
                 } catch (error) {
                     const code = error instanceof SourceHostError ? error.code : 'SOURCE_HOST_UNAVAILABLE'
-                    if (!response.destroyed) json(response, code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : code === 'SOURCE_HOST_SCOPE_REQUIRED' ? 403 : ['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED', 'SOURCE_HOST_BUSY'].includes(code) ? 409 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED', 'SOURCE_HOST_READER_CONSENT_REQUIRED', 'SOURCE_HOST_SOURCE_SELECTION_REQUIRED'].includes(code) ? 400 : 502, { error: code, code })
+                    if (!response.destroyed) json(response, code === 'SOURCE_HOST_AUTH_REQUIRED' ? 401 : code === 'SOURCE_HOST_SCOPE_REQUIRED' ? 403 : ['SOURCE_HOST_CANCELLED', 'SOURCE_HOST_STALE', 'SOURCE_HOST_DISABLED', 'SOURCE_HOST_BUSY'].includes(code) ? 409 : code === 'SOURCE_HOST_TIMEOUT' ? 504 : ['INVALID_SOURCE_HOST', 'SOURCE_HOST_CONSENT_REQUIRED', 'SOURCE_HOST_READER_CONSENT_REQUIRED', 'SOURCE_HOST_SOURCE_SELECTION_REQUIRED', 'SOURCE_HOST_DOWNLOAD_CONSENT_REQUIRED'].includes(code) ? 400 : 502, { error: code, code })
                 } finally { response.removeListener('close', disconnected) }
                 return
             }

@@ -70,7 +70,7 @@ Next work must determine a genuinely supported legacy transition/compatibility p
 
 ## Local evidence and next authorized action
 
-Final selected offline suite: **323/323 assertions / 29 files, 0 skips**, strict types and Web **53/53** PASS. Includes real synthetic SQLite mutation/loss detection, real pure PowerShell hash/reopen, CI-only script refusal before side effects, publisher allowlist/corruption/credential-denial and existing module/update suites. Guards report zero network/listener/Java/application events.
+Final selected offline suite: **323/323 test cases / 29 files, 0 skips**, strict types and Web **53/53** PASS. Counts are Vitest `numTotalTests`, not the number of individual expect calls. Includes real synthetic SQLite mutation/loss detection, real pure PowerShell hash/reopen, CI-only script refusal before side effects, publisher allowlist/corruption/credential-denial and existing module/update suites. Guards report zero network/listener/Java/application events.
 
 Retain initial suite-load failure (test loader did not recognize direct `node:sqlite`), the Vitest mock generic type error, and the real 98/99 hash-lock counterexample. Tests use the project's existing createRequire/native SQLite pattern and correct inferred mock types; no new dependency, check suppression, skip or timeout workaround.
 

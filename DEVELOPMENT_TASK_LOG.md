@@ -1,5 +1,14 @@
 # Pica Library Development Task Log
 
+## P2 Android user-Host — direct source, same Reader and owned chapter (2026-10-26)
+
+**Status: LOCAL_SOURCE_AND_NODE_GATES_PASS / ANDROID_COMPILE_RUNTIME_AND_REAL_HOST_NOT_RUN / FULL_OBJECTIVE_OPEN. Source ffa54e2de0b2e573cc2355991c4f6b78e0ea3ede, isolated local branch codex/android-user-host-20261026. No push/cloud/version/Release/OTA/deployment.**
+
+- User descriptor saved disabled → explicit enable without IO → separate15-minute memory grant → installed-source list → explicit one-source bind → manual search/book selection → existing Android Reader/history. Direct phone-to-user-Host, not Desktop relay. No default host/content, extension install/execution or provider account inheritance. Normal TLS/fixed routes, signed64-string identity, strict JSON/raster ownership and revoke/late-commit guards. Old Permit implements generic Access; three existing IDs/epochs/storage formats unchanged.
+- Separate selected-chapter save consent reuses LocalComicImporter/LocalComicStore's copy/validation/generation/AtomicFile publication and original local Reader/library; not another queue or temporary-cache offline claim. Cancellation/failure retains old copies. Foreground single chapter only, no background resume; online references remain bounded session state, not complete persistent native Host catalogue/tags/sync. Host history never falls back to Pica/Desktop; unsupported Host-only IDs are excluded from portable recommendation evidence without modifying rankers/sync algorithms.
+- Added36 Android/JUnit/Robolectric and3 shared-importer tests, all UNCOMPILED/NOT_RUN. Node contracts12PASS; final regression-2 484PASS/0FAIL/0skip in33files, full types-2/Web56/56 PASS,8offline audits0events. Isolated Node java-parser3.0.1 parses252 Java files: grammar-only, not JVM/Android/device/package proof. Evidence _validation/android-user-host-20261026, contract docs/ANDROID_USER_HOST_READER.md.
+- Local context NOT_FOUND/claim DPAPI failure remains; standing isolated-goal exception, no identity repair. No local Java/app/browser/listener, formal/G-drive data, PR212/Dev87/main/Release/OTA, schema/SDK/version/workflow or ranking/Visual modifications. New cloud authorization remains unanswered; no push/dispatch. Next is exact-source cloud compile/tests, then actual packages/Host, not further feature addition. Ledger7phases/42cases unchanged, user testing NOT_READY, full goal OPEN.
+
 ## P2 unified Downloads — same Host tasks, shared view and safe query lifecycle (2026-10-26)
 
 **Status: LOCAL_UNIFIED_DOWNLOAD_PROJECTION_AND_GATES_PASS / ANDROID_AND_REAL_INTEROP_PENDING / FULL_OBJECTIVE_OPEN. Application source6d5ce26f2fbee9dcf199463e433b5b7d3c21c88a, isolated branch codex/user-host-offline-20261026. No push/cloud/version/Release/OTA/deployment.**

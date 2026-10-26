@@ -1,5 +1,11 @@
 # User-hosted library → shared Reader — NEXT-67 (unpublished)
 
+## Latest native slice — direct Android source/Reader/local copy (2026-10-26)
+
+Source`ffa54e2de0b2e573cc2355991c4f6b78e0ea3ede` adds user-owned Host configuration/grants, explicit installed-source search, the original Android Reader/history and separately confirmed single-chapter copies in existing local inventory. Direct phone-to-Host, not Desktop relay; no default host/content, extension execution or account inheritance. Online references remain ephemeral; a saved local copy is durable, not a cache-only claim or full background queue/native catalogue/sync implementation.
+
+Node484PASS, full types/Web56 and grammar-only parsing252 Java files are local evidence. New36 native/3 shared-importer tests are UNCOMPILED/NOT_RUN; Android build/lint, actual Host, device and packages NOT_RUN. No push/cloud/release/deployment/formal-data access. See [native contract](ANDROID_USER_HOST_READER.md) and [delivery ledger](LOCAL_READER_DELIVERY_LEDGER.zh-CN.md); older sections below remain historical evidence, not native acceptance.
+
 ## Current local extension — shared jobs in the Downloads entry (2026-10-26)
 
 Application source`6d5ce26f2fbee9dcf199463e433b5b7d3c21c88a` projects the SAME authorized-session jobs into Downloads, with separately labeled counts/lifetimes from the existing persistent platform queue. It uses the same shared DOM renderer and fixed current-session query/cancel ports as the Host panel. No second scheduler/store, enqueue/retry command, provider startup, credentials/CSRF export or legacy SQL job action is added. Completed copies open the existing local Reader; ending a session does not delete them.

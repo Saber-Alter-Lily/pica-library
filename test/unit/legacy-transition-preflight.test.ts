@@ -83,7 +83,7 @@ describe('independent first-migration read-only preflight', () => {
             readOnly: true, canApply: false, executionAvailable: false, mustRevalidateBeforeApply: true,
             verdict: 'READY_FOR_EXPLICIT_CONFIRMATION', requiresOptionalRuntimeConsent: false,
             profile: { home: f.home, library: f.library, configured: true, downloadInventory: 'NOT_READ' },
-            nextAction: 'CONFIRMATION_AND_COORDINATOR_NOT_IMPLEMENTED'
+            nextAction: 'EXPLICIT_CONFIRMATION_IN_INDEPENDENT_ENTRY'
         })
         expect(inspectLegacyTransition(f.selection, f.context).previewId).toBe(preview.previewId)
         for (const write of writes) expect(write).not.toHaveBeenCalled()

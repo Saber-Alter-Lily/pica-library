@@ -17,6 +17,7 @@ import { MODULE_CONTRACT_PATH, normalizeModuleContracts, parseModuleContracts, r
 import { normalizeUpdatePath, updaterSelfReplacement, forbiddenUpdatePayload as forbiddenPayload } from './path-safety'
 import { normalizeRuntimeComposition, RUNTIME_COMPOSITION_PATH, sameRuntimeComposition, type RuntimeComposition } from '../modules/runtime-composition'
 import { validateFullApplicationArchive } from './full-archive'
+import { extractValidatedFullApplication } from './full-application-staging'
 import { installedRuntimeComposition, requireInstalledRuntimeComposition } from '../runtime/installed-runtime-composition'
 import { validateAutomaticFullRuntimeComposition, validateIncrementalRuntimeComposition } from './runtime-composition'
 import { RUNTIME_CHOICE_TTL_MS, runtimeChoiceComposition, validateRuntimeChoiceReceipt, validateRuntimeChoiceVersion, type RuntimeChoiceReceipt } from './runtime-choice'
@@ -992,31 +993,15 @@ export class UpdateManager {
                 `full-staged-${id}`,
                 'application'
             )
-            fs.mkdirSync(directory, { recursive: true })
-            this.writeProgress({
-                phase: 'extracting',
-                current: 0,
-                total: validated.declared.size,
-                targetVersion: version
-            })
-            let current = 0
-            for (const [safe, entry] of validated.declared) {
-                const destination = path.join(
-                    directory,
-                    ...safe.split('/')
-                )
-                fs.mkdirSync(path.dirname(destination), {
-                    recursive: true
-                })
-                fs.writeFileSync(destination, entry.getData())
-                current += 1
+            fs.mkdirSync(path.dirname(directory), { recursive: true })
+            extractValidatedFullApplication(validated, directory, (current, total) => {
                 this.writeProgress({
                     phase: 'extracting',
                     current,
-                    total: validated.declared.size,
+                    total,
                     targetVersion: version
                 })
-            }
+            })
             this.staged = null
             this.stagedFull = {
                 id,

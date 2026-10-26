@@ -1,4 +1,4 @@
-import AdmZip from 'adm-zip'
+import type AdmZip from 'adm-zip'
 import { MODULE_CONTRACT_PATH, parseModuleContracts } from '../modules/contracts'
 import { compositionFromPayload, RUNTIME_COMPOSITION_PATH } from '../modules/runtime-composition'
 

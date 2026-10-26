@@ -24,6 +24,8 @@ import { installedRuntimeComposition, requireInstalledRuntimeComposition } from 
 import { validateAutomaticFullRuntimeComposition } from './runtime-composition'
 import { validateRuntimeChoiceReceipt } from './runtime-choice'
 import { sameRuntimeComposition } from '../modules/runtime-composition'
+import { assertLegacyTransitionPreApply } from './legacy-transition-guard'
+import { releaseLegacyTransitionLock } from './legacy-transition-lock'
 
 /** Status storage must never prevent recovery of the application or user state. */
 
@@ -222,6 +224,7 @@ export async function runFullApplicationUpgrade(
     let committed = false
     let parentExited = false
     let replacementStarted = false
+    let recoveryCompleted = false
     try {
         writeProgress(instruction.progressFile, {
             phase: 'waiting-for-exit',
@@ -229,6 +232,9 @@ export async function runFullApplicationUpgrade(
         })
         await prepareHelperStartup(instruction, 'full-application')
         await waitForExit(instruction.parentPid)
+        // Refusal here is pre-transaction: do not restore files/DB or launch an
+        // old app whose current process ownership is unknown.
+        assertLegacyTransitionPreApply(instruction)
         parentExited = true
         validateRuntimeComposition(instruction)
         fs.rmSync(instruction.instanceFile, { force: true })
@@ -331,6 +337,7 @@ export async function runFullApplicationUpgrade(
             if (replaced) rollbackApplication(instruction)
             if (snapshot) restoreUserState(instruction, snapshot)
             await launchApplication(instruction.applicationRoot)
+            recoveryCompleted = true
         } catch (rollbackError) {
             reportRecoveryProgress(instruction.progressFile, {
                 phase: 'failed',
@@ -349,6 +356,10 @@ export async function runFullApplicationUpgrade(
             message: error instanceof Error ? error.message : String(error)
         })
         throw error
+    } finally {
+        if (instruction.legacyTransition && (committed || !parentExited || recoveryCompleted) &&
+            !releaseLegacyTransitionLock(instruction.legacyTransition.lock, instruction.applicationRoot))
+            console.error('Legacy transition ownership lock retained for review.')
     }
 }
 

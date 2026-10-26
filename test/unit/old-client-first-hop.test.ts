@@ -20,6 +20,15 @@ function transport(scenario = 'success', released = true) {
     return { fetch: createFirstHopFetch({ scenario, archiveBytes: fakeBytes, releasedDesktop: () => released, nativeFetch: native, observe: event => observed.push(event) }), observed, native }
 }
 describe('first-hop harness contracts without applications, Java, HTTP or listeners', () => {
+    it('observes uncaught errors without consuming them or turning fatal failure into success', () => {
+        const preload = fs.readFileSync('scripts/lib/old-client-first-hop-preload.mjs', 'utf8')
+        expect(preload).toContain("process.on('uncaughtExceptionMonitor'")
+        expect(preload).not.toContain("process.on('uncaughtException',")
+        const result = spawnSync(process.execPath, ['-e', "process.on('uncaughtExceptionMonitor',()=>process.stdout.write('MONITOR_ONLY'));setImmediate(()=>{throw Error('SYNTHETIC_FATAL')})"],
+            { windowsHide: true, encoding: 'utf8', timeout: 10000 })
+        expect(result.error).toBeUndefined(); expect(result.status).toBe(1)
+        expect(result.stdout).toContain('MONITOR_ONLY'); expect(result.stderr).toContain('SYNTHETIC_FATAL')
+    })
     it('opens actual harness log streams before giving their descriptors to a harmless child', async () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-first-hop-stdio-')); roots.push(root)
         const source = fs.readFileSync('scripts/test-windows-old-client-first-hop.mjs', 'utf8')

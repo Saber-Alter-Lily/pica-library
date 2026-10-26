@@ -35,6 +35,10 @@ if (!kind) throw Error('Unknown or substituted application/helper entrypoint')
 const observe = event => fs.appendFileSync(audit, JSON.stringify({ pid: process.pid, entryKind: kind, ...event }) + '\n')
 let launchErrorInjected = false
 observe({ kind: 'ENTRY_INITIALIZED', sha256: entryHash })
+// Observation only: this monitor does not consume an exception or change fatal exit behavior.
+process.on('uncaughtExceptionMonitor', error => observe({ kind: 'UNCAUGHT_EXCEPTION_OBSERVED', name: error?.name,
+    code: typeof error?.code === 'string' && /^[A-Z0-9_]+$/.test(error.code) ? error.code : null }))
+process.on('exit', code => observe({ kind: 'ENTRY_EXIT_OBSERVED', code }))
 globalThis.fetch = createFirstHopFetch({ scenario: input.scenario, archiveBytes, releasedDesktop: () => kind === 'released-desktop', nativeFetch: globalThis.fetch.bind(globalThis), observe })
 const connect = net.Socket.prototype.connect
 net.Socket.prototype.connect = function (...args) {

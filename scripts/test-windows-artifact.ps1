@@ -26,6 +26,7 @@ $listener = $null
 $smokePassed = $false
 $smokeFailureType = ''
 $observerAudit = $null
+$observerDescriptor = $null
 New-Item -ItemType Directory -Force -Path $extract,$local | Out-Null
 Copy-Item -LiteralPath $Zip -Destination (Join-Path $work 'candidate.zip')
 Expand-Archive -LiteralPath (Join-Path $work 'candidate.zip') -DestinationPath $extract
@@ -94,7 +95,7 @@ try {
         $observerValue = @{ root=$work; applicationRoot=$rootPath; auditFile=$observerAudit; sourceSha=$sourceSha; desktopSha256=(Get-FileHash -LiteralPath (Join-Path $rootPath 'app/desktop.js') -Algorithm SHA256).Hash.ToLowerInvariant() }
         [IO.File]::WriteAllText($observerDescriptor,($observerValue|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
         $env:READER_SMOKE_PROCESS_OBSERVER_FILE=$observerDescriptor
-        $env:NODE_OPTIONS='--require="'+$observer+'"'
+        $env:NODE_OPTIONS='--require="'+$observer.Replace('\','/')+'"'
     }
     if ($PortCollision) {
         $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,4789)
@@ -261,11 +262,12 @@ try {
     $smokeFailureType = $_.Exception.GetType().FullName
     throw
 } finally {
-    if ($observerAudit -and (Test-Path -LiteralPath $observerAudit)) {
+    if ($observerDescriptor) {
         $evidence = Join-Path $repositoryRoot ('artifacts/windows-smoke-evidence/'+(Split-Path -Leaf $work))
         New-Item -ItemType Directory -Path $evidence -Force | Out-Null
-        Copy-Item -LiteralPath $observerAudit -Destination (Join-Path $evidence 'process-audit.jsonl')
-        @{ sourceSha=$sourceSha; gatePassed=$smokePassed; failureType=$smokeFailureType; setupPersistence=[bool]$SetupPersistence; localOnly=[bool]$LocalOnlySetup; requestDeadlinesChanged=$false; privateStateCopied=$false } | ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath (Join-Path $evidence 'result.json')
+        $observerReady = $observerAudit -and (Test-Path -LiteralPath $observerAudit)
+        if ($observerReady) { Copy-Item -LiteralPath $observerAudit -Destination (Join-Path $evidence 'process-audit.jsonl') }
+        @{ sourceSha=$sourceSha; gatePassed=$smokePassed; failureType=$smokeFailureType; observerReady=[bool]$observerReady; setupPersistence=[bool]$SetupPersistence; localOnly=[bool]$LocalOnlySetup; requestDeadlinesChanged=$false; privateStateCopied=$false } | ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath (Join-Path $evidence 'result.json')
     }
     if ($listener) { $listener.Stop() }
     $env:PATH = $originalPath

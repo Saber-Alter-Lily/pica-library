@@ -139,10 +139,12 @@ async function scenario(kind) {
         await new Promise((resolve, reject) => { launcher.once('spawn', resolve); launcher.once('error', reject) })
         await ready(FIRST_HOP_BASELINE.version); assert.ok(ownedPid(instance.pid)); oldPid = instance.pid; state('snapshot')
         const publication = firstHopPublication(kind)
+        row.failureStep = 'check-current-release'
         const check = await fetch(instance.url + '/api/v1/update/check', { signal: AbortSignal.timeout(30000) })
         assert.ok(check.ok); const available = await check.json()
         assert.equal(available.status, 'full-install'); assert.equal(available.oneClick, true); assert.equal(available.version, publication.version); assert.equal(available.assetName, publication.archiveName)
         // Do not call stage-full directly or invoke/copy a candidate helper.
+        row.failureStep = 'prepare-latest'
         const preparedResponse = await post('/api/v1/update/prepare-latest', {}, 180000), prepared = await preparedResponse.json()
         if (kind === 'hash-mismatch') {
             assert.ok(!preparedResponse.ok && !prepared.id, 'Corrupt download was not rejected by old official hash verification')
@@ -153,8 +155,10 @@ async function scenario(kind) {
         } else {
             assert.ok(preparedResponse.ok && prepared.id); assert.equal(prepared.mode, 'full-application'); assert.equal(prepared.oneClick, true)
             assert.equal(prepared.targetSourceSha, sourceSha); assert.equal(prepared.archiveSha256, sha256(candidateBytes))
+            row.failureStep = 'apply'
             const applied = await post('/api/v1/update/apply', { id: prepared.id })
             assert.ok(applied.ok); const accepted = await applied.json(); assert.ok(accepted.accepted || accepted.success, 'Old controller did not acknowledge apply')
+            row.failureStep = 'wait-exact-old-helper-terminal'
             let terminal
             // Observation budget only: production/helper deadlines are never changed.
             for (let attempt = 0; attempt < 1500; attempt++) {
@@ -188,7 +192,11 @@ async function scenario(kind) {
             realProviderSessionsSeeded: false, accountOrFullLibraryReadyClaimed: false,
             realPublicGitHubNetworkOrPublishedOta: false, userDataAccessed: 'OWNED_SYNTHETIC_ONLY', physicalDeviceOrBrowserUiAcceptance: 'NOT_ESTABLISHED' }
         success = true
-    } catch (error) { row.error = String(error?.stack ?? error); throw error }
+    } catch (error) {
+        row.error = String(error?.stack ?? error)
+        row.causeCode = typeof error?.cause?.code === 'string' && /^[A-Z0-9_]+$/.test(error.cause.code) ? error.cause.code : null
+        throw error
+    }
     finally {
         try { if (fs.existsSync(auditFile)) await stopOwned() } catch (error) { success = false; row.status = 'FAIL'; row.teardownError = String(error); throw error }
         finally {

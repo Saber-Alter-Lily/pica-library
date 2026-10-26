@@ -53,4 +53,17 @@ public class LocalComicImporterTest {
     @Test public void emptyArchiveAndUnsafeIrrelevantEntryFailClosed() throws Exception {
         assertThrows(IOException.class,()->prepare());assertThrows(IOException.class,()->prepare(image("a.png"),new LocalComicImporter.Input("../private.txt",0,false,()->new ByteArrayInputStream(new byte[0]))));
     }
+    @Test public void generatedRasterStreamsUseSameBoundsIdentityAndBodySignature()throws Exception {
+        byte[] jpg=new byte[]{(byte)255,(byte)216,(byte)255,1};List<Integer> progress=new ArrayList<>();
+        LocalComicImporter.Prepared result=LocalComicImporter.prepareRasterPages("Generated",Arrays.asList(()->new ByteArrayInputStream(png),()->new ByteArrayInputStream(jpg)),temporary.newFolder(),()->{},(complete,total)->{assertEquals(2,total);progress.add(complete);});
+        assertEquals(Arrays.asList(1,2),progress);assertEquals("000001.png",result.pages.get(0).name);assertEquals("000002.jpg",result.pages.get(1).name);assertEquals(png.length+jpg.length,result.bytes);assertEquals(1,result.chapters);
+    }
+    @Test public void generatedStreamsRejectInvalidBodyAndExcessPageCountBeforeOpening()throws Exception {
+        assertThrows(IOException.class,()->LocalComicImporter.prepareRasterPages("Generated",Collections.singletonList(()->new ByteArrayInputStream(new byte[12])),temporary.newFolder(),()->{},(complete,total)->{}));
+        List<LocalComicImporter.Open> many=new ArrayList<>();for(int i=0;i<2001;i++)many.add(()->{throw new AssertionError("Must not open over-limit chapter");});assertThrows(IOException.class,()->LocalComicImporter.prepareRasterPages("Generated",many,temporary.newFolder(),()->{},(complete,total)->{}));
+    }
+    @Test public void generatedCancellationStopsBeforeNextPageAndClosesTheCurrentStream()throws Exception {
+        java.util.concurrent.atomic.AtomicBoolean cancelled=new java.util.concurrent.atomic.AtomicBoolean(),closed=new java.util.concurrent.atomic.AtomicBoolean();List<LocalComicImporter.Open> pages=Arrays.asList(()->new ByteArrayInputStream(png){public void close()throws IOException{closed.set(true);super.close();}},()->{throw new AssertionError("Cancelled before opening second page");});
+        assertThrows(IOException.class,()->LocalComicImporter.prepareRasterPages("Generated",pages,temporary.newFolder(),()->{if(cancelled.get())throw new IOException("cancelled");},(complete,total)->cancelled.set(true)));assertTrue(closed.get());
+    }
 }

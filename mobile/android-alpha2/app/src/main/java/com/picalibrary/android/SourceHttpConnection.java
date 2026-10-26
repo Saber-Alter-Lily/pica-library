@@ -8,13 +8,13 @@ import java.util.*;
 /** Decorates existing transports, preserving redirects/cookies/timeouts; no second HTTP stack. */
 final class SourceHttpConnection extends HttpURLConnection {
     private final HttpURLConnection delegate;
-    private final SourceAccessPolicy.Permit permit;
+    private final SourceAccessPolicy.Access permit;
     private final SourceAccessPolicy.Registration registration;
     private volatile boolean closed;
-    static HttpURLConnection guard(HttpURLConnection connection,SourceAccessPolicy.Permit permit){
+    static HttpURLConnection guard(HttpURLConnection connection,SourceAccessPolicy.Access permit){
         try{return new SourceHttpConnection(connection,permit);}catch(RuntimeException error){connection.disconnect();throw error;}
     }
-    private SourceHttpConnection(HttpURLConnection delegate,SourceAccessPolicy.Permit permit){
+    private SourceHttpConnection(HttpURLConnection delegate,SourceAccessPolicy.Access permit){
         super(delegate.getURL());this.delegate=delegate;this.permit=permit;permit.check();
         registration=permit.onCancel(delegate::disconnect);
     }

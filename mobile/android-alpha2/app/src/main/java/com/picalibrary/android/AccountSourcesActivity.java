@@ -66,6 +66,7 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         probeSerial++;
         content.removeAllViews();
         content.addView(SettingsRow.row(this,getString(R.string.source_choices_title),getString(R.string.source_choices_summary),v->startActivity(new Intent(this,SourceChoicesActivity.class))));
+        content.addView(SettingsRow.row(this,getString(R.string.host_title),getString(R.string.host_entry),v->startActivity(new Intent(this,HostSourceActivity.class))));
 
         boolean paired=BridgeStore.paired(this);
         boolean localPica=PicaAccountStore.load(this).configured();

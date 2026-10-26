@@ -38,7 +38,7 @@ final class SourceAccess {
     static boolean enabled(Context context,String id){return get(context).loadError.isEmpty()&&get(context).policy.enabled(id);}
     static SourceAccessPolicy.Permit bind(Context context,String id){return get(context).policy.bind(id);}
     static void require(Context context,String id){if(!enabled(context,id))throw new SourceAccessPolicy.Disabled(id);}
-    static <T>T commit(SourceAccessPolicy.Permit permit,SourceAccessPolicy.Commit<T> action){
+    static <T>T commit(SourceAccessPolicy.Access permit,SourceAccessPolicy.Commit<T> action){
         try{return permit==null?action.run():permit.commit(action);}
         catch(RuntimeException error){throw error;}catch(Exception error){throw new IllegalStateException(error);}
     }

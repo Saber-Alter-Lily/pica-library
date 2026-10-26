@@ -87,13 +87,14 @@ public class ReaderActivity extends LocaleAwareActivity {
     }
     private void selected(int p) { index = ReaderPolicy.clampPage(p, pages.size()); updateCounter();prefetchAround(); save(false);if(atChapterEnd())setChrome(true); }
     private void prefetchAround(){int count=StorageSettings.prefetchPages(this);List<String> targets=new ArrayList<>();if(count>0&&!pages.isEmpty())for(int step=1;step<=count;step++){int p=index+step;if(p>=pages.size())break;targets.add(pages.get(p).url);}images.prefetch(targets);}
-    private String sourceLabel(){return source instanceof LocalComicReaderSource?getString(R.string.local_import_label):source instanceof PhoneDownloadReaderSource?"手机":source instanceof RemoteReaderSource?"云端/缓存":source instanceof PicaReaderSource?"Pica/缓存":source instanceof EhReaderSource?"E-H/缓存":source instanceof JmReaderSource?"JM/缓存":"电脑/缓存";}
+    private String sourceLabel(){return source instanceof HostReaderSource?getString(R.string.host_title):source instanceof LocalComicReaderSource?getString(R.string.local_import_label):source instanceof PhoneDownloadReaderSource?"手机":source instanceof RemoteReaderSource?"云端/缓存":source instanceof PicaReaderSource?"Pica/缓存":source instanceof EhReaderSource?"E-H/缓存":source instanceof JmReaderSource?"JM/缓存":"电脑/缓存";}
     private int currentChapterIndex(){for(int i=0;i<chapters.size();i++)if(chapters.get(i).id.equals(chapter))return i;return -1;}
     private boolean atChapterEnd(){return chapterReady&&!pages.isEmpty()&&index>=pages.size()-1;}
     private void updateChapterAdvance(){if(chapterAdvance==null||nextPageButton==null)return;if(!atChapterEnd()){chapterAdvance.setVisibility(View.GONE);nextPageButton.setText(LocalizedText.ui("下一页"));nextPageButton.setEnabled(true);return;}int current=currentChapterIndex(),next=current+1;if(current>=0&&next<chapters.size()){BridgeClient.ChapterItem target=chapters.get(next);chapterAdvance.setVisibility(View.VISIBLE);chapterAdvance.setEnabled(true);chapterAdvance.setText(LocalizedText.ui("下一章 · ")+target.title);nextPageButton.setText(LocalizedText.ui("下一章"));nextPageButton.setEnabled(true);}else{chapterAdvance.setVisibility(View.VISIBLE);chapterAdvance.setEnabled(false);chapterAdvance.setText(LocalizedText.ui("已读完 · 最后一章"));nextPageButton.setText(LocalizedText.ui("已结束"));nextPageButton.setEnabled(false);}}
     private void advanceChapter(){int current=currentChapterIndex(),target=current+1;if(current>=0&&target<chapters.size())loadChapter(chapters.get(target).id,0);else Toast.makeText(this,LocalizedText.ui("已经到最后一章"),Toast.LENGTH_SHORT).show();}
     private void updateCounter() { if (!dragging) { seek.setProgress(index); counter.setText((pages.isEmpty() ? 0 : index + 1) + " / " + pages.size() + " · "+sourceLabel()+LocalizedText.ui(" · 预载 ")+StorageSettings.prefetchPages(this)); } updateChapterAdvance(); }
     private void recordReaderCompleteAsync(){
+        if(!source.emitsRecommendationEvidence())return;
         Context app=getApplicationContext();
         String comicId=comic;
         metadata.submit(()->{

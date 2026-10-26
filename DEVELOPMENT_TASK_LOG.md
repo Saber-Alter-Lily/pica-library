@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## P0-R2 — legacy transition route accepted, bounded compatibility decision (2026-10-26)
+
+**Status: HUMAN_ROUTE_DECISION_CONFIRMED / IMPLEMENTATION_NOT_STARTED / NO_MIGRATION_EXECUTED / FULL_OBJECTIVE_OPEN. Read-only feasibility, documentation only.**
+
+- Human explicitly accepts one independent first migration entry for old v0.5.0, automatic identity/data protection instead of manual file copying, then normal in-app one-click updates. No deployment/migration execution is authorized by this workflow choice. Keep the full goal and42cases; do not require endlessly repairing an immutable old helper, relabel its failed checks or silently weaken recovery.
+- Re-read pinned public archive SHA14b92b60660b6694e2c8c19a2c1da695127de8dfd0fbafd6bd36fc8b5bc3d2bf/sourcebec7f9f:93files, no standard Velopack install markers. Official integration requires real installation/startup handling. This is archive/document compatibility evidence, not actual Velopack install testing or inspection of user installations; no SDK/build/dependency added.
+- Parse-only AST of existing fallback template SHA537483d4295d0adf8fa57afa01a3f8f7b3baeb969bece35fd5bb23652517ed2a:0parse errors, fixed formal data root and no post-Stop-Process exit verification before restoring state in Rollback-Upgrade. No script body, forms, process control, backup or restoration executed. Do not rebrand the old PS engine for isolated RC migration.
+- Chosen route reuses current full-upgrader/process-lifecycle/user-state-snapshot/helper-startup, not a third engine or immediate Velopack migration. The existing manager chooses helper bytes from the installed applicationRoot, so a new external coordinator needs explicit verified self-package authority, not a renamed old registration call. Actual helper reuse/handoff is not proven by this source analysis.
+- [Single ledger](docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md) fixes three work items: T1 readonly identity/path/data-profile preview; T2 actual independent entry with old-process proof and existing engine handshake; T3 separately authorized disposable cloud scenarios and forward updates. Next safe work is T1 with synthetic files/inert ports. R1 cloud attribution and physical/source/sync/gesture acceptance stay open; no user test package, push, version/tag/Release/OTA/G-drive/formal data change.
+
 ## P0-R1 — idle translation request defect, first bounded local correction (2026-10-26)
 
 **Status: LOCAL_DEFECT_REPRODUCED_AND_FIXED / OFFLINE_GATES_PASS / ACTUAL_WINDOWS_ATTRIBUTION_PENDING / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN. No push/build/deployment.**

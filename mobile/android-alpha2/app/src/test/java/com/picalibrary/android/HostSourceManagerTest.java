@@ -56,7 +56,7 @@ public class HostSourceManagerTest {
     }
     @Test public void authenticationIsEphemeralAndNeverEntersConfigOrReaderLocators()throws Exception {
         fixture.manager.configure(0,"Synthetic Host","https://fixture.invalid/","basic",false);fixture.manager.enabled(1,true,true);fixture.manager.start("private-user","private-password",true);
-        String config=Files.readString(new File(context.getFilesDir(),"user-host-config-v1.json").toPath());assertFalse(config.contains("private-user"));assertFalse(config.contains("private-password"));assertFalse(config.contains("Authorization"));
+        String config=new String(Files.readAllBytes(new File(context.getFilesDir(),"user-host-config-v1.json").toPath()),java.nio.charset.StandardCharsets.UTF_8);assertFalse(config.contains("private-user"));assertFalse(config.contains("private-password"));assertFalse(config.contains("Authorization"));
         String header=fixture.opened.get(0).getRequestProperty("Authorization");assertTrue(header.startsWith("Basic "));HostSourceManager.Session old=fixture.manager.requireSession();fixture.manager.end();assertThrows(RuntimeException.class,old::check);assertFalse(fixture.manager.hasSession());assertEquals(0,UnifiedCatalogStore.load(context).byId.size());
     }
     @Test public void corruptConfigurationRemainsUntouchedAndFailsClosed()throws Exception {

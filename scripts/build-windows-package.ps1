@@ -20,8 +20,14 @@ $sourceSha = if ($env:PICA_LIBRARY_BUILD_PROVENANCE) { [string]$env:PICA_LIBRARY
 
 function Get-Sha256([string]$file) {
     $algorithm = [Security.Cryptography.SHA256]::Create()
-    try { return ([BitConverter]::ToString($algorithm.ComputeHash([IO.File]::OpenRead($file)))).Replace('-','').ToLowerInvariant() }
-    finally { $algorithm.Dispose() }
+    $stream = $null
+    try {
+        $stream = [IO.File]::OpenRead($file)
+        return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-','').ToLowerInvariant()
+    } finally {
+        if ($stream) { $stream.Dispose() }
+        $algorithm.Dispose()
+    }
 }
 
 if ($gitSourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Could not resolve Git source commit SHA' }

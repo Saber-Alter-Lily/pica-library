@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## Real old-client first-hop boundary — local continuation (2026-10-25)
+
+**Status: LOCAL_HARNESS_AND_HASH_FIX_GATES_PASS / ACTUAL_FIRST_HOP_NOT_RUN / LEGACY_ASYNC_LAUNCH_COUNTEREXAMPLE_HOLD / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**
+
+- New independent local branch `codex/reader-old-client-first-hop-gate-20261025` starts from sealed `a5e57e1b776ac54b6bf1b7bddf6718f3056a9b2a`. Standing isolated-goal permission continues after NOT_FOUND context/claim; no new cloud/push authority inferred. Frozen PR210/Dev86/source-review ZIPs, formal data/schema and local Java/app/browser/listener remain untouched.
+- Authored CI-only exact-old-client check/prepare-latest/apply gate, not candidate-helper invocation. External test publisher preserves actual official origin/hash/download/file checks; old controller selects its exact pinned helper. Marked CI-only version-metadata fixture, full app tree/state canaries, hash rejection, health/launch recovery, owned process checks and retained evidence. No production test hook, dependency, native/API/DB/ranking/sync change or arbitrary source market.
+- Actual pure builder hash/reopen regression failed98/99: FileStream leaked after SHA calculation. Fixed explicit finally disposal; do not rely on GC/retry or weaken exclusive-open assertion. Initial native-SQLite test-loader/mock-generic development failures also retained. Final selected source/offline gate323/323 across29 files,0skips; strict types/Web53 PASS, zero guarded runtime boundary events.
+- Separate fixed-public-ZIP AST/VM audit verified old helper launch `w` returns no Promise, has zero child error listeners and lets asynchronous EACCES escape. This is a real old-code counterexample, not installed rollback execution or an update PASS. Candidate-helper successes do not repair it. Keep first-hop launch recovery HOLD; actual four runtime scenarios remain unexecuted and must not substitute helpers or skip the known-risk case.
+- [Exact input hashes, fixture safety, coverage limits and required continuation](docs/OLD_CLIENT_FIRST_HOP_GATE.md). Next: supported legacy compatibility/safety decision and separately authorized cloud execution, with real failures retained. Broader source-neutral core/native/trust/sync and physical user acceptance remain open; no one-action upgrade completion claim.
+
 ## Core / optional-runtime composition — isolated local continuation (2026-10-25)
 
 **Status: LOCAL_IMPLEMENTATION_AND_SELECTED_OFFLINE_GATES_PASS / NEW_INSTALLABLE_AND_OLD_FIRST_HOP_GATES_PENDING / FULL_OBJECTIVE_OPEN. Not pushed, released or deployed.**

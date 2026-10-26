@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## Legacy transition T1 — actual read-only preview and shared package validation (2026-10-26)
+
+**Status: LOCAL_CODE_AND_TARGETED_GATES_PASS / BUILD_BINDING_AND_EXECUTION_PENDING / FULL_OBJECTIVE_OPEN. Source045587d746e1664a639f7e0ed427d86135e2a87f, no push/build/deployment/migration.**
+
+- Implements the accepted route's T1 module and actual CLI, not another planner-only interface. Extracts the existing full-archive validator unchanged for both UpdateManager and preflight; reuse Desktop/SQLite disk-path and package asset/composition contracts. No new dependency, database/schema, model, ranker, source provider, Android/signing, application version or workflow change.
+- Read-only exact source-tree/target ZIP/independent-engine identity, CRC, profile/path-role separation, canonical-path review, existing-backup and denied-access handling. Default CLI is unbound and rejects before file access; no user JSON/--manifest/--apply/env authority. Every returned preview has canApply=false and requires later revalidation; target provenance is expected build context, not claimed live publisher authentication.
+- Final local unit-6:127PASS/0FAIL/0skip across7files,29new preflight cases including real compiled bound/unbound CLI; types-3 PASS. All nine unit/type phase boundary audits0events. Existing update-manager/full-orchestration/component and prior translation regressions pass; simulated transactions use owned synthetic temp files/fake processes only, never installed applications or formal data.
+- Preserve unit-1..4 and types-1 failures. The full CLI's misleading missing-launcher diagnosis came from bundled AdmZip's instanceof Uint8Array against native fs Buffer in another VM realm; confirmed dependency line and an explicit counterexample, fixed the fixture's byte/Node intrinsic contract, not package validation. The temporary diagnostic-only altered bundle was not acceptance and is absent from final source. No timeout/skip/security weakening.
+- T1 does not deliver an authenticated migration bundle or execute any transition. Next finite work is T2 trusted distribution/target binding and actual coordinator using existing startup/transaction engine, then separately authorized T3 synthetic cloud proof. [Current single ledger](docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md). Known old first-hop failures, R1 cloud attribution and real source/device/gesture/sync/full-product gates remain open.
+
 ## P0-R2 — legacy transition route accepted, bounded compatibility decision (2026-10-26)
 
 **Status: HUMAN_ROUTE_DECISION_CONFIRMED / IMPLEMENTATION_NOT_STARTED / NO_MIGRATION_EXECUTED / FULL_OBJECTIVE_OPEN. Read-only feasibility, documentation only.**

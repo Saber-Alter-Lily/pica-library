@@ -1,6 +1,6 @@
 # 本地漫画阅读器：总推进与验收账本
 
-版本：P0-20261026-3。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
+版本：P0-20261026-4。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
 
 ## 1. 产品目标与权威规则
 
@@ -20,12 +20,12 @@
 | --- | --- |
 | 正式发布 | [v0.5.0](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0)，不修改 |
 | 最近云端已执行源码 | 6efc865fd229660f77929ebe2018b494fc198995，PR212，仍冻结 |
-| 当前本地应用修复 | 229330e85657f6fdee54d5ec5620c91330b74ccb；[翻译加载边界](SOURCE_IDLE_TRANSLATION_FIX.md)离线通过，未推送/云端构建，不生成新 Dev 版本 |
+| 当前本地源码 | 045587d746e1664a639f7e0ed427d86135e2a87f；包含229330e翻译边界修复和 T1 只读预检，127项定向回归/类型通过；未推送/云端构建，不生成新 Dev 版本 |
 | 最新运行 | [40305007546](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40305007546)，completed / failure；source、windows-unit、fixtures 成功，六类事务失败 |
 | 最近完整安装产物 | PR211 / e9b08b418c2fdbc55dbf499afb74f7b927b12434 / Dev87；PARTIAL 审阅候选，不是全目标可验收完成 |
 | Dev87 本地封存包 | PICA_CORE_RUNTIME_DEV87_CLOUD_REVIEW_20261025_e9b08b418c2f.zip；本轮只读重算 SHA256：6d68de38ba68fb0b2e7a16825df5d8d5146c2b70e69a5b36383e171c507ef2cd |
 | 旧版首跳 | [40274664757](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40274664757)：旧内置路径正常/哈希拒绝有证据，健康/异步启动恢复已知失败，原结果保留；新独立迁移路径未实现/未运行 |
-| 当前状态 | R1 本地缺陷已修、云端未重验；R2 已获用户确认：旧版仅首次用独立迁移入口，此后软件内一键升级。路线决策关闭不等于迁移实现或安全验收完成。P0 整体 IN_PROGRESS，产品目标 OPEN，用户暂不测试 |
+| 当前状态 | R1 本地已修、云端未重验；R2 路线已确认，T1 只读模块/实际 CLI 本地通过，但分发绑定与 T2 执行协调器未提供。没有可执行迁移或新安装包。P0 整体 IN_PROGRESS，产品目标 OPEN，用户暂不测试 |
 
 PR205 → PR206 → PR207 → PR208 → PR209 → PR210 → PR211 → PR212 是层叠候选，不是八套已经接受的产品。先冻结当前应用基线，不再为每个小修提升 Dev 版本或新建整套交付。
 
@@ -101,6 +101,18 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 - **T2 复用引擎协调入口**：复用既有下载校验和启动握手；明确独立协调器的 parentPid/nonce/ready 交接以及旧应用已退出的证明，再交给同一完整事务引擎。新进程退出不可证明时不覆盖文件或恢复数据库；失败保留可恢复资产。成功后验证版本/来源/资料位置，并继续正常应用内更新。不能只做一个未接线的纯接口就宣称入口完成。
 - **T3 单轮授权云端证明**：针对独立入口的新路径验证成功、哈希拒绝、启动失败、健康失败、取消、路径/资料错配与后续正常更新；保持旧内置路径的原始失败，不能替换测试中的旧 helper 冒充修复。仅合成临时资料；本机实际执行与正式部署仍未获授权。
 
+#### T1 工程进度 — 045587d / 本地只读入口
+
+已实现 src/update/legacy-transition-preflight.ts 和实际 scripts/preview-legacy-transition.ts。将现有 UpdateManager 的完整包路径/必需文件/模块/组件校验移至共享 full-archive.ts，原管理器复用同一函数，不新写包解析或替换引擎。127项/7文件定向回归、完整类型通过；其中新预检29项，含实际编译后的完整 CLI。所有离线边界审计0事件。
+
+- 核对精确旧程序完整清单/源码/字节，先拒绝未知目录再下降，不扫描混入的个人正文。目标 ZIP 校验绑定哈希、完整包结构/CRC/源码和预期官方位置；独立 Node/helper 必须与目标中对应字节一致，不从旧程序借用 helper。
+- 复用现有 Desktop 路径及 SQLite 文件名适配器。仅读取有界本地 config 的 libraryDirectory；不解密 credentials、不读取正文/数据库内容、不连接 SQLite、不创建 WAL。未知已有资料配置拒绝；原资料目录整体不存在则只报告默认计划，不创建它。
+- 正式 Pica Library 与 RC 资料不能混用；应用/引擎/工作区与资料不重叠。规范化路径差异要求单独复核；内层链接/硬链接数据库/权限错误/已存在恢复目录拒绝，不把 PermissionDenied 当不存在。
+- 返回稳定预览 ID 与路径，但始终 canApply=false、executionAvailable=false、需要执行前重验。读取权限错误即拒绝，写权限标为 NOT_WRITE_PROBED；T2 必须在退出旧程序前完成实际准备/写入权限验证。入口不接收 --apply、--manifest 或环境注入的“权威”，默认源码没有构建绑定时在文件访问前停止。实际分发包身份/可信构建元数据尚待 T2 绑定，预期 URL 检查不冒充联网发布认证。
+- **限制**：不是已交付的迁移产品。只有已知 v0.5.0 正式资料布局的预检，不证明全部自定义启动环境；没有真实旧安装、Windows helper、GUI/确认、退出/备份/替换/回滚执行或新 APK 验收。稳定/CI 目标元数据在测试中为内部合成端口，不是新的正式 Release。
+
+保留最初类型夹具错误和完整 CLI 模拟的原始失败：AdmZip 用 instanceof Uint8Array 选择字节输入，原 VM 与原生 fs Buffer 的类型不一致导致空 ZIP 误判。只修正模拟环境的 Node 类型契约，未修改 ZIP/哈希校验；诊断改写不计为验收且已从最终测试删除。原始日志及最终回执在 _validation/legacy-transition-preflight-20261026。
+
 决定后停止继续尝试旧 helper 自替换、大小写/路径绕过、增量桥接猜测或未经证明的第三方工具接管。只读探针与决策收据保存在 _validation/legacy-transition-decision-20261026；不是安装包，也没有迁移已完成的结论。
 
 最近六场景由同一 source/run 首次取得上述共同边界失败，不与之前不同的 workflow/oracle 缺陷混为一个根因；后续每轮须记录改动、假设、证据、结果和下一动作，不能清零旧失败。
@@ -171,6 +183,6 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 5. 用户不逐阶段陪跑。维护者先完成工程项，再一次交付日常/高级两组步骤，已通过且未受影响的项目不反复重验。
 6. 任意 APK 执行器、来源市场、PDF/CBR、自动细粒度画风标签、新模型训练、整库搬迁/监视器和全面备份中心均另列长期项；不删除，但不插入本轮。更新必须具备的状态保护/恢复仍是本轮硬门禁。
 
-**下一安全本地动作：已确认路线的 T1 只读预检入口。** R1 实际云端仍未验证；R2 不再选型，按上面三张工作单实现并验证。只使用合成文件/模拟端口，不执行迁移或启动本机应用，不另造更新引擎。新来源完整链路、实际手机和选定升级路径没有证明前，整个目标继续 OPEN。
+**下一安全本地动作：T2 的分发绑定与协调入口。** T1 已有工程证据，但默认入口仍未绑定且不可执行；先建立独立工具/目标包/资料身份的可信构建绑定，再复用既有 ready/nonce/退出与完整事务引擎，不重写替换或回滚。只使用合成文件/模拟端口，不执行迁移或启动本机应用。R1 实际云端、新来源完整链路、真机及选定升级路径未证明前，整个目标继续 OPEN。
 
 专项契约：[架构](MODULAR_LOCAL_READER_ARCHITECTURE.md)、[核心/来源边界](CORE_READER_SOURCE_BOUNDARY.md)、[Host 已有书库能力](USER_HOST_LIBRARY_READER.md)、[两个 issue](ISSUE_199_200_PREFERENCE_DISPLAY_SEARCH.md)、[私人标签](TAG_PARTICIPATION_PRIVATE_LABELS.md)、[AI 方案](AI_TAG_PROFILE_EXCHANGE.md)、[事务门禁](RUNTIME_CHOICE_TRANSACTION_GATE.md)、[用户分组步骤](NEXT_CONCENTRATED_ACCEPTANCE_CHECKLIST.zh-CN.md)。

@@ -4,6 +4,7 @@ import path from 'node:path'
 import vm from 'node:vm'
 import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
 import { spawnSync } from 'node:child_process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
@@ -19,6 +20,29 @@ function transport(scenario = 'success', released = true) {
     return { fetch: createFirstHopFetch({ scenario, archiveBytes: fakeBytes, releasedDesktop: () => released, nativeFetch: native, observe: event => observed.push(event) }), observed, native }
 }
 describe('first-hop harness contracts without applications, Java, HTTP or listeners', () => {
+    it('opens actual harness log streams before giving their descriptors to a harmless child', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pica-first-hop-stdio-')); roots.push(root)
+        const source = fs.readFileSync('scripts/test-windows-old-client-first-hop.mjs', 'utf8')
+        const start = source.indexOf("        for (const channel of ['stdout', 'stderr']) streams.push(")
+        const end = source.indexOf('        launcher = spawn(', start)
+        expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start)
+        const setup = source.slice(start, end)
+        expect(setup).toContain("await Promise.all(streams.map(stream => once(stream, 'open')))")
+        const streams: fs.WriteStream[] = []
+        try {
+            // Execute only the real log-setup block, never the application-launch line.
+            await new vm.Script(`(async()=>{${setup}})()`).runInNewContext({ fs, path, harness: root, streams, once })
+            const result = spawnSync(process.execPath, ['-e', "process.stdout.write('synthetic stdout');process.stderr.write('synthetic stderr')"],
+                { windowsHide: true, stdio: ['ignore', streams[0], streams[1]], timeout: 10000 })
+            expect(result.error).toBeUndefined(); expect(result.status).toBe(0)
+        } finally {
+            const closed = streams.map(stream => stream.closed ? Promise.resolve() : once(stream, 'close'))
+            for (const stream of streams) stream.end()
+            await Promise.all(closed)
+        }
+        expect(fs.readFileSync(path.join(root, 'launcher.stdout.log'), 'utf8')).toBe('synthetic stdout')
+        expect(fs.readFileSync(path.join(root, 'launcher.stderr.log'), 'utf8')).toBe('synthetic stderr')
+    })
     it.each([
         [{}, 'win32'], [{ ...env, GITHUB_ACTIONS: 'false' }, 'win32'], [{ ...env, RUNNER_ENVIRONMENT: 'self-hosted' }, 'win32'], [env, 'linux']
     ] as const)('denies non-disposable or non-Windows execution before side effects: %j %s', (environment, platform) => {

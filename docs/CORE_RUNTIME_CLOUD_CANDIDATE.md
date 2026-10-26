@@ -28,6 +28,8 @@ Building a candidate does not make every requirement pass. The explicit runtime-
 
 ## Evidence rules and handoff
 
+Run40268737492 / source6d539d7 produced actual core/JM ZIPs and passed existing composition/replacement/recovery, source/browser and signed-native gates. Four legacy scenarios stopped before launch on a test-only unready log stream (`stdio`, fd null); retain FAIL and do not attribute a product outcome. The harness now waits for stream open before spawn, with exact setup-block/harmless-child stdout+stderr regression. No old/current application or helper is substituted or patched. A fresh exact-head run is required; earlier artifacts remain historical, not relabelled.
+
 Preserve exact head/run/job IDs, raw failures, package SOURCE_SHA/hash, declared composition and Dev certificate/version. A green static/local subset is not full CI; a counterexample-audit exit0 is not upgrade success. Do not relabel frozen Dev86 or combine APK/ZIP from different heads. A real old-launch failure keeps that gate failed even if current helper/package tests pass; no overall first-hop PASS is inferred.
 
 The source-review ZIPs stay frozen. New artifacts go in this task's isolated validation area; final installables/evidence are verified and converged into one clearly labelled candidate handoff only after current results are inspected. PRE_HANDOFF_CLEANUP preserves raw failures, necessary source/inputs/receipts and unresolved support evidence; it does not delete historical/user files or runtime data. No automatic deployment.

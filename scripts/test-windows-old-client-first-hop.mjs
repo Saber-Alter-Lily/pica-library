@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import AdmZip from 'adm-zip'
@@ -132,6 +133,8 @@ async function scenario(kind) {
         const launchEnv = { ...env, READER_FIRST_HOP_FIXTURE: descriptorFile,
             NODE_OPTIONS: '--import=' + pathToFileURL(path.join(harness, 'old-client-first-hop-preload.mjs')).href }
         for (const channel of ['stdout', 'stderr']) streams.push(fs.createWriteStream(path.join(harness, 'launcher.' + channel + '.log'), { flags: 'wx' }))
+        // createWriteStream opens asynchronously; spawn requires real, already-open fds.
+        await Promise.all(streams.map(stream => once(stream, 'open')))
         launcher = spawn(path.join(app, 'Pica Library.exe'), ['--no-open'], { env: launchEnv, cwd: app, windowsHide: true, stdio: ['ignore', streams[0], streams[1]] })
         await new Promise((resolve, reject) => { launcher.once('spawn', resolve); launcher.once('error', reject) })
         await ready(FIRST_HOP_BASELINE.version); assert.ok(ownedPid(instance.pid)); oldPid = instance.pid; state('snapshot')

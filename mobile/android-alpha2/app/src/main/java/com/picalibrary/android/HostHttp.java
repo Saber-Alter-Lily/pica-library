@@ -52,8 +52,10 @@ final class HostHttp {
     }
     private HttpURLConnection open(HostEndpoint endpoint,String route,String auth,SourceAccessPolicy.Access access)throws Exception {
         access.check();if(Thread.currentThread().isInterrupted())throw failure("SOURCE_HOST_CANCELLED");
-        // Do not change process-wide handlers or replay another provider's ambient credentials.
-        if(CookieHandler.getDefault()!=null||Authenticator.getDefault()!=null)throw failure("SOURCE_HOST_UNSUPPORTED");
+        // Android has no public Authenticator.getDefault(). This controlled app never
+        // registers a global Authenticator (source-gated); only this session owns auth.
+        // Do not mutate process-wide handlers or reuse another provider's cookies.
+        if(CookieHandler.getDefault()!=null)throw failure("SOURCE_HOST_UNSUPPORTED");
         HttpURLConnection connection=factory.open(endpoint.request(route));
         try{connection=SourceHttpConnection.guard(connection,access);connection.setInstanceFollowRedirects(false);connection.setUseCaches(false);connection.setConnectTimeout(4000);connection.setReadTimeout(12000);connection.setRequestProperty("Cache-Control","no-store");if(auth!=null&&!auth.isEmpty())connection.setRequestProperty("Authorization",auth);return connection;}
         catch(Exception failure){connection.disconnect();throw failure;}

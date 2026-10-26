@@ -24,7 +24,7 @@
 
 - 复用既有Suwayomi v2.4.2366 / `40bc5da57820324ed0ae724cbbc020cc4673b594`的八份固定操作，与Desktop逐字漂移检查；不是任意GraphQL或URL代理。来源signed64 ID用字符串，图书/章节/页面均查归属。
 - 复用`ReaderSource/ReaderSourceFactory`、`ReaderActivity/ReaderImages/ReaderProgress`。未知来源仍拒绝，不落回Pica/Desktop。历史明确标记`host`；失效会话只预填搜索词、要求重新授权，不自动联网。Host-only ID不进入尚不支持它的portable推荐证据协议；不修改ranker/sync算法。
-- 旧`SourceAccessPolicy.Permit`实现通用`Access`端口，旧三源ID/epoch/配置不变；Host用自己的短会话实现同一请求/短提交端口。复用`HttpURLConnection/SourceHttpConnection`，正常TLS、不跟跳转、不继承全局cookie/auth或平台凭据，限定基址/固定路由。
+- 旧`SourceAccessPolicy.Permit`实现通用`Access`端口，旧三源ID/epoch/配置不变；Host用自己的短会话实现同一请求/短提交端口。复用`HttpURLConnection/SourceHttpConnection`，正常TLS、不跟跳转、拒绝全局cookie，认证只由本次会话传入，不取平台凭据。Android无公开Authenticator getter，故禁止自有原生源码注册全局Authenticator，并以源码门禁防止引入；不使用反射/隐藏API或更改全局处理器。这是受控应用的边界，不是对任意第三方进程内代码的沙箱保证。
 - 配置文件只存八个元数据字段，原子写入/回读；默认未配置/停用，损坏保留并拒绝、不自动重置。保存、启用、状态查询无网络。
 - 凭据仅本进程15分钟会话，输入禁自动保存/填充，启动/销毁清空；不写Intent/Bundle/文件/导出/同步。清引用不是取证级擦除。Basic只可HTTPS或手机自身loopback；明文私有LAN另行许可且禁Basic。
 - JSON有UTF8、深度、重复键、尾随内容守卫；非法Unicode身份拒绝。权限变更/到期/结束取消请求、拒绝迟到发布，保留已提交副本/本机历史。

@@ -2,6 +2,12 @@
   "sourceSha": "7203626e1cb324e6ca9601872e561950234f7231",
   "importerSha256": "49c255901ae015513b0c8e776c38f5e8ba38547848eedb4f1472804586512816",
   "normalization": "LF text; restore exactly the two extension/signature helper private modifiers before hashing",
+  "sharedImporterParts": {
+    "authority": "Original full importer at sourceSha still has importerSha256 above; these hashes cover unchanged regions after the separately reviewed generated-page copy extraction",
+    "prefixWithoutAddedProgressPort": "556722934af09f9acf09d6d9c37f2849eca5d8b3cd5a762f0ade6bac475f50a8",
+    "legacyInventoryThroughNaturalSort": "fc1a60e80cc29af2121dc6347df441ca5c4603155f68004e8f0368d8c40a1246",
+    "signatureThroughEnd": "9ecdf3a0e11e63433f5f547c50641d897724b772f3c99c9369a6edb2fcab9ec4"
+  },
   "permissions": [
     "<uses-permission android:name=\"android.permission.CAMERA\" />",
     "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />",

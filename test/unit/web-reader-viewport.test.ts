@@ -195,6 +195,7 @@ function lifecycle() {
         state: { reader },
         activeView: 'reader',
         readingLibraryPanel: { refresh: vi.fn(async () => undefined) },
+        hostedDownloadsPanel: { refresh: vi.fn() },
         readerComicRequest: 0,
         readerChapterRequest: 0,
         readerProgressTimer: null,
@@ -565,8 +566,10 @@ describe('actual AST-extracted app lifecycle functions, not app/browser startup'
         expect(h.flush).toHaveBeenCalledOnce()
         expect(h.context.activeView).toBe('library')
         expect(h.context.readingLibraryPanel.refresh).toHaveBeenCalledOnce()
+        expect(h.context.hostedDownloadsPanel.refresh).toHaveBeenCalledOnce()
         h.context.activateView('discover')
         expect(h.context.readingLibraryPanel.refresh).toHaveBeenCalledOnce()
+        expect(h.context.hostedDownloadsPanel.refresh).toHaveBeenCalledTimes(2)
     })
     it('does not render a chapter request completed after navigation', async () => {
         const h = lifecycle(),

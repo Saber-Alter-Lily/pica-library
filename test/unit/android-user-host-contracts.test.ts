@@ -54,10 +54,10 @@ describe('native user-Host source/resource contracts only', () => {
         expect(manager).toContain('!book.source.equals(manga.source)')
         expect(manager).toContain('!session.id.equals(row[1])')
     })
-    it('retains normal TLS, rejects redirects/ambient handlers and has bounded strict JSON/raster intake', () => {
+    it('retains normal TLS, rejects redirects/ambient cookies and has bounded strict JSON/raster intake', () => {
         const http = java('HostHttp'), json = java('HostJson')
         expect(http).toContain('setInstanceFollowRedirects(false)')
-        expect(http).toContain('CookieHandler.getDefault()!=null||Authenticator.getDefault()!=null')
+        expect(http).toContain('if(CookieHandler.getDefault()!=null)')
         expect(http).toContain('HostJson.object(response)')
         expect(http).toContain('20L*1024*1024')
         expect(http).not.toMatch(/TrustManager|HostnameVerifier|SSLSocketFactory|setDefault\(/)
@@ -65,6 +65,15 @@ describe('native user-Host source/resource contracts only', () => {
         expect(json).toContain('JsonToken.END_DOCUMENT')
         expect(json).toContain('depth>32')
         expect(json).toContain('!names.add(reader.nextName())')
+    })
+    it('keeps process-global credential registration out of owned native source code', () => {
+        const files: string[] = []
+        const walk = (dir: string) => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const file = dir + '/' + entry.name; if (entry.isDirectory()) walk(file); else if (entry.name.endsWith('.java')) files.push(file) } }
+        walk(base + 'main/java')
+        for (const file of files) expect(fs.readFileSync(file, 'utf8'), file).not.toMatch(/\bAuthenticator\s*\.\s*setDefault\s*\(/)
+        expect(java('HostHttp').replace(/\/\/[^\n]*/g, '')).not.toContain('Authenticator.getDefault()')
+        // No hidden/reflected getter workaround and no global auth/cookie mutation.
+        expect(java('HostHttp')).not.toMatch(/getDeclaredField|getDeclaredMethod|setAccessible|\.setDefault\(/)
     })
     it('routes Host content to the original Reader and never falls back to Desktop/Pica', () => {
         expect(java('ReaderSourceFactory')).toContain('case "host": return new HostReaderSource(context)')

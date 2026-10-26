@@ -127,4 +127,11 @@ describe('first-hop harness contracts without applications, Java, HTTP or listen
         expect(result.status, result.stderr).toBe(0)
         expect(result.stdout).toContain('PASS_HASH_AND_EXCLUSIVE_REOPEN')
     })
+    it('keeps the BOM-less builder ASCII-safe for legacy non-UTF8 Windows PowerShell locales', () => {
+        const bytes=fs.readFileSync('scripts/build-windows-package.ps1')
+        expect(bytes.every(byte=>byte<128)).toBe(true)
+        const encoded=bytes.toString('ascii').match(/\$runtimeReadmeZhBase64 = '([A-Za-z0-9+/=]+)'/)?.[1]
+        expect(encoded).toBeTruthy()
+        expect(Buffer.from(encoded!,'base64').toString('utf8')).toContain('来源运行时组成：{RUNTIME}')
+    })
 })

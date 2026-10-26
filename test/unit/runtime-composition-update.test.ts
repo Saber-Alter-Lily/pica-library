@@ -148,11 +148,12 @@ describe('one application update preserves the installed optional runtime choice
     })
     it.runIf(process.platform === 'win32')('actual full helper refuses changed components before acknowledgement, snapshot or replacement', async () => {
         const f = fixture(core), staging = path.join(f.root, 'full-stage'), bootstrap = path.join(f.root, 'bootstrap'), previousCwd = process.cwd()
+        const changeDirectory=vi.spyOn(process,'chdir').mockImplementation(()=>{})
         fs.mkdirSync(bootstrap)
         for (const entry of new AdmZip(full(jm)).getEntries()) if (!entry.isDirectory) write(staging, entry.entryName, entry.getData())
-        try {
-            await expect(runFullApplicationUpgrade({ applicationRoot: f.app, stagedApplicationRoot: staging, backupRoot: path.join(f.root, 'backup'), bootstrapRoot: bootstrap, desktopHomeRoot: path.join(f.root, 'profile'), libraryDirectory: path.join(f.root, 'profile/data'), readyNonce: 'unused-before-preflight', readyFile: path.join(f.root, 'ready.json'), parentPid: 1, instanceFile: path.join(f.root, 'profile/instance.json'), progressFile: path.join(f.root, 'profile/progress.json'), targetVersion: '0.5.1', targetSourceSha: targetSha, runtimeComposition: core, healthTimeoutMs: 1 })).rejects.toThrow(/cannot add or remove/)
-        } finally { process.chdir(previousCwd) }
+        await expect(runFullApplicationUpgrade({ applicationRoot: f.app, stagedApplicationRoot: staging, backupRoot: path.join(f.root, 'backup'), bootstrapRoot: bootstrap, desktopHomeRoot: path.join(f.root, 'profile'), libraryDirectory: path.join(f.root, 'profile/data'), readyNonce: 'unused-before-preflight', readyFile: path.join(f.root, 'ready.json'), parentPid: 1, instanceFile: path.join(f.root, 'profile/instance.json'), progressFile: path.join(f.root, 'profile/progress.json'), targetVersion: '0.5.1', targetSourceSha: targetSha, runtimeComposition: core, healthTimeoutMs: 1 })).rejects.toThrow(/cannot add or remove/)
+        expect(changeDirectory).toHaveBeenCalledWith(bootstrap)
+        expect(process.cwd()).toBe(previousCwd)
         expect(fs.existsSync(path.join(f.root, 'backup'))).toBe(false)
         expect(fs.existsSync(path.join(f.root, 'ready.json'))).toBe(false)
         expect(fs.readdirSync(path.join(f.root, 'profile'))).toEqual(['config.json'])

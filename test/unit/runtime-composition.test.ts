@@ -354,17 +354,18 @@ describe('actual optional runtime composition, never source-enable permission', 
         ).toThrow(/canonical/)
     })
     it.runIf(process.platform === 'win32')(
-        'uses the actual Windows PowerShell build choice and keeps the old core archive name',
+        'uses the actual CI PowerShell build choice and keeps the old core archive name',
         () => {
             const script = path
                 .resolve('scripts/lib/source-runtime-build.ps1')
                 .replaceAll("'", "''")
             const command = `. '${script}'; @(@{ mode=(Resolve-PicaSourceRuntimeMode); name=(Get-PicaWindowsPackageStem -Version '0.5.0') }, @{ mode=(Resolve-PicaSourceRuntimeMode -RequireJm '1'); name=(Get-PicaWindowsPackageStem -Version '0.5.0' -SourceRuntimes 'jm') }, @{ mode=(Resolve-PicaSourceRuntimeMode -Requested 'core' -RequireJm '0') }, @{ name=(Get-PicaWindowsPackageStem -Version '0.2.0-dev.0') }, @{ name=(Get-PicaWindowsPackageStem -Version '0.2.0-dev.1' -SourceRuntimes 'jm') }, @{ name=(Get-PicaWindowsPackageStem -Version '9.87.65') }) | ConvertTo-Json -Compress`
             const result = spawnSync(
-                process.platform === 'win32' ? 'powershell.exe' : 'pwsh',
+                'pwsh.exe',
                 ['-NoProfile', '-NonInteractive', '-Command', command],
                 { encoding: 'utf8', windowsHide: true, timeout: 10000 }
             )
+            expect(result.error, result.stderr).toBeUndefined()
             expect(result.status, result.stderr).toBe(0)
             const rows = JSON.parse(result.stdout)
             expect(rows).toEqual([
@@ -378,7 +379,7 @@ describe('actual optional runtime composition, never source-enable permission', 
                 { name: 'Pica-Library-v9.87.65-windows-x64' }
             ])
             const rejected = spawnSync(
-                process.platform === 'win32' ? 'powershell.exe' : 'pwsh',
+                'pwsh.exe',
                 [
                     '-NoProfile',
                     '-NonInteractive',
@@ -387,7 +388,10 @@ describe('actual optional runtime composition, never source-enable permission', 
                 ],
                 { encoding: 'utf8', windowsHide: true, timeout: 10000 }
             )
+            expect(rejected.error,rejected.stderr).toBeUndefined()
+            expect(rejected.status).not.toBeNull()
             expect(rejected.status).not.toBe(0)
+            expect(rejected.stderr).toContain('Core composition conflicts with required JM runtime')
         }
     )
 })

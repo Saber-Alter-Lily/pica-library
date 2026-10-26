@@ -355,6 +355,7 @@ describe('explicit runtime choice, not an automatic component or source change',
                 .spyOn(helperStartup, 'prepareHelperStartup')
                 .mockRejectedValue(Error('SYNTHETIC_AFTER_VALID_PREFLIGHT'))
             const cwd = process.cwd()
+            const changeDirectory = vi.spyOn(process, 'chdir').mockImplementation(() => {})
             const input = {
                 applicationRoot: f.app,
                 stagedApplicationRoot: staged.directory,
@@ -371,13 +372,11 @@ describe('explicit runtime choice, not an automatic component or source change',
                 runtimeChoice: staged.runtimeChoice,
                 healthTimeoutMs: 1
             }
-            try {
-                await expect(runFullApplicationUpgrade(input)).rejects.toThrow(
-                    /SYNTHETIC_AFTER_VALID_PREFLIGHT/
-                )
-            } finally {
-                process.chdir(cwd)
-            }
+            await expect(runFullApplicationUpgrade(input)).rejects.toThrow(
+                /SYNTHETIC_AFTER_VALID_PREFLIGHT/
+            )
+            expect(changeDirectory).toHaveBeenCalledWith(bootstrap)
+            expect(process.cwd()).toBe(cwd)
             expect(afterPreflight).toHaveBeenCalledTimes(1)
             expect(fs.existsSync(input.backupRoot)).toBe(false)
             const tampered = {
@@ -387,13 +386,11 @@ describe('explicit runtime choice, not an automatic component or source change',
                     archiveName: 'evil.zip'
                 }
             }
-            try {
-                await expect(
-                    runFullApplicationUpgrade(tampered)
-                ).rejects.toThrow(/no longer matches/)
-            } finally {
-                process.chdir(cwd)
-            }
+            await expect(
+                runFullApplicationUpgrade(tampered)
+            ).rejects.toThrow(/no longer matches/)
+            expect(changeDirectory).toHaveBeenCalledTimes(2)
+            expect(process.cwd()).toBe(cwd)
             expect(afterPreflight).toHaveBeenCalledTimes(1)
         }
     )

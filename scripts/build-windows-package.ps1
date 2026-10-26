@@ -233,7 +233,10 @@ Local reading needs no Java or external source account. Optional runtimes update
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.txt'),$readme,(New-Object Text.UTF8Encoding($false)))
 $readmeZhBase64 = 'UGljYSBMaWJyYXJ5IHZ7VkVSU0lPTn0gV2luZG93cyAxMC8xMSB4NjQKCjEuIOWujOaVtOino+WOiyBaSVDjgIIKMi4g5Y+M5Ye7IFBpY2EgTGlicmFyeS5leGXjgIIKMy4g5Zyo5rWP6KeI5Zmo5Lit5a6M5oiQ6aaW5qyh6K6+572u44CCCjQuIOiuvue9ruWujOaIkOWQjuWQjOatpeaUtuiXj++8jOWNs+WPr+S9v+eUqOa8q+eUu+W6k+OAgeaOqOiNkOOAgeS4i+i9veWSjOmYheivu+OAggoKdjAuMi4wIOeUqOaIt+WPr+S9v+eUqOWGhee9rui9r+S7tuabtOaWsOWuieijheWFvOWuueeahCB2MC4zLjAg5aKe6YeP5YyF44CCCnYwLjEueCDnlKjmiLfor7fkuIvovb3lubbop6PljovlrozmlbQgV2luZG93cyBaSVDjgIIK5peg6ZyA5a6J6KOFIE5vZGUuanPjgIFucG3jgIFwbnBtIOaIliBHaXTvvIzkuZ/ml6DpnIDnrqHnkIblkZjmnYPpmZDjgII='
 $readmeZh = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($readmeZhBase64)).Replace('{VERSION}',$version)
-$readmeZh += "`n来源运行时组成：$picaRuntimeMode。这不代表已启用来源或已登录。`n本地阅读不需要 Java 或外部账号；可选运行时随整个应用更新，无需另一套模块更新器。`n"
+# Keep this BOM-less script ASCII for Windows PowerShell 5 on non-UTF8 locales.
+# Reuse the existing localized README encoding, not a new runtime asset.
+$runtimeReadmeZhBase64 = 'Cuadpea6kOi/kOihjOaXtue7hOaIkO+8mntSVU5USU1FfeOAgui/meS4jeS7o+ihqOW3suWQr+eUqOadpea6kOaIluW3sueZu+W9leOAggrmnKzlnLDpmIXor7vkuI3pnIDopoEgSmF2YSDmiJblpJbpg6jotKblj7fvvJvlj6/pgInov5DooYzml7bpmo/mlbTkuKrlupTnlKjmm7TmlrDvvIzml6DpnIDlj6bkuIDlpZfmqKHlnZfmm7TmlrDlmajjgIIK'
+$readmeZh += [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($runtimeReadmeZhBase64)).Replace('{RUNTIME}',$picaRuntimeMode)
 [IO.File]::WriteAllText((Join-Path $stage 'README-WINDOWS.zh-CN.txt'),$readmeZh,(New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText((Join-Path $stage 'SOURCE_SHA.txt'),"$sourceSha`n",(New-Object Text.UTF8Encoding($false)))
 

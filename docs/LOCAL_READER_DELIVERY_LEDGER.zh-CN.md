@@ -1,6 +1,6 @@
 # 本地漫画阅读器：总推进与验收账本
 
-版本：P0-20261026-1。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
+版本：P0-20261026-2。用途：统一后续开发顺序、证据和集中验收；不是新安装包或发布公告。
 
 ## 1. 产品目标与权威规则
 
@@ -19,12 +19,13 @@
 | 对象 | 精确基线 / 当前结论 |
 | --- | --- |
 | 正式发布 | [v0.5.0](https://github.com/Saber-Alter-Lily/pica-library/releases/tag/v0.5.0)，不修改 |
-| 当前应用源码 | 6efc865fd229660f77929ebe2018b494fc198995，PR212；本账本分支仅文档，不生成新的 Dev 版本 |
+| 最近云端已执行源码 | 6efc865fd229660f77929ebe2018b494fc198995，PR212，仍冻结 |
+| 当前本地应用修复 | 229330e85657f6fdee54d5ec5620c91330b74ccb；[翻译加载边界](SOURCE_IDLE_TRANSLATION_FIX.md)离线通过，未推送/云端构建，不生成新 Dev 版本 |
 | 最新运行 | [40305007546](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40305007546)，completed / failure；source、windows-unit、fixtures 成功，六类事务失败 |
 | 最近完整安装产物 | PR211 / e9b08b418c2fdbc55dbf499afb74f7b927b12434 / Dev87；PARTIAL 审阅候选，不是全目标可验收完成 |
 | Dev87 本地封存包 | PICA_CORE_RUNTIME_DEV87_CLOUD_REVIEW_20261025_e9b08b418c2f.zip；本轮只读重算 SHA256：6d68de38ba68fb0b2e7a16825df5d8d5146c2b70e69a5b36383e171c507ef2cd |
 | 旧版首跳 | [40274664757](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40274664757)：旧 v0.5.0 正常路径、哈希拒绝有证据；健康及异步启动失败恢复 HOLD |
-| 当前状态 | P0 盘点与入口统一已落地；两个风险决策未关闭，P0 整体 IN_PROGRESS；产品目标 OPEN，用户暂不测试 |
+| 当前状态 | P0 盘点已落地；R1 真实闲置请求缺陷已离线复现并修复，但实际 Windows 归因/门禁未重验；R2 仍 HOLD。P0 整体 IN_PROGRESS，产品目标 OPEN，用户暂不测试 |
 
 PR205 → PR206 → PR207 → PR208 → PR209 → PR210 → PR211 → PR212 是层叠候选，不是八套已经接受的产品。先冻结当前应用基线，不再为每个小修提升 Dev 版本或新建整套交付。
 
@@ -45,7 +46,7 @@ PR203 文档提交 9a68d13f361cb92a53fa73c2f197a28d593559a1 已由 Git 祖先关
 
 实际驱动在场景动作和断言之后检查浏览器错误、外联事件，再检查来源/进程边界。因此这把下一项行动收窄为共同外联的归因，不能把六个失败当六个独立替换引擎根因；也不能将整项改判 PASS。现有记录仅含事件种类，不含请求目标/协议，尚不能证明所有事件都是实际互联网请求。
 
-web/v040-parity.js 的两处启动路径会调用翻译数据读取，使用未经来源生命周期门控的 rawFetch。这是静态可见的待审计外联路径，不是已证明对应全部运行时事件的根因。不得扩大网络白名单绕过断言。只读核对记录及六份 result.json 哈希保存在本地 _validation/stage0-ledger-20261026；原有进行中快照和失败回执不覆盖。
+旧6efc源码 web/v040-parity.js 的两处启动路径调用翻译数据 rawFetch。新229330e源码通过完整脚本的离线反例证明启动4次、语言重建追加2次，并修为明确点击/许可检查/取消/单飞加载；54项定向测试、类型和Web语法通过。已增加脱敏分类但尚未执行新 Windows 场景，不能据此归因旧记录的全部事件或改判六项结果。不得扩大网络白名单。旧核对和六份结果哈希保存在 _validation/stage0-ledger-20261026，新红绿证据在 _validation/source-idle-attribution-20261026；原有快照和失败回执不覆盖。
 
 ## 3. 开源复用与兼容边界
 
@@ -92,7 +93,7 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 | ID | 操作与通过条件 | 当前证据边界 |
 | --- | --- | --- |
 | CORE-01 | 无账号核心成品启动；无漫画正文/官方目录，必要运行资源完整 | 核心/JM 包已有；最终两端成品清单仍需核对 |
-| CORE-02 | 首启、设置、重启及本地阅读不主动连接来源、不启动 JVM/LAN | 当前六场景共同外联断言 FAIL，真实事件归因待补 |
+| CORE-02 | 首启、设置、重启及本地阅读不主动连接来源、不启动 JVM/LAN | 旧六事务仍FAIL；新翻译脚本离线0自动请求，整体成品/云端待验证 |
 | CORE-03 | 两端文件夹/CBZ 预览、确认导入；取消不改原文件 | 已实现；原生 SAF/GUI 操作待实测 |
 | CORE-04 | 详情进入阅读，模式/章节/键盘或触控导航，退出返回原页面 | 既有 Reader 和修复候选；最终实际使用待验收 |
 | CORE-05 | 重启/端口变化后章节、页码和设置保留 | Dev85 曾实际失败；修复后有工程证据，最终包待复验 |
@@ -151,6 +152,6 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 5. 用户不逐阶段陪跑。维护者先完成工程项，再一次交付日常/高级两组步骤，已通过且未受影响的项目不反复重验。
 6. 任意 APK 执行器、来源市场、PDF/CBR、自动细粒度画风标签、新模型训练、整库搬迁/监视器和全面备份中心均另列长期项；不删除，但不插入本轮。更新必须具备的状态保护/恢复仍是本轮硬门禁。
 
-**下一安全动作：P0-R1。** 基于已封存六失败补充最小请求归因与兼容证据，先分类再修复正确生命周期；不重建更新器、不重复运行原任务、不部署。P0-R2 作为并列高风险项记录，不能等到最终交付才处理。新来源完整链路、实际手机和旧版恢复没有证明前，整个目标继续 OPEN。
+**下一安全本地动作：P0-R2。** R1 已完成第1轮本地反例/修复，实际云端仍未验证；保留失败状态，不在本机启动应用或重跑原任务。接下来以只读源码/纯模拟核对旧控制器过渡路线，不再增加 UI 功能或另造更新器。新来源完整链路、实际手机和旧版恢复没有证明前，整个目标继续 OPEN。
 
 专项契约：[架构](MODULAR_LOCAL_READER_ARCHITECTURE.md)、[核心/来源边界](CORE_READER_SOURCE_BOUNDARY.md)、[Host 已有书库能力](USER_HOST_LIBRARY_READER.md)、[两个 issue](ISSUE_199_200_PREFERENCE_DISPLAY_SEARCH.md)、[私人标签](TAG_PARTICIPATION_PRIVATE_LABELS.md)、[AI 方案](AI_TAG_PROFILE_EXCHANGE.md)、[事务门禁](RUNTIME_CHOICE_TRANSACTION_GATE.md)、[用户分组步骤](NEXT_CONCENTRATED_ACCEPTANCE_CHECKLIST.zh-CN.md)。

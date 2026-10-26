@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## P0-R1 — idle translation request defect, first bounded local correction (2026-10-26)
+
+**Status: LOCAL_DEFECT_REPRODUCED_AND_FIXED / OFFLINE_GATES_PASS / ACTUAL_WINDOWS_ATTRIBUTION_PENDING / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN. No push/build/deployment.**
+
+- Continues documentation checkpoint c9a9926 on independent local branch codex/reader-source-idle-boundary-20261026; sealed application source229330e85657f6fdee54d5ec5620c91330b74ccb. Coordination claim still fails DPAPI; standing isolated-goal exception only, no secret/identity repair. PR212/frozen packages and formal/G-drive data are untouched.
+- Execute the whole original parity script with inert browser/locale ports, not isolated invented loader code. Original unit-2 has31PASS+2real regression failures: four automatic translation fetch attempts at boot, six after language rebuild. This proves an actual idle-network defect; old Windows events still lack target/protocol attribution and remain FAIL, not retroactively proven.
+- Narrow correction: explicit optional GitHub translation action, fresh passive source-policy check, disabled/unknown policy refusal, one bounded single-flight request, abort on local source/dropdown change, atomic/late-result-safe maps and retry only by new action. Canonical tags remain usable. No source activation, account/SDK/DB/schema/ranker/Visual/sync/native/version changes. Cross-window immediate revocation is not established by these local events.
+- Existing Windows gate retains exact blocking/empty-event assertions and unchanged deadlines. New enum-only request categories can identify known translation endpoints without logging arbitrary URL/host/path/query/credentials. Actual browser route execution remains pending; no local browser/app/Java/listener.
+- Final unit-3:54PASS/0FAIL/0skip across4files, including23new actual-module/classifier cases; full types PASS, Web54/54 PASS, every runtime guard audit0events. Preserve unit-1's pre-test sandbox/esbuild failure and unit-2's actual counterexamples. [Scope, retained evidence and remaining gates](docs/SOURCE_IDLE_TRANSLATION_FIX.md).
+- Update the single ledger and acceptance entry, not another Dev package. P0-R1 remains cloud-PENDING after its first local correction. Next safe local work is P0-R2 read-only/pure-simulation old-controller transition feasibility; no new updater or UI scope and no change to legacy rollback HOLD.
+
 ## P0 — consolidated product plan and acceptance ledger (2026-10-26)
 
 **Status: BASELINE_AND_CASE_INVENTORY_RECONCILED / P0_RISK_DECISIONS_OPEN / FULL_OBJECTIVE_OPEN. Documentation-only local branch; no application change/build/push/release/deployment.**

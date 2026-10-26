@@ -24,6 +24,8 @@ $extract = Join-Path $work 'extract'
 $local = Join-Path $work 'localappdata'
 $listener = $null
 $smokePassed = $false
+$smokeFailureType = ''
+$observerAudit = $null
 New-Item -ItemType Directory -Force -Path $extract,$local | Out-Null
 Copy-Item -LiteralPath $Zip -Destination (Join-Path $work 'candidate.zip')
 Expand-Archive -LiteralPath (Join-Path $work 'candidate.zip') -DestinationPath $extract
@@ -72,6 +74,8 @@ foreach ($license in @('licenses\Node.js-LICENSE.txt','licenses\THIRD_PARTY_LICE
 
 $originalPath = $env:PATH
 $originalLocal = $env:LOCALAPPDATA
+$originalNodeOptions = [Environment]::GetEnvironmentVariable('NODE_OPTIONS','Process')
+$originalSmokeObserver = [Environment]::GetEnvironmentVariable('READER_SMOKE_PROCESS_OBSERVER_FILE','Process')
 $originalPicaEnvironment = @{}
 foreach ($entry in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'PICA_*' })) {
     $originalPicaEnvironment[$entry.Name] = $entry.Value
@@ -82,6 +86,16 @@ foreach ($entry in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'PICA_*' 
 $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
 $env:LOCALAPPDATA = $local
 try {
+    if ($env:GITHUB_ACTIONS -eq 'true' -and $env:RUNNER_OS -eq 'Windows' -and $env:RUNNER_ENVIRONMENT -eq 'github-hosted') {
+        $observer = Join-Path $work 'artifact-smoke-process-observer.cjs'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'fixtures/artifact-smoke-process-observer.cjs') -Destination $observer
+        $observerDescriptor = Join-Path $work 'observer-descriptor.json'
+        $observerAudit = Join-Path $work 'process-audit.jsonl'
+        $observerValue = @{ root=$work; applicationRoot=$rootPath; auditFile=$observerAudit; sourceSha=$sourceSha; desktopSha256=(Get-FileHash -LiteralPath (Join-Path $rootPath 'app/desktop.js') -Algorithm SHA256).Hash.ToLowerInvariant() }
+        [IO.File]::WriteAllText($observerDescriptor,($observerValue|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+        $env:READER_SMOKE_PROCESS_OBSERVER_FILE=$observerDescriptor
+        $env:NODE_OPTIONS='--require="'+$observer+'"'
+    }
     if ($PortCollision) {
         $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,4789)
         try { $listener.Start() }
@@ -243,10 +257,21 @@ try {
     }
     [ordered]@{ artifact_only_smoke='PASS'; source_sha=$sourceSha; port_collision=if($PortCollision){'PASS'}else{'NOT_RUN'}; version=$status.version; desktop_home_name=$DesktopHomeName; module_contracts=$moduleContractGate; local_only_setup=$localOnlyGate; registry_runtime_assets='PASS'; atlas_clean_package='PASS'; recommendation_clean_package='PASS'; setup_available=$true; ui_contracts='PASS'; responsive_contracts='PASS'; download_progress_fixture_contract='PASS'; credential_encrypted=$credentialEncrypted; relaunch=$relaunch; single_instance='PASS'; shutdown='PASS'; port_released=$true; startup_to_instance_ms=$publishedMs; url=$instance.url } | ConvertTo-Json
     $smokePassed = $true
+} catch {
+    $smokeFailureType = $_.Exception.GetType().FullName
+    throw
 } finally {
+    if ($observerAudit -and (Test-Path -LiteralPath $observerAudit)) {
+        $evidence = Join-Path $repositoryRoot ('artifacts/windows-smoke-evidence/'+(Split-Path -Leaf $work))
+        New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+        Copy-Item -LiteralPath $observerAudit -Destination (Join-Path $evidence 'process-audit.jsonl')
+        @{ sourceSha=$sourceSha; gatePassed=$smokePassed; failureType=$smokeFailureType; setupPersistence=[bool]$SetupPersistence; localOnly=[bool]$LocalOnlySetup; requestDeadlinesChanged=$false; privateStateCopied=$false } | ConvertTo-Json | Set-Content -Encoding utf8 -LiteralPath (Join-Path $evidence 'result.json')
+    }
     if ($listener) { $listener.Stop() }
     $env:PATH = $originalPath
     $env:LOCALAPPDATA = $originalLocal
+    [Environment]::SetEnvironmentVariable('NODE_OPTIONS',$originalNodeOptions,'Process')
+    [Environment]::SetEnvironmentVariable('READER_SMOKE_PROCESS_OBSERVER_FILE',$originalSmokeObserver,'Process')
     foreach ($key in $originalPicaEnvironment.Keys) { [Environment]::SetEnvironmentVariable($key, $originalPicaEnvironment[$key], 'Process') }
     if (-not $smokePassed) { Write-Warning "Failed smoke retained for isolated diagnosis: $work" }
     if ($smokePassed -and (Test-Path -LiteralPath $work)) {

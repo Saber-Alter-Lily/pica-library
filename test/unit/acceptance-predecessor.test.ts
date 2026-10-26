@@ -5,7 +5,7 @@ const workflow = fs
     .readFileSync('.github/workflows/next-consolidated-acceptance.yml', 'utf8')
     .replaceAll('\r\n', '\n')
 const windows =
-    workflow.split('\n  windows:\n')[1]?.split('\n  legacy-first-hop:\n')[0] ??
+    workflow.split('\n  windows:\n')[1]?.split('\n  legacy-fixture:\n')[0] ??
     ''
 const compositionRecipe = fs.readFileSync(
     'scripts/test-windows-runtime-compositions.ps1',

@@ -13,19 +13,19 @@ describe('Reader correction cloud recipe, source inspection only', () => {
             )
         ).toHaveLength(2)
         expect(text.match(/github.event_name != 'pull_request'/g)).toHaveLength(
-            4
+            5
         )
         expect(
             text.match(/github.event.repository.private == false/g)
-        ).toHaveLength(4)
+        ).toHaveLength(5)
         expect(
             text.match(/github.repository == 'Saber-Alter-Lily\/pica-library'/g)
-        ).toHaveLength(4)
+        ).toHaveLength(5)
         expect(
             text.match(
                 /refs\/heads\/codex\/reader-core-upgrade-dev87-20261025/g
             )
-        ).toHaveLength(4)
+        ).toHaveLength(5)
         const windowsUnit=text.split('\n  windows-unit:\n')[1]?.split('\n  windows:\n')[0]??''
         expect(windowsUnit).toContain('pnpm exec vitest run --maxWorkers=4 --minWorkers=1')
         expect(windowsUnit).toContain('name: Pica-Library-Next-Acceptance-Windows-Unit-Evidence')
@@ -37,6 +37,13 @@ describe('Reader correction cloud recipe, source inspection only', () => {
                 .split('\n  legacy-first-hop:\n')[1]
                 ?.split('\n  android:\n')[0] ?? ''
         expect(legacy).toContain('fail-fast: false')
+        expect(legacy).toContain('needs: legacy-fixture')
+        const fixture=text.split('\n  legacy-fixture:\n')[1]?.split('\n  legacy-first-hop:\n')[0]??''
+        expect(fixture).toContain('needs: web-and-source')
+        expect(fixture).toContain('./scripts/build-windows-first-hop-fixture.ps1')
+        expect(fixture).not.toContain('continue-on-error')
+        expect(fixture).not.toContain('secrets.')
+        expect(text).toContain('artifacts/windows-smoke-evidence/')
         expect(legacy).toContain(
             'scenario: [success, hash-mismatch, health-rollback, launch-rollback]'
         )

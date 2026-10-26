@@ -181,8 +181,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/audit-released-upgrade-paths.mjs $base
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ./scripts/build-windows-first-hop-fixture.ps1 -ExpectedSourceSha $env:GITHUB_SHA
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force -Path candidate/windows | Out-Null
           Copy-Item -LiteralPath $zip -Destination candidate/windows/
           Copy-Item -LiteralPath $withJm -Destination candidate/windows/
@@ -200,6 +198,7 @@ jobs:
           path: |
             artifacts/upgrade-diagnostics/
             artifacts/runtime-composition-evidence/
+            artifacts/windows-smoke-evidence/
           retention-days: 3
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
@@ -208,6 +207,31 @@ jobs:
           path: candidate/windows/
           retention-days: 1
           if-no-files-found: error
+  legacy-fixture:
+    needs: web-and-source
+    if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.16.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path artifacts/release-base | Out-Null
+          $base='artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip'
+          Invoke-WebRequest -Uri 'https://github.com/Saber-Alter-Lily/pica-library/releases/download/v0.5.0/Pica-Library-v0.5.0-windows-x64.zip' -OutFile $base
+          if ((Get-FileHash -Algorithm SHA256 -LiteralPath $base).Hash.ToLowerInvariant() -ne $env:BASE_WINDOWS_SHA256) { throw 'Exact released baseline mismatch' }
+          ./scripts/build-windows-first-hop-fixture.ps1 -ExpectedSourceSha $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain CI-only synthetic first-hop fixture separately
         uses: actions/upload-artifact@v4
         with:
@@ -217,7 +241,7 @@ jobs:
           if-no-files-found: error
 
   legacy-first-hop:
-    needs: windows
+    needs: legacy-fixture
     if: github.event.repository.private == false && github.event_name != 'pull_request' && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/reader-core-upgrade-dev87-20261025'
     runs-on: windows-latest
     timeout-minutes: 20

@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict'
+import { isDeepStrictEqual } from 'node:util'
 import { loopbackHost, sha256 } from './old-client-first-hop.mjs'
 
 // Synthetic publisher metadata only. Never reserve/publish this version or enable a product bypass.
 export const RUNTIME_CHOICE_FIXTURE_VERSION = '0.5.1'
 export const RUNTIME_CHOICE_SCENARIOS = Object.freeze(['roundtrip', 'guardrails', 'request-abort', 'hash-mismatch', 'health-rollback', 'launch-rollback'])
+/** Match the published Desktop status envelope, not the inner descriptor alone. */
+export function runtimeChoiceReady(status, capabilities, mode) {
+    return ['core', 'jm'].includes(mode) && status?.startupReady === true &&
+        status.version === RUNTIME_CHOICE_FIXTURE_VERSION && capabilities?.appVersion === RUNTIME_CHOICE_FIXTURE_VERSION &&
+        typeof status.csrfToken === 'string' && status.csrfToken.length > 0 && status.csrfToken.length <= 256 &&
+        isDeepStrictEqual(status.runtimeComposition, { status: 'declared', composition: { formatVersion: 1, sourceRuntimes: mode === 'jm' ? ['jm'] : [] } })
+}
 const repository = 'Saber-Alter-Lily/pica-library'
 export function runtimeChoicePublication(archives) {
     assert.deepEqual(Object.keys(archives).sort(), ['core', 'jm'])

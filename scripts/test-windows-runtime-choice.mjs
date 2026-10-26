@@ -9,7 +9,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import AdmZip from 'adm-zip'
 import { assertDisposableWindowsCi, loopbackHost, sha256 } from './lib/old-client-first-hop.mjs'
-import { RUNTIME_CHOICE_FIXTURE_VERSION, RUNTIME_CHOICE_SCENARIOS } from './lib/runtime-choice-fixture.mjs'
+import { RUNTIME_CHOICE_FIXTURE_VERSION, RUNTIME_CHOICE_SCENARIOS, runtimeChoiceReady } from './lib/runtime-choice-fixture.mjs'
 import { runtimeChoiceStateProgram } from './lib/first-hop-state.mjs'
 
 // No input reads, tool loading, extraction or runtime action before this guard.
@@ -97,19 +97,30 @@ function treeSnapshot(directory) {
     walk(directory); return rows.sort((a, b) => a[0].localeCompare(b[0]))
 }
 async function ready(mode, previous) {
+    let previousObservation = ''
     for (let attempt = 0; attempt < 300; attempt++) {
+        const observation = { stage: 'instance-file', expectedComposition: mode }
         try {
             const value = JSON.parse(fs.readFileSync(instanceFile, 'utf8'))
             assert.ok(Number.isInteger(value.pid) && /^http:\/\/127\.0\.0\.1:\d+$/.test(value.url))
+            observation.stage = 'actual-loopback-status'
             const response = await fetch(value.url + '/api/v1/desktop/status', { signal: AbortSignal.timeout(1500) }), status = await response.json()
             const caps = await fetch(value.url + '/api/v1/capabilities', { signal: AbortSignal.timeout(1500) }), capabilities = await caps.json()
-            if (!response.ok || !caps.ok || !status.startupReady || status.version !== RUNTIME_CHOICE_FIXTURE_VERSION || capabilities.appVersion !== RUNTIME_CHOICE_FIXTURE_VERSION) throw Error('Not ready')
-            assert.deepEqual(status.runtimeComposition, { formatVersion: 1, sourceRuntimes: mode === 'jm' ? ['jm'] : [] })
-            assert.equal(typeof status.csrfToken, 'string'); assert.ok(status.csrfToken.length)
+            Object.assign(observation, { desktopStatus: response.status, capabilityStatus: caps.status, startupReady: status.startupReady === true,
+                expectedDesktopVersion: status.version === RUNTIME_CHOICE_FIXTURE_VERSION, expectedCapabilityVersion: capabilities.appVersion === RUNTIME_CHOICE_FIXTURE_VERSION,
+                declaredComposition: status.runtimeComposition?.status === 'declared', expectedEnvelope: runtimeChoiceReady(status, capabilities, mode) })
+            if (!response.ok || !caps.ok || !runtimeChoiceReady(status, capabilities, mode)) throw Error('Not ready')
+            observation.stage = 'replacement-identity'
             if (previous) { assert.notEqual(value.pid, previous.pid); assert.notEqual(status.csrfToken, previous.csrfToken) }
             instance = { ...value, csrfToken: status.csrfToken }; assert.ok(ownedPid(value.pid))
             return status
-        } catch {}
+        } catch (error) {
+            // Bounded public flags only: never emit status bodies, URLs, tokens or headers.
+            observation.errorCode = /^[A-Z0-9_]+$/.test(error?.code ?? '') ? error.code : null
+            const serialized = JSON.stringify(observation)
+            result.lastReadinessObservation = observation
+            if (serialized !== previousObservation) { fs.appendFileSync(auditFile, JSON.stringify({ kind: 'READINESS_OBSERVATION', ...observation }) + '\n'); previousObservation = serialized }
+        }
         await sleep(100)
     }
     throw Error('Actual owned Desktop did not become ready in expected composition: ' + mode)
@@ -301,7 +312,10 @@ try {
         await Promise.all(streams.map(stream => new Promise((resolve, reject) => { stream.once('error', reject); stream.end(resolve) })))
         fs.mkdirSync(evidence, { recursive: true })
         fs.writeFileSync(path.join(evidence, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx' })
-        for (const [name, file] of [['audit.jsonl', auditFile], ['update-progress.json', progressFile], ['launcher.stdout.log', path.join(harness, 'launcher.stdout.log')], ['launcher.stderr.log', path.join(harness, 'launcher.stderr.log')]]) if (fs.existsSync(file)) fs.copyFileSync(file, path.join(evidence, name), fs.constants.COPYFILE_EXCL)
+        for (const [name, file] of [['audit.jsonl', auditFile], ['update-progress.json', progressFile], ['launcher.stdout.log', path.join(harness, 'launcher.stdout.log')], ['launcher.stderr.log', path.join(harness, 'launcher.stderr.log')], ['synthetic-desktop.log', path.join(home, 'logs', 'pica-library.log')]]) if (fs.existsSync(file)) {
+            assert.ok(fs.realpathSync.native(file).toLowerCase().startsWith(root.toLowerCase() + path.sep) && fs.statSync(file).size <= 256 * 1024, 'Only bounded owned synthetic diagnostics may be exported')
+            fs.copyFileSync(file, path.join(evidence, name), fs.constants.COPYFILE_EXCL)
+        }
         if (success) {
             assert.ok(fs.realpathSync.native(path.dirname(root)) === fs.realpathSync.native(os.tmpdir()) && /^pica-runtime-choice-[a-f0-9]{32}[a-zA-Z0-9]{6}$/.test(path.basename(root)) && !fs.lstatSync(root).isSymbolicLink())
             fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

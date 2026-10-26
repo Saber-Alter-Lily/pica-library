@@ -9,8 +9,9 @@ import { spawnSync } from 'node:child_process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LibraryDatabase } from '../../src/library/database'
 import { assertDisposableWindowsCi, localConnectTarget, loopbackHost, sha256 } from '../../scripts/lib/old-client-first-hop.mjs'
-import { createRuntimeChoiceFetch, RUNTIME_CHOICE_SCENARIOS } from '../../scripts/lib/runtime-choice-fixture.mjs'
+import { createRuntimeChoiceFetch, RUNTIME_CHOICE_SCENARIOS, runtimeChoiceReady } from '../../scripts/lib/runtime-choice-fixture.mjs'
 import { firstHopStateProgram, runtimeChoiceStateProgram, syntheticUpgradeStateProgram } from '../../scripts/lib/first-hop-state.mjs'
+import { installedRuntimeComposition } from '../../src/runtime/installed-runtime-composition'
 
 const roots: string[] = [], require = createRequire(import.meta.url)
 afterEach(() => { vi.restoreAllMocks(); for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }) })
@@ -49,6 +50,26 @@ function preload(kind: 'desktop' | 'helper', scenario = 'roundtrip') {
 }
 
 describe('runtime-choice actual gate preparation, no application/Java/network/listener', () => {
+    it.each(['core', 'jm'])('matches actual installed-status envelopes rather than rejecting a healthy %s application', mode => {
+        const root = ownedRoot(), app = path.join(root, 'application'); fs.mkdirSync(path.join(app, 'app'), { recursive: true })
+        const composition = { formatVersion: 1, sourceRuntimes: mode === 'jm' ? ['jm'] : [] }
+        fs.writeFileSync(path.join(app, 'app', 'runtime-composition.json'), JSON.stringify(composition))
+        if (mode === 'jm') {
+            fs.mkdirSync(path.join(app, 'runtime/jm/bin'), { recursive: true }); fs.mkdirSync(path.join(app, 'runtime/jm/lib'), { recursive: true })
+            for (const name of ['bin/java.exe', 'lib/pica-jm-source.jar', 'PICA_JM_RUNTIME.json']) fs.writeFileSync(path.join(app, 'runtime/jm', name), 'synthetic identity only, never executed')
+        }
+        const status = { startupReady: true, version: '0.5.1', csrfToken: 'synthetic-csrf', runtimeComposition: installedRuntimeComposition(app) }, caps = { appVersion: '0.5.1' }
+        expect(status.runtimeComposition).toEqual({ status: 'declared', composition })
+        // The prior flat assertion necessarily rejects the real, healthy API packet.
+        expect(status.runtimeComposition).not.toEqual(composition)
+        expect(runtimeChoiceReady(status, caps, mode)).toBe(true)
+        expect(runtimeChoiceReady({ ...status, runtimeComposition: composition }, caps, mode)).toBe(false)
+        expect(runtimeChoiceReady({ ...status, runtimeComposition: { status: 'legacy', composition } }, caps, mode)).toBe(false)
+        expect(runtimeChoiceReady({ ...status, startupReady: false }, caps, mode)).toBe(false)
+        expect(runtimeChoiceReady(status, { appVersion: '0.5.0' }, mode)).toBe(false)
+        expect(runtimeChoiceReady({ ...status, csrfToken: '' }, caps, mode)).toBe(false)
+        expect(runtimeChoiceReady(status, caps, mode === 'jm' ? 'core' : 'jm')).toBe(false)
+    })
     it.each([
         ['D:\\a\\_temp\\pica-playwright-owned', true], ['D:\\a\\_temporary\\tools', false], ['C:\\Users\\runneradmin\\AppData\\Local\\Temp\\tools', false]
     ])('confines tools to actual hosted RUNNER_TEMP even when Windows os.tmpdir differs: %s', (toolRoot, accepted) => {

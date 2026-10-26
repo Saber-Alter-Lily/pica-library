@@ -2,6 +2,8 @@
 
 Status: **LOCAL_SOURCE_AND_OFFLINE_GATES_PASS / HOSTED_EXECUTION_PENDING / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN**.
 
+Subsequent explicit human authorization permits a new independent Draft and hosted Windows execution on `codex/reader-runtime-transaction-gate-20261026`; dedicated workflow `runtime-choice-transaction.yml` uses no signing Secrets or Android version change. This source document is the pre-build contract, not a terminal cloud report. Keep local sealed source `01d08bd0a622` and PR211 unchanged. Actual results must be reported by exact run/head after execution, with failures retained.
+
 This continues frozen PR211/source `e9b08b418c2fdbc55dbf499afb74f7b927b12434` on a new local branch. It does not modify PR211, Dev87 installables, PR210/Dev86, G-drive installations, production data/schema, signing identities, main, Release or OTA. The Local Memory claim again failed with DPAPI; the human's standing isolated-goal exception is used without repairing/reprovisioning that secret. No local application, Java, browser or TCP listener is authorized or started.
 
 ## What this closes, and what it does not

@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+## Runtime-choice cloud execution — human-authorized pre-build snapshot (2026-10-26)
+
+**At source creation: INDEPENDENT_DRAFT_AND_WINDOWS_TESTS_AUTHORIZED / CLOUD_TERMINAL_RESULTS_NOT_YET_AVAILABLE / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN.** This is explicitly a pre-build snapshot, not a live CI result; exact-head execution receipts and the new Draft's post-build report must supersede it after actual execution.
+
+- The human explicitly approved pushing local source `01d08bd0a622f85d94680811eca0a39c913ff5a4` to a new independent Draft and disposable hosted Windows tests. Frozen PR211/Dev87, PR210/Dev86 and the134-file source-review ZIP (SHA256 `6bc4cc9211d991d53c96b4597d3e08db89d8eb529acdf24adfa112a3b9256b2e`) remain unchanged. Independent .NET all-member/hash readback passed. No local Java/application/browser/listener.
+- Add only a dedicated exact-branch read-only Actions workflow: full source/Windows tests, existing actual core/JM fixture builder and all six independent actual-browser/HTTP/current-helper scenarios. No Android version/signing change or signing Secrets, no main merge, tag/Release, OTA or deployment. Marked synthetic ZIPs remain diagnostic inputs, never user installables.
+- Workflow/source preflight:10files/124PASS, full TypeScript PASS, YAML/four PowerShell fragments parse-only PASS, zero offline boundary events. These are preparation, not real transaction results. Old0.5.0 recovery failures and all user/source/device/full-goal work remain open. [Scenario contract](docs/RUNTIME_CHOICE_TRANSACTION_GATE.md).
+
 ## Runtime-choice transaction gate — isolated local continuation (2026-10-26)
 
 **Status: LOCAL_SOURCE_AND_OFFLINE_GATES_PASS / ACTUAL_WINDOWS_BROWSER_RUN_PENDING / LEGACY_RECOVERY_HOLD / FULL_OBJECTIVE_OPEN. No push, release or deployment.**

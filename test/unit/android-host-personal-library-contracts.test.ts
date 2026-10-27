@@ -61,12 +61,14 @@ describe('native explicitly saved Host references — source/identity/resource c
         for (const route of ['manager.saveBook(book.id,true)', 'manager.resumeSavedBook(book.comicId,true)', 'manager.removeSavedBook(book.comicId,true)', 'if(!manager.canResumeSaved(book))']) expect(screen).toContain(route)
         expect(screen).toContain('savedOffset+12<savedSnapshot.size()')
         expect(screen).toContain('ticket!=savedRequest')
+        expect(screen).toContain('status.setText(R.string.host_book_removed);reloadSavedBooks()')
+        expect(java('HostSourceActivityTest', true)).toContain('performClick();shadowOf(Looper.getMainLooper()).idle()')
         const resume = screen.slice(screen.indexOf('@Override protected void onResume()'), screen.indexOf('@Override protected void onStop()'))
         expect(resume).toContain('reloadSavedBooks()'); expect(resume).not.toMatch(/manager\.start|manager\.search|manager\.bind/)
     })
     it('provides all three locale messages for explicit reference/download/deletion/permission distinctions', () => {
         const refs = new Set([...screen.matchAll(/R\.string\.(host_book(?:s)?_\w+)/g)].map(row => row[1]))
-        expect(refs.size).toBe(11)
+        expect(refs.size).toBe(12)
         for (const locale of ['values', 'values-zh-rCN', 'values-ja']) {
             const xml = fs.readFileSync(root + `main/res/${locale}/strings_host.xml`, 'utf8')
             for (const name of refs) expect(xml).toContain(`name="${name}"`)

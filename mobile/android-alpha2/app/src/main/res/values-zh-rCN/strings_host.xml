@@ -60,5 +60,6 @@
     <string name="host_book_pinned">书目已保存在本机；这不是下载或宿主收藏，也没有保存账号凭据。</string>
     <string name="host_book_authorize">请在下方为同一宿主与账号重新授权、明确选择原来源，再回到这里阅读。本次没有发出请求。</string>
     <string name="host_book_remove">移出本机书目</string>
+    <string name="host_book_removed">已移出本机书目；下载和阅读历史保留，没有连接或修改宿主。</string>
     <string name="host_book_remove_scope">只移出本机保存的这一条书目？本地下载和阅读历史保留，不修改宿主收藏或内容。</string>
 </resources>

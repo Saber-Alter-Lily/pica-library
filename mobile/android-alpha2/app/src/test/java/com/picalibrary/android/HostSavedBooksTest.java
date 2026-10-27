@@ -36,7 +36,7 @@ public class HostSavedBooksTest {
     }
     @Test public void duplicateSaveDoesNotAddOrPruneRecordsAndMetadataRefreshKeepsOriginalSaveDate()throws Exception {
         HostSavedBooks.Book original=book(1);store.put(original);byte[] before=Files.readAllBytes(file.toPath());store.put(original);assertArrayEquals(before,Files.readAllBytes(file.toPath()));
-        HostSavedBooks.Book changed=book(1,PRINCIPAL,SOURCE,"New verified title");store.put(changed);assertEquals(1,store.load().size());assertEquals(changed.title,store.load().get(0).title);assertEquals(original.savedAt,store.load().get(0).savedAt);
+        HostSavedBooks.Book changed=new HostSavedBooks.Book(original.comicId,original.connectionId,original.principal,original.sourceId,original.remoteId,original.urlDigest,"New verified title",original.hostLabel,"2026-10-28T00:00:00Z");store.put(changed);assertEquals(1,store.load().size());assertEquals(changed.title,store.load().get(0).title);assertEquals(original.savedAt,store.load().get(0).savedAt);
     }
     @Test public void sameTitleDifferentPrincipalSourceOrUrlNeverAliases()throws Exception {
         for(HostSavedBooks.Book book:new HostSavedBooks.Book[]{book(1),book(1,"b".repeat(64),SOURCE,"Book 1"),book(1,PRINCIPAL,"0","Book 1"),book(2,PRINCIPAL,SOURCE,"Book 1")})store.put(book);

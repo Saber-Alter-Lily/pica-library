@@ -59,5 +59,6 @@
     <string name="host_book_pinned">参照を端末に保存しました。ダウンロードやホストのお気に入りではなく、認証情報も保存していません。</string>
     <string name="host_book_authorize">下で同じホストとアカウントを再許可し、元の配信元を明示的に選択してから戻ってください。今回は通信していません。</string>
     <string name="host_book_remove">端末の参照を削除</string>
+    <string name="host_book_removed">端末の参照を削除しました。ダウンロードと読書履歴は保持され、ホストには接続していません。</string>
     <string name="host_book_remove_scope">この端末の作品参照のみを削除しますか？ダウンロードと読書履歴は保持され、ホストのお気に入りや内容は変更しません。</string>
 </resources>

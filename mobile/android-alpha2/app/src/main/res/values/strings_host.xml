@@ -60,5 +60,6 @@
     <string name="host_book_pinned">Reference saved on this device. This is not a download or a host favorite; no credentials were saved.</string>
     <string name="host_book_authorize">Grant access to the same host/account and explicitly select the original source below, then return here to read. No request was sent.</string>
     <string name="host_book_remove">Remove local reference</string>
+    <string name="host_book_removed">Local reference removed. Downloads and reading history were retained; the host was not contacted.</string>
     <string name="host_book_remove_scope">Remove only this saved reference on this device? Local downloads and reading history are retained; host favorites and content are not changed.</string>
 </resources>

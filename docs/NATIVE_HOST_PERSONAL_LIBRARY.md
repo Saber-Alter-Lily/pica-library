@@ -1,5 +1,11 @@
 # 手机：明确保存的外部书目（未发布）
 
+## 云端执行补记（2026-10-26 本地时间）
+
+用户已授权新Draft与既有云端调试CI；PR216基于冻结PR215。首轮源码67ef35a/CI40458023912的Web/Desktop通过；Android已真实编译并执行471项，470PASS/1FAIL（移出确认UI），没有固定签名或发布。现有紧凑日志未提供单个断言expected/actual，原失败不改判。
+
+测试按[Android AlertController消息分发](https://android.googlesource.com/platform/frameworks/base/+/master/core/java/com/android/internal/app/AlertController.java)和[Robolectric PAUSED规则](https://robolectric.org/blog/2019/06/04/paused-looper/)，复用本项目JM测试已有的点击后mainLooper.idle；不跳过或删减确认/取消/无请求断言。产品另外补“移出完成”状态，避免旧代码在操作成功后仍显示处理中。新精确源码CI尚待执行；下文NOT_RUN/未授权是封存时点记录，不是当前授权状态。
+
 ## 实际问题与范围
 
 前一冻结源码`8045754b88c81cd692018915a2dfe779700d0ebd`/PR215已经通过真实官方Suwayomi及合成LocalSource工程互操作；原始下载结果、失败和签名边界不变。手机原来的Host搜索结果仍为有界短会话：重启后必须重新搜索，历史不等于可管理的长期书库。本段在新的本地分支`codex/host-personal-library-20261027`补**用户明确选择的本机书目引用**，不是整个来源目录导入、来源收藏同步或下载。

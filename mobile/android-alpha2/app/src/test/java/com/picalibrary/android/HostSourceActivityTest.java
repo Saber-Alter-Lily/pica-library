@@ -49,13 +49,24 @@ public class HostSourceActivityTest {
     }
     @Test public void removingReferenceRequiresConfirmationAndDoesNotSendAHostRequest()throws Exception {
         HostSourceManager.Book book=fixture.selected();fixture.manager.saveBook(book.id,true);fixture.manager.end();int before=fixture.opened.size();
-        try(ActivityController<Screen> controller=Robolectric.buildActivity(Screen.class)){Screen screen=controller.setup().get();view(screen,"host.book.remove."+book.id).performClick();assertEquals(1,fixture.manager.savedBooks().size());android.app.AlertDialog dialog=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();dialog.getButton(android.app.AlertDialog.BUTTON_NEGATIVE).performClick();assertEquals(1,fixture.manager.savedBooks().size());view(screen,"host.book.remove."+book.id).performClick();org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();assertEquals(0,fixture.manager.savedBooks().size());assertEquals(before,fixture.opened.size());}
+        try(ActivityController<Screen> controller=Robolectric.buildActivity(Screen.class)){
+            Screen screen=controller.setup().get();view(screen,"host.book.remove."+book.id).performClick();
+            assertTrue(org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().isShowing());
+            assertEquals("Opening confirmation must retain the reference",1,fixture.manager.savedBooks().size());
+            pressDialog(android.app.AlertDialog.BUTTON_NEGATIVE);
+            assertEquals("Cancel must retain the reference",1,fixture.manager.savedBooks().size());
+            view(screen,"host.book.remove."+book.id).performClick();pressDialog(android.app.AlertDialog.BUTTON_POSITIVE);
+            assertEquals("Confirmed removal must complete",0,fixture.manager.savedBooks().size());
+            assertEquals(screen.getString(R.string.host_book_removed),((TextView)view(screen,"host.status")).getText().toString());
+            assertEquals("Local reference removal must not contact the host",before,fixture.opened.size());
+        }
     }
     @Test public void fullSavedCollectionExplainsLimitWithoutEvictionOrAReaderLaunch()throws Exception {
         org.json.JSONArray rows=new org.json.JSONArray();for(int i=1;i<=500;i++)rows.put(HostSavedBooksTest.book(i).json());java.nio.file.Files.write(new java.io.File(RuntimeEnvironment.getApplication().getFilesDir(),"user-host-saved-books-v1.json").toPath(),new org.json.JSONObject().put("schemaVersion",1).put("books",rows).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         fixture.configured();try(ActivityController<Screen> controller=Robolectric.buildActivity(Screen.class)){Screen screen=connect(controller);view(screen,"host.bind").performClick();((EditText)view(screen,"host.query")).setText("synthetic");view(screen,"host.search").performClick();HostSourceManager.Book book=fixture.manager.search("synthetic",1).books.get(0);view(screen,"host.pin."+book.id).performClick();assertEquals(screen.getString(R.string.host_books_full),((TextView)view(screen,"host.status")).getText().toString());assertEquals(500,fixture.manager.savedBooks().size());assertNull(shadowOf(screen).getNextStartedActivity());}
     }
     private <T extends View>T view(Screen screen,String tag){return screen.getWindow().getDecorView().findViewWithTag(tag);}
+    private void pressDialog(int which){org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog().getButton(which).performClick();shadowOf(Looper.getMainLooper()).idle();}
     private Screen connect(ActivityController<Screen> controller)throws Exception {Screen screen=controller.setup().get();((CheckBox)view(screen,"host.consent")).setChecked(true);view(screen,"host.start").performClick();shadowOf(Looper.getMainLooper()).idle();return screen;}
     @Test public void creatingAndResumingScreenNeverConnectsEvenWithEnabledConfig()throws Exception {
         fixture.configured();try(ActivityController<Screen> controller=Robolectric.buildActivity(Screen.class)){Screen screen=controller.setup().get();assertEquals(0,fixture.opened.size());assertTrue(view(screen,"host.start").isEnabled());assertFalse(view(screen,"host.search").isEnabled());view(screen,"host.start").performClick();assertEquals(0,fixture.opened.size());controller.pause().resume();assertEquals(0,fixture.opened.size());}

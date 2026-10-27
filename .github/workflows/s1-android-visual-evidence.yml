@@ -48,7 +48,7 @@ jobs:
             cd mobile/android-alpha2
             gradle :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
             adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell wm size 720x1280
             adb shell wm density 320
             mkdir -p s1-visual-evidence
@@ -74,5 +74,5 @@ jobs:
         with:
           name: s1-android-emulator-visual-${{ github.sha }}
           path: mobile/android-alpha2/s1-visual-evidence/
-          retention-days: 7
+          retention-days: 1
           if-no-files-found: warn

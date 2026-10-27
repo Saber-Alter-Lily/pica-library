@@ -55,6 +55,8 @@ public final class S1AndroidVisualSmokeTest {
         if(preview) intent.putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,7);
 
         try(ActivityScenario<? extends Activity> scenario=ActivityScenario.launch(intent)){
+            Instrumentation inst=InstrumentationRegistry.getInstrumentation();
+            inst.waitForIdleSync();
             scenario.onActivity(activity->{
                 if(selection && activity instanceof HomeActivity)
                     ((HomeActivity)activity).onCollectionSelectionStateChanged(true,3,false);
@@ -81,7 +83,6 @@ public final class S1AndroidVisualSmokeTest {
                     assertNotNull("Missing five-action selection bar",bar);
                 }
             });
-            Instrumentation inst=InstrumentationRegistry.getInstrumentation();
             inst.waitForIdleSync();
             SystemClock.sleep(200);
             Bitmap image=inst.getUiAutomation().takeScreenshot();

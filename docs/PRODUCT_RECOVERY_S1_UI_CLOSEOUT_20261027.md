@@ -1,5 +1,13 @@
 # S1 Android UI 第一轮整改及验收边界｜2026-10-27
 
+## 视觉验收工具补充（实际运行回执，不是通过结论）
+
+- 开发分支新增可运行 Android 35 模拟器 UI 截图，`360dp × 字体 1.0/1.5 × 中英日 × 深浅` 的部分页面组合，目标 24 张 PNG；单次截图包含具体源码 SHA、模拟器检查日志。图像来自隔离的 `.dev` 版本，不是官方 stable Android，也不能证明真实手机交互合格。
+- 初次 [#40517358640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40517358640) **FAIL**：模拟器启动但 Gradle 工作目录错误，未执行 UI 截图；本错误已复现并提交独立 Bash 脚本修复（`45e6e641`）。下一次截图只能引用修复后的 [#40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) 结果，不可凭启动状态声明通过。
+- 为实际用户验收准备独立包构建 [#40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684)：按正常 Gradle 单元/Lint/Debug 编译、检查 Dev 应用身份并提供校验 SHA、签名摘要和隔离提示。**打包通过前无任何新 APK 交付**。已有 Dev 安装遇签名不一致不能卸载清用户资料来绕过。
+- **剩余 393/480dp 真实图像、130% 放大字体及物理设备验收尚未覆盖**；不要把 24 张计划截图误写为最终全矩阵。
+
+
 **源码基线**：PR #218 `8f8124657d203c71a51ea5e7121fd6798bfee998`，Draft/UNPUBLISHED。
 **产品基线**：正式 v0.5.0；对照版本与资产元数据见 [S0 正式版审计](PRODUCT_RECOVERY_V050_OFFICIAL_BASELINE_20261027.md)。
 **验收状态**：S1 implementation=IN_PROGRESS，自动 CI（此精确 SHA）=NOT_FINAL，物理手机=NOT_RUN，userAcceptance=NOT_ACCEPTED，G1=OPEN。

@@ -1,5 +1,19 @@
 # Pica Library Development Task Log
 
+## S1 实际视觉证据与独立测试包（2026-10-27，继续推进）
+
+**开发主体：** [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式版 `v0.5.0`、生产 `main`、正式 OTA、历史 PR 和真实用户数据均未改。S1/G1 用户验收仍为 **NOT_ACCEPTED**。
+
+- **独立模拟器真实 UI 验证**：新增 `.github/workflows/s1-android-visual-evidence.yml` 和 `S1AndroidVisualSmokeTest.java`，计划以 Android 35/360dp、100%/150% 字体、中文/英语/日语、深浅模式，对高级引导、标签/多选/更新页留下 **24 张截图**。数据仅写入 `com.picalibrary.android.dev` 临时目录；不需要正式来源、账号或用户数据。截图只允许公开仓库上传且保留 1 天。**未有截图包之前禁止宣称可视化通过。**
+- **真实失败与修复**：首次视觉运行没有 APK/PNG：模拟器成功启动，但 `android-emulator-runner` 的多行 `script` 各命令工作目录不能保证持久，Gradle 错误在仓库根目录找不到 `settings.gradle`（失败运行 [40517358640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40517358640)）。`45e6e641` 将完整流程改为同一 Bash 进程内执行的 `scripts/run-s1-android-visual-emulator.sh`；新 [可视化运行 40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) 发起时未完成，**不得沿用旧版 CI PASS**。
+- **独立 Dev QA APK**：添加 `.github/workflows/s1-android-dev-package.yml`，在源码 `b1cc4777` 上独立执行 Android JUnit/Lint/Debug 编译并验证 APK 签名、包名、版本和 SHA256；目标输出 `Pica-Library-S1-Android-Dev-v90.apk`，固定 `com.picalibrary.android.dev`，与 Stable 正式包隔离。自动产物仅保留一天，无第三方签名私钥及 Release/OTA。首次 [QA 工作流 40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) 发起时仍在运行，**未证明候选 APK 已产生**。
+- **边界不改变**：Gradle/API35 模拟器证据并非真实手机/OEM 验收；Dev APK 不代表正式签名覆盖升级；Pica/EH/JM 具体来源协议仍捆绑于历史程序，S2/S3 仍需要真正外置、独立组件生命周期与老用户迁移。
+
+**下一动作**：按精确 GitHub Actions run 结果定位脚本、仪表测试或实际布局故障；只在生成的可审阅截图/Dev 安装包确实存在时，把对应记录由 NOT_RUN 更新为自动/模拟器已验证；维持 G1 人工验收 OPEN，不越级提交 Release。
+
+---
+
+
 ## S0–S1 当前开发回执（2026-10-27，PR #218 独立 Draft）
 
 产品策略不变：正式 `v0.5.0` 是功能/视觉体验基线；Dev89 源码是未发布工程起点。当前本分支精确源码 `8f8124657d203c71a51ea5e7121fd6798bfee998`；不得合并/发布/OTA。新版用户验收状态 **NOT_ACCEPTED**，真实手机/UI/字体放大和源码包体/来源外置门禁仍 OPEN。

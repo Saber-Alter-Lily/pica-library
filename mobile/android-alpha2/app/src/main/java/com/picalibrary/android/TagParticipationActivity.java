@@ -66,7 +66,15 @@ public class TagParticipationActivity extends LocaleAwareActivity {
     private void shell(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);
         root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
-        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,tr("‹ 返回","‹ Back","‹ 戻る"),v->close(),true));bar.addView(Ui.text(this,tr("用于推荐的标签","Recommendation tag scope","おすすめに使うタグ"),20,Ui.TEXT,true));root.addView(bar);
+        LinearLayout bar=new LinearLayout(this);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(Ui.dp(this,8),Ui.dp(this,4),Ui.dp(this,8),Ui.dp(this,4));
+        bar.addView(Ui.button(this,tr("‹ 返回","‹ Back","‹ 戻る"),v->close(),true));
+        TextView heading=Ui.text(this,tr("用于推荐的标签","Recommendation tag scope","おすすめに使うタグ"),20,Ui.TEXT,true);
+        heading.setTag("tag-participation-heading");
+        // Reserve width for the back control; long English/Japanese text wraps instead of leaving the screen.
+        bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+        root.addView(bar);
         ScrollView scroll=new ScrollView(this);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,14),Ui.dp(this,8),Ui.dp(this,14),Ui.dp(this,20));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         status=Ui.text(this,tr("正在读取本地标签…","Loading local tags…","ローカルタグを読み込み中…"),13,Ui.MUTED,true);root.addView(status);footer=new LinearLayout(this);footer.setOrientation(LinearLayout.VERTICAL);root.addView(footer);setContentView(root);root.requestApplyInsets();
     }

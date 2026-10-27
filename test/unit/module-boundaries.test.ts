@@ -135,6 +135,19 @@ describe('enforced first module boundaries', () => {
                 )
         }
     })
+    it('bundles source routing as a self-contained module without account clients or provider SDKs', async () => {
+        const result=await build({
+            entryPoints:['src/providers/provider-registry.ts'],
+            bundle:true,platform:'browser',format:'esm',write:false,
+            metafile:true,logLevel:'silent'
+        })
+        const inputs=Object.keys(result.metafile!.inputs).map(file=>file.replaceAll('\\','/')).sort()
+        expect(inputs).toEqual([
+            'src/providers/module-manifests.ts',
+            'src/providers/provider-registry.ts'
+        ])
+        expect(result.outputFiles).toHaveLength(1)
+    })
     it('keeps source routing metadata separate from SDK sessions and recommendation generation', () => {
         for (const name of ['provider-registry.ts', 'module-manifests.ts'])
             expect(

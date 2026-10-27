@@ -4,6 +4,10 @@
 
 ## 首轮执行与有证据的夹具修正
 
+最新`ad7040aabb4eb87626062a9b4fe79e5e7a01e3d1`的[T3运行40441168209](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40441168209)在约6分钟内正常以FAIL退出，不再等55分钟取消。**6/7通过**；launch/health回滚按已声明的旧headless隔离范围通过，健康负响应跨度58740ms，产品期限60000ms。success-forward已完成迁移和下一次应用内更新、实际0.5.2就绪及树/合成状态核对，但最后浏览器无错误断言捕获1个400和12个连接拒绝，整体仍FAIL。全部23份下载诊断静态核验、所属进程清理及网络/进程边界通过，常规CI40441171189两job通过。首轮和本轮原始失败均保留。
+
+现有错误文本没有请求身份，不能断言400是可忽略项或将全部连接拒绝当重启噪声。下一轮**仅增加有界请求诊断，不放宽断言**：接口/静态资源路径、HTTP状态、请求失败代码、相对时间与UI阶段；不存host/port/query/fragment/凭据/请求或响应正文，超界仍FAIL。按证据决定是否产品修复，不直接复制旧门禁对所有“Failed to load resource”的宽泛排除。
+
 精确源码 `1360c5ce2e559d5c7b53b849e036b86375c13363` 的常规 [CI40433450181](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40433450181) Web/Desktop 和 Android 通过；独立 [T3运行40433426476](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40433426476) 为 **FAIL：2项通过、5项失败**。七份场景结果已写入，但控制进程未退出，最终在55分钟job上限被取消。不能把控制器不退出等同于迁移事务运行55分钟，也不能用已成功的子断言改判场景通过。
 
 | 场景 | 首轮结果与已核实原因 |

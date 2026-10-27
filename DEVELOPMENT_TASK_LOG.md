@@ -1,5 +1,11 @@
 # Pica Library Development Task Log
 
+## T3 second-run evidence — six of seven, diagnostic gap not waived (2026-10-26)
+
+Sourcead7040aabb4e, CI40441171189 Web/Desktop+Android PASS; T3 run40441168209 completed in about6minutes with a real exit1, **6PASS/1FAIL**. Actual .cmd preview/cancel, integrity rejection, running refusal, concurrent ownership, launch rollback and60000ms health rollback PASS within the declared old-supported-headless CI scope. Health negative-response span58740ms; no boundary violations or cleanup failures. All23diagnostic leaves were downloaded and independently checked. Controller resource type names are now retained; earlier exact leftover-handle cause is not retroactively inferred.
+
+The remaining success-forward scene reached migrated0.5.1, actual one-click forward target0.5.2/healthy process, exact target tree and retained synthetic state, but its unchanged final browser assertion recorded one400 and12ERR_CONNECTION_REFUSED messages. Overall FAIL is retained. Original diagnostics omitted request identity; add only bounded API/static-resource path/status/failure/stage/timing, never host/query/auth/body. Keep all browser-error and source/process/network assertions. No product code, deadline, dependency or schema changes; no local runtime. This is evidence collection for a new unresolved browser-error cause, not a green rerun or blanket resource-error exclusion. Remaining source/device and full-product gates stay open.
+
 ## T3 first-run evidence and bounded harness correction (2026-10-26)
 
 PR214 source1360c5ce2e55: ordinary CI40433450181 Web/Desktop and Android PASS; dedicated T3 run40433426476 **FAIL,2PASS/5FAIL**, followed by55minute job cancellation because the controller remained alive after all seven result rows were durable. This is not evidence of a55minute migration transaction. Original summary, per-case result/audit/terminal and job log are retained under _validation/legacy-transition-t3-20261026 and _validation/user-host-cloud-20261026; no failed result is rewritten.

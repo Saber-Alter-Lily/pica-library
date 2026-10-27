@@ -9,6 +9,21 @@ export const T3_SCENARIOS = Object.freeze(['preview-cancel', 'integrity-rejectio
 export const T3_PTY_VERSION = '1.1.0'
 export const T3_PLAYWRIGHT_VERSION = '1.63.0'
 
+/** Synthetic CI diagnostics only: no host, port, query, fragment, auth or body. */
+export function t3BrowserNetworkEvidence(input, resourceType) {
+    let route = 'unclassified', protocol = 'invalid'
+    try {
+        const url = new URL(input)
+        protocol = ['http:', 'https:', 'data:', 'blob:'].includes(url.protocol) ? url.protocol : 'other'
+        if (url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) {
+            route = url.pathname === '/' ? 'shell' :
+                /^\/api\/v1\/(?:[a-z][a-z0-9-]{0,40}\/?){1,6}$/.test(url.pathname) && !/\/[a-f0-9]{16,}(?:\/|$)|\/[a-f0-9]{8}-[a-f0-9-]{27}(?:\/|$)/i.test(url.pathname) && url.pathname.length <= 160 ? url.pathname :
+                /^\/[a-z][a-z0-9-]*\.(?:js|css)$/.test(url.pathname) ? url.pathname : 'other-loopback-resource'
+        } else route = 'non-loopback-resource'
+    } catch { /* Invalid URLs stay classified without echoing their contents. */ }
+    return { protocol, route, resourceType: ['document', 'script', 'stylesheet', 'fetch', 'xhr', 'image', 'other'].includes(resourceType) ? resourceType : 'other' }
+}
+
 export function t3OwnedPath(root, value) {
     const resolved = path.resolve(String(value)), relative = path.relative(root, resolved)
     assert.ok(relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative), 'T3 path escaped owned root')

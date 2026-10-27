@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 // Source/fixture tests only: native tools, applications and listeners are never loaded.
 // @ts-expect-error The isolated CI helper is an ESM test asset, not an application SDK.
-import { T3_KIND, T3_SCENARIOS, T3_VERSIONS, checkedT3Descriptor, t3OwnedPath, t3ForwardTransport } from '../../scripts/lib/legacy-transition-t3-fixture.mjs'
+import { T3_KIND, T3_SCENARIOS, T3_VERSIONS, checkedT3Descriptor, t3OwnedPath, t3ForwardTransport, t3BrowserNetworkEvidence } from '../../scripts/lib/legacy-transition-t3-fixture.mjs'
 // @ts-expect-error Existing pure string-generating fixture helper.
 import { firstHopStateProgram, runtimeChoiceStateProgram, legacyTransitionStateProgram } from '../../scripts/lib/first-hop-state.mjs'
 
@@ -101,5 +101,20 @@ describe('finite separately authorized T3 gate, no local runtime',()=>{
         expect(driver).toContain("const exitCode = summary.status === 'PASS' ? 0 : 1")
         expect(recipe).toContain('timeout-minutes: 25');expect(recipe).toContain('timeout-minutes: 15')
         expect(driver).toContain('assert.equal(helpers()[0].healthTimeoutMs, 60000)')
+    })
+    it('records diagnostic API identities without hosts, queries, fragments, credentials or body data',()=>{
+        expect(t3BrowserNetworkEvidence('http://user:secret@127.0.0.1:1234/api/v1/desktop/browser-session?token=private#secret','fetch')).toEqual({protocol:'http:',route:'/api/v1/desktop/browser-session',resourceType:'fetch'})
+        for(const url of ['https://user:secret@provider.invalid/path?token=private#secret','invalid secret','http://localhost:1234/api/v1/comics/123456789abcdef?secret=value']) {
+            const value=JSON.stringify(t3BrowserNetworkEvidence(url,'untrusted secret'))
+            expect(value).not.toMatch(/secret|private|token|provider\.invalid|1234|123456789abcdef/)
+        }
+    })
+    it('adds bounded response/failure timing only, without relaxing the original browser or process gate',()=>{
+        expect(driver).toContain("page.on('response'")
+        expect(driver).toContain("page.on('requestfailed'")
+        expect(driver).toContain('browserDiagnostics.length >= 128')
+        expect(driver).toContain("assert.equal(browserDiagnosticsOverflow, false")
+        expect(driver).toContain('assert.deepEqual(browserErrors, []); assert.deepEqual(external, [])')
+        expect(driver).not.toContain("!value.text().includes('Failed to load resource')")
     })
 })

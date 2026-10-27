@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import AdmZip from 'adm-zip'
 import { assertDisposableWindowsCi, FIRST_HOP_BASELINE, sha256 } from './lib/old-client-first-hop.mjs'
 import { legacyTransitionStateProgram } from './lib/first-hop-state.mjs'
-import { T3_KIND, T3_SCENARIOS, T3_VERSIONS, T3_PTY_VERSION, T3_PLAYWRIGHT_VERSION } from './lib/legacy-transition-t3-fixture.mjs'
+import { T3_KIND, T3_SCENARIOS, T3_VERSIONS, T3_PTY_VERSION, T3_PLAYWRIGHT_VERSION, t3BrowserNetworkEvidence } from './lib/legacy-transition-t3-fixture.mjs'
 
 // Mandatory BEFORE input reads, tool/native-addon loading, extraction or runtime IO.
 assertDisposableWindowsCi()
@@ -284,9 +284,26 @@ async function scenario(selected) {
                 Object.assign(result, { actualOldAppRelaunchedAndReady: true, actualTerminalFailureRetained: true, oldProgramTreeRestored: true, healthDeadlineMs: 60000 })
             } else {
                 const browserErrors = [], external = []
+                const browserDiagnostics = [], browserStarted = Date.now()
+                let browserStage = 'initial-page', browserDiagnosticsOverflow = false
+                result.browserDiagnostics = browserDiagnostics
+                const recordBrowser = (kind, url, resourceType, detail) => {
+                    if (browserDiagnostics.length >= 128) { browserDiagnosticsOverflow = true; return }
+                    browserDiagnostics.push({ elapsedMs: Date.now() - browserStarted, stage: browserStage, kind, ...t3BrowserNetworkEvidence(url, resourceType), ...detail })
+                }
                 browser = await chromium.launch({ headless: true }); const page = await browser.newPage()
                 page.on('pageerror', error => browserErrors.push(String(error)))
-                page.on('console', value => { if (value.type() === 'error') browserErrors.push(value.text()) })
+                page.on('console', value => {
+                    if (value.type() === 'error') {
+                        browserErrors.push(value.text())
+                        recordBrowser('console-error', value.location().url, 'other', { messageClass: value.text().startsWith('Failed to load resource:') ? 'RESOURCE_ERROR' : 'OTHER_ERROR' })
+                    }
+                })
+                page.on('response', response => { if (response.status() >= 400) recordBrowser('http-error', response.url(), response.request().resourceType(), { status: response.status(), method: response.request().method() }) })
+                page.on('requestfailed', request => {
+                    const code = request.failure()?.errorText ?? ''
+                    recordBrowser('request-failed', request.url(), request.resourceType(), { failure: /^net::ERR_[A-Z0-9_]+$/.test(code) ? code : 'OTHER_FAILURE', method: request.method() })
+                })
                 await page.route('**/*', route => {
                     const url = new URL(route.request().url())
                     if (['data:', 'blob:'].includes(url.protocol) || ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) return route.continue()
@@ -302,17 +319,20 @@ async function scenario(selected) {
                 await expect(page.locator('#pica-onboarding-welcome')).toBeHidden({ timeout: 10000 })
                 await page.locator('nav [data-view="maintenance"]').click(); await page.locator('#a87-maintenance-tab').click()
                 await expect(page.locator('#update-one-click')).toBeVisible()
+                browserStage = 'update-request'
                 const prepared = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/update/prepare-latest', { timeout: 180000 })
                 const applied = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/update/apply', { timeout: 180000 })
                 const reloaded = page.waitForEvent('domcontentloaded', { timeout: 180000 }).then(() => null, error => error)
                 await page.locator('#update-one-click').click(); await expect(page.locator('#app-confirm-dialog')).toBeVisible(); await expect(page.locator('#app-confirm-message')).toContainText('0.5.2')
                 await page.locator('#app-confirm-submit').click()
                 const preparedResponse = await prepared, staged = await preparedResponse.json(); assert.ok(preparedResponse.ok()); assert.equal(staged.mode, 'full-application'); assert.equal(staged.archiveSha256, targets[1].row.sha256)
-                assert.ok((await applied).ok()); await terminalPhase(normalProgress, 'complete'); await ready('0.5.2')
+                assert.ok((await applied).ok()); browserStage = 'apply-accepted'; await terminalPhase(normalProgress, 'complete'); await ready('0.5.2')
                 const reloadError = await reloaded; if (reloadError) throw reloadError
+                browserStage = 'reconnected'
                 await expect(page.locator('#mode')).not.toHaveText('正在检测模式', { timeout: 10000 })
                 assert.deepEqual(tree(app), expectedTree(targets[1].archive)); state('verify')
                 assert.ok(events().some(row => row.kind === 'NORMAL_INSTALLED_HELPER_SELECTED'))
+                assert.equal(browserDiagnosticsOverflow, false, 'Bounded browser diagnostics overflow')
                 assert.deepEqual(browserErrors, []); assert.deepEqual(external, [])
                 Object.assign(result, { actualOneTimeEntryMigration: true, actualBrowserOneClickForwardUpdate: true, forwardVersion: '0.5.2', browserReloadObserved: true, noExternalBrowserRequests: true })
             }

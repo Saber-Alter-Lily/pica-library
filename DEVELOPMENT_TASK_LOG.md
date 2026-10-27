@@ -1,5 +1,13 @@
 # Pica Library Development Task Log
 
+## T3 request attribution and first product correction (2026-10-26)
+
+d292f70/40442777436 remains6PASS/1FAIL;23downloaded diagnostic leaves checked, no boundary/cleanup failure. The startup400 is POST recommendation-events: renderAll invokes the recommendation renderer before any cycle/batch exists, yet it publishes recommend_batch_presented; server context validation correctly refuses. Executing the actual small client function against inert ports reproduces2FAIL/115PASS with0IO audit events. Retain this red test evidence. Minimal web/app.js guard suppresses only nonexistent/invalid/empty batch presentations, retaining real batch fields and ordinary search/feedback; no server validation, DB/schema/ranker/Visual/user-state changes.
+
+All connection refusals are the shipped reconnect GET capabilities/timestamped HTML probes in the accepted-apply/pre-reload interval. CI now classifies only same-origin fetch GET ERR_CONNECTION_REFUSED within the existing90second reconnect bound; console errors require one-to-one actual failed-request URL/1second correlation and real0.5.2/200capabilities/200HTML readback. HTTP errors,400,uncaught code,other origins/routes/methods/resources/times/codes still fail. This is an explicit correction of the overly literal zero-resource-message assertion, not a blanket ignore or an unchanged-assertion claim. Product60second health deadline unchanged. Product correction/new gates require new exact-source cloud evidence; PR213/Dev88 and original failures remain frozen. Broader source/device/P6 completion is still open.
+
+Green source preflight unit-6/types-5:119actual PASS/13files and full types; JS parses and git diff check PASS, both new boundary audits0events. The red unit-5 retained2failures/115passes. Ledger phase summary and affected42case rows now distinguish verified Dev88 engineering evidence from real source/device and still-incomplete persistence/sync work; stale uncompiled/old-six-scene-FAIL labels are superseded, not used for a completion percentage.
+
 ## T3 second-run evidence — six of seven, diagnostic gap not waived (2026-10-26)
 
 Sourcead7040aabb4e, CI40441171189 Web/Desktop+Android PASS; T3 run40441168209 completed in about6minutes with a real exit1, **6PASS/1FAIL**. Actual .cmd preview/cancel, integrity rejection, running refusal, concurrent ownership, launch rollback and60000ms health rollback PASS within the declared old-supported-headless CI scope. Health negative-response span58740ms; no boundary violations or cleanup failures. All23diagnostic leaves were downloaded and independently checked. Controller resource type names are now retained; earlier exact leftover-handle cause is not retroactively inferred.

@@ -24,6 +24,20 @@ export function t3BrowserNetworkEvidence(input, resourceType) {
     return { protocol, route, resourceType: ['document', 'script', 'stylesheet', 'fetch', 'xhr', 'image', 'other'].includes(resourceType) ? resourceType : 'other' }
 }
 
+/** Only the shipped, bounded reconnect probes during an accepted restart.
+ * No HTTP errors, other resources/origins, pre-update or post-reload failures.
+ */
+export function t3ExpectedReconnectFailure(input, applicationOrigin) {
+    if (input.stage !== 'apply-accepted' || input.method !== 'GET' || input.resourceType !== 'fetch' || input.failure !== 'net::ERR_CONNECTION_REFUSED' || input.status !== undefined ||
+        !Number.isSafeInteger(input.elapsedSinceApplyMs) || input.elapsedSinceApplyMs < 0 || input.elapsedSinceApplyMs > 90000) return false
+    try {
+        const url = new URL(input.url), origin = new URL(applicationOrigin)
+        if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname) || url.origin !== origin.origin || url.username || url.password || url.hash) return false
+        if (url.pathname === '/api/v1/capabilities') return !url.search
+        return url.pathname === '/' && [...url.searchParams.keys()].length === 1 && /^\d{1,17}$/.test(url.searchParams.get('pica-update-ready') ?? '')
+    } catch { return false }
+}
+
 export function t3OwnedPath(root, value) {
     const resolved = path.resolve(String(value)), relative = path.relative(root, resolved)
     assert.ok(relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative), 'T3 path escaped owned root')

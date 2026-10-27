@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 // Source/fixture tests only: native tools, applications and listeners are never loaded.
 // @ts-expect-error The isolated CI helper is an ESM test asset, not an application SDK.
-import { T3_KIND, T3_SCENARIOS, T3_VERSIONS, checkedT3Descriptor, t3OwnedPath, t3ForwardTransport, t3BrowserNetworkEvidence } from '../../scripts/lib/legacy-transition-t3-fixture.mjs'
+import { T3_KIND, T3_SCENARIOS, T3_VERSIONS, checkedT3Descriptor, t3OwnedPath, t3ForwardTransport, t3BrowserNetworkEvidence, t3ExpectedReconnectFailure } from '../../scripts/lib/legacy-transition-t3-fixture.mjs'
 // @ts-expect-error Existing pure string-generating fixture helper.
 import { firstHopStateProgram, runtimeChoiceStateProgram, legacyTransitionStateProgram } from '../../scripts/lib/first-hop-state.mjs'
 
@@ -116,5 +116,22 @@ describe('finite separately authorized T3 gate, no local runtime',()=>{
         expect(driver).toContain("assert.equal(browserDiagnosticsOverflow, false")
         expect(driver).toContain('assert.deepEqual(browserErrors, []); assert.deepEqual(external, [])')
         expect(driver).not.toContain("!value.text().includes('Failed to load resource')")
+    })
+    it('recognizes only the shipped two GET probes during the accepted bounded restart',()=>{
+        const input={url:'http://127.0.0.1:1234/api/v1/capabilities',stage:'apply-accepted',method:'GET',resourceType:'fetch',failure:'net::ERR_CONNECTION_REFUSED',elapsedSinceApplyMs:500}
+        expect(t3ExpectedReconnectFailure(input,'http://127.0.0.1:1234')).toBe(true)
+        expect(t3ExpectedReconnectFailure({...input,url:'http://127.0.0.1:1234/?pica-update-ready=1793070000000'},'http://127.0.0.1:1234')).toBe(true)
+        for(const change of [{stage:'initial-page'},{stage:'update-request'},{stage:'reconnected'},{method:'POST'},{resourceType:'script'},{failure:'net::ERR_ABORTED'},{failure:undefined,status:400},{status:503},{elapsedSinceApplyMs:-1},{elapsedSinceApplyMs:90001},{elapsedSinceApplyMs:null},{url:'http://127.0.0.1:9999/api/v1/capabilities'},{url:'https://example.invalid/api/v1/capabilities'},{url:'http://user:secret@127.0.0.1:1234/api/v1/capabilities'},{url:'http://127.0.0.1:1234/api/v1/recommendation-events'},{url:'http://127.0.0.1:1234/'},{url:'http://127.0.0.1:1234/?pica-update-ready=123&extra=1'},{url:'http://127.0.0.1:1234/?pica-update-ready=bad'},{url:'http://127.0.0.1:1234/api/v1/capabilities?extra=1'}]) {
+            expect(t3ExpectedReconnectFailure({...input,...change},'http://127.0.0.1:1234')).toBe(false)
+        }
+    })
+    it('requires real new-version readback and one-to-one failed-request correlation, while retaining all HTTP errors',()=>{
+        expect(driver).toContain('matched.has(index)')
+        expect(driver).toContain('value.url === error.url')
+        expect(driver).toContain('Math.abs(value.elapsedMs - error.elapsedMs) <= 1000')
+        expect(driver).toContain("error.message === 'Failed to load resource: net::ERR_CONNECTION_REFUSED'")
+        expect(driver).toContain("assert.deepEqual(browserReadback, { capabilitiesStatus: 200, appVersion: '0.5.2', shellStatus: 200, html: true })")
+        expect(driver).toContain("value.kind === 'http-error'")
+        expect(driver).toContain('assert.deepEqual(browserErrors, []); assert.deepEqual(external, [])')
     })
 })

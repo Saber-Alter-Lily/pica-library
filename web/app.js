@@ -514,6 +514,14 @@ function recordRecommendationEvent(eventType, payload = {}) {
         recommendationCycleId: state.recommendationCycleId,
         ...payload
     }
+    // Rendering an empty/local-only page is not a managed recommendation batch.
+    // Keep the server's context requirement; do not submit a fabricated event.
+    if (eventType === 'recommend_batch_presented' && (
+        typeof value.recommendationCycleId !== 'string' || !value.recommendationCycleId.trim() ||
+        typeof value.recommendationBatchId !== 'string' || !value.recommendationBatchId.trim() ||
+        !Number.isSafeInteger(value.recommendationBatchIndex) || value.recommendationBatchIndex < 0 ||
+        !Array.isArray(value.metadata?.itemIds) || value.metadata.itemIds.length === 0
+    )) return
     void post('/api/v1/recommendation-events', {
         ...value,
         contextId: payload.contextId || value.recommendationContextId || null

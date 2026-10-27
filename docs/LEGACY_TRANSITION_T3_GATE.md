@@ -2,6 +2,14 @@
 
 用户已明确批准：只在 GitHub 临时 Windows runner 使用固定公开 v0.5.0 和合成资料，独立验证 T3。不在本机运行，不访问正式资料，不合并/发布/OTA/部署。新分支 `codex/legacy-transition-t3-20261026`；PR213/Dev88 固定 `40b3a555cb0dcb1732fe0f80ba5cb152d1fa136a`，原包/原始失败不动。本文件不是 PASS 记录。
 
+## 最新归因与最小产品修正
+
+诊断源码`d292f70ade0aec07c158ef879b16e5512554fab1`/[运行40442777436](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40442777436)仍6PASS/1FAIL，全部23份诊断已核验。唯一400是首屏`POST /api/v1/recommendation-events`；源码中`renderAll`无条件调用推荐渲染，空状态也提交`recommend_batch_presented`，而服务端必须有cycle/batch上下文。实际客户端函数的惰性端口复现得到2FAIL/115PASS、0本地IO审计事件，保留红灯；这不是迁移事务或合成作品ID问题。
+
+唯一产品修正位于`web/app.js`：没有真实cycle/batch/非负整数批号/非空项目时不提交该展示事件。真实批次原字段及普通search/feedback事件仍通过原单事件接口；服务端验证、数据库、排序、Visual及状态表不变。PR213/Dev88原成品仍封存，不冒充已包含新修正。
+
+其余连接拒绝均发生在已收到apply成功之后、新文档重载之前，且仅为现有`update-reconnect.js`的`GET /api/v1/capabilities`和`GET /?pica-update-ready=<timestamp>`。新增精确分类：同一应用origin、fetch/GET、仅ERR_CONNECTION_REFUSED、已有90000ms重连上限内，console消息必须与真实失败请求按URL和1秒时序一对一对应。必须随后读到真实新版本0.5.2、200capabilities和200HTML页面，否则不能豁免。所有HTTP错误（尤其原400）、页面异常、其他请求/来源/时段/错误类型均继续失败。**此处明确修正“连正常停机探测也要求零资源消息”的测试语义，不声称字面断言完全未变，也不采用旧测试的全资源错误排除。**产品健康60000ms、重连90000ms、来源/进程/网络守卫不变。新精确源码及全七组仍须云端通过。
+
 ## 首轮执行与有证据的夹具修正
 
 最新`ad7040aabb4eb87626062a9b4fe79e5e7a01e3d1`的[T3运行40441168209](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40441168209)在约6分钟内正常以FAIL退出，不再等55分钟取消。**6/7通过**；launch/health回滚按已声明的旧headless隔离范围通过，健康负响应跨度58740ms，产品期限60000ms。success-forward已完成迁移和下一次应用内更新、实际0.5.2就绪及树/合成状态核对，但最后浏览器无错误断言捕获1个400和12个连接拒绝，整体仍FAIL。全部23份下载诊断静态核验、所属进程清理及网络/进程边界通过，常规CI40441171189两job通过。首轮和本轮原始失败均保留。

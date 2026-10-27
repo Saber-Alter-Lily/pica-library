@@ -33,7 +33,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm type:check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm exec vitest run test/unit/legacy-transition-t3-gate.test.ts test/unit/legacy-transition-preflight.test.ts test/unit/legacy-transition-coordinator.test.ts --maxWorkers=2 --minWorkers=1
+          pnpm exec vitest run test/unit/legacy-transition-t3-gate.test.ts test/unit/legacy-transition-preflight.test.ts test/unit/legacy-transition-coordinator.test.ts test/unit/recommendation-event-context.test.ts test/unit/runtime-choice-reconnect.test.ts --maxWorkers=2 --minWorkers=1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Pinned public old package and actual trusted producer
         shell: pwsh

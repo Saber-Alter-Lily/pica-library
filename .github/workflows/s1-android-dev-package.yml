@@ -39,8 +39,9 @@ jobs:
       - name: Lint and assemble isolated Android debug QA
         working-directory: mobile/android-alpha2
         env:
-          PICA_ANDROID_VERSION_CODE: '91'
-          PICA_ANDROID_VERSION_NAME: '0.5.0-S1-QA2'
+          PICA_ANDROID_VERSION_CODE: '92'
+          PICA_ANDROID_VERSION_NAME: '0.5.0-S1-QA3'
+          PICA_ANDROID_QA_PACKAGE_SUFFIX: '.s1qa3'
         run: gradle :app:lintDebug :app:assembleDebug --no-daemon
       - name: Verify separate Dev identity and record exact binary
         working-directory: mobile/android-alpha2
@@ -50,21 +51,21 @@ jobs:
           test -s "$apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/s1-apk-cert.txt"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/s1-apk-package.txt"
-          grep -q "name='com.picalibrary.android.dev'" "$RUNNER_TEMP/s1-apk-package.txt"
-          grep -q "versionCode='91'" "$RUNNER_TEMP/s1-apk-package.txt"
-          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/s1-apk-package.txt"
+          grep -q "name='com.picalibrary.android.s1qa3'" "$RUNNER_TEMP/s1-apk-package.txt"
+          grep -q "versionCode='92'" "$RUNNER_TEMP/s1-apk-package.txt"
+          grep -q "application-label:'Pica Library S1 QA3'" "$RUNNER_TEMP/s1-apk-package.txt"
           mkdir -p candidate
-          cp "$apk" candidate/Pica-Library-S1-Android-Dev-v91.apk
+          cp "$apk" candidate/Pica-Library-S1-Android-QA3-v92.apk
           cp "$RUNNER_TEMP/s1-apk-package.txt" candidate/PACKAGE_INFO.txt
           sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/s1-apk-cert.txt" > candidate/CERTIFICATE_SHA256.txt
           printf '%s\n' "$GITHUB_SHA" > candidate/SOURCE_SHA.txt
-          printf '%s\n' 'UNRELEASED S1 QA2 DEBUG ONLY. com.picalibrary.android.dev has isolated data. Do NOT uninstall existing Dev data to bypass signing conflicts. Official v0.5.0/OTA unchanged. Sources not yet fully externalized. Physical UX acceptance pending.' > candidate/STATUS.txt
-          (cd candidate && sha256sum Pica-Library-S1-Android-Dev-v91.apk > SHA256SUMS.txt)
+          printf '%s\n' 'UNRELEASED S1 QA3 DEBUG ONLY. com.picalibrary.android.s1qa3 has isolated data separate from stable and previous Dev/QA installs. Do NOT uninstall existing Dev data to bypass signing conflicts. Official v0.5.0/OTA unchanged. Sources not yet fully externalized. Physical UX acceptance pending.' > candidate/STATUS.txt
+          (cd candidate && sha256sum Pica-Library-S1-Android-QA3-v92.apk > SHA256SUMS.txt)
       - name: Upload one-day public-only Dev test package
         if: success() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
-          name: pica-s1-android-dev-v91-${{ github.sha }}
+          name: pica-s1-android-qa3-v92-${{ github.sha }}
           path: mobile/android-alpha2/candidate/
           retention-days: 1
           if-no-files-found: error

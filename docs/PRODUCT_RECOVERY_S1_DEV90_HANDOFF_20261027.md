@@ -37,6 +37,13 @@
 
 如果能提供具体截图，需同步记录：设备/Android 版本、屏宽或分辨率、系统字体比例、语言、主题、入口路径、页面滚动位置和看到的预期/实际差异。每项复现对应原 S0–S6 任务编号，修复后在相同条件下复验。
 
+
+## 后续 QA3：防止不同 Debug 签名冲突（计划阶段）
+
+实际下载核实：v90 的 Debug 证书 SHA-256 是 `d3588d987b4d0a6afdf4aed66909722db63011d5b7dacb1d7a8f509a07e4f6b1`，v91 是 `a2f84443b72af8c85ad69d0d7d1c47a729b03169b4edc9c84165fe141e26576a`。两者包名原本都为 `com.picalibrary.android.dev`，因此 v91 **不能视为可覆盖升级 v90**，也不应要求删除已有 Dev 数据。
+
+新 QA3 `v92` 的构建方案引入严格校验的 `PICA_ANDROID_QA_PACKAGE_SUFFIX=.s1qa3`，计划生成独立包名 `com.picalibrary.android.s1qa3` 和独立配对 scheme `picalibrary-s1qa3`、launcher 名称 `Pica Library S1 QA3`。普通 Debug 仍默认 `.dev`，正式版始终为不带后缀的 `com.picalibrary.android`。**这只修复合成 QA 包的并排安装策略，尚未提供正式 Android 签名/无痛升级方案。新版 QA3 工件在精确 CI/签名/身份检测成功前不可视为已产生。**
+
 ## 未完成门禁
 
 真实物理机 UI/聚光验收 **NOT_RUN/NOT_ACCEPTED**；模拟器截图验收 **PENDING**（原 [KVM 通过但 instrumentation 失联/取消 #40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386)；新 [分阶段指南首次截图 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) 独立评估）。历史 42 项及 12 新增案例未据此改成 PASS；G2 来源真正外置、G3 稳定无损升级、G4 正式发布仍 OPEN。

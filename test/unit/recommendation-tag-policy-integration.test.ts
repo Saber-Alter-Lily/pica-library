@@ -91,6 +91,22 @@ describe('tag policy storage, routes and paired knowledge contract', () => {
         expect(intents[0].type).toBe('RELATED');expect(translateIntentPlanV3(intents)[0]).toMatchObject({ routeType: 'RELATED', comicSeedId: 'pica:1' })
         expect(translateIntentPlanV3(intents)[0].queryTerm).toBeUndefined()
     })
+    it('manual annotations never turn an opaque Host or unknown source reference into a Pica related request', () => {
+        const ids = ['hosted:64d223e0-5d29-4320-babb-5a2da654d345:' + 'a'.repeat(64), 'future-source:opaque']
+        for (const id of ids) {
+            const tagPolicy = normalizeTagPolicyV1({ ...off(), selected: ['private|' + privateId], privateTags: [{ id: privateId, name: 'Personal annotation', kind: 'MANUAL', comicIds: [id], mappings: [] }] })
+            // Even a stale/misdeclared adapter row must not override the actual namespace.
+            const intents = inferredPrivateTagIntentsV1([comic(id, [])], { tagPolicy })
+            expect(intents).toEqual([])
+            expect(translateIntentPlanV3(intents)).toEqual([])
+        }
+    })
+    it('an opaque manual binding cannot shadow a valid later Pica seed', () => {
+        const host = 'hosted:64d223e0-5d29-4320-babb-5a2da654d345:' + 'a'.repeat(64)
+        const tagPolicy = normalizeTagPolicyV1({ ...off(), selected: ['private|' + privateId], privateTags: [{ id: privateId, name: 'Mine', kind: 'MANUAL', comicIds: [host, 'pica:1'], mappings: [] }] })
+        const intents = inferredPrivateTagIntentsV1([comic(host, []), comic('pica:1', [])], { tagPolicy })
+        expect(translateIntentPlanV3(intents)[0]).toMatchObject({ routeType: 'RELATED', comicSeedId: 'pica:1' })
+    })
     it('namespaced EH scope survives channel planning and mobile catalog evidence without guessing from flat tags', () => {
         const { database, store } = fixture(), raw = { ...comic('eh:1', ['schoolgirl']), providerMetadata: { rawTags: ['female:schoolgirl'] } }
         const state = { ...defaultPortablePolicyStateV5(), tagPolicy: { ...off(), selected: ['eh|female:schoolgirl'] } }, timescales = buildPreferenceTimescalesV5([], [raw], state)

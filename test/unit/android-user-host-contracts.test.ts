@@ -112,7 +112,7 @@ describe('native user-Host source/resource contracts only', () => {
         expect(screen).toContain('putExtra("source","local")')
     })
     it('has complete Chinese/English/Japanese resources including every Host reference and format argument', () => {
-        const zh = strings('values'), en = strings('values-en'), ja = strings('values-ja')
+        const zh = strings('values-zh-rCN'), en = strings('values'), ja = strings('values-ja')
         expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
         expect(Object.keys(ja).sort()).toEqual(Object.keys(zh).sort())
         const refs = new Set([...java('HostSourceActivity').matchAll(/R\.string\.(host_\w+)/g)].map(row => row[1]))

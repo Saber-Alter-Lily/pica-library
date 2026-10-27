@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import http from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
+import { assertPackagedHostedOfflineChapter } from './assert-hosted-offline-chapter.mjs'
 
 /** Same owned Windows application/profile as the source gate; only this synthetic host is new. */
 export async function assertPackagedHostedLibraryReader({ status, home, data, sourceSha, version }) {
@@ -10,7 +11,7 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
     const current = await status(), app = new URL(current.fixtureApplicationUrl), endpoint = app.origin + '/api/v1/desktop/host-reader'
     assert.equal(current.version, version); assert.equal(current.hostedLibraryReader?.available, true)
     const headers = { 'content-type': 'application/json', Origin: app.origin, 'x-pica-csrf': current.csrfToken }
-    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/XFoAAAAASUVORK5CYII=', 'base64')
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6FkwAAAAASUVORK5CYII=', 'base64')
     const secret = 'synthetic-hosted-reader-not-a-real-secret', authorization = 'Basic ' + Buffer.from('fixture-user:' + secret).toString('base64')
     let reused = false, inLibrary = true, images = 0, calls = 0, unexpected = 0, searches = 0, preparations = 0
     const manga = () => ({ id: 1, sourceId: '9007199254740993', url: reused ? '/reused-for-another-work' : '/owned-book', title: 'Synthetic hosted book', inLibrary })
@@ -79,7 +80,7 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
         const beforeSearchScope=calls
         assert.equal((await command({action:'search',sessionId:session2,query:'fixture search',page:1})).status,403);assert.equal(calls,beforeSearchScope)
         reused=false;inLibrary=false
-        assert.equal(current.hostedSourceBrowser?.available,true);assert.equal(current.hostedSourceBrowser?.downloads,false);assert.equal(current.hostedSourceBrowser?.native,false)
+        assert.equal(current.hostedSourceBrowser?.available,true);assert.equal(current.hostedSourceBrowser?.downloads,true);assert.equal(current.hostedSourceBrowser?.native,false)
         const searchInput={...input,scope:'source-search-read',acceptHostCatalogueSideEffects:true}
         assert.equal((await command({...searchInput,acceptHostCatalogueSideEffects:false})).status,400);assert.equal(calls,beforeSearchScope)
         const searchStarted=await command(searchInput);assert.equal(searchStarted.status,200);const sourceSession=searchStarted.value.sessionId,sourceRoot=endpoint+'/'+sourceSession
@@ -96,6 +97,7 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
         const libraryDenied=await fetch(root2+'/comics/'+encodeURIComponent(comic)+'/chapters',{headers});assert.equal(libraryDenied.status,403);assert.equal((await libraryDenied.json()).code,'SOURCE_HOST_SCOPE_REQUIRED')
         const after=tables(),own=(after.app_state??[]).filter(row=>owned(row.key));assert.equal(own.length,2)
         assert.equal(protectedState(after),protectedState(before));assert.equal(JSON.stringify(after).includes(secret),false)
+        const readOffline=await assertPackagedHostedOfflineChapter({appOrigin:app.origin,headers,command,sessionId:sourceSession,comicId:comic,episodeId:episode,png,tables,hostCalls:()=>calls})
         assert.equal((await configuration({action:'set-enabled',id:host.id,expectedRevision:1,enabled:false,consent:true})).status,200)
         assert.equal((await fetch(root2+'/progress',{headers})).status,409)
         assert.equal((await fetch(sourceRoot+'/progress',{headers})).status,409)
@@ -104,6 +106,9 @@ export async function assertPackagedHostedLibraryReader({ status, home, data, so
         assert.ok(revokedView.value.issues.some(row=>row.port==='selected-host'));assert.equal(calls,revokedCalls);assert.deepEqual(tables(),revokedState)
         assert.equal((await configuration({action:'remove',id:host.id,expectedRevision:2,consent:true})).status,200)
         assert.deepEqual(fs.readFileSync(path.join(home,'config/config.json')),config);assert.deepEqual((await status()).externalSources,choices);assert.equal(fs.existsSync(path.join(home,'config/credentials.dat')),false);assert.equal(unexpected,0)
-        process.stdout.write(JSON.stringify({packaged_host_library_reader:'PASS',source_sha:sourceSha,version,execution_location:'GITHUB_WINDOWS_CI',actual_shared_reader:true,library_scope_cannot_search:true,explicit_single_source_search_read:true,search_browsing_has_no_local_catalogue_write:true,selected_source_metadata_fetches:preparations,library_scope_rejects_nonlibrary_search_refs:true,independent_progress_resumed:true,only_owned_app_state_keys_changed:2,stale_remote_id_rejected_before_cached_body:true,cross_site_media_denied_before_host:true,session_revoked_on_disable:true,selected_reading_projection_without_host_fetch_or_writes:true,implicit_host_projection:false,revoked_projection_is_partial_without_private_rows:true,credential_persistence:false,catalogue_import:false,native_host_reader:false,host_downloads:false,unexpected_fixture_requests:unexpected,production_accessed:false})+'\n')
-    }finally{fixture.closeAllConnections();await new Promise(resolve=>fixture.close(resolve))}
+        fixture.closeAllConnections();await new Promise(resolve=>fixture.close(resolve))
+        const offline=await readOffline()
+        assert.equal(JSON.stringify(tables()).includes(secret),false)
+        process.stdout.write(JSON.stringify({packaged_host_library_reader:'PASS',source_sha:sourceSha,version,execution_location:'GITHUB_WINDOWS_CI',actual_shared_reader:true,library_scope_cannot_search:true,explicit_single_source_search_read:true,search_browsing_has_no_local_catalogue_write:true,selected_source_metadata_fetches:preparations,library_scope_rejects_nonlibrary_search_refs:true,independent_progress_resumed:true,only_owned_app_state_keys_changed_before_local_copy:2,stale_remote_id_rejected_before_cached_body:true,cross_site_media_denied_before_host:true,session_revoked_on_disable:true,selected_reading_projection_without_host_fetch_or_writes:true,implicit_host_projection:false,revoked_projection_is_partial_without_private_rows:true,credential_persistence:false,catalogue_import:false,native_host_reader:false,host_downloads:true,...offline,unexpected_fixture_requests:unexpected,production_accessed:false})+'\n')
+    }finally{if(fixture.listening){fixture.closeAllConnections();await new Promise(resolve=>fixture.close(resolve))}}
 }

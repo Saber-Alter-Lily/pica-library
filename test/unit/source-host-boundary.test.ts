@@ -66,6 +66,15 @@ describe('optional source-host ownership and application safety contracts',()=>{
         expect(gate).toContain('await assertPackagedSourceHostInspection(')
         expect(read('scripts/lib/assert-source-host-inspection.mjs')).toContain("packaged_source_host_inspection: 'PASS'")
     })
+    it('checks the enabled owned-copy capability with a real packaged save and offline Reader, not a stale no-download promise',()=>{
+        const reader=read('scripts/lib/assert-hosted-library-reader.mjs'),copy=read('scripts/lib/assert-hosted-offline-chapter.mjs')
+        expect(reader).toContain('assert.equal(current.hostedSourceBrowser?.downloads,true)')
+        expect(reader).toContain('await assertPackagedHostedOfflineChapter(')
+        expect(reader.indexOf("enabled:false,consent:true")).toBeLessThan(reader.indexOf('await readOffline()'))
+        expect(reader.indexOf('await new Promise(resolve=>fixture.close(resolve))')).toBeLessThan(reader.indexOf('await readOffline()'))
+        expect(copy.indexOf("process.env.GITHUB_ACTIONS !== 'true'")).toBeLessThan(copy.indexOf('await command('))
+        for(const text of ['consent: false','acceptLocalCopy: false',"saved.status, 'COMPLETED'","saved.progressCompleted, 2","'/api/v1/reader/comics/'","'/api/v1/reader/pictures/'",'assert.equal(preserved(after), preserved(before))','assert.deepEqual(after.download_jobs, before.download_jobs)'])expect(copy).toContain(text)
+    })
     it('keeps saved host authority platform-neutral, inspection-only and separate from source/content/account ownership',async()=>{
         const result=await build({entryPoints:['src/source-hosts/connections.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
         expect(Object.keys(result.metafile!.inputs).map(file=>file.replaceAll('\\','/')).sort()).toEqual(['src/source-hosts/connections.ts','src/source-hosts/contract.ts'])

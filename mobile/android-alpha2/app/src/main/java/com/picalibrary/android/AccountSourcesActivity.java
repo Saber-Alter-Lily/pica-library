@@ -21,7 +21,8 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
     @Override protected void onResume(){
         super.onResume();
         renderContent();
-        refreshDesktopAccountState();
+        if(getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)!=0)
+            refreshDesktopAccountState();
     }
 
     @Override protected void onDestroy(){
@@ -65,8 +66,12 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
         if(content==null)return;
         probeSerial++;
         content.removeAllViews();
-        content.addView(SettingsRow.row(this,getString(R.string.source_choices_title),getString(R.string.source_choices_summary),v->startActivity(new Intent(this,SourceChoicesActivity.class))));
-        content.addView(SettingsRow.row(this,getString(R.string.host_title),getString(R.string.host_entry),v->startActivity(new Intent(this,HostSourceActivity.class))));
+        LinearLayout sourceChoices=SettingsRow.row(this,getString(R.string.source_choices_title),getString(R.string.source_choices_summary),v->startActivity(new Intent(this,SourceChoicesActivity.class)));
+        sourceChoices.setTag(AndroidOnboarding.ADV_SOURCE_CHOICES);
+        content.addView(sourceChoices);
+        LinearLayout hostChoices=SettingsRow.row(this,getString(R.string.host_title),getString(R.string.host_entry),v->startActivity(new Intent(this,HostSourceActivity.class)));
+        hostChoices.setTag(AndroidOnboarding.ADV_SOURCE_HOST);
+        content.addView(hostChoices);
 
         boolean paired=BridgeStore.paired(this);
         boolean localPica=PicaAccountStore.load(this).configured();
@@ -125,7 +130,8 @@ public final class AccountSourcesActivity extends LocaleAwareActivity {
             content.addView(note);
         }
 
-        if(localEh&&SourceAccess.enabled(this,"eh"))refreshExh();
+        if(localEh&&SourceAccess.enabled(this,"eh")
+            &&getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)!=0)refreshExh();
     }
 
     private void refreshDesktopAccountState(){

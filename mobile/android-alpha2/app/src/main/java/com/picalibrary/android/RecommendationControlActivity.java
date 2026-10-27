@@ -63,6 +63,7 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         LinearLayout pendingActions=new LinearLayout(this);
         undoButton=Ui.button(this,"撤销修改",v->{if(saving)return;draft.clear();updatePending();renderSignals(currentQuery());},true);
         saveButton=Ui.button(this,"保存调整",v->saveDraft(false),false);
+        saveButton.setTag(AndroidOnboarding.ADV_PREFERENCE_SAVE);
         pendingActions.addView(undoButton,new LinearLayout.LayoutParams(0,-2,1));pendingActions.addView(saveButton,new LinearLayout.LayoutParams(0,-2,1));pendingBar.addView(pendingActions);root.addView(pendingBar);
         updatePending();setContentView(root);root.requestApplyInsets();showLoading();
     }
@@ -131,7 +132,9 @@ public final class RecommendationControlActivity extends LocaleAwareActivity {
         sessionStatus=Ui.text(this,session+" · 仅本机",12,Ui.MUTED,true);intro.addView(SettingsRow.statusLine(this,"本次想看",sessionStatus));
         intro.addView(SettingsRow.statusLine(this,"屏蔽偏好 / 作品",Ui.text(this,blockedTargets+" / "+hardSuppressedCount,12,Ui.MUTED,true)));
         content.addView(intro);
-        content.addView(Ui.button(this,LocalizedText.ui(this,"用于推荐的标签与私人标签","Recommendation tag scope and private labels","おすすめに使うタグ・個人タグ"),v->startActivity(new Intent(this,TagParticipationActivity.class)),false));
+        Button tagScope=Ui.button(this,LocalizedText.ui(this,"用于推荐的标签与私人标签","Recommendation tag scope and private labels","おすすめに使うタグ・個人タグ"),v->startActivity(new Intent(this,TagParticipationActivity.class)),false);
+        tagScope.setTag(AndroidOnboarding.ADV_PREFERENCE_TAGS);
+        content.addView(tagScope);
 
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.addView(Ui.button(this,"推荐同步",v->startActivity(new Intent(this,RecommendationSyncActivity.class)),false),new LinearLayout.LayoutParams(0,-2,1));

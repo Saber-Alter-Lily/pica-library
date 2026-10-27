@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/s1-android-visual-evidence.yml'
       - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AndroidVisualSmokeTest.java'
+      - 'scripts/run-s1-android-visual-emulator.sh'
   workflow_dispatch:
 
 permissions:
@@ -44,31 +45,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           emulator-boot-timeout: 600
-          script: |
-            set -euo pipefail
-            cd mobile/android-alpha2
-            gradle :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell wm size 720x1280
-            adb shell wm density 320
-            mkdir -p s1-visual-evidence
-            for scale in 1.0 1.5; do
-              case "$scale" in
-                1.0) folder=f100 ;;
-                1.5) folder=f150 ;;
-              esac
-              adb shell settings put system font_scale "$scale"
-              adb shell am force-stop com.picalibrary.android.dev || true
-              adb shell rm -rf /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual
-              adb shell am instrument -w -r -e expectedFontScale "$scale" -e class com.picalibrary.android.S1AndroidVisualSmokeTest com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner | tee "s1-visual-evidence/${folder}-instrumentation.txt"
-              grep -q 'OK (1 test)' "s1-visual-evidence/${folder}-instrumentation.txt"
-              mkdir -p "s1-visual-evidence/$folder"
-              adb pull /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual "s1-visual-evidence/$folder/"
-              count=$(find "s1-visual-evidence/$folder/" -type f -name '*.png' | wc -l)
-              test "$count" -eq 12
-              printf 'font_scale=%s captured=%s source_sha=%s\n' "$scale" "$count" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
-            done
+          script: bash scripts/run-s1-android-visual-emulator.sh
       - name: Upload fresh-emulator images for visual inspection
         if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4

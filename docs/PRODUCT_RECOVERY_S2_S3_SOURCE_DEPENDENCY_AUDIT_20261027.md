@@ -1,5 +1,12 @@
 # S2/S3：来源外置的源码耦合证据与最小迁移顺序（2026-10-27）
 
+## S2-01 新增源码薄片：身份绑定的图片路由（2026-10-27）
+
+当前新增 `ProviderRegistry.forPageForComic(comicId, locator)`，先按作品 ID 解析来源归属，再按媒体 locator scheme 解析媒体归属，两者不匹配直接拒绝。单元测试覆盖旧式无前缀 Pica ID、E-H、JM 成功路线及跨来源/未知 Host 失败路线，并禁止触发图片抓取。**新 API 是纯模块契约，本轮没有替换已用 `forPage()` 的历史生产调用。** 这保留既有 Pica HTTP(S) 下载兼容，同时为未来 S3 来源转移提供 fail-closed 接口；它**不能**证明 SDK 已移出核心包、未知 Host 已可动态安装或受控插件信任链完成。
+
+相关测试：`test/unit/source-module-contracts.test.ts`；实现：`src/providers/provider-registry.ts`。运行结果只按新提交精确 SHA 的 CI 判定；真实设备/来源验收仍 OPEN。
+
+
 状态：**STATIC_AUDIT_ONLY / S2-S3_NOT_IMPLEMENTED**。源码基线为 Dev89 及 PR218 的当前代码；本文件不宣布来源已外置，不更改 SDK、账户、数据格式或生产连接。S1 真实 UI 验收优先级不变。
 
 ## 已存在、应当复用的模块

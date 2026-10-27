@@ -81,6 +81,20 @@ export class ProviderRegistry {
         return this.get(id)
     }
 
+    /**
+     * Explicit comic-owned page routing for new Reader/source adapters.
+     * Legacy forPage() still accepts raw Pica HTTP(S) locators for existing
+     * downloads; callers with a work identity should use this stricter port.
+     * Unknown sources and mixed-provider page schemes fail before media I/O.
+     */
+    forPageForComic(comicId: string, locator: string): ComicProvider {
+        const comicOwner = this.forComic(comicId)
+        const mediaOwner = this.forPage(locator)
+        if (comicOwner.id !== mediaOwner.id)
+            throw new Error('Page source does not match comic source')
+        return comicOwner
+    }
+
     manifests(): SourceModuleManifest[] {
         return [...this.modules.values()].map((module) =>
             normalizeSourceModuleManifest(module, module.id)

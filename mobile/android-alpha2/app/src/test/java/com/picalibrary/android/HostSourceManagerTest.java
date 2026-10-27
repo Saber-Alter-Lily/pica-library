@@ -21,6 +21,12 @@ public class HostSourceManagerTest {
     private Context context;private HostTestFixture fixture;
     @Before public void setup()throws Exception {context=RuntimeEnvironment.getApplication();fixture=new HostTestFixture(context);}
     @After public void end(){fixture.manager.end();HostSourceManager.resetForTests();}
+    @Test public void unknownMetadataSurvivesReaderFilteringThenExplicitFetchResolvesRealPages()throws Exception {
+        fixture.unknownPageCount=true;HostSourceManager.Book book=fixture.selected();HostReaderSource source=new HostReaderSource(fixture.manager);
+        BridgeClient.ChapterItem chapter=source.chapters(book.id).get(0);assertEquals(-1,chapter.downloadedPictures);assertTrue(ReaderPolicy.canFetchChapter(source.kind(),chapter.downloadedPictures));
+        BridgeClient.ChapterData ready=source.chapter(book.id,chapter.id);assertEquals(2,ready.pages.size());assertEquals(2,ready.episode.downloadedPictures);
+        HttpURLConnection image=source.image(ready.pages.get(1).url);try(InputStream in=image.getInputStream()){assertEquals(137,in.read());}finally{image.disconnect();}
+    }
     @Test public void defaultConfigurationAndPassiveStatusHaveNoNetworkOrImplicitOptIn()throws Exception {
         assertFalse(fixture.manager.config().configured());assertFalse(fixture.manager.config().enabled);assertFalse(fixture.manager.hasSession());assertEquals("",fixture.manager.selectedSource());assertFalse(fixture.manager.canResume("hosted:missing"));assertEquals(0,fixture.opened.size());
         assertFalse(new File(context.getFilesDir(),"user-host-config-v1.json").exists());

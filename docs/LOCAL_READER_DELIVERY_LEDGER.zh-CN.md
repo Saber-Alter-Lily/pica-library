@@ -95,7 +95,7 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 | --- | --- | --- |
 | P0 | 7阶段/42案例固定，首次迁移路线已由用户确认 | 更新失败/来源边界按真实证据收口，不以局部绿灯计算总百分比 |
 | P1 | Dev88实际核心包及Windows合成本地/Reader持久化路径已有证据；无账号与默认静默已接线 | 真实设备文件选择、触控、实际资料及最终合并候选复验 |
-| P2 | Desktop/Android Host搜索、章节、单章保存接入；Windows成品合成离线链路、Android38Host/443全部原生测试通过 | 真实Host/第二来源；完整持久化原生在线目录、私人标签/收藏/跨端同步及后台恢复仍缺，不能称完全接源 |
+| P2 | Desktop/Android Host搜索、章节、单章保存接入；Dev88 Windows合成离线及Android38Host/443原生测试通过；PR215真实官方Host已到搜索/章节准备，发现未知页数-1解析缺口并有离线反例与最小修正 | 修正后精确源码真实Host全链路与Android门禁；第二真实来源、完整持久化原生在线目录、私人标签/收藏/跨端同步及后台恢复仍缺，不能称完全接源 |
 | P3 | 两issue首轮方案、标签范围/私人映射、AI文件往返、双套引导已实现 | 实际AI返回、操作负担/解释、绑定/冲突及用户验收；#200上游稀疏不算解决 |
 | P4 | 固定签名Dev88/既有配对、LAN/WebDAV/离线协议和手势设置已有候选 | 真机触控/OEM、真实重连/冲突/离线往返；Host新增同步缺口不藏入旧协议成功 |
 | P5 | 当前helper六场景通过；独立T3修正源码5f4b7ea真实七组通过并已独立复核 | 公开分发信任、真实/OEM和缺失旧Dev86原包的HOLD分别保留，不继续追加升级功能 |
@@ -274,6 +274,6 @@ Suwayomi WebUI 的 gql_codegen.ts 已实际核对：schema 生成、查询文档
 5. 用户不逐阶段陪跑。维护者先完成工程项，再一次交付日常/高级两组步骤，已通过且未受影响的项目不反复重验。
 6. 任意 APK 执行器、来源市场、PDF/CBR、自动细粒度画风标签、新模型训练、整库搬迁/监视器和全面备份中心均另列长期项；不删除，但不插入本轮。更新必须具备的状态保护/恢复仍是本轮硬门禁。
 
-**下一有限动作：真实Host互操作，不再扩展已通过的T3专项。** Android/Dev88已完成编译与实际原生测试，T3空批次修正/重连分类也已通过。先运行获准的固定Suwayomi+合成内容H1..H6，再处理真实第二来源及原生持久目录/标签/同步/后台恢复缺口，最后收口单一集中候选；不把内置LocalSource当第二真实平台。本机不运行应用、Java、监听或迁移。P1/P3/P4/P5人工与成品证据、真实Host及完整接源缺口未清前，完整目标继续OPEN，用户暂不测试，42案例不扩张。
+**下一有限动作：真实Host互操作，不再扩展已通过的T3专项。** PR215真实官方Host运行40451709011已到搜索/章节准备，暴露上游合法未知页数-1被两端错误拒绝；最小修正及Android首读过滤反例见[真实门禁](REAL_SOURCE_HOST_INTEROPERABILITY_GATE.md)。须以修正后的精确源码重证H1..H6和新增原生测试，不把旧Dev88绿灯冒充本次通过。其后才处理真实第二来源及原生持久目录/标签/同步/后台恢复缺口，最后收口单一集中候选；内置LocalSource不算第二真实平台。本机不运行应用、Java、监听或迁移。P1/P3/P4/P5人工与成品证据和完整接源缺口未清前，完整目标继续OPEN，用户暂不测试，42案例不扩张。
 
 专项契约：[架构](MODULAR_LOCAL_READER_ARCHITECTURE.md)、[核心/来源边界](CORE_READER_SOURCE_BOUNDARY.md)、[Host 已有书库能力](USER_HOST_LIBRARY_READER.md)、[两个 issue](ISSUE_199_200_PREFERENCE_DISPLAY_SEARCH.md)、[私人标签](TAG_PARTICIPATION_PRIVATE_LABELS.md)、[AI 方案](AI_TAG_PROFILE_EXCHANGE.md)、[事务门禁](RUNTIME_CHOICE_TRANSACTION_GATE.md)、[用户分组步骤](NEXT_CONCENTRATED_ACCEPTANCE_CHECKLIST.zh-CN.md)。

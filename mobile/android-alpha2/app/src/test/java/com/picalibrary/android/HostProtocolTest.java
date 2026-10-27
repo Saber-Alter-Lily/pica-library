@@ -12,6 +12,19 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=android.app.Application.class)
 public class HostProtocolTest {
+    @Test public void pinnedUnknownCountIsMetadataOnlyAndPreservedInBothCatalogueShapes()throws Exception {
+        HostTestFixture fixture=new HostTestFixture(RuntimeEnvironment.getApplication());fixture.unknownPageCount=true;
+        assertEquals(-1,new HostProtocol.Chapter(fixture.chapter()).pageCount);
+        assertEquals(-1,HostProtocol.bundle(fixture.response("PicaHostManga"),false).chapters.get(0).pageCount);
+        assertEquals(-1,HostProtocol.bundle(fixture.response("PicaHostPrepareManga"),true).chapters.get(0).pageCount);
+        for(Object count:new Object[]{-2,-1.1,0.1,"-1",JSONObject.NULL,10001})assertThrows(Exception.class,()->new HostProtocol.Chapter(fixture.chapter().put("pageCount",count)));
+    }
+    @Test public void pageFetchMustResolveUnknownCountAndRetainsOwnershipChecks()throws Exception {
+        HostTestFixture fixture=new HostTestFixture(RuntimeEnvironment.getApplication());fixture.unknownPageCount=true;HostProtocol.Chapter expected=new HostProtocol.Chapter(fixture.chapter());
+        JSONObject response=fixture.response("PicaHostChapterPages");assertEquals(2,HostProtocol.pages(response,expected).pageCount);
+        for(int count:new int[]{-1,0})for(boolean empty:new boolean[]{false,true}){JSONObject invalid=fixture.response("PicaHostChapterPages"),body=invalid.getJSONObject("data").getJSONObject("fetchChapterPages");body.getJSONObject("chapter").put("pageCount",count);if(empty)body.put("pages",new JSONArray());assertThrows(IllegalArgumentException.class,()->HostProtocol.pages(invalid,expected));}
+        fixture.wrongPage=true;assertThrows(IllegalArgumentException.class,()->HostProtocol.pages(fixture.response("PicaHostChapterPages"),expected));
+    }
     @Test public void sourceIdsNeverRoundTripThroughDouble() {
         assertEquals(Long.toString(Long.MIN_VALUE),HostProtocol.sourceId(Long.toString(Long.MIN_VALUE)));
         assertEquals(Long.toString(Long.MAX_VALUE),HostProtocol.sourceId(Long.toString(Long.MAX_VALUE)));

@@ -4,6 +4,11 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class ReaderPolicyTest {
+    @Test public void unknownHostMetadataCanBeFetchedWithoutMakingEmptyLocalChaptersReadable() {
+        assertTrue(ReaderPolicy.canFetchChapter("host",-1));assertTrue(ReaderPolicy.canFetchChapter("host",2));
+        for(String kind:new String[]{"host","local","desktop","pica"}){assertFalse(ReaderPolicy.canFetchChapter(kind,0));assertFalse(ReaderPolicy.canFetchChapter(kind,-2));assertTrue(ReaderPolicy.canFetchChapter(kind,1));}
+        for(String kind:new String[]{"local","desktop","pica"})assertFalse(ReaderPolicy.canFetchChapter(kind,-1));
+    }
     @Test public void emptyChapterHasNoNegativePosition() { assertEquals(0, ReaderPolicy.clampPage(19, 0)); }
     @Test public void shortenedChapterClampsRestoredProgress() { assertEquals(4, ReaderPolicy.clampPage(99, 5)); }
     @Test public void negativeRemoteProgressClampsToStart() { assertEquals(0, ReaderPolicy.clampPage(-3, 10)); }

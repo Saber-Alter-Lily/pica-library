@@ -1,5 +1,15 @@
 # Pica Library Development Task Log
 
+## P2 actual Host failure attribution — unknown chapter count (2026-10-26)
+
+PR215 remains Draft/unmerged. Actual run40451709011/source02a72e293b698f432f7435ebfbb73f17cd5b5c74 reached official Suwayomi in a loopback-only namespace: startup/inspection/source list/search succeeded, then CBZ prepare failed at hostChapter→hostInteger(pageCount), before body retrieval. Downloaded original result/job logs are retained; ownedHostStopped=true. This supersedes the earlier preparation-only NOT_RUN snapshot, not a PASS.
+
+Fixed upstream ChapterTable blobf6fd7be8a37a3dba07c13c99a442d98e69824085 defines page_count.default(-1). Local source-only unit-5 reproduced the missing -1 sentinel support:196PASS/3FAIL, zeroIO guard events. Minimal Desktop/Android metadata codecs now preserve only this exact unknown value; ready page lists still require positive exact counts and owned identity/paths. Android initial Reader filtering also allows only Host/-1 so legitimate unfetched chapters are not discarded; local empty chapter behavior stays unchanged. Four new native tests cover codec/ready-page/ReaderPolicy/HostReaderSource paths, cloud execution pending. unit-6 is199PASS/13files/0events; fulltypes-4 and worker-5 PASS/0events before final evidence instrumentation. New full exact-source gates still required.
+
+This is the first application/mobile delta in PR215, explicitly superseding the initial no-app-delta claim. No schema/version/lockfile/production-data changes, new Reader or downloader, local Java/app/listener or fixed signing. Only permitted existing temporary-debug CI; no merge/tag/Release/OTA/deploy. Seven phases/42cases and fullObjective=OPEN remain unchanged.
+
+Final preflightunit-7:199PASS/0FAIL across13actual files,0boundary events; finalworker-6 and fulltypes-4 PASS/0events. Source02a72e2 ordinaryCI40451713301 bothjobs PASS is historical proof only, not acceptance of these new native/product changes. New exact-source realHost and ordinaryCI remain required.
+
 ## P2 real Host interoperability — authorized isolated gate preparation (2026-10-26)
 
 First real-host run40450507601/source112038f failed in about28seconds before worker/Java: frozen source checks/types and pinned official JARhash/size PASS, then ERR_PACKAGE_PATH_NOT_EXPORTED for tsx/esm/api. The installed/frozen tsx4.7.0 exports ./cli, not that newer API. No runtime result artifact was created; preserve completed job122011847637's raw log. First bounded correction uses the existing public CLI/tinyTSentry; no dependency/application/version/schema or security/deadline change, no local Host/app/Java execution. Real interoperability remainsNOT_RUN pending corrected-source cloud proof.

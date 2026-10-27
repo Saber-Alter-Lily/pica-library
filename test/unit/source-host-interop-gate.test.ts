@@ -48,7 +48,11 @@ describe('bounded real Host interop recipe, source-only local checks', () => {
     })
     it('reuses actual production ports and fresh offline process, not fabricated GraphQL/image responses', () => {
         for (const name of ['HostedLibraryReader', 'SourceHostConnections', 'SourceHostInspector', 'LocalLibraryIngestion', 'PreviewCacheManager', 'ReaderService', 'RuntimeResourceCoordinator']) expect(client).toContain(name)
-        expect(client).toContain('return nativeFetch(input, init)')
+        expect(client).toContain('const response = await nativeFetch(input, init)')
+        expect(client).toContain('return response')
+        expect(client).toContain('pageCountObservations')
+        expect(client.indexOf('realUpstreamRuntime: false')).toBeLessThan(client.indexOf('result.realUpstreamRuntime = true'))
+        expect(client.indexOf('if (!ready)')).toBeLessThan(client.indexOf('result.realUpstreamRuntime = true'))
         expect(client).not.toMatch(/new Response\(|createServer\(|route\.fulfill|fakeFetch/)
         expect(client).toContain("[launcher, 'offline', source, root]")
         expect(client).toContain("await stop(); assert.equal(childExited, true)")

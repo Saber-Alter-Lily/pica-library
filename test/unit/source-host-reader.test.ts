@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HostedLibraryReader } from '../../src/source-hosts/library-reader'
 import { SourceHostConnections } from '../../src/source-hosts/connections'
-import { hostMangaChapters, hostChapterPages } from '../../src/source-hosts/reader-protocol'
+import { hostChapter, hostMangaChapters, hostPreparedManga, hostChapterPages } from '../../src/source-hosts/reader-protocol'
 import { OnlineReaderService } from '../../src/services/online-reader-service'
 import type { Episode, Picture } from '../../src/types'
 
@@ -22,6 +22,7 @@ function fixture() {
         const value = init?.body ? JSON.parse(String(init.body)) : null, operation = value?.operationName ?? 'IMAGE'
         calls.push({ url: String(url), operation, auth: (init?.headers as Record<string, string>)?.authorization, variables: value?.variables })
         if (mode === 'stall-image' && operation === 'IMAGE') await new Promise<void>(resolve => { release = resolve })
+        if (mode === 'resolve-unknown-pages' && operation === 'PicaHostChapterPages') chapter.pageCount = 2
         const data = operation === 'PicaSourceHostInfo' ? { aboutServer: { name: 'Suwayomi-Server', version: '2.4.2366' } } : operation === 'PicaHostLibrary' ? { mangas: { nodes: [manga], pageInfo: { hasNextPage: false } } } : operation === 'PicaHostManga' ? { manga: { ...manga, chapters: { nodes: [chapter] } } } : operation === 'PicaHostChapter' ? { chapter } : operation === 'PicaHostChapterPages' ? { fetchChapterPages: { chapter, pages: [0, 1].map(index => mode === 'bad-route' ? 'https://outside.example/secret' : `/api/v1/manga/1/chapter/0/page/${index}`) } } : null
         if (data) return new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } })
         const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.alloc(16)])
@@ -43,6 +44,36 @@ function fixture() {
 }
 
 describe('actual hosted-library adapter + shared Reader — injected HTTP and state/cache ports only', () => {
+    it('preserves the pinned upstream -1 unknown count in chapter metadata and prepared catalogues', () => {
+        const f = fixture(), unknown = { ...f.chapter, pageCount: -1 }
+        expect(hostChapter(unknown).pageCount).toBe(-1)
+        expect(hostMangaChapters({ data: { manga: { ...f.manga, chapters: { nodes: [unknown] } } } }).chapters[0].pageCount).toBe(-1)
+        expect(hostPreparedManga({ data: { fetchMangaAndChapters: { manga: f.manga, chapters: [unknown] } } }).chapters[0].pageCount).toBe(-1)
+    })
+    it('accepts no other negative, noninteger, coerced or oversized metadata page count', () => {
+        const f = fixture()
+        for (const pageCount of [-2, -1.1, 0.1, '-1', null, NaN, Infinity, 10001])
+            expect(() => hostChapter({ ...f.chapter, pageCount })).toThrow('SOURCE_HOST_PROTOCOL')
+        for (const pageCount of [0, 1, 10000]) expect(hostChapter({ ...f.chapter, pageCount }).pageCount).toBe(pageCount)
+    })
+    it('requires positive resolved counts and exact owned page paths after unknown metadata', () => {
+        const f = fixture(), expected = hostChapter({ ...f.chapter, pageCount: -1 })
+        const response = (pageCount: number, pages: string[]) => ({ data: { fetchChapterPages: { chapter: { ...f.chapter, pageCount }, pages } } })
+        const paths = [0, 1].map(index => `/api/v1/manga/1/chapter/0/page/${index}`)
+        expect(hostChapterPages(response(2, paths), expected)).toMatchObject({ chapter: { pageCount: 2 }, paths: paths.map(value => value.slice(1)) })
+        for (const pageCount of [-1, 0]) for (const pages of [[], paths])
+            expect(() => hostChapterPages(response(pageCount, pages), expected)).toThrow('SOURCE_HOST_PROTOCOL')
+        expect(() => hostChapterPages(response(2, [paths[0], '/api/v1/manga/99/chapter/0/page/1']), expected)).toThrow('SOURCE_HOST_PROTOCOL')
+    })
+    it('opens initially unknown chapters through the same Reader after an explicit page fetch resolves the count', async () => {
+        const f = fixture(); f.chapter.pageCount = -1; f.mode('resolve-unknown-pages')
+        const { sessionId } = await f.start(), ids = await f.select(sessionId)
+        expect(f.chapter.pageCount).toBe(-1)
+        const chapter = await f.reader.read(sessionId, 'chapter', ids, signal()) as { pages: unknown[] }
+        expect(chapter.pages).toHaveLength(2)
+        await f.reader.picture(sessionId, ids.comicId, ids.episodeId, 1, signal())
+        expect(f.calls.filter(call => call.operation === 'IMAGE')).toHaveLength(1)
+    })
     it('projects only explicitly selected references without network/cache/writes; records survive revocation', async () => {
         const f = fixture(), { sessionId } = await f.start()
         await f.reader.command({ action: 'list', sessionId, offset: 0 }, signal())

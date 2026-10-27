@@ -76,7 +76,7 @@ export async function runRealHostInterop(args: string[]) {
     const java = fs.realpathSync.native(path.join(process.env.JAVA_HOME!, 'bin/java'))
     const evidence = path.resolve('artifacts/source-host-interop'); fs.mkdirSync(evidence, { recursive: true })
     const result: Record<string, any> = { kind: REAL_HOST_KIND, sourceSha: source, status: 'FAIL', step: 'prepare', ...netProof, upstreamJarSha256: REAL_HOST_JAR_SHA256,
-        realUpstreamRuntime: true, syntheticBodiesOnly: true, thirdPartyExtensionsInstalled: false, realPlatformAccessed: false, credentialsUsed: false,
+        realUpstreamRuntime: false, syntheticBodiesOnly: true, thirdPartyExtensionsInstalled: false, realPlatformAccessed: false, credentialsUsed: false,
         localExecution: false, runtimeBundledWithPica: false, fullObjective: 'OPEN', secondRealProviderAccepted: false }
     let child: ChildProcess | undefined, childExited = false, database: LibraryDatabase | undefined, hosted: HostedLibraryReader | undefined, connections: SourceHostConnections | undefined
     let stopPromise: Promise<void> | undefined
@@ -90,17 +90,27 @@ export async function runRealHostInterop(args: string[]) {
         if (!graceful) child.kill('SIGKILL')
         await Promise.race([ended, sleep(10000).then(() => { throw Error('OWNED_HOST_DID_NOT_EXIT') })])
     })()
-    const calls: string[] = [], nativeFetch = globalThis.fetch.bind(globalThis)
+    const calls: string[] = [], pageCountObservations: Array<{ operation: string; counts: number[] }> = [], nativeFetch = globalThis.fetch.bind(globalThis)
     const fetcher: typeof fetch = async (input, init) => {
         const url = new URL(input instanceof Request ? input.url : String(input))
         assert.equal(url.origin, origin); assert.ok(!url.username && !url.password && !url.search && !url.hash)
         const headers = new Headers(init?.headers); assert.equal(headers.has('authorization'), false); assert.equal(headers.has('cookie'), false)
+        let operationName = ''
         if ((init?.method ?? 'GET') === 'POST') {
             assert.equal(url.pathname, '/api/graphql')
             const request = JSON.parse(String(init?.body)), operation = Object.values(operations).find(row => row.operationName === request.operationName)
-            assert.ok(operation); assert.equal(request.query, operation.query); calls.push(request.operationName)
+            assert.ok(operation); assert.equal(request.query, operation.query); calls.push(request.operationName); operationName = request.operationName
         } else { assert.equal(init?.method ?? 'GET', 'GET'); assert.match(url.pathname, /^\/api\/v1\/manga\/\d+\/chapter\/\d+\/page\/[01]$/); calls.push('body-page') }
-        return nativeFetch(input, init)
+        const response = await nativeFetch(input, init)
+        if (response.ok && ['PicaHostPrepareManga', 'PicaHostChapterPages'].includes(operationName)) {
+            // Observe only numeric metadata from our own fixture; never replace upstream replies.
+            const payload = await response.clone().json() as any
+            const rows = operationName === 'PicaHostPrepareManga' ? payload.data?.fetchMangaAndChapters?.chapters : [payload.data?.fetchChapterPages?.chapter]
+            assert.ok(Array.isArray(rows) && rows.length === 1 && rows.every(row => Number.isInteger(row?.pageCount)))
+            assert.ok(pageCountObservations.length < 16)
+            pageCountObservations.push({ operation: operationName, counts: rows.map(row => row.pageCount) })
+        }
+        return response
     }
     const mark = (step: string) => { result.step = step }
     try {
@@ -125,6 +135,7 @@ export async function runRealHostInterop(args: string[]) {
             await sleep(250)
         }
         if (!ready) { fs.writeFileSync(path.join(evidence, 'host-startup-tail.txt'), hostLogs, { flag: 'wx' }); throw Error('PINNED_HOST_NOT_READY') }
+        result.realUpstreamRuntime = true
         mark('save-enable-inspect')
         const inspector = new SourceHostInspector(connection => sourceHostHttp(connection, fetcher))
         connections = new SourceHostConnections(sourceHostStore(path.join(root, 'host-connections.json')), inspector, randomUUID)
@@ -186,6 +197,8 @@ export async function runRealHostInterop(args: string[]) {
         await hosted.close(); hosted = undefined; connections.close(); connections = undefined; inspector.close(); database.close(); database = undefined
         await stop(); assert.equal(childExited, true)
         for (const operation of Object.values(operations)) assert.ok(calls.includes(operation.operationName), 'Every fixed operation must reach the actual upstream runtime')
+        assert.equal(pageCountObservations.filter(row => row.operation === 'PicaHostPrepareManga' && row.counts[0] === -1).length, 2)
+        assert.ok(pageCountObservations.filter(row => row.operation === 'PicaHostChapterPages').every(row => row.counts[0] === 2))
         fs.writeFileSync(path.join(root, 'OFFLINE_EXPECTED.json'), JSON.stringify({ sourceSha: source, books: offlineBooks }), { flag: 'wx' })
         mark('fresh-node-offline-reader')
         const launcher = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../test-source-host-interop.mjs')
@@ -201,6 +214,7 @@ export async function runRealHostInterop(args: string[]) {
         try { await hosted?.close(); connections?.close(); database?.close(); await stop(); result.ownedHostStopped = !child || childExited }
         catch { result.status = 'FAIL'; result.cleanupFailed = true }
         result.requests = Object.fromEntries([...new Set(calls)].map(name => [name, calls.filter(value => value === name).length]))
+        result.pageCountObservations = pageCountObservations
         result.hostExit = child ? { code: child.exitCode, signal: child.signalCode } : null
         fs.writeFileSync(path.join(evidence, 'result.json'), JSON.stringify(result, null, 2), { flag: 'wx' })
         console.log(JSON.stringify(result))

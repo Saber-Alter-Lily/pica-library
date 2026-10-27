@@ -1,5 +1,6 @@
 import type { StoredComic } from '../library/types'
 import type { RecommendationIntentV3 } from '../recommendation-v3/intent-planner-v3'
+import { catalogSourceId } from '../library/content-identity'
 import { comicTagProviderV1, effectiveTagPolicyV1, normalizeTagPolicyKey, privateTagMatchesV1, privateTagSignalV1, providerRawTagFactsV1, semanticTagValueV1, rawTagParticipatesV1, tagIdentityV1, tagParticipatesV1, type TagPolicyCarrierV1 } from '../tags/policy'
 
 /** Expand a private concept to its original provider terms. Never search an alias/opaque ID. */
@@ -15,7 +16,11 @@ export function expandPrivateTagIntentV1(intent: RecommendationIntentV3, state: 
     }) }].filter(value => value.anchors.length)
     // No classifier is inferred from a manually applied label. A bounded related-work
     // request can use a known Pica seed; EH/JM have no implemented related endpoint here.
-    const seed = catalog.find(comic => comicTagProviderV1(comic) === 'pica' && privateTagMatchesV1(tag, comic))
+    const seed = catalog.find(comic => {
+        // A private annotation is not authority to reinterpret an external ID as Pica.
+        try { return catalogSourceId(comic.comicId, comic.providerId) === 'pica' && privateTagMatchesV1(tag, comic) }
+        catch { return false }
+    })
     return seed ? [{ ...intent, type: 'RELATED' as const, intentId: intent.intentId + ':MANUAL_RELATED', anchors: [{ ...intent.anchors[0], canonicalKey: seed.comicId, facet: 'PRIVATE_MANUAL_RELATED', providerQueryLabel: null }], explanation: { reasonCode: 'PRIVATE_MANUAL_RELATED', shortReason: `来自你标注「${tag.name}」的作品相关推荐（不是自动标签判断）` } }] : []
 }
 

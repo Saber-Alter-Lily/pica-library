@@ -2,6 +2,8 @@
 
 ## 云端执行补记（2026-10-26 本地时间）
 
+**最终工程结果：`f5be335de553d3e394bc828e8e723198ef2ce61c`／CI `40459202415` 两端通过，2026-10-26 再次只读核对 PR216 仍 Draft/Open/未合并。** Web56、Vitest2620PASS/14skip/331文件、真实Chromium61通过；Android实际执行编译、testDebugUnitTest、lintDebug和assembleRelease并成功，不是缓存/跳过。成功日志未导出原生用例总数，不凭首轮471项伪造最终精确计数。未使用固定私钥、未改版本；该次常规CI没有输出可交付安装包。原生24项新增测试已随完整任务执行；下文“尚未执行”保留为封存时点历史，不再代表此精确源码当前状态。
+
 用户已授权新Draft与既有云端调试CI；PR216基于冻结PR215。首轮源码67ef35a/CI40458023912的Web/Desktop通过；Android已真实编译并执行471项，470PASS/1FAIL（移出确认UI），没有固定签名或发布。现有紧凑日志未提供单个断言expected/actual，原失败不改判。
 
 测试按[Android AlertController消息分发](https://android.googlesource.com/platform/frameworks/base/+/master/core/java/com/android/internal/app/AlertController.java)和[Robolectric PAUSED规则](https://robolectric.org/blog/2019/06/04/paused-looper/)，复用本项目JM测试已有的点击后mainLooper.idle；不跳过或删减确认/取消/无请求断言。产品另外补“移出完成”状态，避免旧代码在操作成功后仍显示处理中。新精确源码CI尚待执行；下文NOT_RUN/未授权是封存时点记录，不是当前授权状态。

@@ -5,6 +5,16 @@ import { loopbackHost, sha256 } from './old-client-first-hop.mjs'
 // Synthetic publisher metadata only. Never reserve/publish this version or enable a product bypass.
 export const RUNTIME_CHOICE_FIXTURE_VERSION = '0.5.1'
 export const RUNTIME_CHOICE_SCENARIOS = Object.freeze(['roundtrip', 'guardrails', 'request-abort', 'hash-mismatch', 'health-rollback', 'launch-rollback'])
+/** CIM can retain a terminating PID row after its executable path disappears.
+ * Missing identity is never absence or permission to kill; a foreign path still fails. */
+export function runtimeChoiceProcessState(row, pid, isOwnedExecutable) {
+    assert.ok(Number.isInteger(pid) && pid > 0)
+    if (row === null) return 'absent'
+    assert.ok(row && row.ProcessId === pid, 'Unexpected process identity response')
+    if (typeof row.ExecutablePath !== 'string' || !row.ExecutablePath.trim()) return 'unidentified'
+    assert.equal(isOwnedExecutable(row.ExecutablePath), true, 'Refuse process outside exact owned root')
+    return 'owned'
+}
 /** Match the published Desktop status envelope, not the inner descriptor alone. */
 export function runtimeChoiceReady(status, capabilities, mode) {
     return ['core', 'jm'].includes(mode) && status?.startupReady === true &&

@@ -9,7 +9,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import AdmZip from 'adm-zip'
 import { assertDisposableWindowsCi, loopbackHost, sha256 } from './lib/old-client-first-hop.mjs'
-import { RUNTIME_CHOICE_FIXTURE_VERSION, RUNTIME_CHOICE_SCENARIOS, runtimeChoiceReady, runtimeChoiceBrowserRequestEvidence } from './lib/runtime-choice-fixture.mjs'
+import { RUNTIME_CHOICE_FIXTURE_VERSION, RUNTIME_CHOICE_SCENARIOS, runtimeChoiceReady, runtimeChoiceBrowserRequestEvidence, runtimeChoiceProcessState } from './lib/runtime-choice-fixture.mjs'
 import { runtimeChoiceStateProgram } from './lib/first-hop-state.mjs'
 
 // No input reads, tool loading, extraction or runtime action before this guard.
@@ -75,14 +75,18 @@ function node(args) {
     assert.equal(child.status, 0, (child.stderr ?? '').slice(-3000)); return child.stdout
 }
 const state = action => JSON.parse(node(['-e', runtimeChoiceStateProgram, action, root]))
+const processObservations = new Map()
 function ownedPid(pid) {
     assert.ok(Number.isInteger(pid) && pid > 0)
     const child = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}' | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress`], { encoding: 'utf8', windowsHide: true, timeout: 15000 })
     assert.equal(child.status, 0)
-    if (!child.stdout.trim()) return false
-    const value = JSON.parse(child.stdout)
-    assert.ok(value.ExecutablePath && fs.realpathSync.native(value.ExecutablePath).toLowerCase().startsWith(root.toLowerCase() + path.sep), 'Refuse process outside exact owned root')
-    return true
+    const value = child.stdout.trim() ? JSON.parse(child.stdout) : null
+    const state = runtimeChoiceProcessState(value, pid, file => fs.realpathSync.native(file).toLowerCase().startsWith(root.toLowerCase() + path.sep))
+    if (processObservations.get(pid) !== state) {
+        fs.appendFileSync(auditFile, JSON.stringify({ kind: 'OWNED_PROCESS_OBSERVATION', pid, state }) + '\n')
+        processObservations.set(pid, state)
+    }
+    return state
 }
 function treeSnapshot(directory) {
     const rows = []
@@ -112,7 +116,7 @@ async function ready(mode, previous) {
             if (!response.ok || !caps.ok || !runtimeChoiceReady(status, capabilities, mode)) throw Error('Not ready')
             observation.stage = 'replacement-identity'
             if (previous) { assert.notEqual(value.pid, previous.pid); assert.notEqual(status.csrfToken, previous.csrfToken) }
-            instance = { ...value, csrfToken: status.csrfToken }; assert.ok(ownedPid(value.pid))
+            instance = { ...value, csrfToken: status.csrfToken }; assert.equal(ownedPid(value.pid), 'owned')
             return status
         } catch (error) {
             // Bounded public flags only: never emit status bodies, URLs, tokens or headers.
@@ -196,17 +200,19 @@ async function stopOwned() {
     if (launcher?.pid) pids.add(launcher.pid)
     try {
         const published = JSON.parse(fs.readFileSync(instanceFile, 'utf8'))
-        if (ownedPid(published.pid) && /^http:\/\/127\.0\.0\.1:\d+$/.test(published.url)) {
+        if (ownedPid(published.pid) === 'owned' && /^http:\/\/127\.0\.0\.1:\d+$/.test(published.url)) {
             const response = await fetch(published.url + '/api/v1/desktop/status', { signal: AbortSignal.timeout(1500) }), status = await response.json()
             instance = { ...published, csrfToken: status.csrfToken }; pids.add(published.pid)
             try { await post('/api/v1/desktop/shutdown', {}, { signal: AbortSignal.timeout(5000) }) } catch {}
         }
     } catch (error) { if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError) && error.name !== 'TypeError') throw error }
     for (const pid of pids) {
-        for (let attempt = 0; attempt < 50 && ownedPid(pid); attempt++) await sleep(100)
-        if (ownedPid(pid)) process.kill(pid)
-        for (let attempt = 0; attempt < 100 && ownedPid(pid); attempt++) await sleep(100)
-        assert.ok(!ownedPid(pid), 'Owned fixture process remains; retain all files')
+        for (let attempt = 0; attempt < 50 && ownedPid(pid) !== 'absent'; attempt++) await sleep(100)
+        // Unidentified is neither absent nor owned. Never kill it. Keep the same
+        // bounded wait and require authoritative absence before removing files.
+        if (ownedPid(pid) === 'owned') process.kill(pid)
+        for (let attempt = 0; attempt < 100 && ownedPid(pid) !== 'absent'; attempt++) await sleep(100)
+        assert.equal(ownedPid(pid), 'absent', 'Owned fixture process remains or cannot be identified; retain all files')
     }
 }
 try {

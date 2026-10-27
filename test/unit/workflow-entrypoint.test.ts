@@ -92,7 +92,11 @@ describe('built CLI entrypoint contract', () => {
                 /jobs:\s*[\s\S]*?runs-on:[^\n]*\n\s+env:\s*\n\s+PICA_(ACCOUNT|PASSWORD):/
             )
             if (content.includes('upload-artifact@')) {
-                expect(content, name).toContain('retention-days: 1')
+                // The explicitly authorized concentrated handoff retains its
+                // public binaries/synthetic evidence for seven days so the user
+                // can download them. Keep every other recipe's one-day policy;
+                // concentrated-acceptance-build checks EACH upload is exactly 7.
+                expect(content, name).toContain(name === 'user-host-acceptance.yml' ? 'retention-days: 7' : 'retention-days: 1')
                 if (name === 'windows-package.yml') {
                     expect(content, name).not.toMatch(
                         /secrets\.PICA_(ACCOUNT|PASSWORD)/

@@ -31,8 +31,46 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
     private void renderShell(){LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});body=new FrameLayout(this);body.setBackgroundColor(Ui.BG);root.addView(body,new LinearLayout.LayoutParams(-1,0,1));bottomNavigationHost=new LinearLayout(this);bottomNavigationHost.setOrientation(LinearLayout.VERTICAL);root.addView(bottomNavigationHost,new LinearLayout.LayoutParams(-1,-2));showNormalBottomNavigation();setContentView(root);root.requestApplyInsets();}
     private Button compact(String label,View.OnClickListener action){return Ui.button(this,label,action,true);}
     private void showNormalBottomNavigation(){if(bottomNavigationHost==null)return;bottomNavigationHost.removeAllViews();bottomNavigationHost.addView(ShellNavigation.build(this,current),new LinearLayout.LayoutParams(-1,-2));}
-    private Button selectionBottomButton(String label,View.OnClickListener action){Button b=Ui.button(this,label,action,true);b.setTextSize(11.5f);b.setSingleLine(true);b.setMinHeight(Ui.dp(this,52));b.setMinimumHeight(Ui.dp(this,52));b.setPadding(Ui.dp(this,4),Ui.dp(this,5),Ui.dp(this,4),Ui.dp(this,5));return b;}
-    private void showSelectionBottomNavigation(int selectedCount,boolean shelfMode){if(bottomNavigationHost==null)return;LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.setPadding(Ui.dp(this,4),Ui.dp(this,3),Ui.dp(this,4),Ui.dp(this,3));bar.setBackgroundColor(Ui.NAV);Button done=selectionBottomButton(LocalizedText.ui(this,"完成 · "+selectedCount,"Done · "+selectedCount,"完了 · "+selectedCount),v->collectionSelection.finish());Button all=selectionBottomButton(LocalizedText.ui(this,"全选","All","全選択"),v->collectionSelection.selectAll());Button clear=selectionBottomButton(LocalizedText.ui(this,"清空","Clear","解除"),v->collectionSelection.clearSelection());Button shelf=selectionBottomButton(LocalizedText.ui(this,shelfMode?"加入其他":"加入书架",shelfMode?"Other shelf":"Add shelf",shelfMode?"別の本棚":"本棚へ"),v->collectionSelection.addSelectionToShelf());Button remove=selectionBottomButton(LocalizedText.ui(this,shelfMode?"移出书架":"取消收藏",shelfMode?"Remove":"Unfavorite",shelfMode?"本棚から外す":"お気に入り解除"),v->collectionSelection.removeSelection());clear.setEnabled(selectedCount>0);shelf.setEnabled(selectedCount>0);remove.setEnabled(selectedCount>0);for(Button b:new Button[]{done,all,clear,shelf,remove})bar.addView(b,new LinearLayout.LayoutParams(0,Ui.dp(this,58),1));bottomNavigationHost.removeAllViews();bottomNavigationHost.addView(bar,new LinearLayout.LayoutParams(-1,-2));}
+    private Button selectionBottomButton(String label,View.OnClickListener action){
+        Button b=Ui.button(this,label,action,true);
+        b.setTextSize(12f);
+        b.setSingleLine(false);
+        b.setMaxLines(2);
+        b.setGravity(Gravity.CENTER);
+        b.setMinHeight(Ui.dp(this,52));
+        b.setMinimumHeight(Ui.dp(this,52));
+        b.setPadding(Ui.dp(this,6),Ui.dp(this,4),Ui.dp(this,6),Ui.dp(this,4));
+        return b;
+    }
+    /** Preserve all five visible actions; narrow phones need two rows rather than five clipped single-line buttons. */
+    private void addSelectionActionRow(LinearLayout parent,Button... actions){
+        LinearLayout line=new LinearLayout(this);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        for(Button action:actions)line.addView(action,new LinearLayout.LayoutParams(0,Ui.dp(this,56),1));
+        parent.addView(line,new LinearLayout.LayoutParams(-1,-2));
+    }
+    private void showSelectionBottomNavigation(int selectedCount,boolean shelfMode){
+        if(bottomNavigationHost==null)return;
+        LinearLayout bar=new LinearLayout(this);
+        bar.setOrientation(LinearLayout.VERTICAL);
+        bar.setPadding(Ui.dp(this,4),Ui.dp(this,3),Ui.dp(this,4),Ui.dp(this,3));
+        bar.setBackgroundColor(Ui.NAV);
+        Button done=selectionBottomButton(LocalizedText.ui(this,"完成 · "+selectedCount,"Done · "+selectedCount,"完了 · "+selectedCount),v->collectionSelection.finish());
+        Button all=selectionBottomButton(LocalizedText.ui(this,"全选","All","全選択"),v->collectionSelection.selectAll());
+        Button clear=selectionBottomButton(LocalizedText.ui(this,"清空","Clear","解除"),v->collectionSelection.clearSelection());
+        Button shelf=selectionBottomButton(LocalizedText.ui(this,shelfMode?"加入其他":"加入书架",shelfMode?"Other shelf":"Add shelf",shelfMode?"別の本棚":"本棚へ"),v->collectionSelection.addSelectionToShelf());
+        Button remove=selectionBottomButton(LocalizedText.ui(this,shelfMode?"移出书架":"取消收藏",shelfMode?"Remove":"Unfavorite",shelfMode?"本棚から外す":"お気に入り解除"),v->collectionSelection.removeSelection());
+        clear.setEnabled(selectedCount>0);shelf.setEnabled(selectedCount>0);remove.setEnabled(selectedCount>0);
+        if(getResources().getConfiguration().screenWidthDp>=560){
+            addSelectionActionRow(bar,done,all,clear,shelf,remove);
+        }else{
+            addSelectionActionRow(bar,done,all,clear);
+            Ui.gap(bar,this,4);
+            addSelectionActionRow(bar,shelf,remove);
+        }
+        bottomNavigationHost.removeAllViews();
+        bottomNavigationHost.addView(bar,new LinearLayout.LayoutParams(-1,-2));
+    }
     @Override public void onCollectionSelectionStateChanged(boolean active,int selectedCount,boolean shelfMode){if(active)showSelectionBottomNavigation(selectedCount,shelfMode);else showNormalBottomNavigation();}
     @Override public void onBackPressed(){if(collectionSelection!=null&&collectionSelection.active()){collectionSelection.finish();return;}super.onBackPressed();}
     void startOnboardingTour(){onboardingPromptScheduled=true;AndroidOnboarding.start(this);}

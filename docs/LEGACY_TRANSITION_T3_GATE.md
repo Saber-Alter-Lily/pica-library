@@ -2,6 +2,12 @@
 
 用户已明确批准：只在 GitHub 临时 Windows runner 使用固定公开 v0.5.0 和合成资料，独立验证 T3。不在本机运行，不访问正式资料，不合并/发布/OTA/部署。新分支 `codex/legacy-transition-t3-20261026`；PR213/Dev88 固定 `40b3a555cb0dcb1732fe0f80ba5cb152d1fa136a`，原包/原始失败不动。本文件不是 PASS 记录。
 
+## 最终工程结果补记（以下准备/失败快照保留）
+
+精确源码5f4b7ead0fcd4faff0974450adf65bdc910717f2：[T3运行40444592760](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40444592760)七组全部PASS，[CI40444597333](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40444597333)Web/Desktop及Android通过。23份实际诊断独立核验：真正0.5.2/200capabilities/200HTML、完整目标树与选定合成状态保留，12条瞬时探测/console一对一对应，HTTP错误0、边界/清理失败0，健康负响应跨度58952ms/产品期限60000ms。
+
+116成员工程复核包SHA2564c8909ef67eccb79ca1106231f491acfd867e31afe0086481beb3be6070a3296，另用.NET核对115个payload哈希，无安装器/可执行stable夹具/正文/数据库/秘密。原2/7、6/7、诊断6/7不重写。PR214冻结Draft、不合并/发布/部署；旧恢复限支持headless CI范围，不证明公开分发信任、真实用户资料、交互默认LAN或物理/OEM验收。当前专项收口，后续回到来源互操作，不继续增加升级功能。
+
 ## 最新归因与最小产品修正
 
 诊断源码`d292f70ade0aec07c158ef879b16e5512554fab1`/[运行40442777436](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40442777436)仍6PASS/1FAIL，全部23份诊断已核验。唯一400是首屏`POST /api/v1/recommendation-events`；源码中`renderAll`无条件调用推荐渲染，空状态也提交`recommend_batch_presented`，而服务端必须有cycle/batch上下文。实际客户端函数的惰性端口复现得到2FAIL/115PASS、0本地IO审计事件，保留红灯；这不是迁移事务或合成作品ID问题。

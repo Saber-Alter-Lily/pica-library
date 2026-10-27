@@ -25,4 +25,10 @@ abstract class LocaleAwareActivity extends Activity {
             recreate();
         }
     }
+
+    @Override protected void onPostResume(){
+        super.onPostResume();
+        // Only a deliberate chapter launch may show a guided overlay; ordinary page visits are unaffected.
+        AndroidOnboarding.maybeStartAdvancedPageTour(this);
+    }
 }

@@ -90,8 +90,12 @@ public final class S1AndroidVisualSmokeTest {
             try {
                 assertTrue("Screenshot width too small",image.getWidth()>=320);
                 assertTrue("Screenshot height too small",image.getHeight()>=500);
-                File dir=context.getExternalFilesDir(DIRECTORY);
-                assertNotNull("No scoped screenshot directory",dir);
+                // Store screenshots in the fresh debug app's private files dir.
+                // Android blocks shell deletion/pull under /sdcard/Android/data on API 35.
+                String expected=InstrumentationRegistry.getArguments().getString("expectedFontScale","1.0");
+                String folder=Float.parseFloat(expected)>=1.3f?"f150":"f100";
+                File dir=new File(context.getFilesDir(),DIRECTORY+"-"+folder);
+                assertNotNull("No app-private screenshot directory",dir);
                 assertTrue(dir.isDirectory()||dir.mkdirs());
                 String safe=lang.replace("-","")+"-"+theme+"-"+page+".png";
                 File destination=new File(dir,safe);

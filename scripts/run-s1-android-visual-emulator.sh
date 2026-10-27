@@ -28,17 +28,33 @@ for scale in 1.0 1.5; do
     esac
     adb shell settings put system font_scale "$scale"
     adb shell am force-stop com.picalibrary.android.dev || true
-    # Only the dedicated scratch folder in the disposable .dev emulator package is cleared.
-    adb shell rm -rf /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual
     log="s1-visual-evidence/${folder}-instrumentation.txt"
     adb shell am instrument -w -r -e expectedFontScale "$scale" \
         -e class com.picalibrary.android.S1AndroidVisualSmokeTest \
         com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
     grep -Fq 'OK (1 test)' "$log"
     mkdir -p "s1-visual-evidence/$folder"
-    adb pull /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual \
-        "s1-visual-evidence/$folder/"
-    count=$(find "s1-visual-evidence/$folder/" -type f -name '*.png' | wc -l)
+    # Debug-only run-as can read files in its own app-private sandbox.
+    # Export only 12 known synthetic image names (never traverse other user files).
+    count=0
+    for lang in zhCN en ja; do
+        for theme in light dark; do
+            image="$lang-$theme-advanced-guide.png"
+            adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$image" \
+                > "s1-visual-evidence/$folder/$image"
+            test -s "s1-visual-evidence/$folder/$image"
+            count=$((count+1))
+        done
+    done
+    for theme in light dark; do
+        for page in tag-editor update-preview selection-bar; do
+            image="zhCN-$theme-$page.png"
+            adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$image" \
+                > "s1-visual-evidence/$folder/$image"
+            test -s "s1-visual-evidence/$folder/$image"
+            count=$((count+1))
+        done
+    done
     if [[ "$count" -ne 12 ]]; then
         echo "Expected 12 fresh screenshot PNGs in $folder, found $count" >&2
         exit 1

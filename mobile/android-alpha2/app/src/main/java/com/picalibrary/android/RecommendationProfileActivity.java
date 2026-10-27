@@ -96,6 +96,7 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
         PortableRecommendationPackageStore.Snapshot portable=data.portable==null?new PortableRecommendationPackageStore.Snapshot():data.portable;
 
         LinearLayout identity=SettingsRow.panel(this,null);
+        identity.setTag(AndroidOnboarding.ADV_PROFILE_RUNTIME);
         identity.addView(Ui.text(this,"本机推荐运行",17,Ui.TEXT,true));
         identity.addView(SettingsRow.statusLine(this,"Engine",Ui.text(this,NativeRecommendationStore.MODEL_VERSION,12,Ui.TEXT,true)));
         identity.addView(SettingsRow.statusLine(this,"本机 Cycle",Ui.text(this,runtime.cycleId.isEmpty()?"尚未生成":shortId(runtime.cycleId),12,Ui.MUTED,true)));
@@ -105,6 +106,7 @@ public final class RecommendationProfileActivity extends LocaleAwareActivity {
         content.addView(identity);
 
         LinearLayout evidence=SettingsRow.panel(this,null);
+        evidence.setTag(AndroidOnboarding.ADV_PROFILE_EVIDENCE);
         evidence.addView(Ui.text(this,"画像证据",17,Ui.TEXT,true));
         evidence.addView(SettingsRow.statusLine(this,"手机收藏 / 已拥有",Ui.text(this,data.localFavorites+" / "+data.localOwned,12,Ui.MUTED,true)));
         evidence.addView(SettingsRow.statusLine(this,"Portable 人工调整",Ui.rawText(this,LocalizedText.ui(this,(data.localControls==null?0:data.localControls.length())+" 项",(data.localControls==null?0:data.localControls.length())+" items",(data.localControls==null?0:data.localControls.length())+" 件"),12,Ui.MUTED,true)));

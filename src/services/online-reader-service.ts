@@ -162,6 +162,10 @@ export class OnlineReaderService {
             index >= pictures.length
         )
             throw new Error('阅读页码无效')
+        // New work-owned transport must also provide a synchronous ownership
+        // validator; otherwise a cache hit would bypass the stronger transport.
+        if (this.provider.fetchPageForComic && !this.provider.assertPageOwnedByComic)
+            throw new Error('Source-owned page transport requires an ownership validator')
         // Check even when a cache entry already exists: foreign-source pages fail closed.
         this.provider.assertPageOwnedByComic?.(comicId, pictures[index].url)
         const key = `${comicId}:${episodeId}:${index}`

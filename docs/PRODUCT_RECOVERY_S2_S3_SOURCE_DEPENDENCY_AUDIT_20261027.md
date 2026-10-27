@@ -33,6 +33,10 @@
 7. **WebDAV 是存储协议**：来源能力应按本地文件、远程文件存储、漫画 Provider、用户 Host 区分，不强制所有能力支持登录、排行榜或 favoritesWrite；任何缺失必须明确表现为 UNSUPPORTED。
 
 
+## S2-02 接口配套完整性门禁（2026-10-27）
+
+新增安全回归：如果未来某个来源适配器单独暴露 `fetchPageForComic`，却没有提供对应的 `assertPageOwnedByComic` 同步校验，在线 Reader **在检查缓存之前**直接拒绝，不允许命中旧缓存绕过来源归属验证。没有采用新接口的旧适配器仍维持兼容通路。此项是 S2 的 fail-closed 契约约束；**并不代表所有旧适配器天然具备独立外置或插件安全性**。
+
 ## S2-02 将来源归属校验接到真实在线阅读链路（2026-10-27）
 
 源码显示真实调用路径为 `OnlineReaderService.picture(comicId,...)` → `ProviderService.fetchPage(locator)`。本轮添加可选端口 `assertPageOwnedByComic(comicId, locator)` 和 `fetchPageForComic(comicId, locator)`，并由 `ProviderService` 实现。真实在线 Reader **在缓存读取前**验证媒体 scheme 与作品身份一致；之后使用作品绑定的来源抓图接口。原有来源接口保留，供未升级的兼容适配器及隔离测试继续使用；本地文件 Reader、数据库和推荐算法没有更改。

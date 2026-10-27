@@ -167,4 +167,21 @@ describe('independent online reader', () => {
         )
         expect(source.fetchPageForComic).toHaveBeenCalledTimes(1)
     })
+
+    it('rejects a partial work-owned transport contract before cached image access', async () => {
+        const {db,dir,provider}=fixture()
+        const cache=new PreviewCacheManager(path.join(dir,'partial-contract-cache'))
+        const partial={
+            ...provider,
+            fetchPageForComic:vi.fn(async()=>({
+                data:Buffer.from('image'),contentType:'image/png'
+            }))
+        }
+        const reader=new OnlineReaderService(db,partial,cache)
+        await expect(reader.picture('comic','episode-1',0)).rejects.toThrow(
+            'Source-owned page transport requires an ownership validator'
+        )
+        expect(partial.fetchPageForComic).not.toHaveBeenCalled()
+        expect(partial.fetchPage).not.toHaveBeenCalled()
+    })
 })

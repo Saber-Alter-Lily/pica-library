@@ -67,7 +67,7 @@ describe('enforced first module boundaries', () => {
     it('bundles the real ordered recommendation build with only pure algorithm dependencies, never database/session/registry/model I/O', async () => {
         const result=await build({entryPoints:['src/recommendation/build-pipeline.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
         const allowed=new Set([
-            'src/recommendation/build-pipeline.ts','src/library/author-normalization.ts',
+            'src/recommendation/build-pipeline.ts','src/library/author-normalization.ts','src/library/content-identity.ts',
             ...['intent-planner-v3','provider-query-translator','retriever-v3','semantic-core','features','tag-combinations','taste-model','behavior-profile','ranker','ranker-adapter-v3'].map(name=>'src/recommendation-v3/'+name+'.ts'),
             'src/recommendation-v4/visual-style.ts','src/tags/policy.ts',
             ...['portable-policy','explicit-intents','tag-intents','intent-policy'].map(name=>'src/recommendation-v5/'+name+'.ts')
@@ -75,6 +75,12 @@ describe('enforced first module boundaries', () => {
         for(const file of Object.keys(result.metafile!.inputs))expect(allowed.has(file.replaceAll('\\','/')),file).toBe(true)
         expect(result.outputFiles).toHaveLength(1)
         expect(result.metafile!.inputs['src/recommendation/build-pipeline.ts']).toBeDefined()
+        // The same canonical identity helper is already admitted by the reading
+        // projection above. Admit this exact dependency, not the library/storage
+        // directory, and prove that it remains a dependency-free pure module.
+        expect(imports(path.join(root,'src/library/content-identity.ts'))).toEqual([])
+        const identity=await build({entryPoints:['src/library/content-identity.ts'],bundle:true,platform:'browser',format:'esm',write:false,metafile:true,logLevel:'silent'})
+        expect(Object.keys(identity.metafile!.inputs)).toEqual(['src/library/content-identity.ts'])
     })
     it('bundles recommendation queries and commands without Node, SQL, provider clients or model execution', async () => {
         const result = await build({ entryPoints: ['src/recommendation/queries.ts','src/recommendation/cycle-commands.ts'],

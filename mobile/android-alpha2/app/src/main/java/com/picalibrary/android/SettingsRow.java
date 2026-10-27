@@ -19,7 +19,7 @@ final class SettingsRow {
         if(hasStatus){
             TextView state=Ui.text(c,status,13,statusColor(status),false);
             state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
-            state.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_HIGH_QUALITY);
+
             row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
         }
         if(action!=null){TextView arrow=Ui.text(c,"›",24,Ui.MUTED,false);arrow.setPadding(Ui.dp(c,10),0,0,0);row.addView(arrow);}
@@ -39,7 +39,7 @@ final class SettingsRow {
     static LinearLayout statusLine(Context c,String title,TextView state){
         LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,Ui.dp(c,6),0,Ui.dp(c,6));row.addView(Ui.text(c,title,14,Ui.TEXT,false),new LinearLayout.LayoutParams(0,-2,1.15f));
         state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
-        state.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_HIGH_QUALITY);
+
         row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
         return row;
     }

@@ -18,6 +18,10 @@
 [GitHub Actions QA 工件 #12745469077](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065/artifacts/12745469077) 在源码 `d288bc225e15e49c40eea06b52c67193f95ba457` 上成功生成；APK 为 14,576,408 字节，SHA-256 `bee99853830d5244c68eff2cda5eb58063564ea952a892d69de7b67e5c69ab28`，证书指纹 `d3588d987b4d0a6afdf4aed66909722db63011d5b7dacb1d7a8f509a07e4f6b1`。包名 `com.picalibrary.android.dev`、versionCode `90`，与正式 v0.5.0 APK 不同包名，且不保证覆盖不同 Debug 证书的旧 Dev APK。**这只是可供用户验收的 Debug 产物，不是 G1、正式发布或升级成功证据。** 交接见 [S1 Dev90 独立验收](PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)。签名与 SHA 校验成功，不等于 Android 真实 UI 已验证。该独立打包工作流保留 Lint/assemble，完整 Android JUnit 仍由主 CI 守卫。
 
 
+## S1-04 从指南首页进入真实聚光控件的下一道门禁
+
+已通过的 `7689f26b` 模拟器仅证明指南首页能渲染，不能证明“开始本章交互引导”能显示控件聚光层。本轮新增隔离 Instrumentation 场景：携带第 0 章 Intent 进入真实 `AccountSourcesActivity`，等待现有 `VSpotView` 出现，断言两步目标分别为“选择来源”和“用户 Host”入口，抓取前后两步真实屏幕图片，点击跳过并检查该章**没有被标记已读**。只读取合成全新 Debug 应用的本地默认状态，不配置来源/账号，不触发联网或业务操作。Android 100%/150% 字体各另有两张预期截图；新测试是否通过仍需本轮精确 GitHub Actions 判定。
+
 ## 新的 S1 模拟器最小真实页面渲染门禁（2026-10-27）
 
 历史 #40526314386 已确认：KVM 生效、Android35 模拟器启动、59 项 Gradle build tasks 通过、安装两个 APK，但 Instrumentation 开始后未结束，任务最终超时取消。**0 张可验收 PNG**。此外 Runner Actions 的正确参数名为 `disable-linux-hw-accel`，旧 `disable-linux-hw-acceleration` 并非有效输入。

@@ -11,6 +11,8 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import com.developer.spoti.vspoti.VSpotView;
+import java.util.concurrent.atomic.AtomicReference;
 
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -129,4 +131,82 @@ public final class S1AndroidVisualSmokeTest {
                 AdvancedGuideActivity.class,"advanced-guide",false,false);
         Log.i(TAG,"phase=test-complete");
     }
+
+    /**
+     * S1-04: first real spotlight evidence, not a screenshot of the text-only guide menu.
+     * No provider is enabled or connected, and skip may not perform the highlighted actions.
+     */
+    @Test public void captureRealSourceSpotlightWithoutRunningProviderActions() throws Exception {
+        prepare();
+        Context context=app();
+        LocaleStore.set(context,LocaleStore.ZH_CN);
+        context.getSharedPreferences("appearance-v1",Context.MODE_PRIVATE)
+            .edit().putString("mode",ThemeStore.MODE_LIGHT).commit();
+        Intent intent=new Intent(context,AccountSourcesActivity.class)
+            .putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,0);
+        Log.i(TAG,"phase=spotlight-launch");
+        try(ActivityScenario<AccountSourcesActivity> scenario=ActivityScenario.launch(intent)){
+            AtomicReference<VSpotView> current=new AtomicReference<>();
+            for(int attempt=0;attempt<45;attempt++){
+                scenario.onActivity(activity->{
+                    ViewGroup decor=(ViewGroup)activity.getWindow().getDecorView();
+                    for(int i=0;i<decor.getChildCount();i++){
+                        View child=decor.getChildAt(i);
+                        if(child instanceof VSpotView && ((VSpotView)child).isShowing())
+                            current.set((VSpotView)child);
+                    }
+                });
+                if(current.get()!=null && current.get().getCurrentStep()!=null)break;
+                SystemClock.sleep(150);
+            }
+            assertNotNull("Explicit source chapter must display a live VSpot overlay",current.get());
+            Log.i(TAG,"phase=spotlight-visible step="+current.get().getCurrentIndex());
+            scenario.onActivity(activity->{
+                VSpotView overlay=current.get();
+                assertEquals(2,overlay.getStepCount());
+                assertEquals(0,overlay.getCurrentIndex());
+                assertEquals(AndroidOnboarding.ADV_SOURCE_CHOICES,
+                    overlay.getCurrentTargetView().getTag());
+                assertNotNull(activity.getWindow().getDecorView()
+                    .findViewWithTag(AndroidOnboarding.ADV_SOURCE_HOST));
+            });
+            SystemClock.sleep(240);
+            saveSpotlightImage(context,"source-spotlight-1");
+            scenario.onActivity(activity->{
+                current.get().next();
+                assertEquals(1,current.get().getCurrentIndex());
+                assertEquals(AndroidOnboarding.ADV_SOURCE_HOST,
+                    current.get().getCurrentTargetView().getTag());
+            });
+            Log.i(TAG,"phase=spotlight-next");
+            SystemClock.sleep(240);
+            saveSpotlightImage(context,"source-spotlight-2");
+            scenario.onActivity(activity->current.get().dismiss());
+            SystemClock.sleep(380);
+            assertFalse("Skip cannot mark this chapter read",
+                OnboardingStore.advancedRead(context).contains("0"));
+            Log.i(TAG,"phase=spotlight-skip-no-write");
+        }
+    }
+
+    private void saveSpotlightImage(Context context,String name) throws Exception {
+        String font=InstrumentationRegistry.getArguments().getString("expectedFontScale","1.0");
+        String folder=Float.parseFloat(font)>=1.3f?"f150":"f100";
+        File dir=new File(context.getFilesDir(),DIRECTORY+"-"+folder);
+        assertTrue(dir.isDirectory()||dir.mkdirs());
+        Bitmap image=InstrumentationRegistry.getInstrumentation()
+            .getUiAutomation().takeScreenshot();
+        assertNotNull("No real Android overlay screenshot: "+name,image);
+        try{
+            File file=new File(dir,"zhCN-light-"+name+".png");
+            try(FileOutputStream output=new FileOutputStream(file)){
+                assertTrue("Unable to encode overlay PNG",
+                    image.compress(Bitmap.CompressFormat.PNG,100,output));
+                output.getFD().sync();
+            }
+            assertTrue("Captured empty overlay PNG",file.length()>1000);
+            Log.i(TAG,"phase=spotlight-captured page="+name+" bytes="+file.length());
+        }finally{image.recycle();}
+    }
+
 }

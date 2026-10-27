@@ -51,6 +51,30 @@ for scale in 1.0 1.5; do
     adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$image" \
         > "s1-visual-evidence/$folder/$image"
     test -s "s1-visual-evidence/$folder/$image"
-    printf 'stage=first-real-guide-screen font_scale=%s captured=1 source_sha=%s\n' \
+    # Stage-2: actual 2-step VSpot overlay in AccountSourcesActivity, not text/manual UI.
+    step_log="s1-visual-evidence/${folder}-spotlight-instrumentation.txt"
+    step_trace="s1-visual-evidence/${folder}-spotlight-logcat.txt"
+    adb logcat -c || true
+    set +e
+    timeout --signal=TERM --kill-after=10s 150s adb shell am instrument -w -r \
+        -e expectedFontScale "$scale" \
+        -e class com.picalibrary.android.S1AndroidVisualSmokeTest#captureRealSourceSpotlightWithoutRunningProviderActions \
+        com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner > "$step_log" 2>&1
+    step_exit=$?
+    set -e
+    adb logcat -d -s S1_VISUAL:I AndroidRuntime:E > "$step_trace" || true
+    cat "$step_log"
+    grep "S1_VISUAL" "$step_trace" || true
+    if [[ "$step_exit" -ne 0 ]] || ! grep -Fq 'OK (1 test)' "$step_log"; then
+        echo "::error::S1 source spotlight failed/timeout ($folder exit=$step_exit); see logs" >&2
+        exit 1
+    fi
+    for phase in 1 2; do
+        proof="zhCN-light-source-spotlight-$phase.png"
+        adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$proof" \
+            > "s1-visual-evidence/$folder/$proof"
+        test -s "s1-visual-evidence/$folder/$proof"
+    done
+    printf 'stage=guide-plus-two-real-vspot-steps font_scale=%s captured=3 source_sha=%s\n' \
         "$scale" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
 done

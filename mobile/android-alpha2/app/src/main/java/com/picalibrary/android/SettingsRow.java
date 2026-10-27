@@ -12,8 +12,16 @@ final class SettingsRow {
 
     static LinearLayout row(Context c,String title,String status,View.OnClickListener action){
         LinearLayout row=container(c,false,action);row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView name=Ui.text(c,title,16,Ui.TEXT,true);row.addView(name,new LinearLayout.LayoutParams(0,-2,1));
-        if(status!=null&&!status.isEmpty()){TextView state=Ui.text(c,status,13,statusColor(status),false);state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);row.addView(state);}
+        boolean hasStatus=status!=null&&!status.isEmpty();
+        TextView name=Ui.text(c,title,16,Ui.TEXT,true);
+        // Both columns receive bounded widths. A long translated status must wrap, not squeeze the title off-screen.
+        row.addView(name,new LinearLayout.LayoutParams(0,-2,hasStatus?1.15f:1f));
+        if(hasStatus){
+            TextView state=Ui.text(c,status,13,statusColor(status),false);
+            state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+            state.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_HIGH_QUALITY);
+            row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
+        }
         if(action!=null){TextView arrow=Ui.text(c,"›",24,Ui.MUTED,false);arrow.setPadding(Ui.dp(c,10),0,0,0);row.addView(arrow);}
         return row;
     }
@@ -29,7 +37,11 @@ final class SettingsRow {
 
     static LinearLayout statusLine(Context c,String title,String status){return statusLine(c,title,Ui.text(c,status,13,statusColor(status),true));}
     static LinearLayout statusLine(Context c,String title,TextView state){
-        LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,Ui.dp(c,6),0,Ui.dp(c,6));row.addView(Ui.text(c,title,14,Ui.TEXT,false),new LinearLayout.LayoutParams(0,-2,1));state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);row.addView(state);return row;
+        LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,Ui.dp(c,6),0,Ui.dp(c,6));row.addView(Ui.text(c,title,14,Ui.TEXT,false),new LinearLayout.LayoutParams(0,-2,1.15f));
+        state.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+        state.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_HIGH_QUALITY);
+        row.addView(state,new LinearLayout.LayoutParams(0,-2,1f));
+        return row;
     }
     static int statusColor(String status){if(status==null)return Ui.MUTED;if(status.contains("可用")||status.contains("已连接")||status.contains("已登录")||status.contains("已同步"))return Ui.GOOD;if(status.contains("异常")||status.contains("失效")||status.contains("无权限")||status.contains("失败"))return Ui.BAD;return Ui.MUTED;}
 }

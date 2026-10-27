@@ -1,5 +1,6 @@
 export const RUNTIME_CHOICE_FIXTURE_VERSION: string
 export const RUNTIME_CHOICE_SCENARIOS: readonly string[]
+export function runtimeChoiceProcessState(row: { ProcessId: number; ExecutablePath?: string | null } | null, pid: number, isOwnedExecutable: (file: string) => boolean): 'absent' | 'unidentified' | 'owned'
 export function runtimeChoiceReady(status: unknown, capabilities: unknown, mode: string): boolean
 export function runtimeChoiceBrowserRequestEvidence(input: string, resourceType: string): {
     kind: 'EXTERNAL_BROWSER_REQUEST_BLOCKED'; protocol: string; resourceType: string; requestClass: string

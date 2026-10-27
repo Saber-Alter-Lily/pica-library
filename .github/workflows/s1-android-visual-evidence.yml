@@ -35,6 +35,13 @@ jobs:
         with:
           gradle-version: '8.9'
       - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Require working KVM acceleration on the disposable runner
+        run: |
+          set -euo pipefail
+          test -e /dev/kvm || { echo "::error::No /dev/kvm on runner"; exit 1; }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm || { echo "::error::KVM not usable"; exit 1; }
+          ls -l /dev/kvm
       - name: Run real Android layout and screenshots on disposable emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -45,6 +52,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           emulator-boot-timeout: 600
+          disable-linux-hw-acceleration: false
           script: bash scripts/run-s1-android-visual-emulator.sh
       - name: Upload fresh-emulator images for visual inspection
         if: always() && github.event.repository.private == false

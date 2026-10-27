@@ -30,7 +30,7 @@ public class UpdateNotesLayoutTest {
                 Robolectric.buildActivity(UpdateActivity.class,intent).create()){
             UpdateActivity activity=controller.get();
             ViewGroup content=activity.findViewById(android.R.id.content);
-            ScrollView scroll=activity.findViewWithTag("update.release.notes.scroll");
+            ScrollView scroll=activity.getWindow().getDecorView().findViewWithTag("update.release.notes.scroll");
             assertNotNull(scroll);
             TextView notes=(TextView)scroll.getChildAt(0);
             StringBuilder copy=new StringBuilder();
@@ -46,7 +46,7 @@ public class UpdateNotesLayoutTest {
                     View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
             content.layout(0,0,width,height);
 
-            View check=activity.findViewWithTag(AndroidOnboarding.ADV_UPDATE_CHECK);
+            View check=activity.getWindow().getDecorView().findViewWithTag(AndroidOnboarding.ADV_UPDATE_CHECK);
             assertNotNull(check);
             Rect rect=new Rect();check.getDrawingRect(rect);
             content.offsetDescendantRectToMyCoords(check,rect);

@@ -24,7 +24,9 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
         LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);p.setBackgroundColor(Ui.BG);p.setPadding(Ui.dp(this,16),Ui.dp(this,14),Ui.dp(this,16),Ui.dp(this,24));scroll.addView(p);
         p.addView(Ui.text(this,"远程存储",27,Ui.TEXT,true));p.addView(Ui.text(this,"可保存多个 WebDAV 网盘。手机一次使用一个“当前网盘”，切换后书库、封面、阅读和进度都会读取所选目标。",12,Ui.MUTED,false));Ui.gap(p,this,12);
 
-        p.addView(Ui.text(this,"已配置网盘",13,Ui.TEXT,true));targetSpinner=new Spinner(this);p.addView(targetSpinner);Ui.gap(p,this,8);
+        p.addView(Ui.text(this,"已配置网盘",13,Ui.TEXT,true));targetSpinner=new Spinner(this);
+        targetSpinner.setTag(AndroidOnboarding.ADV_REMOTE_TARGET);
+        p.addView(targetSpinner);Ui.gap(p,this,8);
         LinearLayout targetActions=new LinearLayout(this);Button add=button("＋ 新增网盘"),remove=button("删除当前");targetActions.addView(add,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(targetActions,this,8);targetActions.addView(remove,new LinearLayout.LayoutParams(0,-2,1));p.addView(targetActions);Ui.gap(p,this,10);
 
         p.addView(Ui.text(this,"网盘类型",13,Ui.TEXT,true));vendorSpinner=new Spinner(this);p.addView(vendorSpinner);Ui.gap(p,this,8);
@@ -36,7 +38,8 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
         providerNote=Ui.text(this,"",12,Ui.MUTED,false);providerNote.setPadding(0,0,0,Ui.dp(this,8));p.addView(providerNote);
         status=Ui.text(this,"",13,Ui.MUTED,false);status.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));p.addView(status);
 
-        LinearLayout actions=new LinearLayout(this);Button test=button("测试连接"),save=button("保存并设为当前");actions.addView(test,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,8);actions.addView(save,new LinearLayout.LayoutParams(0,-2,1));p.addView(actions);
+        LinearLayout actions=new LinearLayout(this);Button test=button("测试连接"),save=button("保存并设为当前");
+        test.setTag(AndroidOnboarding.ADV_REMOTE_TEST);actions.addView(test,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,8);actions.addView(save,new LinearLayout.LayoutParams(0,-2,1));p.addView(actions);
         Button refresh=button("刷新当前网盘状态");refresh.setOnClickListener(v->refreshPortableState());p.addView(refresh);
         p.addView(Ui.text(this,"切换网盘只改变手机当前使用的远程来源，不会删除其他网盘里的漫画，也不会把数据自动复制到所有网盘。",12,Ui.MUTED,false));
 
@@ -55,7 +58,10 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
         int index=0;if(preferred!=null&&!preferred.isEmpty())for(int i=0;i<targets.size();i++)if(preferred.equals(targets.get(i).id)){index=i;break;}
         if(!targets.isEmpty()){targetSpinner.setSelection(index,false);fill(targets.get(index));}else beginNewInternal();
         binding=false;
-        targetSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int position,long id){if(binding||targets.isEmpty()||position<0||position>=targets.size())return;switchTarget(targets.get(position));}});
+        targetSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int position,long id){if(binding||targets.isEmpty()||position<0||position>=targets.size())return;
+            // Spinner's first callback must not start a network refresh merely by opening settings/guide.
+            if(targets.get(position).id.equals(RemoteConfigStore.activeTargetId(RemoteStorageActivity.this)))return;
+            switchTarget(targets.get(position));}});
         vendorSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onNothingSelected(AdapterView<?> parent){}public void onItemSelected(AdapterView<?> parent,View view,int position,long id){if(binding)return;applyPreset(creating||url.getText().toString().trim().isEmpty());}});
         updateStatus();
     }

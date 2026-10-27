@@ -17,6 +17,9 @@ export interface OnlineReaderSource {
     getEpisodes(comicId: string): Promise<Episode[]>
     getEpisodePages(comicId: string, episode: Episode): Promise<Picture[]>
     fetchPage(locator: string): Promise<{ data: Buffer; contentType: string }>
+    /** Optional work-owned page boundary for adapters that know the comic identity. */
+    assertPageOwnedByComic?(comicId: string, locator: string): void
+    fetchPageForComic?(comicId: string, locator: string): Promise<{ data: Buffer; contentType: string }>
 }
 
 /** Application-owned ports, never accepted from a browser or a remote source descriptor. */
@@ -159,6 +162,8 @@ export class OnlineReaderService {
             index >= pictures.length
         )
             throw new Error('阅读页码无效')
+        // Check even when a cache entry already exists: foreign-source pages fail closed.
+        this.provider.assertPageOwnedByComic?.(comicId, pictures[index].url)
         const key = `${comicId}:${episodeId}:${index}`
         const sourceFingerprint = createHash('sha256')
             .update(
@@ -172,7 +177,9 @@ export class OnlineReaderService {
         if (pending) return pending
         const request = this.imageLimit(async () => {
             this.current(comicId, scope)
-            const image = await this.provider.fetchPage(pictures[index].url)
+            const image = this.provider.fetchPageForComic
+                ? await this.provider.fetchPageForComic(comicId, pictures[index].url)
+                : await this.provider.fetchPage(pictures[index].url)
             this.current(comicId, scope)
             this.cache.put(
                 key,

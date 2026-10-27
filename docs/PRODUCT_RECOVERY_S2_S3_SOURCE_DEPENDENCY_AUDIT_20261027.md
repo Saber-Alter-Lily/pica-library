@@ -32,6 +32,13 @@
 6. **新旧数据身份需兼容**：旧未加前缀的 Pica ID、已收藏/下载内容、现有 E-H/JM namespace、portable 状态和原有 SourceAccess legacy 授权必须有明确映射/迁移，而非批量重写或自动注销。
 7. **WebDAV 是存储协议**：来源能力应按本地文件、远程文件存储、漫画 Provider、用户 Host 区分，不强制所有能力支持登录、排行榜或 favoritesWrite；任何缺失必须明确表现为 UNSUPPORTED。
 
+
+## S2-02 将来源归属校验接到真实在线阅读链路（2026-10-27）
+
+源码显示真实调用路径为 `OnlineReaderService.picture(comicId,...)` → `ProviderService.fetchPage(locator)`。本轮添加可选端口 `assertPageOwnedByComic(comicId, locator)` 和 `fetchPageForComic(comicId, locator)`，并由 `ProviderService` 实现。真实在线 Reader **在缓存读取前**验证媒体 scheme 与作品身份一致；之后使用作品绑定的来源抓图接口。原有来源接口保留，供未升级的兼容适配器及隔离测试继续使用；本地文件 Reader、数据库和推荐算法没有更改。
+
+现有单元测试之外新增带作品 ID 的抓图/拒绝跨来源测试及缓存命中时拒绝绕行；运行结果仍以精确新 SHA CI 判定。此阶段**尚未证明旧 SDK 已从安装包外置**，未开放用户自定义可执行插件，也没有真实来源账号的全流程验收。
+
 ## 后续工程顺序（从现有开源实现继续，不另起整套框架）
 
 | 阶段 | 可执行工作 | 验收出口 |

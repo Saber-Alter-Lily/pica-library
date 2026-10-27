@@ -3,6 +3,7 @@ package com.picalibrary.android;
 import static org.junit.Assert.*;
 import static org.robolectric.Shadows.shadowOf;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import org.junit.*;
 import org.junit.runner.RunWith;
@@ -43,6 +44,46 @@ public class DualOnboardingTest {
             assertEquals(RecommendationControlActivity.class.getName(),shadowOf(activity).getNextStartedActivity().getComponent().getClassName());
             assertTrue(OnboardingStore.advancedRead(context).isEmpty());
             assertEquals(0,OnboardingStore.completedVersion(context));
+        }
+    }
+
+    @Test public void allAdvancedChaptersLaunchTheirActualPagesWithAnExplicitTourRequest(){
+        Class<?>[] destinations=new Class<?>[]{
+            AccountSourcesActivity.class,RecommendationControlActivity.class,
+            RecommendationStyleActivity.class,PairingActivity.class,
+            RemoteStorageActivity.class,DownloadsActivity.class,
+            RecommendationProfileActivity.class,UpdateActivity.class
+        };
+        for(int chapter=0;chapter<destinations.length;chapter++){
+            OnboardingStore.advancedPosition(context,chapter);
+            try(ActivityController<AdvancedGuideActivity> controller=
+                    Robolectric.buildActivity(AdvancedGuideActivity.class).setup()){
+                AdvancedGuideActivity activity=controller.get();
+                activity.getWindow().getDecorView().findViewWithTag("advanced-guide-open").performClick();
+                Intent launched=shadowOf(activity).getNextStartedActivity();
+                assertNotNull("chapter "+chapter,launched);
+                assertEquals("chapter "+chapter,destinations[chapter].getName(),
+                        launched.getComponent().getClassName());
+                if(chapter==2){
+                    assertTrue(launched.getBooleanExtra("startDetailedOnboarding",false));
+                    assertFalse(launched.hasExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER));
+                }else{
+                    assertEquals(chapter,launched.getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1));
+                }
+                assertTrue("opening a tour cannot mark the chapter read",
+                        OnboardingStore.advancedRead(context).isEmpty());
+            }
+        }
+    }
+
+    @Test public void advancedSpotlightResourcesMatchEveryLocalizedChapter(){
+        String[] titles=context.getResources().getStringArray(R.array.advanced_spotlight_step_titles);
+        String[] bodies=context.getResources().getStringArray(R.array.advanced_spotlight_step_bodies);
+        assertEquals(16,titles.length);
+        assertEquals(16,bodies.length);
+        for(int i=0;i<16;i++){
+            assertFalse("empty spotlight title "+i,titles[i].trim().isEmpty());
+            assertFalse("empty spotlight description "+i,bodies[i].trim().isEmpty());
         }
     }
 }

@@ -33,6 +33,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Run real Android layout and screenshots on disposable emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -60,7 +61,7 @@ jobs:
               adb shell settings put system font_scale "$scale"
               adb shell am force-stop com.picalibrary.android.dev || true
               adb shell rm -rf /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual
-              adb shell am instrument -w -r -e class com.picalibrary.android.S1AndroidVisualSmokeTest com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner | tee "s1-visual-evidence/${folder}-instrumentation.txt"
+              adb shell am instrument -w -r -e expectedFontScale "$scale" -e class com.picalibrary.android.S1AndroidVisualSmokeTest com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner | tee "s1-visual-evidence/${folder}-instrumentation.txt"
               grep -q 'OK (1 test)' "s1-visual-evidence/${folder}-instrumentation.txt"
               mkdir -p "s1-visual-evidence/$folder"
               adb pull /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual "s1-visual-evidence/$folder/"
@@ -69,7 +70,7 @@ jobs:
               printf 'font_scale=%s captured=%s source_sha=%s\n' "$scale" "$count" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
             done
       - name: Upload fresh-emulator images for visual inspection
-        if: always()
+        if: always() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
           name: s1-android-emulator-visual-${{ github.sha }}

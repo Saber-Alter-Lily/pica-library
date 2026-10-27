@@ -106,6 +106,12 @@ public final class S1AndroidVisualSmokeTest {
 
     @Test public void captureFreshEmulatorLanguagesAndThemesWithoutSourceAccounts() throws Exception {
         prepare();
+        String expected=InstrumentationRegistry.getArguments().getString("expectedFontScale");
+        if(expected!=null&&!expected.isEmpty()){
+            float actual=app().getResources().getConfiguration().fontScale;
+            assertEquals("The screenshot must use the requested Android font scale",
+                    Float.parseFloat(expected),actual,0.08f);
+        }
         for(String lang:new String[]{LocaleStore.ZH_CN,LocaleStore.EN,LocaleStore.JA}){
             for(String theme:new String[]{ThemeStore.MODE_LIGHT,ThemeStore.MODE_DARK}){
                 capture(lang,theme,AdvancedGuideActivity.class,"advanced-guide",false,false);

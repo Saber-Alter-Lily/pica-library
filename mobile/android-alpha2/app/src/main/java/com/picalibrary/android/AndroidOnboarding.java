@@ -34,7 +34,77 @@ final class AndroidOnboarding {
     static final String REC_VISUAL_MODE="pica-tour-rec-visual-mode";
     static final String REC_VISUAL_STRENGTH="pica-tour-rec-visual-strength";
 
+    // An explicit guide request is passed to the real Activity, never inferred from a normal visit.
+    static final String EXTRA_ADVANCED_CHAPTER="pica.guide.advanced.chapter";
+    static final String ADV_SOURCE_CHOICES="pica-tour-adv-source-choices";
+    static final String ADV_SOURCE_HOST="pica-tour-adv-source-host";
+    static final String ADV_PREFERENCE_TAGS="pica-tour-adv-preference-tags";
+    static final String ADV_PREFERENCE_SAVE="pica-tour-adv-preference-save";
+    static final String ADV_PAIR_SCAN="pica-tour-adv-pair-scan";
+    static final String ADV_PAIR_MANUAL="pica-tour-adv-pair-manual";
+    static final String ADV_REMOTE_TARGET="pica-tour-adv-remote-target";
+    static final String ADV_REMOTE_TEST="pica-tour-adv-remote-test";
+    static final String ADV_DOWNLOAD_TASKS="pica-tour-adv-download-tasks";
+    static final String ADV_DOWNLOAD_STORAGE="pica-tour-adv-download-storage";
+    static final String ADV_PROFILE_RUNTIME="pica-tour-adv-profile-runtime";
+    static final String ADV_PROFILE_EVIDENCE="pica-tour-adv-profile-evidence";
+    static final String ADV_UPDATE_STATUS="pica-tour-adv-update-status";
+    static final String ADV_UPDATE_CHECK="pica-tour-adv-update-check";
+
     private AndroidOnboarding(){}
+
+    /** Called after Activity resume only for an explicit guide-launched destination. */
+    static void maybeStartAdvancedPageTour(Activity activity){
+        Intent intent=activity.getIntent();
+        if(intent==null||!intent.hasExtra(EXTRA_ADVANCED_CHAPTER))return;
+        int chapter=intent.getIntExtra(EXTRA_ADVANCED_CHAPTER,-1);
+        intent.removeExtra(EXTRA_ADVANCED_CHAPTER);
+        if(chapter<0||chapter>7||chapter==2)return;
+        activity.getWindow().getDecorView().post(()->{
+            if(!activity.isFinishing()&&!activity.isDestroyed())
+                startAdvancedPageTour(activity,chapter);
+        });
+    }
+
+    /** Two actual tagged controls per chapter; missing/asynchronous targets never count as completed. */
+    private static void startAdvancedPageTour(Activity activity,int chapter){
+        final String[] tags=advancedTargetTags(chapter);
+        if(tags==null)return;
+        View first=target(activity,tags[0]),second=target(activity,tags[1]);
+        if(!awaitTargets(activity,()->startAdvancedPageTour(activity,chapter),true,first,second))return;
+        String[] titles=activity.getResources().getStringArray(R.array.advanced_spotlight_step_titles);
+        String[] bodies=activity.getResources().getStringArray(R.array.advanced_spotlight_step_bodies);
+        int offset=chapter*2;
+        if(titles.length!=16||bodies.length!=16){
+            Toast.makeText(activity,R.string.onboarding_target_unavailable,Toast.LENGTH_LONG).show();
+            return;
+        }
+        new VSpotView.Builder(activity)
+            .setStyle(style(activity))
+            .setDismissType(VSpotView.DismissType.NONE)
+            .addStep(first,titles[offset],bodies[offset])
+            .addStep(second,titles[offset+1],bodies[offset+1])
+            .setCallback(new VSpotView.Callback(){
+                @Override public void onDismiss(View last,boolean completed,int index){
+                    if(activity.isFinishing()||activity.isDestroyed())return;
+                    if(completed)OnboardingStore.markAdvancedRead(activity,chapter);
+                    else OnboardingStore.skipAdvanced(activity);
+                }
+            }).build().show();
+    }
+
+    private static String[] advancedTargetTags(int chapter){
+        switch(chapter){
+            case 0:return new String[]{ADV_SOURCE_CHOICES,ADV_SOURCE_HOST};
+            case 1:return new String[]{ADV_PREFERENCE_TAGS,ADV_PREFERENCE_SAVE};
+            case 3:return new String[]{ADV_PAIR_SCAN,ADV_PAIR_MANUAL};
+            case 4:return new String[]{ADV_REMOTE_TARGET,ADV_REMOTE_TEST};
+            case 5:return new String[]{ADV_DOWNLOAD_TASKS,ADV_DOWNLOAD_STORAGE};
+            case 6:return new String[]{ADV_PROFILE_RUNTIME,ADV_PROFILE_EVIDENCE};
+            case 7:return new String[]{ADV_UPDATE_STATUS,ADV_UPDATE_CHECK};
+            default:return null;
+        }
+    }
 
     static void maybePrompt(HomeActivity activity){
         if(!OnboardingStore.shouldPrompt(activity))return;
@@ -235,6 +305,7 @@ final class AndroidOnboarding {
                     if(activity.isFinishing()||activity.isDestroyed())return;
                     if(completed){
                         OnboardingStore.completeAdvanced(activity);
+                        OnboardingStore.markAdvancedRead(activity,2);
                         new AlertDialog.Builder(activity).setTitle(R.string.advanced_guide_title).setMessage(R.string.advanced_guide_spotlight_done).setPositiveButton(R.string.common_ok,null).show();
                     }else handleSkip(activity,true);
                 }

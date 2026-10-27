@@ -1,4 +1,17 @@
 # Pica Library Development Task Log
+## S1 真实截图整改、QA2 产物校验与 QA3 数据隔离（2026-10-27）
+
+当前代码最新提交 `a28404e7fbdbad20906688a9fd0814bd1f658acd`，仍为 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)，`main`、正式 v0.5.0、Release/OTA 与用户生产资料均未改变。**G1 用户验收、G2 来源外置、G3 旧版无损升级、G4 正式发布仍 OPEN**。
+
+- **首次实体 UI 图像证据已成功**：[Android 35 模拟器 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) 在源码 `d7afa3db` 上获得了真实中文浅色 `AdvancedGuideActivity` 截图 2 张（Android 字体 100% 和 150%），已下载 PNG 与 Instrumentation/Logcat 并由本对话进行人工目视核查。该画面无明显横向裁切，但安全说明过长、选中章节重复展示、主 CTA 层级弱和底部导航按钮贴边。**不等于八章节聚光动画或其他语言/手机已通过。**
+- **针对截图修复**：`7689f26b` 将首屏安全及操作说明压缩为短提示，原完整文本移入原可折叠说明，移除与 Spinner 重复的章节标题，主 CTA 用主题强调色，底部两个按钮增间距，补 Robotlectic 测试和 3 语言资源。修复后 [模拟器复拍 #40541090821](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090821) **仍为 QUEUED**；新截图未回收之前不能视为修复验收。
+- **QA2 Dev v91 已完成**：[CI #40541090823](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090823) **SUCCESS**；工件 [#12750938267](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090823/artifacts/12750938267) 已下载，六文件逐项核验，APK 独立 SHA 计算 PASS。`com.picalibrary.android.dev` / code91 / APK 14,578,316 bytes / SHA-256 `568bbcb04f1af56ce0056599e103fb38d1244807acbd898032e3c35d4afd76ed` / Debug 证书 `a2f84443b72af8c85ad69d0d7d1c47a729b03169b4edc9c84165fe141e26576a`；与 v90 Debug 证书 `d3588d98...` 不一致，**不得称 v91 可覆盖升级既有 Dev90**。
+- **修复 QA 测试数据风险**：`a28404e7` 添加仅允许 `.s1qaN` 的独立 QA 后缀配置，普通 Debug 默认 `com.picalibrary.android.dev` 不变；下一工件 QA3 `v92` 使用 `com.picalibrary.android.s1qa3`、不同配对 scheme、单独应用显示名，避免不同临时 Debug 证书覆盖旧 Dev 资料。对应 [QA3 workflow #40542505173](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40542505173) **QUEUED**，尚无实际 APK 产物/验收；这不是生产签名迁移的解决方案。
+- **S2 端口切入**：前面 `ProviderRegistry.forPageForComic`、ProviderService/OnlineReaderService work-owned 图片权限校验及独立模块测试已提交，**不能**由 S1 Debug 包结果推断来源已从 APK/Windows 移除或 G2 成功。
+- 旧 42 案例和 12 新增标准保持原有状态，不把 Debug 打包成功或“2 张主目录图像”重判为完整 NEW-UI-01/02 PASS。阶段证据详见 [S1 验收台账](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)、[Dev90/QA3 交接](docs/PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)。
+
+---
+
 ## S1 开发包实体校验与最小模拟器回归（2026-10-27）
 
 **唯一交付事实**：独立的 [S1 Dev QA workflow #40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 在精确源码 `d288bc225e15e49c40eea06b52c67193f95ba457` 上 **SUCCESS**。已实际下载其 [6 文件 ZIP #12745469077](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065/artifacts/12745469077)，逐文件回读并独立计算 APK SHA-256，等于包内 SHA256SUMS。编译/Lint/签名合法性/包身份均经 GitHub Actions PASS；测试包含 Debug APK 但**未执行这条工作流内的完整 Robolectric 或用户手机验收**。

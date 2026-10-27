@@ -1,4 +1,17 @@
 # S1 Android UI 第一轮整改及验收边界｜2026-10-27
+## 已核实两代 Debug QA 与真实截图证据（2026-10-27）
+
+| 精确对象 | 已证实 | 不允许误判 |
+| --- | --- | --- |
+| [中文浅色指南第一版截图 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) | 100%/150% 字体各 1 张 PNG，真实 Android35，实测 PASS；已目视发现标题冗余、说明过长、底部按钮挤压 | 不是八章聚光，也不是全语言/全部设备/用户通过 |
+| `7689f26b` 更新后的界面 | 代码完成、翻译与 Robolectric 断言提交，首屏改成短说明+强调 CTA+折叠长文+间距 | [新版模拟器 #40541090821](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090821) QUEUED，没有复拍前后 PASS 证据 |
+| [Dev v90 #40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) | SHA-256 `bee99853830d5244c68eff2cda5eb58063564ea952a892d69de7b67e5c69ab28`，已独立核验，包名 `.dev` | 与更新后的 UI 不是同一源码，未经手机验收 |
+| [Dev v91 QA2 #40541090823](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40541090823) | 最新界面对应 APK 14,578,316 bytes，SHA-256 `568bbcb04f1af56ce0056599e103fb38d1244807acbd898032e3c35d4afd76ed`，签名/包名/哈希成功 | 和 v90 同为 `.dev` 但临时 Debug 签名不同；不能覆盖安装保护旧数据 |
+| QA3 `v92` 源码 `a28404e7` | 计划独立 `com.picalibrary.android.s1qa3` 与配对 scheme；Gradle 默认 Debug/Release 路由不变，静态单测已增加 | [QA3 工件 #40542505173](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40542505173) QUEUED，不能当作实体构建已 PASS |
+
+仍需完成：八章目标控件可见/跳过/回退的 Android 真机验证、三语言与 360/393/480dp × 多字体 × 深浅主题矩阵、旧用户 Stable 签名覆盖和个人库迁移；最终用户接受 G1 保持 **NOT_ACCEPTED**。
+
+
 
 ## 可供实体安装验证的隔离 Android Dev v90（已独立 SHA 核验）
 

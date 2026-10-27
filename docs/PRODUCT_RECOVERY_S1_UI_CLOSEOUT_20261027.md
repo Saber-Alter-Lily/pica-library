@@ -1,5 +1,18 @@
 # S1 Android UI 第一轮整改及验收边界｜2026-10-27
 
+## 最新模拟器运行的独立事实（截至 2026-10-27）
+
+| 运行及源码 | 结果 | 实际工程证据 | 未满足的事项 |
+|---|---|---|---|
+| [#40517358640](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40517358640) / `02841418` | FAIL | 模拟器能启动 | Gradle 在仓库根目录无法找到工程 |
+| [#40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) / `45e6e641` | FAIL | Debug 和 AndroidTest APK 构建成功；59 tasks | 访问 `/sdcard/Android/data` 受限，未进入截图 |
+| [#40522901087](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40522901087) / `505b4a90` | PENDING | 改用应用私有 Files + Debug run-as 按名单提取 | 尚无通过结论、PNG 总数和可视化检查 |
+
+Android 35 的存储拒绝属于**测试工具自身的访问策略问题**；不能据此断言软件的阅读器发生同样的存储故障，也不能因编译成功而宣布 UI 优秀。截图目标仍是每档字体 12 张，总计 24 张；多设备 393/480dp 与 130% 字体、真实手机/用户验收尚未完成。
+
+**独立 S1 Dev 测试包：** [构建 #40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) 必须通过 JUnit、Lint、签名和版本核验后才可当作 Dev QA 候选。不得覆盖正式 APK/清除既有 Dev 用户数据；源码 S2/S3 仍未满足纯 Reader 包条件。
+
+
 ## 视觉验收工具补充（实际运行回执，不是通过结论）
 
 - 开发分支新增可运行 Android 35 模拟器 UI 截图，`360dp × 字体 1.0/1.5 × 中英日 × 深浅` 的部分页面组合，目标 24 张 PNG；单次截图包含具体源码 SHA、模拟器检查日志。图像来自隔离的 `.dev` 版本，不是官方 stable Android，也不能证明真实手机交互合格。

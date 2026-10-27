@@ -1,5 +1,16 @@
 # Pica Library Development Task Log
 
+## S1 视觉验证第 2 次失败与存储边界修复（2026-10-27）
+
+当前 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 保持独立候选；最后这次源码修复为 `505b4a90b8da1eb78808e1b4fc859b6eec30171f`。正式 `main`、Stable v0.5.0、OTA 与用户账号/数据均未触及。G1 真实用户 UI 验收仍为 **NOT_ACCEPTED**。
+
+- `45e6e641` 修复了 Gradle 工作目录错误，真实 [Android API35 模拟器运行 #40519878220](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40519878220) 成功冷启动并执行 Gradle `:app:assembleDebug :app:assembleDebugAndroidTest`（**59 tasks / BUILD SUCCESSFUL**），两个调试 APK 均已编译。**之后的流程仍失败**：Android 35 拒绝 `adb shell rm -rf /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual`（Permission denied）。因此 **0 份可信 UI 截图，不能把 APK 编译成功写成模拟器验收通过**。
+- `505b4a90` 改用 `getFilesDir()/s1-visual-f100|f150` 的应用私有临时证据目录，使用仅对 Debug 应用可用的 `adb exec-out run-as com.picalibrary.android.dev cat` 逐个提取 12 个已知文件名。禁用 shell 直接删除受保护的 Android/data 目录；不读取应用用户其他数据。新 [模拟器运行 #40522901087](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40522901087) 已触发，**当前不得宣称成功或提供 PNG**。
+- 并行 [S1 Dev QA 构建 #40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) 源码 `b1cc4777` 使用隔离包名 `com.picalibrary.android.dev`、versionCode 90，严格经 JUnit/Lint/打包/签名/校验；构建任务仍应以真实 run 成功和工件存在为准。它与 `505b4a90` 只差视觉测试脚本/AndroidTest 改动，没有普通 Android UI 业务代码差异；**仍未正式发布**。
+- 本次仅修复证据基础设施，不改推荐/Visual、数据库/来源 SDK、正式 updater。Android 真机/多字体/三语言的完整视觉证据与 G1 仍待验证；S2/S3 来源真实外置、老用户一键迁移和发布门禁保持未完成。
+
+---
+
 ## S1 实际视觉证据与独立测试包（2026-10-27，继续推进）
 
 **开发主体：** [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)；正式版 `v0.5.0`、生产 `main`、正式 OTA、历史 PR 和真实用户数据均未改。S1/G1 用户验收仍为 **NOT_ACCEPTED**。

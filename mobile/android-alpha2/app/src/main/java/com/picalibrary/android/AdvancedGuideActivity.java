@@ -41,12 +41,13 @@ public final class AdvancedGuideActivity extends LocaleAwareActivity {
         LinearLayout article=SettingsRow.panel(this,null);
         article.addView(Ui.text(this,titles[chapter],20,Ui.TEXT,true));
         TextView body=Ui.text(this,bodies[chapter],15,Ui.TEXT,false);body.setTextIsSelectable(true);body.setTag("advanced-guide-body");article.addView(body);content.addView(article);
-        // S1 interactive-guide pilot: the visual chapter reuses the existing VSpot tour and real tagged controls.
-        // Other chapters remain readable manuals until their own actual page targets have been verified.
-        // Navigation and spotlight never invoke provider, model, download, update or save actions.
+        content.addView(Ui.text(this,getString(R.string.advanced_guide_interactive_hint),13,Ui.MUTED,false));
+        // An explicit advanced chapter opens the actual feature page and highlights tagged controls.
+        // Chapter 2 keeps the existing five-step Visual tour. Guide entry itself never invokes business actions.
         Button open=Ui.button(this,actions[chapter],v->{
             Intent destination=new Intent(this,DESTINATIONS[chapter]);
             if(chapter==2)destination.putExtra("startDetailedOnboarding",true);
+            else destination.putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,chapter);
             startActivity(destination);
         },true);open.setTag("advanced-guide-open");content.addView(open,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);

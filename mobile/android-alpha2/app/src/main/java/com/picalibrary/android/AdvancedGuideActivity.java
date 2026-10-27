@@ -41,8 +41,14 @@ public final class AdvancedGuideActivity extends LocaleAwareActivity {
         LinearLayout article=SettingsRow.panel(this,null);
         article.addView(Ui.text(this,titles[chapter],20,Ui.TEXT,true));
         TextView body=Ui.text(this,bodies[chapter],15,Ui.TEXT,false);body.setTextIsSelectable(true);body.setTag("advanced-guide-body");article.addView(body);content.addView(article);
-        // Navigation is explicit and only opens the destination screen, never invokes its actions.
-        Button open=Ui.button(this,actions[chapter],v->startActivity(new Intent(this,DESTINATIONS[chapter])),true);open.setTag("advanced-guide-open");content.addView(open,new LinearLayout.LayoutParams(-1,-2));
+        // S1 interactive-guide pilot: the visual chapter reuses the existing VSpot tour and real tagged controls.
+        // Other chapters remain readable manuals until their own actual page targets have been verified.
+        // Navigation and spotlight never invoke provider, model, download, update or save actions.
+        Button open=Ui.button(this,actions[chapter],v->{
+            Intent destination=new Intent(this,DESTINATIONS[chapter]);
+            if(chapter==2)destination.putExtra("startDetailedOnboarding",true);
+            startActivity(destination);
+        },true);open.setTag("advanced-guide-open");content.addView(open,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);
         Button previous=Ui.button(this,getString(R.string.onboarding_back),v->{if(chapter>0){chapter--;OnboardingStore.advancedPosition(this,chapter);render();}},true);previous.setEnabled(chapter>0);nav.addView(previous,new LinearLayout.LayoutParams(0,-2,1));
         Button next=Ui.button(this,getString(R.string.advanced_guide_read_next),v->{

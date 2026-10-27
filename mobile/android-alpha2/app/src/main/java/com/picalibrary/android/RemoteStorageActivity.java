@@ -29,7 +29,9 @@ public class RemoteStorageActivity extends LocaleAwareActivity {
         p.addView(targetSpinner);Ui.gap(p,this,8);
         LinearLayout targetActions=new LinearLayout(this);Button add=button("＋ 新增网盘"),remove=button("删除当前");targetActions.addView(add,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(targetActions,this,8);targetActions.addView(remove,new LinearLayout.LayoutParams(0,-2,1));p.addView(targetActions);Ui.gap(p,this,10);
 
-        p.addView(Ui.text(this,"网盘类型",13,Ui.TEXT,true));vendorSpinner=new Spinner(this);p.addView(vendorSpinner);Ui.gap(p,this,8);
+        p.addView(Ui.text(this,"网盘类型",13,Ui.TEXT,true));vendorSpinner=new Spinner(this);
+        vendorSpinner.setTag(AndroidOnboarding.ADV_REMOTE_VENDOR);
+        p.addView(vendorSpinner);Ui.gap(p,this,8);
         label=field(p,"显示名称","","例如：我的 123 云盘");
         url=field(p,"WebDAV 地址","","https://dav.example.com/path");
         root=field(p,"根目录","PicaLibrary","PicaLibrary");

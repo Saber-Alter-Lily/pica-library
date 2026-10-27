@@ -20,6 +20,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
@@ -35,6 +36,7 @@ public final class UpdateActivity extends LocaleAwareActivity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final Handler handler=new Handler(Looper.getMainLooper());
     private TextView status,notes,detail;
+    private ScrollView notesScroll;
     private ProgressBar loading;
     private Button action,cancel;
     private UpdateClient.Info info;
@@ -50,7 +52,9 @@ public final class UpdateActivity extends LocaleAwareActivity {
 
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);Ui.applyWindow(this);
-        guidePreview=getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)==7;
+        guidePreview=saved!=null&&saved.containsKey("guidePreview")
+            ?saved.getBoolean("guidePreview")
+            :getIntent().getIntExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,-1)==7;
         downloadId=prefs().getLong(P_DOWNLOAD,-1);
         lastBytes=prefs().getLong(P_LAST_BYTES,-1);
         lastProgressAt=prefs().getLong(P_LAST_PROGRESS,0);
@@ -61,6 +65,10 @@ public final class UpdateActivity extends LocaleAwareActivity {
             detail.setText("");
             action.setEnabled(true);
         }else check();
+    }
+    @Override protected void onSaveInstanceState(Bundle out){
+        out.putBoolean("guidePreview",guidePreview);
+        super.onSaveInstanceState(out);
     }
     private android.content.SharedPreferences prefs(){return getSharedPreferences(PREFS,MODE_PRIVATE);}
     private Button button(String label,View.OnClickListener click){return Ui.button(this,label,click,false);}
@@ -73,7 +81,15 @@ public final class UpdateActivity extends LocaleAwareActivity {
         status.setPadding(0,Ui.dp(this,16),0,0);root.addView(status);
         detail=Ui.text(this,"",13,Ui.MUTED,false);detail.setPadding(0,Ui.dp(this,6),0,Ui.dp(this,8));root.addView(detail);
         loading=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);loading.setMax(100);loading.setIndeterminate(true);root.addView(loading,new LinearLayout.LayoutParams(-1,Ui.dp(this,8)));
-        notes=Ui.text(this,"",13,Ui.MUTED,false);notes.setPadding(0,Ui.dp(this,14),0,Ui.dp(this,14));root.addView(notes);
+        notes=Ui.text(this,"",13,Ui.MUTED,false);
+        notes.setPadding(0,Ui.dp(this,14),0,Ui.dp(this,14));
+        notesScroll=new ScrollView(this);
+        notesScroll.setTag("update.release.notes.scroll");
+        notesScroll.setFillViewport(false);
+        notesScroll.addView(notes,new ScrollView.LayoutParams(-1,-2));
+        notesScroll.setVisibility(View.GONE);
+        // Long release notes are scrollable while update/check/cancel controls remain visible.
+        root.addView(notesScroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout buttons=new LinearLayout(this);action=button("重新检查",v->check());
         action.setTag(AndroidOnboarding.ADV_UPDATE_CHECK);
         action.setEnabled(false);buttons.addView(action,new LinearLayout.LayoutParams(0,-2,1));Ui.gap(buttons,this,8);cancel=button("取消下载",v->cancelCurrent(false));cancel.setVisibility(View.GONE);buttons.addView(cancel,new LinearLayout.LayoutParams(0,-2,1));root.addView(buttons);
@@ -90,7 +106,9 @@ public final class UpdateActivity extends LocaleAwareActivity {
     }
 
     private void show(UpdateClient.Info value){
-        info=value;loading.setVisibility(View.GONE);notes.setText(value.notes);
+        info=value;loading.setVisibility(View.GONE);
+        notes.setText(value.notes==null?"":value.notes);
+        notesScroll.setVisibility(value.notes==null||value.notes.trim().isEmpty()?View.GONE:View.VISIBLE);
         int savedCode=prefs().getInt(P_CODE,-1);
         if(downloadId>=0&&savedCode>0&&savedCode!=value.versionCode)cancelCurrent(false);
         if(!UpdateClient.newer(this,value)){status.setText(LocalizedText.ui("当前已是最新版本"));detail.setText(value.versionName);retryCheckButton();return;}

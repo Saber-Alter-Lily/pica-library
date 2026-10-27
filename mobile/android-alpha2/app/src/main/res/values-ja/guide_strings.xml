@@ -33,16 +33,16 @@
         <item>ユーザー指定の Host</item>
         <item>タグの参加範囲</item>
         <item>設定を保存</item>
+        <item>画風の利用モード</item>
+        <item>画風の影響度</item>
         <item>QR コードで接続</item>
         <item>手動で接続</item>
         <item>WebDAV の保存先</item>
-        <item>接続テスト</item>
+        <item>WebDAV の種類を選択</item>
         <item>実行中のタスク</item>
         <item>保存先の設定</item>
         <item>おすすめの実行状態</item>
         <item>プロフィールの根拠</item>
-        <item>画風の利用モード</item>
-        <item>画風の影響度</item>
         <item>現在の更新状態</item>
         <item>手動で更新を確認</item>
     </string-array>
@@ -51,17 +51,19 @@
         <item>Host は任意の接続先で、ローカル読書に必要ありません。</item>
         <item>元タグと個人タグの参加範囲を先に選びます。</item>
         <item>編集は仮保存です。ガイドが保存ボタンを押すことはありません。</item>
+        <item>画風の順位への参加は明示的に選択します。</item>
+        <item>影響度は利用者が操作して確認した時だけ変更します。</item>
         <item>実際のボタンを押した時だけカメラを起動します。</item>
         <item>PC のアドレスと一時コードは利用者が入力します。</item>
         <item>登録済み WebDAV を選択します。ガイドは保存先を変更しません。</item>
-        <item>利用者が明示的に押すまで接続テストは行いません。</item>
+        <item>設定の種類を選んでヒントを確認します。接続テストと保存は明示的に操作します。</item>
         <item>完了済み取得と実行中のタスクは別の画面です。</item>
         <item>本機の保存状態を確認します。ガイドは作品を削除しません。</item>
         <item>端末のおすすめサイクルと候補データを確認します。</item>
         <item>収集や行動の根拠は、全てのタグを好きという意味ではありません。</item>
-        <item>画風の順位への参加は明示的に選択します。</item>
-        <item>影響度は利用者が操作して確認した時だけ変更します。</item>
         <item>ヘルプから開いた場合は表示のみで、自動更新確認はしません。</item>
         <item>更新確認が必要なときに利用者が押してください。</item>
     </string-array>
+    <string name="advanced_guide_start_interactive">この章の操作ガイドを開始</string>
+    <string name="advanced_guide_preference_preview">未保存の変更はありません。変更後に保存できます。</string>
 </resources>

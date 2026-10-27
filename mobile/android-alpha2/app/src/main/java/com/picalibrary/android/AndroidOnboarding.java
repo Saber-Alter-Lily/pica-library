@@ -43,6 +43,7 @@ final class AndroidOnboarding {
     static final String ADV_PAIR_SCAN="pica-tour-adv-pair-scan";
     static final String ADV_PAIR_MANUAL="pica-tour-adv-pair-manual";
     static final String ADV_REMOTE_TARGET="pica-tour-adv-remote-target";
+    static final String ADV_REMOTE_VENDOR="pica-tour-adv-remote-vendor";
     static final String ADV_REMOTE_TEST="pica-tour-adv-remote-test";
     static final String ADV_DOWNLOAD_TASKS="pica-tour-adv-download-tasks";
     static final String ADV_DOWNLOAD_STORAGE="pica-tour-adv-download-storage";
@@ -71,7 +72,9 @@ final class AndroidOnboarding {
         final String[] tags=advancedTargetTags(chapter);
         if(tags==null)return;
         View first=target(activity,tags[0]),second=target(activity,tags[1]);
-        if(!awaitTargets(activity,()->startAdvancedPageTour(activity,chapter),true,first,second))return;
+        // A findViewWithTag result inside a GONE panel cannot be spotlighted.
+        if(!awaitTargets(activity,()->startAdvancedPageTour(activity,chapter),true,
+                advancedVisible(first)?first:null,advancedVisible(second)?second:null))return;
         String[] titles=activity.getResources().getStringArray(R.array.advanced_spotlight_step_titles);
         String[] bodies=activity.getResources().getStringArray(R.array.advanced_spotlight_step_bodies);
         int offset=chapter*2;
@@ -93,12 +96,16 @@ final class AndroidOnboarding {
             }).build().show();
     }
 
+    private static boolean advancedVisible(View view){
+        return view!=null&&view.isShown()&&view.getWidth()>0&&view.getHeight()>0;
+    }
+
     private static String[] advancedTargetTags(int chapter){
         switch(chapter){
             case 0:return new String[]{ADV_SOURCE_CHOICES,ADV_SOURCE_HOST};
             case 1:return new String[]{ADV_PREFERENCE_TAGS,ADV_PREFERENCE_SAVE};
             case 3:return new String[]{ADV_PAIR_SCAN,ADV_PAIR_MANUAL};
-            case 4:return new String[]{ADV_REMOTE_TARGET,ADV_REMOTE_TEST};
+            case 4:return new String[]{ADV_REMOTE_TARGET,ADV_REMOTE_VENDOR};
             case 5:return new String[]{ADV_DOWNLOAD_TASKS,ADV_DOWNLOAD_STORAGE};
             case 6:return new String[]{ADV_PROFILE_RUNTIME,ADV_PROFILE_EVIDENCE};
             case 7:return new String[]{ADV_UPDATE_STATUS,ADV_UPDATE_CHECK};
@@ -191,7 +198,14 @@ final class AndroidOnboarding {
         if(activity.isFinishing()||activity.isDestroyed()){pendingTargets.remove(activity);return false;}
         if(ready(views)){pendingTargets.remove(activity);return true;}
         int attempts=pendingTargets.getOrDefault(activity,0)+1;
-        if(attempts>=20){pendingTargets.remove(activity);if(!advanced)OnboardingStore.later();Toast.makeText(activity,R.string.onboarding_target_unavailable,Toast.LENGTH_LONG).show();return false;}
+        // Dynamic recommendation/library panels can take longer than the daily shell to render.
+        // Keep retries bounded, and never mark an unavailable advanced tour as completed.
+        if(attempts>=(advanced?50:20)){
+            pendingTargets.remove(activity);
+            if(!advanced)OnboardingStore.later();
+            Toast.makeText(activity,R.string.onboarding_target_unavailable,Toast.LENGTH_LONG).show();
+            return false;
+        }
         pendingTargets.put(activity,attempts);
         activity.getWindow().getDecorView().postDelayed(()->{if(!activity.isFinishing()&&!activity.isDestroyed())retry.run();else pendingTargets.remove(activity);},120);
         return false;

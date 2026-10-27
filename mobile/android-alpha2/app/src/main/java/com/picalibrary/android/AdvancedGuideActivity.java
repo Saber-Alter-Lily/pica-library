@@ -42,9 +42,11 @@ public final class AdvancedGuideActivity extends LocaleAwareActivity {
         article.addView(Ui.text(this,titles[chapter],20,Ui.TEXT,true));
         TextView body=Ui.text(this,bodies[chapter],15,Ui.TEXT,false);body.setTextIsSelectable(true);body.setTag("advanced-guide-body");article.addView(body);content.addView(article);
         content.addView(Ui.text(this,getString(R.string.advanced_guide_interactive_hint),13,Ui.MUTED,false));
+        // Keep a chapter-specific destination label alongside a clear "start interactive" action.
+        content.addView(Ui.text(this,actions[chapter],13,Ui.MUTED,false));
         // An explicit advanced chapter opens the actual feature page and highlights tagged controls.
         // Chapter 2 keeps the existing five-step Visual tour. Guide entry itself never invokes business actions.
-        Button open=Ui.button(this,actions[chapter],v->{
+        Button open=Ui.button(this,getString(R.string.advanced_guide_start_interactive),v->{
             Intent destination=new Intent(this,DESTINATIONS[chapter]);
             if(chapter==2)destination.putExtra("startDetailedOnboarding",true);
             else destination.putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,chapter);

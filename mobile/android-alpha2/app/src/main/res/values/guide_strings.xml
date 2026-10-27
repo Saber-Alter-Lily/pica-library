@@ -33,16 +33,16 @@
         <item>User-managed Host</item>
         <item>Tag participation</item>
         <item>Save changes</item>
+        <item>Visual modes</item>
+        <item>Visual strength</item>
         <item>Scan pairing code</item>
         <item>Pair manually</item>
         <item>Choose a WebDAV target</item>
-        <item>Test connection</item>
+        <item>Choose WebDAV provider type</item>
         <item>View active tasks</item>
         <item>Storage settings</item>
         <item>Recommendation runtime</item>
         <item>Evidence and profile</item>
-        <item>Visual modes</item>
-        <item>Visual strength</item>
         <item>Current update status</item>
         <item>Check on demand</item>
     </string-array>
@@ -51,17 +51,19 @@
         <item>An optional Host is user-selected and is not required for local reading.</item>
         <item>Choose which raw and personal tags participate before adjusting inference.</item>
         <item>Edits are staged. Save is a separate decision; this guide never presses it.</item>
+        <item>Turn Visual ranking on only when intended.</item>
+        <item>Strength changes require your explicit confirmation.</item>
         <item>Scanning starts only after you press the real scan button.</item>
         <item>Manual pairing requires a device address and temporary code; no code is entered by the guide.</item>
         <item>Choose among configured WebDAV destinations. The guide does not switch storage.</item>
-        <item>Connection tests and saving start only after you choose them.</item>
+        <item>Select a preset to review connection options. Testing and saving still require an explicit tap.</item>
         <item>Completed downloads and background jobs are separate views.</item>
         <item>Inspect local download storage without deleting books.</item>
         <item>Review current phone recommendation cycle and cached foundation.</item>
         <item>Collected and inferred evidence are not automatic statements of preference.</item>
-        <item>Turn Visual ranking on only when intended.</item>
-        <item>Strength changes require your explicit confirmation.</item>
         <item>Opening this page from Help is a read-only preview; no automatic check is started.</item>
         <item>Tap to check only if you want an actual update request.</item>
     </string-array>
+    <string name="advanced_guide_start_interactive">Start interactive guide</string>
+    <string name="advanced_guide_preference_preview">No edits yet. Save becomes available after you change a preference.</string>
 </resources>

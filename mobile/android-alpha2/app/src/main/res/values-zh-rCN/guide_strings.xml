@@ -33,16 +33,16 @@
         <item>用户自选 Host</item>
         <item>标签参与范围</item>
         <item>保存偏好调整</item>
+        <item>画风接入模式</item>
+        <item>画风影响强度</item>
         <item>扫码配对</item>
         <item>手动配对</item>
         <item>选择 WebDAV 网盘</item>
-        <item>测试连接</item>
+        <item>选择 WebDAV 网盘类型</item>
         <item>查看后台任务</item>
         <item>下载存储设置</item>
         <item>本机推荐运行状态</item>
         <item>画像证据</item>
-        <item>画风接入模式</item>
-        <item>画风影响强度</item>
         <item>当前更新状态</item>
         <item>主动检查更新</item>
     </string-array>
@@ -51,17 +51,19 @@
         <item>自选 Host 是可选功能，本地阅读不依赖它。</item>
         <item>先决定原始标签与私人标签是否参与推荐，再调整具体偏好。</item>
         <item>偏好先暂存，保存是单独操作；引导不会替你点击。</item>
+        <item>画风是否参与实际排序需单独选择。</item>
+        <item>影响强度只会在你主动确认后修改。</item>
         <item>仅在主动点击扫码按钮后，才会启动相机。</item>
         <item>手动配对需电脑地址和临时配对码，引导不会填写或提交。</item>
         <item>从已配置的网盘中选择；仅查看引导不会切换存储。</item>
-        <item>测试及保存需用户自己确认，本引导不连接网盘。</item>
+        <item>选择网盘类型并查看配置提示。只有主动点击测试或保存才会连接。</item>
         <item>完成的下载与进行中的后台任务分开管理。</item>
         <item>这里可以检查存储占用，不会因引导而删除作品。</item>
         <item>查看手机当前推荐批次和同步的候选基础。</item>
         <item>收藏构成与行为证据不等于你明确喜欢每个标签。</item>
-        <item>画风是否参与实际排序需单独选择。</item>
-        <item>影响强度只会在你主动确认后修改。</item>
         <item>从帮助进入此页仅显示引导预览，不会自动检查更新。</item>
         <item>需要检查更新时再主动点击此按钮。</item>
     </string-array>
+    <string name="advanced_guide_start_interactive">开始本章交互引导</string>
+    <string name="advanced_guide_preference_preview">当前没有待保存的调整。修改偏好后才可保存。</string>
 </resources>

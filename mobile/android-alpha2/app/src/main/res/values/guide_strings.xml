@@ -24,4 +24,44 @@
     <string-array name="advanced_guide_actions">
         <item>Open accounts and sources</item><item>Open preference adjustments</item><item>Open visual settings</item><item>Open Desktop pairing</item><item>Open remote storage</item><item>Open download tasks</item><item>View local recommendation profile</item><item>Open software updates</item>
     </string-array>
+
+    <!-- S1: short text for real VSpot targets, separate from the detailed offline reading handbook. -->
+    <string name="advanced_guide_interactive_hint">Open a feature to highlight its real controls. Unavailable controls stop the tour rather than completing it. No action is executed by the tour.</string>
+    <string name="advanced_guide_update_preview">Guide preview: no update check or download has been started.</string>
+    <string-array name="advanced_spotlight_step_titles">
+        <item>Choose providers</item>
+        <item>User-managed Host</item>
+        <item>Tag participation</item>
+        <item>Save changes</item>
+        <item>Scan pairing code</item>
+        <item>Pair manually</item>
+        <item>Choose a WebDAV target</item>
+        <item>Test connection</item>
+        <item>View active tasks</item>
+        <item>Storage settings</item>
+        <item>Recommendation runtime</item>
+        <item>Evidence and profile</item>
+        <item>Visual modes</item>
+        <item>Visual strength</item>
+        <item>Current update status</item>
+        <item>Check on demand</item>
+    </string-array>
+    <string-array name="advanced_spotlight_step_bodies">
+        <item>Enable only a provider you intend to use. Visiting this page does not log in.</item>
+        <item>An optional Host is user-selected and is not required for local reading.</item>
+        <item>Choose which raw and personal tags participate before adjusting inference.</item>
+        <item>Edits are staged. Save is a separate decision; this guide never presses it.</item>
+        <item>Scanning starts only after you press the real scan button.</item>
+        <item>Manual pairing requires a device address and temporary code; no code is entered by the guide.</item>
+        <item>Choose among configured WebDAV destinations. The guide does not switch storage.</item>
+        <item>Connection tests and saving start only after you choose them.</item>
+        <item>Completed downloads and background jobs are separate views.</item>
+        <item>Inspect local download storage without deleting books.</item>
+        <item>Review current phone recommendation cycle and cached foundation.</item>
+        <item>Collected and inferred evidence are not automatic statements of preference.</item>
+        <item>Turn Visual ranking on only when intended.</item>
+        <item>Strength changes require your explicit confirmation.</item>
+        <item>Opening this page from Help is a read-only preview; no automatic check is started.</item>
+        <item>Tap to check only if you want an actual update request.</item>
+    </string-array>
 </resources>

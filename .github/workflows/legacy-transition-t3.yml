@@ -15,7 +15,7 @@ jobs:
   t3:
     if: github.event.repository.private == false && github.repository == 'Saber-Alter-Lily/pica-library' && github.ref == 'refs/heads/codex/legacy-transition-t3-20261026' && github.event_name != 'pull_request'
     runs-on: windows-latest
-    timeout-minutes: 55
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,6 +58,7 @@ jobs:
           "PICA_T3_TOOL_ROOT=$toolRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "PLAYWRIGHT_BROWSERS_PATH=$env:PLAYWRIGHT_BROWSERS_PATH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Actual bound entry, protected data, recovery and browser forward update
+        timeout-minutes: 15
         shell: pwsh
         run: |
           node scripts/test-windows-legacy-transition-t3.mjs artifacts/release-base/Pica-Library-v0.5.0-windows-x64.zip artifacts/legacy-transition-t3-private-fixtures $env:GITHUB_SHA

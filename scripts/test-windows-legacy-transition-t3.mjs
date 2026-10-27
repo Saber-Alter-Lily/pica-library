@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
 import { spawn, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { stripVTControlCharacters } from 'node:util'
@@ -118,18 +119,19 @@ async function scenario(selected) {
     async function post(route, body) {
         return fetch(instance.url + route, { method: 'POST', headers: { 'content-type': 'application/json', Origin: instance.url, 'x-pica-csrf': instance.csrfToken }, body: JSON.stringify(body), signal: AbortSignal.timeout(20000) })
     }
-    function launchOld() {
+    async function launchOld() {
         const out = fs.createWriteStream(path.join(harness, 'old-launcher.stdout.log'), { flags: 'wx' }), err = fs.createWriteStream(path.join(harness, 'old-launcher.stderr.log'), { flags: 'wx' }); logs.push(out, err)
+        await Promise.all([once(out, 'open'), once(err, 'open')])
         activeLauncher = spawn(path.join(app, 'Pica Library.exe'), ['--no-open'], { cwd: app, env: { ...env, READER_LEGACY_T3_FIXTURE: descriptor, NODE_OPTIONS: '--import=' + pathToFileURL(path.join(harness, 'legacy-transition-t3-preload.mjs')).href }, windowsHide: true, stdio: ['ignore', out, err] })
         activeLauncher.on('error', () => {})
     }
     function terminal(which = tool, wrapper = false) {
         const binary = wrapper ? path.join(systemRoot, 'System32', 'cmd.exe') : path.join(which, 'runtime', 'node.exe')
-        const args = wrapper ? ['/d', '/s', '/c', 'call "' + path.join(which, 'Start-Pica-Library-Transition.cmd') + '"'] : ['--import=' + pathToFileURL(path.join(harness, 'legacy-transition-t3-preload.mjs')).href, path.join(which, 'app', 'legacy-transition.cjs')]
+        const args = wrapper ? ['/d', '/c', 'Start-Pica-Library-Transition.cmd'] : ['--import=' + pathToFileURL(path.join(harness, 'legacy-transition-t3-preload.mjs')).href, path.join(which, 'app', 'legacy-transition.cjs')]
         const process = pty.spawn(binary, args, { name: 'xterm-color', cols: 4096, rows: 40, cwd: which, env: { ...env, READER_LEGACY_T3_FIXTURE: descriptor } })
         const value = { process, output: '', exited: false, code: null, error: null }
         value.exit = new Promise(resolve => process.onExit(({ exitCode }) => { value.exited = true; value.code = exitCode; resolve(exitCode) }))
-        process.onData(bytes => { value.output += stripVTControlCharacters(bytes).replaceAll('\r', ''); if (value.output.length > 256 * 1024) value.error = Error('T3 terminal output exceeded bound') })
+        process.onData(bytes => { value.output += stripVTControlCharacters(bytes).replaceAll('\r', ''); if (value.output.length > 256 * 1024) { value.output = value.output.slice(0, 256 * 1024); value.error = Error('T3 terminal output exceeded bound') } })
         terminals.push(value); return value
     }
     async function text(value, wanted, timeout = 20000) {
@@ -197,7 +199,8 @@ async function scenario(selected) {
         await executeScenario()
         state('verify')
         const auditRows = events(); assert.ok(!auditRows.some(row => /BLOCKED|UNEXPECTED|UNCAUGHT/.test(row.kind)), 'T3 source/process/network boundary violation')
-        Object.assign(result, { status: 'PASS', selectedSyntheticStateCanariesPreserved: true, originalPublicOldArchiveUnmodified: true, actualBoundEntry: true, physicalDeviceOrPublishedOta: 'NOT_ESTABLISHED' }); success = true
+        Object.assign(result, { status: 'PASS', selectedSyntheticStateCanariesPreserved: true, originalPublicOldArchiveUnmodified: true, actualBoundEntry: true,
+            oldRecoveredRuntimeScope: 'SUPPORTED_HEADLESS_CI_CONTAINMENT_ONLY', oldInteractiveDefaultBridge: 'NOT_ACCEPTED_NOT_FIXED', physicalDeviceOrPublishedOta: 'NOT_ESTABLISHED' }); success = true
     } catch (error) { result.error = String(error?.stack ?? error) }
     finally {
         try { await browser?.close(); await stopOwned() } catch (error) { success = false; cleanupFailure = true; result.status = 'FAIL'; result.cleanupError = String(error) }
@@ -250,7 +253,7 @@ async function scenario(selected) {
             await refused(/PATH_ROLES_OVERLAP/, root); unchanged()
             result.preflightRejections = ['old-full-tree-hash', 'target-payload-hash', 'library-application-overlap', 'broad-overlapping-program-root']
         } else if (selected === 'running-refusal') {
-            launchOld(); await ready('0.5.0'); const pid = instance.pid
+            await launchOld(); await ready('0.5.0'); const pid = instance.pid
             const value = await selectedEntry(); await confirmation(value); value.process.write('MIGRATE\r'); await exited(value, 1)
             assert.match(value.output, /CLOSE_SELECTED_(?:LEGACY_APPLICATION|PROFILE_APPLICATION)_FIRST/)
             assert.ok(ownedPid(pid)); await ready('0.5.0'); assert.equal(instance.pid, pid); unchanged(); assert.ok(!fs.existsSync(work)); assert.equal(helpers().length, 0)
@@ -292,7 +295,11 @@ async function scenario(selected) {
                 await page.goto(instance.url, { waitUntil: 'domcontentloaded' }); await expect(page.locator('#mode')).not.toHaveText('正在检测模式', { timeout: 10000 })
                 if (await page.locator('#pica-disclaimer-gate').isVisible()) { await page.locator('#pica-disclaimer-check').check(); await page.locator('#pica-disclaimer-accept').click() }
                 await expect.poll(() => page.evaluate(() => Boolean(window.picaOnboarding)), { timeout: 10000 }).toBe(true)
-                if (await page.locator('#pica-onboarding-welcome').isVisible()) await page.locator('#pica-onboarding-later').click()
+                // A fresh synthetic profile is known to present welcome. Wait
+                // for the actual dialog, as the frozen six-scenario gate does.
+                await expect(page.locator('#pica-onboarding-welcome')).toBeVisible({ timeout: 10000 })
+                await page.locator('#pica-onboarding-later').click()
+                await expect(page.locator('#pica-onboarding-welcome')).toBeHidden({ timeout: 10000 })
                 await page.locator('nav [data-view="maintenance"]').click(); await page.locator('#a87-maintenance-tab').click()
                 await expect(page.locator('#update-one-click')).toBeVisible()
                 const prepared = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/update/prepare-latest', { timeout: 180000 })
@@ -317,6 +324,11 @@ for (const selected of T3_SCENARIOS) {
     if (row.cleanupFailure) break
 }
 const summary = { kind: T3_KIND, sourceSha, tools: toolsReceipt, status: rows.length === T3_SCENARIOS.length && rows.every(row => row.status === 'PASS') ? 'PASS' : 'FAIL', rows,
-    rawToolsOrInstallersUploaded: false, publicationAuthenticated: false, legacyOriginalInAppFailureReclassified: false, productionDataAccessed: false, localExecution: false, fullObjective: 'OPEN' }
+    rawToolsOrInstallersUploaded: false, publicationAuthenticated: false, legacyOriginalInAppFailureReclassified: false, productionDataAccessed: false, localExecution: false, fullObjective: 'OPEN',
+    controllerResourcesBeforeExit: process.getActiveResourcesInfo(), oldInteractiveDefaultBridge: 'NOT_ACCEPTED_NOT_FIXED' }
 fs.writeFileSync(path.join(evidence, 'summary.json'), JSON.stringify(summary, null, 2), { flag: 'wx' })
-if (summary.status !== 'PASS') process.exitCode = 1
+// All results are synchronously durable and owned-process cleanup has been
+// checked. End this CI controller explicitly so residual PTY-native handles
+// cannot turn a completed FAIL/PASS report into a 55-minute non-termination.
+const exitCode = summary.status === 'PASS' ? 0 : 1
+process.stdout.write(JSON.stringify({ t3TerminalStatus: summary.status, controllerResources: summary.controllerResourcesBeforeExit }) + '\n', () => process.exit(exitCode))

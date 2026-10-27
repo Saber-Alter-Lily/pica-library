@@ -36,6 +36,13 @@ const kind = path.basename(entry) === 'legacy-transition.cjs' && entryHash === i
 if (!kind) throw Error('Substituted T3 entrypoint or old helper refused')
 const observe = event => fs.appendFileSync(audit, JSON.stringify({ at: Date.now(), pid: process.pid, entryKind: kind, ...event }) + '\n')
 observe({ kind: 'ENTRY_INITIALIZED', sha256: entryHash })
+if (kind === 'old-desktop') {
+    // The exact old source's supported headless mode suppresses its unconditional
+    // interactive 0.0.0.0:7788 bridge. CI confinement only: no config/bytes change,
+    // no claim that the old default posture is fixed. New desktop stays interactive.
+    if (!process.argv.includes('--headless')) process.argv.push('--headless')
+    observe({ kind: 'LEGACY_SUPPORTED_HEADLESS_CI_CONTAINMENT', legacyInteractiveDefaultFixed: false })
+}
 process.on('uncaughtExceptionMonitor', error => observe({ kind: 'UNCAUGHT_EXCEPTION_OBSERVED', name: error?.name, code: /^[A-Z0-9_]+$/.test(error?.code ?? '') ? error.code : null }))
 process.on('exit', code => observe({ kind: 'ENTRY_EXIT_OBSERVED', code }))
 const transport = t3ForwardTransport({ archiveBytes: forward, allowedDesktop: () => input.scenario === 'success-forward' && kind === 'desktop-1', nativeFetch: globalThis.fetch.bind(globalThis), observe })

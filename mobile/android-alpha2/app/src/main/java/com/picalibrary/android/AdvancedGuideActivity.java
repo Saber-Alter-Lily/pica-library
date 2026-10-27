@@ -49,20 +49,32 @@ public final class AdvancedGuideActivity extends LocaleAwareActivity {
             @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){if(position!=chapter){chapter=position;OnboardingStore.advancedPosition(AdvancedGuideActivity.this,chapter);render();}}
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
         });
-        LinearLayout article=SettingsRow.panel(this,null);
-        article.addView(Ui.text(this,titles[chapter],20,Ui.TEXT,true));
-        TextView body=Ui.text(this,bodies[chapter],15,Ui.TEXT,false);body.setTextIsSelectable(true);body.setTag("advanced-guide-body");article.addView(body);content.addView(article);
+        // The interactive route is primary. Long-form offline notes remain accessible on demand.
+        content.addView(Ui.text(this,titles[chapter],18,Ui.TEXT,true));
         content.addView(Ui.text(this,getString(R.string.advanced_guide_interactive_hint),13,Ui.MUTED,false));
-        // Keep a chapter-specific destination label alongside a clear "start interactive" action.
         content.addView(Ui.text(this,actions[chapter],13,Ui.MUTED,false));
-        // An explicit advanced chapter opens the actual feature page and highlights tagged controls.
-        // Chapter 2 keeps the existing five-step Visual tour. Guide entry itself never invokes business actions.
         Button open=Ui.button(this,getString(R.string.advanced_guide_start_interactive),v->{
             Intent destination=new Intent(this,DESTINATIONS[chapter]);
             if(chapter==2)destination.putExtra("startDetailedOnboarding",true);
             else destination.putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,chapter);
             startActivity(destination);
-        },true);open.setTag("advanced-guide-open");content.addView(open,new LinearLayout.LayoutParams(-1,-2));
+        },false);
+        open.setTag("advanced-guide-open");
+        content.addView(open,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout article=SettingsRow.panel(this,null);
+        TextView body=Ui.text(this,bodies[chapter],15,Ui.TEXT,false);
+        body.setTextIsSelectable(true);
+        body.setTag("advanced-guide-body");
+        article.addView(body);
+        article.setVisibility(android.view.View.GONE);
+        Button notes=Ui.button(this,getString(R.string.advanced_guide_notes_show),v->{
+            boolean expand=article.getVisibility()!=android.view.View.VISIBLE;
+            article.setVisibility(expand?android.view.View.VISIBLE:android.view.View.GONE);
+            ((Button)v).setText(expand?R.string.advanced_guide_notes_hide:R.string.advanced_guide_notes_show);
+        },true);
+        notes.setTag("advanced-guide-notes-toggle");
+        content.addView(notes,new LinearLayout.LayoutParams(-1,-2));
+        content.addView(article);
         LinearLayout nav=new LinearLayout(this);nav.setOrientation(LinearLayout.HORIZONTAL);
         Button previous=Ui.button(this,getString(R.string.onboarding_back),v->{if(chapter>0){chapter--;OnboardingStore.advancedPosition(this,chapter);render();}},true);previous.setEnabled(chapter>0);nav.addView(previous,new LinearLayout.LayoutParams(0,-2,1));
         Button next=Ui.button(this,getString(R.string.advanced_guide_read_next),v->{

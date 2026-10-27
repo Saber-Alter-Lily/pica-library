@@ -66,4 +66,6 @@
     </string-array>
     <string name="advanced_guide_start_interactive">この章の操作ガイドを開始</string>
     <string name="advanced_guide_preference_preview">未保存の変更はありません。変更後に保存できます。</string>
+    <string name="advanced_guide_notes_show">詳しい説明を表示</string>
+    <string name="advanced_guide_notes_hide">詳しい説明を閉じる</string>
 </resources>

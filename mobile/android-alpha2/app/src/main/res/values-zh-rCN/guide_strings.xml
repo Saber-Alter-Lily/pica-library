@@ -66,4 +66,6 @@
     </string-array>
     <string name="advanced_guide_start_interactive">开始本章交互引导</string>
     <string name="advanced_guide_preference_preview">当前没有待保存的调整。修改偏好后才可保存。</string>
+    <string name="advanced_guide_notes_show">查看详细文字说明</string>
+    <string name="advanced_guide_notes_hide">收起详细文字说明</string>
 </resources>

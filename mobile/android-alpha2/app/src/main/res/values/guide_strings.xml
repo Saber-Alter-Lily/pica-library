@@ -66,4 +66,6 @@
     </string-array>
     <string name="advanced_guide_start_interactive">Start interactive guide</string>
     <string name="advanced_guide_preference_preview">No edits yet. Save becomes available after you change a preference.</string>
+    <string name="advanced_guide_notes_show">Show detailed reference notes</string>
+    <string name="advanced_guide_notes_hide">Hide detailed reference notes</string>
 </resources>

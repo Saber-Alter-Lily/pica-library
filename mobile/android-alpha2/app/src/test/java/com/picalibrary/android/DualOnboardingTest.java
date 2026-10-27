@@ -135,4 +135,35 @@ public class DualOnboardingTest {
             assertEquals(0,OnboardingStore.dismissedVersion(context));
         }
     }
+
+    @Test public void advancedGuideOffersActualSpotlightFirstAndCollapsesLongReferenceText(){
+        OnboardingStore.advancedPosition(context,1);
+        try(ActivityController<AdvancedGuideActivity> controller=
+                Robolectric.buildActivity(AdvancedGuideActivity.class).setup()){
+            AdvancedGuideActivity activity=controller.get();
+            android.view.View target=activity.getWindow().getDecorView()
+                .findViewWithTag("advanced-guide-open");
+            android.view.View body=activity.getWindow().getDecorView()
+                .findViewWithTag("advanced-guide-body");
+            android.view.View toggle=activity.getWindow().getDecorView()
+                .findViewWithTag("advanced-guide-notes-toggle");
+            assertNotNull(target);assertNotNull(body);assertNotNull(toggle);
+            assertEquals(android.view.View.GONE,body.getParent() instanceof android.view.View
+                    ?((android.view.View)body.getParent()).getVisibility():-1);
+            assertTrue(target.getParent() instanceof android.view.ViewGroup);
+            android.view.ViewGroup parent=(android.view.ViewGroup)target.getParent();
+            int targetIndex=parent.indexOfChild(target);
+            assertTrue("interactive entry must precede reference text",
+                targetIndex<parent.indexOfChild((android.view.View)body.getParent()));
+            assertTrue(toggle.performClick());
+            assertEquals(android.view.View.VISIBLE,
+                ((android.view.View)body.getParent()).getVisibility());
+            assertTrue(toggle.performClick());
+            assertEquals(android.view.View.GONE,
+                ((android.view.View)body.getParent()).getVisibility());
+            assertTrue("expanding notes must never complete a guide",
+                OnboardingStore.advancedRead(context).isEmpty());
+        }
+    }
+
 }

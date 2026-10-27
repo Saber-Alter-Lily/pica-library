@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error Pure CI helper, no Java/application/host is loaded by these tests.
 import { assertRealHostCi, checkedOwnedRealHostRoot, realHostJavaArguments, syntheticHostPng, REAL_HOST_JAR_SHA256, REAL_HOST_BRANCH } from '../../scripts/lib/source-host-interop-fixture.mjs'
@@ -23,7 +24,15 @@ describe('bounded real Host interop recipe, source-only local checks', () => {
     it('refuses the actual entry before TS loading, file reads or native runtime work outside CI', () => {
         const result = spawnSync(process.execPath, ['scripts/test-source-host-interop.mjs', 'MUST_NOT_READ'], { env: { ...process.env, GITHUB_ACTIONS: 'false' }, encoding: 'utf8', windowsHide: true, timeout: 10000 })
         expect(result.status).not.toBe(0); expect(result.stderr).toContain('separately authorized exact-branch disposable')
-        expect(launcher.indexOf('assertRealHostCi()')).toBeLessThan(launcher.indexOf("await import('tsx/esm/api')"))
+        expect(launcher.indexOf('assertRealHostCi()')).toBeLessThan(launcher.indexOf("import.meta.resolve('tsx/cli')"))
+        expect(launcher).not.toContain("await import('tsx/esm/api')")
+    })
+    it('resolves and syntax-checks the actually installed public tsx CLI without executing it locally', () => {
+        const require = createRequire(import.meta.url), metadata = require('tsx/package.json'), cli = require.resolve('tsx/cli')
+        expect(metadata.version).toBe('4.7.0'); expect(metadata.exports['./esm/api']).toBeUndefined()
+        expect(metadata.exports['./cli']).toBe(metadata.bin)
+        const result = spawnSync(process.execPath, ['--check', cli], { env: { ...process.env, GITHUB_ACTIONS: 'false' }, encoding: 'utf8', windowsHide: true, timeout: 10000 })
+        expect(result.status).toBe(0)
     })
     it('owns only fresh fixture roots and disables host UI/CEF/automatic source work without patching upstream', () => {
         const parent = path.resolve(os.tmpdir()), root = path.join(parent, 'pica-real-host-' + 'a'.repeat(32) + 'ABC123')

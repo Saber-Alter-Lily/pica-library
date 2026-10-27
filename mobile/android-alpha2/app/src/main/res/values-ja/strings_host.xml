@@ -49,4 +49,16 @@
     <string name="host_no_results">このページに一致する作品はありません。検索語を変更するか、セッション終了後に配信元を変更してください。</string>
     <string name="host_results_ready">選択した配信元の結果のみです。お気に入りやホスト全体のカタログは取り込んでいません。</string>
     <string name="host_request_failed">操作を完了できません。ホストの版・アドレス・接続・今回の許可を確認してください。自動再試行や配信元変更は行わず、既存設定とローカル内容を保持します。</string>
+    <string name="host_books_title">保存済み外部作品</string>
+    <string name="host_books_scope">この端末で明示的に保存した作品参照のみです。本文や認証情報はコピーしません。一覧を開いても接続せず、読む前に同じホスト・アカウント・配信元への再許可が必要です。</string>
+    <string name="host_books_empty">保存済み外部作品はありません。検索結果から参照を明示的に保存すると、再起動後も保持されます。</string>
+    <string name="host_books_count">%1$d–%2$d / %3$d</string>
+    <string name="host_books_storage_error">作品参照を読み取れません。元のファイルは保持され、自動初期化や上書きはしません。</string>
+    <string name="host_books_full">保存済み外部作品が500件に達しました。不要な端末参照を削除してから保存してください。既存の選択は自動削除しません。</string>
+    <string name="host_book_pin">端末の書庫に参照を保存</string>
+    <string name="host_book_pinned">参照を端末に保存しました。ダウンロードやホストのお気に入りではなく、認証情報も保存していません。</string>
+    <string name="host_book_authorize">下で同じホストとアカウントを再許可し、元の配信元を明示的に選択してから戻ってください。今回は通信していません。</string>
+    <string name="host_book_remove">端末の参照を削除</string>
+    <string name="host_book_removed">端末の参照を削除しました。ダウンロードと読書履歴は保持され、ホストには接続していません。</string>
+    <string name="host_book_remove_scope">この端末の作品参照のみを削除しますか？ダウンロードと読書履歴は保持され、ホストのお気に入りや内容は変更しません。</string>
 </resources>

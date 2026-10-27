@@ -21,6 +21,34 @@ public class HostSourceManagerTest {
     private Context context;private HostTestFixture fixture;
     @Before public void setup()throws Exception {context=RuntimeEnvironment.getApplication();fixture=new HostTestFixture(context);}
     @After public void end(){fixture.manager.end();HostSourceManager.resetForTests();}
+    @Test public void pinRequiresExplicitConsentAndActualSelectionThenWritesWithoutExtraHostRequests()throws Exception {
+        fixture.configured();fixture.manager.start("","",true);fixture.manager.sources(0);fixture.manager.bind(HostTestFixture.SOURCE,true);HostSourceManager.Book book=fixture.manager.search("synthetic",1).books.get(0);int before=fixture.opened.size();
+        assertThrows(RuntimeException.class,()->fixture.manager.saveBook(book.id,false));assertThrows(RuntimeException.class,()->fixture.manager.saveBook(book.id,true));assertEquals(0,fixture.manager.savedBooks().size());assertEquals(before,fixture.opened.size());
+        fixture.manager.select(book.id);before=fixture.opened.size();fixture.manager.saveBook(book.id,true);assertEquals(before,fixture.opened.size());assertEquals(book.id,fixture.manager.savedBooks().get(0).comicId);
+        fixture.manager.end();assertEquals(1,fixture.manager.savedBooks().size());assertEquals(before,fixture.opened.size());
+    }
+    @Test public void freshSessionRestoresPinnedIdentityWithoutRepeatingSearchButRevalidatesActualBook()throws Exception {
+        HostSourceManager.Book book=fixture.selected();fixture.manager.saveBook(book.id,true);fixture.manager.end();HostTestFixture fresh=new HostTestFixture(context);
+        assertEquals(1,fresh.manager.savedBooks().size());assertEquals(0,fresh.opened.size());assertFalse(fresh.manager.canResumeSaved(fresh.manager.savedBooks().get(0)));
+        fresh.manager.start("","",true);fresh.manager.sources(0);fresh.manager.bind(HostTestFixture.SOURCE,true);fresh.manager.resumeSavedBook(book.id,true);assertTrue(fresh.manager.canResume(book.id));
+        assertEquals(2,new HostReaderSource(fresh.manager).chapter(book.id,fresh.manager.chapters(fresh.manager.requireSession(),book.id).get(0).id).pages.size());
+        for(HostTestFixture.Connection connection:fresh.opened)if(connection.request!=null)assertNotEquals("PicaHostSourceSearch",connection.request.optString("operationName"));fresh.manager.end();
+    }
+    @Test public void foreignPrincipalSourceAndExpiredGrantsCannotResumePinnedRowsOrEmitRequests()throws Exception {
+        HostSourceManager.Book selected=fixture.selected();HostSavedBooks.Book saved=fixture.manager.saveBook(selected.id,true);HostSavedBooks store=new HostSavedBooks(context);
+        String otherPrincipal="b".repeat(64);HostSavedBooks.Book other=new HostSavedBooks.Book("hosted:"+saved.connectionId+":"+ReaderPolicy.hash(new org.json.JSONArray().put(otherPrincipal).put(saved.sourceId).put(saved.urlDigest).toString()),saved.connectionId,otherPrincipal,saved.sourceId,saved.remoteId,saved.urlDigest,saved.title,saved.hostLabel,saved.savedAt);
+        HostSavedBooks.Book wrongSource=new HostSavedBooks.Book("hosted:"+saved.connectionId+":"+ReaderPolicy.hash(new org.json.JSONArray().put(saved.principal).put("0").put(saved.urlDigest).toString()),saved.connectionId,saved.principal,"0",saved.remoteId,saved.urlDigest,saved.title,saved.hostLabel,saved.savedAt);store.put(other);store.put(wrongSource);int before=fixture.opened.size();
+        for(HostSavedBooks.Book row:new HostSavedBooks.Book[]{other,wrongSource}){assertFalse(fixture.manager.canResumeSaved(row));assertThrows(RuntimeException.class,()->fixture.manager.resumeSavedBook(row.comicId,true));}
+        assertThrows(RuntimeException.class,()->fixture.manager.resumeSavedBook(saved.comicId,false));assertEquals(before,fixture.opened.size());
+        fixture.clock.addAndGet(HostSourceManager.TTL+1);assertThrows(RuntimeException.class,()->fixture.manager.resumeSavedBook(saved.comicId,true));assertEquals(before,fixture.opened.size());assertEquals(3,fixture.manager.savedBooks().size());
+    }
+    @Test public void staleRemoteIdentityNeverGetsReplacedBySameTitleWhenResumingSavedBook()throws Exception {
+        HostSourceManager.Book book=fixture.selected();fixture.manager.saveBook(book.id,true);fixture.source="0";assertThrows(RuntimeException.class,()->fixture.manager.resumeSavedBook(book.id,true));assertEquals(book.id,fixture.manager.savedBooks().get(0).comicId);assertEquals(0,LocalComicStore.list(context).size());
+    }
+    @Test public void removingPinnedReferenceNeedsNoLiveSessionAndKeepsReadingRecords()throws Exception {
+        HostSourceManager.Book book=fixture.selected();fixture.manager.saveBook(book.id,true);context.getSharedPreferences("reader-bookmarks-v1",Context.MODE_PRIVATE).edit().putString("owned-canary","keep").commit();fixture.manager.end();int before=fixture.opened.size();
+        assertThrows(RuntimeException.class,()->fixture.manager.removeSavedBook(book.id,false));assertEquals(1,fixture.manager.savedBooks().size());fixture.manager.removeSavedBook(book.id,true);assertEquals(0,fixture.manager.savedBooks().size());assertEquals(before,fixture.opened.size());assertEquals("keep",context.getSharedPreferences("reader-bookmarks-v1",Context.MODE_PRIVATE).getString("owned-canary",""));
+    }
     @Test public void unknownMetadataSurvivesReaderFilteringThenExplicitFetchResolvesRealPages()throws Exception {
         fixture.unknownPageCount=true;HostSourceManager.Book book=fixture.selected();HostReaderSource source=new HostReaderSource(fixture.manager);
         BridgeClient.ChapterItem chapter=source.chapters(book.id).get(0);assertEquals(-1,chapter.downloadedPictures);assertTrue(ReaderPolicy.canFetchChapter(source.kind(),chapter.downloadedPictures));

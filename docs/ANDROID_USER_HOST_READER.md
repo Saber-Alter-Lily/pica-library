@@ -2,6 +2,8 @@
 
 ## 最新证据补记（2026-10-26，以下原始记录保留为历史）
 
+后续PR216基于PR215/8045754（真实Host和既有CI已通过），新增[明确保存的本机外部书目](NATIVE_HOST_PERSONAL_LIBRARY.md)：未保存的结果仍为短会话，明确保存后可重新授权/选源恢复，不必重复搜索。用户已准许新Draft/既有调试CI；67ef35a原生真实编译并执行471项，470PASS/1FAIL（移出确认UI），已按消息时序与完成状态定位修正，新的精确源码完整CI仍待证。不改冻结Dev88/PR215成品，不把本机引用当成完整原生目录、同步、正文离线或第二真实平台。
+
 冻结源码40b3a555cb0d/PR213/Dev88的实际云端JUnit为443PASS/0FAIL/0skip，其中Host38项；lint0errors/107warnings，固定签名APK已下载独立核验。Windows同源码合成Host保存、撤销会话、停止Host后两页通过现有本地Reader的成品链路已通过。证据位于`_validation/user-host-cloud-20261026`的NATIVE_EVIDENCE/ARTIFACT_VERIFICATION/CLOUD_TERMINAL。故下文“尚未编译/未推送/无新包”只描述原接线时点，不是当前状态。
 
 真实Host/第二来源、真机/OEM、完整持久化原生在线目录/私人标签/收藏/跨端同步和后台恢复仍未完成，不因JUnit/打包通过关闭。正式数据、PR213原包和固定模型不动；后续T3仅Web最小修正不冒充已经重建Dev88。

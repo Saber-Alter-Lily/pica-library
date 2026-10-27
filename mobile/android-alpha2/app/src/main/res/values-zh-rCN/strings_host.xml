@@ -50,4 +50,16 @@
     <string name="host_no_results">这一页没有匹配作品，可修改关键词或结束会话后换源。</string>
     <string name="host_results_ready">仅显示自己所选来源的结果；没有导入收藏或整个宿主目录。</string>
     <string name="host_request_failed">操作未完成。请检查宿主版本、地址、网络和本次授权；不自动重试或更换来源。现有配置与本地内容保留。</string>
+    <string name="host_books_title">已保存的外部作品</string>
+    <string name="host_books_scope">仅保留你明确保存到本机的书目引用，不复制正文或账号凭据。打开列表不会联网；阅读仍需同一宿主、账号与来源的重新授权。</string>
+    <string name="host_books_empty">还没有保存的外部作品。可在搜索结果中明确保存书目，重启后仍会保留。</string>
+    <string name="host_books_count">%1$d–%2$d / %3$d</string>
+    <string name="host_books_storage_error">书目引用暂不可读取，原文件已保留，不会自动重置或覆盖。</string>
+    <string name="host_books_full">本机已保存 500 条外部书目。请先移出不需要的引用，再保存新的；已有书目不会被自动挤掉。</string>
+    <string name="host_book_pin">保存到本机书库</string>
+    <string name="host_book_pinned">书目已保存在本机；这不是下载或宿主收藏，也没有保存账号凭据。</string>
+    <string name="host_book_authorize">请在下方为同一宿主与账号重新授权、明确选择原来源，再回到这里阅读。本次没有发出请求。</string>
+    <string name="host_book_remove">移出本机书目</string>
+    <string name="host_book_removed">已移出本机书目；下载和阅读历史保留，没有连接或修改宿主。</string>
+    <string name="host_book_remove_scope">只移出本机保存的这一条书目？本地下载和阅读历史保留，不修改宿主收藏或内容。</string>
 </resources>

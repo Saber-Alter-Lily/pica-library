@@ -191,6 +191,7 @@ public class MainActivity extends LocaleAwareActivity {
         entries.addView(button("Pica 在线",v->startActivity(new Intent(this,PicaBrowseActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
         entries.addView(button("手机下载",v->startActivity(new Intent(this,DownloadsActivity.class))),new LinearLayout.LayoutParams(0,-2,1));
         p.addView(button(getString(R.string.local_import_title),v->startActivity(new Intent(this,LocalComicImportActivity.class))));
+        p.addView(button(getString(R.string.host_books_title),v->startActivity(new Intent(this,HostSourceActivity.class))));
         TextView status=Ui.text(this,"正在读取本地统一目录…",12,Ui.MUTED,false);p.addView(status);GridView g=grid(p);
         final int id=serial;
         pending=requests.submit(()->{

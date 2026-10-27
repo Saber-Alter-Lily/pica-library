@@ -113,4 +113,26 @@ public class DualOnboardingTest {
             }
         }
     }
+
+    @Test public void returningFromInteractiveTourRefreshesReadCountWithoutMarkingDailyComplete(){
+        OnboardingStore.advancedPosition(context,0);
+        try(ActivityController<AdvancedGuideActivity> controller=
+                Robolectric.buildActivity(AdvancedGuideActivity.class).setup()){
+            AdvancedGuideActivity activity=controller.get();
+            android.widget.TextView before=(android.widget.TextView)activity.getWindow()
+                .getDecorView().findViewWithTag("advanced-guide-progress");
+            assertNotNull(before);
+            assertEquals(activity.getString(R.string.advanced_guide_progress,1,8,0),before.getText().toString());
+            controller.pause();
+            // Emulate completion in the independently running destination screen.
+            OnboardingStore.markAdvancedRead(context,0);
+            controller.resume();
+            android.widget.TextView after=(android.widget.TextView)activity.getWindow()
+                .getDecorView().findViewWithTag("advanced-guide-progress");
+            assertNotNull(after);
+            assertEquals(activity.getString(R.string.advanced_guide_progress,1,8,1),after.getText().toString());
+            assertEquals(0,OnboardingStore.completedVersion(context));
+            assertEquals(0,OnboardingStore.dismissedVersion(context));
+        }
+    }
 }

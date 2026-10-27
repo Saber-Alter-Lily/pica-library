@@ -4,10 +4,12 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.*;
+import java.util.Set;
 
 /** Offline, opt-in chapter guide. Opening a chapter performs no provider/model task. */
 public final class AdvancedGuideActivity extends LocaleAwareActivity {
     private int chapter;
+    private Set<String> displayedRead=java.util.Collections.emptySet();
     private static final Class<?>[] DESTINATIONS={AccountSourcesActivity.class,RecommendationControlActivity.class,
         RecommendationStyleActivity.class,PairingActivity.class,RemoteStorageActivity.class,
         DownloadsActivity.class,RecommendationProfileActivity.class,UpdateActivity.class};
@@ -17,9 +19,16 @@ public final class AdvancedGuideActivity extends LocaleAwareActivity {
         chapter=Math.max(0,Math.min(7,state==null?OnboardingStore.advancedPosition(this):state.getInt("guideChapter",0)));
         render();
     }
+    @Override protected void onResume(){
+        super.onResume();
+        // A completed spotlight writes the shared guide store in its destination Activity.
+        // Refresh the visible chapter count on return, without advancing or changing user settings.
+        if(!OnboardingStore.advancedRead(this).equals(displayedRead))render();
+    }
     @Override protected void onSaveInstanceState(Bundle out){out.putInt("guideChapter",chapter);super.onSaveInstanceState(out);}
 
     private void render(){
+        displayedRead=OnboardingStore.advancedRead(this);
         String[] titles=getResources().getStringArray(R.array.advanced_guide_titles);
         String[] bodies=getResources().getStringArray(R.array.advanced_guide_bodies);
         String[] actions=getResources().getStringArray(R.array.advanced_guide_actions);
@@ -31,8 +40,10 @@ public final class AdvancedGuideActivity extends LocaleAwareActivity {
         ScrollView scroll=new ScrollView(this);LinearLayout content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(Ui.dp(this,14),Ui.dp(this,8),Ui.dp(this,14),Ui.dp(this,24));
         content.addView(Ui.text(this,getString(R.string.advanced_guide_safety),13,Ui.MUTED,false));
-        content.addView(Ui.text(this,getString(R.string.advanced_guide_progress,chapter+1,titles.length,OnboardingStore.advancedRead(this).size()),13,Ui.MUTED,false));
-        String[] chapterLabels=titles.clone();for(int i=0;i<chapterLabels.length;i++)if(OnboardingStore.advancedRead(this).contains(String.valueOf(i)))chapterLabels[i]="✓ "+chapterLabels[i];
+        TextView progress=Ui.text(this,getString(R.string.advanced_guide_progress,chapter+1,titles.length,displayedRead.size()),13,Ui.MUTED,false);
+        progress.setTag("advanced-guide-progress");
+        content.addView(progress);
+        String[] chapterLabels=titles.clone();for(int i=0;i<chapterLabels.length;i++)if(displayedRead.contains(String.valueOf(i)))chapterLabels[i]="✓ "+chapterLabels[i];
         Spinner chapters=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,chapterLabels);adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);chapters.setAdapter(adapter);chapters.setSelection(chapter);content.addView(chapters);
         chapters.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
             @Override public void onItemSelected(android.widget.AdapterView<?> parent,android.view.View view,int position,long id){if(position!=chapter){chapter=position;OnboardingStore.advancedPosition(AdvancedGuideActivity.this,chapter);render();}}

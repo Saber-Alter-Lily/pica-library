@@ -27,7 +27,8 @@ public final class DownloadsActivity extends LocaleAwareActivity {
 
     private void render(){
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Ui.BG);root.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(0,i.getSystemWindowInsetTop(),0,i.getSystemWindowInsetBottom());return i;});
-        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"手机下载",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));bar.addView(Ui.button(this,"任务",v->startActivity(new Intent(this,TaskCenterActivity.class)),true));root.addView(bar);
+        LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);bar.addView(Ui.button(this,"‹ 返回",v->finish(),true));bar.addView(Ui.text(this,"手机下载",22,Ui.TEXT,true),new LinearLayout.LayoutParams(0,-2,1));Button tasks=Ui.button(this,"任务",v->startActivity(new Intent(this,TaskCenterActivity.class)),true);
+        tasks.setTag(AndroidOnboarding.ADV_DOWNLOAD_TASKS);bar.addView(tasks);root.addView(bar);
         ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(Ui.BG);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(Ui.dp(this,12),Ui.dp(this,6),Ui.dp(this,12),Ui.dp(this,24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);root.requestApplyInsets();renderLoading();
     }
 
@@ -60,7 +61,9 @@ public final class DownloadsActivity extends LocaleAwareActivity {
         PhoneDownloadStore.Snapshot snapshot=state.snapshot;
         content.removeAllViews();
         content.addView(Ui.text(this,"主动下载是持久正文，不受阅读/封面缓存上限或 LRU 清理影响。当前约 "+format(state.bytes)+"。",12,Ui.MUTED,false));
-        LinearLayout actions=new LinearLayout(this);actions.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));actions.addView(button("后台任务",v->startActivity(new Intent(this,TaskCenterActivity.class))),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,8);actions.addView(button("存储设置",v->startActivity(new Intent(this,StorageSettingsActivity.class))),new LinearLayout.LayoutParams(0,-2,1));content.addView(actions);
+        LinearLayout actions=new LinearLayout(this);actions.setPadding(0,Ui.dp(this,8),0,Ui.dp(this,8));actions.addView(button("后台任务",v->startActivity(new Intent(this,TaskCenterActivity.class))),new LinearLayout.LayoutParams(0,-2,1));Ui.gap(actions,this,8);Button storage=button("存储设置",v->startActivity(new Intent(this,StorageSettingsActivity.class)));
+        storage.setTag(AndroidOnboarding.ADV_DOWNLOAD_STORAGE);
+        actions.addView(storage,new LinearLayout.LayoutParams(0,-2,1));content.addView(actions);
         if(snapshot.comics.isEmpty()){content.addView(Ui.text(this,getString(R.string.phone_download_empty_sources),14,Ui.MUTED,false));return;}
         for(PhoneDownloadStore.Comic comic:snapshot.comics.values()){
             LinearLayout card=Ui.card(this);card.addView(Ui.text(this,comic.title,17,Ui.TEXT,true));card.addView(Ui.text(this,comic.author+" · "+comic.chapters.size()+" 章 · "+comic.pages()+" 页",12,Ui.MUTED,false));

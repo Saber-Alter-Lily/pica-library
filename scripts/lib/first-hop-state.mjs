@@ -1,6 +1,6 @@
 // Shared selected-state canaries, never a real library. The caller cannot choose an arbitrary root.
 export function syntheticUpgradeStateProgram(kind) {
-if (!['old-first-hop', 'runtime-choice'].includes(kind)) throw Error('Unknown synthetic upgrade state scope')
+if (!['old-first-hop', 'runtime-choice', 'legacy-transition'].includes(kind)) throw Error('Unknown synthetic upgrade state scope')
 return String.raw`
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{DatabaseSync}=require('node:sqlite'),{createHash}=require('node:crypto');
 const [action,root]=process.argv.slice(1),real=fs.realpathSync.native(root);
@@ -26,3 +26,4 @@ if(action==='snapshot')fs.writeFileSync(path.join(root,'expected-state.json'),JS
 }
 export const firstHopStateProgram = syntheticUpgradeStateProgram('old-first-hop')
 export const runtimeChoiceStateProgram = syntheticUpgradeStateProgram('runtime-choice')
+export const legacyTransitionStateProgram = syntheticUpgradeStateProgram('legacy-transition')

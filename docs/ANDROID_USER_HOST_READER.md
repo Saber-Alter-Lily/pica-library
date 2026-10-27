@@ -1,5 +1,11 @@
 # Android 用户自选 Host：未发布实现契约
 
+## 最新证据补记（2026-10-26，以下原始记录保留为历史）
+
+冻结源码40b3a555cb0d/PR213/Dev88的实际云端JUnit为443PASS/0FAIL/0skip，其中Host38项；lint0errors/107warnings，固定签名APK已下载独立核验。Windows同源码合成Host保存、撤销会话、停止Host后两页通过现有本地Reader的成品链路已通过。证据位于`_validation/user-host-cloud-20261026`的NATIVE_EVIDENCE/ARTIFACT_VERIFICATION/CLOUD_TERMINAL。故下文“尚未编译/未推送/无新包”只描述原接线时点，不是当前状态。
+
+真实Host/第二来源、真机/OEM、完整持久化原生在线目录/私人标签/收藏/跨端同步和后台恢复仍未完成，不因JUnit/打包通过关闭。正式数据、PR213原包和固定模型不动；后续T3仅Web最小修正不冒充已经重建Dev88。
+
 应用源码：`cc92217a614666c15ca6b4e1e91f39e87165fd7a`；本地分支：`codex/android-user-host-recovery-20261026`。包含前段`ffa54e2`接线及下述异常清理，不新增功能。总进度仍以[交付账本](LOCAL_READER_DELIVERY_LEDGER.zh-CN.md)为准，7阶段/42案例不变。
 
 ## 当前证据，不是安装说明

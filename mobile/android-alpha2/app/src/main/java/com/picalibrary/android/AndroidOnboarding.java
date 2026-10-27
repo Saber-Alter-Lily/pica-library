@@ -2,6 +2,7 @@ package com.picalibrary.android;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.graphics.Rect;
 import android.content.Intent;
 import android.view.View;
 import android.widget.CheckBox;
@@ -82,18 +83,34 @@ final class AndroidOnboarding {
             Toast.makeText(activity,R.string.onboarding_target_unavailable,Toast.LENGTH_LONG).show();
             return;
         }
-        new VSpotView.Builder(activity)
+        // The vendored VSpot exposes onStepChanged; scroll the underlying page before placing the cutout.
+        final VSpotView[] visibleTour=new VSpotView[1];
+        VSpotView tour=new VSpotView.Builder(activity)
             .setStyle(style(activity))
             .setDismissType(VSpotView.DismissType.NONE)
             .addStep(first,titles[offset],bodies[offset])
             .addStep(second,titles[offset+1],bodies[offset+1])
             .setCallback(new VSpotView.Callback(){
+                @Override public void onStepChanged(View view,int index,VSpotView.Step step){
+                    revealAdvancedTarget(view,visibleTour[0]);
+                }
                 @Override public void onDismiss(View last,boolean completed,int index){
                     if(activity.isFinishing()||activity.isDestroyed())return;
                     if(completed)OnboardingStore.markAdvancedRead(activity,chapter);
                     else OnboardingStore.skipAdvanced(activity);
                 }
-            }).build().show();
+            }).build();
+        visibleTour[0]=tour;
+        tour.show();
+    }
+
+    /** Bring a long-form setting into its ScrollView without activating the highlighted control. */
+    static boolean revealAdvancedTarget(View view,VSpotView overlay){
+        if(view==null||!view.isShown()||view.getWidth()<=0||view.getHeight()<=0)return false;
+        Rect targetBounds=new Rect(0,0,view.getWidth(),view.getHeight());
+        boolean moved=view.requestRectangleOnScreen(targetBounds,true);
+        if(moved&&overlay!=null&&overlay.isShowing())overlay.requestLayout();
+        return moved;
     }
 
     private static boolean advancedVisible(View view){

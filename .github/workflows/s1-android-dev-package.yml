@@ -13,14 +13,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: s1-android-qa-\${{ github.ref }}
+  group: s1-android-qa-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   android-dev:
     if: github.repository == 'Saber-Alter-Lily/pica-library'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -34,12 +34,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Test, lint and assemble isolated Android debug QA
+      # The ordinary PR Android CI separately executes full Robolectric/JUnit.
+      # This artifact-only workflow must not stall for 25 minutes re-running that suite.
+      - name: Lint and assemble isolated Android debug QA
         working-directory: mobile/android-alpha2
         env:
           PICA_ANDROID_VERSION_CODE: '90'
           PICA_ANDROID_VERSION_NAME: '0.5.0-S1-QA'
-        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+        run: gradle :app:lintDebug :app:assembleDebug --no-daemon
       - name: Verify separate Dev identity and record exact binary
         working-directory: mobile/android-alpha2
         run: |
@@ -62,7 +64,7 @@ jobs:
         if: success() && github.event.repository.private == false
         uses: actions/upload-artifact@v4
         with:
-          name: pica-s1-android-dev-v90-\${{ github.sha }}
+          name: pica-s1-android-dev-v90-${{ github.sha }}
           path: mobile/android-alpha2/candidate/
           retention-days: 1
           if-no-files-found: error

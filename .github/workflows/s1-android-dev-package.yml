@@ -1,0 +1,68 @@
+name: S1 Android isolated Dev QA APK (unpublished)
+
+on:
+  push:
+    branches: [codex/product-recovery-s0-s1-20261027]
+    paths:
+      - '.github/workflows/s1-android-dev-package.yml'
+      - 'mobile/android-alpha2/app/src/main/**'
+      - 'mobile/android-alpha2/app/build.gradle'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s1-android-qa-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-dev:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: yes | sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Test, lint and assemble isolated Android debug QA
+        working-directory: mobile/android-alpha2
+        env:
+          PICA_ANDROID_VERSION_CODE: '90'
+          PICA_ANDROID_VERSION_NAME: '0.5.0-S1-QA'
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+      - name: Verify separate Dev identity and record exact binary
+        working-directory: mobile/android-alpha2
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/s1-apk-cert.txt"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" > "$RUNNER_TEMP/s1-apk-package.txt"
+          grep -q "name='com.picalibrary.android.dev'" "$RUNNER_TEMP/s1-apk-package.txt"
+          grep -q "versionCode='90'" "$RUNNER_TEMP/s1-apk-package.txt"
+          grep -q "application-label:'Pica Library Dev'" "$RUNNER_TEMP/s1-apk-package.txt"
+          mkdir -p candidate
+          cp "$apk" candidate/Pica-Library-S1-Android-Dev-v90.apk
+          cp "$RUNNER_TEMP/s1-apk-package.txt" candidate/PACKAGE_INFO.txt
+          sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/s1-apk-cert.txt" > candidate/CERTIFICATE_SHA256.txt
+          printf '%s\n' "$GITHUB_SHA" > candidate/SOURCE_SHA.txt
+          printf '%s\n' 'UNRELEASED DEBUG QA ONLY. com.picalibrary.android.dev has isolated data. Do NOT uninstall existing Dev data to bypass signing conflicts. Official v0.5.0/OTA unchanged. Sources not yet fully externalized. Physical UX acceptance pending.' > candidate/STATUS.txt
+          (cd candidate && sha256sum Pica-Library-S1-Android-Dev-v90.apk > SHA256SUMS.txt)
+      - name: Upload one-day public-only Dev test package
+        if: success() && github.event.repository.private == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: pica-s1-android-dev-v90-\${{ github.sha }}
+          path: mobile/android-alpha2/candidate/
+          retention-days: 1
+          if-no-files-found: error

@@ -53,6 +53,7 @@ public final class HomeActivity extends LocaleAwareActivity implements Collectio
         if(bottomNavigationHost==null)return;
         LinearLayout bar=new LinearLayout(this);
         bar.setOrientation(LinearLayout.VERTICAL);
+        bar.setTag("s1.collection.action.bar");
         bar.setPadding(Ui.dp(this,4),Ui.dp(this,3),Ui.dp(this,4),Ui.dp(this,3));
         bar.setBackgroundColor(Ui.NAV);
         Button done=selectionBottomButton(LocalizedText.ui(this,"完成 · "+selectedCount,"Done · "+selectedCount,"完了 · "+selectedCount),v->collectionSelection.finish());

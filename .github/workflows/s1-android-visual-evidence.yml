@@ -1,0 +1,78 @@
+name: S1 Android isolated emulator visual evidence (no publication)
+
+on:
+  push:
+    branches:
+      - codex/product-recovery-s0-s1-20261027
+    paths:
+      - '.github/workflows/s1-android-visual-evidence.yml'
+      - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AndroidVisualSmokeTest.java'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: s1-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator-visual:
+    if: github.repository == 'Saber-Alter-Lily/pica-library'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Run real Android layout and screenshots on disposable emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: |
+            set -euo pipefail
+            cd mobile/android-alpha2
+            gradle :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon --stacktrace
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell wm size 720x1280
+            adb shell wm density 320
+            mkdir -p s1-visual-evidence
+            for scale in 1.0 1.5; do
+              case "$scale" in
+                1.0) folder=f100 ;;
+                1.5) folder=f150 ;;
+              esac
+              adb shell settings put system font_scale "$scale"
+              adb shell am force-stop com.picalibrary.android.dev || true
+              adb shell rm -rf /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual
+              adb shell am instrument -w -r -e class com.picalibrary.android.S1AndroidVisualSmokeTest com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner | tee "s1-visual-evidence/${folder}-instrumentation.txt"
+              grep -q 'OK (1 test)' "s1-visual-evidence/${folder}-instrumentation.txt"
+              mkdir -p "s1-visual-evidence/$folder"
+              adb pull /sdcard/Android/data/com.picalibrary.android.dev/files/s1-visual "s1-visual-evidence/$folder/"
+              count=$(find "s1-visual-evidence/$folder/" -type f -name '*.png' | wc -l)
+              test "$count" -eq 12
+              printf 'font_scale=%s captured=%s source_sha=%s\n' "$scale" "$count" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
+            done
+      - name: Upload fresh-emulator images for visual inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-android-emulator-visual-${{ github.sha }}
+          path: mobile/android-alpha2/s1-visual-evidence/
+          retention-days: 7
+          if-no-files-found: warn

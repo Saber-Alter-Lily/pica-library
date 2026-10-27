@@ -21,7 +21,7 @@ jobs:
   emulator-visual:
     if: github.repository == 'Saber-Alter-Lily/pica-library'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -52,7 +52,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           emulator-boot-timeout: 600
-          disable-linux-hw-acceleration: false
+          disable-linux-hw-accel: false
           script: bash scripts/run-s1-android-visual-emulator.sh
       - name: Upload fresh-emulator images for visual inspection
         if: always() && github.event.repository.private == false

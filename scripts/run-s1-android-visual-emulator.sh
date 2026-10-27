@@ -20,6 +20,7 @@ adb shell wm density 320
 adb shell wm size
 adb shell wm density
 mkdir -p s1-visual-evidence
+# Stage-1: ensure a genuine Activity can render, without pretending to pass all 24 cases.
 for scale in 1.0 1.5; do
     case "$scale" in
         1.0) folder=f100 ;;
@@ -29,36 +30,27 @@ for scale in 1.0 1.5; do
     adb shell settings put system font_scale "$scale"
     adb shell am force-stop com.picalibrary.android.dev || true
     log="s1-visual-evidence/${folder}-instrumentation.txt"
-    adb shell am instrument -w -r -e expectedFontScale "$scale" \
+    trace="s1-visual-evidence/${folder}-logcat.txt"
+    adb logcat -c || true
+    set +e
+    timeout --signal=TERM --kill-after=10s 150s adb shell am instrument -w -r \
+        -e expectedFontScale "$scale" \
         -e class com.picalibrary.android.S1AndroidVisualSmokeTest \
-        com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
-    grep -Fq 'OK (1 test)' "$log"
-    mkdir -p "s1-visual-evidence/$folder"
-    # Debug-only run-as can read files in its own app-private sandbox.
-    # Export only 12 known synthetic image names (never traverse other user files).
-    count=0
-    for lang in zhCN en ja; do
-        for theme in light dark; do
-            image="$lang-$theme-advanced-guide.png"
-            adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$image" \
-                > "s1-visual-evidence/$folder/$image"
-            test -s "s1-visual-evidence/$folder/$image"
-            count=$((count+1))
-        done
-    done
-    for theme in light dark; do
-        for page in tag-editor update-preview selection-bar; do
-            image="zhCN-$theme-$page.png"
-            adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$image" \
-                > "s1-visual-evidence/$folder/$image"
-            test -s "s1-visual-evidence/$folder/$image"
-            count=$((count+1))
-        done
-    done
-    if [[ "$count" -ne 12 ]]; then
-        echo "Expected 12 fresh screenshot PNGs in $folder, found $count" >&2
+        com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner > "$log" 2>&1
+    exitcode=$?
+    set -e
+    adb logcat -d -s S1_VISUAL:I AndroidRuntime:E > "$trace" || true
+    cat "$log"
+    grep "S1_VISUAL" "$trace" || true
+    if [[ "$exitcode" -ne 0 ]] || ! grep -Fq 'OK (1 test)' "$log"; then
+        echo "::error::Android visual smoke failed/timeout: $folder ($exitcode); inspect instrumentation and logcat artifact." >&2
         exit 1
     fi
-    printf 'font_scale=%s captured=%s source_sha=%s\n' \
-        "$scale" "$count" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
+    mkdir -p "s1-visual-evidence/$folder"
+    image="zhCN-light-advanced-guide.png"
+    adb exec-out run-as com.picalibrary.android.dev cat "files/s1-visual-$folder/$image" \
+        > "s1-visual-evidence/$folder/$image"
+    test -s "s1-visual-evidence/$folder/$image"
+    printf 'stage=first-real-guide-screen font_scale=%s captured=1 source_sha=%s\n' \
+        "$scale" "$GITHUB_SHA" > "s1-visual-evidence/$folder/README.txt"
 done

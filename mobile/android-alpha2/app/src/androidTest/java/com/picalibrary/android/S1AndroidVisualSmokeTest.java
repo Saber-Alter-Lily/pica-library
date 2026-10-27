@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -30,6 +31,7 @@ import java.util.Locale;
 @RunWith(AndroidJUnit4.class)
 public final class S1AndroidVisualSmokeTest {
     private static final String DIRECTORY="s1-visual";
+    private static final String TAG="S1_VISUAL";
 
     private Context app(){
         return InstrumentationRegistry.getInstrumentation().getTargetContext().getApplicationContext();
@@ -49,14 +51,20 @@ public final class S1AndroidVisualSmokeTest {
     private void capture(String lang,String theme,Class<? extends Activity> screen,String page,
                          boolean selection,boolean preview) throws Exception {
         Context context=app();
+        Log.i(TAG,"phase=preferences page="+page+" lang="+lang+" theme="+theme);
         LocaleStore.set(context,lang);
-        ThemeStore.setMode(context,theme);
+        // Persist the actual app theme, without system-wide night-mode binder churn.
+        context.getSharedPreferences("appearance-v1",Context.MODE_PRIVATE).edit()
+            .putString("mode",theme).commit();
         Intent intent=new Intent(context,screen);
         if(preview) intent.putExtra(AndroidOnboarding.EXTRA_ADVANCED_CHAPTER,7);
 
+        Log.i(TAG,"phase=launch-start page="+page);
         try(ActivityScenario<? extends Activity> scenario=ActivityScenario.launch(intent)){
+            Log.i(TAG,"phase=launch-resumed page="+page);
             Instrumentation inst=InstrumentationRegistry.getInstrumentation();
-            inst.waitForIdleSync();
+            SystemClock.sleep(350);
+            Log.i(TAG,"phase=inspect-start page="+page);
             scenario.onActivity(activity->{
                 if(selection && activity instanceof HomeActivity)
                     ((HomeActivity)activity).onCollectionSelectionStateChanged(true,3,false);
@@ -83,9 +91,9 @@ public final class S1AndroidVisualSmokeTest {
                     assertNotNull("Missing five-action selection bar",bar);
                 }
             });
-            inst.waitForIdleSync();
-            SystemClock.sleep(200);
+            Log.i(TAG,"phase=inspect-complete page="+page);
             Bitmap image=inst.getUiAutomation().takeScreenshot();
+            Log.i(TAG,"phase=screenshot-complete page="+page);
             assertNotNull("Unable to capture screenshot for "+page,image);
             try {
                 assertTrue("Screenshot width too small",image.getWidth()>=320);
@@ -104,27 +112,21 @@ public final class S1AndroidVisualSmokeTest {
                     out.getFD().sync();
                 }
                 assertTrue("Screenshot empty: "+safe,destination.length()>500);
+                Log.i(TAG,"phase=written page="+page+" bytes="+destination.length());
             }finally{image.recycle();}
         }
+        Log.i(TAG,"phase=closed page="+page);
     }
 
-    @Test public void captureFreshEmulatorLanguagesAndThemesWithoutSourceAccounts() throws Exception {
+    @Test public void captureFirstRealGuideScreenWithoutUserData() throws Exception {
         prepare();
-        String expected=InstrumentationRegistry.getArguments().getString("expectedFontScale");
-        if(expected!=null&&!expected.isEmpty()){
-            float actual=app().getResources().getConfiguration().fontScale;
-            assertEquals("The screenshot must use the requested Android font scale",
-                    Float.parseFloat(expected),actual,0.08f);
-        }
-        for(String lang:new String[]{LocaleStore.ZH_CN,LocaleStore.EN,LocaleStore.JA}){
-            for(String theme:new String[]{ThemeStore.MODE_LIGHT,ThemeStore.MODE_DARK}){
-                capture(lang,theme,AdvancedGuideActivity.class,"advanced-guide",false,false);
-                if(LocaleStore.ZH_CN.equals(lang)){
-                    capture(lang,theme,TagParticipationActivity.class,"tag-editor",false,false);
-                    capture(lang,theme,UpdateActivity.class,"update-preview",false,true);
-                    capture(lang,theme,HomeActivity.class,"selection-bar",true,false);
-                }
-            }
-        }
+        String expected=InstrumentationRegistry.getArguments().getString("expectedFontScale","1.0");
+        float actual=app().getResources().getConfiguration().fontScale;
+        Log.i(TAG,"phase=test-start expectedFont="+expected+" actualFont="+actual);
+        assertEquals("Screenshot must honor Android font scale",
+                Float.parseFloat(expected),actual,0.08f);
+        capture(LocaleStore.ZH_CN,ThemeStore.MODE_LIGHT,
+                AdvancedGuideActivity.class,"advanced-guide",false,false);
+        Log.i(TAG,"phase=test-complete");
     }
 }

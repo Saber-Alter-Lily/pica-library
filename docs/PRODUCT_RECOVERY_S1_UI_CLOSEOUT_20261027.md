@@ -1,5 +1,11 @@
 # S1 Android UI 第一轮整改及验收边界｜2026-10-27
 
+## 新的 S1 模拟器最小真实页面渲染门禁（2026-10-27）
+
+历史 #40526314386 已确认：KVM 生效、Android35 模拟器启动、59 项 Gradle build tasks 通过、安装两个 APK，但 Instrumentation 开始后未结束，任务最终超时取消。**0 张可验收 PNG**。此外 Runner Actions 的正确参数名为 `disable-linux-hw-accel`，旧 `disable-linux-hw-acceleration` 并非有效输入。
+
+下一次改为仅在 360dp、浅色、中文场景启动真实 `AdvancedGuideActivity`，100% 和 150% 字体各验证 1 张。删除可能阻塞的额外 `waitForIdleSync`，测试直接持久化应用自身主题而非触发系统夜间模式切换；增加 `S1_VISUAL` 逐阶段日志与每档 150 秒上限，并上传文字诊断。**两张成功只是最小渲染证明，不替代原计划 24 张、其余语言/主题/设备或真实手机验收**。
+
 ## S1 真实证据门禁最新分类（独立于工程编译）
 
 | 来源 | 实际结果 | 处理 | 允许得出的结论 |

@@ -1,5 +1,18 @@
 # Pica Library Development Task Log
 
+## S1/S2 最近一次执行回执（2026-10-27 · PR #218）
+
+当前代码提交基线 **`2bb3b44b6c0b5fbfe0455f7beaa57995acbae07c`**。此条是本轮新增回执，不删除此前所有实际失败/证据。正式 v0.5.0、`main`、OTA 和用户资料仍未更动。Draft PR #218 未合并，S1/G1、S2/G2、S5/G3、S6/G4 均未通过用户验收。
+
+- **S1 模拟器真实证据**：首次 Gradle CWD 错误 `#40517358640`；第二次 Android 35 `/sdcard/Android/data` 权限拒绝 `#40519878220`（Debug APK、AndroidTest APK 已构建）；第三次 `#40522901087` 因 runner 用户缺 `/dev/kvm` 硬件加速而启动超时。均是 **FAIL / 没有可验收截图**，不可认定 UI 已验收。
+- 最新 KVM 预检/授权修正 `82558994`：Android 35 真实模拟器工作流 [#40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386) 的 **KVM 检查已 PASS**，但首次读取时完整截图步骤仍 `IN_PROGRESS`；尚未确认24张 PNG、字型布局与操作。如果 CI 仍失败，应严格区分启动、Instrumentation 或真实页面缺陷。
+- **Dev QA 安装物**：`#40521071684` 因重复完整 Android unit suite 达到工作流时间上限 CANCELLED，无 APK 工件。新 `d288bc22` 只保留打包工作流内 Lint/Debug assembly，并要求原 Android CI 独立做 JUnit；[#40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 最近查询是 QUEUED，未经证实的 APK 不能发给用户或称“可无痛升级”。
+- **S2 开始有真实读图链路**：在原 `ProviderRegistry` 之上新增 `forPageForComic`；真实 `ProviderService` 接入 `assertPageOwnedByComic/fetchPageForComic`；在线 `OnlineReaderService.picture()` 在缓存命中之前校验作品归属。新增回归覆盖来源冲突、缓存绕过与不完整新端口的 fail-closed 拒绝，旧 `fetchPage` 仍为 legacy 兼容。**源码已提交，不等于新 SHA 的测试已 PASS；尚未外置 Pica/EH/JM SDK。**
+- 当前阶段以 [S1 视觉验收矩阵](docs/PRODUCT_RECOVERY_S1_UI_CLOSEOUT_20261027.md)、[S2/S3 来源解耦审计](docs/PRODUCT_RECOVERY_S2_S3_SOURCE_DEPENDENCY_AUDIT_20261027.md) 为证据入口，并严格保留原 [42 项+新增 12 项验收映射](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。后续精确 SHA 的 Android/Web CI 仍在队列；NOT_RUN / QUEUED / PASS 不得混写。
+
+---
+
+
 ## S1 视觉验证第 2 次失败与存储边界修复（2026-10-27）
 
 当前 [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218) 保持独立候选；最后这次源码修复为 `505b4a90b8da1eb78808e1b4fc859b6eec30171f`。正式 `main`、Stable v0.5.0、OTA 与用户账号/数据均未触及。G1 真实用户 UI 验收仍为 **NOT_ACCEPTED**。

@@ -1,5 +1,16 @@
 # S1 Android UI 第一轮整改及验收边界｜2026-10-27
 
+## S1 真实证据门禁最新分类（独立于工程编译）
+
+| 来源 | 实际结果 | 处理 | 允许得出的结论 |
+|---|---|---|---|
+| [#40522901087](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40522901087) | FAIL，模拟器冷启动超时 | 日志显示缺少 `/dev/kvm` 权限、运行器关闭加速 | Runner/模拟器可用性问题，**不是**已证明的阅读器排版错误 |
+| [#40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386) | KVM 预检已完成；截图流程 IN_PROGRESS（最近核查） | 等精确 SHA 的 PNG 与 Instrumentation 记录 | 暂时无可展示的 24 张截图，G1 仍 OPEN |
+| [#40521071684](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40521071684) | CANCELLED，在重复跑 full JUnit 时到工作流时限 | 另起 [#40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 只打包/Lint，full JUnit 保留原 CI | 没有 Dev APK 完整验收，勿提供安装链接 |
+
+后续只在实际 APK、PNG、哈希、安装/运行证据出现时更新为包验证或模拟器验证。模拟器正常运行也不等于真实手机 / 用户验收。S2 在线阅读新增来源绑定为另一组独立功能/安全检查，不作为 S1 视觉门禁的替代。
+
+
 ## 最新模拟器运行的独立事实（截至 2026-10-27）
 
 | 运行及源码 | 结果 | 实际工程证据 | 未满足的事项 |

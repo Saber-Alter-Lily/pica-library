@@ -1,5 +1,20 @@
 # Pica Library Development Task Log
 
+## 当前执行权威：产品恢复 S0–S6（2026-10-27）
+
+**本段优先于下面全部历史“下一步/状态快照”；历史事实、任务 ID、失败记录均原样保留。** 此次工作基于正式 `v0.5.0` 作为功能/UX 基线、Dev89 `af42b4d3ecafd1d51b3c2ef8aee7339c56c75921` 作为未发布工程起点；当前新分支 `codex/product-recovery-s0-s1-20261027` / [Draft PR #218](https://github.com/Saber-Alter-Lily/pica-library/pull/218)。旧 PR #203/#205–#217 及 main 均不自动合并或发布。
+
+- **总计划**：[S0–S6 分阶段实施方案](docs/PRODUCT_RECOVERY_EXECUTION_PLAN_20261027.md)；两条主线为正式版用户体验保留基础上的**实际模块维护隔离**和**Pica/EH/JM 等来源可选外置**。一键升级、Issue #199/#200、推荐/Visual、LAN/WebDAV 和旧用户数据兼容持续保留。
+- **原验收**：[42 个原案例逐一映射 + 12 个明确新增案例](docs/PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)；新阶段不删除/重判旧 42 项，不以“关闭来源默认启用”或“Windows 不带 JM JVM”冒充来源外置。
+- **S0 已推进**：[首轮源码核查](docs/PRODUCT_RECOVERY_S0_BASELINE_20261027.md)、[v0.5.0 官方 Release 资产/功能基线](docs/PRODUCT_RECOVERY_V050_OFFICIAL_BASELINE_20261027.md)。正式资产哈希来自官方元数据，本轮未重新下载独立计算；真实 Windows/手机对照、完整来源文件清单仍需验收。
+- **S1 已提交源码，未经用户验收**：Android `SettingsRow` 长状态文本宽度约束；高级 8 章节中的 7 个使用现有 VSpot 复用真实双控件聚光、画风章节沿用原五步；三语言独立短说明；教程进入更新页不自动检查更新，账户页教程避免首次自动账户探测；窄屏书库多选栏自适应两行、宽屏一行。已增加 Robolectric 测试；**物理手机/真实截图仍 NOT_RUN，排版问题还不能标为修完**。
+- **新 CI 的原始失败不可删改**：PR218 首次 `caacd016` Android 481 测试中 2 个新增 Robolectric 行数断言失败；后续 `868e4ec` 定位并修复该断言，但 Android Lint 因两个错误的旧 Layout 常量引用 FAIL；后续源码已移除常量并重新提交。**最终精确 SHA 门禁结果以新的 Actions 检查为准，不预先声称通过**。
+- **安全边界**：仅独立 Draft；不改生产 app/数据、账号、OTA、Release/tag、冻结 PR，不下载私钥，不在用户设备上安装或擅自迁移。任何 CI PASS 不等于 USER_ACCEPTED。
+
+当前顺序：**S0 功能差异与资料矩阵 → S1 Android 排版/交互与真实控件引导 G1 → S2 核心模块隔离 → S3 漫画源真实外置 G2 → S4 书库/标签/推荐/跨端整合 → S5 升级/性能 G3 → S6 双端集中验收 G4**。后续小修只改变对应任务和证据，不得无限扩展 Dev 候选或宣布整个项目完成。
+
+---
+
 ## Concentrated Dev89 — actual packages verified, teardown-only gate correction (2026-10-27 local)
 
 Exactfe84055f4202b2c2917d0d9ee4fd8992fedd2b32 ordinaryCI40474512657 both jobsPASS. Dedicated40474606748 terminal9/10PASS, overallFAIL: source/Windowsunit/actualWindows/Androidsigning and five runtime scenesPASS; launch-rollback failed only in finally/stopOwned. Original result has actualHelperRollback=true, exactApplicationTree=true, selectedStateCanaries=true and no browser/source boundary events, but teardownError='Refuse process outside exact owned root'. Preserve overallFAIL, not waive cleanup. Raw stack is ownedPid called after process.kill at the existing second wait. Original generic assertion omitted PID/path-presence details; it cannot distinguish a transient missing CIM executable path from PID reuse/foreign process, so no retrospective exact-cause claim.

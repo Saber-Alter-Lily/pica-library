@@ -1,5 +1,10 @@
 # S1 Android UI 第一轮整改及验收边界｜2026-10-27
 
+## 可供实体安装验证的隔离 Android Dev v90（已独立 SHA 核验）
+
+[GitHub Actions QA 工件 #12745469077](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065/artifacts/12745469077) 在源码 `d288bc225e15e49c40eea06b52c67193f95ba457` 上成功生成；APK 为 14,576,408 字节，SHA-256 `bee99853830d5244c68eff2cda5eb58063564ea952a892d69de7b67e5c69ab28`，证书指纹 `d3588d987b4d0a6afdf4aed66909722db63011d5b7dacb1d7a8f509a07e4f6b1`。包名 `com.picalibrary.android.dev`、versionCode `90`，与正式 v0.5.0 APK 不同包名，且不保证覆盖不同 Debug 证书的旧 Dev APK。**这只是可供用户验收的 Debug 产物，不是 G1、正式发布或升级成功证据。** 交接见 [S1 Dev90 独立验收](PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)。签名与 SHA 校验成功，不等于 Android 真实 UI 已验证。该独立打包工作流保留 Lint/assemble，完整 Android JUnit 仍由主 CI 守卫。
+
+
 ## 新的 S1 模拟器最小真实页面渲染门禁（2026-10-27）
 
 历史 #40526314386 已确认：KVM 生效、Android35 模拟器启动、59 项 Gradle build tasks 通过、安装两个 APK，但 Instrumentation 开始后未结束，任务最终超时取消。**0 张可验收 PNG**。此外 Runner Actions 的正确参数名为 `disable-linux-hw-accel`，旧 `disable-linux-hw-acceleration` 并非有效输入。

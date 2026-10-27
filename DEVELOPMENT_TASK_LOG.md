@@ -1,4 +1,15 @@
 # Pica Library Development Task Log
+## S1 开发包实体校验与最小模拟器回归（2026-10-27）
+
+**唯一交付事实**：独立的 [S1 Dev QA workflow #40526064065](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065) 在精确源码 `d288bc225e15e49c40eea06b52c67193f95ba457` 上 **SUCCESS**。已实际下载其 [6 文件 ZIP #12745469077](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526064065/artifacts/12745469077)，逐文件回读并独立计算 APK SHA-256，等于包内 SHA256SUMS。编译/Lint/签名合法性/包身份均经 GitHub Actions PASS；测试包含 Debug APK 但**未执行这条工作流内的完整 Robolectric 或用户手机验收**。
+
+- APK `Pica-Library-S1-Android-Dev-v90.apk`：**14,576,408 字节**，SHA-256 `bee99853830d5244c68eff2cda5eb58063564ea952a892d69de7b67e5c69ab28`；身份 `com.picalibrary.android.dev`、versionCode `90`、versionName `0.5.0-S1-QA-dev-pr35`，应用名称 `Pica Library Dev`，Android minSDK `28` / targetSDK `35`。证书 SHA-256 `d3588d987b4d0a6afdf4aed66909722db63011d5b7dacb1d7a8f509a07e4f6b1`。完整 ZIP 5,681,155 字节，SHA-256 `f4ee25f3ee182a0af0802334f79e7b124751091cbdd5bf70ef07579b377cb0d4`。GitHub Actions artifact 仅保留 1 天。
+- 该 DEBUG 签名不承诺兼容之前别的 Dev 安装；发生签名冲突不得为了覆盖测试包而自动删除已有 Dev 数据。正式 v0.5.0 APK 是不同的 `com.picalibrary.android` 包，当前未经稳定覆盖升级验收。测试包不含任何 S2 新增桌面 TypeScript 路由代码的部署证明。
+- **真实 UI 截图仍 NOT_ACCEPTED**：[#40526314386](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40526314386) 已冷启动/构建 APK 但 Instrumentation 长时无完成信号，随后 CANCELLED；不是 24 张截图 PASS。新 [第一张真实指南最小截图 #40539159767](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40539159767) 基于 `d7afa3db`，保留详细进度日志/150 秒超时，每个字体档先争取一张 `AdvancedGuideActivity`，**进行中，未确认 PNG**。
+- 对测试人员的简明交接：[S1 Android Dev90 测试包与验证规范](docs/PRODUCT_RECOVERY_S1_DEV90_HANDOFF_20261027.md)，覆盖真实聚光指南、书库多选、三个语言长标题、更新只读模式和数据不破坏。此前错误/原 42 验收仍保留，S1/G1 用户接受为 NOT_ACCEPTED，S2/G2 来源真正外置未完成，正式发布无授权。
+
+---
+
 
 ## S1/S2 最近一次执行回执（2026-10-27 · PR #218）
 

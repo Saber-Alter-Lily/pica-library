@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 final class ReaderPolicy {
+    static boolean canFetchChapter(String sourceKind, int pageCount) { return pageCount > 0 || ("host".equals(sourceKind) && pageCount == -1); }
     static int clampPage(int page, int count) { return Math.max(0, Math.min(page, Math.max(0, count - 1))); }
     static String hash(String input) {
         try {

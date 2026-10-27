@@ -30,7 +30,8 @@ export function hostManga(value: unknown) {
     return { id: hostInteger(row.id), sourceId: suwayomiSourceId(row.sourceId), url: text(row.url, 2048), title: text(row.title, 500), inLibrary: row.inLibrary }
 }
 export function hostChapter(value: unknown) {
-    const row = object(value), pageCount = hostInteger(row.pageCount, true)
+    // Pinned upstream ChapterTable uses -1 until fetchChapterPages resolves the count.
+    const row = object(value), pageCount = row.pageCount === -1 ? -1 : hostInteger(row.pageCount, true)
     if (pageCount > 10000 || typeof row.chapterNumber !== 'number' || !Number.isFinite(row.chapterNumber)) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
     return { id: hostInteger(row.id), mangaId: hostInteger(row.mangaId), url: text(row.url, 2048), name: text(row.name, 500), sourceOrder: hostInteger(row.sourceOrder, true), pageCount, chapterNumber: row.chapterNumber }
 }
@@ -69,7 +70,7 @@ export function hostPreparedManga(value: unknown) {
 export function hostChapterPages(value: unknown, expected: HostChapter) {
     const data = object(sourceHostData(value).fetchChapterPages), chapter = hostChapter(data.chapter)
     if (chapter.id !== expected.id || chapter.mangaId !== expected.mangaId || chapter.url !== expected.url || chapter.sourceOrder !== expected.sourceOrder) throw new SourceHostError('SOURCE_HOST_STALE')
-    if (!Array.isArray(data.pages) || data.pages.length !== chapter.pageCount || !data.pages.length || data.pages.length > 10000) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
+    if (chapter.pageCount < 1 || !Array.isArray(data.pages) || data.pages.length !== chapter.pageCount || !data.pages.length || data.pages.length > 10000) throw new SourceHostError('SOURCE_HOST_PROTOCOL')
     const paths = data.pages.map((route, index) => {
         const expectedPath = `/api/v1/manga/${chapter.mangaId}/chapter/${chapter.sourceOrder}/page/${index}`
         if (route !== expectedPath) throw new SourceHostError('SOURCE_HOST_PROTOCOL')

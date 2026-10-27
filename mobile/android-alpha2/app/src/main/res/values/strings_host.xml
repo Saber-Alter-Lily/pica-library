@@ -50,4 +50,15 @@
     <string name="host_no_results">No matches on this page. Change the query, or end the session before changing source.</string>
     <string name="host_results_ready">Only results from your chosen source; no favorites or entire host catalogue were imported.</string>
     <string name="host_request_failed">Action incomplete. Check host version, address, network and this grant. No automatic retry or source switching; existing configuration and local content are retained.</string>
+    <string name="host_books_title">Saved external books</string>
+    <string name="host_books_scope">Only references you explicitly save on this device. No body pages or credentials are copied; opening this list never connects. Reading still needs a fresh grant for the same host, account and source.</string>
+    <string name="host_books_empty">No saved external books. Explicitly save a search result to keep its reference after restarting.</string>
+    <string name="host_books_count">%1$d–%2$d / %3$d</string>
+    <string name="host_books_storage_error">Saved book references cannot be read. The original file is retained; it will not be reset or overwritten automatically.</string>
+    <string name="host_books_full">All 500 saved-reference slots are in use. Remove a local reference before saving another; no existing selection was evicted.</string>
+    <string name="host_book_pin">Save reference to my library</string>
+    <string name="host_book_pinned">Reference saved on this device. This is not a download or a host favorite; no credentials were saved.</string>
+    <string name="host_book_authorize">Grant access to the same host/account and explicitly select the original source below, then return here to read. No request was sent.</string>
+    <string name="host_book_remove">Remove local reference</string>
+    <string name="host_book_remove_scope">Remove only this saved reference on this device? Local downloads and reading history are retained; host favorites and content are not changed.</string>
 </resources>

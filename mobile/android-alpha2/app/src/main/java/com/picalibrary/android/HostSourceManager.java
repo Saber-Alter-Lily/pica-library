@@ -17,9 +17,9 @@ final class HostSourceManager {
     private static final Map<String,HostSourceManager> INSTANCES=new HashMap<>();
     static synchronized HostSourceManager get(Context context){Context app=context.getApplicationContext();String key=app.getFilesDir().getAbsolutePath();HostSourceManager manager=INSTANCES.get(key);if(manager==null){manager=new HostSourceManager(app,null,SystemClock::elapsedRealtime);INSTANCES.put(key,manager);}return manager;}
     static synchronized void resetForTests(){for(HostSourceManager manager:INSTANCES.values())manager.end();INSTANCES.clear();}
-    private final Context context;private final HostConfigStore store;private final Handler main=new Handler(Looper.getMainLooper());private final LongSupplier clock;
+    private final Context context;private final HostConfigStore store;private final HostSavedBooks savedBooks;private final Handler main=new Handler(Looper.getMainLooper());private final LongSupplier clock;
     private HostConfigStore.Config config;private String storageError="";private HostHttp http;private Session active;
-    HostSourceManager(Context context,HostHttp http,LongSupplier clock){this.context=context.getApplicationContext();this.http=http;this.clock=clock;store=new HostConfigStore(this.context);try{config=store.load();}catch(Exception invalid){config=HostConfigStore.Config.empty();storageError="SOURCE_HOST_STORAGE";}}
+    HostSourceManager(Context context,HostHttp http,LongSupplier clock){this.context=context.getApplicationContext();this.http=http;this.clock=clock;store=new HostConfigStore(this.context);savedBooks=new HostSavedBooks(this.context);try{config=store.load();}catch(Exception invalid){config=HostConfigStore.Config.empty();storageError="SOURCE_HOST_STORAGE";}}
     synchronized HostConfigStore.Config config(){return config;}
     synchronized String storageError(){return storageError;}
     synchronized String selectedSource(){if(!hasSession()||active.sourceId==null)return "";return active.sourceId;}
@@ -60,9 +60,24 @@ final class HostSourceManager {
     static final class Book {
         final String id,title,source,urlDigest;final int remote;
         Book(Session session,HostProtocol.Manga manga)throws Exception {title=manga.title;source=manga.source;remote=manga.id;urlDigest=ReaderPolicy.hash(manga.url);id="hosted:"+session.host.id+":"+ReaderPolicy.hash(new JSONArray().put(session.principal).put(source).put(urlDigest).toString());}
+        Book(HostSavedBooks.Book saved){id=saved.comicId;title=saved.title;source=saved.sourceId;remote=saved.remoteId;urlDigest=saved.urlDigest;}
     }
-    void select(String comicId)throws Exception {
-        Session session=requireSession();Book book=book(session,comicId);verify(session,book);
+    List<HostSavedBooks.Book> savedBooks()throws Exception {return savedBooks.load();}
+    HostSavedBooks.Book saveBook(String comicId,boolean consent)throws Exception {
+        if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");Session session=requireSession();Book book=selected(session,comicId);
+        return session.commit(()->savedBooks.put(new HostSavedBooks.Book(book.id,session.host.id,session.principal,book.source,book.remote,book.urlDigest,book.title,session.host.label,java.time.Instant.now().toString())));
+    }
+    void removeSavedBook(String comicId,boolean consent)throws Exception {if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");savedBooks.remove(comicId);}
+    synchronized boolean canResumeSaved(HostSavedBooks.Book saved){try{Session session=requireSession();return saved.connectionId.equals(session.host.id)&&saved.principal.equals(session.principal)&&saved.sourceId.equals(session.sourceId);}catch(RuntimeException unavailable){return false;}}
+    void resumeSavedBook(String comicId,boolean consent)throws Exception {
+        if(!consent)throw error("SOURCE_HOST_CONSENT_REQUIRED");Session session=requireSession();HostSavedBooks.Book saved=null;for(HostSavedBooks.Book row:savedBooks.load())if(row.comicId.equals(comicId)){saved=row;break;}
+        if(saved==null||!canResumeSaved(saved))throw error("SOURCE_HOST_SCOPE_REQUIRED");Book book=new Book(saved);
+        session.commit(()->{if(!session.books.containsKey(book.id)&&session.books.size()>=128)throw error("SOURCE_HOST_BUSY");session.books.put(book.id,book);return null;});
+        select(session,book.id);
+    }
+    void select(String comicId)throws Exception {select(requireSession(),comicId);}
+    private void select(Session session,String comicId)throws Exception {
+        Book book=book(session,comicId);verify(session,book);
         HostProtocol.Bundle result=HostProtocol.bundle(rpc(session,"prepare",new JSONObject().put("input",new JSONObject().put("id",book.remote).put("fetchManga",true).put("fetchChapters",true))),true);
         match(book,result.manga);session.commit(()->{putChapters(session,book,result.chapters);session.selected.add(book.id);return null;});
     }

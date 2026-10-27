@@ -1,5 +1,13 @@
 # P2：真实用户宿主互操作门禁（未发布）
 
+## 运行后证据补记（冻结源码，原失败与执行前快照保留）
+
+`8045754b88c81cd692018915a2dfe779700d0ebd`/PR215：[真实Host40453173182](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40453173182)、job122020358508 PASS；[常规CI40453179583](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40453179583)双job PASS。原始976字节artifact ZIP SHA256 `04dfb6548fbf886ecc15bc3aabfada092382e22ec22ab5a94d37c1bc5a50bb00`及唯一result.json SHA256 `9472c18250cea4c67a480531e63fa99bc2a0525ac030fefd333065ebf94e88be`均已独立核验。两册元数据均实际为-1，取页后为2；八个固定操作、四页正文、明确保存、撤销和Host退出、全新Node进程离线四页/进度保留全部通过。
+
+Web56/56、Vitest2612PASS/14skip/330文件、真实Chromium61PASS；Android testDebugUnitTest/lintDebug/assembleRelease完成，现有CI不导出原生案例总数，故不编造。JM SDK R8 stack-map警告保留，不称零警告。没有固定私钥或发布。32成员工程复核ZIP SHA256 `753276df83d85412c40ac818aa4850469e000d6ad4c3c9e6006dbf09ce42bdde`，另经.NET验证31/31 payload哈希。不是第二真实平台、Windows GUI或Android真机验收。
+
+本补记在后续本地书目分支记录，不改变PR215冻结源码或原安装包，不借此声称后续原生书目代码已经通过该CI。
+
 ## 范围与授权
 
 用户已允许新独立Draft及临时云端互操作验证：固定Suwayomi v2.4.2366，仅使用合成图片/CBZ；不安装第三方源、不访问真实平台、不签发安装包、不合并/发布/OTA/部署，本机不启动Java、应用或监听。沿用已批准的目标持续隔离开发例外；Local Memory只读路由仍NOT_FOUND，未猜身份/重置DPAPI。

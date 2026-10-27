@@ -4,7 +4,7 @@
 
 ## 权威基线与产品定位
 
-- **正式产品和功能/视觉对照**：v0.5.0。**未发布工程候选**：PR #217 源码 \`af42b4d3ecafd1d51b3c2ef8aee7339c56c75921\`。**生产 main**：\`095d6910c34e00824e03b08a30af0ce4e708137e\`。本工作独立分支 \`codex/product-recovery-s0-s1-20261027\`，不修改历史 Draft/正式 Release/OTA。
+- **正式产品和功能/视觉对照**：v0.5.0。**未发布工程候选**：PR #217 源码 `af42b4d3ecafd1d51b3c2ef8aee7339c56c75921`。**生产 main**：`095d6910c34e00824e03b08a30af0ce4e708137e`。本工作独立分支 `codex/product-recovery-s0-s1-20261027`，不修改历史 Draft/正式 Release/OTA。
 - Pica Library 是**本地优先的漫画阅读器与个人书库**，不经营漫画平台或托管漫画正文、官方内容目录。无需账号/Host/网络即可导入、浏览、阅读本地文件和管理个人书库。
 - 来源是用户显式选用的外部能力：本地/文件夹/CBZ、WebDAV 及有实际适配的网盘、Pica、E-H/ExH、JM，以及用户选择的兼容 Host。**Suwayomi 不能变成强制依赖**。
 - 核心与具体来源**真正分离**是目标：最终纯核心包不内置 Pica/E-H/JM 可执行协议、账号 SDK、专属运行时或漫画正文；禁用开关、不带 JVM、抽出 TypeScript 文件不等于完成。历史身份映射和旧资料读取仍须兼容。
@@ -25,7 +25,7 @@
 
 严格区分：源码完成、单元测试、实际编译签名、真实模拟器/Chromium、真实手机、用户验收与正式发布。**跳过、未执行、失败不得计入通过**。阻断缺陷：P0 数据/凭据/身份越权或无法回退；P1 常用流程不可用、严重排版、卡死或升级失败。发布前 P0/P1 均为零。
 
-原 P0–P6/42 验收案例保留原编号、描述和历史证据，新 S0–S6 仅重新排列顺序；精确逐项映射在 [验收映射与新标准](PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。详细旧记录仍见 \`docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md\` 和 \`DEVELOPMENT_TASK_LOG.md\`，不能删掉。
+原 P0–P6/42 验收案例保留原编号、描述和历史证据，新 S0–S6 仅重新排列顺序；精确逐项映射在 [验收映射与新标准](PRODUCT_RECOVERY_ACCEPTANCE_MAP_20261027.md)。详细旧记录仍见 `docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md` 和 `DEVELOPMENT_TASK_LOG.md`，不能删掉。
 
 ## S0｜基线冻结、事实核对与风险登记（优先进行）
 

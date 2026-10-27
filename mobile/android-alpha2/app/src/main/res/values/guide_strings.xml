@@ -68,4 +68,6 @@
     <string name="advanced_guide_preference_preview">No edits yet. Save becomes available after you change a preference.</string>
     <string name="advanced_guide_notes_show">Show detailed reference notes</string>
     <string name="advanced_guide_notes_hide">Hide detailed reference notes</string>
+    <string name="advanced_guide_safety_short">This tour only highlights controls; it will not log in, download, or change settings.</string>
+    <string name="advanced_guide_interactive_hint_short">Open the feature page to follow the highlighted controls.</string>
 </resources>

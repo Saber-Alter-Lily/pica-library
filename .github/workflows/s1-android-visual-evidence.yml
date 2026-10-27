@@ -8,6 +8,8 @@ on:
       - '.github/workflows/s1-android-visual-evidence.yml'
       - 'mobile/android-alpha2/app/src/androidTest/java/com/picalibrary/android/S1AndroidVisualSmokeTest.java'
       - 'scripts/run-s1-android-visual-emulator.sh'
+      - 'mobile/android-alpha2/app/src/main/java/com/picalibrary/android/AdvancedGuideActivity.java'
+      - 'mobile/android-alpha2/app/src/main/res/**/guide_strings.xml'
   workflow_dispatch:
 
 permissions:

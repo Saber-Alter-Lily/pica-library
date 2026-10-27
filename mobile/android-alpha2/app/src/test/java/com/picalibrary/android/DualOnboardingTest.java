@@ -166,4 +166,28 @@ public class DualOnboardingTest {
         }
     }
 
+
+    @Test public void compactGuidePreservesFullSafetyInCollapsedHelp(){
+        OnboardingStore.advancedPosition(context,0);
+        try(ActivityController<AdvancedGuideActivity> controller=
+                Robolectric.buildActivity(AdvancedGuideActivity.class).setup()){
+            AdvancedGuideActivity page=controller.get();
+            android.view.View root=page.getWindow().getDecorView();
+            android.widget.TextView compact=(android.widget.TextView)root
+                .findViewWithTag("advanced-guide-safety-short");
+            android.widget.TextView longHelp=(android.widget.TextView)root
+                .findViewWithTag("advanced-guide-safety-long");
+            android.view.View notes=root.findViewWithTag("advanced-guide-notes-toggle");
+            android.widget.Button primary=(android.widget.Button)root.findViewWithTag("advanced-guide-open");
+            assertNotNull(compact);assertNotNull(longHelp);assertNotNull(notes);assertNotNull(primary);
+            assertTrue("primary guide must use themed accent",
+                primary.getCurrentTextColor()==Ui.PRIMARY);
+            assertTrue("short safety should not duplicate the full manual",
+                compact.getText().length()<longHelp.getText().length());
+            assertEquals(android.view.View.GONE,((android.view.View)longHelp.getParent()).getVisibility());
+            notes.performClick();
+            assertEquals(android.view.View.VISIBLE,((android.view.View)longHelp.getParent()).getVisibility());
+            assertEquals(0,OnboardingStore.advancedRead(context).size());
+        }
+    }
 }

@@ -35,7 +35,7 @@ for scale in 1.0 1.5; do
     set +e
     timeout --signal=TERM --kill-after=10s 150s adb shell am instrument -w -r \
         -e expectedFontScale "$scale" \
-        -e class com.picalibrary.android.S1AndroidVisualSmokeTest \
+        -e class com.picalibrary.android.S1AndroidVisualSmokeTest#captureFirstRealGuideScreenWithoutUserData \
         com.picalibrary.android.dev.test/androidx.test.runner.AndroidJUnitRunner > "$log" 2>&1
     exitcode=$?
     set -e

@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "project": "Saber-Alter-Lily/pica-library",
+  "updatedLocalDate": "2026-10-27",
+  "timezone": "America/Los_Angeles",
+  "purpose": "供网页端继续工作的精简交接入口；先读本文件，再按需读取完整日志和精确源码。",
+  "currentStatus": {
+    "engineering": "AUTOMATED_ENGINEERING_GATES_PASS",
+    "userAcceptance": "NOT_ACCEPTED_USER_REPORTED_MULTIPLE_ISSUES",
+    "userLatestFeedback": "有很多问题，但不准备在此对话继续推进，准备转到网页端。",
+    "specificNewSymptoms": "NOT_PROVIDED_IN_THIS_CHAT",
+    "projectComplete": false,
+    "localWork": "STOP_AFTER_DOCUMENTATION_HANDOFF",
+    "interpretation": "CI、构建和合成场景通过不能否定真实用户问题，也不能当作产品验收通过。不要自行把新问题归因于网络、缓存或用户操作。"
+  },
+  "productAuthority": {
+    "objective": "本地漫画阅读器和个人书库；自身不分发漫画正文，不经营漫画平台。用户可自选接入外部来源。",
+    "architecture": "阅读、书库、来源、标签、手势、推荐、同步和更新保持明确模块边界；优先复用维护中的开源组件，不重写已有排序或Visual模型来伪造进展。",
+    "updates": "保留一键升级和状态保护；旧v0.5.0首次过渡采用用户已同意的独立迁移入口，其后仍在应用内更新。",
+    "scope": "统一账本的7阶段/42案例保持完整；本文不是缩减目标或宣布全部完成。",
+    "legalBoundary": "阅读器定位和用户自选来源是产品/工程边界，不是法律免责保证。"
+  },
+  "applicationBaseline": {
+    "branch": "codex/concentrated-acceptance-20261027",
+    "sourceSha": "af42b4d3ecafd1d51b3c2ef8aee7339c56c75921",
+    "pullRequest": "https://github.com/Saber-Alter-Lily/pica-library/pull/217",
+    "pullRequestStateAtHandoff": "DRAFT_OPEN_UNMERGED",
+    "baseSourceSha": "f5be335de553d3e394bc828e8e723198ef2ce61c",
+    "observedMain": "095d6910c34e00824e03b08a30af0ce4e708137e",
+    "documentationBranch": "codex/web-handoff-20261027",
+    "documentationIsNotNewApp": true,
+    "important": "应用基线固定af42b4d。交接分支仅更新文档/记录，不代表另一个已构建或已验收的应用版本；不要误读默认main或最新文档提交为新安装包源码。"
+  },
+  "engineeringEvidence": {
+    "ordinaryCi": {
+      "url": "https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40478267605",
+      "result": "WEB_DESKTOP_AND_ANDROID_PASS"
+    },
+    "concentratedCi": {
+      "url": "https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40478291436",
+      "result": "10_OF_10_JOBS_PASS",
+      "sourceSha": "af42b4d3ecafd1d51b3c2ef8aee7339c56c75921"
+    },
+    "nodeUnit": {
+      "files": 333,
+      "cases": 2649,
+      "linuxPassed": 2635,
+      "linuxConditionalSkipped": 14,
+      "windowsPassed": 2648,
+      "windowsConditionalSkipped": 1,
+      "conditionalCasesHavePassingOppositePlatformCounterparts": true,
+      "warning": "原始Vitest JSON顶层passed计数把skip也计入；以上来自逐条assertionResults，不要写成每个平台2649项全部执行通过。"
+    },
+    "webSyntax": "56_OF_56_PASS",
+    "realChromium": "61_PASS_NOT_PHYSICAL_PHONE",
+    "nativeJUnit": {
+      "files": 60,
+      "tests": 471,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "compileLintR8AndFixedSigningApksigner": "PASS",
+      "warnings": "固定JM SDK仍有R8 stack-map警告，不是零警告证明。"
+    },
+    "actualWindowsSyntheticScenarios": [
+      "roundtrip: PASS",
+      "guardrails: PASS",
+      "request-abort: PASS",
+      "hash-mismatch: PASS",
+      "health-rollback: PASS",
+      "launch-rollback: PASS"
+    ],
+    "runtimeScope": "云端临时Windows、合成资料和实际浏览器/当前helper。不是用户正式数据库、真实来源、物理断电或OEM/手机验收。",
+    "independentHandoffVerification": "Node ZIP/字节核对通过；独立.NET ZipArchive和SHA256验证15个payload及外层哈希通过。"
+  },
+  "installables": {
+    "windowsVersion": "0.5.0-postrc.af42b4d3ecaf",
+    "windowsProfile": "%LOCALAPPDATA%\\Pica Library Post Stable RC",
+    "windowsFormalProfileNotUsed": "%LOCALAPPDATA%\\Pica Library",
+    "core": {
+      "filename": "Pica-Library-Concentrated-Windows-x64.zip",
+      "sha256": "9c55fc14455ce390951f900fbfdc18b88a01fbf344fa1e791239a2d10daee7bc",
+      "files": 113,
+      "jmRuntimeFiles": 0
+    },
+    "withJm": {
+      "filename": "Pica-Library-Concentrated-With-JM-Windows-x64.zip",
+      "sha256": "4eec9499c75cd58d1f4a9916f58a596e365097498341b155b5165cc8c5442193",
+      "files": 280,
+      "jmRuntimeFiles": 167
+    },
+    "android": {
+      "filename": "Pica-Library-Concentrated-Android-Dev89.apk",
+      "packageName": "com.picalibrary.android.dev",
+      "label": "Pica Library Dev",
+      "versionCode": 89,
+      "versionName": "0.5.0-postrc.af42b4d3ecaf-dev-pr35",
+      "sha256": "e1c05123a6b4763bb57cf0b8721a05de29370670d1f01d39388e560098dfb580",
+      "certificateSha256": "64fb87dc7d8bd6bc7b2cec92cc8c83fad3afe8cfb07591a2e53d53cbd3ab2f9d",
+      "verificationBoundary": "本机Node读取实际binaryXML及v2公开证书；完整加密验签权威为同源码CI的apksigner。未在本机安装或运行。",
+      "upgradeRule": "只覆盖已有Dev；签名不一致就停止，不卸载、不清数据来绕过。"
+    },
+    "cloudWindowsArtifact": {
+      "name": "Concentrated-Windows-Candidate",
+      "url": "https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40478291436/artifacts/12722072645",
+      "expiresAtUtc": "2026-11-03T09:25:31Z",
+      "contains": "同源码core和with-JM两个完整包，二选一，不混合程序文件。"
+    },
+    "cloudAndroidArtifact": {
+      "name": "Concentrated-Android-Dev89",
+      "url": "https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40478291436/artifacts/12721954221",
+      "expiresAtUtc": "2026-11-03T09:24:48Z"
+    },
+    "artifactAccess": "Actions下载通常需要GitHub登录/已连接账号；到期后不能把另一个包冒充同源。本文本交接独立于临时artifact，源码和SHA已记录。",
+    "localCombinedHandoff": {
+      "filename": "Pica-Library-Dev89-Acceptance-af42b4d3ecaf.zip",
+      "bytes": 117397651,
+      "members": 16,
+      "sha256": "9a0f5df1d4436ee05bf7686777233f889f4a1669181d1ad16ceaea5608a29f49",
+      "cloudAccessible": false,
+      "contents": "三份安装包、日常/高级验收说明、反馈表、实际证据JSON、许可与SHA清单。只保存在用户本地，不要假设网页端能读取本地C盘路径。"
+    }
+  },
+  "moduleProgress": [
+    {
+      "module": "本地书库与Reader",
+      "implemented": "文件夹/CBZ预览确认后复制到自有存储；复用统一Reader、进度/设置/返回位置；来源无关续读投影；不需要来源账号。",
+      "notProven": "真实SAF/OEM/触控、实际大库和用户日常体验不能由合成/Chromium证明。用户本轮总体反馈为问题很多。"
+    },
+    {
+      "module": "可选来源与JM/Host",
+      "implemented": "核心Windows不附带JM JVM；可选JM沿用MIT SDK v1.1.12。用户Host默认停用，启用/诊断与阅读授权分开；两端已接固定操作的选源/搜索/原Reader/明确单章本地保存。",
+      "androidSavedReferences": "HostSavedBooks是本机引用存储，不是第二目录或下载器；500条/2MiB、AtomicFile、明确保存/移出、同Host/账号主体/来源重新授权复核；不删正文或历史。",
+      "remaining": "完整Host元数据/私人标签/收藏/跨端同步/后台续传恢复、第二真实平台完整链路、任意扩展市场/信任生态均未完成。前台单章复制不等于后台下载恢复。"
+    },
+    {
+      "module": "标签与AI方案交换",
+      "implemented": "纯Tags模块和原生规则模块；来源raw事实与个人参与范围分层；全开/全关/选定、私人手工绑定与平台映射分开；Desktop AI导出→返回JSON→预览→明确保存→有限撤销。",
+      "important": "手工标签不是未见作品分类器；关闭标签参与不等于同时关闭作者/分类/关联/画风信号；未知来源ID不应变成Pica推荐种子。",
+      "remaining": "用户实际操作负担、AI真实往返、规则跨端冲突与一致性仍待验收。Android没有独立AI文件导入器承诺；Host标签未完整接入。"
+    },
+    {
+      "module": "Issue #199 / #200",
+      "issue199": "可选BLOCK/LESS统计/语义图显示投影；不改原始收藏/计数/偏好；不是删除漫画，也不是重算画像。",
+      "issue200": "低频信号全量检索、NFKC/OpenCC显示检索、原始来源键、未知基准/暂存调整；后续私人标签/映射用于可控补充。",
+      "remaining": "上游标签稀疏、解释不足和人工微调负担未被证明解决。萌娘等仅候选taxonomy参考，未完成内容/许可/映射审查，不得宣称已全量导入。此工作未据此关闭issue；网页端需查询其最新外部状态。"
+    },
+    {
+      "module": "推荐与Visual",
+      "implemented": "读已有cycle/batch与显式生成分离；模块化查询/命令/审计/排序端口；手机离线只按缓存baseline作增量，不重复加权或假装有新召回。",
+      "remaining": "真实反馈/规则/重连合并及解释体验仍待用户验证。不得为了本次交接重建Visual向量、训练新模型、切LIVE或改冻结排序权重。"
+    },
+    {
+      "module": "引导、手势与跨端",
+      "implemented": "日常/高级两套引导；阅读手势开关/倍率；二维码/手填配对、配对结果与后台同步分开；LAN明确启用、WebDAV与本地删除目标分开。",
+      "remaining": "物理手机/OEM/SAF/真实LAN-WebDAV离线往返与冲突、手势冲突/流畅度仍需实测；不默认复制来源长期秘密，Host统一同步未完成。"
+    },
+    {
+      "module": "一键升级和运行组件",
+      "implemented": "复用同一完整事务引擎，核心↔可选JM切换及拒绝/取消/哈希/启动/健康回滚有当前六场景工程证据；旧首跳采用已同意的独立迁移路线。",
+      "remaining": "旧Dev86精确前驱artifact缺失仍HOLD。真实旧资料/公开分发信任/OEM/物理断电不是当前合成证明；没有部署迁移、修改正式OTA或发布新稳定版。"
+    }
+  ],
+  "historicalEvidenceScopes": [
+    { "pr": 213, "sourceSha": "40b3a555cb0dcb1732fe0f80ba5cb152d1fa136a", "role": "冻结Dev88成品与六场景工程证据，不是当前用户验收。" },
+    { "pr": 214, "sourceSha": "5f4b7ead0fcd4faff0974450adf65bdc910717f2", "run": 40444592760, "role": "T3七场景通过；旧恢复仅受支持headless CI范围，不是旧交互默认LAN/用户资料/公开发布认证。" },
+    { "pr": 215, "sourceSha": "8045754b88c81cd692018915a2dfe779700d0ebd", "run": 40453173182, "role": "官方Suwayomi v2.4.2366+合成内置LocalSource实联/保存/撤销/新进程离线四页；不是第二真实Provider或原生手机实联。" },
+    { "pr": 216, "sourceSha": "f5be335de553d3e394bc828e8e723198ef2ce61c", "run": 40459202415, "role": "手机明确保存的书目引用；完整双端CI通过，无该次固定签名安装包。" }
+  ],
+  "failureHistory": [
+    { "source": "0a8a0dd", "run": 40473230012, "result": "FAIL", "reason": "六项旧精确契约失配；原始失败保留，修正后纯模块/签名/权限门禁仍受检查。" },
+    { "source": "fe84055", "run": 40474606748, "result": "9_OF_10_OVERALL_FAIL", "reason": "产品回滚及合成状态核对通过，但CI清理身份断言失败；原始null-path-vs-PID复用原因无法由旧记录判定。" },
+    { "source": "af42b4d", "run": 40478291436, "result": "10_OF_10_PASS", "reason": "CI清理三态和实际函数模拟回归；身份未知不强杀/不算退出，外部路径仍拒绝，原等待/产品超时不变。当前实跑所有观察PID最终确认不存在，未观察到unidentified行；不倒推旧失败的精确根因。" }
+  ],
+  "webContinuation": {
+    "firstAction": "先确认用户具体遇到的页面/设备/操作/症状及最小脱敏复现；用户未在此对话给出这些详情。不要要求他重跑全部清单，也不要以CI已绿否定反馈。",
+    "sourceRule": "从应用af42b4d或独立后续分支继续，不从默认main误判当前进展，不把文档分支当新应用，不盲合并历史层叠PR。",
+    "priorities": ["按用户真实问题定位阻断路径", "核对7阶段/42案例真实缺口与已实现链路", "有限修复并补对应回归", "统一验收而非无止境扩展局部模块"],
+    "readAtApplicationCommit": [
+      "docs/MODULAR_LOCAL_READER_ARCHITECTURE.md",
+      "docs/LOCAL_READER_DELIVERY_LEDGER.zh-CN.md",
+      "docs/CORE_READER_SOURCE_BOUNDARY.md",
+      "docs/ISSUE_199_200_PREFERENCE_DISPLAY_SEARCH.md",
+      "docs/TAG_PARTICIPATION_PRIVATE_LABELS.md",
+      "docs/AI_TAG_PROFILE_EXCHANGE.md",
+      "docs/ANDROID_USER_HOST_READER.md",
+      "docs/NATIVE_HOST_PERSONAL_LIBRARY.md",
+      "docs/NEXT_CONCENTRATED_ACCEPTANCE_CHECKLIST.zh-CN.md"
+    ],
+    "historicalTextWarning": "这些源码文档/46万字节任务日志含多个历史快照，旧NOT_RUN和旧下一步不能覆盖本交接的最终工程记录；本交接的工程PASS也不能覆盖用户未验收/报告问题这一事实。",
+    "access": "本文件和本分支任务日志可经GitHub读取；用户本地C/G盘、私有数据库和本地验收ZIP不能凭GitHub连接读取。"
+  },
+  "preservedBoundaries": {
+    "mainMerged": false,
+    "tagOrReleaseCreated": false,
+    "officialOtaChanged": false,
+    "deployedOrInstalledLocally": false,
+    "productionDataAccessedOrChanged": false,
+    "privateSigningKeyDownloaded": false,
+    "decompiledArtifactsUploaded": false,
+    "historicalSigningAuthorizationIsNotNewReleaseAuthorization": true,
+    "newPermissions": "后续有实质扩大动作再由用户授权；本轮交接只更新文档，不构建/签名/发布/部署。"
+  }
+}

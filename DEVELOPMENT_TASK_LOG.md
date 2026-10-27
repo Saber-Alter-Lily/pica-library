@@ -1,5 +1,17 @@
 # Pica Library Development Task Log
 
+## 网页端交接与本对话停止（2026-10-27）— 当前阅读入口
+
+先读 [`docs/WEB_HANDOFF_LATEST.json`](docs/WEB_HANDOFF_LATEST.json)。本日志约466KB，网页工具可能截断；精简交接独立记录应用源码/CI/下载入口/有效期/哈希、模块进展、未完项和权限边界。此文档分支不是新应用版本。
+
+**用户最新反馈：“有很多问题”，不准备在此对话继续，转网页端推进。产品验收状态为 NOT_ACCEPTED；具体新症状尚未提供，不得猜测或以CI通过否定用户反馈。** 本轮仅交接文档，停止本地功能开发、测试、构建及部署；不要在这里继续追问或要求整套重测。网页端先根据用户提供的具体症状定位最小复现，再有限推进。
+
+应用基线固定 `codex/concentrated-acceptance-20261027` / `af42b4d3ecafd1d51b3c2ef8aee7339c56c75921`，Draft [PR217](https://github.com/Saber-Alter-Lily/pica-library/pull/217) 未合并。实际 [常规CI40478267605](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40478267605) 双端PASS，[集中40478291436](https://github.com/Saber-Alter-Lily/pica-library/actions/runs/40478291436)10/10PASS。Linux2635PASS/14条件skip、Windows2648PASS/1条件skip，逐条核对条件案例均由另一平台通过；Web56/Chromium61、实际原生JUnit60文件/471项通过；Windows/APK下载后独立核对，外层ZIP另由.NET验证15/15payload与SHA。**这些仅是工程自动证据，不是实机或用户接受。**
+
+Dev89三份成品及Actions入口/到期时间见精简交接；本机完整验收ZIP未上传云端，网页端不能读取本地C/G盘链接。Windows继续隔离`Pica Library Post Stable RC`，Android为`com.picalibrary.android.dev`/89/原固定证书；不卸载清数据来绕过签名，不改正式目录/数据库。没有合并main、tag/Release、正式OTA、安装/部署、私钥下载或正式数据访问。PR213..216冻结。
+
+仍缺完整Host元数据/私人标签/收藏/跨端同步/后台恢复、第二真实来源、物理手机/OEM/SAF/手势与真实AI/用户issue验收。#199显示投影与#200检索/可控标签方案不等于解决上游标签稀疏和操作负担；无自动issue关闭。7阶段/42案例与完整阅读器目标保持OPEN。下文保留原始过程，包括旧失败/旧NOT_RUN，不再作为当前“下一步”的权威。
+
 ## Concentrated Dev89 — actual packages verified, teardown-only gate correction (2026-10-27 local)
 
 Exactfe84055f4202b2c2917d0d9ee4fd8992fedd2b32 ordinaryCI40474512657 both jobsPASS. Dedicated40474606748 terminal9/10PASS, overallFAIL: source/Windowsunit/actualWindows/Androidsigning and five runtime scenesPASS; launch-rollback failed only in finally/stopOwned. Original result has actualHelperRollback=true, exactApplicationTree=true, selectedStateCanaries=true and no browser/source boundary events, but teardownError='Refuse process outside exact owned root'. Preserve overallFAIL, not waive cleanup. Raw stack is ownedPid called after process.kill at the existing second wait. Original generic assertion omitted PID/path-presence details; it cannot distinguish a transient missing CIM executable path from PID reuse/foreign process, so no retrospective exact-cause claim.
